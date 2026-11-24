@@ -7,7 +7,7 @@ export type ToolStatus = 'running' | 'passed' | 'failed' | 'timeout' | 'skipped'
 
 const ROW_ICONS = {
   running: <LoaderCircleIcon className="dshx:size-3.5 dshx:animate-spin dshx:text-muted-foreground" />,
-  passed: <CheckIcon className="dshx:size-3.5 dshx:text-muted-foreground" />,
+  passed: <CheckIcon className="dshx:size-3.5 dshx:text-success" />,
   failed: <XIcon className="dshx:size-3.5 dshx:text-destructive" />,
   timeout: <ClockAlertIcon className="dshx:size-3.5 dshx:text-destructive" />,
   skipped: <MinusIcon className="dshx:size-3.5 dshx:text-muted-foreground" />,

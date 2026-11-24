@@ -2,42 +2,45 @@ import * as React from 'react'
 import { cn } from '../../lib/utils.js'
 import type { LucideIcon } from '../../icons.js'
 
-/** Hues an agent, model or provider can wear. Semantic tokens only, so both themes work. */
+/**
+ * Hues an agent, model or provider can wear. The keys are the historical names; each draws an identity tone
+ * (DESIGN.md › Colour roles 5), never a status hue, so an agent can never read as Failed or Ready.
+ */
 export type AgentTone = 'chart-1' | 'chart-2' | 'chart-3' | 'chart-4' | 'chart-5' | 'violet' | 'teal' | 'muted'
 
 /** Soft tile: tinted background with the hue as text. */
 export const agentToneSoft = {
-  'chart-1': 'dshx:bg-chart-1/15 dshx:text-chart-1',
-  'chart-2': 'dshx:bg-chart-2/15 dshx:text-chart-2',
-  'chart-3': 'dshx:bg-chart-3/15 dshx:text-chart-3',
-  'chart-4': 'dshx:bg-chart-4/15 dshx:text-chart-4',
-  'chart-5': 'dshx:bg-chart-5/15 dshx:text-chart-5',
-  violet: 'dshx:bg-violet/15 dshx:text-violet',
-  teal: 'dshx:bg-teal/15 dshx:text-teal',
+  'chart-1': 'dshx:bg-identity-7/15 dshx:text-identity-7',
+  'chart-2': 'dshx:bg-identity-5/15 dshx:text-identity-5',
+  'chart-3': 'dshx:bg-identity-3/15 dshx:text-identity-3',
+  'chart-4': 'dshx:bg-identity-4/15 dshx:text-identity-4',
+  'chart-5': 'dshx:bg-identity-6/15 dshx:text-identity-6',
+  violet: 'dshx:bg-identity-2/15 dshx:text-identity-2',
+  teal: 'dshx:bg-identity-1/15 dshx:text-identity-1',
   muted: 'dshx:bg-muted dshx:text-muted-foreground',
 } as const satisfies Record<AgentTone, string>
 
 /** Solid fill in the hue (tiny squares, bars, dots). */
 export const agentToneSolid = {
-  'chart-1': 'dshx:bg-chart-1',
-  'chart-2': 'dshx:bg-chart-2',
-  'chart-3': 'dshx:bg-chart-3',
-  'chart-4': 'dshx:bg-chart-4',
-  'chart-5': 'dshx:bg-chart-5',
-  violet: 'dshx:bg-violet',
-  teal: 'dshx:bg-teal',
+  'chart-1': 'dshx:bg-identity-7',
+  'chart-2': 'dshx:bg-identity-5',
+  'chart-3': 'dshx:bg-identity-3',
+  'chart-4': 'dshx:bg-identity-4',
+  'chart-5': 'dshx:bg-identity-6',
+  violet: 'dshx:bg-identity-2',
+  teal: 'dshx:bg-identity-1',
   muted: 'dshx:bg-muted-foreground',
 } as const satisfies Record<AgentTone, string>
 
 /** Coloured glow under floating labels (cursors, toasts). */
 export const agentToneGlow = {
-  'chart-1': 'dshx:shadow-lg dshx:shadow-chart-1/40',
-  'chart-2': 'dshx:shadow-lg dshx:shadow-chart-2/40',
-  'chart-3': 'dshx:shadow-lg dshx:shadow-chart-3/40',
-  'chart-4': 'dshx:shadow-lg dshx:shadow-chart-4/40',
-  'chart-5': 'dshx:shadow-lg dshx:shadow-chart-5/40',
-  violet: 'dshx:shadow-lg dshx:shadow-violet/40',
-  teal: 'dshx:shadow-lg dshx:shadow-teal/40',
+  'chart-1': 'dshx:shadow-lg dshx:shadow-identity-7/40',
+  'chart-2': 'dshx:shadow-lg dshx:shadow-identity-5/40',
+  'chart-3': 'dshx:shadow-lg dshx:shadow-identity-3/40',
+  'chart-4': 'dshx:shadow-lg dshx:shadow-identity-4/40',
+  'chart-5': 'dshx:shadow-lg dshx:shadow-identity-6/40',
+  violet: 'dshx:shadow-lg dshx:shadow-identity-2/40',
+  teal: 'dshx:shadow-lg dshx:shadow-identity-1/40',
   muted: 'dshx:shadow-lg dshx:shadow-muted-foreground/40',
 } as const satisfies Record<AgentTone, string>
 
