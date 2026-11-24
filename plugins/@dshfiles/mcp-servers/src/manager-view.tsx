@@ -14,7 +14,6 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { EmptyState, Page, PageSection } from '@dshfiles/plugin-ui/components/page'
-import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { useApi } from '@dshfiles/dshx/client'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
@@ -29,6 +28,7 @@ import { McpServerFormModel, type ServerFormValues } from './server-form.js'
 import { ServerSelectionModel } from './server-selection.js'
 import { useServerActions, useServerSnapshot } from './server-queries.js'
 import { McpServerStatusModel } from './server-status.js'
+import { ServerStatusMark } from './server-status-mark.js'
 
 interface EditorState {
   readonly key: number
@@ -292,13 +292,6 @@ interface ServerItemProps {
   readonly onSignOut: () => void
 }
 
-/** Server states on the shared vocabulary; the lifecycle line keeps the exact client state as text. */
-const serverStatus = (server: ServerView): WorkStatus => {
-  if (server.clientLifecycle === 'start-failed') return 'failed'
-  if (server.enabled && (server.oauth === 'needs-sign-in' || server.configuration !== 'ready')) return 'needs-you'
-  if (server.clientLifecycle === 'starting') return 'working'
-  return 'idle'
-}
 
 const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
   const processText = McpServerStatusModel.localProcessText({ server, t })
@@ -307,8 +300,6 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
   return (
     <EntityRow
       role="listitem"
-      status={serverStatus(server)}
-      statusDecorative
       selected={props.selected}
       leading={
         <input
@@ -332,7 +323,12 @@ const ServerItem = ({ t, server, ...props }: ServerItemProps): JSX.Element => {
           className="dshx:size-3.5 dshx:shrink-0 dshx:accent-[var(--color-info)]"
         />
       }
-      heading={<span className="dshx:font-medium">{server.name}</span>}
+      heading={
+        <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+          <ServerStatusMark mark={McpServerStatusModel.lifecycleMark(server)} />
+          <span className="dshx:font-medium">{server.name}</span>
+        </span>
+      }
       meta={
         <>
           {server.enabled ? null : <Badge variant="muted">{t('disabled')}</Badge>}
