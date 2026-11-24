@@ -6,7 +6,8 @@ import { CheckIcon, ChevronDownIcon, LaptopIcon, PlusIcon, SearchIcon, ServerIco
 import { queryOptions, useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { HostSummary, RuntimeSummary } from '../api.js'
-import { HostDialog, hostState, StatusDot } from './hosts-dialog.js'
+import { HostDialog, StatusDot } from './hosts-dialog.js'
+import { HostStatus, type HostState } from './host-status.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { CloneProjectDialog } from './clone-project-dialog.js'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
@@ -22,7 +23,7 @@ const chipClassName = 'dshx:h-7 dshx:gap-1.5 dshx:px-2 dshx:text-sm dshx:font-me
 const HostMenuRow = (props: {
   readonly host: HostSummary | undefined
   readonly runtime: RuntimeSummary
-  readonly state: ReturnType<typeof hostState>
+  readonly state: HostState
   readonly selected: boolean
   readonly onSelect: () => void
 }) => {
@@ -103,7 +104,7 @@ export const HostChip = (props: { readonly api: MultiHostClient; readonly unavai
   }
   const liveState = (runtime: RuntimeSummary | undefined) => {
     const ping = pings[pickable.findIndex(item => item.id === runtime?.id)]?.data
-    if (ping === undefined) return hostState(runtime)
+    if (ping === undefined) return HostStatus.state(runtime)
     if (ping.ok) return { tone: 'online' as const, label: `Connected · ${ping.ms} ms` }
     return { tone: 'error' as const, label: failedHop(runtime)?.label ?? ping.message }
   }

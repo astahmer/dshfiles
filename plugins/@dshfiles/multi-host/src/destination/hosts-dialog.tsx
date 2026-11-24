@@ -11,10 +11,9 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { CheckIcon, ChevronDownIcon, CopyIcon, PlusIcon, SearchIcon, ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
-import type { RuntimeSummary } from '../api.js'
 import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { HealthDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
-import { hostHealth, hostState } from './host-status.js'
+import { HostStatus } from './host-status.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 import { setHostDestination } from './state.js'
@@ -31,12 +30,14 @@ export type HostDraft = {
 const WEIGHTS = [1, 2, 4] as const
 
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
-  new Error(result.message === undefined ? 'The host did not answer. Check it is running, then retry.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
-
-export { hostState } from './host-status.js'
+  new Error(
+    result.message === undefined
+      ? 'The host did not answer. Check it is running, then retry.'
+      : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`,
+  )
 
 /** The host's state as a shared status glyph; the text beside it says which state. */
-export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => <HealthDot health={hostHealth(props.tone)} />
+export const StatusDot = (props: { readonly tone: 'online' | 'idle' | 'error' }) => <HealthDot health={HostStatus.health(props.tone)} />
 
 const HostForm = (props: { readonly api: MultiHostClient; readonly initial: HostDraft; readonly onDone: () => void; readonly onCancel: () => void }) => {
   const { api } = props

@@ -47,7 +47,7 @@ import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/p
 import { Fragment, useRef, useState, type ReactNode } from 'react'
 import { multiHostApi, type HostSummary, type ResourcePoolEntry, type RuntimeSummary } from '../api.js'
 import { remoteDirectoryPicker } from './remote-folders.js'
-import { HostDialog, hostState, type HostDraft } from './hosts-dialog.js'
+import { HostDialog, type HostDraft } from './hosts-dialog.js'
 import { moveHostId, shiftHostId } from './host-order.js'
 import { hostRowActions, type HostRowVerb } from './host-row-actions.js'
 import { CheckoutSyncDialog } from './checkout-sync-dialog.js'
@@ -56,19 +56,26 @@ import { ConnectionDiagnostics } from './connection-diagnostics.js'
 import { ConnectionTestSteps } from './connection-test-steps.js'
 import { FleetUpdateDialog } from './fleet-update-dialog.js'
 import { hostTargetLabel } from './host-target.js'
-import { hostHealth } from './host-status.js'
+import { HostStatus } from './host-status.js'
 import { HostsHeader } from './hosts-header.js'
 import { LinkThisMachineDialog, PairMachineDialog } from './link-machines.js'
 import { linkBackNeedsPlainHttpConsent } from './link-urls.js'
 import { DisconnectGrace } from './disconnect-grace.js'
 import { multiHostKeys, multiHostQueries, type MultiHostClient } from './queries.js'
 
+/** One entry in a host row's menu. */
+type HostMenuItem = { readonly label: string; readonly icon: ReactNode; readonly onSelect: () => void; readonly disabled?: boolean }
+
 type DirectoryData = { readonly hosts: readonly HostSummary[]; readonly runtimes: readonly RuntimeSummary[] }
 
 const blankDraft: HostDraft = { name: '', sshTarget: '', remoteHome: '' }
 
 const failure = (result: { readonly ok: boolean; readonly code?: string; readonly message?: string }): Error =>
-  new Error(result.message === undefined ? 'The host did not answer. Check it is running, then retry.' : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`)
+  new Error(
+    result.message === undefined
+      ? 'The host did not answer. Check it is running, then retry.'
+      : `${result.message}${result.code === undefined ? '' : ` (${result.code})`}`,
+  )
 
 const ResourceUsage = (props: { readonly hostName: string; readonly resource: ResourcePoolEntry }) => {
   if (!props.resource.probe.ok) {
@@ -139,8 +146,8 @@ const HostRow = (props: {
 }) => {
   const { api, host, runtime } = props
   const queryClient = useQueryClient()
-  const state = DisconnectGrace.use(hostState(runtime))
-  const health = hostHealth(state.tone)
+  const state = DisconnectGrace.use(HostStatus.state(runtime))
+  const health = HostStatus.health(state.tone)
   const outdatedVersion = ConnectionDiagnostics.versionMismatch({ localVersion: props.localVersion, remoteVersion: runtime?.identity?.dshVersion })
   const [confirming, setConfirming] = useState(false)
   const [popupBlocked, setPopupBlocked] = useState(false)
@@ -227,7 +234,7 @@ const HostRow = (props: {
   const actions = hostRowActions({ kind: host.connector.kind, failed: runtime?.lastError !== undefined })
   const afterClose = useRef<(() => void) | null>(null)
   const noRuntime = runtime === undefined
-  const menuItems: Record<HostRowVerb, { readonly label: string; readonly icon: ReactNode; readonly onSelect: () => void; readonly disabled?: boolean }> = {
+  const menuItems = {
     open: { label: 'Open host', icon: <ExternalLinkIcon />, onSelect: openHost, disabled: noRuntime || remoteView.isPending },
     'copy-link': {
       label: 'Copy host link',
@@ -250,7 +257,7 @@ const HostRow = (props: {
     'move-up': { label: 'Move up', icon: <ChevronUpIcon />, onSelect: () => props.onMove('up'), disabled: props.index === 0 },
     'move-down': { label: 'Move down', icon: <ChevronDownIcon />, onSelect: () => props.onMove('down'), disabled: props.index === props.count - 1 },
     remove: { label: 'Remove…', icon: <Trash2Icon />, onSelect: () => setConfirming(true) },
-  }
+  } satisfies Record<HostRowVerb, HostMenuItem>
   const target = (
     <Badge variant="outline" className="dshx:shrink-0 dshx:font-mono dshx:text-2xs">
       {hostTargetLabel(host)}
@@ -441,7 +448,7 @@ const HostRow = (props: {
               }}
             >
               {actions.menu.map(verb => {
-                const item = menuItems[verb]
+                const item: HostMenuItem = menuItems[verb]
                 return (
                   <Fragment key={verb}>
                     {verb === 'hide' || verb === 'remove' ? <DropdownMenuSeparator /> : null}
