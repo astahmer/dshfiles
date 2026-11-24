@@ -21,10 +21,10 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
-import { KIND_LABEL, planLabel, routedKind } from './account-labels.js'
+import { AccountLabels, KIND_LABEL } from './account-labels.js'
 import type { AccountOrderDirection, AccountProfile, AccountsUsage } from './api.js'
 import { ActionHint, ProviderGlyph } from './panel-primitives.js'
-import { accountConnectionStatus, type AccountSection } from './account-connection-status.js'
+import { AccountConnection, type AccountSection } from './account-connection-status.js'
 import { HealthDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
 
 /** Selection is cosmetic; ordering always uses the full canonical provider group. */
@@ -52,8 +52,8 @@ export const AccountGroup = (props: {
           if (!props.visibleIds.includes(profile.instanceId)) return null
           const selected = profile.instanceId === props.selectedId
           const open = expanded[profile.instanceId] ?? (selected && props.activeSection === 'models')
-          const status = accountConnectionStatus(profile, props.usage ?? null)
-          const identity = [profile.plan === null ? null : planLabel(profile.plan), profile.identity].filter(Boolean).join(' · ')
+          const status = AccountConnection.status(profile, props.usage ?? null)
+          const identity = [profile.plan === null ? null : AccountLabels.planLabel(profile.plan), profile.identity].filter(Boolean).join(' · ')
           const signIn = profile.signedIn ? 'Credentials available' : 'Not signed in'
           return (
             <li
@@ -108,7 +108,7 @@ export const AccountGroup = (props: {
                 )}
                 <Switch
                   aria-label={
-                    routedKind(profile.kind)
+                    AccountLabels.routedKind(profile.kind)
                       ? `${profile.enabled ? 'Hide' : 'Show'} ${profile.displayName} in the model picker`
                       : `${profile.enabled ? 'Disable' : 'Enable'} quota tracking for ${profile.displayName}`
                   }

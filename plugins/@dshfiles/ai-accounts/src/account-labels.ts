@@ -35,7 +35,7 @@ export const KIND_GROUPS: readonly AccountProfile['kind'][] = [
 ]
 
 /** Kinds that publish a model route; the rest only track identity and quota. */
-export const routedKind = (kind: AccountProfile['kind']): boolean => kind !== 'cursor'
+const routedKind = (kind: AccountProfile['kind']): boolean => kind !== 'cursor'
 
 export const STATE_LABEL = {
   healthy: 'Authenticated',
@@ -62,7 +62,7 @@ export const DISTRIBUTION_HINT = {
 } satisfies Record<AccountsFile['distribution'], string>
 
 /** What connects a new account, for the notice the rail shows after creating one. */
-export const connectHintFor = (kind: AccountProfile['kind']): string => {
+const connectHintFor = (kind: AccountProfile['kind']): string => {
   if (kind === 'codex') return 'Sign in with the copied command (Session section) and the identity fills itself in.'
   if (kind === 'claude') return 'Sign in with the copied command (Session section); quota and identity fill themselves in.'
   if (kind === 'cursor') return 'Run cursor-agent login; this account tracks quota while sessions use the Cursor Agent runtime.'
@@ -78,11 +78,18 @@ export const connectHintFor = (kind: AccountProfile['kind']): string => {
  * A provider's plan as a plain name. Providers report either a name written for people ("Pro+", "ChatGPT Team"),
  * kept as it is, or an id ("individual-pro", "pro_200"), which reads as words here: "Individual Pro", "Pro 200".
  */
-export const planLabel = (plan: string): string => {
+const planLabel = (plan: string): string => {
   const trimmed = plan.trim()
   if (!/^[a-z0-9]+(?:[-_][a-z0-9]+)*$/u.test(trimmed)) return trimmed
   return trimmed
     .split(/[-_]/u)
     .map(word => `${word.charAt(0).toUpperCase()}${word.slice(1)}`)
     .join(' ')
+}
+
+/** The account kind and plan names the accounts page shows, and whether a kind routes models. */
+export class AccountLabels {
+  static readonly routedKind = routedKind
+  static readonly connectHintFor = connectHintFor
+  static readonly planLabel = planLabel
 }

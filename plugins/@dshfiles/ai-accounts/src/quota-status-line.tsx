@@ -1,7 +1,7 @@
 import { Popover, PopoverAnchor } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { ChartColumnIcon, PlusIcon, Settings2Icon } from '@dshfiles/plugin-ui/icons'
+import { ChartColumnIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { ProviderGlyph } from './provider-glyph.js'
 import { useApi } from '@dshfiles/dshx/client'
@@ -328,23 +328,6 @@ const ActiveWithoutQuota = (props: { readonly accountId: string; readonly label:
     </button>
   )
 }
-
-const toolClass =
-  'dshx-root dshx:inline-flex dshx:size-5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
-
-/** A quiet icon tool at the strip's end, named for assistive technology and in its tooltip. */
-const StripTool = (props: { readonly label: string; readonly tooltip: string; readonly onClick: () => void; readonly children: JSX.Element }): JSX.Element => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <button aria-label={props.label} className={toolClass} onClick={props.onClick} type="button">
-        {props.children}
-      </button>
-    </TooltipTrigger>
-    <TooltipContent className="dshx-root" side="top">
-      {props.tooltip}
-    </TooltipContent>
-  </Tooltip>
-)
 
 export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null => {
   const { usage } = useAccountsUsage()

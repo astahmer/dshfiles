@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AccountDraftModel } from './account-draft.js'
 import { accountProfileSchema, accountsUsageSchema } from './api.js'
-import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
+import { AccountConnection } from './account-connection-status.js'
 import * as Schema from 'effect/Schema'
 
 const account = Schema.decodeUnknownSync(accountProfileSchema)({
@@ -41,19 +41,19 @@ const quota = (instanceId: string, status: 'ok' | 'unauthenticated') =>
 
 describe('reference dashboard observed authentication state', () => {
   it('never turns local credential presence into a token-validity or Connected claim', () => {
-    expect(accountConnectionStatus(account, null)).toMatchObject({ label: 'Credentials available', authenticated: false, checkedAt: null })
-    expect(accountConnectionStatus({ ...account, signedIn: false }, null).label).toBe('Not signed in')
+    expect(AccountConnection.status(account, null)).toMatchObject({ label: 'Credentials available', authenticated: false, checkedAt: null })
+    expect(AccountConnection.status({ ...account, signedIn: false }, null).label).toBe('Not signed in')
   })
   it('uses only the selected account provider response and its observed reading time', () => {
-    expect(accountConnectionStatus(account, quota('codex_work', 'ok'))).toMatchObject({ label: 'Connected', authenticated: true, checkedAt: 1234 })
-    expect(accountConnectionStatus(account, quota('codex_work_extra', 'ok'))).toMatchObject({
+    expect(AccountConnection.status(account, quota('codex_work', 'ok'))).toMatchObject({ label: 'Connected', authenticated: true, checkedAt: 1234 })
+    expect(AccountConnection.status(account, quota('codex_work_extra', 'ok'))).toMatchObject({
       label: 'Credentials available',
       authenticated: false,
       checkedAt: null,
     })
   })
   it('provider authentication rejection takes precedence over saved credentials', () => {
-    expect(accountConnectionStatus(account, quota('codex_work', 'unauthenticated'))).toMatchObject({
+    expect(AccountConnection.status(account, quota('codex_work', 'unauthenticated'))).toMatchObject({
       label: 'Sign-in expired',
       health: 'down',
       authenticated: false,
@@ -61,15 +61,15 @@ describe('reference dashboard observed authentication state', () => {
     })
   })
   it('keeps an actual route cooldown visible despite an earlier healthy quota response', () => {
-    expect(accountConnectionStatus({ ...account, state: 'cooling' }, quota('codex_work', 'ok'))).toMatchObject({
+    expect(AccountConnection.status({ ...account, state: 'cooling' }, quota('codex_work', 'ok'))).toMatchObject({
       label: 'Rate limited',
       tone: 'warning',
       authenticated: false,
     })
   })
   it('labels actual authentication choices without inventing identities', () => {
-    expect(accountAuthenticationLabel(account)).toBe('ChatGPT (OAuth)')
-    expect(accountAuthenticationLabel({ ...account, kind: 'claude', apiKeyEnv: 'secret:EXTERNAL' })).toBe('Credential reference')
-    expect(accountAuthenticationLabel({ ...account, kind: 'commandcode', authSource: 'cli', apiKeyEnv: 'COMMANDCODE_API_KEY' })).toBe('CLI login')
+    expect(AccountConnection.authenticationLabel(account)).toBe('ChatGPT (OAuth)')
+    expect(AccountConnection.authenticationLabel({ ...account, kind: 'claude', apiKeyEnv: 'secret:EXTERNAL' })).toBe('Credential reference')
+    expect(AccountConnection.authenticationLabel({ ...account, kind: 'commandcode', authSource: 'cli', apiKeyEnv: 'COMMANDCODE_API_KEY' })).toBe('CLI login')
   })
 })

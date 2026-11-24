@@ -6,7 +6,7 @@ import * as Schema from 'effect/Schema'
 import { AccountDraftModel } from './account-draft.js'
 import { AccountGroup } from './account-group.js'
 import { DetailHeader } from './detail-header.js'
-import { accountConnectionStatus, accountStateLine } from './account-connection-status.js'
+import { AccountConnection } from './account-connection-status.js'
 import { accountProfileSchema, accountsUsageSchema, type AccountProfile } from './api.js'
 
 const account = (patch: Partial<AccountProfile> = {}): AccountProfile =>
@@ -23,19 +23,20 @@ const account = (patch: Partial<AccountProfile> = {}): AccountProfile =>
     detail: null,
     ...patch,
   })
-const usageWith = (status: 'ok' | 'unauthenticated') => Schema.decodeUnknownSync(accountsUsageSchema)({
-  readAt: Date.UTC(2026, 10, 16, 15, 18),
-  hostName: 'synthetic-host',
-  cards: [
-    {
-      instanceId: 'codex_work',
-      displayName: 'Work',
-      kind: 'codex',
-      enabled: true,
-      usage: { status, identity: null, message: 'Authenticated quota response', windows: [], plan: null, bankedResets: 0, bankedResetExpiries: [] },
-    },
-  ],
-})
+const usageWith = (status: 'ok' | 'unauthenticated') =>
+  Schema.decodeUnknownSync(accountsUsageSchema)({
+    readAt: Date.UTC(2026, 10, 16, 15, 18),
+    hostName: 'synthetic-host',
+    cards: [
+      {
+        instanceId: 'codex_work',
+        displayName: 'Work',
+        kind: 'codex',
+        enabled: true,
+        usage: { status, identity: null, message: 'Authenticated quota response', windows: [], plan: null, bankedResets: 0, bankedResetExpiries: [] },
+      },
+    ],
+  })
 const usage = usageWith('ok')
 const noop = (): void => undefined
 const row = (profile: AccountProfile, selectedId: string | null, reading: typeof usage | null = usage): string =>
@@ -61,7 +62,9 @@ describe('a healthy accounts page is quiet', () => {
   it('opens no tooltip faster than the kit default (400 ms)', () => {
     const fast = readdirSync(new URL('.', import.meta.url))
       .filter(name => name.endsWith('.tsx') && !name.includes('.test.'))
-      .filter(name => [...readFileSync(new URL(name, new URL('.', import.meta.url)), 'utf8').matchAll(/delayDuration=\{(\d+)\}/gu)].some(match => Number(match[1]) < 400))
+      .filter(name =>
+        [...readFileSync(new URL(name, new URL('.', import.meta.url)), 'utf8').matchAll(/delayDuration=\{(\d+)\}/gu)].some(match => Number(match[1]) < 400),
+      )
     expect(fast).toEqual([])
   })
   it('leaves every switch on the kit colour', () => {
@@ -105,16 +108,19 @@ describe('a healthy accounts page is quiet', () => {
 describe('account state line', () => {
   const time = (at: number): string => `at ${at}`
   it('names a connected account and when it was checked, beside a green dot', () => {
-    expect(accountStateLine(accountConnectionStatus(account(), usage), time)).toEqual({ text: `Connected · checked at ${usage.readAt}`, health: 'ok' })
+    expect(AccountConnection.stateLine(AccountConnection.status(account(), usage), time)).toEqual({
+      text: `Connected · checked at ${usage.readAt}`,
+      health: 'ok',
+    })
   })
   it('names a blocking state with its health', () => {
-    expect(accountStateLine(accountConnectionStatus(account({ state: 'cooling' }), usage), time)).toEqual({
+    expect(AccountConnection.stateLine(AccountConnection.status(account({ state: 'cooling' }), usage), time)).toEqual({
       text: `Rate limited · checked at ${usage.readAt}`,
       health: 'limited',
     })
   })
   it('falls back to the plain state when the provider was never asked', () => {
-    expect(accountStateLine(accountConnectionStatus(account({ signedIn: false }), null), time)).toEqual({ text: 'Not signed in', health: 'off' })
+    expect(AccountConnection.stateLine(AccountConnection.status(account({ signedIn: false }), null), time)).toEqual({ text: 'Not signed in', health: 'off' })
   })
   it('draws the header state as one health dot and muted text while healthy', () => {
     const header = renderToStaticMarkup(<DetailHeader mark={null} state={{ text: 'Connected · checked 08:30', health: 'ok' }} title={<h2>Work</h2>} />)

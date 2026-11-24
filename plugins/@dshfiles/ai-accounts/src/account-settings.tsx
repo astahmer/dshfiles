@@ -6,8 +6,8 @@ import { PageSection } from '@dshfiles/plugin-ui/components/page'
 import { CheckIcon, CopyIcon, PencilIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
-import { KIND_LABEL, planLabel, routedKind } from './account-labels.js'
-import { accountAuthenticationLabel, accountConnectionStatus } from './account-connection-status.js'
+import { AccountLabels, KIND_LABEL } from './account-labels.js'
+import { AccountConnection } from './account-connection-status.js'
 import { AccountIdentitySection } from './account-identity-section.js'
 import { ExtraUsageMeter } from './extra-usage-view.js'
 import { AccountDefaultReasoningControl, AccountInheritanceControl } from './account-model-defaults.js'
@@ -51,15 +51,17 @@ const PriorityControl = (props: SettingsProps): JSX.Element => {
 const RoutingSwitch = (props: Pick<SettingsProps, 'draft' | 'state'>): JSX.Element => (
   <label className="dshx:flex dshx:items-start dshx:gap-3">
     <Switch
-      aria-label={routedKind(props.draft.kind) ? 'Enable for model routing' : 'Enable quota tracking'}
+      aria-label={AccountLabels.routedKind(props.draft.kind) ? 'Enable for model routing' : 'Enable quota tracking'}
       checked={props.draft.enabled}
       className="dshx:mt-0.5"
       onCheckedChange={enabled => void props.state.persist({ enabled })}
     />
     <span>
-      <span className="dshx:block dshx:text-sm">{routedKind(props.draft.kind) ? 'Enable for model routing' : 'Enable quota tracking'}</span>
+      <span className="dshx:block dshx:text-sm">{AccountLabels.routedKind(props.draft.kind) ? 'Enable for model routing' : 'Enable quota tracking'}</span>
       <span className="dshx:mt-1 dshx:block dshx:text-xs dshx:text-muted-foreground">
-        {routedKind(props.draft.kind) ? 'Allow this account to be used when selecting models.' : 'Include this account in subscription quota readings.'}
+        {AccountLabels.routedKind(props.draft.kind)
+          ? 'Allow this account to be used when selecting models.'
+          : 'Include this account in subscription quota readings.'}
       </span>
     </span>
   </label>
@@ -107,7 +109,7 @@ const ExtraUsageSettings = (props: SettingsProps): JSX.Element | null => {
 
 const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'state'> & { readonly onConnect: () => void }): JSX.Element => {
   const profile = props.state.selected
-  const status = profile === null ? null : accountConnectionStatus(profile, props.state.usage)
+  const status = profile === null ? null : AccountConnection.status(profile, props.state.usage)
   return (
     <section aria-label="Authentication" className="dshx:min-w-0 dshx:space-y-3">
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
@@ -119,7 +121,7 @@ const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'stat
       </div>
       <dl className="dshx:grid dshx:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)] dshx:gap-x-4 dshx:gap-y-3 dshx:text-xs dshx:@max-pane-narrow:grid-cols-1">
         <dt className="dshx:text-muted-foreground">Authentication method</dt>
-        <dd>{accountAuthenticationLabel(props.draft)}</dd>
+        <dd>{AccountConnection.authenticationLabel(props.draft)}</dd>
         <dt className="dshx:text-muted-foreground">Signed in as</dt>
         <dd className="dshx:break-words">{profile?.identity ?? 'Not reported by provider'}</dd>
         <dt className="dshx:text-muted-foreground">Token status</dt>
@@ -172,7 +174,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
   const [editing, setEditing] = useState(false)
   const accountIdCopy = useCopyFeedback()
   const selected = props.state.selected
-  const status = selected === null ? null : accountConnectionStatus(selected, props.state.usage)
+  const status = selected === null ? null : AccountConnection.status(selected, props.state.usage)
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:divide-y">
       <PageSection
@@ -203,7 +205,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
           <dt className="dshx:text-xs dshx:text-muted-foreground">Provider</dt>
           <dd>{KIND_LABEL[props.draft.kind]}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Account type</dt>
-          <dd>{selected?.plan == null ? 'Not reported by provider' : planLabel(selected.plan)}</dd>
+          <dd>{selected?.plan == null ? 'Not reported by provider' : AccountLabels.planLabel(selected.plan)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Email / identity</dt>
           <dd className="dshx:break-words">{selected?.identity ?? 'Not reported by provider'}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Account ID</dt>
@@ -224,7 +226,7 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
             </Button>
           </dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Authentication</dt>
-          <dd>{accountAuthenticationLabel(props.draft)}</dd>
+          <dd>{AccountConnection.authenticationLabel(props.draft)}</dd>
           <dt className="dshx:text-xs dshx:text-muted-foreground">Token status</dt>
           <dd className={status?.tone === 'warning' ? 'dshx:text-warning' : undefined}>
             {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}

@@ -23,8 +23,8 @@ import { BarChart3Icon, LayersIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIco
 import { AccountSignOut } from './account-sign-out.js'
 import { AccountSettings, AccountInlineSettings } from './account-settings.js'
 import { AccountNameEditor } from './account-name-editor.js'
-import { accountConnectionStatus, accountStateLine, type AccountSection } from './account-connection-status.js'
-import { planLabel, routedKind } from './account-labels.js'
+import { AccountConnection, type AccountSection } from './account-connection-status.js'
+import { AccountLabels } from './account-labels.js'
 import { accountRemoveMachine } from './account-remove-machine.js'
 import { AutoSaveIndicator } from './auto-save-indicator.js'
 import type { AccountDraft, AccountsFile } from './api.js'
@@ -54,7 +54,7 @@ export const AccountDetail = (props: {
   const [removeSnapshot, sendRemove] = useMachine(accountRemoveMachine, { input: { removeAccount: remove } })
   const removing = removeSnapshot.matches('removing')
   const removeOpen = removeSnapshot.matches('confirming') || removing || removeSnapshot.matches('error')
-  const stateLine = selected === null ? null : accountStateLine(accountConnectionStatus(selected, props.state.usage))
+  const stateLine = selected === null ? null : AccountConnection.stateLine(AccountConnection.status(selected, props.state.usage))
   const connect = (): void => {
     if (selected !== null && !dirty && !saving) props.onConnectAccount(selected.instanceId)
   }
@@ -65,7 +65,7 @@ export const AccountDetail = (props: {
   return (
     <section aria-label="Selected account" className={DETAIL_PANE_CLASS}>
       <DetailHeader
-        detail={[selected?.plan == null ? null : planLabel(selected.plan), selected?.identity].filter(Boolean).join(' · ')}
+        detail={[selected?.plan == null ? null : AccountLabels.planLabel(selected.plan), selected?.identity].filter(Boolean).join(' · ')}
         mark={<ProviderGlyph kind={draft.kind} />}
         state={stateLine}
         title={
@@ -81,7 +81,7 @@ export const AccountDetail = (props: {
         <>
           <Switch
             aria-label={
-              routedKind(draft.kind)
+              AccountLabels.routedKind(draft.kind)
                 ? draft.enabled
                   ? 'Enabled in model picker'
                   : 'Hidden from model picker'
@@ -148,7 +148,7 @@ export const AccountDetail = (props: {
           </TabsList>
         </div>
         <TabsContent className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:divide-y dshx:px-4" value="models">
-          {routedKind(draft.kind) ? (
+          {AccountLabels.routedKind(draft.kind) ? (
             <>
               <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3 dshx:py-4">
                 <ModelCuration
