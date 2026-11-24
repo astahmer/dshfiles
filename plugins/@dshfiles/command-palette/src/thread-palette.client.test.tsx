@@ -452,6 +452,64 @@ describe('Threads tab project scope', () => {
     expect(result.textContent).not.toContain('/dev/dshfiles')
   })
 
+  it('paints each project mark in the colour the thread list gives that project, never a status hue', async () => {
+    const colorOf = vi.fn((thread: { readonly project: string }) =>
+      thread.project === 'dshfiles' ? { className: 'project-tone-balanced-3' } : { color: '#ffd400' },
+    )
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[here, elsewhere, { id: 'session-loose', title: 'Loose work', project: '', cwd: '', updatedAt: 0 }]}
+        projectColorOf={colorOf}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn()}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const markOf = async (name: RegExp) => (await screen.findByRole('option', { name })).querySelector<HTMLElement>('[data-palette-project-mark]')
+    const tone = await markOf(/Here work/)
+    expect(tone?.className).toContain('project-tone-balanced-3')
+    expect(tone?.className).not.toMatch(/chart-/u)
+    const custom = await markOf(/Elsewhere work/)
+    // A picked colour stays readable: the mark clamps its lightness instead of painting the raw pick as text.
+    expect(custom?.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(custom?.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
+    expect(custom?.className).toContain('dshx:text-(--chip-light)')
+    expect(custom?.className).not.toMatch(/chart-/u)
+    const loose = await markOf(/Loose work/)
+    expect(loose?.className).toContain('dshx:bg-muted')
+    expect(colorOf).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'session-loose' }))
+  })
+
+  it('keeps project marks neutral when nothing provides project colours', async () => {
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[here]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn()}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const mark = (await screen.findByRole('option', { name: /Here work/ })).querySelector<HTMLElement>('[data-palette-project-mark]')
+    expect(mark?.className).toContain('dshx:bg-muted')
+    expect(mark?.className).not.toMatch(/chart-/u)
+  })
+
   it('lists only the current project on Threads and every project on Everything', async () => {
     const view = (mode: 'all' | 'threads') =>
       render(

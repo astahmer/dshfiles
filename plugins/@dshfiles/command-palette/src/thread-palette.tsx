@@ -12,10 +12,9 @@ import { useContentSearch, type ContentSearch } from './content-search-machine.j
 import { PaletteFrecency, paletteFrecency } from './frecency.js'
 import { paletteNavigationMachine } from './palette-navigation-machine.js'
 import { useWorkspaceFiles } from './workspace-files-machine.js'
-import { ProjectTone } from './project-tone.js'
 import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palette.js'
 import { PaletteApi } from './palette-api.js'
-import type { PaletteAction, PaletteActionContext, PaletteMode } from './palette-contract.js'
+import type { PaletteAction, PaletteActionContext, PaletteMode, PaletteProjectColor } from './palette-contract.js'
 import { paletteActionMachine } from './palette-action-machine.js'
 
 export interface ThreadPaletteCopy {
@@ -94,6 +93,8 @@ interface ThreadPaletteProps {
   readonly threads: readonly ThreadCandidate[]
   /** The current project's threads; when set, the Threads tab lists only these, while a session ID still finds any thread. */
   readonly projectThreads?: readonly ThreadCandidate[]
+  /** The colour the thread list gives a thread's project; without it, project marks stay neutral. */
+  readonly projectColorOf?: (thread: ThreadCandidate) => PaletteProjectColor | undefined
   readonly context: PaletteActionContext
   readonly additionalActions: readonly PaletteAction[]
   readonly recentLimit: number
@@ -141,6 +142,25 @@ const withoutRepeatedTitle = (snippet: string, title: string): string => {
     .slice(title.trim().length)
     .replace(/^[\s—–:-]+/u, '')
     .trim()
+}
+
+const neutralMark = 'dshx:bg-muted dshx:text-muted-foreground'
+
+/** A picked colour paints text only through a lightness clamp, so a pale or dark pick still reads in both schemes. */
+const customMarkText = 'dshx:text-(--chip-light) dshx:dark:text-(--chip-dark)'
+
+/** The project mark of a thread row: its project's identity colour as text on a 16% tint of it, else neutral. */
+const projectMark = (color: PaletteProjectColor | undefined): { readonly className: string; readonly style?: CSSProperties } => {
+  if (color === undefined || (color.className === undefined && color.color === undefined)) return { className: neutralMark }
+  const tint = 'color-mix(in srgb, currentColor 16%, transparent)'
+  if (color.color === undefined) return { className: color.className ?? '', style: { backgroundColor: tint } }
+  const style: CSSProperties = { backgroundColor: tint }
+  Object.assign(style, {
+    '--chip': color.color,
+    '--chip-light': 'oklch(from var(--chip) min(l, 0.52) c h)',
+    '--chip-dark': 'oklch(from var(--chip) max(l, 0.78) c h)',
+  })
+  return { className: customMarkText, style }
 }
 
 const projectLabel = (project: string): string => project.split(/[\\/]/u).filter(Boolean).at(-1) ?? project
@@ -815,13 +835,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 {threadRows.map(thread => {
                   const row: PaletteRow = { kind: 'thread', thread }
                   const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
+                  const mark = thread.project.length > 0 ? projectMark(props.projectColorOf?.(thread)) : { className: neutralMark }
                   return (
                     <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
                       <span
                         className={cn(
                           'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
-                          thread.project.length > 0 ? ProjectTone.glyph(project) : 'dshx:bg-muted dshx:text-muted-foreground',
+                          mark.className,
                         )}
+                        style={mark.style}
+                        data-palette-project-mark=""
                         aria-hidden="true"
                       >
                         {thread.project.length > 0 ? project.slice(0, 2).toLocaleUpperCase() : <MessageSquareIcon className="dshx:size-3.5" />}

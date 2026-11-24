@@ -69,6 +69,21 @@ export interface CommandPaletteService {
   readonly state: Subscribable<CommandPaletteState>
 }
 
+/** The colour one project wears: a theme-aware class that sets `color:`, or a CSS colour the operator picked. */
+export interface PaletteProjectColor {
+  readonly className?: string
+  readonly color?: string
+}
+
+/** Paints a thread row's project mark, so a project wears the same colour in the palette as in the thread list. */
+export interface PaletteProjectColorSource {
+  /** `path` is the project folder (a thread workspace resolves to the repository it was cut from), `title` its name. */
+  readonly colorOf: (project: { readonly path: string | undefined; readonly title: string }) => PaletteProjectColor | undefined
+}
+
+/** The plugin that owns project colours adds one source; the latest wins. Without one, project marks stay neutral ink. */
+export const PaletteProjectColors = defineRegistry<PaletteProjectColorSource>('@dshfiles/command-palette.project-color')
+
 /** Rows other plugins add with `api.add(PaletteActions, action)`; they wait here while the palette loads. */
 export const PaletteActions = defineRegistry<PaletteAction>('@dshfiles/command-palette.action')
 

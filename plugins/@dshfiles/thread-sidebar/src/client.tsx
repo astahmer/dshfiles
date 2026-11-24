@@ -175,6 +175,7 @@ import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
 import { useSavedProjectChip } from './project-colors.js'
+import { PaletteProjectColorsModel } from './palette-project-colors.js'
 import { useThreadDirectories } from './use-thread-directories.js'
 import {
   failedResumeNotice,
@@ -5827,6 +5828,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     enabled: !isBoard,
   }
   const savedProjectChipOf = useSavedProjectChip()
+  // The command palette paints project marks with the colours these rows use (round two, item 13).
+  useEffect(() => {
+    if (!isPrimarySurface) return
+    return PaletteBridge.addProjectColors(PaletteProjectColorsModel.sourceOf({ savedChipOf: savedProjectChipOf, palette: preferences.projectColorPalette }))
+  }, [isPrimarySurface, preferences.projectColorPalette, savedProjectChipOf])
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel'], section?: SidebarSection): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)

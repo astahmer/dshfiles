@@ -1,4 +1,11 @@
-import { CommandPalette, PaletteActions, type PaletteAction, type PaletteMode } from '@dshfiles/command-palette/palette-contract'
+import {
+  CommandPalette,
+  PaletteActions,
+  PaletteProjectColors,
+  type PaletteAction,
+  type PaletteMode,
+  type PaletteProjectColorSource,
+} from '@dshfiles/command-palette/palette-contract'
 import type { PluginContext } from '@dshfiles/dshx/client'
 
 const DEFAULT_RECENT_LIMIT = 10
@@ -62,6 +69,10 @@ const addActionsTo = (plugin: PluginContext, actions: readonly PaletteAction[]):
   }
 }
 
+/** Give the palette the thread list's project colours until the returned disposer runs. */
+const addProjectColors = (source: PaletteProjectColorSource): (() => void) =>
+  sidebarPlugin === undefined ? () => {} : sidebarPlugin.add(PaletteProjectColors, source)
+
 const open = (mode: PaletteMode): void => activePalette()?.open(mode)
 
 const close = (): void => activePalette()?.close()
@@ -74,6 +85,7 @@ const setRecentLimit = (limit: number): void => {
 export class PaletteBridge {
   static readonly connect = connect
   static readonly addActions = addActions
+  static readonly addProjectColors = addProjectColors
   static readonly open = open
   static readonly close = close
   static readonly setRecentLimit = setRecentLimit

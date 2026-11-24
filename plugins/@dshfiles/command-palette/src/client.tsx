@@ -10,8 +10,8 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
-import { Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
-import { PaletteRules } from './palette.js'
+import { Command, createApiClient, createRegisteredApiClient, defineClient, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { PaletteRules, type ThreadCandidate } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
 import { createThreadContentSearch } from './thread-content-source.js'
@@ -24,6 +24,7 @@ import { ContributedCommandsModel } from './contributed-commands.js'
 import {
   CommandPalette,
   PaletteActions,
+  PaletteProjectColors,
   type CommandPaletteState,
   type PaletteAction,
   type PaletteActionContext,
@@ -196,6 +197,13 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     [archivedSessionIds, projectTitleOf, sessions, sessionsById, workspaceBySession, workspacePathById],
   )
   const threads = useMemo(() => threadEntries.map(entry => entry.thread), [threadEntries])
+  // The thread list resolves project colours (a picked colour, else its own palette); the palette borrows the latest source.
+  const projectColorSource = useRegistry(PaletteProjectColors).at(-1)
+  const projectColorOf = useMemo(() => {
+    if (projectColorSource === undefined) return undefined
+    const repositoryById = new Map<string, string | undefined>(threadEntries.map(entry => [entry.thread.id, entry.repository]))
+    return (thread: ThreadCandidate) => projectColorSource.colorOf({ path: repositoryById.get(thread.id), title: thread.project })
+  }, [projectColorSource, threadEntries])
   const threadsScope = (useSettings(paletteSettings).value ?? defaultSettings).threadsScope
   const currentRepository = threadsScope === 'project' ? repositoryOf(askWorkspaceId) : undefined
   const projectThreads = useMemo(
@@ -223,6 +231,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       mode={mode}
       threads={threads}
       {...(projectThreads === undefined ? {} : { projectThreads })}
+      {...(projectColorOf === undefined ? {} : { projectColorOf })}
       context={context}
       additionalActions={workspaceActions}
       recentLimit={recentLimit}
