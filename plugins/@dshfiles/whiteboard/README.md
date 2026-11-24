@@ -60,6 +60,37 @@ measurement), so the Host queues them and the editor converts and appends them t
 **Discard queued diagram**. mermaid-to-excalidraw converts flowcharts, sequence and class diagrams into shapes; other
 Mermaid types arrive as one image.
 
+## Compare HTML mockup versions
+
+Use one Whiteboard for **still images** of the versions, and publish the live mockups in their original thread. This
+covers side-by-side comparison in [#169](https://github.com/astahmer/dshfiles/issues/169), not live HTML on the canvas.
+Capture each card as you go rather than relying on the transcript to show every version at once.
+
+1. With [HTML Render](../html-render/README.md) and its chat cards enabled, ask the agent to publish a self-contained
+   mockup with `html_render`, for example **Checkout v1**. Try it in its chat card and capture a cropped PNG or JPEG
+   before asking for the next version. Use **Expand** for more room; you can focus and activate it with the keyboard
+   and close it with Escape while focus is outside the preview frame.
+2. Ask the agent to publish **Checkout v2** as a separate call in the same thread. Capture it at a comparable size.
+   If using `html_preview` instead, give each version its own workspace file; a card keeps a copy from the time of
+   the call and does not follow subsequent file edits. Only capture mockups you own and mean to copy to the board.
+3. Open **Knowledge → Whiteboard** (on a phone, start with **More**), select the matching local project, and create or
+   open a board for the comparison. On desktop, drag the first capture from your file manager onto the canvas,
+   then drop the second beside it. You can also use **Insert image** in the Excalidraw toolbar. Select an image to
+   resize it with its handles. On desktop, hold Space and drag to pan, or use the hand tool; the zoom buttons are
+   keyboard accessible. Pan and zoom to see the versions together, and wait for **Saved** before leaving the board.
+4. For another version, repeat the publish, capture and insert steps without replacing a prior image. If the board
+   reports a concurrent edit, use **Load newer version** and re-add your image; **Keep mine** replaces the newer scene.
+
+A board is project-scoped, **not private to the source thread**. The imported images are independent copies: resizing
+scales the image, not the HTML viewport, and edits to the source do not update the image. Keep the images small; the
+**900 KiB** scene limit includes encoded images and drawing data. Crop or compress captures, or split them across
+boards if the scene cannot save.
+
+There is no **Add version** action that links the transcript and Whiteboard. The sandboxed HTML card owns live
+rendering. `html_render_screenshot` is an optional screenshot tool for the agent, not a board import, and
+`whiteboard_write`'s queued append is for diagrams/shapes; its raw `elements` write replaces the scene. Do not use
+URL embeds or copy HTML into the board as a substitute for the restricted renderer.
+
 ## xstate machines as diagrams
 
 `@dshfiles/whiteboard/xstate-diagram` exports `machineToMermaid(machine, format)`, a pure function over an xstate v5
