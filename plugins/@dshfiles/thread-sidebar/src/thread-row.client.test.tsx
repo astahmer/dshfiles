@@ -90,16 +90,28 @@ describe('the hover actions of a thread row', () => {
 describe('a row that needs you', () => {
   const asking = { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: Which layout should the release notes use?' }) }
 
-  it('seats Answer on the second line, so the title and the time keep the first', async () => {
+  it('gives the question the second line and Answer its own seat at the first line\'s trailing edge', async () => {
     const row = await renderRow(asking)
     const verb = row.querySelector('[data-testid="thread-row-verb"]')
-    expect(verb?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('meta')
-    expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m')
-    expect(row.querySelector('[data-thread-main-action]')?.className).not.toContain('dshx:pr-20')
-    // The question takes the rest of the second line: the project name gives way, its mark stays.
-    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-20')
-    expect(row.querySelector('[data-testid="thread-row-status-detail"]')?.className).not.toContain('dshx:max-w-[60%]')
+    expect(verb?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('head')
+    // Its touch area paints above the row after it, which covered the part below the row.
+    expect(verb?.className).toContain('dshx:z-10')
+    // The verb takes the time's seat; the title gives way before it, on the first line only.
+    expect(row.querySelector('[data-thread-time]')).toBeNull()
+    expect(row.querySelector('[data-thread-head]')?.className).toContain('dshx:pr-17.5')
+    expect(row.querySelector('[data-thread-main-action]')?.className).not.toMatch(/dshx:pr-(20|30)\b/u)
+    // The question takes the whole second line: no seat is reserved there, and the project name gives way.
+    expect(row.querySelector('[data-thread-where]')?.className).not.toMatch(/dshx:pr-(20|36)/u)
+    expect(row.querySelector('[data-testid="thread-row-status-detail"]')?.className).toContain('dshx:flex-1')
     expect(row.querySelector('[data-testid="thread-row-project"]')).toBeNull()
+  })
+
+  it('keeps the question readable beside a subagent counter', async () => {
+    // With three children the second line reserved 144 px for the verb and the counter, and the question read "A…".
+    const children = ['c1', 'c2', 'c3'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const row = await renderRow({ ...asking, childThreads: children })
+    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-16')
+    expect(row.querySelector('[data-thread-where]')?.className).not.toContain('dshx:pr-36')
   })
 
   it('keeps the verb beside the title on a row with no second line', async () => {
@@ -109,7 +121,7 @@ describe('a row that needs you', () => {
     })
     expect(row.querySelector('[data-thread-where]')).toBeNull()
     expect(row.querySelector('[data-testid="thread-row-verb"]')?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('head')
-    expect(row.querySelector('[data-thread-main-action]')?.className).toContain('dshx:pr-20')
+    expect(row.querySelector('[data-thread-head]')?.className).toContain('dshx:pr-17.5')
   })
 })
 

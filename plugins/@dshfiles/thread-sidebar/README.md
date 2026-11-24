@@ -665,8 +665,8 @@ Restore instead): Open in side panel, Pin, Snooze, Mute and Archive ship hidden 
 stay in that menu and on their keys. The buttons sit in the first line's time slot
 and the line gives them their width while they show, so the title truncates before
 them instead of being covered. A row's inline verb (Answer, Approve, Retry, Resume,
-Land) sits at the end of its second line, which leaves the first line to the title
-and the time.
+Land) has its own seat at the first line's trailing edge, in the time's place, which
+leaves the second line to the question or reason it answers.
 
 **Pending restarts.** Client bundles hot-reload; Host code, `package.json` and
 `cordis.patch.yml` load only at boot. The Host half remembers a content hash of

@@ -1488,9 +1488,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     showAgent ||
     statusDetail !== undefined
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.integrationQueuedAt !== undefined || (props.subscriberCount ?? 0) > 0
-  // The inline verb sits at the end of the second line, so the title and the time keep the first (the rows that most
-  // need reading were the most truncated). A row with no second line keeps the verb beside its title.
-  const verbSeat = inlineVerb === undefined ? undefined : metaLine ? 'meta' : 'head'
+  // The inline verb has its own seat at the first line's trailing edge, where the time sits: on the second line it
+  // shared the end with the subagent counter and cut the question it answers to "A…" (C14). The question now has the
+  // second line to itself.
+  const verbSeat = inlineVerb === undefined ? undefined : 'head'
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1691,8 +1692,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
                 // Phone rows are 60pt two-line targets (T1.3), whatever the density preference.
                 'dshx:pointer-coarse:min-h-15 dshx:pointer-coarse:justify-center',
-                // Touch: the row's actions menu button takes the top-right corner, so a verb on the first line moves left of it.
-                verbSeat === 'head' ? 'dshx:pr-20 dshx:pointer-coarse:pr-30' : 'dshx:pointer-coarse:pr-11',
+                // Touch: the row's actions menu button takes the top-right corner's column.
+                'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
               )}
               data-thread-id={session.id}
@@ -1707,6 +1708,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2',
+                    // The verb's seat is on this line only, so the second line keeps its full width for the question; on
+                    // touch the verb also sits left of the row menu button.
+                    verbSeat === 'head' && 'dshx:pr-17.5 dshx:pointer-coarse:pr-19',
                     // Wherever the strip can show (it hides on a coarse pointer, where the row menu button keeps its own corner).
                     verbSeat !== 'head' &&
                       stripSeats > 0 &&
@@ -1801,9 +1805,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    // Room for what sits at the end of this line: the subagent counter, the inline verb, or both.
-                    childCount > 0 && verbSeat !== 'meta' && 'dshx:pr-16',
-                    verbSeat === 'meta' && (childCount > 0 ? 'dshx:pr-36' : 'dshx:pr-20'),
+                    // Room for what sits at the end of this line: the subagent counter.
+                    childCount > 0 && 'dshx:pr-16',
                   )}
                   data-thread-where=""
                 >
@@ -1827,8 +1830,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         'dshx:min-w-0 dshx:shrink dshx:truncate',
-                        // Beside the verb the reason has the line to itself; otherwise the project name follows it.
-                        verbSeat === 'meta' ? 'dshx:flex-1' : 'dshx:max-w-[60%]',
+                        // A reason the row's verb answers has the line to itself; otherwise the project name follows it.
+                        inlineVerb === undefined ? 'dshx:max-w-[60%]' : 'dshx:flex-1',
                         (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
                       )}
                       data-testid="thread-row-status-detail"
@@ -1836,7 +1839,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {statusDetail}
                     </span>
                   )}
-                  {showProject && liveStep === undefined && !(verbSeat === 'meta' && statusDetail !== undefined) ? (
+                  {showProject && liveStep === undefined && !(inlineVerb !== undefined && statusDetail !== undefined) ? (
                     <span
                       className={cn(
                         // The first text to give way on a short row: it truncates, then hides, before the mark does.
@@ -1915,30 +1918,6 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               )}
             </button>
           ) : null}
-          {props.renaming || verbSeat !== 'meta' || inlineVerb === undefined || workStatus === undefined ? null : (
-            // The row's visible action, at the end of the second line: left of the subagent counter when the row has
-            // one, and left of the touch menu button's column.
-            <div
-              data-verb-seat="meta"
-              className={cn(
-                // 2px from the row's bottom: the hover actions end 2px above it, so the two never touch (a 50px row).
-                'dshx:absolute dshx:bottom-0.5 dshx:flex dshx:items-center',
-                childCount > 0 ? 'dshx:right-17' : 'dshx:right-1.5 dshx:pointer-coarse:right-11',
-              )}
-            >
-              <Button
-                type="button"
-                size="xs"
-                variant={workStatus.status === 'ready' ? 'outline' : 'default'}
-                className="dshx:h-5 dshx:px-2"
-                data-testid="thread-row-verb"
-                data-verb={inlineVerb}
-                onClick={() => props.actions.actOnStatus(session.id, workStatus)}
-              >
-                {t(inlineVerbLabelKeys[inlineVerb])}
-              </Button>
-            </div>
-          )}
           {props.renaming || (verbSeat !== 'head' && !nearViewport) ? null : (
             // The first line's corner: the hover actions in the time slot. A verb on a one-line row shares it, and the
             // actions then open to its left, so neither ever covers the other.
@@ -1956,7 +1935,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   type="button"
                   size="xs"
                   variant={workStatus.status === 'ready' ? 'outline' : 'default'}
-                  className="dshx:h-6 dshx:px-2"
+                  // Above the neighbouring rows, so its 44 px touch area is not covered by the row painted after it.
+                  className="dshx:z-10 dshx:h-6 dshx:px-2"
                   data-testid="thread-row-verb"
                   data-verb={inlineVerb}
                   onClick={() => props.actions.actOnStatus(session.id, workStatus)}
