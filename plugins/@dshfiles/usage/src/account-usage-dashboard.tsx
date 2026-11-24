@@ -6,6 +6,7 @@ import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { CalendarIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { DATA_SERIES } from './data-series.js'
 import { errorMessage, useQuery } from '@dshfiles/plugin-ui/query'
 import { usageApi, type ChartQuery, type ChartView, type RequestPage } from './api.js'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -48,15 +49,15 @@ const Metric = (props: { label: string; value: string; children: ReactNode }): J
 const Legend = (): JSX.Element => (
   <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground" aria-label="Chart legend">
     <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-      <span className="dshx:h-0.5 dshx:w-3 dshx:bg-chart-1" />
+      <span className="dshx:h-0.5 dshx:w-3 dshx:bg-data-1" />
       Requests
     </span>
     <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-      <span className="dshx:size-2 dshx:rounded-sm dshx:bg-chart-1 dshx:opacity-40" />
+      <span className="dshx:size-2 dshx:rounded-sm dshx:bg-data-2" />
       Input tokens
     </span>
     <span className="dshx:flex dshx:items-center dshx:gap-1.5">
-      <span className="dshx:size-2 dshx:rounded-sm dshx:bg-chart-1 dshx:opacity-60" />
+      <span className="dshx:size-2 dshx:rounded-sm dshx:bg-data-3" />
       Output tokens
     </span>
     <span className="dshx:flex dshx:items-center dshx:gap-1.5">
@@ -85,7 +86,7 @@ const UsageTimeline = (props: { days: readonly AccountUsageDay[]; empty: boolean
     return defineChart({
       marks: [
         barY(tokens, { x: 'label', y: 'value', color: 'kind', yScale: 'tokens', layout: stack(), maxThickness: 50 }),
-        lineY(requests, { x: 'label', y: 'value', yScale: 'requests', stroke: 'var(--ts-chart-1)', strokeWidth: 2, points: true }),
+        lineY(requests, { x: 'label', y: 'value', yScale: 'requests', stroke: DATA_SERIES[0], strokeWidth: 2, points: true }),
         lineY(costs, { x: 'label', y: 'value', yScale: 'cost', stroke: 'var(--dsw-alias-label-secondary)', strokeWidth: 1.5, strokeDasharray: '3 4' }),
       ],
       scales: {
@@ -113,7 +114,7 @@ const UsageTimeline = (props: { days: readonly AccountUsageDay[]; empty: boolean
       },
       color: {
         domain: ['Input tokens', 'Output tokens'],
-        range: ['color-mix(in srgb, var(--ts-chart-1) 40%, transparent)', 'color-mix(in srgb, var(--ts-chart-1) 60%, transparent)'],
+        range: [DATA_SERIES[1], DATA_SERIES[2]],
       },
       tooltip: {
         use: tooltip,
@@ -186,7 +187,7 @@ const ModelTable = (props: { view: ChartView }): JSX.Element => {
                       <div className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-2">
                         <span>{share === null ? '—' : `${share.toFixed(0)}%`}</span>
                         <span className="dshx:h-1.5 dshx:w-16 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-                          <span className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-chart-1" style={{ width: `${share ?? 0}%` }} />
+                          <span className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-data-1" style={{ width: `${share ?? 0}%` }} />
                         </span>
                       </div>
                     </td>

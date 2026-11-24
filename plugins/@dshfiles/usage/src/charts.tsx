@@ -4,6 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { DATA_SERIES, FAILED_SERIES } from './data-series.js'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, useState, type ReactNode } from 'react'
@@ -205,6 +206,7 @@ export const UsageCharts = (props: {
         },
         color: {
           domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
+          range: [...DATA_SERIES],
           legend: colorLegend({ placement: 'bottom' }),
         },
         tooltip: {
@@ -223,7 +225,7 @@ export const UsageCharts = (props: {
           x: xAxis,
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCount(Number(value)) } } },
         },
-        color: { domain: [...TOKEN_KINDS], legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: [...TOKEN_KINDS], range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -250,7 +252,7 @@ export const UsageCharts = (props: {
       defineChart({
         marks: [barY(series.requests, { x: 'label', y: 'count', color: 'outcome' })],
         scales: { x: xAxis, y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4 } } } },
-        color: { domain: ['Succeeded or aborted', 'Failed'], range: ['var(--ts-chart-1)', 'var(--ts-chart-4)'], legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: ['Succeeded or aborted', 'Failed'], range: [DATA_SERIES[0], FAILED_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -267,7 +269,7 @@ export const UsageCharts = (props: {
           x: pointAxis,
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatDuration(Number(value)) } } },
         },
-        color: { domain: ['TTFT p50', 'TTFT p90', 'Duration p50', 'Duration p90'], legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: ['TTFT p50', 'TTFT p90', 'Duration p50', 'Duration p90'], range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>

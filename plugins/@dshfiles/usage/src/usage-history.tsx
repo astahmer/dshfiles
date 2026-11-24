@@ -121,7 +121,7 @@ export const UsageBreakdownTable = (props: {
                         <span className="dshx:mt-1 dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
                           <span className="dshx:h-1.5 dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
                             <span
-                              className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-chart-1"
+                              className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-data-1"
                               style={{ width: `${Math.min(100, (knownCostShare ?? 0) * 100)}%` }}
                             />
                           </span>
@@ -150,7 +150,7 @@ export const UsageBreakdownTable = (props: {
   )
 }
 
-const calendarClasses = ['dshx:bg-muted', 'dshx:bg-chart-1/25', 'dshx:bg-chart-1/45', 'dshx:bg-chart-1/70', 'dshx:bg-chart-1'] as const
+const calendarClasses = ['dshx:bg-muted', 'dshx:bg-data-1/25', 'dshx:bg-data-1/45', 'dshx:bg-data-1/70', 'dshx:bg-data-1'] as const
 
 export const UsageCalendar = (props: { readonly view: ChartView; readonly range: { readonly from: number; readonly to: number } }): JSX.Element => {
   const [metric, setMetric] = useState<CalendarMetric>('tokens')

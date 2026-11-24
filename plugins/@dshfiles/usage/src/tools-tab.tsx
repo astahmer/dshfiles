@@ -9,6 +9,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ActivityReport } from './api.js'
 import { UsageBucketsModel } from './buckets.js'
 import { UsageFormattingModel } from './format.js'
+import { DATA_SERIES } from './data-series.js'
 
 const TOOL_CATEGORIES = ['tool', 'skill', 'api', 'plugin', 'mcp', 'other'] as const
 type ToolCategory = (typeof TOOL_CATEGORIES)[number]
@@ -144,7 +145,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
           x: xAxis,
           y: { scale: scaleLinear, grid: true, axis: { ticks: { count: 4 } } },
         },
-        color: { domain: categories.map(category => CATEGORY_LABELS[category]), legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: categories.map(category => CATEGORY_LABELS[category]), range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -170,7 +171,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
           },
           y: { scale: () => scaleBand<string>().paddingInner(0.15).paddingOuter(0.05) },
         },
-        color: { domain: categories.map(category => CATEGORY_LABELS[category]), legend: colorLegend({ placement: 'bottom' }) },
+        color: { domain: categories.map(category => CATEGORY_LABELS[category]), range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: { use: tooltip, format: point => `${point.datum.name} · ${point.datum.category}: ${metricLabel(metric, point.datum.value)}` },
       }),
     [rankedRows, metric, categories],
