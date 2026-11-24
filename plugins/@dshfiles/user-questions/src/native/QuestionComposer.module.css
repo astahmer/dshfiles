@@ -366,14 +366,15 @@
   font-weight: 500;
 }
 
+/* Owned delta (unslop r3 item 23): "Recommended" is a muted chip; the indigo is reserved for interaction and Needs you. */
 .badge {
   padding: 0 4px;
   border-radius: var(--dsw-radius-xs);
-  background: var(--dsw-specific-sidebar-nav-item-active-accent);
-  color: var(--dsw-alias-button-info-fill);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-secondary);
   font-size: 11px;
   line-height: 18px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .description {
@@ -710,6 +711,17 @@
     content: '';
     position: absolute;
     inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+  }
+
+  /* Owned delta (unslop r3 item 23): the header's Collapse and Answer later sit on the body's positioned rows and on
+     each other; their areas win those strips, so each answers its full 44pt. */
+  .headerActions :where(button) {
+    z-index: 1;
+  }
+
+  /* Two 24px icons 4px apart cannot both answer 44pt: on touch they stand 20px apart. */
+  .headerActions {
+    column-gap: 20px;
   }
 }
 

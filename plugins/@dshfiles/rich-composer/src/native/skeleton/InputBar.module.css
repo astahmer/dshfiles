@@ -931,3 +931,40 @@
     inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
   }
 }
+
+/* Touch (unslop r3 item 23): the 44pt areas above must fit where they are hit-tested. A narrow bar is a scroll
+   container, which clips its children's areas to its padding box: give it room above the chips (taken back by the
+   margin, so nothing moves), and let + win the strip it shares with the chip beside it. The meter line's ⋯ gets the
+   same area; its line stops clipping, since every item in it shrinks or hides on its own. */
+@media (pointer: coarse) {
+  @container (max-width: 560px) {
+    .row {
+      padding-top: 8px;
+      margin-top: -8px;
+    }
+
+    .dock:not([data-meter-expanded]) {
+      overflow: visible;
+    }
+  }
+
+  .add {
+    z-index: 1;
+  }
+
+  .meterMore {
+    position: relative;
+  }
+
+  /* Send's own area ends 4px under the card, so ⋯'s reaches 7px up and 17px down; the line keeps 10px under it so that
+     reach stays on screen. */
+  .meterMore::after {
+    content: '';
+    position: absolute;
+    inset: -7px min(0px, calc((100% - 44px) / 2)) -17px;
+  }
+
+  .root:not(.hero) {
+    padding-bottom: 10px;
+  }
+}
