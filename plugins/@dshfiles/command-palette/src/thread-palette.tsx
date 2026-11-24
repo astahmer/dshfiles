@@ -149,8 +149,11 @@ const neutralMark = 'dshx:bg-muted dshx:text-muted-foreground'
 /** A picked colour paints text only through a lightness clamp, so a pale or dark pick still reads in both schemes. */
 const customMarkText = 'dshx:text-(--chip-light) dshx:dark:text-(--chip-dark)'
 
+/** How a thread row draws its project mark. */
+type ProjectMark = { readonly className: string; readonly style?: CSSProperties }
+
 /** The project mark of a thread row: its project's identity colour as text on a 16% tint of it, else neutral. */
-const projectMark = (color: PaletteProjectColor | undefined): { readonly className: string; readonly style?: CSSProperties } => {
+const projectMark = (color: PaletteProjectColor | undefined): ProjectMark => {
   if (color === undefined || (color.className === undefined && color.color === undefined)) return { className: neutralMark }
   const tint = 'color-mix(in srgb, currentColor 16%, transparent)'
   if (color.color === undefined) return { className: color.className ?? '', style: { backgroundColor: tint } }
@@ -238,6 +241,7 @@ const usePaletteViewport = (): CSSProperties | undefined => {
     }
   }, [])
   return useMemo(
+    // SAFETY: both keys are CSS custom properties, which React passes through as style; CSSProperties has no `--*` names.
     () => (box === null ? undefined : ({ '--palette-height': `${String(box.height)}px`, '--palette-top': `${String(box.top)}px` } as CSSProperties)),
     [box],
   )
