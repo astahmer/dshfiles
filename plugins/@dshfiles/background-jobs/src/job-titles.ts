@@ -1,3 +1,6 @@
+import { decodeJson } from '@dshfiles/dshx/json'
+import { Schema } from 'effect'
+
 /**
  * The description a tool call gave the job it started ("Build"). The native job registry keeps only the shell command,
  * so the transcript's tool card, which sees the call, records the title here and the job strip above the composer
@@ -5,15 +8,16 @@
  */
 const titles = new Map<string, string>()
 const listeners = new Set<() => void>()
+/** The one argument of a bash or pwsh call the strip reads. */
+const callArgsSchema = Schema.Struct({ description: Schema.String })
 
 export class JobTitles {
   /** The `description` of a bash or pwsh call, from its raw arguments. */
   static readonly descriptionOf = (argsRaw: string | undefined): string | undefined => {
     if (argsRaw === undefined) return undefined
     try {
-      const args: unknown = JSON.parse(argsRaw)
-      const description = typeof args === 'object' && args !== null && 'description' in args ? args.description : undefined
-      return typeof description === 'string' && description.trim() !== '' ? description.trim() : undefined
+      const description = decodeJson(callArgsSchema, argsRaw).description.trim()
+      return description === '' ? undefined : description
     } catch {
       return undefined
     }
