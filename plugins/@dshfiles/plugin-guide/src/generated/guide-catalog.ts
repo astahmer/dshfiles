@@ -1660,7 +1660,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "ThreadHeaderLand",
       "importFrom": "@dshfiles/jj-integration/thread-header-land",
       "owner": "@dshfiles/jj-integration",
-      "source": "plugins/@dshfiles/jj-integration/src/thread-header-land.ts:20",
+      "source": "plugins/@dshfiles/jj-integration/src/thread-header-land.ts:27",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "contract:@dshfiles/jj-integration.thread-header-land",
