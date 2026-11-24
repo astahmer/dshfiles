@@ -597,6 +597,61 @@ describe('ThreadPalette thread actions and keycaps', () => {
   })
 })
 
+describe('ThreadPalette goes to threads', () => {
+  const fakeThreads = [
+    { id: 'session-fake-1', title: 'Fake provider seeds', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 3 },
+    { id: 'session-fake-2', title: 'Fake child run', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 2 },
+    { id: 'session-fake-3', title: 'Remove the fake clock', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 1 },
+  ]
+  const settingsAction = {
+    id: '@journey/test/settings-projects',
+    label: 'Settings: Projects',
+    aliases: ['fake projects', 'workspaces'],
+    group: 'destination' as const,
+    run: () => undefined,
+  }
+  const palette = (input: { readonly threadStatusOf?: Parameters<typeof ThreadPalette>[0]['threadStatusOf'] } = {}) => (
+    <ThreadPalette
+      mode="all"
+      threads={fakeThreads}
+      {...(input.threadStatusOf === undefined ? {} : { threadStatusOf: input.threadStatusOf })}
+      context={context}
+      additionalActions={[settingsAction]}
+      recentLimit={6}
+      mac
+      copy={copy}
+      searchContent={null}
+      onAsk={vi.fn(async () => {})}
+      onBacklogCapture={vi.fn(() => true)}
+      onOpenThread={vi.fn()}
+      onClose={vi.fn()}
+    />
+  )
+
+  it('orders groups by their best match, so a thread whose title matches comes before a command alias', async () => {
+    // "fake" ranked Settings: Projects above three matching threads, so Enter opened Settings (F7).
+    render(palette())
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'fake' } })
+    await waitFor(() => expect(screen.getAllByRole('option')[0]?.textContent).toContain('Fake provider seeds'))
+    expect(screen.getAllByRole('option').some(option => option.textContent?.includes('Settings: Projects'))).toBe(true)
+  })
+
+  it('leads with recent threads on an empty query', async () => {
+    // The empty palette led with Go to file, Export and Import (F26).
+    render(palette())
+    await waitFor(() => expect(screen.getAllByRole('option')[0]?.textContent).toContain('Fake provider seeds'))
+  })
+
+  it("draws a thread's status with the list's glyph and word", async () => {
+    // A thread that waits for an answer read "Working" here while the list said Needs you.
+    render(palette({ threadStatusOf: thread => (thread.id === 'session-fake-2' ? { status: 'needs-you', label: 'Needs you' } : undefined) }))
+    const row = await screen.findByRole('option', { name: /Fake child run/ })
+    expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('needs-you')
+    expect(row.textContent).toContain('Needs you')
+    expect(row.textContent).not.toContain('Working')
+  })
+})
+
 describe('ThreadPalette on a phone (unslop phone 27)', () => {
   it('is a full-screen search sized to the visual viewport, with no key legend', async () => {
     // The software keyboard leaves 508px of an 844px screen; the palette ends where it starts.

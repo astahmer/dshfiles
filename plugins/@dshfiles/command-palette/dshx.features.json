@@ -5,7 +5,7 @@
       "id": "palette-search",
       "title": "Search threads and workspace files",
       "summary": "Search threads by title, project or id, and files in the workspace.",
-      "details": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all.",
+      "details": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all. On Everything, threads come before commands when their best match is stronger, and an empty search leads with recent threads; a thread row draws the thread list's status glyph and word when a provider (thread-sidebar) adds one to PaletteThreadStatuses.",
       "surfaces": ["client"],
       "surface": "command",
       "destination": "none",

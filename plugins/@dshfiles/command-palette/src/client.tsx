@@ -25,6 +25,7 @@ import {
   CommandPalette,
   PaletteActions,
   PaletteProjectColors,
+  PaletteThreadStatuses,
   type CommandPaletteState,
   type PaletteAction,
   type PaletteActionContext,
@@ -37,6 +38,12 @@ import { ThreadPalette } from './thread-palette.js'
 const defaultSettings: PaletteSettings = paletteSettings.schema({})
 
 /** The web new-thread chord (plan Q2 T2.5): Cmd+T and Cmd+N belong to the browser tab. */
+const noStatusSnapshot = (): null => null
+const noStatusSubscribe =
+  (_listener: () => void): (() => void) =>
+  () =>
+    undefined
+
 const NEW_THREAD_CHORD = 'Mod+Shift+O'
 /** Sent by the composer (rich-composer's InputBar) when a send should be followed by a fresh new-thread draft. */
 const START_NEW_THREAD_EVENT = 'dshfiles:start-new-thread'
@@ -204,6 +211,17 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     const repositoryById = new Map<string, string | undefined>(threadEntries.map(entry => [entry.thread.id, entry.repository]))
     return (thread: ThreadCandidate) => projectColorSource.colorOf({ path: repositoryById.get(thread.id), title: thread.project })
   }, [projectColorSource, threadEntries])
+  // The thread list's status per thread (glyph and word); without a provider rows keep their own running fact.
+  const threadStatusSource = useRegistry(PaletteThreadStatuses).at(-1)
+  const threadStatuses = useSyncExternalStore(
+    threadStatusSource?.subscribe ?? noStatusSubscribe,
+    threadStatusSource?.getSnapshot ?? noStatusSnapshot,
+    threadStatusSource?.getSnapshot ?? noStatusSnapshot,
+  )
+  const threadStatusOf = useMemo(
+    () => (threadStatuses === null ? undefined : (thread: ThreadCandidate) => threadStatuses.get(thread.id)),
+    [threadStatuses],
+  )
   const threadsScope = (useSettings(paletteSettings).value ?? defaultSettings).threadsScope
   const currentRepository = threadsScope === 'project' ? repositoryOf(askWorkspaceId) : undefined
   const projectThreads = useMemo(
@@ -232,6 +250,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       threads={threads}
       {...(projectThreads === undefined ? {} : { projectThreads })}
       {...(projectColorOf === undefined ? {} : { projectColorOf })}
+      {...(threadStatusOf === undefined ? {} : { threadStatusOf })}
       context={context}
       additionalActions={workspaceActions}
       recentLimit={recentLimit}

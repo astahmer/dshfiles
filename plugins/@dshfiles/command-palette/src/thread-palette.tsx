@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from 'react'
@@ -14,7 +15,7 @@ import { paletteNavigationMachine } from './palette-navigation-machine.js'
 import { useWorkspaceFiles } from './workspace-files-machine.js'
 import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palette.js'
 import { PaletteApi } from './palette-api.js'
-import type { PaletteAction, PaletteActionContext, PaletteMode, PaletteProjectColor } from './palette-contract.js'
+import type { PaletteAction, PaletteActionContext, PaletteMode, PaletteProjectColor, PaletteThreadStatus } from './palette-contract.js'
 import { paletteActionMachine } from './palette-action-machine.js'
 
 export interface ThreadPaletteCopy {
@@ -95,6 +96,8 @@ interface ThreadPaletteProps {
   readonly projectThreads?: readonly ThreadCandidate[]
   /** The colour the thread list gives a thread's project; without it, project marks stay neutral. */
   readonly projectColorOf?: (thread: ThreadCandidate) => PaletteProjectColor | undefined
+  /** The thread list's status of a thread (glyph and word); without it a row says Working or Idle from its own turn. */
+  readonly threadStatusOf?: (thread: ThreadCandidate) => PaletteThreadStatus | undefined
   readonly context: PaletteActionContext
   readonly additionalActions: readonly PaletteAction[]
   readonly recentLimit: number
@@ -346,17 +349,18 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   )
   const threadSearch = PaletteRules.parseThreadSearchInput(deferredQuery)
   const rankedThreadIndex = view === 'threads' && threadSearch.exactId === undefined ? (projectThreadIndex ?? threadIndex) : threadIndex
-  const threadRows = useMemo(
+  const rankedThreads = useMemo(
     () =>
       view === 'all' || view === 'threads'
-        ? PaletteRules.rankThreads({
+        ? PaletteRules.rankThreadsScored({
             index: rankedThreadIndex,
             query: threadSearch.query,
             limit: threadSearch.query.length === 0 ? props.recentLimit : RESULT_LIMIT,
           })
-        : [],
+        : { rows: [], best: -Infinity },
     [props.recentLimit, rankedThreadIndex, threadSearch.query, view],
   )
+  const threadRows = rankedThreads.rows
   const exactSearchId = threadSearch.exactId?.toLocaleLowerCase()
   const missingSessionId =
     (view === 'all' || view === 'threads') && exactSearchId !== undefined && !threadIndex.entries.some(entry => entry.id === exactSearchId)
@@ -425,38 +429,46 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     [props.copy.goToFile],
   )
   // The thread the user is on comes first: its own verbs, under "Actions for …" (plan Q2 T2.4).
-  const threadActionRows = useMemo(
+  const rankedThreadActions = useMemo(
     () =>
       view === 'all' || view === 'commands'
-        ? PaletteRules.rankActions({ actions: actionOptions.filter(action => action.group === 'thread'), query: deferredQuery, boost: () => 0 })
-        : [],
+        ? PaletteRules.rankActionsScored({ actions: actionOptions.filter(action => action.group === 'thread'), query: deferredQuery, boost: () => 0 })
+        : { rows: [], best: -Infinity },
     [actionOptions, deferredQuery, view],
   )
+  const threadActionRows = rankedThreadActions.rows
   const threadActionHeading = threadActionRows.find(action => action.heading !== undefined)?.heading
-  const destinationRows = useMemo(
+  const rankedDestinations = useMemo(
     () =>
       view === 'all' || view === 'commands'
-        ? PaletteRules.rankActions({
+        ? PaletteRules.rankActionsScored({
             actions: [goToFile, ...actionOptions.filter(action => action.group !== 'command' && action.group !== 'thread')],
             query: deferredQuery,
             boost: id => boosts.get(id) ?? 0,
           })
-        : [],
+        : { rows: [], best: -Infinity },
     [actionOptions, boosts, deferredQuery, goToFile, view],
   )
-  const commandRows = useMemo(() => {
-    if (view !== 'all' && view !== 'commands') return []
+  const destinationRows = rankedDestinations.rows
+  const rankedCommands = useMemo(() => {
+    if (view !== 'all' && view !== 'commands') return { rows: [], best: -Infinity }
     const commands = actionOptions.filter(action => action.group === 'command')
-    if (view === 'commands')
-      return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, RESULT_LIMIT)
-    if (deferredQuery.trim().length > 0)
-      return PaletteRules.rankActions({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 }).slice(0, COMMAND_LIMIT)
-    return PaletteRules.rankActions({
-      actions: commands.filter(command => boosts.has(command.id) || command.suggested === true),
-      query: '',
-      boost: id => boosts.get(id) ?? 0,
-    }).slice(0, FRECENT_COMMANDS_ON_EMPTY)
+    const ranked =
+      view === 'commands' || deferredQuery.trim().length > 0
+        ? PaletteRules.rankActionsScored({ actions: commands, query: deferredQuery, boost: id => boosts.get(id) ?? 0 })
+        : PaletteRules.rankActionsScored({
+            actions: commands.filter(command => boosts.has(command.id) || command.suggested === true),
+            query: '',
+            boost: id => boosts.get(id) ?? 0,
+          })
+    const limit = view === 'commands' ? RESULT_LIMIT : deferredQuery.trim().length > 0 ? COMMAND_LIMIT : FRECENT_COMMANDS_ON_EMPTY
+    return { rows: ranked.rows.slice(0, limit), best: ranked.best }
   }, [actionOptions, boosts, deferredQuery, view])
+  const commandRows = rankedCommands.rows
+  // Groups go by their best match (F7): "fake" ranked Settings › Projects above three threads whose titles say fake. An
+  // empty search leads with recent threads (F26); the verbs of the thread the user is on follow them.
+  const threadsFirst =
+    threadRows.length > 0 && (emptyQuery || rankedThreads.best >= Math.max(rankedThreadActions.best, rankedDestinations.best, rankedCommands.best))
 
   const rows: PaletteRow[] = useMemo(
     () => [
@@ -465,13 +477,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
       ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
       ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
+      ...(threadsFirst ? threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })) : []),
       ...threadActionRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...commandRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
-      ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
+      ...(threadsFirst ? [] : threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread }))),
     ],
-    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadActionRows, threadRows],
+    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadActionRows, threadRows, threadsFirst],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
@@ -614,6 +627,62 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   else if (view === 'files' && (workspaceFiles.status === 'loading' || workspaceFiles.status === 'indexing')) filesStatus = props.copy.filesIndexing
   else if (view === 'files' && workspaceFiles.truncated) filesStatus = props.copy.filesTruncated
 
+  const hasActionRows = threadActionRows.length > 0 || destinationRows.length > 0 || commandRows.length > 0
+  const threadGroup =
+    threadRows.length === 0 ? null : (
+      <>
+        {!threadsFirst && (destinationRows.length > 0 || commandRows.length > 0) ? <CommandSeparator className="dshx:my-1" /> : null}
+        <CommandGroup heading={emptyQuery ? props.copy.recent : props.copy.threads}>
+          {threadRows.map(thread => {
+            const row: PaletteRow = { kind: 'thread', thread }
+            const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
+            const mark = thread.project.length > 0 ? projectMark(props.projectColorOf?.(thread)) : { className: neutralMark }
+            // The list's status, rolled up: a thread that waits for an answer is Needs you here too, not Working.
+            const listed = props.threadStatusOf?.(thread)
+            return (
+              <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
+                <span
+                  className={cn(
+                    'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
+                    mark.className,
+                  )}
+                  style={mark.style}
+                  data-palette-project-mark=""
+                  aria-hidden="true"
+                >
+                  {thread.project.length > 0 ? project.slice(0, 2).toLocaleUpperCase() : <MessageSquareIcon className="dshx:size-3.5" />}
+                </span>
+                <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                  <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
+                  <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
+                    <span className="dshx:min-w-0 dshx:truncate">
+                      {[
+                        project,
+                        thread.updatedAt > 0 ? new Date(thread.updatedAt).toLocaleDateString() : null,
+                        listed !== undefined || thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle,
+                      ]
+                        .filter(value => value !== null)
+                        .join(' · ')}
+                    </span>
+                    {listed === undefined ? null : (
+                      <>
+                        <span aria-hidden="true">·</span>
+                        <StatusGlyph status={listed.status} decorative />
+                        <span className="dshx:shrink-0" data-palette-thread-status="">
+                          {listed.label}
+                        </span>
+                      </>
+                    )}
+                  </span>
+                </span>
+                {shortcut(row)}
+              </CommandItem>
+            )
+          })}
+        </CommandGroup>
+        {threadsFirst && hasActionRows ? <CommandSeparator className="dshx:my-1" /> : null}
+      </>
+    )
   return (
     <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
       <DialogContent
@@ -798,6 +867,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 })}
               </CommandGroup>
             ) : null}
+            {threadsFirst ? threadGroup : null}
             {threadActionRows.length > 0 ? (
               <>
                 <CommandGroup heading={threadActionHeading ?? props.copy.commands} data-palette-thread-actions="">
@@ -833,44 +903,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 })}
               </CommandGroup>
             ) : null}
-            {(destinationRows.length > 0 || commandRows.length > 0) && threadRows.length > 0 ? <CommandSeparator className="dshx:my-1" /> : null}
-            {threadRows.length > 0 ? (
-              <CommandGroup heading={emptyQuery ? props.copy.recent : props.copy.threads}>
-                {threadRows.map(thread => {
-                  const row: PaletteRow = { kind: 'thread', thread }
-                  const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
-                  const mark = thread.project.length > 0 ? projectMark(props.projectColorOf?.(thread)) : { className: neutralMark }
-                  return (
-                    <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <span
-                        className={cn(
-                          'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
-                          mark.className,
-                        )}
-                        style={mark.style}
-                        data-palette-project-mark=""
-                        aria-hidden="true"
-                      >
-                        {thread.project.length > 0 ? project.slice(0, 2).toLocaleUpperCase() : <MessageSquareIcon className="dshx:size-3.5" />}
-                      </span>
-                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-                        <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
-                        <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-                          {[
-                            project,
-                            thread.updatedAt > 0 ? new Date(thread.updatedAt).toLocaleDateString() : null,
-                            thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle,
-                          ]
-                            .filter(value => value !== null)
-                            .join(' · ')}
-                        </span>
-                      </span>
-                      {shortcut(row)}
-                    </CommandItem>
-                  )
-                })}
-              </CommandGroup>
-            ) : null}
+            {threadsFirst ? null : threadGroup}
           </CommandList>
         </Command>
         <footer

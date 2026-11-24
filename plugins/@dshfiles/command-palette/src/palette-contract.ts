@@ -4,6 +4,7 @@
  * none of the palette's runtime.
  */
 import { defineContract, defineRegistry, type Subscribable } from '@dshfiles/dshx/client'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { ReactNode } from 'react'
 
 export interface PaletteWorkspace {
@@ -83,6 +84,22 @@ export interface PaletteProjectColorSource {
 
 /** The plugin that owns project colours adds one source; the latest wins. Without one, project marks stay neutral ink. */
 export const PaletteProjectColors = defineRegistry<PaletteProjectColorSource>('@dshfiles/command-palette.project-color')
+
+/** A thread row's status: the shared glyph and one of the six words, in the providing plugin's language. */
+export interface PaletteThreadStatus {
+  readonly status: WorkStatus
+  readonly label: string
+}
+
+/** What the thread list says of each thread, so a palette row and a list row never disagree (DESIGN.md R2). */
+export interface PaletteThreadStatusSource {
+  /** Null while the provider projects no statuses; then rows keep their own running fact. */
+  readonly getSnapshot: () => ReadonlyMap<string, PaletteThreadStatus> | null
+  readonly subscribe: (listener: () => void) => () => void
+}
+
+/** The plugin that owns thread statuses adds one source; the latest wins. */
+export const PaletteThreadStatuses = defineRegistry<PaletteThreadStatusSource>('@dshfiles/command-palette.thread-status')
 
 /** Rows other plugins add with `api.add(PaletteActions, action)`; they wait here while the palette loads. */
 export const PaletteActions = defineRegistry<PaletteAction>('@dshfiles/command-palette.action')

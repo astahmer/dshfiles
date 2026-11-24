@@ -121,10 +121,19 @@ const indexThreads = (threads: readonly ThreadCandidate[]): ThreadIndex => ({
 
 const weighted = (score: number | null, weight: number): number => (score === null ? -Infinity : score * weight)
 
+/** Ranked rows with the best row's score, so the palette can order its groups by their best match. */
+export interface Scored<Row> {
+  readonly rows: Row[]
+  /** The first row's score; -Infinity when nothing matched, 0 for an empty query. */
+  readonly best: number
+}
+
 /** Recent threads for an empty query; otherwise the best title, project, path or id matches. */
-const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query: string; limit: number }): ThreadCandidate[] => {
+const rankThreads = (input: { index: ThreadIndex; query: string; limit: number }): ThreadCandidate[] => rankThreadsScored(input).rows
+
+const rankThreadsScored = ({ index, query, limit }: { index: ThreadIndex; query: string; limit: number }): Scored<ThreadCandidate> => {
   const needle = parseThreadSearchInput(query).query.toLocaleLowerCase()
-  if (needle.length === 0) return index.recent.slice(0, limit)
+  if (needle.length === 0) return { rows: index.recent.slice(0, limit), best: 0 }
   const matches: Array<{ readonly thread: ThreadCandidate; readonly best: number }> = []
   for (const entry of index.entries) {
     const best = Math.max(
@@ -135,10 +144,8 @@ const rankThreads = ({ index, query, limit }: { index: ThreadIndex; query: strin
     )
     if (best !== -Infinity) matches.push({ thread: entry.thread, best })
   }
-  return matches
-    .sort((left, right) => right.best - left.best || right.thread.updatedAt - left.thread.updatedAt)
-    .slice(0, limit)
-    .map(({ thread }) => thread)
+  const sorted = matches.sort((left, right) => right.best - left.best || right.thread.updatedAt - left.thread.updatedAt).slice(0, limit)
+  return { rows: sorted.map(({ thread }) => thread), best: sorted[0]?.best ?? -Infinity }
 }
 
 /** Lowercased paths and basenames, built once per file list. */
@@ -184,7 +191,10 @@ export interface RankableAction {
 }
 
 /** Labels weigh more than aliases; frecency breaks ties and lifts habits, and keeps source order otherwise. */
-const rankActions = <Action extends RankableAction>({
+const rankActions = <Action extends RankableAction>(input: { actions: readonly Action[]; query: string; boost: (id: string) => number }): Action[] =>
+  rankActionsScored(input).rows
+
+const rankActionsScored = <Action extends RankableAction>({
   actions,
   query,
   boost,
@@ -192,7 +202,7 @@ const rankActions = <Action extends RankableAction>({
   actions: readonly Action[]
   query: string
   boost: (id: string) => number
-}): Action[] => {
+}): Scored<Action> => {
   const needle = query.trim().toLocaleLowerCase()
   const matches: Array<{ readonly action: Action; readonly score: number; readonly order: number }> = []
   actions.forEach((action, order) => {
@@ -205,7 +215,8 @@ const rankActions = <Action extends RankableAction>({
     for (const alias of action.aliases ?? []) best = Math.max(best, weighted(scoreLowered(needle, alias.toLocaleLowerCase()), 1))
     if (best !== -Infinity) matches.push({ action, score: best + bonus, order })
   })
-  return matches.sort((left, right) => right.score - left.score || left.order - right.order).map(({ action }) => action)
+  const sorted = matches.sort((left, right) => right.score - left.score || left.order - right.order)
+  return { rows: sorted.map(({ action }) => action), best: sorted[0]?.score ?? -Infinity }
 }
 
 export class PaletteRules {
@@ -219,7 +230,9 @@ export class PaletteRules {
   static readonly indexThreads = indexThreads
   static readonly isTopLevelThread = isTopLevelThread
   static readonly rankThreads = rankThreads
+  static readonly rankThreadsScored = rankThreadsScored
   static readonly indexFiles = indexFiles
   static readonly rankFiles = rankFiles
   static readonly rankActions = rankActions
+  static readonly rankActionsScored = rankActionsScored
 }
