@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { fileURLToPath } from 'node:url'
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import test from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { stripVTControlCharacters } from 'node:util'
 import { selectTests } from './test-selection.mjs'
 
 const packages = [
@@ -43,6 +47,91 @@ test('consumer narrowing drops unrelated dependents and keeps bundle-boot tests'
   assert.equal(consumers.get('@dshfiles/jj-integration'), 0)
   assert.ok(consumers.get('@dshfiles/thread-sidebar') >= 1)
   assert.ok([...consumers.values()].reduce((sum, count) => sum + count, 0) <= 20)
+})
+
+test('Vitest gets one passWithNoTests option for related and narrowed runs', t => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'test-selection-vitest-')))
+  t.after(() => rmSync(root, { recursive: true, force: true }))
+  const write = (path, content, mode) => {
+    mkdirSync(dirname(join(root, path)), { recursive: true })
+    writeFileSync(join(root, path), content, { mode })
+  }
+  const owner = 'plugins/@dshfiles/fixture-owner'
+  const consumer = 'plugins/@dshfiles/ui-styles'
+  const manifest = (dir, name, command, dependencies) => write(`${dir}/package.json`, JSON.stringify({ name, scripts: { test: command }, dependencies }))
+  const setConsumerTest = flag => manifest(consumer, '@dshfiles/ui-styles', `vitest run ${flag}`, { '@dshfiles/fixture-owner': 'workspace:*' })
+  manifest(owner, '@dshfiles/fixture-owner', 'vitest run')
+  setConsumerTest('--passWithNoTests')
+  write(`${owner}/src/input.ts`, 'export type Fixture = number\n')
+  write(`${consumer}/src/empty.ts`, 'export {}\n')
+  write(
+    `${consumer}/tests/inert.test.ts`,
+    `import { appendFileSync } from 'node:fs'
+import type { Fixture } from '@dshfiles/fixture-owner'
+import { test } from 'vitest'
+test('inert', () => appendFileSync(new URL('./inert.runs', import.meta.url), 'inert\\n'))
+`,
+  )
+  const vitest = realpathSync(resolve(import.meta.dirname, '../plugins/@dshfiles/ui-styles/node_modules/vitest'))
+  mkdirSync(join(root, 'tooling/dshx/packages'), { recursive: true })
+  mkdirSync(join(root, 'scripts'))
+  copyFileSync(selectionScript, join(root, 'scripts/test-selection.mjs'))
+  copyFileSync(join(import.meta.dirname, 'turbo-cache.mjs'), join(root, 'scripts/turbo-cache.mjs'))
+  mkdirSync(join(root, 'node_modules'))
+  symlinkSync(resolve(import.meta.dirname, '../node_modules/effect'), join(root, 'node_modules/effect'), 'dir')
+  symlinkSync(vitest, join(root, 'node_modules/vitest'), 'dir')
+
+  // Record the selector's actual arguments and run the installed Vitest CLI. The type-only
+  // dependency has no build to run, so only that Turbo command is stubbed out.
+  const calls = join(root, 'calls.jsonl')
+  write(
+    'bin/pnpm',
+    `#!/usr/bin/env node
+const { appendFileSync } = require('node:fs')
+const { spawnSync } = require('node:child_process')
+const args = process.argv.slice(2)
+if (args.slice(0, 4).join(' ') === 'exec turbo run build') process.exit(0)
+if (args[0] !== 'exec' || args[1] !== 'vitest') process.exit(2)
+appendFileSync(${JSON.stringify(calls)}, JSON.stringify(args.slice(2)) + '\\n')
+const result = spawnSync(process.execPath, [${JSON.stringify(join(vitest, 'vitest.mjs'))}, ...args.slice(2)], { stdio: 'inherit' })
+process.exit(result.status ?? 2)
+`,
+    0o755,
+  )
+  const run = (path, status = 0) => {
+    writeFileSync(calls, '')
+    const result = spawnSync(process.execPath, [join(root, 'scripts/test-selection.mjs'), 'related', path], {
+      cwd: root,
+      env: { ...process.env, CI: '1', PATH: `${join(root, 'bin')}:${process.env.PATH}` },
+      encoding: 'utf8',
+    })
+    const output = stripVTControlCharacters(`${result.stdout}${result.stderr}`)
+    assert.equal(result.status, status, output)
+    return {
+      output,
+      args: readFileSync(calls, 'utf8')
+        .trim()
+        .split('\n')
+        .map(line => JSON.parse(line)),
+    }
+  }
+
+  const narrowed = run(`${owner}/src/input.ts`)
+  assert.deepEqual(narrowed.args, [
+    ['run', 'tests/inert.test.ts', '--passWithNoTests'],
+    ['related', '--run', 'src/input.ts', '--passWithNoTests'],
+  ])
+  const related = run(`${consumer}/src/empty.ts`)
+  assert.deepEqual(related.args, [['related', '--run', 'src/empty.ts', '--passWithNoTests']])
+  assert.match(related.output, /No test files found, exiting with code 0/)
+  for (const flag of ['--passWithNoTests=false', '--no-pass-with-no-tests']) {
+    setConsumerTest(flag)
+    const { args, output } = run(`${consumer}/src/empty.ts`, 1)
+    assert.deepEqual(args, [['related', '--run', 'src/empty.ts', flag]])
+    assert.match(output, /No test files found, exiting with code 1/)
+  }
+  // The test body must run exactly once; a successful empty run cannot write this.
+  assert.equal(readFileSync(join(root, consumer, 'tests/inert.runs'), 'utf8'), 'inert\n')
 })
 
 test('CLI rejects an unknown build mode', () => {
