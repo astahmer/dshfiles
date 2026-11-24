@@ -176,6 +176,7 @@ import { ContinueInProjectItems } from './continue-in-menu.js'
 import { projectTextTone } from './project-tone.js'
 import { useSavedProjectChip } from './project-colors.js'
 import { PaletteProjectColorsModel } from './palette-project-colors.js'
+import { RowArrivalTintModel } from './row-arrival-tint.js'
 import { useThreadDirectories } from './use-thread-directories.js'
 import {
   failedResumeNotice,
@@ -1448,6 +1449,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const showMachine = rowStyle.machine && props.machine !== undefined
   const showPath = rowStyle.path && session.cwd !== undefined && session.cwd.length > 0
   const workStatus = props.workStatus
+  // A row that just became Needs you, Failed or Ready on screen holds that colour's tint for a moment (round two, item 15).
+  const arrival = RowArrivalTintModel.useTint(session.id, workStatus?.status)
   // The status glyph keeps its own 16px seat on line 1; line 2's seat holds the project mark under it.
   const leadSeat = workStatus !== undefined || rowStyle.statusDot
   const inlineVerb = workStatus?.verb
@@ -1656,6 +1659,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           )}
           style={swipe.offset === 0 ? undefined : { transform: `translateX(${String(swipe.offset)}px)` }}
         >
+          {arrival.tint === undefined ? null : <RowArrivalTintModel.Tint key={arrival.tint.key} tint={arrival.tint} onEnd={arrival.end} />}
           {props.renaming ? (
             <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center', compact ? 'dshx:px-2 dshx:py-1.5' : 'dshx:px-2.5 dshx:py-2.5')}>
               <InlineTitleEditor
