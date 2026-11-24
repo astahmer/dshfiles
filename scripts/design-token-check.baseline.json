@@ -8,12 +8,12 @@
     "numeric-duration": 47,
     "viewport-variant": 46,
     "solid-status-fill": 35,
-    "chart-hue": 52,
+    "chart-hue": 37,
     "palette-colour": 2,
     "uppercase": 20,
+    "local-duration-formatter": 1,
     "unguarded-loop-animation": 10,
-    "outline-without-focus": 4,
-    "local-duration-formatter": 12
+    "outline-without-focus": 4
   },
   "counts": {
     "arbitrary-radius/attachment-gallery": 1,
@@ -33,7 +33,6 @@
     "arbitrary-text/thread-sidebar": 2,
     "arbitrary-text/workbench": 1,
     "chart-hue/backlog": 5,
-    "chart-hue/command-palette": 15,
     "chart-hue/memory": 1,
     "chart-hue/plugin-ui": 2,
     "chart-hue/traces": 14,
@@ -57,9 +56,7 @@
     "default-shadow/settings-shell": 1,
     "default-shadow/thread-sidebar": 6,
     "default-shadow/workspace-folder-picker": 1,
-    "local-duration-formatter/agent-plan": 3,
     "local-duration-formatter/ai-accounts": 1,
-    "local-duration-formatter/thread-sidebar": 4,
     "native-icons/agent-preset": 9,
     "native-icons/chat": 12,
     "native-icons/cordis-cards": 11,
