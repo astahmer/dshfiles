@@ -51,12 +51,15 @@ export interface StatusGlyphProps extends Omit<React.ComponentPropsWithoutRef<'s
   readonly decorative?: boolean
 }
 
-/** Colour lives here only for the two attention states (indigo Needs you, red Failed); the rest are greys. */
+/**
+ * DESIGN.md › Colour roles: the two attention states keep their hues (indigo Needs you, red Failed), Ready is the green
+ * result dot, Working is an ink ring whose motion says it, and the rest are greys.
+ */
 const glyphClass = {
-  working: 'dshx:text-muted-foreground',
+  working: 'dshx:text-status-working',
   'needs-you': 'dshx:text-info',
   failed: 'dshx:text-destructive',
-  ready: 'dshx:text-foreground',
+  ready: 'dshx:text-status-ready',
   idle: 'dshx:text-(--dsw-alias-label-tertiary)',
   done: 'dshx:text-muted-foreground',
   stale: 'dshx:text-(--dsw-alias-label-tertiary)',
@@ -112,15 +115,33 @@ const GlyphMark = ({ status }: { readonly status: StatusGlyphState }): React.JSX
   }
 }
 
+/** The 120ms cross-fade of a mark that replaced another while on screen (opacity only under reduced motion). */
+const markEnter = 'dshx:animate-in dshx:fade-in-0 dshx:zoom-in-80 dshx:duration-(--dshx-duration-fade) dshx:ease-enter'
+
+/**
+ * Whether the glyph has changed status since it mounted. The previous status is kept from the last render, so a row
+ * that mounts already Ready (a virtualised row scrolling back in) draws its mark at once instead of replaying a change.
+ */
+function useChangedWhileMounted(status: StatusGlyphState): boolean {
+  const [seen, setSeen] = React.useState({ status, changed: false })
+  if (seen.status !== status) {
+    setSeen({ status, changed: true })
+    return true
+  }
+  return seen.changed
+}
+
 /**
  * The status mark of a work item, in a fixed 16 px box so rows align whatever the state (StatusGlyph v2): working is
- * a colourless phase-synced spinner, needs-you the indigo diamond, failed the red cross, ready a solid dot, idle a
- * faint ring, done a muted check, stale a dashed ring, stopped a muted square.
+ * an ink phase-synced spinner, needs-you the indigo diamond, failed the red cross, ready a green dot, idle a faint
+ * ring, done a muted check, stale a dashed ring, stopped a muted square. A mark that changes while on screen
+ * cross-fades in 120ms.
  */
 export const StatusGlyph = React.forwardRef<HTMLSpanElement, StatusGlyphProps>(function StatusGlyph(
   { status, label, decorative = false, className, ...props },
   ref,
 ) {
+  const changed = useChangedWhileMounted(status)
   return (
     <span
       ref={ref}
@@ -132,7 +153,9 @@ export const StatusGlyph = React.forwardRef<HTMLSpanElement, StatusGlyphProps>(f
       className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', glyphClass[status], className)}
       {...props}
     >
-      <GlyphMark status={status} />
+      <span key={status} data-glyph-mark="" className={cn('dshx:inline-flex dshx:items-center dshx:justify-center', changed && markEnter)}>
+        <GlyphMark status={status} />
+      </span>
     </span>
   )
 })

@@ -70,12 +70,30 @@ describe('WorkStatus', () => {
       expect(glyph.getAttribute('data-status')).toBe(status)
     }
     const classOf = (status: WorkStatus): string => view.getByRole('img', { name: WorkStatusModel.label(status) }).className
-    expect(classOf('working')).toContain('text-muted-foreground')
     expect(classOf('needs-you')).toContain('text-info')
     expect(classOf('failed')).toContain('text-destructive')
     expect(classOf('idle')).toContain('label-tertiary')
-    // Colour is a signal: only the two attention states carry a hue.
-    expect(classOf('ready')).not.toMatch(/text-(info|destructive|success|warning)/)
+    // DESIGN.md › Colour roles: Ready is the green result dot; Working is motion in ink, never a hue.
+    expect(classOf('ready')).toContain('dshx:text-status-ready')
+    expect(classOf('working')).toContain('dshx:text-status-working')
+    expect(classOf('working')).not.toMatch(/text-(info|destructive|success|warning|muted-foreground)/)
+  })
+
+  it('cross-fades the mark only when the status changes while mounted', () => {
+    const mark = (container: HTMLElement): Element | null => container.querySelector('[data-slot="status-glyph"] > [data-glyph-mark]')
+    const enter = ['dshx:animate-in', 'dshx:fade-in-0', 'dshx:zoom-in-80', 'dshx:duration-(--dshx-duration-fade)']
+    const view = render(<StatusGlyph status="working" />)
+    // A first mount (a virtualised row scrolling in) never replays a change it did not see.
+    expect(mark(view.container)?.className ?? '').not.toContain('animate-in')
+    view.rerender(<StatusGlyph status="ready" />)
+    const changed = mark(view.container)
+    for (const token of enter) expect(changed?.className.split(' ')).toContain(token)
+    // Re-rendering the same status keeps the node, so the 120ms fade does not run again.
+    view.rerender(<StatusGlyph status="ready" className="dshx:ml-1" />)
+    expect(mark(view.container)).toBe(changed)
+    cleanup()
+    const remounted = render(<StatusGlyph status="ready" />)
+    expect(mark(remounted.container)?.className ?? '').not.toContain('animate-in')
   })
 
   it('draws the glyph-only stale and stopped states and phase-locks the working spinner', () => {
