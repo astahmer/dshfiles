@@ -60,6 +60,15 @@ test('remote threads share view groups by default and can be separated', () => {
   assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, separateRemoteThreads: true })?.separateRemoteThreads, true)
 })
 
+test('project names are coloured by default, and a saved choice of plain names is kept', () => {
+  const { threadRowProjectColor, ...older } = DEFAULT_PREFERENCES
+  assert.equal(threadRowProjectColor, true)
+  assert.equal(threadSidebarSettings.schema({}).threadRowProjectColor, true)
+  assert.equal(SidebarPreferencesModel.decode(older)?.threadRowProjectColor, true)
+  assert.equal(SidebarPreferencesModel.decode({ ...DEFAULT_PREFERENCES, threadRowProjectColor: false })?.threadRowProjectColor, false)
+  assert.equal(threadSidebarSettings.schema({ threadRowProjectColor: false }).threadRowProjectColor, false)
+})
+
 test('older preferences without group collapse default to no collapsed groups', () => {
   const { collapsedGroups, ...older } = DEFAULT_PREFERENCES
   assert.ok(collapsedGroups.length === 0)

@@ -261,8 +261,9 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   paletteRecentLimit: 20,
   threadRowDensity: 'compact',
   threadRowProject: true,
-  // Colour is a signal (visual refresh T1.3): project names are muted text unless the user turns colour on.
-  threadRowProjectColor: false,
+  // Colour tells projects apart (DESIGN.md › Colour roles, identity): each project name wears its own colour. A stored
+  // `false` still wins, so anyone who turned it off keeps plain names.
+  threadRowProjectColor: true,
   projectColorPalette: 'balanced',
   threadRowTitle: true,
   // The local Host name repeats on every row; it is opt-in (T1.3), the second line reads project · branch.
