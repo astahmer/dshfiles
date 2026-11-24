@@ -25,6 +25,7 @@ describe('button press feedback', () => {
       ghost: 'dshx:active:bg-(--dsw-alias-interactive-bg-active)',
     } as const
     for (const [variant, active] of Object.entries(wash)) {
+      // SAFETY: Object.entries of the literal wash table yields only its own keys, each a button variant.
       const list = classesOf(variant as keyof typeof wash)
       expect(list, variant).toContain(active)
       expect(list, variant).toContain('dshx:duration-(--dshx-duration-hover)')
@@ -43,9 +44,11 @@ describe('button press feedback', () => {
 
 describe('tooltip timing', () => {
   it('waits 400ms before the first tooltip and 300ms of grace between neighbours', () => {
+    // SAFETY: TooltipProvider returns the Radix Provider element with the timing props it forwarded.
     const element = TooltipProvider({ children: null }) as React.ReactElement<{ delayDuration: number; skipDelayDuration: number }>
     expect(element.props.delayDuration).toBe(400)
     expect(element.props.skipDelayDuration).toBe(300)
+    // SAFETY: as above, the returned element carries the delay the caller passed.
     const instant = TooltipProvider({ delayDuration: 0, children: null }) as React.ReactElement<{ delayDuration: number }>
     expect(instant.props.delayDuration).toBe(0)
   })

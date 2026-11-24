@@ -1,8 +1,6 @@
 import { PHONE_SHELL_QUERY } from '../lib/phone-shell.js'
 import { SheetSnap, type SheetDragSample, type SheetSnapLayout, type SheetSnapPoint } from '../lib/sheet-snap.js'
 
-/** The phone rule under which menus, pickers and popovers present as bottom sheets (styles.css). */
-const PHONE_QUERY = PHONE_SHELL_QUERY
 /**
  * Elements that may be a bottom sheet: an explicit `data-dshx-sheet`, or a kit/Host layer the phone sheet rules
  * restyle (styles.css, rich-composer). Only a candidate that draws the grabber (`::before`) is one right now.
@@ -91,7 +89,8 @@ const layoutOf = (sheet: HTMLElement, rest: number, bottom: number): SheetSnapLa
 
 const reducedMotion = (view: Window): boolean => typeof view.matchMedia === 'function' && view.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-const isPhone = (view: Window): boolean => typeof view.matchMedia === 'function' && view.matchMedia(PHONE_QUERY).matches
+/** The phone rule, under which menus, pickers and popovers present as bottom sheets (styles.css). */
+const isPhone = (view: Window): boolean => typeof view.matchMedia === 'function' && view.matchMedia(PHONE_SHELL_QUERY).matches
 
 /**
  * Makes every phone bottom sheet draggable from one document-level listener: the grab strip (or a

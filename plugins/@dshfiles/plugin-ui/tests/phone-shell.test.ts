@@ -24,6 +24,7 @@ const evaluate = (query: string, device: Device): boolean =>
   )
 
 const view = (device: Device): Pick<Window, 'matchMedia'> => ({
+  // SAFETY: matchesPhoneShell reads only `matches` from the list it asks for.
   matchMedia: (query: string) => ({ matches: evaluate(query, device) }) as MediaQueryList,
 })
 
@@ -48,7 +49,7 @@ describe('phone shell media rule (unslop U8)', () => {
     expect(blocks.length).toBeGreaterThan(0)
     for (const block of blocks) expect(block).toContain('(pointer: coarse) and (max-height: 500px)')
     expect(styles).toContain('@media (pointer: coarse) and (max-width: 28rem), (pointer: coarse) and (max-height: 500px)')
-    expect(read('src/hooks/sheet-drag.ts')).toContain('const PHONE_QUERY = PHONE_SHELL_QUERY')
+    expect(read('src/hooks/sheet-drag.ts')).toContain('view.matchMedia(PHONE_SHELL_QUERY)')
     expect(PHONE_SHELL_QUERY).toBe('(max-width: 639.98px), (pointer: coarse) and (max-height: 500px)')
   })
 
