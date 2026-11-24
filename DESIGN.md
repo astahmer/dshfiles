@@ -273,6 +273,20 @@ The minimum is 11px; nothing smaller. Every kit text step reads a density token 
 text takes the phone sizes without a phone class (see Density). Never write `text-[Npx]`; `node --run check:design-tokens` ratchets it. Descriptions cap at 72ch. Labels are sentence case; ALL-CAPS form labels are
 retired. Numbers in counters, times, token counts and tables use `tabular-nums`.
 
+### Durations
+
+One grammar, from `@dshfiles/plugin-ui/lib/format-duration`; no plugin formats a duration itself.
+
+| Kind                                                                              | Function               | Looks like                           |
+| --------------------------------------------------------------------------------- | ---------------------- | ------------------------------------ |
+| Time someone waited: a turn, a tool call, a job, a subagent, an open question     | `formatElapsed(ms)`    | `9s` · `2m 05s` · `1h 04m`           |
+| A measured span in a table, a trace or a test report                              | `formatDurationMs(ms)` | `420ms` · `1.5s` · `42s` · `3m 05s`  |
+
+Whole seconds, rounded down; no space before the unit; `s`, `m` and `h` are the same in every language. Seconds are
+zero-padded after minutes and minutes after hours, so a ticking clock keeps its width. A clock that ticks is a
+`LiveElapsed`, which shares one timer for the page. A finished step under one second shows no duration, and a turn's
+total is said once, by its "Worked for" header. `m:ss` and `2 min 5 s` are retired.
+
 ### Density
 
 Two densities, switched by pointer and width, never by user agent (`plugin-ui/src/styles.css`):
@@ -312,6 +326,10 @@ A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not 
   secondary chips hide or wrap, primary text truncates, and only then does a row wrap.
 - No horizontal page overflow at 390px. Filter rows scroll sideways (`overflow-x-auto`) instead of wrapping into a
   column of chips.
+- Transcript measure: prose caps at 34em. A work row (a turn's "Worked for" header, a tool call, a summary line) is
+  as wide as its content and no wider than that measure; its duration or count follows the label after 8px, and its
+  hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
+  message column. Everything docked above the composer shares the composer card's two edges.
 
 ## Elevation & Depth
 
@@ -358,6 +376,14 @@ A status glyph that changes while on screen cross-fades in 120ms; a row that jus
 Ready holds a 12% tint of that colour for 1.2s, then fades it in 280ms. Controls answer a press within 80ms.
 Under reduced motion the glyph swaps with opacity only and the tint is skipped.
 
+A state change never moves what the pointer or the eye is on. A mark that comes and goes (a tab's status glyph, the
+header's live line, a status-strip count) keeps a reserved slot and cross-fades in 120ms. A notice over a list is an
+overlay: opacity and 4px of travel in 120ms, out in 100ms. A dock entry reveals with `grid-template-rows` in 120ms
+and never moves the input. Content inserted above the reader's position is compensated in the scroll offset. A
+switch moves at once and reverts in the same 120ms if the write fails; no control is disabled while it saves. A
+question card enters with opacity and 8px of travel in 220ms and takes focus at once. Under reduced motion each of
+these is an opacity change only; nothing travels or resizes.
+
 ## Shapes
 
 One radius scale for kit and native: **4 chips · 6 controls and rows · 8 cards and code · 12 composer, menus and
@@ -397,12 +423,33 @@ item — thread, subagent, job, check, workspace, host. Plugins map onto them an
 Two glyph-only states draw but never group or sort: **stale** (dashed faint ring: a reading or workspace that may be
 out of date) and **stopped** (muted square: cancelled or parked by the user).
 
+**One status per item, on every surface.** A thread's status is computed once, by the thread list's projection; the
+tab, the header, the palette and the status strip read that value and none derives its own. Status rolls up: a thread
+is Working while it or one of its subagents is working, Needs you while one of them waits for an answer, and Ready
+only when all of them have finished. A background job does not make a thread Working; it shows as a muted count. A
+surface says a state with one of the six words or with the glyph alone: never Running, Completed, waiting or
+Finished. A subagent that has finished is Done, never Idle.
+
 **EntityRow / EntityList** (`components/entity-row`). One row shape: `leading control · status glyph · title · muted
 meta chips · trailing inline verb`, with an optional muted description line and full-width children (an output pane).
 The middle is one button when the row selects; leading and trailing stay separate controls. Lists are one bordered
 card with hairline dividers. In narrow panes meta wraps under the title and trailing verbs drop to their own line.
 
+**Live work row** (a subagent, a background job). One row in the EntityRow shape: `status glyph · name · muted
+current step · elapsed · Open`. While the work runs it lives in the dock above the composer, where it expands to its
+detail and its Stop verb; the transcript keeps a record row with the same glyph and name and no clock. When the work
+ends the dock row leaves and the record row takes the final state and the total (`Done · 5m 02s`). The name is the
+task description its parent gave, the same string in the row, the list, the header and the tab: no generated handle,
+no route or account id. One thing is never a card and a row on the same screen.
+
 **PageSection.** `h2` (section title) that names its `section` region, optional muted meta ("3 enabled") and actions.
+
+## Language
+
+English is the source language and the only one every plugin has; 中文 is kept where a plugin already carries it. A
+sentence, a row or a chip is built from one dictionary: never join a count DSH translated to a word from a plugin.
+Copy lives in the plugin's locale table, not in a component. Settings › General › Language says that other languages
+translate DSH's built-in parts only.
 
 ## Do's and Don'ts
 
@@ -412,6 +459,8 @@ card with hairline dividers. In narrow panes meta wraps under the title and trai
   ([plan §3](docs/ade-ux/README.md#glossary-enforced-in-copy)). `node --run check:copy` ratchets banned terms.
 - **Do** write Retry (not Try again), the ellipsis character (not three dots), and an error that says what to do next
   instead of ending in the raw cause (`Could not save: {message}`).
+- **Do** format every duration with `formatElapsed` or `formatDurationMs`, and take a thread's status from the
+  thread list's projection.
 - **Don't** give Working a hue, colour a row for being healthy beyond its one dot, or add a second attention colour.
 - **Don't** put plugin names in labels ("pulls.review: Reviews", "Thread Sidebar: Navigation").
 - **Don't** use an indigo or blue primary button, an icon tile in a page header, underline page tabs or ALL-CAPS
@@ -424,11 +473,15 @@ card with hairline dividers. In narrow panes meta wraps under the title and trai
   (a pending count). Every upstream batch merged on 2026-11-11 broke this rule at least once.
 - **Don't** draw a second control for something that already has one (restart, find, Since you left, notifications):
   feed the existing control instead.
+- **Don't** draw one thing as a card and as a row, show a generated handle or a route id as a name, or stretch a
+  one-line work row across the message column.
+- **Don't** insert a control or a notice in flow where it moves the row, tab or button under the pointer.
 
 Two ratchets in `check:green` and CI hold these rules: they count findings per rule and plugin and fail only when a
 count rises ([repository checks](docs/repository-checks.md#design-and-copy-ratchets)). `check:design-tokens` counts
 arbitrary text sizes and radii, raw colours, native icons, Tailwind's shadow step names, numeric durations, viewport
 variants, solid status fills outside the kit, `chart-1..5` used as identity or decoration, numbered palette colours,
-`uppercase`, spin or pulse without a reduced-motion variant, and a control's `outline-none` with no focus ring.
+`uppercase`, spin or pulse without a reduced-motion variant, a control's `outline-none` with no focus ring, and a
+duration formatted outside the kit.
 `check:copy` counts the glossary terms, `Plugin Name:` prefixes, "Host" as the server process, package names, raw
 error echoes, the non-canonical status words, "Try again" and three-dot ellipses.

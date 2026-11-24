@@ -234,3 +234,13 @@ test('counts a duration formatted outside the kit, not a call to the kit or a wa
   assert.deepEqual(rulesIn('plugins/@dshfiles/plugin-ui/src/lib/format-duration.ts', source), [])
   assert.deepEqual(rulesIn('plugins/@dshfiles/demo/src/a.module.css', '.a { --formatDuration: 1; }'), [])
 })
+
+test('DESIGN.md states the duration grammar the ratchet enforces', async () => {
+  const { readFileSync } = await import('node:fs')
+  const design = readFileSync(new URL('../DESIGN.md', import.meta.url), 'utf8')
+  const checks = readFileSync(new URL('../docs/repository-checks.md', import.meta.url), 'utf8')
+  assert.ok(checks.includes('(../DESIGN.md#durations)'), 'repository-checks.md links the section')
+  assert.match(design, /^### Durations$/m)
+  assert.ok(design.includes('`formatElapsed(ms)`') && design.includes('`formatDurationMs(ms)`'))
+  assert.ok(design.replace(/\s+/g, ' ').includes('a duration formatted outside the kit'), 'the check:design-tokens paragraph names the rule')
+})
