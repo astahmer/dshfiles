@@ -211,8 +211,8 @@ test('counts vendored forks with the owned plugins instead of skipping them', ()
 
 test('counts a duration formatted outside the kit, not a call to the kit or a wall clock', () => {
   const source = [
-    "const formatElapsed = (ms: number): string => {",
-    "  const total = Math.floor(ms / 1000)",
+    'const formatElapsed = (ms: number): string => {',
+    '  const total = Math.floor(ms / 1000)',
     "  return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`",
     '}',
     'function formatClock(seconds: number) {',

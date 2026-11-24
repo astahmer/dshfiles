@@ -239,7 +239,9 @@ function StepRow({
               <RollingNumber value={percent} />%
             </span>
           ) : null}
-          {step.status === 'done' && step.durationSeconds !== undefined ? <span className="dshx:font-mono">{formatElapsed(step.durationSeconds * 1000)}</span> : null}
+          {step.status === 'done' && step.durationSeconds !== undefined ? (
+            <span className="dshx:font-mono">{formatElapsed(step.durationSeconds * 1000)}</span>
+          ) : null}
         </div>
       </div>
       {step.status === 'running' ? <ProgressLine value={step.progress ?? 0} /> : null}
