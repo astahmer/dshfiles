@@ -2,13 +2,12 @@ import type { JobId } from '@deepseek-ai/dsh-jobs/brand'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
 import { ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
-import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
-import { formatDurationMs } from '@dshfiles/plugin-ui/lib/format-duration'
+import { StatusGlyph, type StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import type { ToolCallSectionProps } from '@dshfiles/tool-meta/tool-call-sections'
@@ -17,7 +16,7 @@ import { backgroundJobsApi } from './api.js'
 import { JobPreviewModel, type JobPreviewView, type JobsClient } from './job-preview-model.js'
 import { JobTitles } from './job-titles.js'
 import type { BackgroundJobsTranslate } from './locales.js'
-import { STATUS_KEY, statusVariant } from './panel.js'
+import { STATUS_KEY } from './panel.js'
 
 /** What the card reads from its plugin, bound once in the client entry. */
 export interface JobPreviewBindings {
@@ -54,15 +53,22 @@ const useJobView = (input: { readonly jobs: JobsClient; readonly sessionId: stri
   return useSyncExternalStore(useJobsSubscribe(jobs), read)
 }
 
-const Elapsed = (props: { readonly startedAt: number; readonly finishedAt: number | undefined; readonly live: boolean }): JSX.Element => {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    if (!props.live) return undefined
-    const timer = setInterval(() => setNow(Date.now()), 1_000)
-    return () => clearInterval(timer)
-  }, [props.live])
-  return <span className="dshx:shrink-0 dshx:tabular-nums">{formatDurationMs((props.finishedAt ?? now) - props.startedAt)}</span>
-}
+/** The job's one clock: ticking on the page's shared second while it runs, its total once it ends. */
+const Elapsed = (props: { readonly startedAt: number; readonly finishedAt: number | undefined; readonly live: boolean }): JSX.Element =>
+  props.live || props.finishedAt === undefined ? (
+    <LiveElapsed since={props.startedAt} active={props.live} className="dshx:shrink-0 dshx:tabular-nums" />
+  ) : (
+    <span className="dshx:shrink-0 dshx:tabular-nums">{formatElapsed(props.finishedAt - props.startedAt)}</span>
+  )
+
+/** The registry's lifecycle on the six-status glyph: a stopped job is Stopped, not Failed. */
+const GLYPH = {
+  running: 'working',
+  stopping: 'working',
+  completed: 'done',
+  failed: 'failed',
+  killed: 'stopped',
+} as const satisfies Record<JobPreviewView['status'], StatusGlyphState>
 
 /** Mounted only while the card is open: collapsing stops the stream, and the Host coalesces its frames. */
 const JobOutput = (props: {
@@ -149,6 +155,9 @@ const JobPreviewCard = (
   // A job the registry no longer holds (an earlier DSH process, or retention) has nothing live to show.
   if (view === undefined) return null
   const live = JobPreviewModel.isLive(view.status)
+  // One home at a time (DESIGN.md, live work row): the dock above the composer while the job runs, this transcript
+  // card once it has finished.
+  if (props.seat === 'tool-card' && live) return null
   const open = disclosure.expanded
   // The call's description titles the job; the shell command it ran is the second line.
   const name = title ?? view.label
@@ -164,8 +173,9 @@ const JobPreviewCard = (
       data-job-id={view.id}
       data-state={view.status}
     >
+      {/* glyph · description · muted command · elapsed · › (DESIGN.md, live work row) */}
       <ComposerRow
-        icon={<SquareTerminalIcon />}
+        icon={<StatusGlyph status={GLYPH[view.status]} decorative />}
         label={title === undefined ? <span className="dshx:font-mono!">{view.label}</span> : <span data-job-title="">{title}</span>}
         meta={
           <>
@@ -174,11 +184,9 @@ const JobPreviewCard = (
                 {view.label}
               </span>
             )}
-            <span className="dshx:shrink-0 dshx:@max-pane-narrow:sr-only">{t('previewKind')}</span>
-            {view.progress === undefined ? null : <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{view.progress}</span>}
-            <span role="status" className="dshx:shrink-0">
-              <Badge variant={statusVariant(view.status)}>{t(STATUS_KEY[view.status])}</Badge>
-            </span>
+            <span className="dshx:flex-1" />
+            {/* The glyph says the state; assistive technology hears it as a word. */}
+            <span role="status" className="dshx:sr-only">{t(STATUS_KEY[view.status])}</span>
             <Elapsed startedAt={view.startedAt} finishedAt={view.finishedAt} live={live} />
             <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:transition-transform', open && 'dshx:rotate-90')} />
           </>
@@ -187,7 +195,7 @@ const JobPreviewCard = (
         onSelect={disclosure.toggle}
         selectLabel={t('previewToggle', { label: name })}
         variant={props.seat === 'dock' ? 'card' : 'plain'}
-      />
+      >
       {open ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:p-2">
           {view.detail === undefined ? null : <p className="dshx:text-muted-foreground">{view.detail}</p>}
@@ -208,6 +216,7 @@ const JobPreviewCard = (
           </div>
         </div>
       ) : null}
+      </ComposerRow>
     </section>
   )
 }

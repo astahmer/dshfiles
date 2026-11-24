@@ -229,18 +229,13 @@ Then('the composer dock previews the running job and streams its output', async 
     await expect(output).toContainText('preview-tick-', { timeout: 30_000 })
     const earlier = (await output.textContent()) ?? ''
     await expect.poll(async () => ((await output.textContent()) ?? '').length, { timeout: 30_000 }).toBeGreaterThan(earlier.length)
-    // The same job also keeps its card under the tool call, inside the folded turn.
+    // One home at a time (DESIGN.md, live work row): while the job runs, the folded turn shows no second card for it.
     await page
       .getByText(/^(Worked for|Completed in) /)
       .last()
       .click()
-    // The owned Chat fork lists a finished turn's rows directly under "Worked for"; the native Chat ("Completed in")
-    // keeps a "Ran commands" header over them.
-    const toolCardSeat = page.locator('[data-dshfiles-live-preview-seat="tool-card"]')
-    const commandGroup = page.getByText('Ran commands', { exact: true }).last()
-    await expect(commandGroup.or(toolCardSeat).first()).toBeVisible()
-    if (!(await toolCardSeat.isVisible())) await commandGroup.click()
-    await expect(toolCardSeat).toHaveAttribute('data-state', 'running')
+    await expect(page.locator('[data-dshfiles-live-preview-seat="tool-card"]')).toHaveCount(0)
+    await expect(page.locator('[data-job-id]').filter({ visible: true })).toHaveCount(1)
     const desktop = page.viewportSize()
     await page.setViewportSize({ width: 360, height: 780 })
     await expect(preview.getByRole('button', { name: 'Stop', exact: true })).toBeInViewport()

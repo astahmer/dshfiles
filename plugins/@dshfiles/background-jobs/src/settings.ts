@@ -10,6 +10,11 @@ export const backgroundJobsSettings = defineSettings({
       .description(
         'Stop a background job this many minutes after its thread goes idle, done or archived (0 never stops it).',
       ),
+    headerJobChip: Schema.boolean()
+      .default(false)
+      .description(
+        'Also show DSH\'s "N background jobs" chip in the thread header. Off: a running job lives in the row above the composer, and in the transcript once it has finished.',
+      ),
   }),
   applies: 'live',
 })

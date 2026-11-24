@@ -135,10 +135,12 @@ never touch the model's own consuming cursor.
 
 ![Live job preview in the transcript and above the composer](docs/screenshots/transcript-job-preview.png)
 
-A call that starts a job (`bash` or `pwsh` with `run_in_background`, either one promoted past its timeout, or a background `workflow`) gets a preview under its tool card, through tool-meta's `ToolCallSections`. Collapsed it shows the job's status, label, progress and elapsed time. Open, it streams the output tail and offers Stop, the owning thread, and Processes.
+A job has one home at a time (DESIGN.md, live work row). While it runs it is a row above the composer (`conversation.input.dock`): status glyph · the call's description · the command, muted · elapsed · ›. Once it has finished, the same card sits under the tool call that started it (`bash` or `pwsh` with `run_in_background`, either one promoted past its timeout, or a background `workflow`), through tool-meta's `ToolCallSections`, with its total time. Open, either one streams the output tail and offers Stop (while it runs), the owning thread, and Processes. Times use the kit's `formatElapsed` and the page's shared clock.
 
 It reads the client `jobs` service (`watchRows`, `observe`), which is the stream the native header control shares. `observe` runs only while the card is open, and each card subscribes on its own with a selector that ignores output offsets, so an output chunk re-renders that card and never the transcript. Stop is the Jobs board's two-step confirmation over `background_jobs_kill`. A job the registry no longer holds shows no preview.
 
-A turn that ends folds its tool cards, and with them the card of a job still running, so the thread's running jobs also list above the composer (`conversation.input.dock`) with the same expandable card. The dock clears as jobs settle; the card under the tool stays as the history. A running job can show in both places while its turn is open.
+The dock stays in reach when a turn folds its tool cards, and clears as jobs settle; the card under the tool is the history. DSH's own "N background jobs" header chip is withdrawn (the `job-list` header entry is replaced at priority −1000 by one that renders nothing); `headerJobChip` (namespace `dshfiles-background-jobs`, off by default) brings it back. The setting's field reaches a running Host after a restart; until then the chip stays withdrawn.
+
+The title comes from the call's description, which the native registry does not keep: it is remembered when the tool card mounts in this page. A job seen only after a reload, with its turn folded, is titled by its command.
 
 Job status is the registry's lifecycle, worded as on the board. A subagent is not a job: its row in `@dshfiles/thread-sidebar` has its own states.

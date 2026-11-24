@@ -336,8 +336,8 @@
     {
       "id": "transcript-job-preview",
       "title": "Live job preview in the transcript and above the composer",
-      "summary": "A running job shows its progress and output under the tool call that started it and above the composer.",
-      "details": "Under the tool card that started a background job, and above the composer while it runs, an expandable preview shows the job's lifecycle, progress and elapsed time and streams its output while open, with Stop behind a confirmation, the owning thread and a way to Processes.",
+      "summary": "A running job is one row above the composer, and its card moves under its tool call once it finishes.",
+      "details": "While a background job runs, the row above the composer shows its status glyph, the call's description, the command, one elapsed clock and a chevron, and opens to stream its output with Stop behind a confirmation, the owning thread and a way to Processes. The transcript shows nothing for it meanwhile; once it finishes, the same card sits under the tool call that started it with its total time. DSH's header job chip is withdrawn unless headerJobChip is on.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or threads*\" \"[[call bash {\\\"command\\\":\\\"for i in 1 2 3 4 5 6 7 8 9 10; do echo compiled module $i; sleep 1; done; sleep 300\\\",\\\"description\\\":\\\"Build\\\",\\\"run_in_background\\\":true}]]\"",
@@ -349,8 +349,15 @@
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: under the tool card that started the job; composer dock while it runs",
-      "configuration": [],
+      "currentSurface": "composer dock while it runs; transcript: under the tool card that started the job once it finished",
+      "configuration": [
+        {
+          "key": "headerJobChip",
+          "defaultValue": "false",
+          "constraints": "Boolean in the dshfiles-background-jobs namespace; on brings back DSH's header job chip. A running Host needs a restart to register the field.",
+          "coveredBy": ["background-jobs.preview-one-home"]
+        }
+      ],
       "states": ["collapsed", "streaming", "no-output", "stream-failed", "stop-armed", "stopping", "settled", "no-longer-tracked"],
       "failureModes": [
         "A job the registry no longer holds (an earlier DSH process or retention) renders no preview, so history stays quiet.",
@@ -369,6 +376,12 @@
           "kind": "gherkin",
           "id": "background-jobs.transcript-job-preview",
           "featureFile": "tooling/dshx/e2e/features/background-jobs.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "background-jobs.preview-one-home",
+          "file": "plugins/@dshfiles/background-jobs/src/job-preview.test.tsx",
+          "testName": "titles the job by the description its call carried, with the command as the second line"
         },
         {
           "kind": "unit-test",

@@ -109,12 +109,19 @@ describe('JobPreviewSection', () => {
     expect(card()).toBeNull()
   })
 
-  it('shows the job state and label, without streaming output while collapsed', () => {
-    const { observe } = renderCard({})
-    expect(card()?.getAttribute('data-state')).toBe('running')
-    expect(screen.getByRole('status').textContent).toContain('statusRunning')
+  it('renders nothing while the job runs (the dock shows it), and the finished card after', () => {
+    const fake = renderCard({})
+    expect(card()).toBeNull()
+    act(() => fake.publish({ rows: { [SESSION]: [row({ status: 'completed', finishedAt: STARTED_AT + 125_000 })] } }))
+    expect(card()?.getAttribute('data-state')).toBe('completed')
+    expect(card()?.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('done')
+    expect(screen.getByRole('status').textContent).toBe('statusCompleted')
     expect(screen.getByText('pnpm build')).toBeTruthy()
-    expect(observe).not.toHaveBeenCalled()
+    // One clock in the kit's grammar, no visible status badge and no "Background job" label.
+    expect(screen.getByText('2m 05s')).toBeTruthy()
+    expect(card()?.querySelector('[data-slot="badge"]')).toBeNull()
+    expect(screen.queryByText('previewKind')).toBeNull()
+    expect(fake.observe).not.toHaveBeenCalled()
   })
 
   it('titles the job by the description its call carried, with the command as the second line', async () => {
@@ -130,14 +137,17 @@ describe('JobPreviewSection', () => {
         <JobPreviewDock {...bindings} jobs={fake.jobs} sessionId={SESSION} />
       </PluginQueryProvider>,
     )
-    await waitFor(() => expect(document.querySelectorAll('[data-job-title]')).toHaveLength(2))
-    for (const title of document.querySelectorAll('[data-job-title]')) expect(title.textContent).toBe('Build')
-    for (const command of document.querySelectorAll('[data-job-command]')) expect(command.textContent).toBe('for i in 1 2 3; do echo compiled; done')
+    // C7/Q4: a running job is one card on screen, in the dock, titled by its description.
+    await waitFor(() => expect(document.querySelectorAll('[data-job-title]')).toHaveLength(1))
+    expect(document.querySelectorAll('[data-job-id]')).toHaveLength(1)
+    expect(document.querySelector('[data-job-title]')?.textContent).toBe('Build')
+    expect(document.querySelector('[data-job-command]')?.textContent).toBe('for i in 1 2 3; do echo compiled; done')
     expect(document.querySelector('[data-dshfiles-live-preview-seat="dock"]')?.getAttribute('aria-label')).toBe('previewKind: Build')
+    expect(document.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
   })
 
   it('streams output only while open and releases the stream on collapse', () => {
-    const fake = fakeJobs()
+    const fake = fakeJobs([row({ status: 'completed', finishedAt: STARTED_AT + 5_000 })])
     const stopStream = vi.fn()
     fake.observe.mockReturnValue(stopStream)
     const Toggle = () => {
@@ -181,7 +191,12 @@ describe('JobPreviewSection', () => {
   })
 
   it('stops a job only after an explicit confirmation, which can be backed out of', async () => {
-    renderCard({ expanded: true })
+    render(
+      <PluginQueryProvider>
+        <JobPreviewDock {...bindings} jobs={fakeJobs().jobs} sessionId={SESSION} />
+      </PluginQueryProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /previewToggle/ }))
     fireEvent.click(screen.getByRole('button', { name: 'stop' }))
     expect(kill).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'stopCancel' }))
@@ -199,14 +214,14 @@ describe('JobPreviewSection', () => {
 
   it('links a job owned by another thread to that thread', () => {
     // SAFETY: the card treats the owner as an opaque id.
-    renderCard({ expanded: true }, fakeJobs([row({ owner: 'session-2' as NonNullable<JobView['owner']> })]))
+    renderCard({ expanded: true }, fakeJobs([row({ owner: 'session-2' as NonNullable<JobView['owner']>, status: 'completed', finishedAt: STARTED_AT + 5_000 })]))
     fireEvent.click(screen.getByRole('button', { name: /previewThread/ }))
     expect(bindings.openThread).toHaveBeenCalledWith('session-2')
     expect(screen.queryByText('previewThisThread')).toBeNull()
   })
 
   it('names the current thread as owner without a link to itself', () => {
-    renderCard({ expanded: true })
+    renderCard({ expanded: true }, fakeJobs([row({ status: 'completed', finishedAt: STARTED_AT + 5_000 })]))
     expect(screen.getByText('previewThisThread')).toBeTruthy()
     expect(screen.queryByRole('button', { name: /previewThread/ })).toBeNull()
   })
