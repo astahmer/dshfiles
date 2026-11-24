@@ -54,6 +54,7 @@ import { landRepositoriesApi, type LandRepositories, type LocalLandApi, type Rem
 import { sessionPreviewMessages } from './session-preview.js'
 import { useDiscardConfirmation } from './discard-machine.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
+import { REPOSITORY_CHANGED_EVENT } from './repository-change.js'
 import type { JjIntegrationTranslate } from './locales.js'
 import { integrationQueueMachine, type IntegrationJob, type IntegrationJobPhase } from './integration-queue-machine.js'
 import { indexSessionActivity } from './panel-session-activity.js'
@@ -799,6 +800,13 @@ export const ThreadWorkspacesPanel = (props: {
     staleTime: 15_000,
     refetchInterval: query => (query.state.data?.refreshing === true ? 5_000 : 60_000),
   })
+  // A land anywhere in this browser (the header, the Changes land card, a status read that saw `/rebase`) updates each
+  // "N to land" here at once instead of on the minute poll. A read in flight may predate the land, so it starts over.
+  useEffect(() => {
+    const refresh = (): void => void queryClient.invalidateQueries({ queryKey: threadQueryKeys.repositories, exact: true })
+    window.addEventListener(REPOSITORY_CHANGED_EVENT, refresh)
+    return () => window.removeEventListener(REPOSITORY_CHANGED_EVENT, refresh)
+  }, [queryClient])
   const refreshRepositoryViews = async (): Promise<void> => {
     try {
       await api.refreshRepositories({})

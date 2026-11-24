@@ -32,6 +32,43 @@ describe('where the header Land sits', () => {
   })
 })
 
+describe('the header Landed mark', () => {
+  const unseen = WorkspaceControlModel.initialLandedMark('session-a')
+
+  it('does not claim a land it did not see: the first read of an older land shows nothing', () => {
+    const first = WorkspaceControlModel.landedMark(unseen, { sessionId: 'session-a', rebasedAt: 100, unlanded: 0 })
+    expect(first.shown).toBe(false)
+  })
+
+  it('shows Landed once a land finishes while the header is on screen, and keeps it until the thread has work again', () => {
+    const before = WorkspaceControlModel.landedMark(unseen, { sessionId: 'session-a', rebasedAt: 100, unlanded: 2 })
+    const landed = WorkspaceControlModel.landedMark(before, { sessionId: 'session-a', rebasedAt: 200, unlanded: 0 })
+    expect(landed.shown).toBe(true)
+    expect(WorkspaceControlModel.landedMark(landed, { sessionId: 'session-a', rebasedAt: 200, unlanded: 0 }).shown).toBe(true)
+    expect(WorkspaceControlModel.landedMark(landed, { sessionId: 'session-a', rebasedAt: 200, unlanded: 1 }).shown).toBe(false)
+  })
+
+  it('shows Landed at once for a land this header ran, and forgets it for another thread', () => {
+    const landed = WorkspaceControlModel.landedMark(unseen, { sessionId: 'session-a', rebasedAt: undefined, unlanded: 0, landedHere: true })
+    expect(landed.shown).toBe(true)
+    expect(WorkspaceControlModel.landedMark(landed, { sessionId: 'session-b', rebasedAt: 300, unlanded: 0 }).shown).toBe(false)
+  })
+})
+
+describe('a status read that saw the repository move', () => {
+  const thread = { rebasedAt: 100, integrationQueuedAt: undefined }
+
+  it('tells the other views when a land or a queue change happened since the last read', () => {
+    expect(WorkspaceControlModel.repositoryMoved(thread, { ...thread, rebasedAt: 200 })).toBe(true)
+    expect(WorkspaceControlModel.repositoryMoved(thread, { ...thread, integrationQueuedAt: 5 })).toBe(true)
+    expect(WorkspaceControlModel.repositoryMoved(thread, thread)).toBe(false)
+  })
+
+  it('stays quiet on the first read, when there is nothing to compare', () => {
+    expect(WorkspaceControlModel.repositoryMoved(undefined, thread)).toBe(false)
+  })
+})
+
 describe('the workspace path label', () => {
   it('keeps the end of the path, where the workspace is named', () => {
     expect(WorkspaceControlModel.pathTail('/private/var/folders/3k/k0xz2zs57sq25lq8bfg2yg480000gn/T/home/projects/sample-threads/thread-31057e')).toBe(

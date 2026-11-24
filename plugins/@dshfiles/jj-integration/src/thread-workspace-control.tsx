@@ -108,6 +108,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const queryClient = useQueryClient()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
   const [confirmingLand, setConfirmingLand] = useState(false)
+  const [landedMark, setLandedMark] = useState(() => WorkspaceControlModel.initialLandedMark(String(props.sessionId)))
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
@@ -126,7 +127,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
         if (!Schema.is(contractRejectionSchema)(error)) throw error
         return read({ path: cwd ?? '' })
       })
-      if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt) announceRepositoryChange()
+      // A land or queue change this read reveals (another view, `/rebase`, a queued land) refreshes every inventory view.
+      if (previous?.thread?.integrationQueuedAt !== current.thread?.integrationQueuedAt || WorkspaceControlModel.repositoryMoved(previous?.thread, current.thread))
+        announceRepositoryChange()
       return current
     },
     refetchInterval: query => {
@@ -151,6 +154,8 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       announceRepositoryChange()
       await queryClient.invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
       await queryClient.invalidateQueries({ queryKey: revisionGraphQueryKey(input.path) })
+      if (result?.status === 'landed')
+        setLandedMark(mark => WorkspaceControlModel.landedMark(mark, { sessionId: String(props.sessionId), rebasedAt: mark.seenRebasedAt ?? undefined, unlanded: 0, landedHere: true }))
       if (result !== undefined && result !== null) toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' })
     },
   })
@@ -244,6 +249,14 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const unlanded = current?.unlanded.length ?? 0
   const conflicted = current?.unlanded.some(revision => revision.conflict) ?? false
   const isThread = current !== null && current !== undefined
+  // The mark follows the land time and the count, not each new thread object a read returns.
+  const observedRebasedAt = current?.rebasedAt
+  const answered = current !== undefined
+  useEffect(() => {
+    if (!answered) return
+    setLandedMark(mark => WorkspaceControlModel.landedMark(mark, { sessionId: String(props.sessionId), rebasedAt: observedRebasedAt, unlanded }))
+  }, [answered, observedRebasedAt, props.sessionId, unlanded])
+  const landed = isThread && unlanded === 0 && landedMark.sessionId === String(props.sessionId) && landedMark.shown
   // `current` is undefined until the status query answers and null when the path is not a thread workspace.
   const loading = current === undefined && cwd !== null
   const name = current?.name ?? (cwd === null || cwd.length === 0 ? props.t('unknownWorkspace') : folderName(cwd))
@@ -311,6 +324,13 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
         {props.t('toRebase', { count: unlanded })}
       </span>
     ) : null
+  // Round two item 19: a land seen here confirms in green, glyph only; the word stays ink (DESIGN.md colour rule 3).
+  const landedLabel = (className?: string): JSX.Element => (
+    <span className={cn('dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-xs', className)} data-workspace-landed="">
+      <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
+      <span className="dshx:@max-[26rem]:sr-only">{props.t('landedMark')}</span>
+    </span>
+  )
 
   const trigger = (
     <Button
@@ -324,7 +344,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
     >
       {glyph}
       <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:@max-[32rem]:hidden">{placeLabel}</span>
-      {countLabel}
+      {landed ? landedLabel() : countLabel}
       {integrationQueued ? <ClockIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" /> : null}
       <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
     </Button>
@@ -366,7 +386,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   if (seat === 'phone-bar')
     return (
       <TooltipProvider>
-        {landButton}
+        {landButton ?? (landed && phone ? <span role="status">{landedLabel('dshx-root dshx:ml-1.5 dshx:px-1')}</span> : null)}
         {landDialog}
         {toast.element}
       </TooltipProvider>

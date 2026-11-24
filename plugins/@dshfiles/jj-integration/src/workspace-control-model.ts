@@ -39,8 +39,48 @@ const pathTail = (path: string, segments = 2): string => {
  */
 const landSeatShows = (input: { readonly seat: 'header' | 'phone-bar'; readonly phone: boolean }): boolean => (input.seat === 'phone-bar') === input.phone
 
+/** What the header knows about the thread's lands: the land time it last read, and whether it says Landed. */
+export interface LandedMark {
+  readonly sessionId: string
+  /** `null` until the first status read; `undefined` when the thread never landed. */
+  readonly seenRebasedAt: number | undefined | null
+  readonly shown: boolean
+}
+
+const initialLandedMark = (sessionId: string): LandedMark => ({ sessionId, seenRebasedAt: null, shown: false })
+
+/**
+ * Round two item 19: a land the header saw finish (its own, or one the status read reveals) shows a green check and
+ * "Landed" until the thread changes: new work to land, or another thread on screen. An older land read on first sight
+ * is history, not a result to confirm.
+ */
+const landedMark = (
+  previous: LandedMark,
+  observed: { readonly sessionId: string; readonly rebasedAt: number | undefined; readonly unlanded: number; readonly landedHere?: boolean },
+): LandedMark => {
+  const base = previous.sessionId === observed.sessionId ? previous : initialLandedMark(observed.sessionId)
+  const landedSince = base.seenRebasedAt !== null && observed.rebasedAt !== undefined && observed.rebasedAt !== base.seenRebasedAt
+  const shown = observed.unlanded > 0 ? false : observed.landedHere === true || landedSince || base.shown
+  return { sessionId: observed.sessionId, seenRebasedAt: observed.rebasedAt, shown }
+}
+
+/**
+ * A status read that saw a land or a queue change since the previous one (a land in another view, `/rebase`, a queued
+ * land finishing): the other views reading the inventory (the thread list's "N to land", the Land page) refetch now.
+ */
+const repositoryMoved = (
+  previous: { readonly rebasedAt?: number | undefined; readonly integrationQueuedAt?: number | undefined } | null | undefined,
+  current: { readonly rebasedAt?: number | undefined; readonly integrationQueuedAt?: number | undefined } | null | undefined,
+): boolean =>
+  previous !== undefined &&
+  previous !== null &&
+  (previous.rebasedAt !== current?.rebasedAt || previous.integrationQueuedAt !== current?.integrationQueuedAt)
+
 export class WorkspaceControlModel {
   static readonly showsLand = showsLand
   static readonly landSeatShows = landSeatShows
+  static readonly initialLandedMark = initialLandedMark
+  static readonly landedMark = landedMark
+  static readonly repositoryMoved = repositoryMoved
   static readonly pathTail = pathTail
 }
