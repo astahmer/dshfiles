@@ -6,9 +6,18 @@ from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a
 are the draft PR astahmer/dshfiles#271 (branch `contribute/unslop-ui` on the tbrowang fork); nothing is landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** round one's 14 steps and round two's five lanes are done. Round two started 2026-11-24 after feedback that the monochrome changes
+**Resume here:** round one's 14 steps and round two's five lanes are done; round three's audits are running (see [Round three](#round-three)). Round two started 2026-11-24 after feedback that the monochrome changes
 were dull: bring purposeful colour back and make daily use smoother, without undoing upstream's coloured project
 chips (#287). See [Round two](#round-two). Round one's leftovers are under [Follow-ups](#follow-ups).
+
+## Round three
+
+Started 2026-11-24 from the owner's screenshots of his live instance: one subagent drawn twice (a transcript row and a
+live card above the composer, with a raw route id and one duration in two formats), bash rows spanning the full pane,
+and French and English mixed in one view. Two read-only audits run first: one inventories every object drawn in more
+than one place and compares the drawings; one measures friction in the daily loop (clicks, feedback latency, layout
+shifts, focus, widths) on desktop and phone. Big design choices then go to a Fable 5.2 (high) consultation, and the
+fixes to lanes by plugin ownership.
 
 ## Round two
 
