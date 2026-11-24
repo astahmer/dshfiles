@@ -8,7 +8,7 @@ import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { HealthDot, StatusDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -38,6 +38,85 @@ function ControlsDemo() {
         <ToggleGroupItem value="week">Week</ToggleGroupItem>
         <ToggleGroupItem value="month">Month</ToggleGroupItem>
       </ToggleGroup>
+    </div>
+  )
+}
+
+/** Each colour role as a swatch (DESIGN.md › Colour roles); classes are literal so Tailwind keeps them. */
+const roleSwatches = {
+  'Attention and result': [
+    ['status-needs-you', 'dshx:bg-status-needs-you'],
+    ['status-failed', 'dshx:bg-status-failed'],
+    ['status-ready', 'dshx:bg-status-ready'],
+    ['status-working', 'dshx:bg-status-working'],
+    ['status-idle', 'dshx:bg-status-idle'],
+    ['status-done', 'dshx:bg-status-done'],
+    ['control-on', 'dshx:bg-control-on'],
+  ],
+  Identity: [
+    ['identity-1', 'dshx:bg-identity-1'],
+    ['identity-2', 'dshx:bg-identity-2'],
+    ['identity-3', 'dshx:bg-identity-3'],
+    ['identity-4', 'dshx:bg-identity-4'],
+    ['identity-5', 'dshx:bg-identity-5'],
+    ['identity-6', 'dshx:bg-identity-6'],
+    ['identity-7', 'dshx:bg-identity-7'],
+    ['identity-8', 'dshx:bg-identity-8'],
+  ],
+  Data: [
+    ['data-1', 'dshx:bg-data-1'],
+    ['data-2', 'dshx:bg-data-2'],
+    ['data-3', 'dshx:bg-data-3'],
+    ['data-4', 'dshx:bg-data-4'],
+    ['data-5', 'dshx:bg-data-5'],
+    ['data-6', 'dshx:bg-data-6'],
+  ],
+} as const
+
+const identityText = [
+  'dshx:text-identity-1',
+  'dshx:text-identity-2',
+  'dshx:text-identity-3',
+  'dshx:text-identity-4',
+  'dshx:text-identity-5',
+  'dshx:text-identity-6',
+  'dshx:text-identity-7',
+  'dshx:text-identity-8',
+] as const
+
+const healthLabels = { ok: 'Connected', limited: 'Rate limited', down: 'Signed out', off: 'Off' } as const
+
+function ColourRolesDemo() {
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-4">
+      {Object.entries(roleSwatches).map(([group, swatches]) => (
+        <section key={group} aria-label={group} className="dshx:flex dshx:flex-col dshx:gap-1.5">
+          <h3 className="dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group}</h3>
+          <div className="dshx:flex dshx:flex-wrap dshx:gap-3">
+            {swatches.map(([name, swatch]) => (
+              <span key={name} className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
+                <span aria-hidden className={`dshx:size-4 dshx:rounded-sm ${swatch}`} />
+                {name}
+              </span>
+            ))}
+          </div>
+        </section>
+      ))}
+      <section aria-label="Identity text" className="dshx:flex dshx:flex-wrap dshx:gap-3 dshx:text-sm dshx:font-medium">
+        {identityText.map((tone, index) => (
+          <span key={tone} className={tone}>
+            Project {index + 1}
+          </span>
+        ))}
+      </section>
+      <section aria-label="Health" className="dshx:flex dshx:flex-wrap dshx:gap-4 dshx:text-sm">
+        {(['ok', 'limited', 'down', 'off'] as const).map(health => (
+          <span key={health} className="dshx:flex dshx:items-center dshx:gap-1.5">
+            <HealthDot health={health} />
+            <span className={healthTextClass[health]}>{healthLabels[health]}</span>
+          </span>
+        ))}
+      </section>
     </div>
   )
 }
@@ -111,6 +190,15 @@ export const kitDemos: readonly GalleryDemo[] = [
         ))}
       </EntityList>
     ),
+  },
+  {
+    id: 'kit-colour-roles',
+    title: 'Colour roles',
+    description: 'Attention, result, identity and data: the four jobs colour has, and the health dot.',
+    source: "import { HealthDot } from '@dshfiles/plugin-ui/components/ui/status-dot'",
+    static: true,
+    wide: true,
+    render: () => <ColourRolesDemo />,
   },
   {
     id: 'kit-controls',
