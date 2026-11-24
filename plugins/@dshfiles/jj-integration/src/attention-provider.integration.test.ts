@@ -120,8 +120,9 @@ describe.skipIf(!jjAvailable)('jj-integration inbox provider', () => {
 
     // The facet (and the Land view) call `land` directly, not the inbox verb; no rescan or safety tick follows.
     expect(await harness.api.land({ path, sessionId: 'session-facet' })).toMatchObject({ status: 'landed' })
-    const closed = await until('closed', list => list.items.some(entry => entry.dedupeKey === `${path}:ready` && entry.resolvedAt !== null))
-    expect(closed.items.find(entry => entry.dedupeKey === `${path}:ready`)?.source).toBe(READY_TO_LAND_SOURCE)
+    // Round three item 28: the item is retracted before the land answers, so the list stops offering Land with it.
+    const closed = await inbox.list({ view: 'closed' })
+    expect(closed.items.find(entry => entry.dedupeKey === `${path}:ready` && entry.resolvedAt !== null)?.source).toBe(READY_TO_LAND_SOURCE)
   }, 180_000)
 
   it('lists a conflicted thread as Failed, refuses Retry while it conflicts, and lands and resolves it once fixed', async () => {

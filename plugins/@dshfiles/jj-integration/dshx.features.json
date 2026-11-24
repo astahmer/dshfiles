@@ -914,6 +914,12 @@
           "span": "jj-integration auto fetch",
           "file": "plugins/@dshfiles/jj-integration/src/auto-fetch.test.ts",
           "testName": "reports a failed fetch with a recovery hint and an error span"
+        },
+        {
+          "kind": "custom",
+          "span": "jj-integration repository changed",
+          "file": "plugins/@dshfiles/jj-integration/src/land-freshness.integration.test.ts",
+          "testName": "tells browsers that a thread workspace gained a revision, without a poll"
         }
       ]
     },

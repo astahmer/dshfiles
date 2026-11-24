@@ -154,7 +154,15 @@ const make = Effect.gen(function* () {
       { ...location, threadName },
       { bookmark, sessionId: input.sessionId, validate, onProgress: phase => requests.recordProgress({ path: input.path, phase }) },
     )
-    if (outcome.status === 'landed' || outcome.status === 'nothing-to-land') yield* views.invalidate
+    if (outcome.status === 'landed' || outcome.status === 'nothing-to-land') {
+      yield* views.invalidate
+      // Round three item 28: the thread list refetches the inventory the moment this answers, while the full rescan
+      // the invalidation starts takes seconds; one read of this thread replaces its stale entry first. It never fails the land.
+      yield* views.findThread({ location: { ...location, threadName } }).pipe(
+        Effect.flatMap(found => (found === undefined ? Effect.void : views.replaceThread(found.thread))),
+        Effect.catchCause(cause => Effect.logDebug('jj-integration: the landed thread was not re-read', cause)),
+      )
+    }
     const landed =
       outcome.status === 'landed' ? (outcome.warning === undefined ? { head: outcome.head } : { head: outcome.head, warning: outcome.warning }) : undefined
     const result: LandResult = {

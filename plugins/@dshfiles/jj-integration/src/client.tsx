@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-session-log-export/client'
-import { Changes, createApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
+import { Changes, createApiClient, defineClient, subscribeApiEvent, useSettings } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, CircleCheckIcon, ClockIcon, GitMergeIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
@@ -33,6 +33,7 @@ import { IntegrationRecovery } from './integration-recovery.js'
 import { announceRepositoryChange, landResultToast } from './land-feedback.js'
 import { IntegrationMarkerLine } from './integration-marker.js'
 import { useMinuteTick } from './relative-label.js'
+import { followRepositoryChanges } from './repository-change-events.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel, threadQueryKeys } from './panel.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
@@ -321,6 +322,16 @@ export default defineClient({
       },
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
+    // Round three item 28: a jj operation in a thread's repository re-reads that thread's status (and its Land) at once.
+    // A Host from before the event never publishes it; the idle and turn-end polls still cover that case.
+    ctx.effect(
+      () =>
+        followRepositoryChanges({
+          subscribe: onEvent => subscribeApiEvent(jjThreads, 'repositoryChanged', { onEvent }),
+          queryClient: pluginQueryClient(),
+        }),
+      'jj-integration: thread status follows repository changes',
+    )
     // Which threads show a header Land right now: the land card beside the header and the turn-end offer read it, so a
     // screen keeps one Land.
     const headerLand = createHeaderLandPresence()

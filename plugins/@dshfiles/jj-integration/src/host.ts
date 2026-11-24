@@ -24,6 +24,7 @@ import { MaintenanceLive } from './maintenance.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepoLocks } from './repo-locks.js'
 import { RepositoryViews } from './repository-views.js'
+import { RepositoryWatch } from './repository-watch.js'
 import { SessionActivity } from './session-activity.js'
 import { jjIntegrationSettings } from './settings.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -52,7 +53,7 @@ const BaseLive = Layer.mergeAll(
   WorkspaceProcesses.layer,
 )
 
-const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, IntegrationQueue.layer).pipe(
+const JjIntegrationLive = Layer.mergeAll(MaintenanceLive, HostHooksLive, IntegrationQueue.layer, RepositoryWatch).pipe(
   Layer.provideMerge(
     Layer.mergeAll(AutoIntegration.layer, Cleanup.layer, ThreadLifecycle.layer, LandAttention.layer, WorkspaceSetupService.layer, DshUpdate.layer),
   ),
@@ -95,9 +96,11 @@ const handlers = Api.handlers(jjIntegrationApi, {
   refreshRepositories: () => RepositoryViews.use(views => Effect.map(views.startRefresh, started => ({ started }))),
   threadAt: input => ThreadLifecycle.use(lifecycle => lifecycle.threadAt(input)),
   revisionGraph: input => ThreadWorkspaces.use(threads => Effect.map(threads.revisionGraph(input.path), graph => ({ graph }))),
-  // A land from a client view resolves its ready-to-land inbox item at once instead of on the provider's safety tick.
+  // A land from a client view resolves its ready-to-land inbox item before it answers (round three item 28), and the
+  // provider's next pass confirms it instead of waiting for its safety tick.
   land: input =>
     Landing.use(landing => landing.land({ path: input.path, sessionId: input.sessionId, fromAgent: false, bookmark: input.bookmark })).pipe(
+      Effect.tap(result => (result.status === 'landed' ? LandAttention.use(attention => attention.landed(input.path)) : Effect.void)),
       Effect.ensuring(LandAttention.use(attention => attention.refresh)),
     ),
   queueLand: input => Landing.use(landing => landing.queue({ path: input.path, sessionId: input.sessionId })),

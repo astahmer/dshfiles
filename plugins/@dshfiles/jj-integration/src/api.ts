@@ -1,5 +1,5 @@
 import type { ApiMethodOptions, ApiToolExposure } from '@dshfiles/dshx/api'
-import { defineApi, method as defineMethod } from '@dshfiles/dshx/api'
+import { defineApi, event, method as defineMethod } from '@dshfiles/dshx/api'
 import {
   jjRepositoriesEffectSchema,
   jjRevisionEffectSchema,
@@ -625,6 +625,16 @@ export const jjIntegrationApi = defineApi({
             })
             .join('\n') || 'No thread-workspace removal has run.',
       },
+    }),
+  },
+  events: {
+    // Round three item 28: an open thread header shows Land within a second of `jj describe`, instead of on its poll.
+    repositoryChanged: event({
+      schema: Schema.Struct({
+        paths: Schema.Array(Schema.String.check(Schema.isMaxLength(4096))).check(Schema.isMaxLength(2_000)),
+      }),
+      description:
+        'A jj operation changed a repository (a describe, a new revision, a rebase, a land): `paths` are the thread workspaces it holds. Read those threads again.',
     }),
   },
 })

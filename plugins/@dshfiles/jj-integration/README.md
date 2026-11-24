@@ -359,6 +359,20 @@ one writer. Both are disabled while the Session is running. Automatic settling
 and archiving are not a second policy here: "Settle integrated threads" and
 "Archive settled threads" in Settings › Thread sidebar already do it on a delay.
 
+### Fresh Land state
+
+A land answers only once the landed thread's entry in the cached inventory has been
+read again (`RepositoryViews.replaceThread`) and its Ready item retracted, so the
+thread list's refetch on `dshfiles:jj-changed` stops showing "1 to land" and its
+Land at once instead of after the rescan (5.5 s measured before). New work shows
+Land without the one-minute idle poll: the Host watches the operation heads
+(`.jj/repo/op_heads/heads`) of every repository the last scan named
+(`src/repository-watch.ts`, no jj process) and publishes `repositoryChanged` with
+that repository's thread workspaces, at most once a second; each open header,
+turn-end offer and marker of one of those threads reads its status again. A
+git-only repository, or a Host from before the event, keeps the polls. The watch
+is Host code: it takes effect after a DSH restart.
+
 ### In the Inbox
 
 A conflicted workspace, or one whose queued land stopped, is a Failed Inbox item with Retry. A workspace with

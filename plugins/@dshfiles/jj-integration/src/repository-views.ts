@@ -1,5 +1,5 @@
 import type { Workspace } from '@deepseek-ai/dsh-workspace'
-import { Cache, Clock, Context, Duration, Effect, Exit, Fiber, FiberSet, FileSystem, Layer, Option, Path, SynchronizedRef } from 'effect'
+import { Cache, Clock, Context, Duration, Effect, Exit, Fiber, FiberSet, FileSystem, Layer, Option, Path, Stream, SubscriptionRef, SynchronizedRef } from 'effect'
 import type { RepositoryView, ThreadView } from './api.js'
 import type { HostCallFailed, ThreadWorkspaceError } from './errors.js'
 import { SessionReads, WorkspaceRegistry, type SessionActivityMap } from './host-edges-promise.js'
@@ -53,6 +53,12 @@ export interface LocatedWorkspace {
 
 export type ScanError = HostCallFailed | ThreadWorkspaceError
 
+/** One repository a scan named, with the thread workspaces it holds. */
+export interface ScannedRepository {
+  readonly repoRoot: string
+  readonly paths: readonly string[]
+}
+
 export interface RepositoriesSnapshot {
   readonly repositories: RepositoryView[]
   readonly refreshing: boolean
@@ -93,6 +99,13 @@ export class RepositoryViews extends Context.Service<
     readonly invalidateViews: Effect.Effect<void>
     /** Forget views, thread statuses and the Session activity they were judged on, after a jj mutation. */
     readonly invalidate: Effect.Effect<void>
+    /** The repositories of the last scan, each time a scan lands: what the repository watch follows. */
+    readonly scanned: Stream.Stream<readonly ScannedRepository[]>
+    /**
+     * Put a thread read just now in place of its entry in the last scan (round three item 28). After a land, the scan
+     * the invalidation starts takes seconds; until it lands, the thread list's refetch would read "1 to land".
+     */
+    readonly replaceThread: (thread: ThreadView) => Effect.Effect<void>
     readonly threadView: (input: {
       readonly status: ThreadStatus
       readonly workspace: Workspace | undefined
@@ -250,6 +263,14 @@ export class RepositoryViews extends Context.Service<
       }).pipe(Effect.withSpan('repository views scan'))
 
       const views = yield* SynchronizedRef.make<ViewsState>({ cached: undefined, invalidated: false, failedAt: undefined, generation: 0, scan: undefined })
+      const scannedRepositories = yield* SubscriptionRef.make<readonly ScannedRepository[]>([])
+      const announceScan = (exit: Exit.Exit<readonly RepositoryView[], ScanError>) =>
+        Exit.isSuccess(exit)
+          ? SubscriptionRef.set(
+              scannedRepositories,
+              exit.value.map(repository => ({ repoRoot: repository.repoRoot, paths: repository.threads.map(thread => thread.path) })),
+            )
+          : Effect.void
 
       // Check and fork under the ref's lock, so callers that arrive together share one scan.
       const startScan = SynchronizedRef.modifyEffect(views, (current): Effect.Effect<readonly [ScanStart, ViewsState]> => {
@@ -263,7 +284,7 @@ export class RepositoryViews extends Context.Service<
               if (Exit.isSuccess(exit)) return { ...released, cached: { value: exit.value, at: now }, invalidated: false, failedAt: undefined }
               return { ...released, failedAt: now }
             }),
-          )
+          ).pipe(Effect.andThen(announceScan(exit)))
         return Effect.map(FiberSet.run(scans, scanRepositories.pipe(Effect.onExit(settle))), (fiber): readonly [ScanStart, ViewsState] => [
           { started: true, fiber },
           { ...current, scan: fiber, failedAt: undefined },
@@ -304,6 +325,23 @@ export class RepositoryViews extends Context.Service<
         list: Effect.flatMap(startScan, started => Fiber.join(started.fiber)),
         invalidateViews,
         invalidate: Effect.all([invalidateViews, Cache.invalidateAll(statuses), activity.reset], { discard: true }),
+        scanned: SubscriptionRef.changes(scannedRepositories),
+        replaceThread: thread =>
+          SynchronizedRef.update(views, state =>
+            state.cached === undefined
+              ? state
+              : {
+                  ...state,
+                  cached: {
+                    at: state.cached.at,
+                    value: state.cached.value.map(repository =>
+                      repository.threads.some(entry => entry.path === thread.path)
+                        ? { ...repository, threads: repository.threads.map(entry => (entry.path === thread.path ? thread : entry)) }
+                        : repository,
+                    ),
+                  },
+                },
+          ),
         threadView,
         findThread: Effect.fn('repository views find thread')(function* (input: Parameters<RepositoryViews['Service']['findThread']>[0]) {
           const threadName = input.location.threadName
