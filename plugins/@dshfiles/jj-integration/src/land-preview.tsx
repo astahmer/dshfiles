@@ -6,13 +6,14 @@ import { ChevronDownIcon, GitMergeIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useId, useState } from 'react'
 import type { ThreadRevisionView } from './api.js'
+import { LandConfirmDialog } from './land-confirm-dialog.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
 const titleLine = (revision: ThreadRevisionView): string => revision.description.split('\n')[0] ?? ''
 
 /**
- * The turn-end land offer: one click to land the answer's work, and the exact revisions that click moves, so the
- * user never lands blind. The list opens in place instead of in a tooltip or hovering layer: a large thread can hold
+ * The turn-end land offer: the answer's work and the exact revisions it would move, so the user never lands blind.
+ * Land asks the header's question first (round two item 18: every Land asks the same question). The list opens in place instead of in a tooltip or hovering layer: a large thread can hold
  * dozens of revisions, and a list that scrolls stays readable and reachable from the keyboard.
  */
 export const LandPreview = (props: {
@@ -24,6 +25,7 @@ export const LandPreview = (props: {
   readonly onLand: () => void
 }): JSX.Element => {
   const [open, setOpen] = useState(false)
+  const [confirming, setConfirming] = useState(false)
   const listId = useId()
 
   return (
@@ -53,7 +55,7 @@ export const LandPreview = (props: {
               aria-label={props.t('rebaseOnto', { bookmark: props.bookmark })}
               className="dshx-root dshx:shrink"
               disabled={props.landing}
-              onClick={props.onLand}
+              onClick={() => setConfirming(true)}
               size="sm"
               type="button"
               // The thread header holds the one primary Land; this is the same verb next to the answer.
@@ -81,6 +83,14 @@ export const LandPreview = (props: {
           ))}
         </ul>
       ) : null}
+      <LandConfirmDialog
+        bookmark={props.bookmark}
+        onConfirm={props.onLand}
+        onOpenChange={setConfirming}
+        open={confirming && props.revisions.length > 0}
+        revisions={props.revisions}
+        t={props.t}
+      />
     </div>
   )
 }

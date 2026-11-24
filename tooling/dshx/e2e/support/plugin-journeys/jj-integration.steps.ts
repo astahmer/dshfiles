@@ -1378,6 +1378,8 @@ Then('the end of the turn offers one revision to integrate into main', async ({ 
 
 When('the integration is clicked at the end of the turn', async ({ page }: { page: Page }) => {
   await turnEndIntegrateOffer(page).getByRole('button', { name: 'Land on main', exact: true }).click()
+  // Every Land asks the same question (round two item 18): the offer opens the header's confirmation.
+  await page.getByRole('alertdialog').getByRole('button', { name: 'Land on main', exact: true }).click()
 })
 
 Then('the inline integration advances main and confirms it in the chat', async ({ page }: { page: Page }) => {
