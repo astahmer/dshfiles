@@ -15,6 +15,16 @@ afterEach(() => {
 
 const whereLine = (row: HTMLElement): string => row.querySelector('[data-thread-where]')?.textContent ?? ''
 
+describe('pressing a row', () => {
+  it('answers a tap or click with the accent fill within the hover duration (80ms)', async () => {
+    const row = await renderRow()
+    const button = row.querySelector<HTMLElement>('[data-thread-main-action]')
+    expect(button?.className).toContain('dshx:active:bg-accent')
+    expect(button?.className).toContain('dshx:transition-[background-color]')
+    expect(button?.className).toContain('dshx:duration-(--dshx-duration-hover)')
+  })
+})
+
 describe('a working thread row', () => {
   const working = { session: rowSession({ running: true }), workStatus: rowStatus({ status: 'working' }) }
 

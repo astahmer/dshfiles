@@ -1677,6 +1677,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               data-work-status={workStatus?.status}
               className={cn(
                 'dshx:@container/row dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-default',
+                // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
+                'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
                 // Phone rows are 60pt two-line targets (T1.3), whatever the density preference.
                 'dshx:pointer-coarse:min-h-15 dshx:pointer-coarse:justify-center',

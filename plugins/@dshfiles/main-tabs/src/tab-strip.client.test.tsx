@@ -237,6 +237,14 @@ describe('TabStrip layout', () => {
     expect(tab.querySelector('[data-tab-project]')).toBeNull()
   })
 
+  it('answers a tap or click on a tab with the accent fill within the hover duration (80ms)', () => {
+    mount()
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab.className).toContain('dshx:active:bg-accent')
+      expect(tab.className).toContain('dshx:duration-(--dshx-duration-hover)')
+    }
+  })
+
   it('gives every tab the same width when fixed width is on', () => {
     render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} fixedWidth />)
     for (const tab of screen.getAllByRole('tab')) {

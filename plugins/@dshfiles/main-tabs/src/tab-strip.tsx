@@ -297,6 +297,8 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         draggable={renamingTabId !== tab.id}
                         className={cn(
                           'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:bg-(--dsh-main-tab-bg) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-(--dsh-main-tab-bg-hover) dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                          // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
+                          'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                           props.fixedWidth === true
                             ? 'dshx:w-[160px] dshx:flex-none'
                             : cn('dshx:max-w-[190px] dshx:flex-[0_1_auto]', tab.pinned ? 'dshx:min-w-0' : 'dshx:min-w-[100px]'),
