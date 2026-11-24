@@ -213,6 +213,47 @@ Then('once the turn settles the tool card shows how long the call took and when 
     await expect(note).toHaveText(/^[3-9]\.\d s$/)
     await expect(page.getByRole('timer')).toHaveCount(0)
   })
+})
+
+/** 34em of the 14px prose: the measure a one-line work row stops at (DESIGN.md, layout: transcript measure). */
+const PROSE_MEASURE_PX = 34 * 14
+
+Then('the settled bash row is only as wide as its words, with its duration right after them', async ({ page }: { page: Page }) => {
+  await revealSettledToolCard(page)
+  await recordAssertion(page, 'tool-meta-work-row-fits-its-content', async () => {
+    const frame = page.locator('[data-dshfiles-tool-meta-frame]').filter({ hasText: 'Wait three seconds' }).first()
+    await expect(frame).toHaveAttribute('data-dshfiles-tool-meta-fit', '')
+    const geometry = await frame.evaluate(element => {
+      const textRight = (root: Element): number => {
+        let right = Number.NEGATIVE_INFINITY
+        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (node.textContent?.trim() === '' || node.parentElement?.closest('[data-dshfiles-tool-meta-label]') !== null) continue
+          const range = document.createRange()
+          range.selectNodeContents(node)
+          for (const box of range.getClientRects()) if (box.width > 0) right = Math.max(right, box.right)
+        }
+        return right
+      }
+      const row = element.querySelector('[data-dshfiles-tool-meta-row]')
+      const duration = element.querySelector('[data-dshfiles-tool-meta-label] [data-dshfiles-tool-meta]')
+      const column = element.closest('[data-chat-call-id]')
+      if (row === null || duration === null || column === null) return undefined
+      const range = document.createRange()
+      range.selectNodeContents(duration)
+      const durationLeft = Math.min(...[...range.getClientRects()].filter(box => box.width > 0).map(box => box.left))
+      return {
+        box: row.getBoundingClientRect().width,
+        column: column.getBoundingClientRect().width,
+        gap: durationLeft - textRight(row),
+      }
+    })
+    if (geometry === undefined) throw new Error('The bash row, its duration or its column is missing.')
+    expect(geometry.box).toBeLessThanOrEqual(PROSE_MEASURE_PX)
+    expect(geometry.box).toBeLessThan(geometry.column)
+    expect(geometry.gap).toBeGreaterThanOrEqual(0)
+    expect(geometry.gap).toBeLessThanOrEqual(16)
+  })
   await finishJourneyAssertions(page)
 })
 

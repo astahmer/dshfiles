@@ -47,6 +47,8 @@ DSH already folds them into the blocks it hands every tool view: a dispatched ca
 
 The timing label is an overlay at the right of the card's top row, and it shows only where that row can make room for it: a native disclosure row, which the frame pads by the label's width. A card that draws its own header (the HTML page card, with its copy and expand buttons) has no such row, so it gets no label instead of text over its controls. A card that prints its own duration opts out by marking any element inside it with `data-tool-card-timing="own"`, as the test-run card does.
 
+A card that is one collapsed row (a bash call, a read, a write, a subagent's record row) is a work row: its frame takes the width of the row's content, capped at Chat's prose measure (`--dsh-chat-prose-measure`), so the label lands 8px after the label it times and the row's hover covers only its own box. The frame keeps the message column as soon as the row opens, and for every card with a body (a diff, a plan, a page, a job), a section under it, a card that prints its own duration, or a card holding a size container. A fitted row keeps its duration in a narrow pane (a split, a phone); on a full-width card the label still gives way below the narrow tier, where it would cover the card's own chips.
+
 ### Sections under a card
 
 Other plugins add to the same frame through the `@dshfiles/tool-meta/tool-call-sections` dshx module: `plugin.add(ToolCallSections, { id, Section })` renders `Section` under every tool card, whichever view owns the card. `@dshfiles/background-jobs` uses it for the live job preview. A `Section` returns null for calls it has nothing to say about, and it subscribes to its own live data so the transcript above it does not re-render.

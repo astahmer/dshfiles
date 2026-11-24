@@ -33,6 +33,28 @@ export const OWN_TIMING_SELECTOR = '[data-tool-card-timing="own"]'
  * first match is the card's own unless the card has no header and the match belongs to a nested call's frame.
  */
 const HEADER_ROW_SELECTOR = '[data-disclosure-header], [data-expandable], [data-disclosure-row]'
+/** Set on a frame whose card is one collapsed row; the frame then fits that row instead of the message column. */
+export const FIT_ATTRIBUTE = 'data-dshfiles-tool-meta-fit'
+
+/**
+ * Whether the frame holds one collapsed row and nothing else (DESIGN.md, layout: a work row is as wide as its content):
+ * its card reaches its top row through single children, nothing in it is expanded, and no section or in-flow line
+ * follows the card. A card with a body (a diff, a plan, a page, a job) keeps the message column, and so does a card that
+ * prints its own duration (a test report) or holds a size container, which takes no width from its content and would
+ * collapse in a fitted frame. Reads no layout.
+ */
+export const isLoneRow = (frame: HTMLElement): boolean => {
+  const [card, ...rest] = frame.children
+  if (card === undefined || rest.some(child => !child.hasAttribute('data-dshfiles-tool-meta-label'))) return false
+  const keepsColumn = `[aria-expanded="true"], ${OWN_TIMING_SELECTOR}, [class*="@container"]`
+  if (card.matches(keepsColumn) || card.querySelector(keepsColumn) !== null) return false
+  let element: Element | null = card
+  while (element !== null && !element.matches(HEADER_ROW_SELECTOR)) {
+    if (element.children.length !== 1) return false
+    element = element.firstElementChild
+  }
+  return element !== null
+}
 
 /** One observer for every timing label on the page; each label registers the callback that re-reserves its row. */
 const labelSizes = (() => {
@@ -84,6 +106,7 @@ const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | nul
     let queued: number | undefined
     // Marking reads no layout, so a card that streams (many mutations) never forces one; only a resize measures.
     const mark = (): void => {
+      frame.toggleAttribute(FIT_ATTRIBUTE, isLoneRow(frame))
       const anchor = headerRowOf(frame, label)
       label.toggleAttribute(ANCHORED_ATTRIBUTE, anchor !== undefined)
       const row = width > 0 ? anchor : undefined
@@ -113,6 +136,7 @@ const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | nul
       if (queued !== undefined) cancelAnimationFrame(queued)
       marked?.removeAttribute(RESERVED_ROW_ATTRIBUTE)
       label.removeAttribute(ANCHORED_ATTRIBUTE)
+      frame.removeAttribute(FIT_ATTRIBUTE)
     }
   }, [frameRef, labelRef])
 }
@@ -129,10 +153,14 @@ const ToolCallFrame = (props: {
   return (
     // The frame is a size container: in a narrow pane (a phone, a split) the timing would sit over the card's own
     // status chip, so it gives way below the narrow tier (visual refresh P2). Its marked top row is padded by the
-    // label's width, so the row's content ends before the label.
+    // label's width plus 8px, so the row's content ends 8px before the label. A lone collapsed row fits its content
+    // (capped at chat's prose measure) so the label lands right after it, in its reserved room, at every pane width; a
+    // size container cannot take its width from its content, so that frame stops being one, and the label's narrow
+    // tier (which asks for this frame by name) no longer applies. The `aria-expanded` guard applies in the same frame a
+    // row opens, before the attribute is recomputed.
     <div
       ref={frameRef}
-      className="dshx:@container dshx:relative dshx:[&_[data-dshfiles-tool-meta-row]]:pe-[calc(var(--dshfiles-tool-meta-reserve)+0.25rem)]!"
+      className="dshx:@container/tool-frame dshx:relative dshx:[&_[data-dshfiles-tool-meta-row]]:pe-[calc(var(--dshfiles-tool-meta-reserve)+0.5rem)]! dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:w-fit dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:max-w-[min(100%,var(--dsh-chat-prose-measure,100%))] dshx:data-[dshfiles-tool-meta-fit]:not-has-[[aria-expanded=true]]:[container-type:normal]"
       data-dshfiles-tool-meta-frame=""
     >
       {props.card}
@@ -142,7 +170,7 @@ const ToolCallFrame = (props: {
         <span
           ref={labelRef}
           data-dshfiles-tool-meta-label=""
-          className="dshx-root dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2 dshx:data-[dshfiles-tool-meta-anchored]:visible dshx:@max-pane-narrow:hidden"
+          className="dshx-root dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2 dshx:data-[dshfiles-tool-meta-anchored]:visible dshx:@max-pane-narrow/tool-frame:hidden"
         >
           {props.meta}
         </span>

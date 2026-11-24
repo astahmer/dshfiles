@@ -2,7 +2,9 @@
   box-sizing: border-box;
   display: flex;
   align-items: center;
-  width: 100%;
+  /* dshfiles (unslop R4): as wide as its label, so its hover and focus cover the words, not the column. */
+  width: fit-content;
+  max-width: var(--dsh-chat-prose-measure, 100%);
   min-width: 0;
   /* dshfiles (visual refresh T2.1): no rule under the row; turns separate by spacing. */
   height: calc(24px + var(--dsh-content-font-delta, 0px));

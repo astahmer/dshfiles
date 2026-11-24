@@ -223,7 +223,7 @@ export const TurnSummaryLine = (props: {
     })
   const separators = TurnActivity.separators(parts.map(part => part.chevron))
   return (
-    <div className="dshx-root dshx:flex dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-dshfiles-turn-summary="">
+    <div className="dshx-root dshx:flex dshx:w-fit dshx:max-w-[var(--dsh-chat-prose-measure,100%)] dshx:flex-col dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-dshfiles-turn-summary="">
       <div className="dshx:flex dshx:min-w-0 dshx:items-start dshx:gap-1.5">
         <ListChecksIcon aria-hidden className="dshx:mt-0.5 dshx:size-3.5 dshx:shrink-0" />
         {/* Each part draws its "·" in its own left padding, and the row clips that padding at its left edge: the
