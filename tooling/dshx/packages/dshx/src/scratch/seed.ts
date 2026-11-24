@@ -29,6 +29,8 @@ const AI_ACCOUNTS_BUTTON_NAME = 'AI Accounts: Accounts'
 const AI_ACCOUNTS_SETTINGS_NAME = 'AI Accounts'
 const FAKE_PROVIDER_ROUTE_SLUG = 'dshx_fake_commandcode'
 export const NEW_THREAD_START_BUTTON_NAME = /^(?:New thread|New session)$/i
+/** The thread header's title landmark (rich-composer `session.hierarchy`), which names the sent thread. */
+export const THREAD_HIERARCHY_NAVIGATION_NAME = 'Thread hierarchy'
 const fakeProviderScript = fileURLToPath(new URL('./fake-provider-main.js', import.meta.url))
 
 const openSettingsDialog = async (page: Page, timeoutMs: number): Promise<void> => {
@@ -301,7 +303,7 @@ const seedRebaseReadyThread = async (state: ScratchState, page: Page, timeoutMs:
   await composer.fill(REBASE_READY_THREAD_MESSAGE)
   await composer.press('Enter')
   await page
-    .getByRole('navigation', { name: 'Session hierarchy', exact: true })
+    .getByRole('navigation', { name: THREAD_HIERARCHY_NAVIGATION_NAME, exact: true })
     .filter({ hasText: REBASE_READY_THREAD_MESSAGE })
     .waitFor({ state: 'visible', timeout: timeoutMs })
   // The send can land in another prepared workspace than the one the composer named while the draft was written (a

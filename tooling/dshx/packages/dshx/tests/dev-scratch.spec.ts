@@ -15,7 +15,7 @@ import { runCli } from '../src/cli/run.js'
 import { ScratchDriveRuntime } from '../src/scratch/drive.js'
 import { StartupDialogs } from '../src/project/startup-dialogs.js'
 import { ScratchReaperRuntime } from '../src/scratch/reaper.js'
-import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime } from '../src/scratch/seed.js'
+import { installFakeSecretCli, NEW_THREAD_START_BUTTON_NAME, ScratchSeedRuntime, THREAD_HIERARCHY_NAVIGATION_NAME } from '../src/scratch/seed.js'
 import { DEFAULT_WARN_MINUTES, ScratchStateRuntime, type ScratchState } from '../src/scratch/state.js'
 import { ScratchBootModel } from '../src/scratch/up.js'
 
@@ -66,6 +66,14 @@ const startProcess = async (args: readonly string[]): Promise<number> => {
 }
 
 describe('dshx dev scratch commands', () => {
+  it('waits for the sent seed thread under the header landmark rich-composer names', async () => {
+    // The rebase-ready-thread seed failed for every caller once the landmark became "Thread hierarchy".
+    const locales = await readFile(fileURLToPath(new URL('../../../../../plugins/@dshfiles/rich-composer/src/native/locales.ts', import.meta.url)), 'utf8')
+    const enBlock = locales.slice(locales.indexOf('export const en = {'))
+    const english = enBlock.slice(enBlock.indexOf("'session.hierarchy':"))
+    expect(/^'session\.hierarchy': '([^']+)'/u.exec(english)?.[1]).toBe(THREAD_HIERARCHY_NAVIGATION_NAME)
+  })
+
   it('lists the scratch actions and the plugin dev session when dev has no action', async () => {
     for (const flag of ['--help', '-h']) {
       const help = await run(['dev', flag])
