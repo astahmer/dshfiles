@@ -1,0 +1,46 @@
+[
+  {
+    "id": "scratch-mobile-capture",
+    "skill": "verify-dsh",
+    "prompt": "I changed the thread creation screen and need to hand QA a phone-width screenshot of the new-thread composer. The regular DSH window is in use by other people. In our repo the workspace-nav feature id is new-thread-composer. Give me an ordered scratch verification and handoff plan I can follow, including what counts as a failed run and what to keep. Plan only; don't start anything or claim you verified it.",
+    "criteria": {
+      "isolate": "Selects a dedicated scratch instance (consistent name if used), the stock checkout core and a disposable home/project/browser; leaves the regular window and Host alone.",
+      "reach": "Gives a usable order: dev up with workspace-nav and needed providers, dev doctor, dev open --narrow workspace-nav/new-thread-composer, then dev shot with a label and JSON evidence.",
+      "evidence": "Names both the PNG and redacted JSON, and says how to check console/page/request failures and report their counts; a failed doctor or reach is not a pass.",
+      "cleanup": "Includes dev down for that instance even after failure, preserving the evidence; no tokenized URLs in the handoff."
+    }
+  },
+  {
+    "id": "scratch-expired-lease",
+    "skill": "verify-dsh",
+    "prompt": "Yesterday I used a named disposable DSH preview called rebase-demo. Today its browser is gone and opening the jj-integration/thread-destination feature returns not-up. Someone suggested repointing the rehearsal at the URL from our regular browser. Write me a recovery runbook for replaying that feature and attaching clean evidence. Don't run it, access any accounts, or touch the regular DSH.",
+    "criteria": {
+      "diagnose": "Treats not-up as an absent/possibly expired scratch instance, not proof of a plugin defect; checks that named instance rather than substituting the regular Host.",
+      "recover": "Explains how to create a fresh named scratch instance for @dshfiles/jj-integration, check it with doctor and replay jj-integration/thread-destination with the same name.",
+      "evidence": "Captures a labeled shot plus redacted JSON only after the successful reach; gives a stop/recovery path for failed doctor or reach and rules out publishing a tokenized URL.",
+      "cleanup": "Tears down only the named scratch instance and distinguishes keeping the lease alive during rehearsal from preserving evidence after teardown."
+    }
+  },
+  {
+    "id": "plugin-old-host",
+    "skill": "dsh-plugin-verify",
+    "prompt": "Our owned plugin's new client card calls a newly added Host API. The client bundle rebuilt, but a teammate says the already-open tab crashes because the method is missing. The latest typecheck passed. Give me the smallest verification plan I can use before calling this fixed, including what to tell people whose tabs are already open. Don't modify the plugin, run commands, or restart anything.",
+    "criteria": {
+      "lifecycle": "Distinguishes client HMR from Host restart and does not treat a rebuilt client or refreshed tab as a new Host.",
+      "compatibility": "Tests new client against old Host (missing method/default/fallback, no slot crash) as well as against the new Host (successful result); failures remain unverified.",
+      "build": "Calls for focused tests/typecheck/build and a Node 24.11.1 import of the built Host entry, rather than relying on the previous typecheck.",
+      "evidence": "Calls for disposable-profile activation and a real browser check including console/slot errors, and says any live restart belongs to the user."
+    }
+  },
+  {
+    "id": "plugin-pending-settings",
+    "skill": "dsh-plugin-verify",
+    "prompt": "I added a settings panel to an owned DSH plugin. The scratch boot reports my row pending, two consumers are also pending, and the web UI shows no settings. This is the first change that adds dshx settings to a Host entry that already has a native Config export. Draft a diagnostic and verification checklist with stop conditions; the running team profile must stay as it is. Don't make edits or run the checklist.",
+    "criteria": {
+      "contract": "Identifies native Config plus dshx settings in one entry as unsupported and requires the settings namespace to match the Loader row id.",
+      "diagnose": "Separates the first failing provider/import from dependent pending rows; checks the actual composed profile and activation, not only package installation or typecheck.",
+      "build": "Includes focused plugin tests/typecheck/build and importing the built Host entry under pinned Node before repeating scratch boot.",
+      "evidence": "Requires the setting to appear and work in the disposable UI without slot/console errors while consumers activate; unresolved pending rows are not a pass and the team profile stays unchanged."
+    }
+  }
+]
