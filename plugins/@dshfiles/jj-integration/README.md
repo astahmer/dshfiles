@@ -342,9 +342,15 @@ instead of restarting it, so a fold that was nearly done still answers and the
 rebase proceeds; only a read that stays unreadable for 45 s refuses with "refresh
 and retry", and by then its work has warmed the next attempt.
 
-Each successful rebase adds a row to the conversation, after the turn it
-followed, with the target bookmark and 12-character tip change ID; a thread that
-keeps working and lands again gets one row per land. The latest row's actions are
+Each successful rebase adds a one-line row to the conversation, after the turn it
+followed: "Landed on main" and how long ago, with the 8-character tip change ID and
+the exact time in its tooltip; a thread that keeps working and lands again gets
+one row per land. A clean land shows no toast: the header's "✓ Landed" (which
+fades in over the count) and this row confirm it, and the confirmation dialog
+hands focus back to the Land that opened it, or to the composer once it landed.
+Only a land that stopped or left a warning reports in a toast, which counts the
+revisions instead of naming their ids. While the header shows Land, the turn-end
+offer keeps its sentence and revision list but not a second Land button. The latest row's actions are
 what `integratedThreadActions` selects: **Settle** alone by default, **Archive**,
 both, or none. Archive acts on that Session only; Settle asks
 `@dshfiles/thread-sidebar`, which owns the settled status, through the cancelable

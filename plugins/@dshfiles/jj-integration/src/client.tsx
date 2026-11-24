@@ -30,7 +30,9 @@ import { IntegrationTimeline, type IntegrationRecord } from './integration-timel
 import { InlineIntegrateOffer } from './inline-integrate.js'
 import { LandPreview } from './land-preview.js'
 import { IntegrationRecovery } from './integration-recovery.js'
-import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
+import { announceRepositoryChange, landResultToast } from './land-feedback.js'
+import { IntegrationMarkerLine } from './integration-marker.js'
+import { useMinuteTick } from './relative-label.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
 import { ThreadWorkspacesPanel, threadQueryKeys } from './panel.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
@@ -319,6 +321,9 @@ export default defineClient({
       },
     }
     const jjThreads = createApiClient(ctx, jjIntegrationApi)
+    // Which threads show a header Land right now: the land card beside the header and the turn-end offer read it, so a
+    // screen keeps one Land.
+    const headerLand = createHeaderLandPresence()
     const integrationTimeline = new IntegrationTimeline()
     const TURN_END_STATUS_REFRESH_WINDOW_MS = 30_000
     const ThreadIntegrationMarkers = (props: { readonly turn: TurnLocation; readonly sessionId: SessionSummary['id'] }): JSX.Element | null => {
@@ -333,6 +338,12 @@ export default defineClient({
         () => undefined,
       )
       const newestTurnHasEnded = props.turn.end?.time !== undefined && nextTurnStartedAt === undefined
+      const headerLandShown = useSyncExternalStore(
+        headerLand.subscribe,
+        () => headerLand.shown(String(props.sessionId)),
+        () => false,
+      )
+      const now = useMinuteTick()
       const subscribeToSessions = useCallback((listener: () => void) => ctx.sessions.list.subscribe(listener), [])
       const path = ctx.sessions.list.getSnapshot().byId[props.sessionId]?.cwd
       const statusQueryKey = useMemo(() => threadQueryKeys.threadAt(path ?? '', props.sessionId), [path, props.sessionId])
@@ -490,7 +501,9 @@ export default defineClient({
           announceRepositoryChange()
           await pluginQueryClient().invalidateQueries({ queryKey: threadQueryKeys.threadAt(input.path) })
           await pluginQueryClient().invalidateQueries({ queryKey: revisionGraphQueryKey(input.path) })
-          if (result !== undefined && result !== null) noticeToast.show({ text: describeLandResult(translate, result), success: result.status === 'landed' })
+          // Round three item 27: a clean land confirms in the header and in the marker below; only a warning or a stop toasts.
+          const report = result === undefined || result === null ? undefined : landResultToast(translate, result)
+          if (report !== undefined) noticeToast.show({ text: report, success: false })
         },
       })
       if (thread === null || thread === undefined || turnStartedAt === undefined) return noticeToast.element
@@ -526,16 +539,18 @@ export default defineClient({
               ) : (
                 <ClockIcon aria-hidden="true" className="dshx:shrink-0" size={14} />
               )}
-              <span className="dshx:min-w-0">
-                {marker.kind === 'integrated'
-                  ? marker.tipChangeId === undefined
-                    ? translate('rebaseNotice', { bookmark })
-                    : translate('rebaseNoticeWithTip', { bookmark, revisionId: marker.tipChangeId })
-                  : translate(marker.kind === 'queued' ? 'integrationQueuedNotice' : 'integrationUnqueuedNotice', { bookmark })}
-              </span>
-              <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(marker.at).toISOString()}>
-                {new Date(marker.at).toLocaleString()}
-              </time>
+              {marker.kind === 'integrated' ? (
+                <IntegrationMarkerLine at={marker.at} bookmark={bookmark} now={now} t={translate} tipChangeId={marker.tipChangeId} />
+              ) : (
+                <>
+                  <span className="dshx:min-w-0">
+                    {translate(marker.kind === 'queued' ? 'integrationQueuedNotice' : 'integrationUnqueuedNotice', { bookmark })}
+                  </span>
+                  <time className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums" dateTime={new Date(marker.at).toISOString()}>
+                    {new Date(marker.at).toLocaleString()}
+                  </time>
+                </>
+              )}
               <span aria-hidden="true" className="dshx:h-px dshx:min-w-4 dshx:flex-1 dshx:bg-border" />
               {marker !== activeQueueMarker ? null : (
                 <Button
@@ -597,7 +612,9 @@ export default defineClient({
             // answer the user just read, and it disappears as soon as the work is integrated.
             <LandPreview
               bookmark={bookmark}
+              headerLandShown={headerLandShown}
               landing={landing}
+              sessionId={String(props.sessionId)}
               onLand={() => land.mutate({ path: thread.path })}
               pending={land.isPending}
               revisions={thread.unlanded}
@@ -1186,8 +1203,6 @@ export default defineClient({
     // The export plugin draws its trigger and its progress modal in one header cell. A lower priority shadows that
     // cell, so this plugin owns the trigger (a row in the workspace menu) and keeps the feedback the modal carried.
     const sessionLog = createSessionLogDownloadPort()
-    // The land card beside the header reads which threads show a header Land, so a screen keeps one primary Land.
-    const headerLand = createHeaderLandPresence()
     // Round two item 17: the phone top bar shows the header utilities only inside its ⋯ sheet, so jujutsu seats this
     // Land in the bar itself (conversation.session.header.changes); it opens the header's confirmation.
     const PhoneLand = (props: { readonly sessionId: string }): JSX.Element => (

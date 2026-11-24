@@ -23,7 +23,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useIsMutating, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useRegistry } from '@dshfiles/dshx/client'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { Schema } from 'effect'
 import type { ThreadRevisionView, ThreadView } from './api.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
@@ -31,7 +31,7 @@ import type { JjIntegrationTranslate } from './locales.js'
 import type { HeaderLandPresence } from './header-land-presence.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { LandConfirmDialog } from './land-confirm-dialog.js'
-import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
+import { announceRepositoryChange, landResultToast, undescribedText } from './land-feedback.js'
 import { REPOSITORY_CHANGED_EVENT } from './repository-change.js'
 import { threadQueryKeys } from './panel.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
@@ -119,6 +119,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const cwd = useSyncExternalStore(subscribe, read, noCwd)
   const bookmark = useProjectBookmark(cwd, props.bookmark)
   const toast = useToast()
+  const landTrigger = useRef<HTMLButtonElement>(null)
   const pathCopy = useCopyFeedback()
   const menuSections = arrangeWorkspaceMenuSections(useRegistry(WorkspaceMenuSections))
   const thread = useQuery({
@@ -161,7 +162,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       await queryClient.invalidateQueries({ queryKey: revisionGraphQueryKey(input.path) })
       if (result?.status === 'landed')
         setLandedMark(mark => WorkspaceControlModel.landedMark(mark, { sessionId: String(props.sessionId), rebasedAt: mark.seenRebasedAt ?? undefined, unlanded: 0, landedHere: true }))
-      if (result !== undefined && result !== null) toast.show({ text: describeLandResult(props.t, result), success: result.status === 'landed' })
+      // Round three item 27: a clean land confirms in the header ("✓ Landed"); only a warning or a stop gets a toast.
+      const report = result === undefined || result === null ? undefined : landResultToast(props.t, result)
+      if (report !== undefined) toast.show({ text: report, success: false })
     },
   })
   /** The status refetch runs jj and can take seconds, so the menu shows the Host's answer at once and refreshes behind it. */
@@ -319,12 +322,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       case 'conflicts':
         return statusText()
       case 'undescribed':
-        return props.t('needsDescription', {
-          revisions: (current?.unlanded ?? [])
-            .filter(revision => revision.description.trim().length === 0)
-            .map(revision => revision.changeId.slice(0, 8))
-            .join(', '),
-        })
+        return undescribedText(props.t, (current?.unlanded ?? []).filter(revision => revision.description.trim().length === 0).length)
       case 'busy':
         return blockedReason ?? props.t('rebaseBlockedUnknownThread')
       default:
@@ -368,8 +366,15 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       </span>
     ) : null
   // Round two item 19: a land seen here confirms in green, glyph only; the word stays ink (DESIGN.md colour rule 3).
+  // Round three item 27: it fades in over the count it replaces (120ms, opacity only, so reduced motion keeps it).
   const landedLabel = (className?: string): JSX.Element => (
-    <span className={cn('dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-xs', className)} data-workspace-landed="">
+    <span
+      className={cn(
+        'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:animate-in dshx:fade-in-0 dshx:duration-(--dshx-duration-fade) dshx:ease-(--dshx-motion-ease-enter)',
+        className,
+      )}
+      data-workspace-landed=""
+    >
       <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-success" />
       <span className="dshx:@max-[26rem]:sr-only">{props.t('landedMark')}</span>
     </span>
@@ -405,6 +410,7 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
           data-workspace-land={seat === 'phone-bar' ? 'phone' : ''}
           disabled={rebasesPending}
           onClick={askToLand}
+          ref={landTrigger}
           size="sm"
           type="button"
         >
@@ -425,7 +431,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       onOpenChange={setConfirmingLand}
       open={confirmingLand && unlanded > 0 && (seat !== 'request' || landBlock === undefined)}
       revisions={current.unlanded}
+      sessionId={String(props.sessionId)}
       t={props.t}
+      trigger={() => landTrigger.current}
     />
   ) : null
 

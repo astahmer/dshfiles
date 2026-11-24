@@ -9,7 +9,9 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { useRef } from 'react'
 import type { ThreadRevisionView } from './api.js'
+import { focusAfterLandDialog } from './land-focus.js'
 import type { JjIntegrationTranslate } from './locales.js'
 
 /**
@@ -23,9 +25,27 @@ export const LandConfirmDialog = (props: {
   readonly bookmark: string
   readonly revisions: readonly ThreadRevisionView[]
   readonly onConfirm: () => void
-}): JSX.Element => (
-  <AlertDialog onOpenChange={props.onOpenChange} open={props.open}>
-    <AlertDialogContent>
+  /** The Land that opened the dialog: a cancel returns focus to it. */
+  readonly trigger?: (() => HTMLElement | null) | undefined
+  /** The thread whose composer takes focus after a confirmed Land, or when the trigger is gone. */
+  readonly sessionId?: string | undefined
+}): JSX.Element => {
+  const confirmed = useRef(false)
+  return (
+  <AlertDialog
+    onOpenChange={open => {
+      if (open) confirmed.current = false
+      props.onOpenChange(open)
+    }}
+    open={props.open}
+  >
+    <AlertDialogContent
+      onCloseAutoFocus={event => {
+        event.preventDefault()
+        focusAfterLandDialog({ confirmed: confirmed.current, trigger: props.trigger?.(), sessionId: props.sessionId })
+        confirmed.current = false
+      }}
+    >
       <AlertDialogHeader>
         <AlertDialogTitle>
           {props.revisions.length === 1
@@ -45,8 +65,16 @@ export const LandConfirmDialog = (props: {
       </ul>
       <AlertDialogFooter>
         <AlertDialogCancel>{props.t('cancel')}</AlertDialogCancel>
-        <AlertDialogAction onClick={props.onConfirm}>{props.t('rebaseOnto', { bookmark: props.bookmark })}</AlertDialogAction>
+        <AlertDialogAction
+          onClick={() => {
+            confirmed.current = true
+            props.onConfirm()
+          }}
+        >
+          {props.t('rebaseOnto', { bookmark: props.bookmark })}
+        </AlertDialogAction>
       </AlertDialogFooter>
     </AlertDialogContent>
   </AlertDialog>
-)
+  )
+}

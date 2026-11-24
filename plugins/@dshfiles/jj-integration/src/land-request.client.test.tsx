@@ -114,12 +114,9 @@ describe('a Land asked for from another view (ThreadHeaderLand.confirm)', () => 
     fireEvent.click(screen.getByRole('button', { name: 'Land on main' }))
     await waitFor(() => expect(api.land).toHaveBeenCalledTimes(1))
     expect(api.land.mock.calls[0]?.[0]).toEqual({ path: PATH, sessionId: SESSION })
-    // The request stays mounted until the land is reported, then ends.
-    const report = await screen.findByRole('status')
-    expect(report.textContent).toContain('main')
-    expect(onDone).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'dismiss toast' }))
+    // A clean land reports nothing over the page (round three item 27): the thread list and header show it landed.
     await waitFor(() => expect(onDone).toHaveBeenCalledTimes(1))
+    expect(screen.queryByRole('status')).toBeNull()
   })
 
   it('Cancel lands nothing and ends the request', async () => {
@@ -144,7 +141,9 @@ describe('a Land asked for from another view (ThreadHeaderLand.confirm)', () => 
     api.threadAt.mockResolvedValue({ thread: thread({ unlanded: [{ changeId: 'kundescribed', commitId: 'c1', description: '', conflict: false }] }) })
     renderRequest()
     const reason = await screen.findByRole('status')
-    expect(reason.textContent).toContain('kundescr')
+    // The refusal counts the revisions; the dialog is where they are listed by id.
+    expect(reason.textContent).toContain('1 revision has no description')
+    expect(reason.textContent).not.toContain('kundescr')
     expect(screen.queryByRole('alertdialog')).toBeNull()
     expect(api.land).not.toHaveBeenCalled()
   })

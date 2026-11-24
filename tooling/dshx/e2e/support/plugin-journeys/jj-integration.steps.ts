@@ -284,6 +284,22 @@ const rebaseButton = (page: Page) => page.getByRole('button', { name: 'Land this
 const confirmLand = async (page: Page): Promise<void> => {
   await page.getByRole('alertdialog').getByRole('button', { name: 'Land on main', exact: true }).click()
 }
+/**
+ * Round three item 27: a clean Land confirms with the header's "✓ Landed", which nothing covers, and the closed
+ * dialog leaves focus on the composer (or the Land that opened it), never on the page.
+ */
+const expectLandConfirmedInHeader = async (page: Page): Promise<void> => {
+  const landed = page.locator('[data-workspace-landed]').first()
+  await expect(landed).toBeVisible()
+  const box = await landed.boundingBox()
+  if (box === null) throw new Error('The header "Landed" mark has no layout box.')
+  const uncovered = await page.evaluate(
+    point => document.elementFromPoint(point.x, point.y)?.closest('[data-workspace-landed], [data-workspace-place]') !== null,
+    { x: box.x + box.width / 2, y: box.y + box.height / 2 },
+  )
+  expect(uncovered).toBe(true)
+  await expect.poll(() => page.evaluate(() => document.activeElement !== null && document.activeElement !== document.body)).toBe(true)
+}
 /** The same land action, one click from the answer: the row the newest completed turn renders. */
 const turnEndIntegrateOffer = (page: Page) => page.getByTestId('jj-inline-integrate-offer')
 /** The one header control: it names a thread workspace, or the shared checkout the thread runs in. */
@@ -1305,7 +1321,7 @@ Then('Rebase refuses the placeholder description and leaves main in place', asyn
   await rebaseButton(page).click()
   await confirmLand(page)
   await recordAssertion(page, 'jj-integration-rebase-asks-for-a-description', async () => {
-    await expect(page.getByRole('alert').filter({ hasText: /^Describe these revisions before landing: \w+\./ })).toBeVisible()
+    await expect(page.getByRole('alert').filter({ hasText: /^1 revision has no description\. Describe it, then land again\./ })).toBeVisible()
     expect(commitIdOf(repository, 'main')).toBe(repository.baseCommitId)
   })
 })
@@ -1321,8 +1337,9 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
   })
   await confirmLand(page)
   await recordAssertion(page, 'jj-integration-rebase-moves-the-bookmark', async () => {
-    const rebasedToast = page.getByRole('alert').filter({ hasText: 'Landed 1 revision on main:' })
-    await expect(rebasedToast).toContainText(description)
+    // Round three item 27: the header's "✓ Landed" confirms; no toast covers the header, and focus is not dropped.
+    await expectLandConfirmedInHeader(page)
+    await expect(page.getByRole('alert').filter({ hasText: /Landed \d+ revisions? on main/u })).toHaveCount(0)
     await openWorkspaceMenu(page)
     await expect(rebaseButton(page)).toBeDisabled()
     const notice = page.getByTestId('jj-thread-rebased-notice')
@@ -1330,7 +1347,12 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     expect(descriptionOf(repository, 'main')).toBe(description)
 
     await expect(notice).toBeVisible()
-    await expect(notice).toContainText(`Landed on main (${changeIdOf(repository, 'main').slice(0, 12)}`)
+    // One line: where and when; the short revision id is in the tooltip of its words.
+    await expect(notice.getByTestId('jj-integration-marker-text')).toHaveText('Landed on main')
+    await expect(notice).toContainText('just now')
+    await expect(notice).not.toContainText(changeIdOf(repository, 'main'))
+    await notice.getByTestId('jj-integration-marker-text').focus()
+    await expect(page.getByRole('tooltip')).toContainText(changeIdOf(repository, 'main').slice(0, 8))
     await expect(notice.getByRole('button', { name: 'Mark this landed thread done', exact: true })).toBeEnabled()
     await expect(notice.getByRole('button', { name: 'Archive this landed thread', exact: true })).toHaveCount(0)
     // A thread lands more than once, so each land is a row in the transcript rather than a banner in the composer dock.
@@ -1338,8 +1360,6 @@ Then('Rebase moves main onto the work described {string}', async ({ page }: { pa
     const composerBounds = await threadComposer(page).boundingBox()
     if (noticeBounds === null || composerBounds === null) throw new Error('The rebased notice or the composer has no layout box.')
     expect(noticeBounds.y + noticeBounds.height).toBeLessThan(composerBounds.y)
-    await expect(rebasedToast).toContainText('main is now at')
-    await expect(rebasedToast).toContainText(`(${commitIdOf(repository, 'main').slice(0, 8)})`)
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
   })
   await finishJourneyAssertions(page)
@@ -1362,7 +1382,9 @@ Then('the end of the turn offers one revision to integrate into main', async ({ 
   await recordAssertion(page, 'jj-integration-turn-end-integrates-in-one-click', async () => {
     await expect(offer).toBeVisible({ timeout: 20_000 })
     await expect(offer).toContainText('1 revision ready to land on main.')
-    await expect(offer.getByRole('button', { name: 'Land on main', exact: true })).toBeEnabled()
+    // Round three item 27: the header shows Land, so the offer keeps its sentence and drops its own button.
+    await expect(page.getByRole('button', { name: 'Land this thread', exact: true })).toBeVisible()
+    await expect(offer.getByRole('button', { name: 'Land on main', exact: true })).toHaveCount(0)
     // The offer names the exact revisions the button moves, so landing is never blind.
     await offer.getByRole('button', { name: 'Show the revisions that will land' }).click()
     await expect(offer.getByRole('list', { name: 'Revisions landing on main' })).toContainText('One click work')
@@ -1377,8 +1399,9 @@ Then('the end of the turn offers one revision to integrate into main', async ({ 
 })
 
 When('the integration is clicked at the end of the turn', async ({ page }: { page: Page }) => {
-  await turnEndIntegrateOffer(page).getByRole('button', { name: 'Land on main', exact: true }).click()
-  // Every Land asks the same question (round two item 18): the offer opens the header's confirmation.
+  // The offer under the answer drops its button while the header shows Land (round three item 27): the one Land on
+  // screen is the header's, and every Land asks the same question (round two item 18).
+  await page.getByRole('button', { name: 'Land this thread', exact: true }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Land on main', exact: true }).click()
 })
 
@@ -1389,6 +1412,7 @@ Then('the inline integration advances main and confirms it in the chat', async (
     await expect(notice).toHaveCount(1)
     await expect(notice).toContainText('Landed on main')
     await expect(turnEndIntegrateOffer(page)).toHaveCount(0)
+    await expectLandConfirmedInHeader(page)
     expect(descriptionOf(repository, 'main')).toBe('One click work')
     expect(commitIdOf(repository, 'main-')).toBe(repository.baseCommitId)
   })

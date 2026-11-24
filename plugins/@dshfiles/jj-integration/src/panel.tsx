@@ -1,5 +1,4 @@
 import type { ISessions, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
-import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PaletteActions, type PaletteActionContext } from '@dshfiles/command-palette/palette-contract'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
@@ -73,6 +72,7 @@ import { ProjectBookmarkQuery } from './project-bookmark-query.js'
 import { threadAtQueryKey } from './thread-query-keys.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
+import { activityLabel, useMinuteTick } from './relative-label.js'
 
 /** The Land page lists the newest revisions of each thread; the full list of one thread is `threadAt`. */
 const LAND_REVISION_LIMIT = 10
@@ -211,16 +211,6 @@ const SessionConversationPreview = (props: {
 }
 
 const userMessagesLabel = (t: JjIntegrationTranslate, count: number): string => (count === 1 ? t('userMessage', { count }) : t('userMessages', { count }))
-
-const activityLabel = (t: JjIntegrationTranslate, at: number, now: number): string => {
-  const age = relativeTime(at, now)
-  if (age.unit === 'now') return t('timeNow')
-  if (age.unit === 'minutes') return t('timeMinutes', { n: age.n })
-  if (age.unit === 'hours') return t('timeHours', { n: age.n })
-  if (age.unit === 'days') return t('timeDays', { n: age.n })
-  if (age.unit === 'months') return t('timeMonths', { n: age.n })
-  return t('timeYears', { n: age.n })
-}
 
 const integrationStatusLabel = (t: JjIntegrationTranslate, assessment: ThreadIntegrationAssessment): string => {
   if (assessment.category === 'ready') return t('readyToIntegrate')
@@ -715,16 +705,6 @@ const PanelSkeleton = (): JSX.Element => (
     </CardContent>
   </Card>
 )
-
-/** Relative activity times stay honest while the page sits open. */
-const useMinuteTick = (): number => {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 60_000)
-    return () => clearInterval(timer)
-  }, [])
-  return now
-}
 
 interface SessionDirectory {
   readonly byId: ReadonlyMap<string, SessionSummary>
