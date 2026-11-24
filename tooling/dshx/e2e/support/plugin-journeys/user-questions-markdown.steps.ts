@@ -140,3 +140,19 @@ Then('the question form fits a phone-width viewport', async ({ page }: { page: P
   })
   await finishJourneyAssertions(page)
 })
+
+Then('pressing 2 then Enter answers it and the composer takes focus back', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'keyboard-answer', async () => {
+    const card = questionCard(page)
+    const key = await card.getAttribute('data-question-key')
+    // The recommended option holds focus as the card mounts, so no pointer is needed.
+    await expect(card.getByRole('radio', { name: 'Grouped by plugin' })).toBeFocused()
+    await page.keyboard.press('2')
+    await expect(card.getByRole('radio', { name: 'One flat list' })).toHaveAttribute('aria-checked', 'true')
+    await expect(card.getByRole('radio', { name: 'One flat list' })).toBeFocused()
+    await page.keyboard.press('Enter')
+    await expect(page.locator(`[data-question-key="${key ?? ''}"]`)).toHaveCount(0, { timeout: 10_000 })
+    await expect(page.getByRole('textbox', { name: THREAD_COMPOSER })).toBeFocused()
+  })
+  await finishJourneyAssertions(page)
+})

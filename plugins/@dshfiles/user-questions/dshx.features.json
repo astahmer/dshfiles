@@ -99,6 +99,49 @@
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: question form"
+    },
+    {
+      "id": "keyboard-answer",
+      "title": "Answer a question by keyboard",
+      "summary": "A question can be answered with a digit and Enter, and focus goes back to the composer.",
+      "details": "On a desktop pointer the question card focuses the chosen, recommended or first option as it mounts. Digits 1-9 choose an option at card level (never inside a text field), Enter on the focused option sends the answer, and focus returns to the composer once the card leaves. The card enters with opacity and 8px of travel in 220ms, opacity only under reduced motion. On touch nothing takes focus, so no keyboard opens.",
+      "surfaces": [
+        "client"
+      ],
+      "configuration": [],
+      "states": [
+        "focused-on-mount",
+        "digit-chosen",
+        "sent",
+        "focus-returned"
+      ],
+      "failureModes": [
+        "Focus is not moved when another field outside the card and its composer holds it, so typing elsewhere is never interrupted.",
+        "A digit typed in the free-text answer is a character, never a choice."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "user-questions.keyboard-digits",
+          "file": "plugins/@dshfiles/user-questions/tests/question-keys.spec.ts",
+          "testName": "digits 1-9 name options; modified keys and digits past the list choose nothing"
+        },
+        {
+          "kind": "gherkin",
+          "id": "user-questions.keyboard-answer",
+          "featureFile": "tooling/dshx/e2e/features/user-questions-keyboard.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: focus and key handling in the question card; it starts no Host work of its own."
+        }
+      ],
+      "surface": "transcriptCard",
+      "destination": "transcript",
+      "currentSurface": "composer: question card"
     }
   ]
 }

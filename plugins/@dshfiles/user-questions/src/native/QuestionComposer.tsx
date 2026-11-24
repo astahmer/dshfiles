@@ -16,6 +16,7 @@ import type { QuestionDraftAnswer, QuestionDraftProgress } from './draft-store.t
 import { PlanReviewPanel } from './PlanReviewPanel.tsx'
 import { QuestionMarkdownText } from '../rich/question-markdown.ts'
 import { CardChrome } from '../card-chrome.ts'
+import { QuestionKeys } from '../question-keys.ts'
 import { OptionDescription, QuestionMarkdown, QuestionTitle } from '../rich/QuestionMarkdown.tsx'
 import css from './QuestionComposer.module.css'
 
@@ -453,13 +454,55 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
     submitDrafts(nextDrafts)
   }
 
+  // Owned delta (unslop r3 item 22): answer by keyboard. On a fine pointer the shown question's chosen, recommended or
+  // first option takes focus at once (not after the card's entrance), digits 1-9 choose at card level, Enter on the
+  // focused option submits, and focus goes back to the composer when the card leaves.
+  const cardRef = useRef<HTMLElement>(null)
+  const focusOption = (optionIndex: number): void => {
+    cardRef.current?.querySelector<HTMLElement>(`[data-option-index="${String(optionIndex)}"]`)?.focus({ preventScroll: true })
+  }
+  const shown = useRef({ question, draft, locked, minimized })
+  shown.current = { question, draft, locked, minimized }
+  useEffect(() => {
+    const card = cardRef.current
+    const current = shown.current
+    if (card === null || current.locked || current.minimized || !QuestionKeys.finePointer()) return
+    if (!QuestionKeys.mayTakeFocus<Node>(document.activeElement, { body: document.body, within: [card, card.closest('[data-composer-seat]')] })) return
+    const target = QuestionKeys.initialOption(current.question.options ?? [], current.draft.selected, label => parseRecommendedLabel(label).recommended)
+    if (target !== undefined) focusOption(target)
+  }, [index, pending.key])
+  useEffect(() => {
+    const card = cardRef.current
+    const conversation = card?.closest('[data-conversation-content]') ?? null
+    return () => {
+      if (conversation !== null && QuestionKeys.finePointer()) QuestionKeys.focusComposer(conversation)
+    }
+  }, [])
+  const chooseByDigit = (event: KeyboardEvent<HTMLElement>): void => {
+    const options = question.options ?? []
+    const optionIndex = QuestionKeys.digitOption({
+      key: event.key, altKey: event.altKey, ctrlKey: event.ctrlKey, metaKey: event.metaKey, shiftKey: event.shiftKey,
+      isComposing: event.nativeEvent.isComposing,
+    }, options.length)
+    if (optionIndex === undefined || locked || QuestionKeys.typesText(event.target)) return
+    const option = options[optionIndex]
+    if (option === undefined) return
+    event.preventDefault()
+    choose(option.label)
+    // A single choice on an earlier question moves to the next one, whose own option takes focus above.
+    if (question.multiSelect === true || index === questions.length - 1) focusOption(optionIndex)
+  }
+
   const exit = CardChrome.exitOf({ dismissal: pending.dismissal, review: review !== undefined })
 
   return (
     <div className={css.frame} data-question-key={pending.key}>
+      {/* Digits are shortcuts for the radio and checkbox controls inside (each names its key); the card is not a control. */}
       <section
+        ref={cardRef}
         className={clsx(css.card, minimized && css.cardMinimized, questionBody !== '' && css.cardRich)}
         aria-labelledby={`question-${pending.key}-${String(index)}`}
+        onKeyDown={chooseByDigit}
       >
         <header className={css.header}>
           {(question.header !== undefined || minimized) && (
@@ -595,6 +638,8 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
                         aria-checked={selected}
                         aria-label={display.label}
                         aria-describedby={hasDescription || richDescription !== undefined ? descriptionId : undefined}
+                        aria-keyshortcuts={optionIndex < 9 ? String(optionIndex + 1) : undefined}
+                        data-option-index={optionIndex}
                         disabled={locked}
                         onClick={() => { choose(option.label) }}
                         onKeyDown={(event) => {

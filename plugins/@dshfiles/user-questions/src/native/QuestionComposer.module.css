@@ -757,3 +757,28 @@
   border-top: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-specific-input-major);
 }
+
+/* Owned delta (unslop r3 item 22): the card enters with opacity and 8px of travel in 220ms; focus moves at mount, not
+   after it. Under reduced motion it only fades. */
+.card {
+  animation: question-card-in var(--dshx-duration-panel, 220ms) var(--dshx-motion-ease-enter, cubic-bezier(0.2, 0, 0, 1)) both;
+}
+
+@keyframes question-card-in {
+  from {
+    opacity: 0;
+    translate: 0 8px;
+  }
+}
+
+@keyframes question-card-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation-name: question-card-fade;
+  }
+}
