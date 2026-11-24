@@ -6,7 +6,7 @@ from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a
 are the draft PR astahmer/dshfiles#271 (branch `contribute/unslop-ui` on the tbrowang fork); nothing is landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** round one's 14 steps and round two's five lanes are done; round three's audits are running (see [Round three](#round-three)). Round two started 2026-11-24 after feedback that the monochrome changes
+**Resume here:** round one's 14 steps and round two's five lanes are done; round three's lanes are running (see [Round three](#round-three)). Round two started 2026-11-24 after feedback that the monochrome changes
 were dull: bring purposeful colour back and make daily use smoother, without undoing upstream's coloured project
 chips (#287). See [Round two](#round-two). Round one's leftovers are under [Follow-ups](#follow-ups).
 
@@ -18,6 +18,31 @@ and French and English mixed in one view. Two read-only audits run first: one in
 than one place and compares the drawings; one measures friction in the daily loop (clicks, feedback latency, layout
 shifts, focus, widths) on desktop and phone. Big design choices then go to a Fable 5.2 (high) consultation, and the
 fixes to lanes by plugin ownership.
+
+Audits (`.cache/unslop-audit/r3/`): the live card in the owner's screenshot is pre-branch code, but on the branch a
+subagent's transcript row still reads Idle while it works, the dock flips between a card and a row, a tab says
+"Finished, unread" while the list says Working, the phone dock is 2 px wide, one job is drawn in five places with four
+duration formats, 12 duration formatters exist, tool rows are 742 px wide for 155 px of content, and French and
+English mix (owned plugins carry only English and Chinese). Friction: the list moves under the pointer, the question
+card has no keyboard path, the palette ranks commands over threads, a Settings switch waits 660 ms, the Land toast
+covers the header, 12 of 19 phone targets are under 44 px.
+
+Decisions (Fable 5.2 high; the owner chose every recommended option): a running subagent is one compact row in the
+dock with a record row in the transcript; a running child makes its parent Working everywhere, a background job does
+not (a muted "1 job" chip); a child is named by its task description; a job lives in the dock while it runs and in
+the transcript after; one duration grammar in the kit (`9s`, `2m 05s`, `1h 04m`); work rows fit their content with
+the time beside the label; English first, no new translations; no success toast after Land; the core goal strip's
+words are left to upstream.
+
+| Lane | Items | State |
+| --- | --- | --- |
+| K kit (plugin-ui, DESIGN.md, ratchet) | one duration module, kit defaults and motion utilities, formatter ratchet, DESIGN.md | running |
+| L land and settings (jj-integration, settings-shell) | Land without toast, fresh land state, optimistic switches, Settings paints once | running |
+| T threads (thread-sidebar, main-tabs, workbench, command-palette, sidebar-right) | one subagent row, header roster, rolled-up status, list that holds still, reserved slots, palette ranking | after K item 1 |
+| C transcript (chat, tool-meta, turn-summary) | rows fit content, output reachable after the fold, no turn-end shift, reply into view, durations | after K item 1 |
+| D composer (rich-composer, user-questions, background-jobs, agent-plan) | dock width and phone floor, focus, keyboard answers, touch targets, one question row, one job home | after K item 1 |
+
+Brief: `.cache/unslop-audit/r3/round-three-brief.md`.
 
 ## Round two
 
