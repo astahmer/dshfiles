@@ -36,11 +36,11 @@ words are left to upstream.
 
 | Lane | Items | State |
 | --- | --- | --- |
-| K kit (plugin-ui, DESIGN.md, ratchet) | one duration module, kit defaults and motion utilities, formatter ratchet, DESIGN.md | running |
+| K kit (plugin-ui, DESIGN.md, ratchet) | one duration module, kit defaults and motion utilities, formatter ratchet, DESIGN.md | done: 8 revisions `vyruwtqr` … `wxroonwx`; `local-duration-formatter` baselined at 12 (agent-plan 3, thread-sidebar 4, turn-summary 2, tool-meta 1, chat 1, ai-accounts 1) |
 | L land and settings (jj-integration, settings-shell) | Land without toast, fresh land state, optimistic switches, Settings paints once | running |
-| T threads (thread-sidebar, main-tabs, workbench, command-palette, sidebar-right) | one subagent row, header roster, rolled-up status, list that holds still, reserved slots, palette ranking | after K item 1 |
-| C transcript (chat, tool-meta, turn-summary) | rows fit content, output reachable after the fold, no turn-end shift, reply into view, durations | after K item 1 |
-| D composer (rich-composer, user-questions, background-jobs, agent-plan) | dock width and phone floor, focus, keyboard answers, touch targets, one question row, one job home | after K item 1 |
+| T threads (thread-sidebar, main-tabs, workbench, command-palette, sidebar-right) | one subagent row, header roster, rolled-up status, list that holds still, reserved slots, palette ranking | running |
+| C transcript (chat, tool-meta, turn-summary) | rows fit content, output reachable after the fold, no turn-end shift, reply into view, durations | running |
+| D composer (rich-composer, user-questions, background-jobs, agent-plan) | dock width and phone floor, focus, keyboard answers, touch targets, one question row, one job home | running |
 
 Brief: `.cache/unslop-audit/r3/round-three-brief.md`.
 
