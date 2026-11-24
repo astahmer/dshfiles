@@ -28,6 +28,7 @@ import { Schema } from 'effect'
 import type { ThreadRevisionView, ThreadView } from './api.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
 import type { JjIntegrationTranslate } from './locales.js'
+import type { HeaderLandPresence } from './header-land-presence.js'
 import { IntegrationRecovery } from './integration-recovery.js'
 import { LandConfirmDialog } from './land-confirm-dialog.js'
 import { announceRepositoryChange, describeLandResult } from './land-feedback.js'
@@ -51,6 +52,8 @@ export interface ThreadWorkspaceControlProps {
   readonly bookmark: string
   readonly sessionLog: SessionLogDownloadPort
   readonly openThreadWorkspaces: () => void
+  /** Marked while the header Land shows, so the land card beside it steps back to a secondary button. */
+  readonly headerLand?: HeaderLandPresence | undefined
 }
 
 const noCwd = (): null => null
@@ -252,6 +255,8 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   useEffect(() => {
     if (unlanded === 0) setConfirmingLand(false)
   }, [unlanded])
+  const headerLand = props.headerLand
+  useEffect(() => (showsLand && headerLand !== undefined ? headerLand.mark(String(props.sessionId)) : undefined), [headerLand, props.sessionId, showsLand])
   /** Both Land buttons of this control ask first: the dialog lists the revisions that move. */
   const askToLand = (): void => {
     setWorkspaceMenuOpen(false)

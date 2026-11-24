@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { LandCard } from './land-card.js'
 
 const host = vi.hoisted(() => ({
+  /** Whether jj-integration says a header Land shows for the thread; undefined: no provider. */
+  headerLand: undefined as boolean | undefined,
   thread: {
     path: '/work/sample-threads/thread-31057e',
     name: 'thread-31057e',
@@ -21,6 +23,10 @@ const host = vi.hoisted(() => ({
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({
   ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
   useRegistry: () => [],
+  useContract: () =>
+    host.headerLand === undefined
+      ? { status: 'inactive' }
+      : { status: 'active', value: { shown: () => host.headerLand === true, subscribe: () => () => undefined } },
   useApi: () => ({
     threadStatus: async () => ({ bookmark: 'main', thread: host.thread }),
     receipts: async () => [],
@@ -31,6 +37,7 @@ vi.mock('@dshfiles/dshx/client', async importOriginal => ({
 }))
 
 afterEach(() => {
+  host.headerLand = undefined
   cleanup()
   pluginQueryClient().clear()
 })
@@ -59,5 +66,21 @@ describe('Land card preconditions', () => {
     expect(facts.textContent).toBe('2 revisions to land · described')
     expect([...document.querySelectorAll('[data-merge-check]')].map(chip => chip.getAttribute('data-merge-check'))).toEqual(['behind'])
     expect(screen.getByText('Behind main by 3')).toBeTruthy()
+  })
+})
+
+describe('Land card primary', () => {
+  const landButton = async (): Promise<HTMLElement> => screen.findByRole('button', { name: 'Land 2 revisions on main' })
+
+  it('is the primary Land when no header Land shows', async () => {
+    host.headerLand = false
+    mount()
+    expect((await landButton()).getAttribute('data-variant')).toBe('default')
+  })
+
+  it('steps back to outline while the thread header shows its own Land', async () => {
+    host.headerLand = true
+    mount()
+    expect((await landButton()).getAttribute('data-variant')).toBe('outline')
   })
 })

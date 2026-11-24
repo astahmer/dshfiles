@@ -16,6 +16,8 @@ export default defineConfig({
     'repository-change': 'src/repository-change.ts',
     // Sections other plugins add to the thread header's workspace menu (jujutsu's project-changes row).
     'workspace-menu-sections': 'src/workspace-menu-sections.ts',
+    // Whether the thread header shows Land (diffs-review's land card then draws its Land as the secondary one).
+    'thread-header-land': 'src/thread-header-land.ts',
   },
   host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/vcs-provider-port', '@dshfiles/jj-cli', '@dshfiles/git-cli'] },
   client: { entry: 'src/client.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },

@@ -1,7 +1,8 @@
 import { announceRepositoryChange } from '@dshfiles/jj-integration/repository-change'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
+import { ThreadHeaderLand } from '@dshfiles/jj-integration/thread-header-land'
 import { projectChecksApi } from '@dshfiles/project-checks/api'
-import { useApi, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useContract, useRegistry } from '@dshfiles/dshx/client'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +21,7 @@ import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useSyncExternalStore } from 'react'
 import { diffsReviewApi } from './api.js'
 import { arrangeLandCardActions, LandCardActions } from './land-card-actions.js'
 import { ChangesScopeModel } from './changes-scope.js'
@@ -48,6 +49,17 @@ export interface LandCardProps {
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 
 const landStatusQueryKey = (cwd: string) => ['diffs-review', 'land', cwd] as const
+
+const noSubscription = (): (() => void) => () => undefined
+
+/** Whether the thread header shows its own Land for this thread, so the card's Land is the secondary one. */
+const useHeaderLandShown = (sessionId: string): boolean => {
+  const headerLand = useContract(ThreadHeaderLand)
+  const service = headerLand.status === 'active' ? headerLand.value : undefined
+  const subscribe = useCallback((listener: () => void) => (service === undefined ? noSubscription() : service.subscribe(listener)), [service])
+  const read = useCallback(() => service?.shown(sessionId) === true, [service, sessionId])
+  return useSyncExternalStore(subscribe, read, read)
+}
 
 /**
  * The top of the Changes facet: where this thread's work would land and whether it can, with one primary Land. Land
@@ -107,6 +119,8 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
     },
   })
   const registeredActions = useRegistry(LandCardActions)
+  // One primary Land per screen: while the header carries Land, this one is a secondary button with the same dialog.
+  const headerLandShown = useHeaderLandShown(props.sessionId)
   const card = useRef<HTMLElement | null>(null)
   const seenLandRequest = useRef(props.landRequest ?? 0)
   useEffect(() => {
@@ -261,6 +275,7 @@ export const LandCard = (props: LandCardProps): JSX.Element | null => {
             }}
             size="sm"
             type="button"
+            variant={headerLandShown ? 'outline' : 'default'}
           >
             {landSnapshot.matches('landing') ? <Spinner /> : <GitMergeIcon aria-hidden className="dshx:size-3.5" />}
             Land

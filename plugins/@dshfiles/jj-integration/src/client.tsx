@@ -45,6 +45,8 @@ import { WorkspaceSetupDock } from './workspace-setup-dock.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
+import { createHeaderLandPresence } from './header-land-presence.js'
+import { ThreadHeaderLand } from './thread-header-land.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
@@ -1183,6 +1185,9 @@ export default defineClient({
     // The export plugin draws its trigger and its progress modal in one header cell. A lower priority shadows that
     // cell, so this plugin owns the trigger (a row in the workspace menu) and keeps the feedback the modal carried.
     const sessionLog = createSessionLogDownloadPort()
+    // The land card beside the header reads which threads show a header Land, so a screen keeps one primary Land.
+    const headerLand = createHeaderLandPresence()
+    metadata?.plugin?.provide(ThreadHeaderLand, { shown: headerLand.shown, subscribe: headerLand.subscribe })
     ctx.inject(['sessionLogDownload'], scoped => {
       const controller = scoped.sessionLogDownload
       sessionLog.current = controller
@@ -1220,6 +1225,7 @@ export default defineClient({
               bookmark={useBookmark()}
               sessionLog={sessionLog}
               openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+              headerLand={headerLand}
             />
           </PluginQueryProvider>
         )),
