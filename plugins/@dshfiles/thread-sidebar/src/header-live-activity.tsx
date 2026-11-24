@@ -68,6 +68,21 @@ export const HeaderLiveSignal = (props: {
   )
 }
 
+/**
+ * The live line's seat: a fixed width whether the thread works or not, so the step growing ("Running for i in … · 3s")
+ * or the line coming and going never moves the workspace chip and the actions beside it (F12, 157 px measured). It
+ * narrows with the header row at the same tiers the line sheds its clock and step, down to the glyph alone. The line
+ * fades in over 120 ms (DESIGN.md › Motion).
+ */
+export const HeaderLiveSlot = (props: { readonly children?: JSX.Element | null }): JSX.Element => (
+  <span
+    className="dshx-root dshx:inline-flex dshx:w-64 dshx:shrink-0 dshx:items-center dshx:overflow-hidden dshx:@max-pane-compact:w-40 dshx:@max-[32rem]:w-6 dshx:[&>*]:transition-opacity dshx:[&>*]:duration-(--dshx-duration-fade) dshx:[&>*]:starting:opacity-0"
+    data-header-live-slot=""
+  >
+    {props.children}
+  </span>
+)
+
 const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | null => {
   const sessionState = props.useSessions(HostSnapshotsModel.selectStableSessionListState)
   const session = sessionState.byId[props.sessionId]
@@ -98,7 +113,9 @@ const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | n
 
 export const HeaderLiveActivity = (props: HeaderLiveActivityProps): JSX.Element => (
   <PluginQueryProvider>
-    <HeaderLiveActivityBody {...props} />
+    <HeaderLiveSlot>
+      <HeaderLiveActivityBody {...props} />
+    </HeaderLiveSlot>
   </PluginQueryProvider>
 )
 

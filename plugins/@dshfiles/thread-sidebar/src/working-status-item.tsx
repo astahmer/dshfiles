@@ -4,6 +4,13 @@ import { useSyncExternalStore } from 'react'
 import { useWorkingTabTitle } from './header-live-activity.js'
 import { WorkingThreadsProjection } from './working-threads.js'
 
+/**
+ * Where "N working" sits in the global strip: after the accounts chip (order 20) and the other steady items, just before
+ * Restart (90). It comes and goes with every turn, so no steady item may sit after it: mounted first, it moved the
+ * accounts chip 72 px each time it appeared (F14).
+ */
+export const WORKING_STATUS_ORDER = 85
+
 /** Selects the Working view of the thread list (client.tsx listens). */
 export const SHOW_WORKING_THREADS_EVENT = 'dshfiles:thread-sidebar-show-working'
 

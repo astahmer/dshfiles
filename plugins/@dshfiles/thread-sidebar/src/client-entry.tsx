@@ -25,7 +25,7 @@ import { ThreadHeaderLand } from '@dshfiles/jj-integration/thread-header-land'
 import { HeroSuggestionCards, type HeroSuggestionActions } from './hero-suggestions.js'
 import { DESTINATION_GO_KEYS, GO_DESTINATION_EVENT, SHOW_DESTINATION_EVENT } from './destination-shell.js'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
-import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
+import { WORKING_STATUS_ORDER, WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
 import { RestartStatusItem } from './restart-status-item.js'
 import { UPDATE_DSH_SECTION_ID, UpdateDshSection, UpdateStatusItem } from './update-dsh.js'
 import { threadActionsApi } from './thread-actions-api.js'
@@ -324,7 +324,7 @@ export default defineClient({
           plugin.add(StatusItems, {
             id: '@dshfiles/thread-sidebar',
             side: 'global',
-            order: 10,
+            order: WORKING_STATUS_ORDER,
             label: 'Working',
             component: plugin.bind(WorkingItem),
             open: WorkingStatusModel.open,
