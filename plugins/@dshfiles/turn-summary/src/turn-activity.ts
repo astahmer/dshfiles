@@ -64,6 +64,8 @@ export interface TurnSegment {
   readonly key: 'files' | 'commands' | 'tests' | 'reads' | 'searches'
   readonly text: string
   readonly failed?: boolean
+  /** Set on the tests part when every test passed: the line draws the green check of a verified result before it. */
+  readonly passed?: boolean
   /** Set on the failed-tests part while commands failed: it is the one red part, and opens the failures list. */
   readonly opensFailures?: boolean
 }
@@ -222,7 +224,7 @@ export class TurnActivity {
 
   /** The one test outcome: "2 of 42 tests failed" in red, opening the failed commands; else "40 tests passed". */
   private static testsSegment(summary: TurnActivitySummary, tests: TestCounts): TurnSegment {
-    if (tests.failed === 0) return { key: 'tests', text: `${tests.passed} ${tests.passed === 1 ? 'test' : 'tests'} passed` }
+    if (tests.failed === 0) return { key: 'tests', text: `${tests.passed} ${tests.passed === 1 ? 'test' : 'tests'} passed`, passed: true }
     return {
       key: 'tests',
       text: `${tests.failed} of ${tests.total} ${tests.total === 1 ? 'test' : 'tests'} failed`,

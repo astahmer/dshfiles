@@ -154,6 +154,18 @@ export const TurnSummaryLine = (props: {
           </Toggle>
         ),
       }
+    // Every test passed: the same green check as an all-pass test card, glyph only; the words keep the line's ink.
+    if (segment.passed === true)
+      return {
+        key: segment.key,
+        chevron: false,
+        node: (
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1" data-dshfiles-turn-summary-tests="passed">
+            <CircleCheckIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:text-success" />
+            <span className="dshx:min-w-0 dshx:truncate">{label(segment, index)}</span>
+          </span>
+        ),
+      }
     return {
       key: segment.key,
       chevron: false,

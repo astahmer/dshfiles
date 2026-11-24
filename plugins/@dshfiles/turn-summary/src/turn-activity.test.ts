@@ -143,7 +143,7 @@ describe('TurnActivity.summarize', () => {
       expect(TurnActivity.failedCommandsBeyondTests(failing, { testResults: true })).toBe(0)
     })
 
-    it('counts failed commands on their own when no test failed, and says passing tests without colour', () => {
+    it('counts failed commands on their own when no test failed, and marks passing tests as passed, never red', () => {
       const build = TurnActivity.summarize({
         calls: [call('a', 'bash', { command: 'pnpm build' })],
         results: [{ callId: 'a', isError: false, text: 'boom\n[exit code: 2]' }],
@@ -153,7 +153,8 @@ describe('TurnActivity.summarize', () => {
         calls: [call('a', 'bash', { command: 'pnpm vitest run' })],
         results: [{ callId: 'a', isError: false, text: ' Tests  5 passed (5)\n[exit code: 0]' }],
       })
-      expect(TurnActivity.segments(passing, options).at(-1)).toEqual({ key: 'tests', text: '5 tests passed' })
+      // Every test passed: the part carries the green check of a verified result (round two item 21).
+      expect(TurnActivity.segments(passing, options).at(-1)).toEqual({ key: 'tests', text: '5 tests passed', passed: true })
       expect(TurnActivity.segments(passing, options).some(part => part.failed === true)).toBe(false)
     })
 
