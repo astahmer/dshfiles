@@ -105,6 +105,22 @@ createInterface({ input: process.stdin }).on('line', async line => {
   if (message.method === 'session/prompt') {
     const sessionId = message.params.sessionId
     const text = message.params.prompt.map(block => block.text ?? '').join('')
+    if (text.includes('multi-usage')) {
+      update(sessionId, { sessionUpdate: 'usage_update', used: 0, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'usage_update', used: 40000, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_u1', name: 'mcp_dsh_' + tools[0].name, rawInput: { value: 'ping' }, status: 'in_progress' })
+      const answer = await rpc('tools/call', { name: tools[0].name, arguments: { value: 'ping' } })
+      update(sessionId, { sessionUpdate: 'usage_update', used: 45000, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'used ' + answer.result.content.map(block => block.text).join('') } })
+      return reply({ stopReason: 'end_turn', usage: { inputTokens: 800000, outputTokens: 2000, cachedReadTokens: 1500000, cachedWriteTokens: 0 } })
+    }
+    if (text.includes('stale-usage')) {
+      update(sessionId, { sessionUpdate: 'usage_update', used: 40000, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_s1', name: 'mcp_dsh_' + tools[0].name, rawInput: { value: 'ping' }, status: 'in_progress' })
+      const answer = await rpc('tools/call', { name: tools[0].name, arguments: { value: 'ping' } })
+      update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'used ' + answer.result.content.map(block => block.text).join('') } })
+      return reply({ stopReason: 'end_turn', usage: { inputTokens: 800000, outputTokens: 2000, cachedReadTokens: 1500000, cachedWriteTokens: 0 } })
+    }
     if (text.includes('call')) {
       update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_1', name: 'mcp_dsh_' + tools[0].name, rawInput: { value: 'ping', toolSummary: 'Echo ping' }, status: 'in_progress' })
       update(sessionId, { sessionUpdate: 'tool_call_update', toolCallId: 'call_1', name: 'mcp_dsh_' + tools[0].name, status: 'pending' })
@@ -389,6 +405,89 @@ it('fails a step whose plan is spent as a quota failure instead of waiting on ag
     ),
   ).rejects.toThrow(/^Antigravity quota exhausted: Google answers 429 RESOURCE_EXHAUSTED for this account's plan\./u)
   expect(cli.processCount).toBe(0)
+})
+
+it('reports per-step usage_update instead of cumulative prompt usage across tool-call steps', async () => {
+  const { cli, model } = setup()
+  const messages: Message[] = [{ role: 'user', content: 'multi-usage test', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', tools: [tool as never], messages })
+  const options = { sessionId: 'session-usage' }
+
+  const first = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(first.stopReason).toBe('toolUse')
+  expect(first.usage.input).toBe(40_000)
+  expect(first.usage.totalTokens).toBe(40_000)
+
+  messages.push(first, {
+    role: 'toolResult',
+    toolCallId: 'call_u1',
+    toolName: 'echo_tool',
+    content: [{ type: 'text', text: 'pong' }],
+    isError: false,
+    timestamp: 2,
+  })
+  const second = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(second.stopReason).toBe('stop')
+  expect(textOf(second)).toBe('used pong')
+  expect(second.usage.input).toBe(45_000)
+  expect(second.usage.cacheRead).toBe(0)
+  expect(second.usage.totalTokens).toBe(45_000)
+})
+
+it('keeps the last per-step usage when the final step of a tool-call prompt gets no usage_update', async () => {
+  const { cli, model } = setup()
+  const messages: Message[] = [{ role: 'user', content: 'stale-usage test', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', tools: [tool as never], messages })
+  const options = { sessionId: 'session-stale-usage' }
+
+  const first = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(first.stopReason).toBe('toolUse')
+  expect(first.usage.input).toBe(40_000)
+
+  messages.push(first, {
+    role: 'toolResult',
+    toolCallId: 'call_s1',
+    toolName: 'echo_tool',
+    content: [{ type: 'text', text: 'pong' }],
+    isError: false,
+    timestamp: 2,
+  })
+  const second = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(second.stopReason).toBe('stop')
+  expect(textOf(second)).toBe('used pong')
+  expect(second.usage.input).toBe(40_000)
+  expect(second.usage.cacheRead).toBe(0)
+  expect(second.usage.totalTokens).toBe(40_000)
+})
+
+it('caps a large replayed transcript below the agy prompt limit so the trailing instruction is never truncated', async () => {
+  const { cli, model } = setup()
+  const hugeMiddle = 'x'.repeat(240_000)
+  const messages: Message[] = [
+    { role: 'user', content: 'HEAD_INTENT_MARKER', timestamp: 1 },
+    {
+      role: 'assistant',
+      content: [{ type: 'text', text: `${hugeMiddle}TAIL_CONTEXT_MARKER` }],
+      api: 'antigravity-acp',
+      provider: 'antigravity',
+      model: 'gemini-fast',
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: 'stop',
+      timestamp: 2,
+    },
+    { role: 'user', content: 'COMPACTION_INSTRUCTION_MARKER', timestamp: 3 },
+  ]
+  const reply = await finished(
+    cli.stream(model('gemini-fast'), normalizeContext({ systemPrompt: 'DSH.', messages }), {
+      sessionId: 'session-replay-cap',
+    }),
+  )
+  const echoed = textOf(reply)
+  expect(Buffer.byteLength(echoed, 'utf8')).toBeLessThanOrEqual(161_000)
+  expect(echoed).toContain('HEAD_INTENT_MARKER')
+  expect(echoed).toContain('TAIL_CONTEXT_MARKER')
+  expect(echoed).toContain('bytes omitted to fit Antigravity CLI prompt limit')
+  expect(echoed).toContain('COMPACTION_INSTRUCTION_MARKER')
 })
 
 it('reads live five-hour and weekly quota windows from agy /usage and attaches the account plan', async () => {
