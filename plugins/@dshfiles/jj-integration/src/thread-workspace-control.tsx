@@ -57,9 +57,12 @@ export interface ThreadWorkspaceControlProps {
   readonly headerLand?: HeaderLandPresence | undefined
   /**
    * `header` (default): the workspace chip, its menu and, on a desktop shell, Land beside it. `phone-bar`: only Land and
-   * its confirmation, for the phone top bar, which shows the header utilities only inside its ⋯ sheet.
+   * its confirmation, for the phone top bar, which shows the header utilities only inside its ⋯ sheet. `request`: no
+   * button, only the confirmation, open from the start, for a Land another view asked for (`ThreadHeaderLand.confirm`).
    */
-  readonly seat?: 'header' | 'phone-bar' | undefined
+  readonly seat?: 'header' | 'phone-bar' | 'request' | undefined
+  /** `request` seat: the dialog, its land and its report are done, so the request can unmount. */
+  readonly onRequestDone?: (() => void) | undefined
 }
 
 const noCwd = (): null => null
@@ -107,7 +110,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const api = useSessionThreadApi(props.sessionId)
   const queryClient = useQueryClient()
   const [workspaceMenuOpen, setWorkspaceMenuOpen] = useState(false)
-  const [confirmingLand, setConfirmingLand] = useState(false)
+  const [confirmingLand, setConfirmingLand] = useState(props.seat === 'request')
+  /** A land this control started and has not reported yet; the request seat stays mounted until it has. */
+  const [landing, setLanding] = useState(false)
   const [landedMark, setLandedMark] = useState(() => WorkspaceControlModel.initialLandedMark(String(props.sessionId)))
   const subscribe = useCallback((listener: () => void) => props.sessions.list.subscribe(listener), [props.sessions])
   const read = useCallback(() => props.sessions.list.getSnapshot().byId[props.sessionId]?.cwd ?? null, [props.sessions, props.sessionId])
@@ -274,9 +279,14 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const phone = usePhoneShell()
   const landHere = showsLand && WorkspaceControlModel.landSeatShows({ seat, phone })
   // A dialog left without revisions (the work landed elsewhere meanwhile) closes for good, not until the next change.
+  // Only once the status answered: a request opens before it, with nothing read yet.
   useEffect(() => {
-    if (unlanded === 0) setConfirmingLand(false)
-  }, [unlanded])
+    if (answered && unlanded === 0) setConfirmingLand(false)
+  }, [answered, unlanded])
+  // A requested Land gets the header Land's guards: the dialog opens only when the header would show Land, and any
+  // other answer closes the request with the reason the workspace menu gives.
+  const landBlock = WorkspaceControlModel.landBlock({ isThread, unlanded: current?.unlanded ?? [], canLand: canRebase, queued: integrationQueued })
+  const requestBlocked = seat === 'request' && confirmingLand && !landing && (cwd === null || cwd.length === 0 || (answered && landBlock !== undefined))
   const headerLand = props.headerLand
   useEffect(() => (landHere && headerLand !== undefined ? headerLand.mark(String(props.sessionId)) : undefined), [headerLand, landHere, props.sessionId])
   /** Both Land buttons of this control ask first: the dialog lists the revisions that move. */
@@ -299,6 +309,39 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
                 .join(', '),
             })
       : undefined
+  const landBlockText = (): string => {
+    if (!isThread) return props.t('sharedCheckoutHint')
+    switch (landBlock) {
+      case 'nothing-to-land':
+        return props.t('upToDateNoChanges')
+      case 'queued':
+        return props.t('integrationQueuedHint', { bookmark })
+      case 'conflicts':
+        return statusText()
+      case 'undescribed':
+        return props.t('needsDescription', {
+          revisions: (current?.unlanded ?? [])
+            .filter(revision => revision.description.trim().length === 0)
+            .map(revision => revision.changeId.slice(0, 8))
+            .join(', '),
+        })
+      case 'busy':
+        return blockedReason ?? props.t('rebaseBlockedUnknownThread')
+      default:
+        return statusText()
+    }
+  }
+  useEffect(() => {
+    if (!requestBlocked) return
+    setConfirmingLand(false)
+    toast.show({ text: landBlockText(), success: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- the reason is read once, when the request is refused
+  }, [requestBlocked])
+  const requestDone = seat === 'request' && !confirmingLand && !landing && toast.element === null
+  const onRequestDone = props.onRequestDone
+  useEffect(() => {
+    if (requestDone) onRequestDone?.()
+  }, [onRequestDone, requestDone])
   const statusText = (): string => {
     if (loading) return props.t('workspaceStatusLoading')
     if (!isThread) return props.t('sharedCheckoutHint')
@@ -375,13 +418,24 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const landDialog = isThread ? (
     <LandConfirmDialog
       bookmark={bookmark}
-      onConfirm={() => rebase.mutate({ path: current.path })}
+      onConfirm={() => {
+        setLanding(true)
+        rebase.mutate({ path: current.path }, { onSettled: () => setLanding(false) })
+      }}
       onOpenChange={setConfirmingLand}
-      open={confirmingLand && unlanded > 0}
+      open={confirmingLand && unlanded > 0 && (seat !== 'request' || landBlock === undefined)}
       revisions={current.unlanded}
       t={props.t}
     />
   ) : null
+
+  if (seat === 'request')
+    return (
+      <TooltipProvider>
+        {landDialog}
+        {toast.element}
+      </TooltipProvider>
+    )
 
   if (seat === 'phone-bar')
     return (

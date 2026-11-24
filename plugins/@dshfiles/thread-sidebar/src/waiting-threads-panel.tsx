@@ -23,6 +23,8 @@ export const WaitingThreadsPanel = (props: {
   readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>
   readonly sessions: ISessions
   readonly openThread: (sessionId: string) => void
+  /** Opens the thread header's Land confirmation; false when nothing can confirm. Land never runs on one click here. */
+  readonly confirmLand?: ((sessionId: string) => boolean) | undefined
 }): JSX.Element => {
   const t = props.t
   const [tab, setTab] = useState<WaitingThreadTab>('needs-you')
@@ -46,7 +48,11 @@ export const WaitingThreadsPanel = (props: {
       setBusy(false)
     }
   }
-  const act = (itemId: string, verb: NonNullable<InboxThreadSignal['verb']>): void => {
+  const act = (sessionId: string, itemId: string, verb: NonNullable<InboxThreadSignal['verb']>): void => {
+    if (verb === 'Land') {
+      if (props.confirmLand?.(sessionId) !== true) props.openThread(sessionId)
+      return
+    }
     void settle(async () => {
       const outcome = await inbox.act(itemId, verb)
       if (!outcome.ok) setNotice({ tone: 'error', text: outcome.message })
@@ -100,7 +106,7 @@ export const WaitingThreadsPanel = (props: {
                     {t('waitingThreadsOpen')}
                   </Button>
                   {verb === undefined ? null : (
-                    <Button size="sm" variant="outline" disabled={busy} onClick={() => act(signal.itemId, verb)}>
+                    <Button size="sm" variant="outline" disabled={busy} onClick={() => act(sessionId, signal.itemId, verb)}>
                       {verb}
                     </Button>
                   )}

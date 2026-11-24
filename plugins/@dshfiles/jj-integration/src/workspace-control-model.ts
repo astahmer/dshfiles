@@ -15,12 +15,24 @@ interface LandFacts {
  * conflicts, a revision without a description, a busy thread or a queued land all leave the header without the button,
  * and the workspace menu says why. A fixed surface shows a verb only while it carries live state (DESIGN.md).
  */
-const showsLand = (facts: LandFacts): boolean =>
-  facts.isThread &&
-  facts.unlanded.length > 0 &&
-  facts.canLand &&
-  !facts.queued &&
-  facts.unlanded.every(revision => !revision.conflict && revision.description.trim().length > 0)
+const showsLand = (facts: LandFacts): boolean => landBlock(facts) === undefined
+
+/** Why Land cannot start now, in the order the workspace menu explains it; `undefined` when it can. */
+export type LandBlock = 'shared-checkout' | 'nothing-to-land' | 'queued' | 'conflicts' | 'undescribed' | 'busy'
+
+/**
+ * The header Land's guards as one reason. A Land asked for from another view (`ThreadHeaderLand.confirm`) opens the
+ * confirmation only when this is `undefined`, and otherwise says the reason, so it never offers what the header hides.
+ */
+const landBlock = (facts: LandFacts): LandBlock | undefined => {
+  if (!facts.isThread) return 'shared-checkout'
+  if (facts.unlanded.length === 0) return 'nothing-to-land'
+  if (facts.queued) return 'queued'
+  if (facts.unlanded.some(revision => revision.conflict)) return 'conflicts'
+  if (facts.unlanded.some(revision => revision.description.trim().length === 0)) return 'undescribed'
+  if (!facts.canLand) return 'busy'
+  return undefined
+}
 
 /**
  * The last folders of a workspace path, for a label: an absolute path cut at its end hides the one part that tells
@@ -37,7 +49,8 @@ const pathTail = (path: string, segments = 2): string => {
  * utilities (the chip included) into the ⋯ sheet, so the top bar's own seat carries it there and the sheet does not:
  * one Land on screen, opening the same confirmation.
  */
-const landSeatShows = (input: { readonly seat: 'header' | 'phone-bar'; readonly phone: boolean }): boolean => (input.seat === 'phone-bar') === input.phone
+const landSeatShows = (input: { readonly seat: 'header' | 'phone-bar' | 'request'; readonly phone: boolean }): boolean =>
+  input.seat !== 'request' && (input.seat === 'phone-bar') === input.phone
 
 /** What the header knows about the thread's lands: the land time it last read, and whether it says Landed. */
 export interface LandedMark {
@@ -78,6 +91,7 @@ const repositoryMoved = (
 
 export class WorkspaceControlModel {
   static readonly showsLand = showsLand
+  static readonly landBlock = landBlock
   static readonly landSeatShows = landSeatShows
   static readonly initialLandedMark = initialLandedMark
   static readonly landedMark = landedMark

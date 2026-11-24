@@ -36,6 +36,7 @@ import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-ch
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
+import { RowVerb } from './row-verb.js'
 import { useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
 import { useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
@@ -314,6 +315,11 @@ type InjectedActions = {
   /** Open the thread a page-load link names without closing a panel the user opened while the list was loading. */
   openLinkedSession?: (sessionId: SessionSummary['id']) => void
   startFollowUp: (sessionId: SessionSummary['id'], workspaceId: string | undefined) => void
+  /**
+   * Opens the thread header's Land confirmation for this thread (jj-integration's `ThreadHeaderLand.confirm`); false
+   * when nothing can confirm, and then nothing lands. A row's Land never lands on its own.
+   */
+  confirmLand?: (sessionId: string) => boolean
   startProjectSession: (projectId: string) => void
   drafts?: SessionDrafts['list'] | undefined
   /** Root uiSession selection; scoped or retained sidebar occurrences do not select the main conversation. */
@@ -4971,26 +4977,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   ]
   const activeFilterSummary = activeFilterLabels.length === 0 ? props.tSidebar('threadSidebarFilterNone') : activeFilterLabels.join(' · ')
 
-  /**
-   * A row's inline verb. Answer and Approve open the thread, where the question or approval card is answered in place;
-   * Retry, Resume and Land on an inbox item run that item's provider verb through the inbox, exactly as the Inbox page
-   * does; a Resume the sidebar itself classified (interrupted turn) resumes it here.
-   */
+  /** A row's inline verb: `RowVerb.actionOf` decides what it does. */
   const actOnStatus = (sessionId: SessionSummary['id'], status: ThreadStatus): void => {
-    const verb = status.verb
-    if (verb === undefined || verb === 'Answer' || verb === 'Approve') {
+    const action = RowVerb.actionOf(status, { recovering: recoverySessionIds.has(sessionId), landConfirm: props.confirmLand !== undefined })
+    if (action.kind === 'open') {
       openThread(sessionId)
       return
     }
-    if (status.itemId === undefined) {
-      if (verb === 'Resume' && recoverySessionIds.has(sessionId)) void resumeRecoverySession(sessionId)
-      else openThread(sessionId)
+    if (action.kind === 'confirm-land') {
+      if (props.confirmLand?.(sessionId) !== true) openThread(sessionId)
       return
     }
-    const itemId = status.itemId
+    if (action.kind === 'resume') {
+      void resumeRecoverySession(sessionId)
+      return
+    }
     const act = async (): Promise<void> => {
       try {
-        const outcome = await inbox.act(itemId, verb)
+        const outcome = await inbox.act(action.itemId, action.verb)
         setNotice({ tone: outcome.ok ? 'success' : 'warning', message: outcome.message })
       } catch {
         setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarVerbFailed') })

@@ -47,6 +47,7 @@ import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadWorkspaceControl } from './thread-workspace-control.js'
 import { createHeaderLandPresence } from './header-land-presence.js'
 import { ThreadHeaderLand } from './thread-header-land.js'
+import { createLandRequests } from './land-requests.js'
 import { useSessionThreadApi } from './use-session-thread-api.js'
 import { useToast } from './toast.js'
 import { DraftAttachmentCarry } from './draft-attachment-carry.js'
@@ -1203,8 +1204,39 @@ export default defineClient({
         />
       </PluginQueryProvider>
     )
+    // The thread list's row verb and Inbox › Waiting threads ask here instead of landing: the request opens this header's
+    // confirmation for that thread, with the same guards, and only its confirm lands.
+    const landRequests = createLandRequests()
+    const LandRequestHost = (): JSX.Element | null => {
+      const request = useSyncExternalStore(landRequests.subscribe, landRequests.current, landRequests.current)
+      const bookmark = useBookmark()
+      if (request === null) return null
+      return (
+        <PluginQueryProvider>
+          <ThreadWorkspaceControl
+            key={request.sequence}
+            sessionId={SessionId(request.sessionId)}
+            sessions={ctx.sessions}
+            t={translate}
+            bookmark={bookmark}
+            sessionLog={sessionLog}
+            openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+            seat="request"
+            onRequestDone={() => landRequests.finish(request.sequence)}
+          />
+        </PluginQueryProvider>
+      )
+    }
+    ctx.slots.inject('shell.overlay', () =>
+      ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-jj-integration-land-request', order: 123 }, decorate(LandRequestHost)),
+    )
     if (metadata?.plugin !== undefined)
-      metadata.plugin.provide(ThreadHeaderLand, { PhoneLand: metadata.plugin.bind(PhoneLand), shown: headerLand.shown, subscribe: headerLand.subscribe })
+      metadata.plugin.provide(ThreadHeaderLand, {
+        PhoneLand: metadata.plugin.bind(PhoneLand),
+        confirm: landRequests.request,
+        shown: headerLand.shown,
+        subscribe: headerLand.subscribe,
+      })
     ctx.inject(['sessionLogDownload'], scoped => {
       const controller = scoped.sessionLogDownload
       sessionLog.current = controller

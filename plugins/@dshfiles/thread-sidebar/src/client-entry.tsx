@@ -21,6 +21,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { Changes, Command, createApiClient, defineClient, hasHostCommandRegistry, runHostCommand, useSettings } from '@dshfiles/dshx/client'
+import { ThreadHeaderLand } from '@dshfiles/jj-integration/thread-header-land'
 import { HeroSuggestionCards, type HeroSuggestionActions } from './hero-suggestions.js'
 import { DESTINATION_GO_KEYS, GO_DESTINATION_EVENT, SHOW_DESTINATION_EVENT } from './destination-shell.js'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
@@ -1035,6 +1036,15 @@ export default defineClient({
     }
 
     // The new-thread hero's Resume / Review / Inbox cards (visual refresh T3.4), from the statuses this list computes.
+    // A Land from the thread list or Inbox › Waiting threads opens the thread header's confirmation (jj-integration),
+    // read at the click so a provider that arrives or leaves later counts. Without it nothing here can confirm.
+    const confirmLand = (sessionId: string): boolean => {
+      const land = plugin?.use(ThreadHeaderLand).get()
+      // An older jj-integration client (before a reload) provides the contract without `confirm`.
+      if (land?.status !== 'active' || typeof land.value.confirm !== 'function') return false
+      land.value.confirm(sessionId)
+      return true
+    }
     const heroActions: HeroSuggestionActions = {
       open: sessionId => openThread(SessionId(sessionId)),
       review: input => {
@@ -1247,6 +1257,7 @@ export default defineClient({
       },
       renameSession,
       startFollowUp,
+      confirmLand,
       drafts: ctx.get('sessionDrafts')?.list,
       startProjectSession: (projectId: string) => {
         // Recheck at the click: deleted or remote projects must never fall back to the current project.
@@ -1330,7 +1341,12 @@ export default defineClient({
         { name: 'main', key: WAITING_THREADS_PANEL_ID, locale: THREAD_SIDEBAR_LOCALE_NAMESPACE },
         decorate(({ t }: { readonly t: TranslateNS<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE> }) => (
           <PluginQueryProvider>
-            <WaitingThreadsPanel t={t} sessions={ctx.sessions} openThread={sessionId => openThread(SessionId(sessionId))} />
+            <WaitingThreadsPanel
+              t={t}
+              sessions={ctx.sessions}
+              openThread={sessionId => openThread(SessionId(sessionId))}
+              confirmLand={confirmLand}
+            />
           </PluginQueryProvider>
         )),
       ),

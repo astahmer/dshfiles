@@ -14,7 +14,7 @@ describe('every Land asks the same question', () => {
 
   it('the header control lands only from the dialog', () => {
     const header = source('thread-workspace-control.tsx')
-    expect(header).toMatch(/<LandConfirmDialog[\s\S]*?onConfirm=\{\(\) => rebase\.mutate/u)
+    expect(header).toMatch(/<LandConfirmDialog[\s\S]*?onConfirm=\{\(\) => \{\s*setLanding\(true\)\s*rebase\.mutate/u)
     expect(header.match(/rebase\.mutate\(/gu)).toHaveLength(1)
   })
 })

@@ -20,6 +20,16 @@ describe('the header Land verb', () => {
     expect(WorkspaceControlModel.showsLand({ ...ready, unlanded: [described, { description: 'Fix', conflict: true }] })).toBe(false)
     expect(WorkspaceControlModel.showsLand({ ...ready, unlanded: [{ description: '  ', conflict: false }] })).toBe(false)
   })
+
+  it('names the one reason a requested Land cannot open its confirmation', () => {
+    expect(WorkspaceControlModel.landBlock(ready)).toBeUndefined()
+    expect(WorkspaceControlModel.landBlock({ ...ready, isThread: false })).toBe('shared-checkout')
+    expect(WorkspaceControlModel.landBlock({ ...ready, unlanded: [] })).toBe('nothing-to-land')
+    expect(WorkspaceControlModel.landBlock({ ...ready, queued: true, canLand: false })).toBe('queued')
+    expect(WorkspaceControlModel.landBlock({ ...ready, unlanded: [{ description: 'Fix', conflict: true }] })).toBe('conflicts')
+    expect(WorkspaceControlModel.landBlock({ ...ready, unlanded: [{ description: ' ', conflict: false }] })).toBe('undescribed')
+    expect(WorkspaceControlModel.landBlock({ ...ready, canLand: false })).toBe('busy')
+  })
 })
 
 describe('where the header Land sits', () => {
@@ -29,6 +39,11 @@ describe('where the header Land sits', () => {
     // The phone folds the header control into the ⋯ sheet; the top bar's own seat carries the one Land.
     expect(WorkspaceControlModel.landSeatShows({ seat: 'header', phone: true })).toBe(false)
     expect(WorkspaceControlModel.landSeatShows({ seat: 'phone-bar', phone: true })).toBe(true)
+  })
+
+  it('is never drawn by a requested Land, which shows only the confirmation', () => {
+    expect(WorkspaceControlModel.landSeatShows({ seat: 'request', phone: false })).toBe(false)
+    expect(WorkspaceControlModel.landSeatShows({ seat: 'request', phone: true })).toBe(false)
   })
 })
 
