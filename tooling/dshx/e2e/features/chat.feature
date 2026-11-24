@@ -46,6 +46,14 @@ Feature: Chat browser journeys
     And the fake model streams a long answer in a fresh workspace while the reader scrolls up 400 px
     Then the paragraph the reader is on stays where it is when the turn ends
 
+  @scenario:chat.answer-follows-reply
+  Scenario: On a phone, answering a question brings its reply into view
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/session-controller, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a phone-width thread with history asks a question in a fresh workspace
+    And the question is answered with a tap on its first option
+    Then the reply to the answer ends on screen with no "Back to bottom"
+
   @scenario:session-controller.lean-session-follow
   Scenario: A real Host follow renders history without provider replay blocks in browser frames
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted

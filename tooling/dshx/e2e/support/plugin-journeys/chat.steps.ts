@@ -624,3 +624,51 @@ Then('the paragraph the reader is on stays where it is when the turn ends', asyn
   await finishJourneyAssertions(page)
 })
 
+const QUESTION_REPLY = Array.from({ length: 6 }, (_, index) => `Paragraph ${String(index + 1)} of the reply after the answer. The agent goes on with the work you just chose.`).join('\n\n')
+const HISTORY_ANSWER = Array.from({ length: 8 }, (_, index) => `Earlier line ${String(index + 1)} of history.`).join('\n\n')
+
+When('a phone-width thread with history asks a question in a fresh workspace', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-chat-answer-follow-')
+  const workspace = join(root, 'chat-answer-follow')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'chat-answer-follow', model: 'commandcode_work/gpt-6-luna' })
+  await sendPrompt(page, `[[answer ${HISTORY_ANSWER}]]`)
+  await expect(page.getByText('Earlier line 8 of history.', { exact: true })).toBeVisible({ timeout: 60_000 })
+  await page.setViewportSize({ width: 390, height: 664 })
+  const question = {
+    questions: [{ id: 'ship', header: 'Proceed', question: 'Ship the release notes now?', options: [{ label: 'Ship them now', description: 'Publish today.' }, { label: 'Hold them', description: 'Wait for review.' }] }],
+    timeout: -1,
+  }
+  // The fake model answers [[after]] once the tool result is back: the reply to the answer.
+  const composer = page.getByRole('textbox', { name: /commands, @ files or (?:threads|sessions)$/ })
+  await composer.fill(`[[once call ask_user_question ${JSON.stringify(question)}]] [[after ${QUESTION_REPLY}]]`)
+  await composer.press('Enter')
+  await expect(page.getByText('Ship them now', { exact: true })).toBeVisible({ timeout: 60_000 })
+})
+
+When('the question is answered with a tap on its first option', async ({ page }: { page: Page }) => {
+  // A phone tap starts with touchstart, which the transcript reads as the reader taking over its scroll.
+  const tap = async (target: Locator): Promise<void> => {
+    await target.dispatchEvent('touchstart')
+    await target.click()
+  }
+  await tap(page.getByText('Ship them now', { exact: true }))
+  await tap(page.getByRole('button', { name: /^Submit/ }))
+})
+
+Then('the reply to the answer ends on screen with no "Back to bottom"', async ({ page }: { page: Page }) => {
+  const last = page.getByText(/^Paragraph 6 of the reply after the answer\./).last()
+  await expect(last).toBeAttached({ timeout: 60_000 })
+  // Both turns settled: the history turn and the one that asked.
+  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(2, { timeout: 60_000 })
+  await recordAssertion(page, 'chat-answer-follows-reply', async () => {
+    await expect.poll(async () => {
+      const reply = await last.boundingBox()
+      const composer = await page.locator('[data-composer-seat]').last().boundingBox()
+      return reply !== null && composer !== null && reply.y + reply.height <= composer.y + 1
+    }).toBe(true)
+    await expect(page.getByRole('button', { name: /bottom/i })).toBeHidden()
+  })
+  await finishJourneyAssertions(page)
+})

@@ -81,7 +81,7 @@ type PendingInput = PendingSubmission | InboxState['next-step'][number]
  * ordered business Node crosses the keyed renderer seat.
  */
 export function ChatView({
-  useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding,
+  useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding, usePendingInteraction,
   sessionId, openFile, openExternalLink, resolveFilePath, useContextMenu,
   loadOlder, consumeOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt,
   usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag, viewRequest, completeViewRequest, openView,
@@ -106,6 +106,7 @@ export function ChatView({
   const nodeStore = useChat(s => s.nodes)
   const imageGalleryScope = useImageGalleryScope(scope => scope)
   const unreadLanding = useUnreadLanding(landing => landing)
+  const pendingInteraction = usePendingInteraction(key => key)
   const unreadLabel = t('chat.unreadDivider')
   const unread = useMemo(() => ({ landing: unreadLanding, seenAnswer, label: unreadLabel }), [unreadLanding, seenAnswer, unreadLabel])
   const deferCompletedTurns = usePresentation(policy => policy.collapseTiming === 'next-input')
@@ -361,6 +362,7 @@ export function ChatView({
     steeringId,
     submissionId: visibleSubmissions.at(-1)?.requestId ?? null,
     submissionSteers: visibleSubmissions.at(-1)?.placement === 'steering',
+    pendingInteraction,
     loadedTurns: turnNavigationItems,
     transcriptView,
     unread,

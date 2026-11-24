@@ -78,7 +78,7 @@
       "id": "windowed-transcript",
       "title": "Open a thread on its latest messages",
       "summary": "A thread opens on its latest messages and loads older ones as you scroll up.",
-      "details": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up.",
+      "details": "A thread opens with the rows that fill the viewport mounted; older rows mount as the transcript scrolls up. Answering a question the thread waits on follows its reply, as sending a message does.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -112,6 +112,11 @@
         {
           "kind": "gherkin",
           "id": "chat.windowed-transcript-touch",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.answer-follows-reply",
           "featureFile": "tooling/dshx/e2e/features/chat.feature"
         }
       ],

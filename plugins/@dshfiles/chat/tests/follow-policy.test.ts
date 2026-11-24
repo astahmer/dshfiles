@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { describe, expect, it } from 'vitest'
-import { ReadingFollowIntent } from '../src/native/chat/follow-policy.ts'
+import { ownInputOf, ReadingFollowIntent, type OwnInputFacts } from '../src/native/chat/follow-policy.ts'
 import { LocalFollowIntent, ScrollFollow } from '../src/native/chat/use-scroll-follow.ts'
 
 describe('reading follow intent', () => {
@@ -58,5 +58,29 @@ describe('scroll follow', () => {
     expect(intent.following).toBe(false)
     follow.sample(metrics(596), true)
     expect(intent.following).toBe(true)
+  })
+})
+
+describe('what counts as the reader\'s own input', () => {
+  const settled: OwnInputFacts = {
+    lastKey: 'answer-1', lastIsUser: false, steeringId: null, submissionId: null, pendingInteraction: null,
+  }
+
+  it('follows a message the reader sent, as before', () => {
+    expect(ownInputOf(settled, { ...settled, lastKey: 'user-2', lastIsUser: true })).toEqual({ own: true, steering: false, submission: false })
+    expect(ownInputOf(settled, { ...settled, submissionId: 'request-2' })).toEqual({ own: true, steering: false, submission: true })
+    expect(ownInputOf(settled, { ...settled, steeringId: 'rpc-2' })).toEqual({ own: true, steering: true, submission: false })
+  })
+
+  it('follows an answered question like a sent message, so the reply comes into view (round three F6)', () => {
+    const asking = { ...settled, pendingInteraction: 'question-7' }
+    expect(ownInputOf(settled, asking).own).toBe(false)
+    expect(ownInputOf(asking, { ...asking, pendingInteraction: null })).toEqual({ own: true, steering: false, submission: false })
+    // A question replaced by the next one is still waiting on the reader.
+    expect(ownInputOf(asking, { ...asking, pendingInteraction: 'question-8' }).own).toBe(false)
+  })
+
+  it('treats the first sample as no input', () => {
+    expect(ownInputOf(null, { ...settled, pendingInteraction: null }).own).toBe(false)
   })
 })
