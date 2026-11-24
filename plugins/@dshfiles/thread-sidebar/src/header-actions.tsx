@@ -459,7 +459,7 @@ export const HeaderThreadActions = ({
   const archiveDisabled = !archived && targetIds.some(targetId => sessionState.byId[targetId]?.running === true)
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <div className="dshx-root dshx:flex dshx:items-center dshx:gap-1" role="group" aria-label={t('threadSidebarThreadActions')}>
         {/* One control: every verb of the thread is a row of this menu, never a second button beside it. */}
         <DropdownMenu>

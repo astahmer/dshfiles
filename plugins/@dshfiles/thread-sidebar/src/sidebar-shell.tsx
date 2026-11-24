@@ -1138,7 +1138,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   }
 
   return (
-    <TooltipProvider delayDuration={350}>
+    <TooltipProvider>
       <div
         ref={shellRef}
         className={cn(
