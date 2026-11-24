@@ -34,6 +34,9 @@ export const zh = {
   'plan.approve': '同意执行',
   'plan.decline': '拒绝',
   'plan.discuss': '要求修改',
+  'row.asked': '已提问',
+  'row.show': '显示问题',
+  'row.inspect': '检查',
 } satisfies Record<string, string>
 
 /** The question namespace key union. */
@@ -73,6 +76,9 @@ export const en = {
   'plan.approve': 'Approve',
   'plan.decline': 'Refuse',
   'plan.discuss': 'Request changes',
+  'row.asked': 'Asked',
+  'row.show': 'Show the question',
+  'row.inspect': 'Inspect',
 } satisfies Record<QuestionKey, string>
 
 /** Japanese copy, checked against the English keys. */
@@ -109,6 +115,9 @@ export const ja = {
   'plan.approve': '承認',
   'plan.decline': '拒否',
   'plan.discuss': '変更を依頼',
+  'row.asked': '質問',
+  'row.show': '質問を表示',
+  'row.inspect': '調べる',
 } satisfies Record<keyof typeof en, string>
 
 /** Spanish dictionary, checked against the English keys. */
@@ -145,6 +154,9 @@ export const es = {
   'plan.approve': 'Aprobar',
   'plan.decline': 'Rechazar',
   'plan.discuss': 'Solicitar cambios',
+  'row.asked': 'Preguntado',
+  'row.show': 'Mostrar la pregunta',
+  'row.inspect': 'Inspeccionar',
 } satisfies Record<keyof typeof en, string>
 
 /** French dictionary, checked against the English keys. */
@@ -181,6 +193,9 @@ export const fr = {
   'plan.approve': 'Approuver',
   'plan.decline': 'Refuser',
   'plan.discuss': 'Demander des modifications',
+  'row.asked': 'Question posée',
+  'row.show': 'Afficher la question',
+  'row.inspect': 'Inspecter',
 } satisfies Record<keyof typeof en, string>
 
 /** German dictionary, checked against the English keys. */
@@ -217,6 +232,9 @@ export const de = {
   'plan.approve': 'Genehmigen',
   'plan.decline': 'Ablehnen',
   'plan.discuss': 'Fordern Sie Änderungen an',
+  'row.asked': 'Gefragt',
+  'row.show': 'Frage anzeigen',
+  'row.inspect': 'Prüfen',
 } satisfies Record<keyof typeof en, string>
 
 /** Russian dictionary, checked against the English keys. */
@@ -253,6 +271,9 @@ export const ru = {
   'plan.approve': 'Утвердить',
   'plan.decline': 'Отказаться',
   'plan.discuss': 'Запросить изменения',
+  'row.asked': 'Вопрос',
+  'row.show': 'Показать вопрос',
+  'row.inspect': 'Проверить',
 } satisfies Record<keyof typeof en, string>
 
 /** Portuguese dictionary, checked against the English keys. */
@@ -289,4 +310,7 @@ export const pt = {
   'plan.approve': 'Aprovar',
   'plan.decline': 'Recusar',
   'plan.discuss': 'Solicitar alterações',
+  'row.asked': 'Perguntado',
+  'row.show': 'Mostrar a pergunta',
+  'row.inspect': 'Inspecionar',
 } satisfies Record<keyof typeof en, string>

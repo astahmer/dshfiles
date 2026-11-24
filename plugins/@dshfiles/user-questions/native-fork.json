@@ -32,6 +32,7 @@
     "src/native/locales.ts",
     "src/native/PlanReviewPanel.tsx",
     "src/native/QuestionReplyView.tsx",
+    "src/native/question-reply.ts",
     "src/native/contract/slots.ts"
   ]
 }

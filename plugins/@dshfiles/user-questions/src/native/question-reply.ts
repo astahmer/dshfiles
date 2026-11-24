@@ -49,7 +49,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Read the question and answer pairs out of the reply text at the conversation boundary.
+ * Read the question and answer pairs out of the reply text at the conversation boundary. Owned delta: a payload with
+ * only one side (a call's questions, a result's answers) yields that side, so the transcript row reads both.
  * @param text - Model-facing JSON payload of the steered message.
  * @returns The pairs, or empty lists when the payload is unreadable.
  */
@@ -62,11 +63,11 @@ export function replyPairsOf(text: string): Pick<QuestionReplyData, 'questions' 
     void error
     return { questions: [], answers: [] }
   }
-  if (!isRecord(value) || !Array.isArray(value.questions)) {
+  if (!isRecord(value)) {
     return { questions: [], answers: [] }
   }
   const questions: QuestionReplyQuestion[] = []
-  for (const question of value.questions) {
+  for (const question of Array.isArray(value.questions) ? value.questions : []) {
     if (!isRecord(question) || typeof question.id !== 'string' || typeof question.question !== 'string') continue
     questions.push({
       id: question.id,

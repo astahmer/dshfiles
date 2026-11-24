@@ -37,6 +37,7 @@ import { createQuestionDraftStore } from './draft-store.ts'
 import { QuestionComposer } from './QuestionComposer.tsx'
 import { answeredQuestionDefinition, questionReplyDefinition } from './question-reply.ts'
 import { QuestionReplyView } from './QuestionReplyView.tsx'
+import { AskedRow } from '../asked-row.tsx'
 import { en, ja, es, fr, de, ru, pt, zh, type QuestionKey } from './locales.ts'
 
 export type {
@@ -464,6 +465,16 @@ export function apply(ctx: ClientContext): void {
     key: 'question-reply',
     locale: NS,
   }, QuestionReplyView))
+  // Owned delta (unslop r3 item 24): the transcript row of an ask_user_question call is one line, `Asked · {header}`
+  // then `Asked · {header} · {answer}`, replacing core's keyed row the same way thread-sidebar replaces `subagent`.
+  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+    name: 'tool.call.toolview',
+    key: 'ask_user_question',
+    registrant: '@dshfiles/user-questions',
+    priority: -1000,
+    locale: NS,
+    inject: (sessionId: SessionId) => ({ revealPanel: (callId: string) => cards.reveal(sessionId, callId) }),
+  }, AskedRow))
   ctx.remote.$on('user-questions/request', function (request, next) {
     return answerQuestion(ctx, this, request, next, cards)
   })
