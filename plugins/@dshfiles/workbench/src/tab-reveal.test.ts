@@ -1,4 +1,4 @@
-import { createDockview, type DockviewApi } from 'dockview-react'
+import { createDockview, type DockviewApi, type DockviewGroupPanel } from 'dockview-react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { revealOffset, TabReveal } from './tab-reveal.js'
 
@@ -50,23 +50,17 @@ const pinnedScroll = (strip: HTMLElement, scrollWidth = 500, clientWidth = 100):
   Object.defineProperty(strip, 'clientWidth', { configurable: true, value: clientWidth })
 }
 
-const groupParts = (api: DockviewApi) => {
-  const panel = api.panels[0]
-  if (panel === undefined) throw new Error('Missing panel')
-  const strip = panel.group.element.querySelector<HTMLElement>('.dv-tabs-container')
-  const tab = panel.group.element.querySelector<HTMLElement>('.dv-tabs-container > .dv-tab.dv-active-tab')
+const overflowingParts = (group: DockviewGroupPanel) => {
+  const strip = group.element.querySelector<HTMLElement>('.dv-tabs-container')
+  const tab = group.element.querySelector<HTMLElement>('.dv-tabs-container > .dv-tab.dv-active-tab')
   if (strip === null || tab === null) throw new Error('Missing tab strip')
-  return { group: panel.group, strip, tab }
+  vi.spyOn(strip, 'getBoundingClientRect').mockReturnValue(rect(0, 100))
+  vi.spyOn(tab, 'getBoundingClientRect').mockReturnValue(rect(120, 200))
+  pinnedScroll(strip)
+  return { group, strip, tab }
 }
 
-const openOverflowingTab = (api: DockviewApi) => {
-  api.addPanel({ id: 'first', component: 'body', title: 'First' })
-  const parts = groupParts(api)
-  vi.spyOn(parts.strip, 'getBoundingClientRect').mockReturnValue(rect(0, 100))
-  vi.spyOn(parts.tab, 'getBoundingClientRect').mockReturnValue(rect(120, 200))
-  pinnedScroll(parts.strip)
-  return parts
-}
+const openOverflowingTab = (api: DockviewApi) => overflowingParts(api.addPanel({ id: 'first', component: 'body', title: 'First' }).group)
 
 describe('revealOffset', () => {
   it('asks for the pixels a clipped tab misses, and nothing when it fits', () => {
@@ -117,16 +111,36 @@ describe('TabReveal', () => {
 
   it('re-reveals every group on window resize, and stops after disposal', () => {
     const api = createApi()
-    openOverflowingTab(api)
-    const disposed = TabReveal.retain(api)
-    const reveal = vi.spyOn(TabReveal, 'reveal')
+    const first = openOverflowingTab(api)
+    const second = overflowingParts(api.addPanel({ id: 'second', component: 'body', position: { referencePanel: 'first', direction: 'right' } }).group)
+    const release = TabReveal.retain(api)
+    disposers.push(release)
+    window.dispatchEvent(new Event('resize'))
+    expect([first.strip.scrollLeft, second.strip.scrollLeft]).toEqual([0, 0])
+    vi.advanceTimersByTime(100)
+    expect([first.strip.scrollLeft, second.strip.scrollLeft]).toEqual([100, 100])
+
+    window.dispatchEvent(new Event('resize'))
+    release()
+    vi.advanceTimersByTime(100)
+    expect([first.strip.scrollLeft, second.strip.scrollLeft]).toEqual([100, 100])
+
     window.dispatchEvent(new Event('resize'))
     vi.advanceTimersByTime(100)
-    expect(reveal).toHaveBeenCalled()
-    disposed()
-    reveal.mockClear()
-    window.dispatchEvent(new Event('resize'))
+    expect([first.strip.scrollLeft, second.strip.scrollLeft]).toEqual([100, 100])
+  })
+
+  it('reveals the selected tab after restoring a layout', () => {
+    const source = createApi()
+    source.addPanel({ id: 'restored', component: 'body' })
+    const api = createApi()
+    disposers.push(TabReveal.retain(api))
+    api.fromJSON(source.toJSON())
+    const panel = api.getPanel('restored')
+    if (panel === undefined) throw new Error('Missing restored panel')
+    const { strip } = overflowingParts(panel.group)
+    expect(strip.scrollLeft).toBe(0)
     vi.advanceTimersByTime(100)
-    expect(reveal).not.toHaveBeenCalled()
+    expect(strip.scrollLeft).toBe(100)
   })
 })

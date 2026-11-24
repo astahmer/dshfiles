@@ -150,10 +150,10 @@
         },
         {
           "key": "showProjectName",
-          "defaultValue": "false",
-          "constraints": "Boolean; true shows the owning project's folder name before thread titles in the standalone strip (thread workspaces and subagents resolve to their project). Panel and start tabs are unchanged; Workbench headers keep their own titles.",
+          "defaultValue": "true",
+          "constraints": "Boolean; shows a project chip before thread titles in both the standalone strip and Workbench. It uses the owning project's display name or falls back to its folder name. Panel and start tabs do not show a project chip.",
           "choices": ["true", "false"],
-          "coveredBy": ["main-tabs.fixed-tab-width-default", "main-tabs.project-name-strip", "main-tabs.project-name-folder"]
+          "coveredBy": ["main-tabs.project-name-default", "main-tabs.project-name-strip", "main-tabs.project-name-workbench", "main-tabs.project-name-folder"]
         },
         {
           "key": "maxTabs",
@@ -195,7 +195,7 @@
           "kind": "unit-test",
           "id": "main-tabs.fixed-tab-width-default",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
-          "testName": "sizes tabs to their titles and hides project names by default"
+          "testName": "sizes tabs to their titles and omits chips when no project names are supplied"
         },
         {
           "kind": "unit-test",
@@ -207,13 +207,25 @@
           "kind": "unit-test",
           "id": "main-tabs.project-name-strip",
           "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
-          "testName": "shows the project name before thread titles only"
+          "testName": "shows the project name as a chip before thread titles only"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.project-name-default",
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "shows project chips by default and removes and restores them when the setting changes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "main-tabs.project-name-workbench",
+          "file": "plugins/@dshfiles/workbench/src/workbench-tab.test.tsx",
+          "testName": "shows the project chip before a thread title when the provider publishes project names"
         },
         {
           "kind": "unit-test",
           "id": "main-tabs.project-name-folder",
-          "file": "plugins/@dshfiles/main-tabs/src/project-names.test.ts",
-          "testName": "names each project workspace after its folder"
+          "file": "plugins/@dshfiles/main-tabs/src/tab-strip.client.test.tsx",
+          "testName": "resolves custom display names and project folder fallbacks for both tab surfaces"
         },
         {
           "kind": "unit-test",

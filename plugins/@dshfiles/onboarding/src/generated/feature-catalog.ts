@@ -28803,7 +28803,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "main-tab-parity",
       "title": "Keep preview pin unread and close semantics in Dockview tabs",
-      "summary": "Dockview tabs consume main-tabs' existing semantics provider and profile close-button setting: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears. Selecting a tab also scrolls it fully into view once its title and the…",
+      "summary": "Dockview tabs keep Main Tabs' preview, pin, unread, close and thread-open behavior. Dockview handles normal tab scrolling. Workbench reveals selected tabs after window resize or layout restore, once the strip settles, without re-revealing when a title mounts or changes.",
       "destination": "none",
       "currentSurface": "workbench: tab semantics",
       "reach": [
