@@ -1,4 +1,5 @@
 import { decodeJson, jsonValueSchema, type JsonValue } from '@dshfiles/dshx/json'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { ToolMetaTranslate } from './locales.js'
@@ -107,16 +108,8 @@ export class ToolTimingModel {
     }
   }
 
-  /** A finished call keeps tenths under ten seconds; a running counter ticks in whole seconds. */
-  static readonly formatDuration = (input: { readonly ms: number; readonly live: boolean; readonly t: ToolMetaTranslate }): string => {
-    const ms = Math.max(0, input.ms)
-    if (ms < 10_000 && !input.live) return input.t('seconds', { n: (Math.round(ms / 100) / 10).toFixed(1) })
-    const totalSeconds = Math.floor(ms / 1000)
-    if (totalSeconds < 60) return input.t('seconds', { n: String(totalSeconds) })
-    const totalMinutes = Math.floor(totalSeconds / 60)
-    if (totalMinutes < 60) return input.t('minutes', { m: String(totalMinutes), s: String(totalSeconds % 60) })
-    return input.t('hours', { h: String(Math.floor(totalMinutes / 60)), m: String(totalMinutes % 60) })
-  }
+  /** The kit's grammar for time waited (DESIGN.md › Durations): `3s`, `2m 05s`, `1h 04m`, the same live and finished. */
+  static readonly formatDuration = (ms: number): string => formatElapsed(ms)
 
   static readonly formatMoment = (input: { readonly at: number; readonly now: number; readonly format: TimeFormat; readonly t: ToolMetaTranslate }): string => {
     if (input.format === 'absolute') {
@@ -150,7 +143,7 @@ export class ToolTimingModel {
     }
     const live = timing.kind === 'running'
     const ms = (live ? now : timing.endedAt) - timing.startedAt
-    const duration = ToolTimingModel.formatDuration({ ms, live, t })
+    const duration = ToolTimingModel.formatDuration(ms)
     const start = ToolTimingModel.formatMoment({ at: timing.startedAt, now, format, t })
     return { text: ms >= ToolTimingModel.shownFromMs ? duration : '', label: t(live ? 'runningLabel' : 'finishedLabel', { duration, start }) }
   }

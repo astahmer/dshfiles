@@ -87,7 +87,8 @@
     "src/native/chat/use-chat-scroll.ts",
     "src/native/conversation-nodes/register.ts",
     "src/native/chat/TurnUsagePanel.module.css",
-    "src/native/chat/text-interaction.ts"
+    "src/native/chat/text-interaction.ts",
+    "src/native/chat/message-chrome.ts"
   ],
   "added": [
     "src/native/chat/AnnotateSelection.module.css",

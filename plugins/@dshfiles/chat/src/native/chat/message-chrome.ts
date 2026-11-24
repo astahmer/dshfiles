@@ -1,13 +1,10 @@
 // Shared time-label helpers for user/assistant IconActions rows.
 
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 
 /** The date-template share of the conversation dictionary the clock consumes. */
 export type ClockTranslate = Translate<'clock.md' | 'clock.ymd'>
-
-/** The elapsed-duration share of the conversation dictionary. */
-export type RunDurationTranslate =
-  Translate<'duration.secondUnit' | 'duration.minuteUnit' | 'duration.hourUnit'>
 
 /** Refresh interval for whole-second live run clocks. */
 export const LIVE_RUN_CLOCK_INTERVAL_MS = 1000
@@ -38,7 +35,7 @@ export function msUntilNextLocalMidnight(ms: number): number {
   return Math.max(next.getTime() - ms, 1)
 }
 
-/** One numeric value or localized unit in an elapsed-time label. */
+/** One numeric value or unit in an elapsed-time label. */
 export interface RunDurationPart {
   readonly text: string
   readonly numeric: boolean
@@ -46,21 +43,16 @@ export interface RunDurationPart {
 
 /**
  * Build elapsed-time fragments for both live and completed Turn labels.
+ * dshfiles (unslop R1): the kit's `formatElapsed` grammar (`9s`, `2m 05s`, `1h 04m`), whole seconds floored, padded
+ * after minutes and hours so a ticking clock keeps its width, and the same `s`/`m`/`h` in every language.
  * @param ms - elapsed milliseconds; negatives clamp to zero and fractions floor.
- * @param t - translate seat supplying units and their trailing spacing.
- * @returns numbers and localized units in display order, without leading zeros;
- * minutes start at 60 seconds and hours at 60 minutes.
+ * @returns numbers and units in display order; the space between two pairs rides on the first unit.
  */
-export function formatRunDuration(ms: number, t: RunDurationTranslate): RunDurationPart[] {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor(total / 60) % 60
-  const seconds = total % 60
-  const parts: RunDurationPart[] = []
-  if (hours > 0) parts.push({ text: String(hours), numeric: true }, { text: t('duration.hourUnit'), numeric: false })
-  if (total >= 60) parts.push({ text: String(minutes), numeric: true }, { text: t('duration.minuteUnit'), numeric: false })
-  parts.push({ text: String(seconds), numeric: true }, { text: t('duration.secondUnit'), numeric: false })
-  return parts
+export function formatRunDuration(ms: number): RunDurationPart[] {
+  return [...formatElapsed(ms).matchAll(/(\d+)(\D+)/g)].flatMap(([, value = '', unit = '']) => [
+    { text: value, numeric: true },
+    { text: unit, numeric: false },
+  ])
 }
 
 /**

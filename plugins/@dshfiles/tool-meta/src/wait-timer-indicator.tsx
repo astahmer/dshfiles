@@ -9,9 +9,9 @@ export interface WaitTimerIndicatorProps {
 }
 
 export const WaitTimerIndicator = ({ timer, t }: WaitTimerIndicatorProps) => {
-  const elapsed = ToolTimingModel.formatDuration({ ms: timer.elapsedMs, live: true, t })
-  const remaining = timer.remainingMs === undefined ? undefined : ToolTimingModel.formatDuration({ ms: timer.remainingMs, live: true, t })
-  const timeout = timer.timeoutMs === undefined ? undefined : ToolTimingModel.formatDuration({ ms: timer.timeoutMs, live: true, t })
+  const elapsed = ToolTimingModel.formatDuration(timer.elapsedMs)
+  const remaining = timer.remainingMs === undefined ? undefined : ToolTimingModel.formatDuration(timer.remainingMs)
+  const timeout = timer.timeoutMs === undefined ? undefined : ToolTimingModel.formatDuration(timer.timeoutMs)
   const label = remaining === undefined || timeout === undefined ? t('waitElapsed', { duration: elapsed }) : t('waitProgress', { remaining, timeout })
   const waitingForLabel = () => {
     if (timer.waitingFor === 'job-output') return t('waitingForJobOutput')

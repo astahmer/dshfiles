@@ -41,7 +41,7 @@ export const ReasoningTiming = ({ timing, t }: {
   const running = timing !== undefined && timing.endedAt === undefined
   const now = useSyncExternalStore(running ? clock.subscribe : subscribeNever, clock.now)
   if (timing === undefined) return null
-  const duration = formatRunDuration((timing.endedAt ?? now) - timing.startedAt, t)
+  const duration = formatRunDuration((timing.endedAt ?? now) - timing.startedAt)
     .map(part => part.text).join('')
   const started = new Date(timing.startedAt)
   const today = new Date(now)

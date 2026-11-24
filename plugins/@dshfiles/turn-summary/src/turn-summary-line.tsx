@@ -152,7 +152,8 @@ export const TurnSummaryLine = (props: {
       : (callId: string): void => openView(ChatFocusModel.viewId, ChatFocusModel.encode({ turn: props.turn.turn, toolCallId: callId, open: true }))
   const start = props.turn.start?.time
   const end = props.turn.end?.time
-  const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.shownDuration(end - start) : undefined
+  const ownTotal = TurnActivity.saysOwnTotal(props.turn.end?.data.reason.kind)
+  const duration = settings?.duration !== false && ownTotal && start !== undefined && end !== undefined ? TurnActivity.shownDuration(end - start) : undefined
   const changesSeq = summary.changesSeq
   const openChanges = changesSeq === undefined ? undefined : () => props.openChanges({ seq: changesSeq, turn: props.turn.turn })
   // With file chips the edits are named once (GitHub #47): `editedFiles: !chips` above already leaves the

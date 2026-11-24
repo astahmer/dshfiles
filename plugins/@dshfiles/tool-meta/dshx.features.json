@@ -6,7 +6,7 @@
       "id": "tool-call-timing",
       "title": "How long each tool call took",
       "summary": "Each tool call that takes a second or more shows how long it took.",
-      "details": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took once it reaches one second (\"1.2 s\"); hovering the duration gives the start time. A card that draws its own header or prints its own duration gets no label. Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
+      "details": "Each tool card in the chat transcript, native or plugin-owned, root or nested, shows how long the call took once it reaches one second (\"3s\", \"2m 05s\"); hovering the duration gives the start time. A card that draws its own header or prints its own duration gets no label. Wait calls also show elapsed time and an indeterminate bar, or a timeout countdown bar when an explicit limit is set. Users can interrupt through the existing composer controls.",
       "reach": ["seed tool-call-thread", "click text \"Worked for*\"", "expect note \"Took*\""],
       "surfaces": ["client", "settings"],
       "surface": "transcriptCard",

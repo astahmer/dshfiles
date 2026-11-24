@@ -1,4 +1,5 @@
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { EditLines, type LineCounts } from './edit-lines.js'
 
 export interface ToolCallRecord {
@@ -252,18 +253,22 @@ export class TurnActivity {
     return endsWithChevron.map((_chevron, index) => index > 0 && endsWithChevron[index - 1] !== true)
   }
 
-  /** "1m 12s" for a finished turn's wall time. */
+  /** "1m 12s" for a finished turn's wall time: the kit's grammar (DESIGN.md › Durations). */
   static duration(ms: number): string {
-    const seconds = Math.max(0, Math.round(ms / 1000))
-    if (seconds < 60) return `${seconds}s`
-    const minutes = Math.floor(seconds / 60)
-    if (minutes < 60) return `${minutes}m ${String(seconds % 60).padStart(2, '0')}s`
-    return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`
+    return formatElapsed(ms)
   }
 
   /** The footer's duration, or undefined for a turn under a second: "0s" is not a duration worth a part. */
   static shownDuration(ms: number): string | undefined {
-    return Math.round(ms / 1000) < 1 ? undefined : TurnActivity.duration(ms)
+    return ms < 1_000 ? undefined : TurnActivity.duration(ms)
+  }
+
+  /**
+   * Whether the footer says the turn's total itself. Chat's "Worked for" row already says it for a turn that ended
+   * normally, and a total is said once; a stopped or failed turn has no such row, so the footer keeps it there.
+   */
+  static saysOwnTotal(endReason: string | undefined): boolean {
+    return endReason === 'aborted' || endReason === 'interrupted' || endReason === 'error'
   }
 
   static isEmpty(summary: TurnActivitySummary): boolean {

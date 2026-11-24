@@ -13,7 +13,7 @@ export const turnSummarySettings = defineSettings({
       .description(
         'Show the test outcome from the last test-runner summary a command printed (Vitest, Jest, pytest).',
       ),
-    duration: Schema.boolean().default(true).description('Show how long the turn took, from its start to its end.'),
+    duration: Schema.boolean().default(true).description('Show how long a stopped or failed turn took, from its start to its end ("Worked for" says it for the others).'),
     openLists: Schema.boolean().default(true).description('Let the edited-file and command counts open their lists; each file opens in the editor.'),
     walkthrough: Schema.boolean()
       .default(true)

@@ -1547,7 +1547,7 @@ When('the fake model keeps the thread workspace busy with a long bash call', asy
   await newThreadComposer(page).press('Enter')
   await expect(
     page
-      .getByRole('timer', { name: /^Running for \d+ s/ })
+      .getByRole('timer', { name: /^Running for \d+s/ })
       .or(page.getByText('Keep the thread busy'))
       .first(),
   ).toBeVisible({ timeout: 30_000 })

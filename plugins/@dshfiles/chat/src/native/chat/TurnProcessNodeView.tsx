@@ -92,7 +92,7 @@ export const TurnProcessNodeView = memo(function TurnProcessNodeView({
   const elapsedMs = turn.start === undefined || turn.end === undefined ? undefined
     : Math.max(1000, turn.end.time - turn.start.time)
   const duration = elapsedMs === undefined || stopped || reason === 'error' ? undefined
-    : formatRunDuration(elapsedMs, t)
+    : formatRunDuration(elapsedMs)
   // Other end reasons retain elapsed time; only stops and failure replace it.
   const label = stopped ? t('message.stopped')
     : reason === 'error' ? t('message.turnProcess.failed')

@@ -52,7 +52,7 @@ export const RunningStatus = memo(function RunningStatus({ startTime, paused, ho
     return () => { clearInterval(timer) }
   }, [startTime, paused, holding, onScreen])
   const label = startTime === undefined ? t('chat.deepDiving') : t('chat.deepDivingFor', {
-    duration: formatRunDuration(Math.max(1000, now - startTime), t).map(part => part.text).join(''),
+    duration: formatRunDuration(Math.max(1000, now - startTime)).map(part => part.text).join(''),
   })
   return (
     <div

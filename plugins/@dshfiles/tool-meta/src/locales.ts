@@ -4,9 +4,6 @@ import { defineLocale } from '@dshfiles/dshx/client'
 export const TOOL_META_LOCALE_NAMESPACE = 'dshfiles.tool-meta'
 
 const en = {
-  seconds: '{n} s',
-  minutes: '{m} min {s} s',
-  hours: '{h} h {m} min',
   secondsAgo: '{n} s ago',
   minutesAgo: '{n} min ago',
   hoursAgo: '{n} h ago',
@@ -34,9 +31,6 @@ const en = {
 }
 
 const zh = {
-  seconds: '{n} 秒',
-  minutes: '{m} 分 {s} 秒',
-  hours: '{h} 小时 {m} 分',
   secondsAgo: '{n} 秒前',
   minutesAgo: '{n} 分钟前',
   hoursAgo: '{n} 小时前',

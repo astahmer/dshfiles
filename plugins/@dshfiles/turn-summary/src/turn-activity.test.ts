@@ -115,6 +115,21 @@ describe('TurnActivity.summarize', () => {
       expect(TurnActivity.shownDuration(72_000)).toBe('1m 12s')
     })
 
+    it('reads a duration as the kit does: whole seconds rounded down (DESIGN.md › Durations)', () => {
+      // Rounded, 59.9 s read "1m 00s" here while "Worked for" read "59s" for the same turn.
+      expect(TurnActivity.shownDuration(59_900)).toBe('59s')
+      expect(TurnActivity.shownDuration(999)).toBeUndefined()
+      expect(TurnActivity.shownDuration(3_840_000)).toBe('1h 04m')
+    })
+
+    it('says the total only where "Worked for" does not: a stopped or failed turn', () => {
+      expect(TurnActivity.saysOwnTotal('end_turn')).toBe(false)
+      expect(TurnActivity.saysOwnTotal(undefined)).toBe(false)
+      expect(TurnActivity.saysOwnTotal('aborted')).toBe(true)
+      expect(TurnActivity.saysOwnTotal('interrupted')).toBe(true)
+      expect(TurnActivity.saysOwnTotal('error')).toBe(true)
+    })
+
     it('reports a failed test run once, as the one red part, which opens the failed command', () => {
       const summary = TurnActivity.summarize({
         calls: [call('a', 'bash', { command: 'pnpm vitest run' })],
