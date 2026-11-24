@@ -7,9 +7,11 @@ import { compactStatusStrip } from './native/client/AppFrame.js'
 const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/client/AppFrame.module.css'), 'utf8')
 
 /** A view whose media rule matches only the landscape clause (`(pointer: coarse) and (max-height: 500px)`). */
+// SAFETY: compactStatusStrip reads only `matches` from the lists these views return.
 const sideways: Pick<Window, 'matchMedia'> = {
   matchMedia: (query: string) => ({ matches: query.split(',').some(part => part.trim() === '(pointer: coarse) and (max-height: 500px)') }) as MediaQueryList,
 }
+// SAFETY: as above, only `matches` is read.
 const desktop: Pick<Window, 'matchMedia'> = { matchMedia: () => ({ matches: false }) as MediaQueryList }
 
 describe('phone turned sideways (unslop U8)', () => {
