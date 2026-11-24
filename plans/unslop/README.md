@@ -1,13 +1,23 @@
 # Unslop: UI/UX audit and work list
 
 Audit date: 2026-11-16, on the fork's `main` at `wqstyzvl`. This file is the audit and the work list that follows
-from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a3` and rebased on 2026-11-17 onto
-`ea6b8d88`, one revision per change, not on the fork's `main`, so they
-merge into upstream as a fast-forward. Nothing is pushed or landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
+from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a3` and rebased on 2026-11-24 onto
+`ecdb9212`, one revision per change, not on the fork's `main`, so they merge into upstream as a fast-forward. They
+are the draft PR astahmer/dshfiles#271 (branch `contribute/unslop-ui` on the tbrowang fork); nothing is landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** all 14 steps are done. What is left is under [Follow-ups](#follow-ups): items the lanes found
-outside their scope, none started. See [Work list](#work-list).
+**Resume here:** all 14 steps are done. Round two started 2026-11-24 after feedback that the monochrome changes
+were dull: bring purposeful colour back and make daily use smoother, without undoing upstream's coloured project
+chips (#287). See [Round two](#round-two). Round one's leftovers are under [Follow-ups](#follow-ups).
+
+## Round two
+
+- Rebased onto upstream `ecdb9212` (project chips with colours #287, Antigravity accounts). Upstream's coloured
+  provider tiles in AI accounts were kept over round one's ink-only glyph, and its test now expects the brand colour.
+- Upstream `main` itself failed `features:check` on three test names #287 renamed; fixed here.
+- Upstream's chip text, provider tiles and project palette are counted in the ratchet baselines, not rewritten.
+- Design direction: decided with a Fable 5.2 (high) consultation; its brief and the work list follow below once
+  agreed.
 
 ## Method and limits
 
