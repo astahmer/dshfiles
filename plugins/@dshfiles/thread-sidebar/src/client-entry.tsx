@@ -941,6 +941,13 @@ export default defineClient({
       const result = await ctx.remote.session.rename({ sessionId, title })
       if (!result.ok) throw new Error(result.error.message)
     }
+    // The header chip and its popover speak this plugin's words, never core's count beside an English word (C5).
+    const subagentCatalogCopy: SubagentCatalogInjected['copy'] = {
+      count: count => translate(count === 1 ? 'subagentCountOne' : 'subagentCountOther', { count: String(count) }),
+      working: translate('subagentPreviewWorking'),
+      done: translate('subagentPreviewFinished'),
+      stopped: translate('subagentPreviewInterrupted'),
+    }
     const subagentCatalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => ({
       openChild(address: SubagentAddress) {
         ctx.uiWorkspace.openSession(address)
@@ -954,6 +961,7 @@ export default defineClient({
       refreshProjection(parentSessionId: SessionId) {
         void ctx.sessions.refreshProjections(parentSessionId)
       },
+      copy: subagentCatalogCopy,
     })
     ctx.slots.inject('conversation.session.header.lineage', () =>
       ctx.slots.register(

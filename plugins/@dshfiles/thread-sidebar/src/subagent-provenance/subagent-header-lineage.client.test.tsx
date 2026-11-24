@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SessionListState, SessionSnapshot, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
@@ -139,6 +139,7 @@ const props = (): SubagentHeaderLineageProps => ({
   openChild: vi.fn(),
   openChildAside: vi.fn(),
   refreshProjection: vi.fn(),
+  copy: { count: count => `${String(count)} ${count === 1 ? 'subagent' : 'subagents'}`, working: 'Working', done: 'Done', stopped: 'Stopped' },
   sessionId: CHILD,
   lineageSessionId: CHILD,
   displayTitle: 'worker',
@@ -148,26 +149,51 @@ const props = (): SubagentHeaderLineageProps => ({
 afterEach(cleanup)
 
 describe('SubagentHeaderLineage route provenance', () => {
-  it('shows the latest safe model route in the child header and catalog row', () => {
+  it('keeps the route in the child header, out of the catalog row', () => {
     render(<SubagentHeaderLineage {...props()} />)
 
     expect(screen.getByText('openai/gpt-6.1-luna')).not.toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'switcher.aria' }))
-    expect(screen.getAllByText(/openai\/gpt-6\.1-luna/)).toHaveLength(2)
+    expect(screen.getAllByText(/openai\/gpt-6\.1-luna/)).toHaveLength(1)
   })
 
-  it('shows active subagents over the total and labels each working row', () => {
+  it('counts the subagents in its own words, with the spinner while one works and no "2/34"', () => {
     const state = sessionListWithRunningSubagents()
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(state)} />)
 
-    const trigger = screen.getByRole('button', { name: '2 running' })
-    expect(trigger.textContent).toContain('2/34 subagents')
+    const trigger = screen.getByRole('button', { name: '34 subagents · Working' })
+    expect(trigger.textContent).toBe('34 subagents')
+    expect(trigger.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
 
     fireEvent.click(trigger)
-    const activeRow = screen.getByRole('treeitem', { name: /^worker-1 / })
-    const inactiveRow = screen.getByRole('treeitem', { name: /^worker-3 / })
-    expect(within(activeRow).getByRole('status').textContent).toBe('Running')
-    expect(within(inactiveRow).queryByRole('status')).toBeNull()
+    const activeRow = screen.getByRole('treeitem', { name: /^worker-1 · Working/ })
+    const inactiveRow = screen.getByRole('treeitem', { name: /^worker-3$/ })
+    expect(activeRow.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
+    expect(inactiveRow.querySelector('[data-slot="status-glyph"]')).toBeNull()
+  })
+
+  it('shows a finished 300 s child as Done for 5m 00s, with no token count and no raw prompt', () => {
+    // The row read "[[once call bash {\"command\":\"sleep 300\"…", "0 tok" and a duration from core's own formatter.
+    const finished: SessionListState = {
+      ...sessionList,
+      byId: {
+        [CHILD]: {
+          ...childSummary,
+          title: '[[once call bash {"command":"sleep 300"}]]',
+          projectionValues: {
+            ...childSummary.projectionValues,
+            subagentTiming: { settledMs: 300_000, lastTurnCompleted: true },
+            tokenUsage: { uncachedInputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0 },
+          },
+        },
+      },
+    }
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(finished)} />)
+    fireEvent.click(screen.getByRole('button', { name: '1 subagent' }))
+    const row = screen.getByRole('treeitem', { name: 'worker · Done · 5m 00s' })
+    expect(row.textContent).toContain('5m 00s')
+    expect(row.textContent).not.toMatch(/tok|once call/u)
+    expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('done')
   })
 
   it('hovers the catalog open and closed with its delays, and a click pins it open', () => {
@@ -212,7 +238,7 @@ describe('SubagentHeaderLineage route provenance', () => {
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(timed)} />)
 
     fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
-    const row = screen.getByRole('treeitem', { name: /^worker / })
-    expect(row.textContent).toContain('duration.')
+    const row = screen.getByRole('treeitem', { name: /^worker/ })
+    expect(row.textContent).toContain('1m 05s')
   })
 })
