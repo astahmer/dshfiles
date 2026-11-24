@@ -54,6 +54,8 @@ import { subagentRunFold } from './subagent-provenance/subagent-run-fold.js'
 import { TranscriptRunFolds } from '@dshfiles/chat/run-folds'
 import { ThreadWorkStatusSources } from './thread-status-client.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
+import { PaletteThreadStatuses } from '@dshfiles/command-palette/palette-contract'
+import { PaletteThreadStatusesModel, STATUS_WORD_KEYS } from './palette-thread-statuses.js'
 import { NS as SUBAGENT_LOCALE_NAMESPACE } from './subagent-provenance/locales.js'
 import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
@@ -1027,6 +1029,8 @@ export default defineClient({
     plugin?.add(TranscriptRunFolds, subagentRunFold({ t: translate, count: subagentCount }))
     // The list's one status per thread, for the tab, the header and the palette (thread-status-client).
     plugin?.add(ThreadWorkStatusSources, { getSnapshot: threadWorkStatusStore.getSnapshot, subscribe: threadWorkStatusStore.subscribe })
+    // The palette's thread rows draw the same glyph and word as the list (command-palette's PaletteThreadStatuses).
+    plugin?.add(PaletteThreadStatuses, PaletteThreadStatusesModel.sourceOf(threadWorkStatusStore, status => translate(STATUS_WORD_KEYS[status])))
     for (const key of ['subagent', 'subagent_fork'])
       ctx.slots.inject('tool.call.toolview', () =>
         ctx.slots.register(
