@@ -26730,6 +26730,20 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "by": "complementary",
           "name": "Span detail",
           "value": null
+        },
+        {
+          "text": "click button \"Zoom to selected span\"",
+          "action": "click",
+          "by": "button",
+          "name": "Zoom to selected span",
+          "value": null
+        },
+        {
+          "text": "expect button \"Show full trace\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Show full trace",
+          "value": null
         }
       ],
       "reachNarrow": null,

@@ -26,7 +26,14 @@ list, a span waterfall, a per-span attribute panel, log search correlated with t
 charts, a service/operation overview and error groups.
 
 It is a generic viewer: anything that speaks OTLP/HTTP can send to it, with any `service.name`, resource, scope,
-span kind or attribute key. DSH-specific touches are enrichments only: a span carrying `dsh.session.id` gets an
+span kind or attribute key. Select a row and choose **Zoom to selected span** to fit its recorded interval. The axis
+starts at the displayed trace offset; overlapping bars are clipped, while all rows, details and full-trace totals stay
+available. **Show full trace** restores the original scale. The view refreshes from stored OTLP batches, not from live
+span-start events: a recorded trace can still receive more spans.
+
+![Zoomed waterfall with synthetic spans at phone width](docs/screenshots/trace-explorer-zoom.png)
+
+DSH-specific touches are enrichments only: a span carrying `dsh.session.id` gets an
 **Open thread** button that lands Chat on its turn, step or tool call, each turn's footer gets a **Trace** button,
 and `dshx.cost.usd` shows as list-price cost ([below](#trace--transcript-links)).
 
