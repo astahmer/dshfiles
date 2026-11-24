@@ -39,6 +39,13 @@ Feature: Chat browser journeys
     And the fake model answers, then answers again at High effort in a fresh workspace
     Then the transcript marks the effort change once
 
+  @scenario:chat.turn-end-holds-reader
+  Scenario: A reader scrolled up keeps their place when the turn ends
+    Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/session-controller, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model streams a long answer in a fresh workspace while the reader scrolls up 400 px
+    Then the paragraph the reader is on stays where it is when the turn ends
+
   @scenario:session-controller.lean-session-follow
   Scenario: A real Host follow renders history without provider replay blocks in browser frames
     Given the isolated plugin composition of "@dshfiles/chat, @dshfiles/session-controller" is booted

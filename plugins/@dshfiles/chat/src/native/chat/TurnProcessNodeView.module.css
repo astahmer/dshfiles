@@ -23,6 +23,18 @@
   cursor: default;
 }
 
+/* dshfiles (unslop R5): a row whose Turn just closed fades in on the collapse token while the scroll offset keeps the
+   text below it still (TurnProcessNodeView). Opacity only, so reduced motion keeps it. */
+.root[data-entering] {
+  animation: turn-process-enters var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease) both;
+}
+
+@keyframes turn-process-enters {
+  from {
+    opacity: 0;
+  }
+}
+
 /* dshfiles (unslop, phone #20): on a touch screen the row that opens a turn's work was 24px tall. */
 @media (pointer: coarse) {
   .root:not(:disabled) {

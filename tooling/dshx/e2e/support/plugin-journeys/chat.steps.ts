@@ -567,3 +567,60 @@ Then('the transcript marks the effort change once', async ({ page }: { page: Pag
   })
   await finishJourneyAssertions(page)
 })
+
+/** A streamed answer long enough to scroll: nine sections of four sentences. */
+const STREAMED_SECTION = 'The harness streams this paragraph word by word so the transcript grows while you watch it.'
+const STREAMED_ANSWER = Array.from({ length: 9 }, (_, index) => `## Section ${String(index + 1)}\n\n${Array.from({ length: 4 }, () => STREAMED_SECTION).join(' ')}`).join('\n\n')
+/** The answer block the reader is on: its index among the answer's blocks and its top before the turn ended. */
+const readerAnchors = new WeakMap<Page, { readonly index: number; readonly top: number }>()
+const answerBlocks = (page: Page): Locator => page.locator('[data-dsh-markdown] > :is(p, h2)')
+
+When('the fake model streams a long answer in a fresh workspace while the reader scrolls up 400 px', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-chat-turn-end-')
+  const workspace = join(root, 'chat-turn-end')
+  await mkdir(workspace)
+  await registerWorkspaceFolder(page, workspace)
+  await startThreadWithModel(page, { project: 'chat-turn-end', model: 'commandcode_work/gpt-6-luna' })
+  await sendPrompt(page, `[[stream 12]] [[answer ${STREAMED_ANSWER}]]`)
+  await expect(page.locator('[data-dsh-markdown] h2').filter({ hasText: 'Section 4' })).toBeVisible({ timeout: 60_000 })
+  // A reader's own scroll, over the transcript, while the answer still streams.
+  const answer = await page.locator('[data-dsh-markdown]').last().boundingBox()
+  if (answer === null) throw new Error('The streamed answer is not on screen.')
+  await page.mouse.move(answer.x + answer.width / 2, Math.min(answer.y + answer.height, page.viewportSize()?.height ?? 600) - 150)
+  await page.mouse.wheel(0, -400)
+  await expect(page.locator('[data-chat-following-tail]')).toHaveCount(0)
+  // Let the wheel's scroll settle: the answer's first block holds still between two reads.
+  let previous = Number.NaN
+  await expect
+    .poll(
+      async () => {
+        const top = await answerBlocks(page).first().evaluate(block => block.getBoundingClientRect().top)
+        const settled = top === previous
+        previous = top
+        return settled
+      },
+      { intervals: [150] },
+    )
+    .toBe(true)
+  await expect(page.locator('button[data-turn-process]')).toHaveCount(0)
+  const anchor = await answerBlocks(page).evaluateAll(blocks => {
+    const tops = blocks.map(block => block.getBoundingClientRect().top)
+    const index = tops.findIndex(top => top > 200)
+    return { index, top: tops[index] ?? Number.NaN }
+  })
+  readerAnchors.set(page, anchor)
+})
+
+Then('the paragraph the reader is on stays where it is when the turn ends', async ({ page }: { page: Page }) => {
+  const anchor = readerAnchors.get(page)
+  if (anchor === undefined || anchor.index < 0) throw new Error('No answer block was on screen when the reader scrolled up.')
+  await recordAssertion(page, 'chat-turn-end-holds-reader', async () => {
+    // The "Worked for" row appears above the answer as the turn ends.
+    await expect(page.locator('button[data-turn-process]')).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByText('Section 9', { exact: true })).toBeAttached()
+    const block = answerBlocks(page).nth(anchor.index)
+    await expect.poll(async () => Math.abs((await block.evaluate(element => element.getBoundingClientRect().top)) - anchor.top)).toBeLessThanOrEqual(2)
+  })
+  await finishJourneyAssertions(page)
+})
+

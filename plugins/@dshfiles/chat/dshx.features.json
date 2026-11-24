@@ -332,7 +332,7 @@
       "id": "folded-work",
       "title": "A finished turn folds its work under one Worked for row",
       "summary": "A finished turn folds its tool calls under one Worked for row, and failures stay visible.",
-      "details": "While a turn runs, its tail reads \"Working for 12s\" with a shimmer (paused off screen, none under reduced motion). Once it settles, its tool calls fold under one \"Worked for 1m 12s\" row; a failed call (an error result or a shell command that exited non-zero), a question and any PinnedToolCalls deliverable stay outside the fold, so a folded turn still shows what failed.",
+      "details": "While a turn runs, its tail reads \"Working for 12s\" with a shimmer (paused off screen, none under reduced motion). Once it settles, its tool calls fold under one \"Worked for 1m 12s\" row, which fades in without moving the text a reader who scrolled up is on; a failed call (an error result or a shell command that exited non-zero), a question and any PinnedToolCalls deliverable stay outside the fold, so a folded turn still shows what failed.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -359,6 +359,11 @@
           "kind": "not-applicable",
           "id": "chat.folded-work-browser",
           "reason": "Walked in scratch DSH vr-p2 (visual refresh P2): a 30-call turn folded and expanded with its exit-3 call visible while folded, light/dark/phone. The e2e journeys that open the fold (tool-meta, html-render, test-runs) also cover the Worked for row."
+        },
+        {
+          "kind": "gherkin",
+          "id": "chat.turn-end-holds-reader",
+          "featureFile": "tooling/dshx/e2e/features/chat.feature"
         }
       ],
       "telemetry": [
