@@ -130,6 +130,7 @@ const lead = (icon: ReactNode, label: string): JSX.Element => (
 export const ThreadMenu = (props: ThreadMenuProps): JSX.Element => {
   const { kit, entries } = props
   const offered = new Set<ThreadMenuEntryId>()
+  // SAFETY: ICONS is a literal object keyed by every ThreadMenuEntryId and nothing else, so its keys are exactly those ids.
   for (const id of Object.keys(ICONS) as ThreadMenuEntryId[]) if (entries[id] !== undefined) offered.add(id)
   const menu = ThreadMenuModel.layout({ offered, archived: props.archived, phone: props.phone })
   const entry = (id: ThreadMenuEntryId): ReactNode => {

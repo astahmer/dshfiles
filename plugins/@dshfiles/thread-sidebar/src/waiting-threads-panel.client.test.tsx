@@ -18,7 +18,9 @@ vi.mock('./relative-age.js', () => ({ formatAge: () => '1m' }))
 const { WaitingThreadsPanel } = await import('./waiting-threads-panel.js')
 
 const snapshot = { byId: { [SESSION]: { id: SESSION, displayTitle: 'Ready thread' } } }
-const sessions = { list: { getSnapshot: () => snapshot, subscribe: () => () => undefined } } as unknown as ISessions
+// SAFETY: the panel reads only the session list's snapshot and subscription, and this snapshot carries every row it names.
+const sessions: ISessions = { list: { getSnapshot: () => snapshot, subscribe: () => () => undefined } } as never
+// SAFETY: the panel only prints keys, so the identity translator covers every key it asks for.
 const t = ((key: string) => key) as Parameters<typeof WaitingThreadsPanel>[0]['t']
 
 const renderPanel = (props: { readonly confirmLand?: (sessionId: string) => boolean; readonly openThread?: (sessionId: string) => void }) => {

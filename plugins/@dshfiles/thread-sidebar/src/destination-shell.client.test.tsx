@@ -192,6 +192,7 @@ describe('DestinationShell', () => {
     expect(shell.selectPanel).toHaveBeenCalledWith('attention-inbox')
     const rows = within(screen.getByRole('navigation', { name: 'Inbox pages' })).getAllByRole('button')
     expect(rows.map(row => row.getAttribute('aria-label'))).toEqual(['Inbox'])
+    // SAFETY: the assertion above pins exactly one row, so the first one exists.
     const row = rows[0] as HTMLElement
     const seat = row.querySelector('[data-attention-badge]')?.parentElement
     // The count is positioned against the row (its trailing edge), not over the 16px icon where it touched the label.

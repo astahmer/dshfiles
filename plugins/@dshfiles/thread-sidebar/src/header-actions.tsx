@@ -111,7 +111,7 @@ const noNativeActions = (): readonly ThreadHeaderMenuAction[] => NO_NATIVE_ACTIO
  * register for the header menu), listed in this menu so the header has one `⋯`. Read inside the open menu: it resolves
  * them when the menu opens and lets go when it closes.
  */
-const useNativeHeaderMenu = (sessionId: string): { readonly menu: ThreadHeaderMenu | undefined; readonly actions: readonly ThreadHeaderMenuAction[] } => {
+const useNativeHeaderMenu = (sessionId: string) => {
   const [menu, setMenu] = useState<ThreadHeaderMenu | undefined>(undefined)
   useEffect(() => {
     const resolved = ThreadViewsModel.headerMenu(sessionId)
