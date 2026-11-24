@@ -52,7 +52,7 @@ describe('plugin feature metadata', () => {
   })
 
   it('keeps engineering notes in an optional details field', () => {
-    const withText = (patch: Record<string, unknown>) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...patch }] })
+    const withText = (patch: { readonly details: string }) => featureCatalogIssues({ schemaVersion: 1, kind: 'bundle', features: [{ ...feature, ...patch }] })
     expect(withText({ details: 'The move keeps the message id; a second edit while saving waits for the first.' })).toEqual([])
     expect(withText({ details: '' })).toEqual([expect.stringContaining('details')])
   })
