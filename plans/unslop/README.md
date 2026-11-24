@@ -16,8 +16,24 @@ chips (#287). See [Round two](#round-two). Round one's leftovers are under [Foll
   provider tiles in AI accounts were kept over round one's ink-only glyph, and its test now expects the brand colour.
 - Upstream `main` itself failed `features:check` on three test names #287 renamed; fixed here.
 - Upstream's chip text, provider tiles and project palette are counted in the ratchet baselines, not rewritten.
-- Design direction: decided with a Fable 5.2 (high) consultation; its brief and the work list follow below once
-  agreed.
+- Design direction, from a Fable 5.2 (high) consultation; the owner chose every recommended option. Colour has four
+  jobs: attention (Needs you indigo, Failed red), results (Ready green dot, a green check for a verified land,
+  all-pass tests, sign-in), identity (projects' own colour, provider brand marks, agents on `identity-1..8`, never a
+  status hue) and data (`data-1..6`). Working stays an ink ring; controls turn indigo when on; project colour shows
+  in the thread list by default. Smoothness: press feedback in 80 ms, tooltips after 400 ms, a newer toast replaces
+  the showing one, a short tint on a row that changes state, one Land confirmation everywhere and Land on the phone.
+  DESIGN.md carries the rules.
+
+| Lane | Items | State |
+| --- | --- | --- |
+| Kit (plugin-ui, ui-styles, DESIGN.md, ratchets) | role tokens, glyph colours, control-on, HealthDot, press feedback, tooltip delay | done: 8 revisions `wnspznrr` … `vksqztzz` |
+| Land (jj-integration, jujutsu, diffs-review, dialogs, test-runs, turn-summary) | phone Land, one confirmation, Landed in green, toasts, all-pass check | running |
+| Threads (thread-sidebar, main-tabs, workbench, command-palette) | project colour in the list, palette colours, chip contrast, state tint, tap feedback, Ready mappings | running |
+| Pages (ai-accounts, model-effort-picker, usage, multi-host, mcp-servers) | Connected dot, brand marks, model chip mark, chart palette, host and MCP health | running |
+
+Also fixed while integrating: upstream's new project-names settings namespace had no Settings group (`tlksuovx`).
+The kit lane found states that map to Ready without being finished work (a stopped or blocked turn, a waiting
+restart notice); the threads and pages lanes remap them.
 
 ## Method and limits
 
