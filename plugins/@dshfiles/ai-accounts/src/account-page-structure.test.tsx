@@ -14,10 +14,11 @@ const noop = (): void => undefined
 const source = (name: string): string => readFileSync(new URL(name, import.meta.url), 'utf8')
 
 describe('account detail anatomy', () => {
-  it('draws the provider mark at text size with no tile, fill or shadow', () => {
+  it('draws each provider on its brand colour, so accounts are told apart at a glance', () => {
     const markup = renderToStaticMarkup(<ProviderGlyph kind="commandcode" />)
-    expect(markup).toContain('dshx:size-5')
-    expect(markup).not.toMatch(/size-(11|16)|shadow|background-color|rounded-lg/u)
+    expect(markup).toMatch(/background-color:/u)
+    expect(markup).toContain('dshx:rounded-lg')
+    expect(renderToStaticMarkup(<ProviderGlyph kind="claude" />)).not.toEqual(markup)
   })
   it('sets the account name at section-title size, under the page title', () => {
     const markup = renderToStaticMarkup(<AccountNameEditor disabled={false} editing={false} name="Command Code 1" onChange={noop} onEditingChange={noop} />)
