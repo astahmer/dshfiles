@@ -11,7 +11,8 @@
 //   default-shadow            Tailwind's shadow steps (`shadow-xs..2xl`) instead of the elevation steps `shadow-s0..s3`
 //   numeric-duration          `duration-<n>` instead of a `--dshx-duration-*` token
 //   viewport-variant          window breakpoints (`sm:`…`2xl:`, `max-*`) in a pane; a dialog's `max-w-*` is allowed
-//   solid-status-fill         solid `bg-info|success|warning` outside the kit
+//   solid-status-fill         solid `bg-info|success|warning` (or a status/health role) outside the kit
+//   chart-hue                 `chart-1..5` classes outside the chart component (identity and data have their own tones)
 //   palette-colour            numbered Tailwind palette classes (`bg-emerald-500`)
 //   uppercase                 `uppercase` and `text-transform: uppercase`
 //   unguarded-loop-animation  spin or pulse with no `motion-reduce:`/`motion-safe:` class in the same list
@@ -128,11 +129,28 @@ export const designTokenRules: readonly DesignTokenRule[] = [
       classes(line, file, token => token.variants.some(variant => /^(?:max-)?(?:sm|md|lg|xl|2xl)$/.test(variant)) && !/^max-w-/.test(token.utility)),
   },
   {
-    // Status colour belongs to the kit's StatusGlyph and badges; a plugin's own solid fill invents a tone table.
+    // Status colour belongs to the kit's StatusGlyph, HealthDot and badges; a plugin's own solid fill invents a tone
+    // table. The role names (`status-ready`, `health-down`) count as well; `control-on` is a fill DESIGN.md allows (the
+    // on state of a control), so it is not matched.
     id: 'solid-status-fill',
-    use: 'StatusGlyph / Badge from the kit, or the tinted trio (dshx:bg-info/10 with var(--dshx-tone-*))',
+    use: 'StatusGlyph / HealthDot / Badge from the kit, or the tinted trio (dshx:bg-info/10 with var(--dshx-tone-*))',
     matches: (line, file) =>
-      file.startsWith('plugins/@dshfiles/plugin-ui/') ? [] : classes(line, file, token => /^bg-(?:info|success|warning)$/.test(token.utility)),
+      file.startsWith('plugins/@dshfiles/plugin-ui/')
+        ? []
+        : classes(line, file, token => /^bg-(?:info|success|warning|status-(?:needs-you|failed|ready)|health-(?:ok|limited|down))$/.test(token.utility)),
+  },
+  {
+    // `chart-1..5` resolve to indigo, success, warning, danger and grey: as an identity (an agent, a project) or a
+    // decoration they read as a status. DESIGN.md › Colour roles 5 and 8: identity-1..8 tell things apart, data-1..6
+    // order chart series. The kit's chart component maps the series variables itself.
+    id: 'chart-hue',
+    use: 'identity-1..8 for a project, agent or provider, data-1..6 for a chart series, or a status role for a status',
+    matches: (line, file) =>
+      file === 'plugins/@dshfiles/plugin-ui/src/chart.tsx'
+        ? []
+        : classes(line, file, token =>
+            /^(?:bg|text|fill|stroke|border(?:-[trblxyse])?|ring|outline|shadow|from|via|to|decoration|accent|caret|divide)-chart-[1-5](?:\/[\w.[\]-]+)?$/.test(token.utility),
+          ),
   },
   {
     // Tailwind's numbered palette (emerald-500) ignores the theme; the kit's own hues (teal, violet) carry no step.

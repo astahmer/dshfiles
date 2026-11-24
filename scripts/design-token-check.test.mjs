@@ -118,6 +118,17 @@ test('solid-status-fill: a solid info, success or warning fill outside the kit',
   assert.deepEqual(ruleHits('solid-status-fill', line, 'plugins/@dshfiles/plugin-ui/src/components/ui/badge.tsx'), [])
 })
 
+test('solid-status-fill: the status and health role names count too; the control on state is an allowed fill', () => {
+  const line = "cn('dshx:bg-status-ready dshx:bg-health-down dshx:bg-status-working dshx:data-[state=checked]:bg-control-on dshx:bg-identity-3')"
+  assert.deepEqual(ruleHits('solid-status-fill', line), ['dshx:bg-status-ready', 'dshx:bg-health-down'])
+})
+
+test('chart-hue: chart-1..5 classes outside the chart component, not data or identity tones', () => {
+  const line = "cn('dshx:bg-chart-1/15 dshx:text-chart-3 dshx:fill-chart-2 dshx:bg-data-2 dshx:text-identity-4 dshx:[--ts-chart-1:var(--x)]')"
+  assert.deepEqual(ruleHits('chart-hue', line), ['dshx:bg-chart-1/15', 'dshx:text-chart-3', 'dshx:fill-chart-2'])
+  assert.deepEqual(ruleHits('chart-hue', line, 'plugins/@dshfiles/plugin-ui/src/chart.tsx'), [])
+})
+
 test('palette-colour: numbered Tailwind palette classes, not semantic colours or kit hues', () => {
   assert.deepEqual(
     ruleHits(

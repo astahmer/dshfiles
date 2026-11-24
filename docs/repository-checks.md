@@ -132,7 +132,8 @@ class into its variants and utility:
 | `default-shadow`           | `shadow-2xs..2xl` (the kit maps them onto the levels; new code writes `shadow-s0..s3`)                    |
 | `numeric-duration`         | `duration-<number>` and `duration-[<time>]` instead of `duration-(--dshx-duration-*)`                    |
 | `viewport-variant`         | a `sm:`/`md:`/`lg:`/`xl:`/`2xl:` (or `max-*`) variant, except a dialog's `max-w-*` width                 |
-| `solid-status-fill`        | solid `bg-info`/`bg-success`/`bg-warning` outside `plugin-ui`                                             |
+| `solid-status-fill`        | solid `bg-info`/`bg-success`/`bg-warning`, or a status or health role (`bg-status-ready`, `bg-health-down`), outside `plugin-ui`; `bg-control-on` (a control's on state) is allowed |
+| `chart-hue`                | `chart-1..5` colour classes outside the kit's chart component: an identity uses `identity-1..8`, a chart series `data-1..6` |
 | `palette-colour`           | numbered Tailwind palette classes (`bg-emerald-500`)                                                     |
 | `uppercase`                | the `uppercase` class and CSS `text-transform: uppercase`                                                |
 | `unguarded-loop-animation` | `animate-spin`/`animate-pulse` when no class in the same list has a `motion-reduce:`/`motion-safe:` variant |
