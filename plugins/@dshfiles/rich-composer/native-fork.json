@@ -85,6 +85,7 @@
     "src/native/input/retained-send.ts",
     "src/native/skeleton/AnnotationsPill.tsx",
     "src/native/skeleton/annotations-pill-done.test.tsx",
+    "src/native/skeleton/dock-geometry.test.ts",
     "src/native/skeleton/input-bar-overlay.test.ts"
   ]
 }

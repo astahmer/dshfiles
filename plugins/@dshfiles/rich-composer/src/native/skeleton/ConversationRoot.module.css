@@ -668,6 +668,39 @@ button.crumbEditable {
   gap: var(--dsh-composer-stack-gap);
 }
 
+/* Dock entries share the composer card's two edges (DESIGN.md, Layout). The kit's dock row (jobs, To-dos) and core's
+   goal strip each subtract four dock insets on their own and sat 16px inside the card on both sides, under subagent
+   rows that already matched it. The queue keeps its insets: it is a tab attached to the card's top edge. */
+.composerStack > :global([data-slot='conversation.input.dock']) :is(:global([data-slot='composer-row'][data-variant='card']), :global([data-goal-bar])) {
+  --dsh-composer-dock-inset: 0px;
+}
+
+/* An entry fades in where it lands; the seat is pinned to the floor, so the input never moves. */
+.composerStack > :global([data-slot='conversation.input.dock']) > * {
+  transition:
+    opacity var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease-out),
+    translate var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease-out);
+}
+
+@starting-style {
+  .composerStack > :global([data-slot='conversation.input.dock']) > * {
+    opacity: 0;
+    translate: 0 4px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .composerStack > :global([data-slot='conversation.input.dock']) > * {
+    transition: opacity var(--dshx-duration-fade, 120ms) linear;
+  }
+
+  @starting-style {
+    .composerStack > :global([data-slot='conversation.input.dock']) > * {
+      translate: none;
+    }
+  }
+}
+
 /* Common seat for the composer chain (fallback + elected overlay siblings). */
 .composerSeat {
   display: flex;
@@ -1023,8 +1056,10 @@ button.crumbEditable {
     display: none !important;
   }
 
+  /* A closed entry keeps a 10rem floor: a disclosure whose rows are all `w-full` has no content width of its own and
+     would otherwise shrink to its border. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > * {
-    flex: 0 1 auto;
+    flex: 1 1 10rem;
     width: auto;
     min-width: 0;
     max-width: 100%;
