@@ -95,6 +95,7 @@
     "@dshfiles/activity-timeline": "workspace:*",
     "@dshfiles/agents": "workspace:*",
     "@dshfiles/ai-accounts": "workspace:*",
+    "@dshfiles/background-jobs": "workspace:*",
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/command-palette": "workspace:*",
     "@dshfiles/frame-layout": "workspace:*",

@@ -8875,6 +8875,9 @@ importers:
       '@dshfiles/ai-accounts':
         specifier: workspace:*
         version: link:../ai-accounts
+      '@dshfiles/background-jobs':
+        specifier: workspace:*
+        version: link:../background-jobs
       '@dshfiles/chat':
         specifier: workspace:*
         version: link:../chat

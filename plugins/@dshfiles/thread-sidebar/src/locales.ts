@@ -7,6 +7,8 @@ export type ThreadSidebarLocaleKey = keyof typeof en
 
 const en = {
   subagentPreviewKind: 'Subagent',
+  threadSidebarRunningJobs_one: '1 job',
+  threadSidebarRunningJobs_other: '{count} jobs',
   subagentCount_one: '1 subagent',
   subagentCount_other: '{count} subagents',
   subagentsWorking_one: '1 subagent working',
@@ -607,6 +609,8 @@ const en = {
 
 const zh = {
   subagentPreviewKind: '子智能体',
+  threadSidebarRunningJobs_one: '{count} 个任务',
+  threadSidebarRunningJobs_other: '{count} 个任务',
   subagentCount_one: '{count} 个子智能体',
   subagentCount_other: '{count} 个子智能体',
   subagentsWorking_one: '{count} 个子智能体工作中',

@@ -215,6 +215,7 @@ import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMulti
 import { ThreadSelectionBar } from './thread-selection-bar.js'
 import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
 import { HeldUpdatesPill } from './held-updates-pill.js'
+import { RunningJobsModel } from './running-jobs.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
@@ -678,6 +679,8 @@ export interface ThreadRowProps {
   readonly projectMark?: boolean | undefined
   /** A running turn's start and current step, for the live activity line; undefined while the thread does not run. */
   readonly liveTurn?: LiveTurnView | undefined
+  /** Background jobs this thread runs now: a muted "1 job" chip, never Working (DESIGN.md R2). */
+  readonly runningJobs?: number | undefined
   /** Each child's own status, for the nested subagent rows under a status-grouped parent. */
   readonly childStatuses?: ReadonlyMap<SessionSummary['id'], ThreadStatus> | undefined
   /** The `@handle` of the agent that started the thread, else the agent preset it runs, shown as a muted chip. */
@@ -1464,6 +1467,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const leadSeat = workStatus !== undefined || rowStyle.statusDot
   const inlineVerb = workStatus?.verb
   const showAgent = workStatus !== undefined && props.agent !== undefined
+  const jobCount = props.runningJobs ?? 0
   // Why it needs you leads the second line, so the title keeps the first line to itself.
   const statusDetail =
     workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
@@ -1486,6 +1490,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     showPath ||
     childCount > 0 ||
     showAgent ||
+    jobCount > 0 ||
     statusDetail !== undefined
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.integrationQueuedAt !== undefined || (props.subscriberCount ?? 0) > 0
   // The inline verb has its own seat at the first line's trailing edge, where the time sits: on the second line it
@@ -1857,6 +1862,11 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     </span>
                   ) : null}
                   {ownWorkspace === undefined ? null : <OwnWorkspaceIndicator workspace={ownWorkspace} showState={liveStep === undefined} t={t} />}
+                  {jobCount === 0 ? null : (
+                    <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-muted-foreground" data-thread-jobs="">
+                      {plural(t, 'threadSidebarRunningJobs', jobCount)}
+                    </span>
+                  )}
                   {showAgent ? (
                     <span className="dshx:shrink-0 dshx:truncate dshx:max-w-[35%]" data-testid="thread-row-agent">
                       @{props.agent}
@@ -4098,6 +4108,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
   const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
   const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
+  // Background jobs per thread for the rows' muted chip; a job never makes its thread Working.
+  const runningJobs = RunningJobsModel.useCounts(sessionState.phase === 'ready')
   const transitionClock = useRef(ThreadStatusModel.createTransitionClock())
   const groupSettler = useRef(ThreadStatusModel.createGroupSettler())
   const threadViewAttentionEntries = useMemo(() => {
@@ -5935,6 +5947,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         // A project section's header already carries the mark; elsewhere every row leads with its project's mark.
         projectMark={threadView.groupBy !== 'project'}
         liveTurn={session.running ? liveTurns.get(session.id) : undefined}
+        runningJobs={runningJobs.get(session.id)}
         notifyTarget={
           !subscriptions.available || selectedSession === undefined || selectedSession.id === session.id
             ? undefined

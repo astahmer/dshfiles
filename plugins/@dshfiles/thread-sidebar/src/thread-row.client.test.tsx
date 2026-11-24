@@ -125,6 +125,21 @@ describe('a row that needs you', () => {
   })
 })
 
+describe('a thread that runs a background job', () => {
+  it('says so with a muted job chip and stays Idle, never Working', async () => {
+    const row = await renderRow({ runningJobs: 1, workStatus: rowStatus({ status: 'idle' }) })
+    const chip = row.querySelector('[data-thread-jobs]')
+    expect(chip?.textContent).toMatch(/threadSidebarRunningJobs/u)
+    expect(chip?.className).toContain('dshx:text-muted-foreground')
+    expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('idle')
+  })
+
+  it('shows no chip without a running job', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(row.querySelector('[data-thread-jobs]')).toBeNull()
+  })
+})
+
 describe('a subagent row under its parent', () => {
   it('is titled with the name the parent gave the subagent, not with the prompt it was sent', async () => {
     const child = rowSession({
