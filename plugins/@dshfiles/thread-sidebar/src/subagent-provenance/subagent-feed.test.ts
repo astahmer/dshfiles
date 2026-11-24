@@ -25,10 +25,18 @@ const source = (initial: readonly SessionEventLikeEntry[] = []) => {
 }
 
 describe('SubagentFeedModel', () => {
-  it('reads the child id from a delegation result only', () => {
-    expect(SubagentFeedModel.childIdOfResult('started subagent session-9')).toBe('session-9')
-    expect(SubagentFeedModel.childIdOfResult('Error: no route')).toBeUndefined()
-    expect(SubagentFeedModel.childIdOfResult(undefined)).toBeUndefined()
+  it('reads the child name from a delegation result only', () => {
+    expect(SubagentFeedModel.childNameOfResult('started subagent agent-1')).toBe('agent-1')
+    expect(SubagentFeedModel.childNameOfResult('Error: no route')).toBeUndefined()
+    expect(SubagentFeedModel.childNameOfResult(undefined)).toBeUndefined()
+  })
+
+  it('finds the child session behind that name in the parent catalog', () => {
+    const catalog = [{ id: 'session-9', name: 'agent-1' }, { id: 'session-8' }]
+    expect(SubagentFeedModel.childOf(catalog, 'agent-1')).toBe('session-9')
+    // An older result named the session itself.
+    expect(SubagentFeedModel.childOf(catalog, 'session-8')).toBe('session-8')
+    expect(SubagentFeedModel.childOf(catalog, undefined)).toBeUndefined()
   })
 
   it('follows the tool the child is in and counts its calls', () => {

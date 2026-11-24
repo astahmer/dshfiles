@@ -79,9 +79,19 @@ const foldEntry = (feed: SubagentFeed, entry: SessionEventLikeEntry): SubagentFe
 export const SubagentFeedModel = {
   empty: EMPTY,
 
-  /** The child session a settled delegation call started. */
-  childIdOfResult(text: string | undefined): string | undefined {
+  /** The name a settled delegation call gives its child: core answers `started subagent agent-1`, the child's handle. */
+  childNameOfResult(text: string | undefined): string | undefined {
     return text?.match(/^started subagent (\S+)$/)?.[1]
+  },
+
+  /**
+   * The child session behind that name, from the parent's catalog. The result names the handle, not the session, so
+   * reading it as a session id found no status and the row said Idle while the child worked. An older result that
+   * named the session itself still resolves.
+   */
+  childOf(catalog: readonly { readonly id: string; readonly name?: string }[] | undefined, name: string | undefined): string | undefined {
+    if (name === undefined) return undefined
+    return catalog?.find(entry => entry.name === name || entry.id === name)?.id ?? name
   },
 
   fold(feed: SubagentFeed, entries: readonly SessionEventLikeEntry[]): SubagentFeed {

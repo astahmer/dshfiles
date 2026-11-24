@@ -28,9 +28,13 @@ export const subagentRunFold = (input: { readonly t: SubagentPreviewTranslate; r
   order: 10,
   Icon: BotIcon,
   claims: call => SUBAGENT_TOOLS.has(call.toolName),
-  useStates: ({ calls, runtime }) => {
-    const children = calls.map(call => (call.phase === 'result' && !call.isError ? (SubagentFeedModel.childIdOfResult(call.resultText) ?? '') : ''))
-    const key = children.join(SEPARATOR)
+  useStates: ({ sessionId, calls, runtime }) => {
+    const names = calls.map(call => (call.phase === 'result' && !call.isError ? (SubagentFeedModel.childNameOfResult(call.resultText) ?? '') : ''))
+    const key = runtime.useSessions(list => {
+      const catalog = list.projectionsBySession[sessionId]?.values.subagentCatalog
+      return names.map(name => (name === '' ? '' : (SubagentFeedModel.childOf(catalog, name) ?? ''))).join(SEPARATOR)
+    })
+    const children = key.split(SEPARATOR)
     const live = runtime.useSessionStatus(statuses =>
       children
         .map(child => {

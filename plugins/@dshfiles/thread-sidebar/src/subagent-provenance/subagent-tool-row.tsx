@@ -46,7 +46,8 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const args = useMemo(() => callArguments(argsRaw), [argsRaw])
   const routeLabel = providerModelLabel(args?.provider, args?.model)
   const result = resultText(props)
-  const childId = props.phase === 'result' && !props.block.isError ? SubagentFeedModel.childIdOfResult(result) : undefined
+  const childName = props.phase === 'result' && !props.block.isError ? SubagentFeedModel.childNameOfResult(result) : undefined
+  const childId = props.useSessions(list => SubagentFeedModel.childOf(list.projectionsBySession[props.sessionId]?.values.subagentCatalog, childName))
   // The result only says the child started; the child's own state is what the row reports from here on.
   const output = childId === undefined ? result : undefined
   const running = props.useSessionStatus(statuses => (childId === undefined ? false : statuses.get(SessionId(childId))?.running === true))

@@ -83,7 +83,7 @@ const props = ({
   usePanelInfo: unused,
   useResource: unused,
   // SAFETY: the row reads only `byId` of the session list.
-  useSessions: selector => selector({ byId: {} } as never),
+  useSessions: selector => selector({ byId: {}, projectionsBySession: {} } as never),
   // SAFETY: an empty status map holds nothing to misread.
   useSessionStatus: selector => selector(new Map<string, never>() as never),
   useSessionRetainInfo: unused,
@@ -117,17 +117,24 @@ const settled = (input: {
   readonly lastTurnCompleted?: boolean
   readonly preview?: SubagentPreviewBindings
   readonly isError?: boolean
+  /** The result text; core names the child by its handle (`started subagent agent-1`). */
+  readonly resultText?: string
 }): Props => {
   const base = props({ provider: 'openai', model: 'gpt-6.1-luna', expanded: input.expanded ?? false })
   if (base.phase !== 'start') throw new Error('fixture starts from the start phase')
   // SAFETY: the row reads only these fields of a settled block.
   const block = {
     call: base.block,
-    content: [{ type: 'text', text: input.isError === true ? 'no route' : `started subagent ${CHILD}` }],
+    content: [{ type: 'text', text: input.isError === true ? 'no route' : (input.resultText ?? `started subagent ${CHILD}`) }],
     isError: input.isError === true,
   } as unknown as Extract<Props, { phase: 'result' }>['block']
   const statuses = new Map([[CHILD, { running: input.running === true }]])
-  const list = { byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted } } } } }
+  const list = {
+    byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted } } } },
+    projectionsBySession: {
+      'session-1': { values: { subagentCatalog: [{ id: CHILD, name: 'agent-1', mode: 'continuable', label: 'Long child', createdAt: 1 }] } },
+    },
+  }
   // SAFETY: `base` is the start-phase fixture; this swaps it to the result phase with the block built above.
   return {
     ...base,
@@ -185,6 +192,12 @@ describe('SubagentProvenanceToolRow', () => {
     expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
     rerender(<SubagentProvenanceToolRow {...settled({})} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('idle')
+  })
+
+  it('follows the child core names by its handle, through the parent catalog', () => {
+    // Core answers `started subagent agent-1`: the handle, not the session id, so the row read an unknown session as Idle.
+    render(<SubagentProvenanceToolRow {...settled({ running: true, resultText: 'started subagent agent-1' })} />)
+    expect(previewRoot()?.getAttribute('data-state')).toBe('working')
   })
 
   it('shows the failure of a call that started no child', () => {
