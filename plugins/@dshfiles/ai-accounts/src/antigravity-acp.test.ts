@@ -24,6 +24,48 @@ const { readFileSync, writeFileSync } = require('node:fs')
 const { join } = require('node:path')
 const { createInterface } = require('node:readline')
 const out = value => process.stdout.write(JSON.stringify(value) + '\\n')
+if (process.env.FAKE_AGY_RUNS) require('node:fs').appendFileSync(process.env.FAKE_AGY_RUNS, process.argv[2] + '\\n')
+if (process.argv.includes('/usage')) {
+  if ((process.env.HOME && process.env.HOME.includes('signed-out')) || process.env.FAKE_AGY_USAGE_SIGNED_OUT) {
+    process.stdout.write('Authentication required. Please visit the URL to log in:\\n')
+    setInterval(() => {}, 1000)
+    return
+  }
+  out({
+    conversation_id: '',
+    status: 'SUCCESS',
+    duration_seconds: 0,
+    num_turns: 0,
+    command: {
+      name: 'usage',
+      data: {
+        groups: [
+          {
+            name: 'Gemini Models',
+            buckets: [
+              { id: 'gemini-weekly', name: 'Weekly Limit Remaining', window: 'weekly', remaining_fraction: 0.42006, reset_time: '2026-11-28T13:22:19Z' },
+              { id: 'gemini-5h', name: 'Five Hour Limit Remaining', window: '5h', remaining_fraction: 0.7801, reset_time: '2026-11-23T17:36:55Z' },
+            ],
+          },
+          {
+            name: 'Claude and GPT models',
+            buckets: [
+              { id: '3p-weekly', name: 'Weekly Limit Remaining', window: 'weekly', remaining_fraction: 0.4909, reset_time: '2026-11-30T13:48:30Z' },
+              { id: '3p-5h', name: 'Five Hour Limit Remaining', window: '5h', remaining_fraction: 0, reset_time: '2026-11-23T18:48:30Z' },
+            ],
+          },
+          {
+            name: 'Gemini 4 Argon',
+            buckets: [
+              { id: 'gemini-argon-wtu-weekly', name: 'Gemini 4 Argon Weekly Limit', window: 'weekly', remaining_fraction: 1, reset_time: '2026-11-30T14:14:44Z' },
+            ],
+          },
+        ],
+      },
+    },
+  })
+  process.exit(0)
+}
 const update = (sessionId, value) => out({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: value } })
 if (process.env.FAKE_AGY_REPORT) writeFileSync(process.env.FAKE_AGY_REPORT, JSON.stringify({ argv: process.argv.slice(2), home: process.env.HOME, key: process.env.GEMINI_API_KEY ?? null }))
 if (process.env.FAKE_AGY_AGENT) writeFileSync(process.env.FAKE_AGY_AGENT, readFileSync(join(process.argv[process.argv.indexOf('--gemini-dir') + 1], 'config', 'agents', 'dsh.md'), 'utf8'))
@@ -103,6 +145,7 @@ const processes = AntigravityProcessesPromiseModel.facade(Context.get(processesC
 const directories: string[] = []
 const sessions: AntigravityAcpSessions[] = []
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await Promise.all(sessions.splice(0).map(session => session.dispose()))
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
@@ -346,4 +389,96 @@ it('fails a step whose plan is spent as a quota failure instead of waiting on ag
     ),
   ).rejects.toThrow(/^Antigravity quota exhausted: Google answers 429 RESOURCE_EXHAUSTED for this account's plan\./u)
   expect(cli.processCount).toBe(0)
+})
+
+it('reads live five-hour and weekly quota windows from agy /usage and attaches the account plan', async () => {
+  const executable = fakeAgy()
+  const card = await AntigravityAccountModel.readUsage({
+    describe: () => AntigravityAccountModel.probe({ home: '/synthetic/usage-home', processes, executable }),
+    readQuota: () => AntigravityAccountModel.probeUsage({ home: '/synthetic/usage-home', processes, executable }),
+  })
+  expect(card).toEqual({
+    status: 'ok',
+    message: null,
+    identity: null,
+    plan: 'Google AI Pro',
+    windows: [
+      { label: 'Gemini 5h', percentRemaining: 78, resetsAt: Date.parse('2026-11-23T17:36:55Z') },
+      { label: 'Gemini weekly', percentRemaining: 42, resetsAt: Date.parse('2026-11-28T13:22:19Z') },
+      { label: 'Claude / GPT 5h', percentRemaining: 0, resetsAt: Date.parse('2026-11-23T18:48:30Z') },
+      { label: 'Claude / GPT weekly', percentRemaining: 49.1, resetsAt: Date.parse('2026-11-30T13:48:30Z') },
+      { label: 'Gemini 4 Argon weekly', percentRemaining: 100, resetsAt: Date.parse('2026-11-30T14:14:44Z') },
+    ],
+    bankedResets: 0,
+    bankedResetExpiries: [],
+  })
+})
+
+it('stops agy /usage immediately as unauthenticated instead of waiting on interactive sign-in', async () => {
+  const reading = await AntigravityAccountModel.probeUsage({ home: '/synthetic/signed-out-usage', processes, executable: fakeAgy() })
+  expect(reading).toEqual({
+    status: 'unauthenticated',
+    detail: "Antigravity CLI is not signed in for this account. Run: HOME='/synthetic/signed-out-usage' agy acp --login",
+  })
+})
+
+const runLog = () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agy-runs-'))
+  directories.push(directory)
+  const file = join(directory, 'runs')
+  vi.stubEnv('FAKE_AGY_RUNS', file)
+  return {
+    runs: () =>
+      existsSync(file)
+        ? readFileSync(file, 'utf8')
+            .split('\n')
+            .filter(line => line !== '')
+        : [],
+  }
+}
+
+it('serves every quota read of one home from a single agy /usage run for a minute, and a caller giving up cancels only its own read', async () => {
+  const log = runLog()
+  const executable = fakeAgy()
+  const home = '/synthetic/shared-quota-home'
+  const now = Date.now()
+  const abandoned = new AbortController()
+  const [first, cancelled, second] = await Promise.all([
+    AntigravityAccountModel.readQuota({ home, processes, executable, now }),
+    AntigravityAccountModel.readQuota({ home, processes, executable, now, signal: abandoned.signal }),
+    (async () => {
+      abandoned.abort()
+      return AntigravityAccountModel.readQuota({ home, processes, executable, now })
+    })(),
+  ])
+  expect(first.status).toBe('ok')
+  expect(second).toBe(first)
+  expect(cancelled).toEqual({ status: 'error', detail: 'Antigravity usage read was cancelled.' })
+  expect(log.runs()).toEqual(['-p'])
+  await AntigravityAccountModel.readQuota({ home, processes, executable, now: now + 61_000 })
+  expect(log.runs()).toEqual(['-p', '-p'])
+  AntigravityAccountModel.forget(home)
+})
+
+it('reports a login that /usage finds signed out as unauthenticated, and forgets the signed-in description it contradicts', async () => {
+  const log = runLog()
+  const executable = fakeAgy()
+  const home = '/synthetic/expired-login-home'
+  const describe = () => AntigravityAccountModel.describe({ home, processes, executable })
+  expect((await describe()).signedIn).toBe(true)
+  vi.stubEnv('FAKE_AGY_USAGE_SIGNED_OUT', '1')
+  const onAuthenticated = vi.fn()
+  const card = await AntigravityAccountModel.readUsage({
+    describe,
+    readQuota: () => AntigravityAccountModel.readQuota({ home, processes, executable }),
+    onAuthenticated,
+  })
+  expect(card.status).toBe('unauthenticated')
+  expect(card.message).toBe("Antigravity CLI is not signed in for this account. Run: HOME='/synthetic/expired-login-home' agy acp --login")
+  expect(onAuthenticated).not.toHaveBeenCalled()
+  await vi.waitFor(async () => {
+    await describe()
+    expect(log.runs().filter(run => run === 'acp')).toHaveLength(2)
+  })
+  AntigravityAccountModel.forget(home)
 })
