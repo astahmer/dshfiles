@@ -5,6 +5,15 @@ const sources = readdirSync(new URL('.', import.meta.url))
   .filter(name => name.endsWith('.tsx') && !name.includes('.test.'))
   .map(name => ({ name, text: readFileSync(new URL(name, import.meta.url), 'utf8') }))
 
+describe('usage tooltips', () => {
+  it('opens no tooltip faster than the kit default (400 ms)', () => {
+    const fast = readdirSync(new URL('.', import.meta.url))
+      .filter(name => name.endsWith('.tsx') && !name.includes('.test.'))
+      .filter(name => [...readFileSync(new URL(name, new URL('.', import.meta.url)), 'utf8').matchAll(/delayDuration=\{(\d+)\}/gu)].some(match => Number(match[1]) < 400))
+    expect(fast).toEqual([])
+  })
+})
+
 describe('usage charts colour series by the data ramp (DESIGN.md › Colour roles 8)', () => {
   it('never paints a series from the status-hued chart palette', () => {
     const offenders = sources.filter(source => /--ts-chart-\d|dshx:bg-chart-\d/u.test(source.text)).map(source => source.name)

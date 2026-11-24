@@ -284,7 +284,7 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
   const label = items.length === 0 ? 'AI accounts usage' : `AI accounts usage. ${items.map(item => describeItem(item, now, usageWindowLayout)).join('. ')}`
 
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <Popover onOpenChange={setOpen} open={open}>
         <PopoverAnchor asChild>
           <div
@@ -487,7 +487,7 @@ export const QuotaFooter = (props: QuotaSurfaceProps & { readonly wide: boolean;
 }
 
 const AddAccountPreviewButton = (props: { readonly onClick: () => void }): JSX.Element => (
-  <TooltipProvider delayDuration={200}>
+  <TooltipProvider>
     <Tooltip>
       <TooltipTrigger asChild>
         <button

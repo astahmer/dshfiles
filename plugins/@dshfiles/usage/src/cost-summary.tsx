@@ -49,7 +49,7 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
           label={
             <>
               Cost (estimate)
-              <TooltipProvider delayDuration={300}>
+              <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button aria-label="About this estimate" className="dshx:inline-flex dshx:rounded-sm dshx:text-muted-foreground" type="button">

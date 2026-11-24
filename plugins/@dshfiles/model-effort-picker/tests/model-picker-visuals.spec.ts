@@ -1,3 +1,4 @@
+import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { ACCOUNT_HUES, accountColor } from '../src/account-color.js'
 import { EFFORT_BAR_COUNT, effortGlyph } from '../src/effort-levels.js'
@@ -23,6 +24,13 @@ describe('model brand marks', () => {
 })
 
 describe('composer model chip mark', () => {
+  it('opens no tooltip faster than the kit default (400 ms)', () => {
+    const fast = readdirSync(new URL('../src/', import.meta.url))
+      .filter(name => name.endsWith('.tsx') && !name.includes('.test.'))
+      .filter(name => [...readFileSync(new URL(name, new URL('../src/', import.meta.url)), 'utf8').matchAll(/delayDuration=\{(\d+)\}/gu)].some(match => Number(match[1]) < 400))
+    expect(fast).toEqual([])
+  })
+
   it('leads with the family mark of the model in use, read from its catalog name, and none for an unknown family', () => {
     const codex = { id: 'codex', name: 'Codex', models: [{ id: 'm-1', name: 'GPT-6 Luna' }] }
     expect(ModelPickerModel.triggerBrand({ groups: [codex], current: { provider: 'codex', model: 'm-1' } })).toBe('openai')

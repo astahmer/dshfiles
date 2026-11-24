@@ -58,6 +58,12 @@ const row = (profile: AccountProfile, selectedId: string | null, reading: typeof
 const dots = (markup: string): string[] => [...markup.matchAll(/data-health="([a-z]+)"/gu)].map(match => match[1] ?? '')
 
 describe('a healthy accounts page is quiet', () => {
+  it('opens no tooltip faster than the kit default (400 ms)', () => {
+    const fast = readdirSync(new URL('.', import.meta.url))
+      .filter(name => name.endsWith('.tsx') && !name.includes('.test.'))
+      .filter(name => [...readFileSync(new URL(name, new URL('.', import.meta.url)), 'utf8').matchAll(/delayDuration=\{(\d+)\}/gu)].some(match => Number(match[1]) < 400))
+    expect(fast).toEqual([])
+  })
   it('leaves every switch on the kit colour', () => {
     const sources = readdirSync(new URL('.', import.meta.url))
       .filter(name => name.endsWith('.tsx') && !name.includes('.test.'))

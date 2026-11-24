@@ -418,7 +418,7 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
     setRoot(current => (current === element ? current : element))
   }
   return (
-    <TooltipProvider delayDuration={300}>
+    <TooltipProvider>
       <Popover onOpenChange={setOpen} open={open}>
         <PopoverAnchor asChild>
           <span
