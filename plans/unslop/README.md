@@ -6,7 +6,7 @@ from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a
 are the draft PR astahmer/dshfiles#271 (branch `contribute/unslop-ui` on the tbrowang fork); nothing is landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** all 14 steps are done. Round two started 2026-11-24 after feedback that the monochrome changes
+**Resume here:** round one's 14 steps and round two's five lanes are done. Round two started 2026-11-24 after feedback that the monochrome changes
 were dull: bring purposeful colour back and make daily use smoother, without undoing upstream's coloured project
 chips (#287). See [Round two](#round-two). Round one's leftovers are under [Follow-ups](#follow-ups).
 
@@ -29,12 +29,18 @@ chips (#287). See [Round two](#round-two). Round one's leftovers are under [Foll
 | Kit (plugin-ui, ui-styles, DESIGN.md, ratchets) | role tokens, glyph colours, control-on, HealthDot, press feedback, tooltip delay | done: 8 revisions `wnspznrr` … `vksqztzz` |
 | Land (jj-integration, jujutsu, diffs-review, dialogs, test-runs, turn-summary) | phone Land, one confirmation, Landed in green, toasts, all-pass check | done: 7 revisions `qpmovqpy` … `qwpmrvxq`; the thread list's row verb still lands without asking (thread-sidebar); `/rebase` still takes about 55 s to show (needs a Host event) |
 | Threads (thread-sidebar, main-tabs, workbench, command-palette) | project colour in the list, palette colours, chip contrast, state tint, tap feedback, Ready mappings | done: 7 revisions `tlkumozk` … `swppzxss`, plus `ytomktxu` (guide catalog). Stopped and blocked turns are Idle, not Ready. The palette reads project colours through a new `PaletteProjectColors` registry (importing workspace-folder-picker would close a cycle). Not done: Dockview tab press feedback; date-grouped views keep the older configurable dot |
-| Land row verb (jj-integration, thread-sidebar) | the thread list's Land opens the confirmation; tooltip delays | running |
+| Land row verb (jj-integration, thread-sidebar) | the thread list's Land opens the confirmation; tooltip delays | done: `rslryxzr` (`ThreadHeaderLand.confirm`; without jj-integration the row opens the thread instead of landing), `rxkuzqno` |
 | Pages (ai-accounts, model-effort-picker, usage, multi-host, mcp-servers) | Connected dot, brand marks, model chip mark, chart palette, host and MCP health | done: 9 revisions `ysszptlz` … `mtnwtuxu`. New labels: "Sign-in expired" in red; an MCP server needing sign-in is amber, not the Needs-you diamond. The Inbox draws green only for finished or landable work. Not seen rendered: a connected host, a failed MCP server, a multi-series Usage chart |
 
 Also fixed while integrating: upstream's new project-names settings namespace had no Settings group (`tlksuovx`).
 The kit lane found states that map to Ready without being finished work (a stopped or blocked turn, a waiting
-restart notice); the threads and pages lanes remap them.
+restart notice); the threads and pages lanes remapped them.
+
+Round two's open follow-ups: `/rebase` takes about 55 s to show in the header (needs a Host event from
+jj-integration); two of upstream's project tones (rose) sit close to Failed red; Dockview tabs have no press
+feedback; date-grouped thread views keep the older configurable dot; `ChartFrame` still maps `--ts-chart-*` onto
+status hues; a passed connection-test step is still a muted check; `models-page-accounts.tsx` draws "Not signed
+in" with a red dot. Not seen rendered: a connected host, a failed MCP server, a multi-series Usage chart.
 
 ## Method and limits
 
