@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { namespaceLabelOf, type BundleLabel } from './bundle-labels.js'
 
 const english = (text: NonNullable<BundleLabel['title']>): string => (typeof text === 'string' ? text : text.en)
+const chinese = (text: NonNullable<BundleLabel['title']>): string => (typeof text === 'string' ? text : (text.zh ?? text.en))
 
 // Rows as the scratch Host reports them (2026-11-16): an owned plugin with a locale file, one without, and two DSH
 // core rows whose generated locale files only restate the row id and the package description.
@@ -54,6 +55,6 @@ describe('namespaceLabelOf', () => {
 
   it('drops the description of a row whose manifest only restates its id, in every language', () => {
     expect(namespaceLabelOf(coreRow, english).description).toBe('')
-    expect(namespaceLabelOf(coreRow, text => (typeof text === 'string' ? text : (text.zh ?? text.en))).description).toBe('')
+    expect(namespaceLabelOf(coreRow, chinese).description).toBe('')
   })
 })

@@ -41,19 +41,28 @@ interface Placement {
   readonly entry?: string
 }
 
+/** A merged entry's place and name. */
+interface MergedEntry {
+  readonly group: SettingsGroupId
+  readonly label: string
+  readonly order: number
+}
+
 /**
  * One task several plugins hold settings for: its members join one nav row instead of one row per plugin (audit
  * 2026-11-16: General listed 15 rows, of which Composer, Message queue and Prompt stash were one task). A merged entry
  * shows once a member is loaded, always under the task's name, so the row reads the same in every composition.
  */
-const MERGED_ENTRIES: Readonly<Record<string, { readonly group: SettingsGroupId; readonly label: string; readonly order: number }>> = {
-  layout: { group: 'general', label: 'Layout', order: 25 },
-  composer: { group: 'general', label: 'Composer', order: 30 },
-  transcript: { group: 'general', label: 'Transcript', order: 35 },
-  'web-access': { group: 'tools', label: 'Web search and fetch', order: 30 },
-  checks: { group: 'projects', label: 'Checks and tests', order: 30 },
-  diagnostics: { group: 'about', label: 'Diagnostics', order: 20 },
-}
+const MERGED_ENTRIES: ReadonlyMap<string, MergedEntry> = new Map(
+  Object.entries({
+    layout: { group: 'general', label: 'Layout', order: 25 },
+    composer: { group: 'general', label: 'Composer', order: 30 },
+    transcript: { group: 'general', label: 'Transcript', order: 35 },
+    'web-access': { group: 'tools', label: 'Web search and fetch', order: 30 },
+    checks: { group: 'projects', label: 'Checks and tests', order: 30 },
+    diagnostics: { group: 'about', label: 'Diagnostics', order: 20 },
+  } satisfies Record<string, MergedEntry>),
+)
 
 /** Native and plugin `settings.section` ids. */
 const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
@@ -351,7 +360,7 @@ const groupEntries = (input: {
   const entries = new Map<string, Draft>()
   /** The entry of one task several plugins share, created when its first member arrives. */
   const mergedEntry = (id: string): Draft | undefined => {
-    const merged = MERGED_ENTRIES[id]
+    const merged = MERGED_ENTRIES.get(id)
     if (merged === undefined) return undefined
     const existing = entries.get(id)
     if (existing !== undefined) return existing

@@ -133,20 +133,22 @@ const resolve = (walk: Walk, reference: JsonValue | undefined): SchemaNode | und
 }
 
 /** Words a sentence-cased label keeps in their own case. */
-const ACRONYMS: Readonly<Record<string, string>> = {
-  api: 'API',
-  cdp: 'CDP',
-  cpu: 'CPU',
-  dsh: 'DSH',
-  github: 'GitHub',
-  http: 'HTTP',
-  id: 'ID',
-  json: 'JSON',
-  mcp: 'MCP',
-  ram: 'RAM',
-  ui: 'UI',
-  url: 'URL',
-}
+const ACRONYMS: ReadonlyMap<string, string> = new Map(
+  Object.entries({
+    api: 'API',
+    cdp: 'CDP',
+    cpu: 'CPU',
+    dsh: 'DSH',
+    github: 'GitHub',
+    http: 'HTTP',
+    id: 'ID',
+    json: 'JSON',
+    mcp: 'MCP',
+    ram: 'RAM',
+    ui: 'UI',
+    url: 'URL',
+  }),
+)
 
 /** `maxTabs` → "Max tabs", `archive-undo` → "Archive undo", `baseURL` → "Base URL". */
 function humanizeKey(key: string): string {
@@ -156,7 +158,7 @@ function humanizeKey(key: string): string {
     .trim()
     .toLowerCase()
     .split(' ')
-    .map(word => ACRONYMS[word] ?? word)
+    .map(word => ACRONYMS.get(word) ?? word)
     .join(' ')
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
