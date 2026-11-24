@@ -116,6 +116,8 @@ const NO_UNREAD: ThreadRowProps['unreadSessionIds'] = new Set()
 
 export const rowProps = (overrides: Partial<ThreadRowProps> = {}): ThreadRowProps => ({
   session: rowSession(),
+  projectChipClassName: undefined,
+  projectChipColor: undefined,
   unread: false,
   autoSettleOverride: 'inherit',
   unreadSessionIds: NO_UNREAD,
