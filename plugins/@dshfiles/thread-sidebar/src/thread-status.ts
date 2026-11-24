@@ -169,14 +169,28 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
   return { status: 'idle', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt }
 }
 
-const plural = (count: number, one: string, many: string): string => `${count} ${count === 1 ? one : many}`
+/** The roll-up's detail lines, from the plugin's locale table (plural keys); this file stays pure and wordless. */
+export interface ThreadStatusCopy {
+  readonly subagentsNeedYou: (count: number) => string
+  readonly subagentsFailed: (count: number) => string
+  readonly waitingOnSubagents: (count: number) => string
+  readonly subagentsWorking: (count: number) => string
+}
+
+/** A row with no children never asks for a roll-up line. */
+const NO_ROLLUP: ThreadStatusCopy = {
+  subagentsNeedYou: () => '',
+  subagentsFailed: () => '',
+  waitingOnSubagents: () => '',
+  subagentsWorking: () => '',
+}
 
 /**
  * The row status of a thread with its subagents rolled up: a child that needs you or failed lifts the parent into
  * Needs you (with detail text naming how many), and a running child keeps an otherwise finished parent Working
- * ("waiting on 2 subagents").
+ * ("Waiting on 2 subagents").
  */
-const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus, 'group'>[] = []): ThreadStatus => {
+const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus, 'group'>[] = [], copy: ThreadStatusCopy = NO_ROLLUP): ThreadStatus => {
   const own = ownStatus(input)
   const waiting = children.filter(child => child.status === 'needs-you')
   const failed = children.filter(child => child.status === 'failed')
@@ -185,7 +199,7 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
   if (own.status !== 'needs-you' && own.status !== 'done' && waiting.length > 0) {
     rolled = {
       status: 'needs-you',
-      detail: `${plural(waiting.length, 'subagent needs', 'subagents need')} you`,
+      detail: copy.subagentsNeedYou(waiting.length),
       verb: waiting[0]?.verb,
       itemId: waiting[0]?.itemId,
       since: Math.max(...waiting.map(child => child.since)),
@@ -193,7 +207,7 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
   } else if (own.status !== 'needs-you' && own.status !== 'failed' && own.status !== 'done' && failed.length > 0) {
     rolled = {
       status: 'failed',
-      detail: `${plural(failed.length, 'subagent', 'subagents')} failed`,
+      detail: copy.subagentsFailed(failed.length),
       verb: failed[0]?.verb,
       itemId: failed[0]?.itemId,
       since: Math.max(...failed.map(child => child.since)),
@@ -201,13 +215,13 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
   } else if ((own.status === 'idle' || own.status === 'ready') && working.length > 0) {
     rolled = {
       status: 'working',
-      detail: `waiting on ${plural(working.length, 'subagent', 'subagents')}`,
+      detail: copy.waitingOnSubagents(working.length),
       verb: undefined,
       itemId: undefined,
       since: own.since,
     }
   } else if (own.status === 'working' && working.length > 0 && own.detail === undefined) {
-    rolled = { ...own, detail: `${plural(working.length, 'subagent', 'subagents')} working` }
+    rolled = { ...own, detail: copy.subagentsWorking(working.length) }
   }
   return { ...rolled, group: input.draft === true && !input.pinned ? 'draft' : groupOf(rolled.status, input.pinned) }
 }

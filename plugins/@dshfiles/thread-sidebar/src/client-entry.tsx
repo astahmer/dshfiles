@@ -20,7 +20,7 @@ import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type Transl
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { Changes, Command, createApiClient, defineClient, hasHostCommandRegistry, runHostCommand, useSettings } from '@dshfiles/dshx/client'
+import { Changes, Command, createApiClient, defineClient, hasHostCommandRegistry, plural, runHostCommand, useSettings } from '@dshfiles/dshx/client'
 import { ThreadHeaderLand } from '@dshfiles/jj-integration/thread-header-land'
 import { HeroSuggestionCards, type HeroSuggestionActions } from './hero-suggestions.js'
 import { DESTINATION_GO_KEYS, GO_DESTINATION_EVENT, SHOW_DESTINATION_EVENT } from './destination-shell.js'
@@ -943,7 +943,7 @@ export default defineClient({
     }
     // The header chip and its popover speak this plugin's words, never core's count beside an English word (C5).
     const subagentCatalogCopy: SubagentCatalogInjected['copy'] = {
-      count: count => translate(count === 1 ? 'subagentCountOne' : 'subagentCountOther', { count: String(count) }),
+      count: count => plural(translate, 'subagentCount', count),
       working: translate('subagentPreviewWorking'),
       done: translate('subagentPreviewFinished'),
       stopped: translate('subagentPreviewInterrupted'),
@@ -1002,8 +1002,7 @@ export default defineClient({
       },
       canOpenAside: childId => ctx.sessions.subagentAddress(SessionId(childId)) !== undefined,
     }
-    const subagentCopy = ctx.locale.bind(SUBAGENT_LOCALE_NAMESPACE)
-    const subagentCount = (count: number): string => subagentCopy(count === 1 ? 'count.total.one' : 'count.total.other', { count })
+    const subagentCount = (count: number): string => plural(translate, 'subagentCount', count)
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(
         { name: 'conversation.input.dock', id: 'thread-sidebar-subagents-live', order: 4, inject: sessionId => ({ sessionId }) },
@@ -1017,7 +1016,7 @@ export default defineClient({
               sessionId={props.sessionId}
               preview={subagentPreview}
               runCards={runCards}
-              count={subagentCount}
+              foldLabel={count => plural(translate, 'subagentsWorking', count)}
             />
           )
         }),

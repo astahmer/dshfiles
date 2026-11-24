@@ -6,8 +6,10 @@ import {
   FINISHED_TURN_SOURCE,
   THREAD_STATUS_GROUPS,
   ThreadStatusModel,
+  type ThreadStatusCopy,
   type ThreadStatusInput,
 } from './thread-status.js'
+import { threadSidebarDictionaries } from './locales.js'
 
 const NOW = 10_000_000_000
 
@@ -24,6 +26,16 @@ const input = (overrides: Partial<ThreadStatusInput> = {}): ThreadStatusInput =>
   now: NOW,
   ...overrides,
 })
+
+/** The English table's roll-up lines, as the client binds them with dshx's plural. */
+const en = threadSidebarDictionaries.en
+const pick = (one: string, other: string) => (count: number): string => (count === 1 ? one : other).replace('{count}', String(count))
+const COPY: ThreadStatusCopy = {
+  subagentsNeedYou: pick(en.threadSidebarSubagentsNeedYou_one, en.threadSidebarSubagentsNeedYou_other),
+  subagentsFailed: pick(en.threadSidebarSubagentsFailed_one, en.threadSidebarSubagentsFailed_other),
+  waitingOnSubagents: pick(en.threadSidebarWaitingOnSubagents_one, en.threadSidebarWaitingOnSubagents_other),
+  subagentsWorking: pick(en.subagentsWorking_one, en.subagentsWorking_other),
+}
 
 describe('thread status', () => {
   it('maps the plain states', () => {
@@ -145,9 +157,9 @@ describe('thread status', () => {
     const waitingChild = ThreadStatusModel.ownStatus(input({ labels: ['threadSidebarInputNeeded'] }))
     const failedChild = ThreadStatusModel.ownStatus(input({ inbox: { itemId: 'c', severity: 'failed', reason: 'x', verb: 'Retry', openedAt: NOW } }))
     const workingChild = ThreadStatusModel.ownStatus(input({ running: true }))
-    expect(ThreadStatusModel.statusOf(input(), [waitingChild, waitingChild])).toMatchObject({ status: 'needs-you', detail: '2 subagents need you' })
-    expect(ThreadStatusModel.statusOf(input({ running: true }), [failedChild])).toMatchObject({ status: 'failed', detail: '1 subagent failed', itemId: 'c' })
-    expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild])).toMatchObject({ status: 'working', detail: 'waiting on 1 subagent' })
+    expect(ThreadStatusModel.statusOf(input(), [waitingChild, waitingChild], COPY)).toMatchObject({ status: 'needs-you', detail: '2 subagents need you' })
+    expect(ThreadStatusModel.statusOf(input({ running: true }), [failedChild], COPY)).toMatchObject({ status: 'failed', detail: '1 subagent failed', itemId: 'c' })
+    expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild], COPY)).toMatchObject({ status: 'working', detail: 'Waiting on 1 subagent' })
     // A parent that already needs you keeps its own reason.
     expect(ThreadStatusModel.statusOf(input({ labels: ['threadSidebarApprovalNeeded'] }), [failedChild]).verb).toBe('Approve')
   })

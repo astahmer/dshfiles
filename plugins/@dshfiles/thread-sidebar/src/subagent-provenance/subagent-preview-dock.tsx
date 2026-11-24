@@ -109,7 +109,8 @@ export const SubagentPreviewDock = (
     readonly sessionId: string
     readonly preview: SubagentPreviewBindings
     readonly runCards: boolean
-    readonly count?: (count: number) => string
+    /** The fold row's one phrase, "4 subagents working", from this plugin's table: never a count beside a word from another. */
+    readonly foldLabel?: (count: number) => string
   },
 ): JSX.Element | null => {
   const parentId = SessionId(props.sessionId)
@@ -128,7 +129,6 @@ export const SubagentPreviewDock = (
   if (working === '') return null
   const list = working.split(ID_SEPARATOR)
   const folded = list.length > MAX_OPEN_ROWS
-  const count = props.count?.(list.length) ?? String(list.length)
   return (
     <div
       aria-label={props.preview.t('subagentPreviewDock')}
@@ -146,7 +146,7 @@ export const SubagentPreviewDock = (
         >
           <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', expanded && 'dshx:rotate-90')} />
           <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{`${count} ${subagentStateLabel(props.preview.t, 'working').toLocaleLowerCase()}`}</span>
+          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.foldLabel?.(list.length) ?? String(list.length)}</span>
           <StatusGlyph status="working" decorative />
         </button>
       ) : null}

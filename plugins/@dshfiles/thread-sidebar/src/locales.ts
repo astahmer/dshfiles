@@ -7,8 +7,16 @@ export type ThreadSidebarLocaleKey = keyof typeof en
 
 const en = {
   subagentPreviewKind: 'Subagent',
-  subagentCountOne: '1 subagent',
-  subagentCountOther: '{count} subagents',
+  subagentCount_one: '1 subagent',
+  subagentCount_other: '{count} subagents',
+  subagentsWorking_one: '1 subagent working',
+  subagentsWorking_other: '{count} subagents working',
+  threadSidebarSubagentsNeedYou_one: '1 subagent needs you',
+  threadSidebarSubagentsNeedYou_other: '{count} subagents need you',
+  threadSidebarSubagentsFailed_one: '1 subagent failed',
+  threadSidebarSubagentsFailed_other: '{count} subagents failed',
+  threadSidebarWaitingOnSubagents_one: 'Waiting on 1 subagent',
+  threadSidebarWaitingOnSubagents_other: 'Waiting on {count} subagents',
   subagentPreviewDock: 'Working subagents',
   subagentPreviewToggle: 'Show or hide the progress of {label}',
   subagentPreviewStarting: 'Working',
@@ -599,8 +607,16 @@ const en = {
 
 const zh = {
   subagentPreviewKind: '子智能体',
-  subagentCountOne: '1 个子智能体',
-  subagentCountOther: '{count} 个子智能体',
+  subagentCount_one: '{count} 个子智能体',
+  subagentCount_other: '{count} 个子智能体',
+  subagentsWorking_one: '{count} 个子智能体工作中',
+  subagentsWorking_other: '{count} 个子智能体工作中',
+  threadSidebarSubagentsNeedYou_one: '{count} 个子智能体需要你',
+  threadSidebarSubagentsNeedYou_other: '{count} 个子智能体需要你',
+  threadSidebarSubagentsFailed_one: '{count} 个子智能体失败',
+  threadSidebarSubagentsFailed_other: '{count} 个子智能体失败',
+  threadSidebarWaitingOnSubagents_one: '正在等待 {count} 个子智能体',
+  threadSidebarWaitingOnSubagents_other: '正在等待 {count} 个子智能体',
   subagentPreviewDock: '工作中的子智能体',
   subagentPreviewToggle: '显示或隐藏 {label} 的进度',
   subagentPreviewStarting: '工作中',
@@ -1191,5 +1207,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
     'thread-sidebar': keyof typeof en
   }
 }
+
+/** The raw tables, for tests that check what a language really says. */
+export const threadSidebarDictionaries = { en, zh } as const
 
 export const threadSidebarLocale = defineLocale(THREAD_SIDEBAR_LOCALE_NAMESPACE, { en, zh })

@@ -36,9 +36,9 @@ import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useInboxThreadSignals } from './inbox-signals.js'
-import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusGroup } from './thread-status.js'
+import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusCopy, type ThreadStatusGroup } from './thread-status.js'
 import { RowVerb } from './row-verb.js'
-import { useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
+import { plural, useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
 import { useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { ThreadRowActions, type ThreadRowActionTarget } from './thread-row-actions.js'
@@ -3973,6 +3973,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       operations: rows.map(row => ({ key: row.id, run: ({ signal }) => resumeAttentionSession(row.id, signal) })),
     })
   }
+  // The roll-up's detail lines in this plugin's words, one dictionary per line (C5).
+  const rollupCopy = useMemo(
+    (): ThreadStatusCopy => ({
+      subagentsNeedYou: count => plural(tSidebar, 'threadSidebarSubagentsNeedYou', count),
+      subagentsFailed: count => plural(tSidebar, 'threadSidebarSubagentsFailed', count),
+      waitingOnSubagents: count => plural(tSidebar, 'threadSidebarWaitingOnSubagents', count),
+      subagentsWorking: count => plural(tSidebar, 'subagentsWorking', count),
+    }),
+    [tSidebar],
+  )
   const childStatusById = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
     if (!statusGlyphs) return statuses
@@ -4037,6 +4047,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             now,
           },
           children,
+          rollupCopy,
         ),
       )
     }
@@ -4046,6 +4057,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     attention.records,
     attentionLabelsBySession,
     childStatusById,
+    rollupCopy,
     failedTurns,
     inbox.signals,
     jjThreadBySession,

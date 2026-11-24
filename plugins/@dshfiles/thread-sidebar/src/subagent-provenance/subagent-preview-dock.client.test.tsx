@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SubagentPreviewDock } from './subagent-preview-dock.js'
 import type { SubagentPreviewBindings } from './subagent-live-preview.js'
+import { threadSidebarDictionaries } from '../locales.js'
 
 afterEach(cleanup)
 
@@ -200,20 +201,29 @@ describe('SubagentPreviewDock', () => {
     expect(document.querySelector('[data-live-elapsed]')).toBeNull()
   })
 
+  it('says the fold in one phrase of its own table, so Chinese has no English word in it', () => {
+    // It joined core's translated count to the English "working": "Sous-agents 2 working".
+    const zh = threadSidebarDictionaries.zh.subagentsWorking_other
+    const foldLabel = (count: number): string => zh.replace('{count}', String(count))
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={foldLabel} />)
+    expect(fold()?.textContent).toBe('4 个子智能体工作中')
+    expect(fold()?.textContent).not.toMatch(/[A-Za-z]/u)
+  })
+
   it("shows up to three rows, folds four or more into one closed row, and keeps the reader's choice", () => {
     const count = (n: number): string => `${n} subagents`
-    const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'] })} count={count} />)
+    const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'] })} foldLabel={count} />)
     expect(fold()).toBeNull()
     expect(rows()).toHaveLength(3)
-    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} count={count} />)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={count} />)
     expect(fold()?.getAttribute('aria-expanded')).toBe('false')
     expect(rows()).toHaveLength(0)
     openFold()
     expect(rows()).toHaveLength(4)
-    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-b'] })} count={count} />)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-b'] })} foldLabel={count} />)
     expect(fold()).toBeNull()
     expect(rows()).toHaveLength(1)
-    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} count={count} />)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={count} />)
     expect(fold()?.getAttribute('aria-expanded')).toBe('true')
     expect(rows()).toHaveLength(4)
   })

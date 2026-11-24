@@ -95,7 +95,7 @@ hover-action strip opens to the left of that verb and never over it, so the visi
 group header offers **Resume all**: every row whose verb is Resume moves at once (three requests at a time), whether it
 stopped on a usage limit, on an interrupted turn or on a provider's own resumable item, and a mixed group still reports
 one combined result.
-Subagents stay nested one level under their parent and roll up into it ("2 subagents need you", "waiting on 1
+Subagents stay nested one level under their parent and roll up into it ("2 subagents need you", "Waiting on 1
 subagent"), so a parent never looks finished while a child waits or failed. **Group › Arrange manually** brings back
 the drag-to-arrange sections below; a saved view keeps whatever grouping it was saved with, so only a new profile
 starts on the status list. The row uses `StatusGlyph` rather than the whole `EntityRow`: the list row is also a
