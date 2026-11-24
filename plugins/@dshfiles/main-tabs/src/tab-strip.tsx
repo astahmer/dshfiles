@@ -363,7 +363,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         {closeButtonPosition === 'left' ? closeButton : null}
                         <span className="dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]">
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
-                          {tab.status === null ? null : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none" />}
+                          {tab.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? null : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : null}
                           {project === undefined ? null : (
                             <span
                               data-tab-project=""

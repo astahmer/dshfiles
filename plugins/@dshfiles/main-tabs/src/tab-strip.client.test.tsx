@@ -146,6 +146,20 @@ const openAsideFromMenu = async (): Promise<void> => {
 }
 
 describe('TabStrip layout', () => {
+  it('keeps a 16 px status seat on a thread tab whether or not it has a status, so the title never moves', () => {
+    // The glyph mounted only with a status, and the title moved 24 px each time a thread started or stopped (F13).
+    const idle = tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status: null } : tab))
+    const { unmount } = mount(undefined, undefined, idle)
+    const seat = (): Element | null => document.querySelector('[data-tab-status-slot]')
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(seat()?.childElementCount).toBe(0)
+    unmount()
+    mount()
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(seat()?.childElementCount).toBe(1)
+    expect(document.querySelectorAll('[data-tab-status-slot]')).toHaveLength(1)
+  })
+
   it('marks a preview tab with a muted title instead of italics', () => {
     mount(
       undefined,
