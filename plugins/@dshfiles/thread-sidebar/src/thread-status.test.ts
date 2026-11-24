@@ -209,3 +209,27 @@ describe('thread status', () => {
     expect(THREAD_STATUS_GROUPS.indexOf('draft')).toBe(THREAD_STATUS_GROUPS.indexOf('idle') + 1)
   })
 })
+
+describe('group settler', () => {
+  it('moves a row once its new group held for 600 ms, so a turn-end burst moves it once', () => {
+    let clock = 0
+    const settler = ThreadStatusModel.createGroupSettler(600, () => clock)
+    expect(settler.groupOf('a', 'working')).toBe('working')
+    // Working, Idle, Working, Ready within 300 ms: the row stays in Working.
+    for (const [at, group] of [[100, 'idle'], [200, 'working'], [300, 'ready']] as const) {
+      clock = at
+      expect(settler.groupOf('a', group)).toBe('working')
+    }
+    expect(settler.wakeAt()).toBe(900)
+    clock = 899
+    expect(settler.groupOf('a', 'ready')).toBe('working')
+    clock = 900
+    expect(settler.groupOf('a', 'ready')).toBe('ready')
+    expect(settler.wakeAt()).toBeUndefined()
+  })
+
+  it('seats a row it has not seen at once', () => {
+    const settler = ThreadStatusModel.createGroupSettler(600, () => 0)
+    expect(settler.groupOf('new', 'needs-you')).toBe('needs-you')
+  })
+})

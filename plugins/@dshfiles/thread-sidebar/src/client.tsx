@@ -214,6 +214,7 @@ import {
 import { createThreadMultiSelectionStore, useThreadMultiSelected, useThreadMultiSelectedIds, type ThreadMultiSelectionStore } from './thread-multi-selection.js'
 import { ThreadSelectionBar } from './thread-selection-bar.js'
 import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
+import { HeldUpdatesPill } from './held-updates-pill.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
@@ -4106,6 +4107,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
   const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
   const transitionClock = useRef(ThreadStatusModel.createTransitionClock())
+  const groupSettler = useRef(ThreadStatusModel.createGroupSettler())
   const threadViewAttentionEntries = useMemo(() => {
     // A tab's dot follows the dots its rows draw, and a row's dot shows only its own state: a child's label lights
     // the tab only in views that list that child.
@@ -4682,7 +4684,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             now,
           })
         const pinnedIndex = thread.kind === 'local' ? pinnedOrder.get(thread.session.id) : undefined
-        const statusEntry = { thread, status, cameBackAt: transitionClock.current(sessionId, status.group, status.since, now) }
+        // A turn-end burst moves the row once, after its new group held for a moment; its glyph updates at once.
+        const group = groupSettler.current.groupOf(sessionId, status.group)
+        const settled = group === status.group ? status : { ...status, group }
+        const statusEntry = { thread, status: settled, cameBackAt: transitionClock.current(sessionId, group, status.since, now) }
         return pinnedIndex === undefined ? statusEntry : { ...statusEntry, pinnedIndex }
       })
       return ThreadStatusModel.groupEntries(statusEntries).map(group => ({
@@ -4727,6 +4732,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     visibleThreadEntries,
     pinnedIdList,
   ])
+  // A row whose group change waits to settle moves once it held: look again then.
+  useEffect(() => {
+    const wakeAt = groupSettler.current.wakeAt()
+    if (wakeAt === undefined) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.max(0, wakeAt - Date.now()))
+    return () => clearTimeout(timer)
+  }, [liveGroupedThreadEntries])
   // While the pointer is over the list or focus is in it, rows hold their places (plan Q2 T2.2); see held-groups.ts.
   const [heldGroups, setHeldGroups] = useState<HeldGroups | null>(null)
   const holding = useRef({ hover: false, focus: false })
@@ -6982,7 +6994,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           data-shortcut-scope={isBoard ? undefined : 'list'}
           onPointerEnter={() => holdOrder('hover', true)}
           onPointerLeave={() => holdOrder('hover', false)}
-          onFocus={() => holdOrder('focus', true)}
+          onFocus={event => {
+            if (HeldGroupsModel.holdsOnFocus(event.target)) holdOrder('focus', true)
+          }}
           onBlur={event => {
             if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) holdOrder('focus', false)
           }}
@@ -6993,20 +7007,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             if (!isBoard) navigateThreadList(event.nativeEvent)
           }}
         >
-          {heldUpdates > 0 ? (
-            <div className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:justify-center dshx:py-1">
-              <Button
-                size="xs"
-                variant="outline"
-                data-held-updates=""
-                className="dshx:rounded-full dshx:bg-background dshx:tabular-nums dshx:shadow-s1"
-                aria-label={`${tSidebar('threadSidebarHeldUpdates', { count: heldUpdates })}. ${tSidebar('threadSidebarHeldUpdatesHint')}`}
-                onClick={showHeldUpdates}
-              >
-                {tSidebar('threadSidebarHeldUpdates', { count: heldUpdates })}
-              </Button>
-            </div>
-          ) : null}
+          {isBoard ? null : (
+            <HeldUpdatesPill
+              count={heldUpdates}
+              label={count => tSidebar('threadSidebarHeldUpdates', { count })}
+              hint={tSidebar('threadSidebarHeldUpdatesHint')}
+              onShow={showHeldUpdates}
+            />
+          )}
           {peekSession === undefined ? null : (
             <RowPeek anchor={peekAnchor} open onOpenChange={open => (open ? undefined : setPeekId(null))}>
               <PeekCard

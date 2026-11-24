@@ -270,6 +270,49 @@ const createTransitionClock = (): ((sessionId: string, group: ThreadStatusGroup,
   }
 }
 
+/** How long a row's new group must hold before the row moves there. */
+export const GROUP_SETTLE_MS = 600
+
+/**
+ * A row moves to another group only once its new group held for {@link GROUP_SETTLE_MS}: at a turn's end the status
+ * flips Working, Idle, Working, Ready within a few hundred milliseconds (five group changes in 800 ms measured, F3), and
+ * each flip moved the row under the pointer. A row seen for the first time takes its group at once; its glyph never
+ * waits, only its seat in the list.
+ */
+const createGroupSettler = (settleMs: number = GROUP_SETTLE_MS, clock: () => number = Date.now) => {
+  const rows = new Map<string, { readonly shown: ThreadStatusGroup; readonly pending: ThreadStatusGroup | undefined; readonly since: number }>()
+  return {
+    /** The group the row shows now, given the group its status asks for. */
+    groupOf(sessionId: string, live: ThreadStatusGroup): ThreadStatusGroup {
+      const now = clock()
+      const row = rows.get(sessionId)
+      if (row === undefined || row.shown === live) {
+        rows.set(sessionId, { shown: live, pending: undefined, since: now })
+        return live
+      }
+      if (row.pending !== live) {
+        rows.set(sessionId, { shown: row.shown, pending: live, since: now })
+        return row.shown
+      }
+      if (now - row.since >= settleMs) {
+        rows.set(sessionId, { shown: live, pending: undefined, since: now })
+        return live
+      }
+      return row.shown
+    },
+    /** When the earliest waiting move settles, so the list can look again; undefined when none waits. */
+    wakeAt(): number | undefined {
+      let earliest: number | undefined
+      for (const row of rows.values()) {
+        if (row.pending === undefined) continue
+        const at = row.since + settleMs
+        if (earliest === undefined || at < earliest) earliest = at
+      }
+      return earliest
+    },
+  }
+}
+
 /** The stopped finish a thread's attention record holds, unless the user marked it unread by hand. */
 const stoppedTurnOf = (
   record: { readonly finishedReason: string | null; readonly manuallyUnread: boolean } | undefined,
@@ -287,5 +330,6 @@ export class ThreadStatusModel {
   static readonly isCollapsed = isCollapsed
   static readonly toggle = toggle
   static readonly createTransitionClock = createTransitionClock
+  static readonly createGroupSettler = createGroupSettler
   static readonly isInlineVerb = (value: string): value is InlineVerb => INLINE_VERBS.some(verb => verb === value)
 }
