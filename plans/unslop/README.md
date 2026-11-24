@@ -28,7 +28,8 @@ chips (#287). See [Round two](#round-two). Round one's leftovers are under [Foll
 | --- | --- | --- |
 | Kit (plugin-ui, ui-styles, DESIGN.md, ratchets) | role tokens, glyph colours, control-on, HealthDot, press feedback, tooltip delay | done: 8 revisions `wnspznrr` … `vksqztzz` |
 | Land (jj-integration, jujutsu, diffs-review, dialogs, test-runs, turn-summary) | phone Land, one confirmation, Landed in green, toasts, all-pass check | done: 7 revisions `qpmovqpy` … `qwpmrvxq`; the thread list's row verb still lands without asking (thread-sidebar); `/rebase` still takes about 55 s to show (needs a Host event) |
-| Threads (thread-sidebar, main-tabs, workbench, command-palette) | project colour in the list, palette colours, chip contrast, state tint, tap feedback, Ready mappings | running |
+| Threads (thread-sidebar, main-tabs, workbench, command-palette) | project colour in the list, palette colours, chip contrast, state tint, tap feedback, Ready mappings | done: 7 revisions `tlkumozk` … `swppzxss`, plus `ytomktxu` (guide catalog). Stopped and blocked turns are Idle, not Ready. The palette reads project colours through a new `PaletteProjectColors` registry (importing workspace-folder-picker would close a cycle). Not done: Dockview tab press feedback; date-grouped views keep the older configurable dot |
+| Land row verb (jj-integration, thread-sidebar) | the thread list's Land opens the confirmation; tooltip delays | running |
 | Pages (ai-accounts, model-effort-picker, usage, multi-host, mcp-servers) | Connected dot, brand marks, model chip mark, chart palette, host and MCP health | running |
 
 Also fixed while integrating: upstream's new project-names settings namespace had no Settings group (`tlksuovx`).
