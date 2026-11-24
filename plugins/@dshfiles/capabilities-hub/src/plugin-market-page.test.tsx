@@ -54,6 +54,7 @@ describe('PluginMarketPanel', () => {
     expect(screen.getByText(/The community catalog is not installed in this profile\./u)).toBeTruthy()
     const actions = within(page).getAllByRole('button')
     expect(actions.map(button => button.textContent)).toEqual(['Open Plugins'])
+    // SAFETY: the assertion above pins exactly one button, so the first one exists.
     fireEvent.click(actions[0] as HTMLElement)
     expect(openPlugins).toHaveBeenCalledOnce()
     expect(requests).toEqual([])
