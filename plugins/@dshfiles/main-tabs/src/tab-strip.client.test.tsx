@@ -251,6 +251,27 @@ describe('TabStrip layout', () => {
     expect(within(thread).getByText('dshfiles')).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Workbench' }).querySelector('[data-tab-project]')).toBeNull()
   })
+
+  it('keeps a custom chip colour readable by clamping its text lightness in each scheme', () => {
+    render(
+      <TabStrip
+        tabs={tabs}
+        send={() => {}}
+        t={t}
+        newTabKeys=""
+        renameThread={async () => {}}
+        projectNames={new Map([['workspace-1', 'dshfiles']])}
+        projectChips={{ 'workspace-1': { color: '#ffd400' } }}
+      />,
+    )
+    const chip = within(screen.getByRole('tab', { name: 'dshfiles / Thread, Working' })).getByText('dshfiles')
+    expect(chip.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(chip.style.color).toBe('')
+    expect(chip.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
+    expect(chip.style.getPropertyValue('--chip-dark')).toBe('oklch(from var(--chip) max(l, 0.78) c h)')
+    expect(chip.className).toContain('dshx:text-(--chip-light)')
+    expect(chip.className).toContain('dshx:dark:text-(--chip-dark)')
+  })
 })
 
 describe('TabStrip thread actions', () => {

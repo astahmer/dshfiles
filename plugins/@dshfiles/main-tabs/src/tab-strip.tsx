@@ -45,9 +45,17 @@ interface TabStripProps {
 const projectChipStyle = (chip: { readonly color?: string } | undefined): CSSProperties | undefined => {
   if (chip === undefined) return undefined
   const style: CSSProperties = { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }
-  if (chip.color !== undefined) style.color = chip.color
+  // A custom pick rides as --chip; its text clamps the lightness so a pale or dark pick still reads in each scheme.
+  if (chip.color !== undefined)
+    Object.assign(style, {
+      '--chip': chip.color,
+      '--chip-light': 'oklch(from var(--chip) min(l, 0.52) c h)',
+      '--chip-dark': 'oklch(from var(--chip) max(l, 0.78) c h)',
+    })
   return style
 }
+
+const customChipText = 'dshx:text-(--chip-light) dshx:dark:text-(--chip-dark)'
 
 /** One glyph per thread tab, most urgent first: a question or approval waits, then work in progress, then a failed last turn, then an unseen finish. */
 export const threadTabStatus = (facts: {
@@ -348,7 +356,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                                 'dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none',
                                 projectChip === undefined
                                   ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
-                                  : cn('dshx:font-medium', projectChip.className),
+                                  : cn('dshx:font-medium', projectChip.className ?? (projectChip.color === undefined ? undefined : customChipText)),
                               )}
                               style={projectChipStyle(projectChip)}
                             >

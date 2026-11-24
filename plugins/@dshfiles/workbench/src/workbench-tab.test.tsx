@@ -144,6 +144,19 @@ describe('workbench semantic tab chrome', () => {
     expect(screen.getByText('NixConfig').className).toContain('project-tone-balanced-3')
   })
 
+  it('keeps a custom chip colour readable by clamping its text lightness in each scheme', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectChips: { 'workspace-a': { color: '#ffd400' } } })
+    tab.update({ workspaceId: 'workspace-a' })
+    const chip = screen.getByText('NixConfig')
+    // The pick rides as --chip; the text is the pick at L ≤ 0.52 in light and L ≥ 0.78 in dark, its tint follows the text.
+    expect(chip.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(chip.style.color).toBe('')
+    expect(chip.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
+    expect(chip.style.getPropertyValue('--chip-dark')).toBe('oklch(from var(--chip) max(l, 0.78) c h)')
+    expect(chip.className).toContain('dshx:text-(--chip-light)')
+    expect(chip.className).toContain('dshx:dark:text-(--chip-dark)')
+  })
+
   it('hides the project chip without a project name for the tab', () => {
     fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
     expect(document.querySelector('[data-workbench-tab-project]')).toBeNull()
