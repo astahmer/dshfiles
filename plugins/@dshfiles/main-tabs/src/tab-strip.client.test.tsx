@@ -173,6 +173,14 @@ describe('TabStrip layout', () => {
     expect(within(screen.getByRole('tab', { name: 'Thread, Working' })).queryByRole('button', { name: 'Close tab' })).toBeNull()
   })
 
+  it('keeps the close button visible on an inactive tab', () => {
+    render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} />)
+    const inactive = screen.getByRole('tab', { name: 'Workbench' })
+    const close = within(inactive).getByRole('button', { name: 'Close tab' })
+    expect(close.className).not.toContain('dshx:opacity-0')
+    expect(close.className).not.toContain('dshx:pointer-events-none')
+  })
+
   it('lets long tab titles shrink inside the capped tab width', () => {
     const longTitle = 'A conversation title that is much wider than the tab strip should allow'
     const longTabs = tabs.map(tab => (tab.id === 'thread:thread-1' ? { ...tab, title: longTitle } : tab))
@@ -205,10 +213,10 @@ describe('TabStrip layout', () => {
     }
   })
 
-  it('shows the project name before thread titles only', () => {
+  it('shows the project name as a chip before thread titles only', () => {
     render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={new Map([['workspace-1', 'dshfiles']])} />)
     const thread = screen.getByRole('tab', { name: 'dshfiles / Thread, Working' })
-    expect(within(thread).getByText('dshfiles /')).toBeTruthy()
+    expect(within(thread).getByText('dshfiles')).toBeTruthy()
     expect(screen.getByRole('tab', { name: 'Workbench' }).querySelector('[data-tab-project]')).toBeNull()
   })
 })

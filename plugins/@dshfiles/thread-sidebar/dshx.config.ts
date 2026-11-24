@@ -27,6 +27,8 @@ export default defineConfig({
     'fan-out-request': 'src/fan-out-request.ts',
     // Plugins that group by project resolve a thread workspace (custom threads directory included) to its project.
     'thread-directories': 'src/thread-directories.ts',
+    // The colour chosen when a project is imported, and the palette class it resolves to.
+    'project-colors': 'src/project-colors.ts',
   },
   build: { sourcemap: true, declarations: true, minify: true },
 })

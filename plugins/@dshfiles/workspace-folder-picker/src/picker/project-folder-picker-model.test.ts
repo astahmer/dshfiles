@@ -154,7 +154,10 @@ describe('project and folder selection', () => {
   it('wraps keyboard selection and handles an empty list', () => {
     expect(ProjectFolderPickerModel.movePickerSelection(1, 2, 'down')).toBe(0)
     expect(ProjectFolderPickerModel.movePickerSelection(0, 2, 'up')).toBe(1)
-    expect(ProjectFolderPickerModel.movePickerSelection(4, 0, 'down')).toBe(0)
+    expect(ProjectFolderPickerModel.movePickerSelection(4, 0, 'down')).toBe(-1)
+    // Nothing highlighted yet: the first arrow picks an end, it does not wrap past it.
+    expect(ProjectFolderPickerModel.movePickerSelection(-1, 3, 'down')).toBe(0)
+    expect(ProjectFolderPickerModel.movePickerSelection(-1, 3, 'up')).toBe(2)
   })
 
   it('keeps project identity and canonical folder path explicit', () => {
@@ -235,5 +238,30 @@ describe('project and folder selection', () => {
   it('offers Recents and Workspaces scopes only when they have folders', () => {
     expect(ProjectFolderPickerModel.availableTabs({ projects, recentFolders: [] })).toEqual(['all', 'projects'])
     expect(ProjectFolderPickerModel.availableTabs({ projects: allProjects, recentFolders })).toEqual(['all', 'projects', 'recents', 'workspaces'])
+  })
+  it('walks up one folder from the crumbs, else from the path itself', () => {
+    expect(
+      ProjectFolderPickerModel.parentDirectoryPath({
+        path: '/Users/me/dev/dshfiles',
+        crumbs: [
+          { path: '/', name: '/', hidden: false },
+          { path: '/Users/me', name: 'me', hidden: false },
+          { path: '/Users/me/dev', name: 'dev', hidden: false },
+          { path: '/Users/me/dev/dshfiles', name: 'dshfiles', hidden: false },
+        ],
+      }),
+    ).toBe('/Users/me/dev')
+    expect(ProjectFolderPickerModel.parentDirectoryPath({ path: '/Users/me/dev', crumbs: [] })).toBe('/Users/me')
+    expect(ProjectFolderPickerModel.parentDirectoryPath({ path: '/', crumbs: [] })).toBeNull()
+    expect(ProjectFolderPickerModel.parentDirectoryPath({ path: 'C:\\work\\project', crumbs: [] })).toBe('C:\\work')
+  })
+
+  it('keeps the current folder in the crumb row even when it is a hidden folder', () => {
+    const crumbs = [
+      { path: '/', name: '/', hidden: false },
+      { path: '/Users/me/.config', name: '.config', hidden: true },
+      { path: '/Users/me/.config/ghostty', name: 'ghostty', hidden: true },
+    ]
+    expect(ProjectFolderPickerModel.visibleCrumbs(crumbs).map(crumb => crumb.name)).toEqual(['/', 'ghostty'])
   })
 })

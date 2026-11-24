@@ -457,12 +457,18 @@ const readQuotaResetAt = async (ctx: Context, store: AccountStorePromise, accoun
   const account = file.accounts.find(profile => profile.instanceId === accountId)
   if (account === undefined) return null
   return knownQuotaResetAt(
-    await readAccountUsage({
-      account,
-      shadowRoot: file.shadowRoot,
-      resolveCredential: resolveKeyFromContext(ctx),
-      readCopilotCredential: createCopilotCredentialsService(ctx.get('credentials')).read,
-      describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+    await boundedUsageRead({
+      read: signal =>
+        readAccountUsage({
+          account,
+          shadowRoot: file.shadowRoot,
+          resolveCredential: resolveKeyFromContext(ctx),
+          readCopilotCredential: createCopilotCredentialsService(ctx.get('credentials')).read,
+          describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+          readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
+          signal,
+        }),
+      timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
     }),
     Date.now(),
   )
@@ -498,6 +504,7 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
               resolveCredential,
               readCopilotCredential,
               describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+              readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
               signal: readSignal,
             }),
           timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,

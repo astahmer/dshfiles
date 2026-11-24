@@ -68,6 +68,10 @@
     "./thread-directories": {
       "types": "./src/thread-directories.ts",
       "default": "./dist/thread-directories.js"
+    },
+    "./project-colors": {
+      "types": "./src/project-colors.ts",
+      "default": "./dist/project-colors.js"
     }
   },
   "scripts": {

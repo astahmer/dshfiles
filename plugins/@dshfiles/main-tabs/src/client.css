@@ -2,3 +2,13 @@
   outline: 2px solid var(--dsw-alias-brand-primary);
   outline-offset: 2px;
 }
+
+/* One tab chrome for both surfaces: the selected tab sits on the content background, the others stay one tint
+ * above it, and a hairline divides them (Zed's flat tab strip). Derived from the label colour so the same
+ * mix reads on the light and the dark palette. */
+[data-dshfiles-main-tabs] {
+  --dsh-main-tab-bg: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-base));
+  --dsh-main-tab-bg-hover: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base));
+  --dsh-main-tab-chip: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+  --dsh-main-tab-divider: var(--dsw-alias-border-l3);
+}

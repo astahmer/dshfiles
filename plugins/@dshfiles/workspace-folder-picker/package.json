@@ -40,6 +40,14 @@
       "types": "./src/project-config.ts",
       "default": "./dist/project-config.js"
     },
+    "./project-tone": {
+      "types": "./src/project-tone.ts",
+      "default": "./dist/project-tone.js"
+    },
+    "./settings": {
+      "types": "./src/settings.ts",
+      "default": "./dist/settings.js"
+    },
     "./project-settings-panels": {
       "types": "./src/project-settings-panels.ts",
       "default": "./dist/project-settings-panels.js"
@@ -55,6 +63,18 @@
     "./project-add-flow": {
       "types": "./src/project-add-flow.ts",
       "default": "./dist/project-add-flow.js"
+    },
+    "./project-create-dialog": {
+      "types": "./src/project-create-dialog.tsx",
+      "default": "./dist/project-create-dialog.js"
+    },
+    "./project-clone-dialog": {
+      "types": "./src/project-clone-dialog.tsx",
+      "default": "./dist/project-clone-dialog.js"
+    },
+    "./project-name": {
+      "types": "./src/project-name.ts",
+      "default": "./dist/project-name.js"
     }
   },
   "scripts": {
@@ -133,7 +153,8 @@
         "@deepseek-ai/dsh-client-ui-workspace",
         "@deepseek-ai/dsh-api-gateway",
         "@deepseek-ai/dsh-api-remotes",
-        "@deepseek-ai/dsh-api-workspace-controller"
+        "@deepseek-ai/dsh-api-workspace-controller",
+        "@deepseek-ai/dsh-client-ui-settings"
       ],
       "external": [
         "@dshfiles/shared-runtime"

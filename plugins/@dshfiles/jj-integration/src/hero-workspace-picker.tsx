@@ -9,8 +9,14 @@ import {
   type RegisteredProject,
   type WorkspacePickerPorts,
 } from '@dshfiles/workspace-folder-picker/picker'
-import { useApi } from '@dshfiles/dshx/client'
+import { useApi, useSettings } from '@dshfiles/dshx/client'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { FolderOpenIcon, FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { ProjectFolderSetup } from '@dshfiles/workspace-folder-picker/project-folder-setup'
+import { ProjectCloneDialog } from '@dshfiles/workspace-folder-picker/project-clone-dialog'
+import { ProjectCreateDialog } from '@dshfiles/workspace-folder-picker/project-create-dialog'
+import { ProjectTone, type ProjectColorChoice } from '@dshfiles/workspace-folder-picker/project-tone'
+import { workspaceFolderPickerSettings } from '@dshfiles/workspace-folder-picker/settings'
 import { workspaceFolderBrowserApi } from '@dshfiles/workspace-folder-picker/directory-browser-api'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
 import {
@@ -21,7 +27,7 @@ import {
   shouldBootstrapRemoteSession,
   type ShownSession,
 } from '@dshfiles/multi-host/destination'
-import { useCallback, useLayoutEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { jjIntegrationApi } from './api.js'
 import { DestinationBar, HostChipSlot, type DestinationBarServices, type WorkspaceToggleActor } from './destination-bar.js'
 import type { JjIntegrationTranslate } from './locales.js'
@@ -68,6 +74,17 @@ export const HeroWorkspacePicker = (
   const destination = hostDestination.useValue()
   const [remotePickerOpen, setRemotePickerOpen] = useState(false)
   const [inspecting, setInspecting] = useState<string | null>(null)
+  // Adding a project from this picker: the same three routes the directory flow offers, on the surface the composer
+  // actually opens (jj-integration replaces the native New-thread project picker).
+  const [addDialog, setAddDialog] = useState<'create' | 'clone' | null>(null)
+  const pickRequest = useRef<AbortController | null>(null)
+  const toneSettings = useSettings(workspaceFolderPickerSettings)
+  const projectTools = useQuery({
+    queryKey: ['workspace-folder-picker', 'project-tools'],
+    queryFn: () => lifecycleApi.tools({}),
+    retry: false,
+    staleTime: 60_000,
+  })
   const directory = useQuery({ ...multiHostQueries.directory(multiHost), enabled: destination.kind === 'runtime' })
   const shownSessionId = useSyncExternalStore(
     useCallback((listener: () => void) => services.shownSessionId.subscribe(listener), [services]),
@@ -214,34 +231,70 @@ export const HeroWorkspacePicker = (
     props.onPick(workspaceId as Parameters<EmptyWorkspaceOwnerProps['onPick']>[0])
   }
 
+  /** The colour chosen in the setup/create/clone dialog outlives it, and the project is adopted straight away. */
+  const adoptWithColor = (path: string, choice: ProjectColorChoice): void => {
+    void toneSettings.set('projectColors', ProjectTone.upsertColor(toneSettings.value?.projectColors ?? [], path, choice)).catch(() => undefined)
+    setAddDialog(null)
+    setInspecting(null)
+    void choose({ kind: 'directory', canonicalPath: path, title: ProjectTone.projectFolderName(path) }).catch(() => props.onClose())
+  }
+
+  const pickExistingFolder = (): void => {
+    pickRequest.current?.abort()
+    const controller = new AbortController()
+    pickRequest.current = controller
+    void props.ports.directoryPicker
+      .pick(controller.signal)
+      .then(path => {
+        if (path !== null) setInspecting(path)
+      })
+      .catch(() => undefined)
+  }
+
+  const addActions = (
+    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+      {pickerCapabilities.data?.nativePicker === true ? (
+        <Button className="dshx:shrink-0" onClick={pickExistingFolder} size="sm" type="button" variant="outline">
+          <FolderOpenIcon aria-hidden />
+          Add folder…
+        </Button>
+      ) : null}
+      <Button
+        className="dshx:shrink-0"
+        disabled={projectTools.data?.jj !== true}
+        onClick={() => setAddDialog('create')}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <FolderPlusIcon aria-hidden />
+        Create project…
+      </Button>
+      <Button
+        className="dshx:shrink-0"
+        disabled={projectTools.data?.git !== true}
+        onClick={() => setAddDialog('clone')}
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <GitBranchIcon aria-hidden />
+        Clone repository…
+      </Button>
+    </div>
+  )
+
   return (
     <>
       {bar}
-      {inspecting === null ? null : (
-        <ProjectFolderSetup
-          api={lifecycleApi}
-          path={inspecting}
-          onAdded={path => {
-            setInspecting(null)
-            void choose({
-              kind: 'directory',
-              canonicalPath: path,
-              title:
-                path
-                  .split(/[/\\]/u)
-                  .filter(part => part.length > 0)
-                  .at(-1) ?? path,
-            })
-          }}
-          onClose={() => setInspecting(null)}
-        />
-      )}
-      {inspecting === null ? (
+      {inspecting === null ? null : <ProjectFolderSetup api={lifecycleApi} path={inspecting} onAdded={adoptWithColor} onClose={() => setInspecting(null)} />}
+      {inspecting === null && addDialog === null ? (
         <ProjectFolderPicker
           projects={registered}
           recentFolders={recentFolders}
           pinnedWorkspaceIds={pinnedWorkspaceIds}
           directoryPicker={directoryPicker}
+          headerActions={addActions}
           onRegisterWorkspace={async path => {
             const project = await props.ports.registerWorkspace(path)
             await projects.refetch()
@@ -256,12 +309,28 @@ export const HeroWorkspacePicker = (
             selection.kind === 'workspace' ? void choose(selection).catch(() => props.onClose()) : setInspecting(selection.canonicalPath)
           }
           onClose={props.onClose}
-          showNativePicker={pickerCapabilities.data?.nativePicker === true}
+          showNativePicker={false}
           pathStyle={pickerCapabilities.data?.pathStyle}
           disabled={projects.isLoading}
           loading={projects.isLoading}
           heading={props.t('chooseProject')}
         />
+      ) : null}
+      {addDialog === 'create' ? (
+        <ProjectCreateDialog
+          api={lifecycleApi}
+          defaultParent={toneSettings.value?.projectParent}
+          gitHubAvailable={projectTools.data?.gh === true}
+          home={projectTools.data?.home}
+          onClose={() => setAddDialog(null)}
+          onCreated={adoptWithColor}
+          onRememberParent={parent => {
+            void toneSettings.set('projectParent', parent.trim()).catch(() => undefined)
+          }}
+        />
+      ) : null}
+      {addDialog === 'clone' ? (
+        <ProjectCloneDialog api={lifecycleApi} home={projectTools.data?.home} onClose={() => setAddDialog(null)} onCloned={adoptWithColor} />
       ) : null}
     </>
   )
