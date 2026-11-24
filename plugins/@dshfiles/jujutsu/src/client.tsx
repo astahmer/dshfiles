@@ -237,6 +237,9 @@ const formatAge = (value: string): string => {
   return age.unit === 'now' ? 'now' : `${age.n}${RELATIVE_TIME_SUFFIX[age.unit]}`
 }
 
+/** When a revision last changed, relative to the clock as the detail line renders, like formatAge. */
+const revisionChangedNow = (revision: Revision, editedAt: string | undefined) => RevisionTime.lastChanged(revision, editedAt, Date.now())
+
 const dayLabel = (value: string): string => {
   const time = Date.parse(value)
   return Number.isFinite(time)
@@ -1342,6 +1345,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
     const describeText = describeDrafts[revision.commitId] ?? editableDescription(revision.description)
     const describeChanged = RevisionGraphModel.describeDraftChanged(describeText, revision.description)
     const editing = editingDescription === revision.commitId && !revision.immutable
+    const changed = revisionChangedNow(revision, editTimes.get(revision.commitId))
     return (
       <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:py-2 dshx:pr-3 dshx:text-xs">
         {revision.description.trim().length > 0 && !editing && (
@@ -1353,8 +1357,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
           {/* A2 #37 (unslop): one relative time; the three absolute timestamps are the tooltip's. */}
           <Tooltip>
             <TooltipTrigger asChild>
-              <time data-revision-time="" dateTime={RevisionTime.lastChanged(revision, editTimes.get(revision.commitId), Date.now()).dateTime} tabIndex={0}>
-                {RevisionTime.lastChanged(revision, editTimes.get(revision.commitId), Date.now()).text}
+              <time data-revision-time="" dateTime={changed.dateTime} tabIndex={0}>
+                {changed.text}
               </time>
             </TooltipTrigger>
             <TooltipContent className="dshx:whitespace-pre-line" side="bottom">

@@ -50,22 +50,27 @@ import { ChangesPill, ComposerChips, ProjectChangesSection, type ComposerJujutsu
 
 vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
 
-const store = <Snapshot,>(snapshot: Snapshot) => ({ list: { subscribe: () => () => undefined, getSnapshot: () => snapshot } })
+const store = <Snapshot,>(snapshot: Snapshot): never =>
+  // SAFETY: the pill reads only a list store's snapshot and subscription, and this fake carries both.
+  ({ list: { subscribe: () => () => undefined, getSnapshot: () => snapshot } }) as never
 
-const services = (cwd: string, review: ComposerJujutsuServices['openWorkspaceReview']): ComposerJujutsuServices =>
-  ({
-    sessions: store({ byId: { 'session-1': { id: 'session-1', cwd, blank: false } } }),
-    workspaces: store({
-      items: [
-        { workspaceId: 'workspace-project', title: 'sample', path: '/work/sample', sessionIds: cwd === '/work/sample' ? ['session-1'] : [] },
-        { workspaceId: 'workspace-thread', title: 'thread-31057e', path: '/work/sample-threads/thread-31057e', sessionIds: cwd === '/work/sample' ? [] : ['session-1'] },
-      ],
-    }),
-    toggleJujutsu: () => undefined,
-    openWorkspaceReview: review,
-    openJujutsuReference: () => undefined,
-    // SAFETY: the pill reads only the two list stores above.
-  }) as never as ComposerJujutsuServices
+const services = (cwd: string, review: ComposerJujutsuServices['openWorkspaceReview']): ComposerJujutsuServices => ({
+  sessions: store({ byId: { 'session-1': { id: 'session-1', cwd, blank: false } } }),
+  workspaces: store({
+    items: [
+      { workspaceId: 'workspace-project', title: 'sample', path: '/work/sample', sessionIds: cwd === '/work/sample' ? ['session-1'] : [] },
+      {
+        workspaceId: 'workspace-thread',
+        title: 'thread-31057e',
+        path: '/work/sample-threads/thread-31057e',
+        sessionIds: cwd === '/work/sample' ? [] : ['session-1'],
+      },
+    ],
+  }),
+  toggleJujutsu: () => undefined,
+  openWorkspaceReview: review,
+  openJujutsuReference: () => undefined,
+})
 
 let root: Root | undefined
 let container: HTMLElement | undefined
@@ -160,7 +165,9 @@ describe('Changes pill at the end of a turn', () => {
     const base = services('/work/sample-threads/thread-31057e', () => true)
     const listeners = new Set<() => void>()
     let byId = { 'session-1': { id: 'session-1', cwd: '/work/sample-threads/thread-31057e', blank: false, running: true } }
-    const sessions = { list: { subscribe: (listener: () => void) => (listeners.add(listener), () => listeners.delete(listener)), getSnapshot: () => ({ byId }) } }
+    const sessions = {
+      list: { subscribe: (listener: () => void) => (listeners.add(listener), () => listeners.delete(listener)), getSnapshot: () => ({ byId }) },
+    }
     const view = await mount(<ChangesPill sessionId={'session-1' as never} jujutsu={{ ...base, sessions } as never} />)
     expect(view.querySelector('[data-changes-pill]')).toBeNull()
     const readsWhileRunning = host.reads

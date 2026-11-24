@@ -54,17 +54,15 @@ const locationLabel = (input: {
 }): string => {
   const counts = input.counts ?? undefined
   const ahead = counts === undefined || counts.ahead === 0 ? '' : `${String(counts.ahead)} `
-  const stand =
-    input.bookmark === undefined
-      ? undefined
-      : input.onBookmark
-        ? `on ${input.bookmark}`
-        : input.ownWorkspace
-          ? undefined
-          : `${ahead}ahead of ${input.bookmark}`
+  const stand = (): string | undefined => {
+    if (input.bookmark === undefined) return undefined
+    if (input.onBookmark) return `on ${input.bookmark}`
+    if (input.ownWorkspace) return undefined
+    return `${ahead}ahead of ${input.bookmark}`
+  }
   return [
     input.ownWorkspace ? 'Own workspace' : 'In the project',
-    stand,
+    stand(),
     counts === undefined || counts.behind === 0 ? undefined : `${String(counts.behind)} behind`,
   ]
     .filter((value): value is string => value !== undefined)
