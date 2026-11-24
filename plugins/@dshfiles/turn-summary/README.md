@@ -13,7 +13,7 @@ A footer under each finished turn that says what the agent did with tools:
   the Host has addressed the turn's changes). Four chips show, the rest fold into `+N more`, which opens the
   walkthrough. With the walkthrough setting off, the footer falls back to the `Edited 3 files +42 −7 ›` count, whose
   list opens each file in the editor.
-- **Commands** open every command (its description, or the first line of the command) with how it ended.
+- **Commands** open every command (its description, or the first line of the command) with how it ended. In the owned Chat each command is a button: it unfolds the turn, opens that call's card and scrolls it to the top, so a command's output stays one click away after the turn folds (it asks Chat through `@dshfiles/chat/chat-focus` with `open: true`).
 - **Tests** are the outcome of the last Vitest, Jest or pytest summary a command printed in the turn: "2 of 42 tests failed" in red, else "40 tests passed" in plain ink. Failed tests are the line's one red part: it opens every failed command, so no second failure count stands beside it. Without failed tests, failed commands get their own red part ("1 command failed").
 - **Nothing twice, nothing empty.** Calls that are neither a command, an edit, a read nor a search get no part (no "1 other tool call"), a turn under a second shows no duration, and a turn with nothing to name gets no line. A wrapped line never starts with a separator, and no separator follows a chevron.
 - The red **failure count** opens the failed commands and how each ended: `exit 1`, `signal SIGKILL`, `no exit code`, or `error` when the tool rejected the call.

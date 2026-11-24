@@ -1,4 +1,5 @@
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { ChatFocusModel, type ChatTurnTailExtras } from '@dshfiles/chat/chat-focus'
 import { useSettings } from '@dshfiles/dshx/client'
 import { ChevronDownIcon, ChevronRightIcon, CircleCheckIcon, CircleXIcon, FileIcon, ListChecksIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -45,7 +46,16 @@ const FileList = (props: { readonly summary: TurnActivitySummary; readonly openF
   </ul>
 )
 
-const CommandList = (props: { readonly summary: TurnActivitySummary; readonly onlyFailed: boolean }): JSX.Element => {
+/**
+ * The commands a Turn ran. With `openCall` (a transcript that can open its own rows), each command is a button that
+ * unfolds the Turn and opens the call's card, so a command's output stays one click away after the Turn folds.
+ */
+export const CommandList = (props: {
+  readonly summary: TurnActivitySummary
+  readonly onlyFailed: boolean
+  readonly openCall?: ((callId: string) => void) | undefined
+}): JSX.Element => {
+  const openCall = props.openCall
   const rows = props.onlyFailed ? props.summary.failedCommands : props.summary.commandRuns
   return (
     <ul aria-label={props.onlyFailed ? 'Failed commands' : 'Commands'} className="dshx:flex dshx:flex-col dshx:gap-0.5 dshx:pl-5">
@@ -58,7 +68,18 @@ const CommandList = (props: { readonly summary: TurnActivitySummary; readonly on
             ) : (
               <CircleCheckIcon aria-hidden className="dshx:size-3 dshx:shrink-0" />
             )}
-            <span className="dshx:min-w-0 dshx:truncate dshx:font-mono">{row.label}</span>
+            {openCall === undefined ? (
+              <span className="dshx:min-w-0 dshx:truncate dshx:font-mono">{row.label}</span>
+            ) : (
+              <button
+                aria-label={`Show the output of ${row.label}`}
+                className="dshx:min-w-0 dshx:truncate dshx:text-left dshx:font-mono! dshx:hover:text-foreground dshx:hover:underline dshx:pointer-coarse:min-h-11"
+                onClick={() => openCall(row.callId)}
+                type="button"
+              >
+                {row.label}
+              </button>
+            )}
             {failed && <span className="dshx:shrink-0 dshx:text-destructive">{row.outcome}</span>}
           </li>
         )
@@ -100,6 +121,8 @@ export const TurnSummaryLine = (props: {
   readonly openFile: (path: string) => void
   /** Opens this turn's changed-files review at the `workspace/changes` sequence that addresses it. */
   readonly openChanges: (input: { readonly seq: number; readonly turn: number }) => void
+  /** The thread's Conversation View opener the Chat fork hands its Turn-tail rows; absent on a detached transcript. */
+  readonly openView?: ChatTurnTailExtras['openView']
 }): JSX.Element | null => {
   const source = props.turn.data.source(TURN_ACTIVITY_KEY)
   const summary = useSyncExternalStore(source.subscribe, source.getSnapshot)
@@ -122,6 +145,11 @@ export const TurnSummaryLine = (props: {
   const canList = summary.failedCommands.length > 0 && settings?.listFailures !== false
   const openLists = settings?.openLists !== false
   const toggle = (list: OpenList) => () => setOpen(current => (current === list ? undefined : list))
+  const openView = props.openView
+  const openCall =
+    openView === undefined
+      ? undefined
+      : (callId: string): void => openView(ChatFocusModel.viewId, ChatFocusModel.encode({ turn: props.turn.turn, toolCallId: callId, open: true }))
   const start = props.turn.start?.time
   const end = props.turn.end?.time
   const duration = settings?.duration !== false && start !== undefined && end !== undefined ? TurnActivity.shownDuration(end - start) : undefined
@@ -239,8 +267,8 @@ export const TurnSummaryLine = (props: {
         </div>
       </div>
       {open === 'files' && <FileList openFile={props.openFile} summary={summary} />}
-      {open === 'commands' && <CommandList onlyFailed={false} summary={summary} />}
-      {open === 'failures' && canList && <CommandList onlyFailed summary={summary} />}
+      {open === 'commands' && <CommandList onlyFailed={false} openCall={openCall} summary={summary} />}
+      {open === 'failures' && canList && <CommandList onlyFailed openCall={openCall} summary={summary} />}
       {walkthrough && walkthroughOpen && <TurnWalkthroughList openChanges={openChanges} openFile={props.openFile} summary={summary} />}
     </div>
   )

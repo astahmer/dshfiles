@@ -16,3 +16,10 @@ Feature: Tool activity appears under a finished turn
     When a Command Code account backed by a local fake provider is added
     And the fake model writes files in two folders in a fresh workspace
     Then the finished turn opens a walkthrough naming the written files by folder
+
+  @scenario:turn-summary.command-output
+  Scenario: A command named under a folded turn opens its output
+    Given the isolated plugin composition of "@dshfiles/turn-summary, @dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker, @dshfiles/rich-composer, @dshfiles/session-controller" is booted
+    When a Command Code account backed by a local fake provider is added
+    And the fake model runs one build command in a fresh workspace
+    Then choosing the build command under the finished turn opens the turn and shows the command's output

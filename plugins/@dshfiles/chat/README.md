@@ -152,7 +152,9 @@ The first header of a loaded window has no predecessor there and gets no row unt
 
 Chat jumps through the turn rail's navigation (unloaded history pages in), opens the folded process group with the
 `beforematch` event browser find uses, scrolls the row to the middle and outlines it for 4 s. A tool call or Step that
-never appears within 4 s lands on its Turn.
+never appears within 4 s lands on its Turn. A tool-call focus with `open: true` also opens the call's card, as a click
+on its row would, and scrolls the row to the top so its output reads below it: turn-summary's command list uses it, so a
+command under "Ran N commands" reaches its output after the Turn folds.
 
 The latest **Task stopped** or **Turn error** notice from a turn a restart cut
 off, or whose model request failed (upstream outage, rate limit, transport),

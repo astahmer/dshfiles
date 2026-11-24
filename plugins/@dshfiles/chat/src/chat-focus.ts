@@ -25,6 +25,8 @@ const chatFocusSchema = Schema.Struct({
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   step: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   toolCallId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
+  /** With `toolCallId`: also open the call's card, as a click on its row would, so its output shows. */
+  open: Schema.optional(Schema.Boolean),
 })
 
 export type ChatFocus = Schema.Schema.Type<typeof chatFocusSchema>

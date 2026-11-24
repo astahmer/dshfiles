@@ -12,6 +12,7 @@ const WRITE_FILES = [
   `[[call write ${JSON.stringify({ file_path: 'src/second.ts', content: 'export const second = 2' })}]]`,
 ].join(' ')
 const FAILING_COMMAND = `[[call bash ${JSON.stringify({ command: 'printf "turn-summary-e2e"; exit 7', description: 'Run the failing summary fixture' })}]]`
+const BUILD_COMMAND = `[[call bash ${JSON.stringify({ command: 'for i in $(seq 1 12); do echo output line number $i of the build; done', description: 'Build the project' })}]]`
 
 const runInFreshWorkspace = async (page: Page, message: string): Promise<void> => {
   const root = await createScratchDirectory('dshx-turn-summary-e2e-')
@@ -27,6 +28,29 @@ const runInFreshWorkspace = async (page: Page, message: string): Promise<void> =
 
 When('the fake model runs a failing bash command in a fresh workspace', async ({ page }: { page: Page }) => {
   await runInFreshWorkspace(page, FAILING_COMMAND)
+})
+
+When('the fake model runs one build command in a fresh workspace', async ({ page }: { page: Page }) => {
+  await runInFreshWorkspace(page, BUILD_COMMAND)
+})
+
+Then("choosing the build command under the finished turn opens the turn and shows the command's output", async ({ page }: { page: Page }) => {
+  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  const summary = page.locator('[data-dshfiles-turn-summary]')
+  const output = page.getByText('output line number 1 of the build').first()
+  await recordAssertion(page, 'turn-summary-command-output-folded-away', async () => {
+    // The settled turn folds its one call behind "Worked for": the output is not on screen.
+    await expect(page.locator('button[data-turn-process]')).toHaveAttribute('aria-expanded', 'false')
+    await expect(output).toBeHidden()
+  })
+  await summary.getByRole('button', { name: /^Ran 1 command$/ }).click()
+  await summary.getByRole('button', { name: 'Show the output of Build the project', exact: true }).click()
+  await recordAssertion(page, 'turn-summary-command-opens-its-output', async () => {
+    await expect(page.locator('button[data-turn-process]')).toHaveAttribute('aria-expanded', 'true')
+    await expect(output).toBeVisible({ timeout: 10_000 })
+    await expect(output).toBeInViewport()
+  })
+  await finishJourneyAssertions(page)
 })
 
 When('the fake model writes files in two folders in a fresh workspace', async ({ page }: { page: Page }) => {
