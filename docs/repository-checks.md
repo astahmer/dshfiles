@@ -136,12 +136,21 @@ class into its variants and utility:
 | `chart-hue`                | `chart-1..5` colour classes outside the kit's chart component: an identity uses `identity-1..8`, a chart series `data-1..6` |
 | `palette-colour`           | numbered Tailwind palette classes (`bg-emerald-500`)                                                     |
 | `uppercase`                | the `uppercase` class and CSS `text-transform: uppercase`                                                |
+| `local-duration-formatter` | a `formatElapsed`, `formatDuration` or `formatClock` defined outside `plugin-ui/src/lib` (an alias, a one-line wrapper that calls `formatElapsed`/`formatDurationMs`, and a `Date` clock-time formatter are not counted), and a `padStart(2, '0')` on a line that prints a unit right after an interpolation (`${s}s`, `${m}m`, `${h} h`) |
 | `unguarded-loop-animation` | `animate-spin`/`animate-pulse` when no class in the same list has a `motion-reduce:`/`motion-safe:` variant |
 | `outline-without-focus`    | `outline-none` on a button, link, summary, `*Trigger` or widget-role element with no `focus-visible:`/`focus-within:` class in the same list |
 
 The last two read a whole class list: a string literal, template holes
 included, joined with its neighbours when only `,` or `+` separates them, as
 in a `cn()` call over several lines.
+
+`local-duration-formatter` holds [DESIGN.md › Durations](../DESIGN.md#durations):
+one grammar, from `@dshfiles/plugin-ui/lib/format-duration`. It reads one line
+at a time, so it is a heuristic: a time of day (`${hh}:${mm}`) and a UTC offset
+print no unit and are not counted, and a wrapper that calls the kit across
+several lines still counts until it fits on one. Its 2026-11-24 baseline is 12
+(agent-plan 3, thread-sidebar 4, turn-summary 2, ai-accounts 1, chat 1,
+tool-meta 1); round three of the unslop plan removes most of them.
 
 `scripts/copy-check.ts` reads `.tsx` files and locale tables (non-English
 tables skipped), the `.description(…)` text of `defineSettings` schemas,

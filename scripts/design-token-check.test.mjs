@@ -208,3 +208,29 @@ test('counts vendored forks with the owned plugins instead of skipping them', ()
     rmSync(root, { recursive: true, force: true })
   }
 })
+
+test('counts a duration formatted outside the kit, not a call to the kit or a wall clock', () => {
+  const source = [
+    "const formatElapsed = (ms: number): string => {",
+    "  const total = Math.floor(ms / 1000)",
+    "  return `${Math.floor(total / 60)}m ${String(total % 60).padStart(2, '0')}s`",
+    '}',
+    'function formatClock(seconds: number) {',
+    "  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`",
+    '}',
+    'export const formatDuration = (ms: number | null): string => (ms === null ? "—" : formatDurationMs(ms))',
+    "const formatClock = (at: number): string => new Date(at).toLocaleTimeString(undefined, { hour: '2-digit' })",
+    "const id = String(index).padStart(2, '0')",
+    "const time = `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`",
+    'static readonly formatElapsed = formatElapsed',
+    'static readonly formatDuration = (input: { readonly ms: number }): string => {',
+  ].join('\n')
+  assert.deepEqual(rulesIn('plugins/@dshfiles/demo/src/a.tsx', source), [
+    'local-duration-formatter:formatElapsed',
+    "local-duration-formatter:padStart(2, '0')",
+    'local-duration-formatter:formatClock',
+    'local-duration-formatter:formatDuration',
+  ])
+  assert.deepEqual(rulesIn('plugins/@dshfiles/plugin-ui/src/lib/format-duration.ts', source), [])
+  assert.deepEqual(rulesIn('plugins/@dshfiles/demo/src/a.module.css', '.a { --formatDuration: 1; }'), [])
+})

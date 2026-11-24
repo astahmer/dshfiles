@@ -15,6 +15,8 @@
 //   chart-hue                 `chart-1..5` classes outside the chart component (identity and data have their own tones)
 //   palette-colour            numbered Tailwind palette classes (`bg-emerald-500`)
 //   uppercase                 `uppercase` and `text-transform: uppercase`
+//   local-duration-formatter  a `formatElapsed`/`formatDuration`/`formatClock` defined outside the kit's `lib`, and a
+//                             `padStart(2, '0')` on a line that prints a time unit (`}s`, `}m`, `}h`)
 //   unguarded-loop-animation  spin or pulse with no `motion-reduce:`/`motion-safe:` class in the same list
 //   outline-without-focus     a control's `outline-none` with no `focus-visible:` replacement in the same list
 //
@@ -41,6 +43,24 @@ export interface DesignTokenRule {
 const isCss = (file: string): boolean => file.endsWith('.css')
 
 const all = (pattern: RegExp, line: string): readonly string[] => [...line.matchAll(pattern)].map(match => match[0])
+
+/** The kit's duration grammar lives here; DESIGN.md › Durations. */
+const durationModuleDirectory = 'plugins/@dshfiles/plugin-ui/src/lib/'
+
+/** A definition of a duration formatter name: `const formatClock =`, `function formatElapsed(`, `static formatDuration =`. */
+const durationFormatterName = /(?:\bfunction\s+|\b(?:const|let|var)\s+|\bstatic\s+(?:readonly\s+)?)(formatElapsed|formatDuration|formatClock)\b/
+
+/**
+ * A definition that formats nothing itself: an alias of another function, a one-line wrapper that calls the kit, or a
+ * clock-time formatter (a `Date`), which prints a time of day rather than a duration.
+ */
+const notAFormatter = /=\s*[\w.]+\s*$|=.*\b(?:formatElapsed|formatDurationMs)\(|\bDate\b|toLocale(?:Date|Time)?String\(|DateTimeFormat/
+
+/**
+ * A printed duration unit right after an interpolation (`${s}s`, `${m}m`, `${h} h`). A time of day (`${hh}:${mm}`) and
+ * a UTC offset print none, so their padding is not counted.
+ */
+const timeUnit = /\}\s?(?:ms|s|m|h|min|sec)\b/
 
 export interface ClassToken {
   /** The whole class as written, `dshx:hover:md:shadow-sm`. */
@@ -168,6 +188,18 @@ export const designTokenRules: readonly DesignTokenRule[] = [
     id: 'uppercase',
     use: 'sentence case in the copy itself (a type token for the overline style), or Kbd for a key',
     matches: (line, file) => (isCss(file) ? all(/text-transform:\s*uppercase\b/g, line) : classes(line, file, token => token.utility === 'uppercase')),
+  },
+  {
+    // DESIGN.md › Durations: one grammar, so a wait reads the same in the transcript, the dock and a table.
+    id: 'local-duration-formatter',
+    use: 'formatElapsed or formatDurationMs from @dshfiles/plugin-ui/lib/format-duration',
+    matches: (line, file) => {
+      if (isCss(file) || file.startsWith(durationModuleDirectory)) return []
+      const named = durationFormatterName.exec(line)
+      const definition = named?.[1] === undefined || notAFormatter.test(line) ? [] : [named[1]]
+      const padded = timeUnit.test(line) ? all(/padStart\(2,\s*['"]0['"]\)/g, line) : []
+      return [...definition, ...padded]
+    },
   },
 ]
 
