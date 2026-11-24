@@ -1187,7 +1187,24 @@ export default defineClient({
     const sessionLog = createSessionLogDownloadPort()
     // The land card beside the header reads which threads show a header Land, so a screen keeps one primary Land.
     const headerLand = createHeaderLandPresence()
-    metadata?.plugin?.provide(ThreadHeaderLand, { shown: headerLand.shown, subscribe: headerLand.subscribe })
+    // Round two item 17: the phone top bar shows the header utilities only inside its ⋯ sheet, so jujutsu seats this
+    // Land in the bar itself (conversation.session.header.changes); it opens the header's confirmation.
+    const PhoneLand = (props: { readonly sessionId: string }): JSX.Element => (
+      <PluginQueryProvider>
+        <ThreadWorkspaceControl
+          sessionId={SessionId(props.sessionId)}
+          sessions={ctx.sessions}
+          t={translate}
+          bookmark={useBookmark()}
+          sessionLog={sessionLog}
+          openThreadWorkspaces={() => ctx.sidebarRight.openTab(RIGHT_PANE_KIND, { revealIfOpened: true })}
+          headerLand={headerLand}
+          seat="phone-bar"
+        />
+      </PluginQueryProvider>
+    )
+    if (metadata?.plugin !== undefined)
+      metadata.plugin.provide(ThreadHeaderLand, { PhoneLand: metadata.plugin.bind(PhoneLand), shown: headerLand.shown, subscribe: headerLand.subscribe })
     ctx.inject(['sessionLogDownload'], scoped => {
       const controller = scoped.sessionLogDownload
       sessionLog.current = controller

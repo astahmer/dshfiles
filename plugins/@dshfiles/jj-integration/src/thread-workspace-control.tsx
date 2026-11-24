@@ -41,6 +41,7 @@ import { WorkspaceActivityIndex } from './workspace-activity-index.js'
 import { ThreadRebaseEligibilityModel } from './thread-rebase-eligibility.js'
 import { threadStatusPollMs } from './thread-status-poll.js'
 import { useToast } from './toast.js'
+import { usePhoneShell } from './phone-shell.js'
 import { useProjectBookmark } from './project-bookmark-query.js'
 import { WorkspaceControlModel } from './workspace-control-model.js'
 import { arrangeWorkspaceMenuSections, WorkspaceMenuSections } from './workspace-menu-sections.js'
@@ -54,6 +55,11 @@ export interface ThreadWorkspaceControlProps {
   readonly openThreadWorkspaces: () => void
   /** Marked while the header Land shows, so the land card beside it steps back to a secondary button. */
   readonly headerLand?: HeaderLandPresence | undefined
+  /**
+   * `header` (default): the workspace chip, its menu and, on a desktop shell, Land beside it. `phone-bar`: only Land and
+   * its confirmation, for the phone top bar, which shows the header utilities only inside its ⋯ sheet.
+   */
+  readonly seat?: 'header' | 'phone-bar' | undefined
 }
 
 const noCwd = (): null => null
@@ -251,12 +257,15 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
   const canQueueIntegration = isThread && unlanded > 0 && !canRebase && !rebasesPending
   // H4 (unslop): landing finishes a thread, so the header carries it as its one primary verb while it can run.
   const showsLand = WorkspaceControlModel.showsLand({ isThread, unlanded: current?.unlanded ?? [], canLand: canRebase, queued: integrationQueued })
+  const seat = props.seat ?? 'header'
+  const phone = usePhoneShell()
+  const landHere = showsLand && WorkspaceControlModel.landSeatShows({ seat, phone })
   // A dialog left without revisions (the work landed elsewhere meanwhile) closes for good, not until the next change.
   useEffect(() => {
     if (unlanded === 0) setConfirmingLand(false)
   }, [unlanded])
   const headerLand = props.headerLand
-  useEffect(() => (showsLand && headerLand !== undefined ? headerLand.mark(String(props.sessionId)) : undefined), [headerLand, props.sessionId, showsLand])
+  useEffect(() => (landHere && headerLand !== undefined ? headerLand.mark(String(props.sessionId)) : undefined), [headerLand, landHere, props.sessionId])
   /** Both Land buttons of this control ask first: the dialog lists the revisions that move. */
   const askToLand = (): void => {
     setWorkspaceMenuOpen(false)
@@ -320,6 +329,48 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
       <ChevronDownIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:opacity-60" />
     </Button>
   )
+
+  const landButton = landHere ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          aria-label={props.t('landThreadLabel')}
+          // The phone bar is 44px tall: the 32px button takes the rest of the bar's height as its touch target.
+          className={cn(
+            seat === 'phone-bar' && 'dshx-root dshx:relative dshx:ml-1.5 dshx:after:absolute dshx:after:-inset-y-1.5 dshx:after:inset-x-0 dshx:after:content-[""]',
+          )}
+          data-workspace-land={seat === 'phone-bar' ? 'phone' : ''}
+          disabled={rebasesPending}
+          onClick={askToLand}
+          size="sm"
+          type="button"
+        >
+          {rebasesPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5 dshx:@max-[26rem]:hidden" />}
+          {props.t('landThreadVerb')}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{`${label} (${props.t('toRebase', { count: unlanded })})`}</TooltipContent>
+    </Tooltip>
+  ) : null
+  const landDialog = isThread ? (
+    <LandConfirmDialog
+      bookmark={bookmark}
+      onConfirm={() => rebase.mutate({ path: current.path })}
+      onOpenChange={setConfirmingLand}
+      open={confirmingLand && unlanded > 0}
+      revisions={current.unlanded}
+      t={props.t}
+    />
+  ) : null
+
+  if (seat === 'phone-bar')
+    return (
+      <TooltipProvider>
+        {landButton}
+        {landDialog}
+        {toast.element}
+      </TooltipProvider>
+    )
 
   return (
     <TooltipProvider>
@@ -498,28 +549,9 @@ export const ThreadWorkspaceControl = (props: ThreadWorkspaceControlProps): JSX.
             </div>
           </PopoverContent>
         </Popover>
-        {showsLand ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button aria-label={props.t('landThreadLabel')} data-workspace-land="" disabled={rebasesPending} onClick={askToLand} size="sm" type="button">
-                {rebasesPending ? <Spinner /> : <GitMergeIcon aria-hidden="true" className="dshx:size-3.5 dshx:@max-[26rem]:hidden" />}
-                {props.t('landThreadVerb')}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{`${label} (${props.t('toRebase', { count: unlanded })})`}</TooltipContent>
-          </Tooltip>
-        ) : null}
+        {landButton}
       </span>
-      {isThread ? (
-        <LandConfirmDialog
-          bookmark={bookmark}
-          onConfirm={() => rebase.mutate({ path: current.path })}
-          onOpenChange={setConfirmingLand}
-          open={confirmingLand && unlanded > 0}
-          revisions={current.unlanded}
-          t={props.t}
-        />
-      ) : null}
+      {landDialog}
       {toast.element}
     </TooltipProvider>
   )

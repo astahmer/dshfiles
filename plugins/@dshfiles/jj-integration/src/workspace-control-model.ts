@@ -32,7 +32,15 @@ const pathTail = (path: string, segments = 2): string => {
   return parts.slice(-segments).join(path.includes('\\') && !path.includes('/') ? '\\' : '/')
 }
 
+/**
+ * Which seat draws the header Land. A desktop header puts it beside the workspace chip. A phone folds the header
+ * utilities (the chip included) into the ⋯ sheet, so the top bar's own seat carries it there and the sheet does not:
+ * one Land on screen, opening the same confirmation.
+ */
+const landSeatShows = (input: { readonly seat: 'header' | 'phone-bar'; readonly phone: boolean }): boolean => (input.seat === 'phone-bar') === input.phone
+
 export class WorkspaceControlModel {
   static readonly showsLand = showsLand
+  static readonly landSeatShows = landSeatShows
   static readonly pathTail = pathTail
 }

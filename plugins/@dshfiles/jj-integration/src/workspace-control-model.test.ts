@@ -22,6 +22,16 @@ describe('the header Land verb', () => {
   })
 })
 
+describe('where the header Land sits', () => {
+  it('is beside the workspace chip on a desktop shell and in the phone top bar on a phone, never both', () => {
+    expect(WorkspaceControlModel.landSeatShows({ seat: 'header', phone: false })).toBe(true)
+    expect(WorkspaceControlModel.landSeatShows({ seat: 'phone-bar', phone: false })).toBe(false)
+    // The phone folds the header control into the ⋯ sheet; the top bar's own seat carries the one Land.
+    expect(WorkspaceControlModel.landSeatShows({ seat: 'header', phone: true })).toBe(false)
+    expect(WorkspaceControlModel.landSeatShows({ seat: 'phone-bar', phone: true })).toBe(true)
+  })
+})
+
 describe('the workspace path label', () => {
   it('keeps the end of the path, where the workspace is named', () => {
     expect(WorkspaceControlModel.pathTail('/private/var/folders/3k/k0xz2zs57sq25lq8bfg2yg480000gn/T/home/projects/sample-threads/thread-31057e')).toBe(

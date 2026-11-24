@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { InlineReferences } from '@dshfiles/chat/inline-references'
-import { Changes, createApiClient, defineClient, useApi } from '@dshfiles/dshx/client'
+import { Changes, createApiClient, defineClient, useApi, useContract } from '@dshfiles/dshx/client'
 import { multiHostApi } from '@dshfiles/multi-host/api'
 // Type-only: `ctx.rightPanel`, the frame's right-column seat.
 import type {} from '@dshfiles/frame-layout/regions'
@@ -40,6 +40,7 @@ import {
   type ComposerSlotProps,
 } from './composer-context.js'
 import { WorkspaceMenuSections, type WorkspaceMenuSectionProps } from '@dshfiles/jj-integration/workspace-menu-sections'
+import { ThreadHeaderLand } from '@dshfiles/jj-integration/thread-header-land'
 import { DEFAULT_PANEL_SCOPE, PanelScopes, useActiveJujutsuScope } from './panel-scope.js'
 import { SchemaHelpers } from './schema-helpers.js'
 import { containsPath, sidePanelRepository } from './side-panel-repository.js'
@@ -309,6 +310,18 @@ export default defineClient({
           inject: sessionId => ({ sessionId, jujutsu: composerServices }),
         },
         composerSlot(ChangesPill),
+      ),
+    )
+    // Round two item 17: on a phone the header utilities (the workspace chip and its Land) fold into the ⋯ sheet, so the
+    // top bar carries jj-integration's Land after the pill. It renders nothing on a desktop shell or without that plugin.
+    const PhoneLand = (props: { readonly sessionId: SessionId }): JSX.Element | null => {
+      const land = useContract(ThreadHeaderLand)
+      return land.status === 'active' ? <land.value.PhoneLand sessionId={String(props.sessionId)} /> : null
+    }
+    ctx.slots.inject('conversation.session.header.changes', () =>
+      ctx.slots.register(
+        { name: 'conversation.session.header.changes', id: 'dshfiles-jujutsu-phone-land', order: 45, inject: sessionId => ({ sessionId }) },
+        decorate(PhoneLand),
       ),
     )
     // H3 (unslop): a thread in the project checkout gets no pill; the workspace menu states the checkout's diff as the
