@@ -59,16 +59,18 @@ const RUN_SCRIPT: readonly Omit<AgentRunStep, 'status' | 'durationMs'>[] = [
   { id: 'run', kind: 'run', label: 'Ran', target: 'pnpm test api', output: '✓ 18 passed (1.9s)' },
 ]
 const RUN_DURATIONS = [1200, 900, 1600, 2300, 1900]
+const RUN_JOINED_AFTER_MS = 125_000
 
 function AgentRunDemo() {
   const [round, setRound] = React.useState(0)
-  const [startedAt, setStartedAt] = React.useState(() => Date.now())
+  const [startedAt, setStartedAt] = React.useState(() => Date.now() - RUN_JOINED_AFTER_MS)
   const [endedAt, setEndedAt] = React.useState<number | undefined>(undefined)
   const [shown, setShown] = React.useState(0)
   const [doneCount, setDoneCount] = React.useState(0)
   useScript(
     after => {
-      setStartedAt(Date.now())
+      // The demo joins a run two minutes in, so the clock shows the minute form.
+      setStartedAt(Date.now() - RUN_JOINED_AFTER_MS)
       setEndedAt(undefined)
       setShown(0)
       setDoneCount(0)
