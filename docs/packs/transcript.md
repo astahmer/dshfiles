@@ -58,7 +58,7 @@ From the onboarding feature catalog: 35 features, the 17 curated ones first.
 2. **Receive annotations from the browser extension** (`annotations`) — Pair the browser extension for two minutes, then its annotations wait until you pick a thread.
 3. **Plan card for the agent's to-do list** (`agent-plan`, transcript) — The agent's plan shows as a card with each step, its state and how long it took.
 4. **Current plan step pinned beside the composer** (`agent-plan`, composer) — The current plan step sits beside the composer and opens the whole plan.
-5. **Live activity strip beside the composer controls** (`agent-plan`, composer) — While the agent works, a strip beside the composer shows the running tool, jobs and subagents with timers.
+5. **Live activity strip beside the composer controls** (`agent-plan`, composer) — While the agent runs a tool, a strip beside the composer names it with a timer.
 6. **Ask to fix on a failed turn** (`agent-plan`, transcript) — A failed turn offers Ask to fix, which drafts a fix request in the composer for you to review and send.
 7. **Tokens left before automatic compaction** (`agent-plan`, composer) — The context meter shows how many tokens are left before the thread compacts.
 8. **Agent screenshot of its own published page** (`html-render`) — The agent can take a screenshot of a page it published to check how it looks.

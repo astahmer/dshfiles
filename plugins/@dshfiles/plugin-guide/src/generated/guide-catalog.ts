@@ -3696,7 +3696,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › root-timed-questions"
       ],
       "details": [
-        "Used by 42 catalog feature(s)",
+        "Used by 43 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

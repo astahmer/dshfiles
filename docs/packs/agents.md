@@ -49,7 +49,7 @@ From the onboarding feature catalog: 52 features, the 42 curated ones first.
 15. **Jobs that outlived their turn** (`background-jobs`, observe) — A job still running after its turn ended is marked, and after two hours it is stopped.
 16. **Processes: jobs, dev servers and RAM** (`background-jobs`, observe) — One Processes page holds jobs, dev servers and RAM, each in its own tab.
 17. **Jobs tab in the thread panel** (`background-jobs`, thread-panel) — The thread panel's Jobs tab shows this thread's jobs, dev servers and RAM, with Stop.
-18. **Live job preview in the transcript and above the composer** (`background-jobs`, transcript) — A running job shows its progress and output under the tool call that started it and above the composer.
+18. **Live job preview in the transcript and above the composer** (`background-jobs`, transcript) — A running job is one row above the composer, and its card moves under its tool call once it finishes.
 19. **Add and identify hosts** (`multi-host`, settings) — Add a host over SSH, then test, reconnect, edit or remove it on the Hosts page.
 20. **Manage hosts on a dedicated page** (`multi-host`, observe) — The Hosts page lists your hosts with their load and memory, and adds projects to them.
 21. **Group remote threads under matching local projects** (`multi-host`, threads) — Threads on another host group under the matching local project, with a host badge.

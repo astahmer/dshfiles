@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-569 features from 121 plugins.
+570 features from 121 plugins.
 
 ## Counts
 
@@ -22,7 +22,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Settings |  |  |  |  | 3 |  |  |  | 1 |  | 64 |  |  |  | 68 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
 | Composer |  |  |  | 70 |  |  |  |  |  |  |  |  |  |  | 70 |
-| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 42 | 42 |
+| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 43 | 43 |
 | No place of its own | 28 |  | 22 |  |  |  | 1 | 133 |  |  |  | 10 |  |  | 194 |
 
 ## By current left-nav entry
@@ -81,10 +81,11 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | client | 17 | No place of its own 17 |
 | command palette | 1 | No place of its own 1 |
 | command palette and New tab page | 1 | Inbox 1 |
-| composer | 62 | Composer 60, Settings 1, Thread panel 1 |
+| composer | 63 | Composer 60, Settings 1, Thread panel 1, Transcript 1 |
 | composer ⋯ | 1 | Composer 1 |
 | composer and transcript | 1 | Threads 1 |
 | composer dock | 1 | Composer 1 |
+| composer dock while it runs; transcript | 1 | Transcript 1 |
 | conversation composer seat of a mirrored thread | 1 | Composer 1 |
 | conversation-view | 1 | Thread panel 1 |
 | conversation.chat.assistant-actions | 1 | Work 1 |
@@ -128,7 +129,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | thread-panel | 1 | Thread panel 1 |
 | threads | 1 | Threads 1 |
 | toast | 1 | No place of its own 1 |
-| transcript | 42 | Transcript 39, Inbox 1, Land 1, Thread panel 1 |
+| transcript | 41 | Transcript 38, Inbox 1, Land 1, Thread panel 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 17 | No place of its own 12, Thread panel 4, Settings 1 |
 
@@ -539,7 +540,7 @@ run row, chips, `/` and `@` sources; 70 features.
 
 ### Transcript
 
-cards inline in the active thread; 42 features.
+cards inline in the active thread; 43 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -551,7 +552,7 @@ cards inline in the active thread; 42 features.
 | ai-accounts/credential-recovery: Open credential setup from failed turns | transcriptCard | transcript: failed turn › Open AI Accounts |
 | ai-accounts/stalled-stream-recovery: Explain turns stopped by a stalled model stream | transcriptCard | transcript: failed turn › stalled-stream advice |
 | attachment-gallery/image-gallery-navigation: Navigate image previews | transcriptCard | transcript: image previews (and composer attachments) |
-| background-jobs/transcript-job-preview: Live job preview in the transcript and above the composer | transcriptCard | transcript: under the tool card that started the job; composer dock while it runs |
+| background-jobs/transcript-job-preview: Live job preview in the transcript and above the composer | transcriptCard | composer dock while it runs; transcript: under the tool card that started the job once it finished |
 | backlog/jev-secret-setup: Set up a missing Jev key from chat | transcriptCard | transcript: turn tail › Set up missing secrets |
 | chat/find-in-thread: Find text anywhere in a long thread | transcriptCard | transcript: find bar over the thread |
 | chat/folded-work: A finished turn folds its work under one Worked for row | transcriptCard | transcript: turn process row |
@@ -583,6 +584,7 @@ cards inline in the active thread; 42 features.
 | turn-summary/turn-summary-line: A summary footer under each finished turn | transcriptCard | transcript: turn summary footer |
 | turn-summary/turn-walkthrough: A walkthrough under a turn that changed code | transcriptCard | transcript: turn walkthrough row |
 | user-questions/answered-question-stays-closed: An answered question form stays closed while its reply waits for admission | transcriptCard | transcript: question form |
+| user-questions/keyboard-answer: Answer a question by keyboard | transcriptCard | composer: question card |
 | user-questions/markdown-question: Markdown questions with sandboxed HTML previews | transcriptCard | transcript: question form |
 | web-fetch-readable/web-citations: Source chips under web_search and web_fetch results | transcriptCard | transcript: web_search / web_fetch rows |
 

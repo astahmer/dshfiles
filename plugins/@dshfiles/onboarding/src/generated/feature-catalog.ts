@@ -684,7 +684,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "user-questions",
       "description": "Owned fork of DSH's native question form: markdown questions with sandboxed HTML previews, and an answered question stays closed while its reply waits for admission.",
       "ui": true,
-      "features": 2
+      "features": 3
     },
     {
       "name": "vcs-provider-port",
@@ -1353,7 +1353,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-plan",
       "id": "live-activity-strip",
       "title": "Live activity strip beside the composer controls",
-      "summary": "While the agent works, a strip beside the composer shows the running tool, jobs and subagents with timers.",
+      "summary": "While the agent runs a tool, a strip beside the composer names it with a timer.",
       "destination": "composer",
       "currentSurface": "composer: activity strip",
       "reach": [
@@ -4389,9 +4389,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "background-jobs",
       "id": "transcript-job-preview",
       "title": "Live job preview in the transcript and above the composer",
-      "summary": "A running job shows its progress and output under the tool call that started it and above the composer.",
+      "summary": "A running job is one row above the composer, and its card moves under its tool call once it finishes.",
       "destination": "transcript",
-      "currentSurface": "transcript: under the tool card that started the job; composer dock while it runs",
+      "currentSurface": "composer dock while it runs; transcript: under the tool card that started the job once it finished",
       "reach": [
         {
           "text": "seed tool-call-thread",
@@ -29264,6 +29264,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         "firstAction": "Ask the agent to ask you to choose between options.",
         "doneWhen": "A question form shows the options and your answer reaches the agent."
       }
+    },
+    {
+      "key": "user-questions#keyboard-answer",
+      "plugin": "user-questions",
+      "id": "keyboard-answer",
+      "title": "Answer a question by keyboard",
+      "summary": "A question can be answered with a digit and Enter, and focus goes back to the composer.",
+      "destination": "transcript",
+      "currentSurface": "composer: question card",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
     },
     {
       "key": "vcs-provider-port#vcs-provider-resolution",

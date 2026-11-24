@@ -44,7 +44,7 @@ Pack id `core`, always on: every other pack builds on it. Back to [all packs](RE
 
 ## Features
 
-From the onboarding feature catalog: 207 features, the 100 curated ones first.
+From the onboarding feature catalog: 208 features, the 100 curated ones first.
 
 ### Curated
 
@@ -252,12 +252,13 @@ From the onboarding feature catalog: 207 features, the 100 curated ones first.
 99. **One mention and reference-preview registry** (`input-trigger`) — Files, threads, skills, backlog items, agents and more share one @ menu and one preview card.
 100. **An answered question form stays closed while its reply waits for admission** (`user-questions`, transcript) — A question you answered stays closed while your reply waits to reach the agent.
 101. **Markdown questions with sandboxed HTML previews** (`user-questions`, transcript) — Questions show Markdown, and their HTML previews run safely sandboxed.
-102. **Changed-files card and review tab** (`deliverables`, transcript) — Each turn lists the files it changed, with a comparison on hover and a review tab.
-103. **Changed images preview instead of the binary placeholder** (`deliverables`, transcript) — A changed image shows as the image itself instead of a binary file note.
-104. **Plugin panel loads its list once** (`cordis-cards`, threads) — The dynamic plugin panel and its tool cards load the plugin list once per connection.
-105. **Models settings and provider onboarding** (`settings-models`, settings) — The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.
-106. **Subagent settings** (`settings-subagent`, settings) — Set how deep subagents can nest, how many run at once and which model they use.
-107. **Web search settings** (`settings-web-search`, settings) — Choose the web search provider, its limits and its key.
+102. **Answer a question by keyboard** (`user-questions`, transcript) — A question can be answered with a digit and Enter, and focus goes back to the composer.
+103. **Changed-files card and review tab** (`deliverables`, transcript) — Each turn lists the files it changed, with a comparison on hover and a review tab.
+104. **Changed images preview instead of the binary placeholder** (`deliverables`, transcript) — A changed image shows as the image itself instead of a binary file note.
+105. **Plugin panel loads its list once** (`cordis-cards`, threads) — The dynamic plugin panel and its tool cards load the plugin list once per connection.
+106. **Models settings and provider onboarding** (`settings-models`, settings) — The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.
+107. **Subagent settings** (`settings-subagent`, settings) — Set how deep subagents can nest, how many run at once and which model they use.
+108. **Web search settings** (`settings-web-search`, settings) — Choose the web search provider, its limits and its key.
 
 ## Enable it
 
