@@ -463,14 +463,26 @@ function QuestionFlow({ pending, t, useStore, useQuestionCard, actions }: Questi
   }
   const shown = useRef({ question, draft, locked, minimized })
   shown.current = { question, draft, locked, minimized }
-  useEffect(() => {
+  const focusShownOption = useRef(() => {
     const card = cardRef.current
     const current = shown.current
     if (card === null || current.locked || current.minimized || !QuestionKeys.finePointer()) return
-    if (!QuestionKeys.mayTakeFocus<Node>(document.activeElement, { body: document.body, within: [card, card.closest('[data-composer-seat]')] })) return
+    const scope = { body: document.body, within: [card, card.closest('[data-composer-seat]')], typesText: QuestionKeys.typesText }
+    if (!QuestionKeys.mayTakeFocus<Element>(document.activeElement, scope)) return
     const target = QuestionKeys.initialOption(current.question.options ?? [], current.draft.selected, label => parseRecommendedLabel(label).recommended)
     if (target !== undefined) focusOption(target)
-  }, [index, pending.key])
+  })
+  useEffect(() => { focusShownOption.current() }, [index, pending.key])
+  // A thread view the workbench kept mounted is shown again without remounting this card: take focus the same way,
+  // as the composer does in its place (unslop r3 item 21).
+  useEffect(() => {
+    const onShown = (event: Event): void => {
+      const card = cardRef.current
+      if (card !== null && event.target instanceof Node && event.target.contains(card)) focusShownOption.current()
+    }
+    document.addEventListener(QuestionKeys.THREAD_VIEW_SHOWN, onShown)
+    return () => document.removeEventListener(QuestionKeys.THREAD_VIEW_SHOWN, onShown)
+  }, [])
   useEffect(() => {
     const card = cardRef.current
     const conversation = card?.closest('[data-conversation-content]') ?? null

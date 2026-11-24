@@ -60,14 +60,24 @@ const typesText = (target: EventTarget | null): boolean => {
 }
 
 /**
- * Whether the card may take focus now: nothing else holds it (the page body), or it is already inside the card or the
- * composer seat the card replaced. A field the user chose elsewhere keeps it.
+ * Whether the card may take focus now: nothing holds it (the page body), it is inside the card or the composer seat
+ * the card replaced, or it sits on a control that types nothing (the thread row just clicked to get here). A text field
+ * the user is typing in elsewhere keeps it.
  * @param active - `document.activeElement`.
- * @param scope - the elements the card may take focus from.
- * @returns true when moving focus steals nothing.
+ * @param scope - the elements the card may take focus from, and whether an element types text.
+ * @returns true when moving focus steals no typing.
  */
-const mayTakeFocus = <T>(active: T | null, scope: { readonly body: T; readonly within: readonly ({ contains(other: T): boolean } | null)[] }): boolean =>
-  active === null || active === scope.body || scope.within.some(element => element?.contains(active) === true)
+const mayTakeFocus = <T>(
+  active: T | null,
+  scope: { readonly body: T; readonly within: readonly ({ contains(other: T): boolean } | null)[]; readonly typesText: (element: T) => boolean },
+): boolean =>
+  active === null || active === scope.body || scope.within.some(element => element?.contains(active) === true) || !scope.typesText(active)
+
+/**
+ * Dispatched (bubbling) by `@dshfiles/workbench` on a kept thread view's container when it is shown again without
+ * remounting (its `KeptThreadViews.shownEvent`); the composer listens for the same name.
+ */
+const THREAD_VIEW_SHOWN = 'dshfiles:thread-view-shown'
 
 /** Whether the primary pointer is precise: on touch, moving focus would open the keyboard or scroll the page. */
 const finePointer = (): boolean => globalThis.matchMedia?.('(pointer: fine)').matches === true
@@ -95,4 +105,4 @@ const focusComposer = (conversation: Element, frames = 10): void => {
   requestAnimationFrame(() => { attempt(frames) })
 }
 
-export const QuestionKeys = { initialOption, digitOption, typesText, mayTakeFocus, finePointer, focusComposer, COMPOSER_EDITOR }
+export const QuestionKeys = { initialOption, digitOption, typesText, mayTakeFocus, finePointer, focusComposer, COMPOSER_EDITOR, THREAD_VIEW_SHOWN }

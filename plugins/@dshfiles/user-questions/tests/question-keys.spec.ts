@@ -27,15 +27,27 @@ describe('keyboard answering', () => {
     expect(QuestionKeys.digitOption(press('2', { isComposing: true }), 2)).toBeUndefined()
   })
 
-  test('the card takes focus only from the body, itself or the composer it replaced', () => {
+  test('the card takes focus from the body, its seat or a clicked thread row, never from a field being typed in', () => {
     const body = 'body'
     const inside = 'composer editor'
-    const elsewhere = 'sidebar search'
+    const row = 'thread row'
+    const search = 'sidebar search'
     const seat = { contains: (node: string) => node === inside }
-    expect(QuestionKeys.mayTakeFocus(body, { body, within: [seat] })).toBe(true)
-    expect(QuestionKeys.mayTakeFocus(null, { body, within: [seat] })).toBe(true)
-    expect(QuestionKeys.mayTakeFocus(inside, { body, within: [seat] })).toBe(true)
-    expect(QuestionKeys.mayTakeFocus(elsewhere, { body, within: [seat, null] })).toBe(false)
+    const typesText = (node: string) => node === search || node === inside
+    expect(QuestionKeys.mayTakeFocus(body, { body, within: [seat], typesText })).toBe(true)
+    expect(QuestionKeys.mayTakeFocus(null, { body, within: [seat], typesText })).toBe(true)
+    expect(QuestionKeys.mayTakeFocus(inside, { body, within: [seat], typesText })).toBe(true)
+    // F17: switching threads from the list left focus on the row when the composer seat held a question card.
+    expect(QuestionKeys.mayTakeFocus(row, { body, within: [seat, null], typesText })).toBe(true)
+    expect(QuestionKeys.mayTakeFocus(search, { body, within: [seat, null], typesText })).toBe(false)
+  })
+
+  test('the card listens for the workbench event that shows a kept thread view again', () => {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
+    const workbench = readFileSync(resolve(root, 'workbench/src/kept-thread-views.tsx'), 'utf8')
+    expect(workbench).toContain(`shownEvent = '${QuestionKeys.THREAD_VIEW_SHOWN}'`)
+    const card = readFileSync(resolve(root, 'user-questions/src/native/QuestionComposer.tsx'), 'utf8')
+    expect(card).toMatch(/addEventListener\(QuestionKeys\.THREAD_VIEW_SHOWN/)
   })
 
   // The native card wires these: it focuses at mount, handles digits at card level and gives focus back when it leaves.
