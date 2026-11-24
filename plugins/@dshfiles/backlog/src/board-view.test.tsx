@@ -6,7 +6,7 @@ import type { BacklogSummaryView } from './api.js'
 import { cardClass, StateLine } from './board-view.js'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', async importOriginal => ({
-  ...(await importOriginal<Record<string, unknown>>()),
+  ...(await importOriginal<typeof import('@deepseek-ai/dsh-client-ui-primitives')>()),
   relativeTime: () => 'now',
 }))
 
