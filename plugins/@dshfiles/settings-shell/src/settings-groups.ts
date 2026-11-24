@@ -136,6 +136,8 @@ const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
   'web-deepseek-api': { group: 'tools', label: 'DeepSeek web API', order: 3, entry: 'web-access' },
   'dshfiles-web-fetch-readable': { group: 'tools', label: 'Page fetch', order: 4, entry: 'web-access' },
   // Projects & workspaces
+  // Upstream #287: each project's chip name and colour, edited on the Projects entry it belongs to.
+  'dshfiles-workspace-folder-picker': { group: 'projects', label: 'Names and colours', order: 1, entry: 'dshfiles-workspace-folder-picker-projects' },
   'jj-integration': { group: 'projects', label: 'Thread workspaces', order: 10 },
   'dshfiles-git-worktrees': { group: 'projects', label: 'Git worktrees', order: 1, entry: 'plugin:jj-integration' },
   'dshfiles-session-undo': { group: 'projects', label: 'Undo a turn', order: 2, entry: 'plugin:jj-integration' },
