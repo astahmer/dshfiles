@@ -11,7 +11,6 @@ const STATUS = {
   'failed-to-start': 'failed',
   working: 'working',
   finished: 'done',
-  idle: 'done',
   interrupted: 'stopped',
 } as const satisfies Record<SubagentPreviewState, RunFoldStatus>
 
@@ -71,7 +70,8 @@ export const subagentRunFold = (input: { readonly t: SubagentPreviewTranslate; r
           running: flags.includes('r'),
           lastTurnCompleted: turn === '' || turn === undefined ? undefined : turn === 'true',
         })
-        return { status: STATUS[state] }
+        // A child with no known status or closed turn yet settled as far as the fold can tell.
+        return { status: state === undefined ? 'done' : STATUS[state] }
       })
     }, [key, live, turns, phases])
   },

@@ -119,6 +119,7 @@ const settled = (input: {
   readonly isError?: boolean
   /** The result text; core names the child by its handle (`started subagent agent-1`). */
   readonly resultText?: string
+  readonly settledMs?: number
 }): Props => {
   const base = props({ provider: 'openai', model: 'gpt-6.1-luna', expanded: input.expanded ?? false })
   if (base.phase !== 'start') throw new Error('fixture starts from the start phase')
@@ -130,7 +131,7 @@ const settled = (input: {
   } as unknown as Extract<Props, { phase: 'result' }>['block']
   const statuses = new Map([[CHILD, { running: input.running === true }]])
   const list = {
-    byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted } } } },
+    byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted, settledMs: input.settledMs } } } },
     projectionsBySession: {
       'session-1': { values: { subagentCatalog: [{ id: CHILD, name: 'agent-1', mode: 'continuable', label: 'Long child', createdAt: 1 }] } },
     },
@@ -153,14 +154,15 @@ const previewRoot = () => document.querySelector('[data-dshfiles-live-preview="a
 afterEach(cleanup)
 
 describe('SubagentProvenanceToolRow', () => {
-  it('shows a readable subagent name and the requested provider/model', () => {
-    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna' })} />)
-    expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+ · openai\/gpt-6\.1-luna$/)).not.toBeNull()
+  it('names the row by the task the parent gave, with no generated handle and no route', () => {
+    // It read "Create subagent · Fern Puffin · Optimize traces plugin · openai/gpt-6.1-luna".
+    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description: '  Optimize traces plugin ' })} />)
+    expect(screen.getByText('subagentPreviewKind · Optimize traces plugin')).not.toBeNull()
   })
 
-  it('names the delegated task between the subagent name and its route', () => {
-    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description: '  Optimize traces plugin ' })} />)
-    expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+ · Optimize traces plugin · openai\/gpt-6\.1-luna$/)).not.toBeNull()
+  it('falls back to the catalog label when the call gave no description', () => {
+    render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
+    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
   })
 
   it('keeps the full prompt out of the collapsed preview', () => {
@@ -178,20 +180,24 @@ describe('SubagentProvenanceToolRow', () => {
 
   it('omits email-like route values from the visible tool card', () => {
     render(<SubagentProvenanceToolRow {...props({ provider: 'alex@example.com', model: 'gpt-6.1-luna' })} />)
-    expect(screen.getByText(/^Create subagent · [A-Z][a-z]+ [A-Z][a-z]+$/)).not.toBeNull()
+    expect(screen.getByText('subagentPreviewKind')).not.toBeNull()
     expect(screen.queryByText(/alex@example\.com/)).toBeNull()
   })
 
-  it('reports the child in agent terms, never the job lifecycle', () => {
+  it('reports the child in agent terms, never Idle, and says its total once it is done', () => {
     const { rerender } = render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('working')
-    expect(screen.getByText(/subagentPreviewWorking$/)).not.toBeNull()
-    rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: true })} />)
+    // A working child says it with the row's spinner; the record row has no clock.
+    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+    rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: true, settledMs: 302_400 })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('finished')
+    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewFinished · 5m 02s')).not.toBeNull()
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
+    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewInterrupted')).not.toBeNull()
     rerender(<SubagentProvenanceToolRow {...settled({})} />)
-    expect(previewRoot()?.getAttribute('data-state')).toBe('idle')
+    expect(previewRoot()?.getAttribute('data-state')).not.toBe('idle')
+    expect(document.body.textContent).not.toMatch(/idle/iu)
   })
 
   it('follows the child core names by its handle, through the parent catalog', () => {
@@ -203,6 +209,7 @@ describe('SubagentProvenanceToolRow', () => {
   it('shows the failure of a call that started no child', () => {
     render(<SubagentProvenanceToolRow {...settled({ isError: true, expanded: true })} />)
     expect(previewRoot()).toBeNull()
+    expect(screen.getByText('subagentPreviewKind · subagentPreviewFailedToStart')).not.toBeNull()
     expect(screen.getByTestId('expanded-content').textContent).toContain('no route')
   })
 

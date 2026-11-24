@@ -28,9 +28,9 @@ The rules that keep the list honest:
 
 Selecting revisions in the graph and choosing **Review together** is presentation state over one read, so the capability is `diffs_review_revisions` (diffs-review, read-only): each revision with its own files, ancestors first, with gaps and unresolved ids named. The selection itself and which panel opens are not tools. `jj_details` reads one revision's patch, and `changes_mark_viewed` writes a combined review's marks with the range `<commit>-` to `<commit>`.
 
-## Compact subagent run card (DSH0.2.1-rc.2)
+## Compact subagent dock row (DSH0.2.1-rc.2)
 
-The composer dock's compact run card shows a working subagent's current tool, route, elapsed turn time and step count. **Stop** reuses the existing interrupt verb: the card confirms first, then calls the child session's cancel, which is the same path `thread_stop` and the native `interrupt_agent` reach; there is no second stop tool. **Open thread** is client navigation (which thread the browser shows), so it is presentation-only. **Pause** is not rendered: DSH has no Host verb that pauses a session and resumes it, so the card must not fake one. An Agent sees the same facts as the card through `list_agents` and `thread_references`, not through a new read tool. The card itself has no write of its own; the setting is `subagentRunCards` and is switched by the user.
+The composer dock's compact row shows a working subagent's current step, elapsed turn time and, opened, its model. **Stop** reuses the existing interrupt verb: the row confirms first, then calls the child session's cancel, which is the same path `thread_stop` and the native `interrupt_agent` reach; there is no second stop tool. **Open thread** is client navigation (which thread the browser shows), so it is presentation-only. **Pause** is not rendered: DSH has no Host verb that pauses a session and resumes it, so the row must not fake one. An Agent sees the same facts as the row through `list_agents` and `thread_references`, not through a new read tool. The row itself has no write of its own; the setting is `subagentRunCards` and is switched by the user.
 
 ## Thread-local account handoff (DSH0.2.1-rc.2)
 

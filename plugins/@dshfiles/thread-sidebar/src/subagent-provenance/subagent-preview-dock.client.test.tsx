@@ -10,6 +10,7 @@ afterEach(cleanup)
 type Props = Parameters<typeof SubagentPreviewDock>[0]
 const PARENT = 'session-parent'
 const STARTED_AT = 1_000
+const CHILDREN = ['child-a', 'child-b', 'child-c', 'child-d', 'child-e'] as const
 
 const preview = (overrides: Partial<SubagentPreviewBindings> = {}): SubagentPreviewBindings => ({
   // SAFETY: the preview only prints keys, so the identity translator covers every key it asks for.
@@ -21,30 +22,40 @@ const preview = (overrides: Partial<SubagentPreviewBindings> = {}): SubagentPrev
   ...overrides,
 })
 
-/** A child whose event window already reports one tool in flight. */
-const childInTool = (input: { readonly cancel?: () => Promise<{ readonly ok: true }>; readonly tool?: string } = {}) => {
-  const entry = { type: 'event', event: { type: 'tool/call', data: { name: input.tool ?? 'bash' }, seq: 2, time: 2 } }
+/** A child whose event window reports one tool in flight, or none (between tools) when `tool` is null. */
+const childFeed = (tool: string | null, cancel: () => Promise<{ readonly ok: true }>) => {
+  const entries = tool === null ? [] : [{ type: 'event', event: { type: 'tool/call', data: { name: tool }, seq: 2, time: 2 } }]
   const eventSource = {
-    getSnapshot: () => ({ entries: [entry], hasMore: false, revision: 0, change: { kind: 'replace', entries: [entry] } }),
+    getSnapshot: () => ({ entries, hasMore: false, revision: 0, change: { kind: 'replace', entries } }),
     subscribe: () => () => undefined,
   }
-  const cancel = input.cancel ?? vi.fn(async () => ({ ok: true as const }))
-  const binding = { eventSource, session: { cancel } }
   // SAFETY: the dock reads only the event source and cancel of a retained child.
-  const ready = Promise.resolve(binding as unknown as SessionBinding)
-  return { cancel, retainChild: vi.fn(() => ({ ready, release: vi.fn() })) }
+  return Promise.resolve({ eventSource, session: { cancel } } as unknown as SessionBinding)
+}
+
+/** Children held through one binding; each child's tool comes from `tools` (default: a command). */
+const childInTool = (input: { readonly cancel?: () => Promise<{ readonly ok: true }>; readonly tool?: string; readonly tools?: Record<string, string | null> } = {}) => {
+  const cancel = input.cancel ?? vi.fn(async () => ({ ok: true as const }))
+  const retainChild = vi.fn((childId: string) => {
+    const tool = input.tools?.[childId] === undefined ? (input.tool ?? 'bash') : (input.tools[childId] ?? null)
+    return { ready: childFeed(tool, cancel), release: vi.fn() }
+  })
+  return { cancel, retainChild }
 }
 
 const sessionList = (input: { readonly childTiming: boolean }) => ({
   byId: input.childTiming
-    ? {
-        'child-a': {
-          projectionValues: {
-            subagentTiming: { settledMs: 0, active: { since: STARTED_AT, through: STARTED_AT + 1_000 } },
-            threadSidebarModelRoute: 'openai/gpt-6.1-luna',
+    ? Object.fromEntries(
+        ['child-a', 'child-b'].map(id => [
+          id,
+          {
+            projectionValues: {
+              subagentTiming: { settledMs: 0, active: { since: STARTED_AT, through: STARTED_AT + 1_000 } },
+              threadSidebarModelRoute: 'openai/gpt-6.1-luna',
+            },
           },
-        },
-      }
+        ]),
+      )
     : {},
   projectionsBySession: {
     [PARENT]: {
@@ -53,6 +64,8 @@ const sessionList = (input: { readonly childTiming: boolean }) => ({
           { id: 'child-a', mode: 'one-shot', label: 'Review' },
           { id: 'child-b', mode: 'continuable', label: 'Refactor' },
           { id: 'child-c', mode: 'external', label: 'Remote' },
+          { id: 'child-d', mode: 'one-shot', label: 'Lint' },
+          { id: 'child-e', mode: 'one-shot', label: 'Docs' },
         ],
       },
     },
@@ -65,7 +78,7 @@ const dockProps = (input: {
   readonly runCards?: boolean
   readonly childTiming?: boolean
 }): Props => {
-  const statuses = new Map(['child-a', 'child-b', 'child-c'].map(id => [id, { running: input.running.includes(id) }]))
+  const statuses = new Map(CHILDREN.map(id => [id, { running: input.running.includes(id) }]))
   return {
     sessionId: PARENT,
     preview: input.bindings ?? preview(),
@@ -78,12 +91,18 @@ const dockProps = (input: {
 }
 
 const rows = () => document.querySelectorAll('[data-dshfiles-live-preview="agent"]')
-const cardOf = (): HTMLElement => {
-  const card = document.querySelector<HTMLElement>('[data-subagent-run-card]')
-  if (card === null) throw new Error('no subagent run card')
-  return card
+const dockRows = () => [...document.querySelectorAll<HTMLElement>('[data-subagent-dock-row]')]
+const rowOf = (label: string): HTMLElement => {
+  const row = document.querySelector<HTMLElement>(`[aria-label="subagentPreviewKind: ${label}"]`)
+  if (row === null) throw new Error(`no dock row for ${label}`)
+  return row
 }
-const fold = () => document.querySelector('[data-dshfiles-live-preview-fold="subagents"]')
+const fold = () => document.querySelector<HTMLElement>('[data-dshfiles-live-preview-fold="subagents"]')
+const openFold = (): void => {
+  const button = fold()
+  if (button === null) throw new Error('no fold row')
+  fireEvent.click(button)
+}
 
 describe('SubagentPreviewDock', () => {
   it('lists working children only, and clears as they go idle', () => {
@@ -93,7 +112,7 @@ describe('SubagentPreviewDock', () => {
     expect(document.querySelector('[data-dshfiles-live-preview-dock]')).toBeNull()
   })
 
-  it('holds a child open only while its row is expanded', () => {
+  it('holds a child open only while its row is expanded when the step setting is off', () => {
     const bindings = preview()
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings })} />)
     expect(bindings.retainChild).not.toHaveBeenCalled()
@@ -101,112 +120,101 @@ describe('SubagentPreviewDock', () => {
     expect(bindings.retainChild).toHaveBeenCalledOnce()
   })
 
-  it('shows a single working child without a fold row', () => {
-    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'] })} />)
+  it('draws a child in a tool and a child between tools as the same compact row, never a card', async () => {
+    // One child was a 133 px card while its sibling between tools was a 34 px row, and each flipped between the two.
+    const bindings = preview({ retainChild: childInTool({ tools: { 'child-a': 'bash', 'child-b': null } }).retainChild })
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'], bindings, runCards: true, childTiming: true })} />)
+    await waitFor(() => expect(rowOf('Review').querySelector('[data-subagent-run-step]')?.textContent).toBe('Running a command'))
     expect(fold()).toBeNull()
-    expect(rows()).toHaveLength(1)
+    expect(dockRows()).toHaveLength(2)
+    expect(document.querySelector('[data-subagent-run-card]')).toBeNull()
+    for (const label of ['Review', 'Refactor']) {
+      const row = rowOf(label)
+      expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
+      expect(row.querySelectorAll('[data-live-elapsed]')).toHaveLength(1)
+      expect(row.querySelector('[data-subagent-dock-row]')?.className).toContain('dshx:h-8')
+      expect(row.querySelectorAll('button')).toHaveLength(2)
+    }
+    expect(rowOf('Refactor').querySelector('[data-subagent-run-step]')).toBeNull()
   })
 
-  it("folds two or more working children into one closed row and keeps the reader's choice as children come and go", () => {
-    const count = (n: number): string => `${n} subagents`
-    const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} count={count} />)
-    expect(fold()?.textContent).toBe('2 subagents subagentpreviewworking')
-    expect(fold()?.getAttribute('aria-expanded')).toBe('false')
-    expect(rows()).toHaveLength(0)
-    fireEvent.click(screen.getByRole('button', { name: '2 subagents subagentpreviewworking' }))
-    expect(fold()?.getAttribute('aria-expanded')).toBe('true')
-    expect(rows()).toHaveLength(2)
-    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-b'] })} count={count} />)
-    expect(fold()).toBeNull()
-    expect(rows()).toHaveLength(1)
-    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} count={count} />)
-    expect(fold()?.getAttribute('aria-expanded')).toBe('true')
-    expect(rows()).toHaveLength(2)
-    fireEvent.click(screen.getByRole('button', { name: '2 subagents subagentpreviewworking' }))
-    expect(rows()).toHaveLength(0)
-  })
-
-  it('shows the compact run card for a working child whose turn, route and tool are known', async () => {
+  it('says the step in words, never the tool identifier, and keeps the model for the expanded detail', async () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
-    await screen.findByRole('button', { name: 'subagentPreviewStop' })
-    const card = cardOf()
-    // The step in words, never the tool's identifier ("In bash").
-    expect(card.querySelector('[data-subagent-run-step]')?.textContent).toBe('Running a command')
-    expect(card.textContent).not.toMatch(/\bbash\b/u)
+    await waitFor(() => expect(document.querySelector('[data-subagent-run-step]')?.textContent).toBe('Running a command'))
+    const row = rowOf('Review')
+    expect(row.textContent).not.toMatch(/\bbash\b/u)
+    expect(row.querySelector('[data-subagent-run-model]')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
     // The model's name, never the route id with its provider ("openai/gpt-6.1-luna").
-    expect(card.querySelector('[data-subagent-run-model]')?.textContent).toBe('gpt-6.1-luna')
-    expect(card.textContent).not.toContain('openai/')
-    // The shared status glyph (no decorative ring) and one clock, not the same duration in two formats.
-    expect(card.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
-    expect(card.querySelectorAll('[data-live-elapsed]')).toHaveLength(1)
-    expect(screen.queryByRole('button', { name: 'Pause' })).toBeNull()
+    expect(row.querySelector('[data-subagent-run-model]')?.textContent).toBe('gpt-6.1-luna')
+    expect(row.textContent).not.toContain('openai/')
   })
 
   it('says a child held by a question waits for an answer, with the Needs-you glyph', async () => {
     const bindings = preview({ retainChild: childInTool({ tool: 'ask_parent_question' }).retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
-    await screen.findByRole('button', { name: 'subagentPreviewStop' })
-    const card = cardOf()
-    // It read "Working · In ask_parent_question" beside a spinner.
-    expect(card.querySelector('[data-subagent-run-step]')?.textContent).toBe('subagentRunWaiting')
-    expect(card.textContent).not.toContain('ask_parent_question')
-    expect(card.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('needs-you')
-    expect(card.hasAttribute('data-waiting')).toBe(true)
+    await waitFor(() => expect(document.querySelector('[data-subagent-run-step]')?.textContent).toBe('subagentRunWaiting'))
+    const row = rowOf('Review')
+    expect(row.textContent).not.toContain('ask_parent_question')
+    expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('needs-you')
+    expect(row.hasAttribute('data-waiting')).toBe(true)
   })
 
-  it('stops the child through its interrupt after a confirmation', async () => {
+  it('stops the child from the expanded row after a confirmation, and the confirmation can be cancelled', async () => {
     const child = childInTool()
-    render(
-      <SubagentPreviewDock
-        {...dockProps({ running: ['child-a'], bindings: preview({ retainChild: child.retainChild }), runCards: true, childTiming: true })}
-      />,
-    )
-    fireEvent.click(await screen.findByRole('button', { name: 'subagentPreviewStop' }))
-    expect(child.cancel).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewConfirmStop' }))
-    await Promise.resolve()
-    expect(child.cancel).toHaveBeenCalledOnce()
-  })
-
-  it('keeps the confirmation cancellable without losing the card', async () => {
-    const bindings = preview({ retainChild: childInTool().retainChild })
-    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings: preview({ retainChild: child.retainChild }), runCards: true, childTiming: true })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
     fireEvent.click(await screen.findByRole('button', { name: 'subagentPreviewStop' }))
     fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewKeepWorking' }))
-    expect(screen.getByRole('button', { name: 'subagentPreviewStop' })).not.toBeNull()
-    expect(cardOf()).not.toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewStop' }))
+    expect(child.cancel).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewConfirmStop' }))
+    await waitFor(() => expect(child.cancel).toHaveBeenCalledOnce())
   })
 
-  it('opens the child thread from the card', async () => {
+  it('opens the child thread from the row, and the expanded detail does not repeat it', async () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
-    fireEvent.click(await screen.findByRole('button', { name: 'subagentPreviewOpenThread' }))
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
+    await screen.findByRole('button', { name: 'subagentPreviewStop' })
+    expect(screen.getAllByRole('button', { name: 'subagentPreviewOpenThread' })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: 'subagentPreviewStop' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewOpenThread' }))
     expect(bindings.openChild).toHaveBeenCalledWith('child-a')
   })
 
-  it('expands the live progress without duplicating the card actions', async () => {
-    const bindings = preview({ retainChild: childInTool().retainChild })
-    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
-    await screen.findByRole('button', { name: 'subagentPreviewStop' })
-    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'subagentPreviewToggle' }).getAttribute('aria-expanded')).toBe('true'))
-    expect(screen.getAllByRole('button', { name: 'subagentPreviewStop' })).toHaveLength(1)
-    expect(screen.getAllByRole('button', { name: 'subagentPreviewOpenThread' })).toHaveLength(1)
-  })
-
-  it('keeps the one-line row until the open turn is known', async () => {
+  it('shows no clock until the open turn is known', () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: false })} />)
-    expect(screen.getByRole('button', { name: 'subagentPreviewToggle' })).not.toBeNull()
-    expect(document.querySelector('[data-subagent-run-card]')).toBeNull()
-    expect(bindings.retainChild).toHaveBeenCalled()
+    expect(dockRows()).toHaveLength(1)
+    expect(document.querySelector('[data-live-elapsed]')).toBeNull()
   })
 
-  it('never holds a child while the run card setting is off', () => {
+  it('never holds a child and shows no step or clock while the step-and-clock setting is off', () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: false, childTiming: true })} />)
     expect(bindings.retainChild).not.toHaveBeenCalled()
-    expect(document.querySelector('[data-subagent-run-card]')).toBeNull()
+    expect(dockRows()).toHaveLength(1)
+    expect(document.querySelector('[data-subagent-run-step]')).toBeNull()
+    expect(document.querySelector('[data-live-elapsed]')).toBeNull()
+  })
+
+  it("shows up to three rows, folds four or more into one closed row, and keeps the reader's choice", () => {
+    const count = (n: number): string => `${n} subagents`
+    const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'] })} count={count} />)
+    expect(fold()).toBeNull()
+    expect(rows()).toHaveLength(3)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} count={count} />)
+    expect(fold()?.getAttribute('aria-expanded')).toBe('false')
+    expect(rows()).toHaveLength(0)
+    openFold()
+    expect(rows()).toHaveLength(4)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-b'] })} count={count} />)
+    expect(fold()).toBeNull()
+    expect(rows()).toHaveLength(1)
+    rerender(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} count={count} />)
+    expect(fold()?.getAttribute('aria-expanded')).toBe('true')
+    expect(rows()).toHaveLength(4)
   })
 })

@@ -26,7 +26,6 @@ const STATE_KEY = {
   working: 'subagentPreviewWorking',
   finished: 'subagentPreviewFinished',
   interrupted: 'subagentPreviewInterrupted',
-  idle: 'subagentPreviewIdle',
 } as const satisfies Record<SubagentPreviewState, string>
 
 export const subagentStateLabel = (t: SubagentPreviewTranslate, state: SubagentPreviewState): string => t(STATE_KEY[state])
@@ -125,10 +124,12 @@ const FeedLine = (props: {
 export const SubagentLivePreview = (
   props: SubagentPreviewBindings & {
     readonly childId: string
-    readonly state: SubagentPreviewState
+    readonly state: SubagentPreviewState | undefined
     readonly onTurnState: (lastTurnCompleted: boolean | undefined) => void
-    /** Off when the surface around the preview already renders Stop and Open thread (the run card does). */
+    /** Off when the surface around the preview already renders Stop and Open thread. */
     readonly showActions?: boolean
+    /** Off when the row around the preview already has Open thread (the dock row does). */
+    readonly showOpenThread?: boolean
   },
 ): JSX.Element => {
   const { t, childId, state } = props
@@ -141,9 +142,11 @@ export const SubagentLivePreview = (
       {feed.kind === 'ready' ? <FeedLine store={feed.store} t={t} onTurnState={props.onTurnState} /> : null}
       {showActions ? (
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          <Button size="xs" variant="link" className="dshx:shrink" onClick={() => props.openChild(childId)}>
-            {t('subagentPreviewOpenThread')}
-          </Button>
+          {props.showOpenThread === false ? null : (
+            <Button size="xs" variant="link" className="dshx:shrink" onClick={() => props.openChild(childId)}>
+              {t('subagentPreviewOpenThread')}
+            </Button>
+          )}
           {props.canOpenAside(childId) ? (
             <Button size="xs" variant="ghost" className="dshx:shrink" onClick={() => props.openChildAside(childId)}>
               {t('subagentPreviewOpenAside')}

@@ -2,24 +2,21 @@ import { useMemo, useState, type ComponentProps } from 'react'
 import * as Result from 'effect/Result'
 import * as Schema from 'effect/Schema'
 import { DisclosureRow, IconAgentPresetOutlineRegular, IconInspectOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
-import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { JsonText } from '../json-text.js'
 import { SubagentFeedModel } from './subagent-feed.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
-import { subagentName } from './subagent-name.js'
-import { providerModelLabel } from './route-label.js'
+import { useSubagentState } from './subagent-state.js'
 
 const subagentArgumentsSchema = Schema.StructWithRest(
   Schema.Struct({
     prompt: Schema.optional(Schema.String),
     description: Schema.optional(Schema.String),
-    provider: Schema.optional(Schema.String),
-    model: Schema.optional(Schema.String),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 )
@@ -40,32 +37,46 @@ const resultText = (props: SubagentToolRowProps): string | undefined => {
   return props.block.error === undefined ? undefined : `${props.block.error.name}: ${props.block.error.code}`
 }
 
+/** How a record row ends once its child stopped working; a working child says it with the row's spinner, not a word. */
+const endingOf = (
+  t: SubagentPreviewBindings['t'],
+  state: ReturnType<typeof SubagentFeedModel.stateOf>,
+  settledMs: number | undefined,
+): readonly string[] => {
+  if (state === 'finished') return settledMs === undefined || settledMs < 1_000 ? [subagentStateLabel(t, state)] : [subagentStateLabel(t, state), formatElapsed(settledMs)]
+  if (state === 'interrupted' || state === 'failed-to-start') return [subagentStateLabel(t, state)]
+  return []
+}
+
+/**
+ * A delegation's record row in the transcript: `Subagent · {description}`, the same glyph and name as its dock row and
+ * no clock. It ends as `Done · 5m 02s`, `Failed` or `Stopped`; it never shows a generated handle or the route.
+ */
 export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const call = props.phase === 'preparing' ? null : props.phase === 'result' ? props.block.call : props.block
   const argsRaw = call?.argsRaw
   const args = useMemo(() => callArguments(argsRaw), [argsRaw])
-  const routeLabel = providerModelLabel(args?.provider, args?.model)
   const result = resultText(props)
   const childName = props.phase === 'result' && !props.block.isError ? SubagentFeedModel.childNameOfResult(result) : undefined
-  const childId = props.useSessions(list => SubagentFeedModel.childOf(list.projectionsBySession[props.sessionId]?.values.subagentCatalog, childName))
+  const catalog = (list: Parameters<Parameters<SubagentToolRowProps['useSessions']>[0]>[0]) =>
+    list.projectionsBySession[props.sessionId]?.values.subagentCatalog
+  const childId = props.useSessions(list => SubagentFeedModel.childOf(catalog(list), childName))
+  const catalogLabel = props.useSessions(list => (childId === undefined ? undefined : catalog(list)?.find(entry => entry.id === childId)?.label))
   // The result only says the child started; the child's own state is what the row reports from here on.
   const output = childId === undefined ? result : undefined
-  const running = props.useSessionStatus(statuses => (childId === undefined ? false : statuses.get(SessionId(childId))?.running === true))
-  const listedTurn = props.useSessions(list =>
-    childId === undefined ? undefined : list.byId[SessionId(childId)]?.projectionValues?.subagentTiming?.lastTurnCompleted,
-  )
+  const child = useSubagentState({ childId, useSessions: props.useSessions, useSessionStatus: props.useSessionStatus })
   const [feedTurn, setFeedTurn] = useState<boolean | undefined>(undefined)
   const state = SubagentFeedModel.stateOf({
     phase: props.phase,
     failed: props.phase === 'result' && props.block.isError,
     childId,
-    running,
-    lastTurnCompleted: feedTurn ?? listedTurn,
+    running: child.working,
+    lastTurnCompleted: feedTurn ?? child.lastTurnCompleted,
   })
-  const name = subagentName({ sessionId: props.sessionId, callId: props.callId })
-  const task = args?.description?.trim()
-  const heading = [props.t('tool.title.subagent'), name, task === '' ? undefined : task, routeLabel].filter(part => part !== undefined).join(' · ')
-  const title = childId === undefined ? heading : `${heading} · ${subagentStateLabel(props.preview.t, state)}`
+  const task = args?.description?.trim() || catalogLabel?.trim() || undefined
+  const title = [props.preview.t('subagentPreviewKind'), task, ...endingOf(props.preview.t, state, child.settledMs)]
+    .filter(part => part !== undefined)
+    .join(' · ')
   const disclosure = props.useDisclosure()
   const prompt = args?.prompt?.trim()
   const expandable = (prompt !== undefined && prompt !== '') || output !== undefined || childId !== undefined
@@ -80,7 +91,7 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   }
 
   return (
-    <div className="dshx-root" {...(childId === undefined ? {} : { 'data-dshfiles-live-preview': 'agent', 'data-state': state })}>
+    <div className="dshx-root" {...(childId === undefined ? {} : { 'data-dshfiles-live-preview': 'agent', 'data-state': state ?? 'unknown' })}>
       <DisclosureRow {...disclosureProps}>
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3">
           {prompt === undefined || prompt === '' ? null : (

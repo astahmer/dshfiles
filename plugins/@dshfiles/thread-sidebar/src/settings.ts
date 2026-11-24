@@ -201,7 +201,7 @@ export const threadSidebarSettings = defineSettings({
     subagentRunCards: Schema.boolean()
       .default(DEFAULT_PREFERENCES.subagentRunCards)
       .description(
-        'Show each working subagent above the composer as a run card with its tool, time and Stop.',
+        'Show the current step and the elapsed time on each working subagent\'s row above the composer.',
       ),
     archiveUndoEnabled: Schema.boolean()
       .default(DEFAULT_PREFERENCES.archiveUndoEnabled)

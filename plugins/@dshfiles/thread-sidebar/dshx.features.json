@@ -4360,7 +4360,7 @@
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
       "summary": "A subagent's row shows its current step and latest answer, and opens its thread or stops it.",
-      "details": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer fold into one \"N subagents working\" row, closed by default like the background-jobs dock; opening it lists them, and the choice holds while children start and finish. With subagentRunCards on (the default) a working child whose open turn, route and tool are known becomes a compact run card: current tool, route, elapsed time, step count, Stop behind a confirmation and Open thread. A child with any of those parts missing keeps its one-line row, and the setting's off state is that row.",
+      "details": "A delegation's row in the transcript is the child's record, `Subagent · {description}` with no generated handle and no route: a spinner while the child works, then Done with its working time, Stopped or Failed; never Idle. Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Above the composer each working child is one compact row whatever it is doing: status glyph, name, current step, elapsed time and Open thread; opening it shows the model, the live preview and Stop behind a confirmation. Up to three rows show; four or more fold into one \"N subagents working\" row, closed by default like the background-jobs dock, and the choice holds while children start and finish. subagentRunCards (on by default) shows the step and the clock; off, the row shows the name only and never holds the child.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
@@ -4377,7 +4377,7 @@
         {
           "key": "subagentRunCards",
           "defaultValue": "true",
-          "constraints": "Boolean; show the compact run card instead of the one-line row above the composer.",
+          "constraints": "Boolean; show the current step and the elapsed time on each working subagent's dock row.",
           "choices": ["true", "false"],
           "coveredBy": ["thread-sidebar.subagent-live-preview"]
         }
@@ -4388,12 +4388,11 @@
         "working",
         "finished",
         "interrupted",
-        "idle",
         "stop-armed",
         "stopping",
         "progress-unavailable",
-        "run-card",
-        "run-card-row-fallback"
+        "dock-row",
+        "dock-fold"
       ],
       "failureModes": [
         "A child that cannot be opened keeps its row and thread link, and says live progress is unavailable.",
@@ -4440,31 +4439,31 @@
           "kind": "unit-test",
           "id": "thread-sidebar.subagent-dock-group-collapse",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
-          "testName": "folds two or more working children into one closed row and keeps the reader's choice as children come and go"
+          "testName": "shows up to three rows, folds four or more into one closed row, and keeps the reader's choice"
         },
         {
           "kind": "unit-test",
-          "id": "thread-sidebar.subagent-run-card",
+          "id": "thread-sidebar.subagent-dock-one-row-shape",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
-          "testName": "shows the compact run card for a working child whose turn, route and tool are known"
+          "testName": "draws a child in a tool and a child between tools as the same compact row, never a card"
         },
         {
           "kind": "unit-test",
-          "id": "thread-sidebar.subagent-run-card-fallback",
+          "id": "thread-sidebar.subagent-dock-no-clock-until-known",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
-          "testName": "keeps the one-line row until the open turn is known"
+          "testName": "shows no clock until the open turn is known"
         },
         {
           "kind": "unit-test",
-          "id": "thread-sidebar.subagent-run-card-actions",
+          "id": "thread-sidebar.subagent-dock-stop",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
-          "testName": "stops the child through its interrupt after a confirmation"
+          "testName": "stops the child from the expanded row after a confirmation, and the confirmation can be cancelled"
         },
         {
           "kind": "unit-test",
-          "id": "thread-sidebar.subagent-run-card-no-fake-actions",
-          "file": "plugins/@dshfiles/plugin-ui/tests/agent-run-status.test.tsx",
-          "testName": "renders only the actions whose handler exists, never a disabled stand-in"
+          "id": "thread-sidebar.subagent-record-row",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-tool-row.client.test.tsx",
+          "testName": "reports the child in agent terms, never Idle, and says its total once it is done"
         }
       ],
       "telemetry": [

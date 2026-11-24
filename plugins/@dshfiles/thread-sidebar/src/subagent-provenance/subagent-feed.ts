@@ -4,7 +4,7 @@ import type { SessionEventLikeEntry, SessionEventSource } from '@deepseek-ai/dsh
  * What the transcript's subagent preview shows of a child thread. A subagent is a conversation, not a job: it works,
  * goes idle and can be followed up, so it has its own states and never reuses the job lifecycle words.
  */
-export type SubagentPreviewState = 'starting' | 'failed-to-start' | 'working' | 'finished' | 'interrupted' | 'idle'
+export type SubagentPreviewState = 'starting' | 'failed-to-start' | 'working' | 'finished' | 'interrupted'
 
 export interface SubagentFeed {
   /** The tool the child is in now. */
@@ -104,11 +104,12 @@ export const SubagentFeedModel = {
     readonly childId: string | undefined
     readonly running: boolean
     readonly lastTurnCompleted: boolean | undefined
-  }): SubagentPreviewState {
+  }): SubagentPreviewState | undefined {
     if (input.failed) return 'failed-to-start'
     if (input.childId === undefined) return 'starting'
     if (input.running) return 'working'
-    if (input.lastTurnCompleted === undefined) return 'idle'
+    // Neither a status nor a closed turn is known yet: say nothing rather than "Idle", which a child never is.
+    if (input.lastTurnCompleted === undefined) return undefined
     return input.lastTurnCompleted ? 'finished' : 'interrupted'
   },
 }

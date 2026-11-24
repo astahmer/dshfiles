@@ -3076,7 +3076,8 @@ Then("the transcript row opens the subagent's thread", async ({ page }: { page: 
       .click()
     await page.getByText('Coordinated subagents', { exact: true }).first().click()
     const row = page.locator('[data-dshfiles-live-preview="agent"]').first()
-    await expect(row).toHaveAttribute('data-state', /^(interrupted|idle)$/, { timeout: 30_000 })
+    // A child is never Idle: the row reads its stop from the child's timing, or says nothing until it knows.
+    await expect(row).toHaveAttribute('data-state', /^(interrupted|unknown)$/, { timeout: 30_000 })
     await row.getByRole('button').first().click()
     await row.getByRole('button', { name: 'Open thread', exact: true }).click()
     // A child keeps the parent's address; its own first message is what proves the navigation.
