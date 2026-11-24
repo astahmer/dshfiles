@@ -1635,6 +1635,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "ThreadHeaderLand",
+      "importFrom": "@dshfiles/jj-integration/thread-header-land",
+      "owner": "@dshfiles/jj-integration",
+      "source": "plugins/@dshfiles/jj-integration/src/thread-header-land.ts:20",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/jj-integration.thread-header-land",
+      "kind": "contract",
+      "title": "ThreadHeaderLand",
+      "summary": "Client service contract provided by @dshfiles/jj-integration.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(ThreadHeaderLand) to consume; only @dshfiles/jj-integration provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/jj-integration's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/jj-integration.thread-header-land"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/loopback-access/startup",
       "kind": "module",
       "title": "@dshfiles/loopback-access/startup",
