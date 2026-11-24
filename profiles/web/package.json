@@ -20,6 +20,7 @@
     "@dshfiles/backlog": "link:../../plugins/@dshfiles/backlog",
     "@dshfiles/backlog-jira": "link:../../plugins/@dshfiles/backlog-jira",
     "@dshfiles/backlog-notion": "link:../../plugins/@dshfiles/backlog-notion",
+    "@dshfiles/browse": "link:../../plugins/@dshfiles/browse",
     "@dshfiles/btw": "link:../../plugins/@dshfiles/btw",
     "@dshfiles/capabilities-hub": "link:../../plugins/@dshfiles/capabilities-hub",
     "@dshfiles/chat": "link:../../plugins/@dshfiles/chat",
@@ -218,6 +219,7 @@
         "@dshfiles/whiteboard",
         "@dshfiles/phone-access",
         "@dshfiles/phone-pairing",
+        "@dshfiles/browse",
         "@dshfiles/onboarding",
         "@dshfiles/mermaid-diagrams"
       ]
