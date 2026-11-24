@@ -46,6 +46,7 @@ test('counts raw colours outside token files and comments, and each native icon 
   assert.deepEqual(rulesIn('plugins/@dshfiles/demo/src/a.tsx', source), ['raw-colour:#10A37F', 'raw-colour:oklch(0', 'native-icons:IconArchiveOutlineRegular'])
   assert.deepEqual(rulesIn('plugins/@dshfiles/ui-styles/src/theme.generated.css', ':root { --x: oklch(0.5 0.1 65); }'), [])
   assert.ok(isTokenFile('plugins/@dshfiles/plugin-ui/src/styles.css'))
+  assert.ok(isTokenFile('plugins/@dshfiles/plugin-ui/src/color-roles.css'))
   assert.equal(isTokenFile('plugins/@dshfiles/plugin-ui/src/components/ui/button.tsx'), false)
 })
 

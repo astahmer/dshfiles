@@ -1,0 +1,68 @@
+/*
+ * Colour roles (DESIGN.md › Colour roles). Colour has four jobs: attention, result, identity, data. Each role below
+ * names its job, so a plugin writes `dshx:text-status-ready` or `dshx:bg-identity-3` instead of borrowing a status hue.
+ *
+ * - Status and health roles are new names for the existing semantic values: they follow the Host theme (and a custom
+ *   accent hue) exactly as `info`, `success`, `warning` and `destructive` do.
+ * - `control-on` is the accent: the on state of a switch, checkbox or radio.
+ * - Identity tells projects, providers and agents apart and never says state: a text-safe ramp at oklch L 0.50
+ *   (light) and 0.78 with chroma capped at 0.13 (dark), every tone at AA on bg, panel and raised in both schemes
+ *   (tests/palette.test.ts).
+ * - Data is the categorical chart order: the accent, then five identity tones (green, sky and brown stay out of charts
+ *   so a series never reads as a status).
+ *
+ * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
+ */
+@theme inline {
+  --color-status-needs-you: var(--dsw-alias-state-business-primary);
+  --color-status-failed: var(--dsw-alias-state-error-primary);
+  --color-status-ready: var(--dsw-alias-state-success-primary);
+  --color-status-working: var(--dsw-alias-label-primary);
+  --color-status-idle: var(--dsw-alias-label-tertiary);
+  --color-status-done: var(--dsw-alias-label-secondary);
+  --color-control-on: var(--dsw-alias-state-business-primary);
+  --color-health-ok: var(--dsw-alias-state-success-primary);
+  --color-health-limited: var(--dsw-alias-state-warn-primary);
+  --color-health-down: var(--dsw-alias-state-error-primary);
+  --color-health-off: var(--dsw-alias-label-tertiary);
+  --color-identity-1: var(--dshx-identity-1);
+  --color-identity-2: var(--dshx-identity-2);
+  --color-identity-3: var(--dshx-identity-3);
+  --color-identity-4: var(--dshx-identity-4);
+  --color-identity-5: var(--dshx-identity-5);
+  --color-identity-6: var(--dshx-identity-6);
+  --color-identity-7: var(--dshx-identity-7);
+  --color-identity-8: var(--dshx-identity-8);
+  --color-data-1: var(--dsw-alias-state-business-primary);
+  --color-data-2: var(--dshx-identity-1);
+  --color-data-3: var(--dshx-identity-3);
+  --color-data-4: var(--dshx-identity-2);
+  --color-data-5: var(--dshx-identity-4);
+  --color-data-6: var(--dshx-identity-6);
+}
+
+@layer base {
+  :root {
+    /* teal, violet, orange, pink, green, olive, sky, brown */
+    --dshx-identity-1: oklch(0.5 0.09 195);
+    --dshx-identity-2: oklch(0.5 0.17 300);
+    --dshx-identity-3: oklch(0.5 0.13 50);
+    --dshx-identity-4: oklch(0.5 0.17 350);
+    --dshx-identity-5: oklch(0.5 0.13 145);
+    --dshx-identity-6: oklch(0.5 0.1 100);
+    --dshx-identity-7: oklch(0.5 0.12 235);
+    --dshx-identity-8: oklch(0.5 0.08 70);
+    /* How long a row that just became Needs you, Failed or Ready holds its tint (DESIGN.md › Motion). */
+    --dshx-duration-hold: 1200ms;
+  }
+  body[data-ds-dark-theme] {
+    --dshx-identity-1: oklch(0.78 0.09 195);
+    --dshx-identity-2: oklch(0.78 0.13 300);
+    --dshx-identity-3: oklch(0.78 0.13 50);
+    --dshx-identity-4: oklch(0.78 0.13 350);
+    --dshx-identity-5: oklch(0.78 0.13 145);
+    --dshx-identity-6: oklch(0.78 0.1 100);
+    --dshx-identity-7: oklch(0.78 0.12 235);
+    --dshx-identity-8: oklch(0.78 0.08 70);
+  }
+}

@@ -15,6 +15,7 @@
 @source './';
 @source '../..';
 @import 'tw-animate-css' prefix(dshx);
+@import './color-roles.css';
 
 @custom-variant dark (&:where(body[data-ds-dark-theme] *));
 /*
