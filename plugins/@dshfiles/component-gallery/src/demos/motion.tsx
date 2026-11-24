@@ -133,6 +133,55 @@ function DrawStrokeDemo() {
   )
 }
 
+/** `dshx-reveal`: dock entries above a composer stand-in open by height and never move the field below them. */
+function RevealDemo() {
+  const [open, setOpen] = React.useState(true)
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-3">
+      <div className="dshx:flex dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background">
+        <div className="dshx-reveal" data-state={open ? 'open' : 'closed'} data-demo-reveal="">
+          <div>
+            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:text-sm">
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">Dev server</span>
+              <span className="dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">2m 05s</span>
+            </div>
+          </div>
+        </div>
+        <div className="dshx:px-3 dshx:py-3 dshx:text-sm dshx:text-muted-foreground">Ask anything</div>
+      </div>
+      <Button size="sm" variant="outline" className="dshx:self-start" aria-pressed={open} onClick={() => setOpen(value => !value)}>
+        {open ? 'Close the entry' : 'Open the entry'}
+      </Button>
+    </div>
+  )
+}
+
+/** `dshx-pop-in`: a notice over a list that takes no layout, so the rows under the pointer hold still. */
+function PopInDemo() {
+  const [shown, setShown] = React.useState(true)
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-3">
+      <div className="dshx:relative dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:p-2 dshx:pt-10">
+        <span
+          className="dshx-pop-in dshx:absolute dshx:inset-x-0 dshx:top-2 dshx:mx-auto dshx:w-fit dshx:rounded-full dshx:border dshx:border-border dshx:bg-popover dshx:px-3 dshx:py-1 dshx:text-xs dshx:shadow-s1"
+          data-state={shown ? 'open' : 'closed'}
+          data-demo-pop-in=""
+        >
+          3 updates held
+        </span>
+        {['Fix the flaky test', 'Review the land plan', 'Draft the release notes'].map(row => (
+          <div key={row} className="dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-sm">
+            {row}
+          </div>
+        ))}
+      </div>
+      <Button size="sm" variant="outline" className="dshx:self-start" aria-pressed={shown} onClick={() => setShown(value => !value)}>
+        {shown ? 'Hide the notice' : 'Show the notice'}
+      </Button>
+    </div>
+  )
+}
+
 export const motionDemos: readonly GalleryDemo[] = [
   {
     id: 'motion-presets',
@@ -168,5 +217,19 @@ export const motionDemos: readonly GalleryDemo[] = [
     description: 'Draws an SVG path in: sparklines, graph edges, check marks.',
     source: "import { drawStroke } from '@dshfiles/plugin-ui/motion'",
     render: () => <DrawStrokeDemo />,
+  },
+  {
+    id: 'motion-reveal',
+    title: 'dshx-reveal',
+    description: 'A block that opens by its height (grid rows 0fr to 1fr) in 120ms and closes in 100ms: dock entries, stacked notices.',
+    source: '<div className="dshx-reveal" data-state={open ? "open" : "closed"}><div>…</div></div>',
+    render: () => <RevealDemo />,
+  },
+  {
+    id: 'motion-pop-in',
+    title: 'dshx-pop-in',
+    description: 'An overlay that fades in with 4px of travel in 120ms and out in 100ms, taking no layout: a notice over a list.',
+    source: '<span className="dshx-pop-in" data-state={shown ? "open" : "closed"}>…</span>',
+    render: () => <PopInDemo />,
   },
 ]

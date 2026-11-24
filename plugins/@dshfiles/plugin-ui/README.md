@@ -206,8 +206,13 @@ import { RollingNumber, ShimmerText } from '@dshfiles/plugin-ui/components/motio
 - **Reduced motion:** pass every option object through `motionSafe` (the helpers and hooks already do). Under
   `prefers-reduced-motion` the animation ends on its final frame at once and `PresenceList` removes items immediately;
   CSS loops use `dshx:motion-reduce:animate-none`.
+- Two CSS utilities need no JavaScript (`src/motion-utilities.css`): `dshx-reveal` opens a block by its height
+  (`grid-template-rows` 0fr → 1fr, its one child clipped) and `dshx-pop-in` fades an overlay in with 4px of travel.
+  Both enter in 120ms on mount or when `data-state="closed"` goes, leave in 100ms when it comes, and are opacity only
+  under reduced motion. `dshx-pop-in` owns `translate`, so do not add a `translate-*` utility to it.
 - Live clocks and running bars use `everyFrame`/`useElapsed`, never `setInterval` inside a component. Simulated data
-  belongs to gallery demos; components stay controlled by props.
+  belongs to gallery demos; components stay controlled by props. A clock's text comes from `formatElapsed`
+  (`lib/format-duration`); `LiveElapsed` ticks it on the page's one shared second timer.
 - Do not put Tailwind `scale-*`/`rotate-*`/`translate-*` classes on an element Motion animates: they set the separate
   CSS `scale`/`rotate`/`translate` properties, which compound with Motion's `transform`.
 - Inline styles cannot use the `--dshx-color-*` theme variables (they are declared on `:root`, where the Host's
