@@ -5,7 +5,7 @@ import { cn } from '../../lib/utils.js'
 import { ArrowUpRightIcon, AsteriskIcon, CheckIcon, CircleXIcon, PauseIcon, PlayIcon, SquareIcon, type LucideIcon } from '../../icons.js'
 import { Button } from '../ui/button.js'
 import { ShimmerText, RollingNumber } from './text.js'
-import { ElapsedClock, formatDuration } from './elapsed-clock.js'
+import { ElapsedClock } from './elapsed-clock.js'
 
 export type AgentRunState = 'running' | 'paused' | 'done' | 'stopped' | 'failed'
 
@@ -159,7 +159,6 @@ export function AgentRunStatus({
             startedAt={current.startedAt}
             endedAt={current.endedAt ?? endedAt}
             running={active}
-            format={formatDuration}
             className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground"
           />
         </Swap>

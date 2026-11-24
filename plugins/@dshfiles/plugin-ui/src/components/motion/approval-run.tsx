@@ -18,7 +18,8 @@ import {
 import { Button } from '../ui/button.js'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js'
 import { RollingNumber } from './text.js'
-import { ElapsedClock, formatClock } from './elapsed-clock.js'
+import { formatElapsed } from '../../lib/format-duration.js'
+import { ElapsedClock } from './elapsed-clock.js'
 
 export type ApprovalStepStatus = 'done' | 'running' | 'waiting' | 'pending'
 /** `answer` asks the user a question; `approval` needs an explicit approve / revise / deny. */
@@ -176,7 +177,7 @@ export function ApprovalRun({
           Step <RollingNumber value={stepNumber} /> of {totalSteps}
         </span>
         <span aria-hidden className="dshx:size-1 dshx:rounded-full dshx:bg-muted-foreground/50" />
-        <ElapsedClock startedAt={startedAt} endedAt={endedAt} running={state === 'working' || state === 'waiting'} format={formatClock} aria-label="Elapsed" />
+        <ElapsedClock startedAt={startedAt} endedAt={endedAt} running={state === 'working' || state === 'waiting'} aria-label="Elapsed" />
         {state !== 'done' ? (
           <Button
             variant="outline"
@@ -238,7 +239,7 @@ function StepRow({
               <RollingNumber value={percent} />%
             </span>
           ) : null}
-          {step.status === 'done' && step.durationSeconds !== undefined ? <span className="dshx:font-mono">{formatClock(step.durationSeconds)}</span> : null}
+          {step.status === 'done' && step.durationSeconds !== undefined ? <span className="dshx:font-mono">{formatElapsed(step.durationSeconds * 1000)}</span> : null}
         </div>
       </div>
       {step.status === 'running' ? <ProgressLine value={step.progress ?? 0} /> : null}

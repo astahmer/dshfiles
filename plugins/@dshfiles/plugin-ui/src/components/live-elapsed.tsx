@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { formatElapsed } from '../lib/format-duration.js'
 import { cn } from '../lib/utils.js'
 
 /**
@@ -51,14 +52,8 @@ export const subscribeSecondTick = (listener: TickListener): (() => void) => {
   }
 }
 
-/** "12s", "1m 12s", "1h 04m". */
-export const formatElapsed = (ms: number): string => {
-  const total = Math.max(0, Math.floor(ms / 1000))
-  if (total < 60) return `${String(total)}s`
-  const minutes = Math.floor(total / 60)
-  if (minutes < 60) return `${String(minutes)}m ${String(total % 60).padStart(2, '0')}s`
-  return `${String(Math.floor(minutes / 60))}h ${String(minutes % 60).padStart(2, '0')}m`
-}
+/** "12s", "1m 12s", "1h 04m"; the kit's duration grammar, re-exported for the callers that import it from here. */
+export { formatElapsed }
 
 export interface LiveElapsedProps {
   /** Epoch ms the clock counts from. */
