@@ -13,10 +13,9 @@ import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/compone
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
-import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
-import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { PencilIcon, PlusIcon, PresentationIcon, RotateCcwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
@@ -244,9 +243,15 @@ export function BoardsPanel(props: {
   const projectTitle = props.projects.find(choice => choice.path === project)?.title ?? 'this project'
 
   return (
-    <main className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:p-5 dshx:@max-pane-narrow:p-3">
-      <PageHeader heading="Whiteboards" description={`Excalidraw boards saved for ${projectTitle}. Agents can list, read and draw on them.`}>
-        {props.projects.length > 1 ? (
+    <main className="dshx-root dshx:h-full dshx:min-h-0">
+      {/* The kit Page: one h1 the phone top bar replaces, its button on the h1's line, the project as a header select. */}
+      <Page
+        scroll
+        heading="Whiteboard"
+        description={`Boards saved for ${projectTitle}. Agents can list, read and draw on them.`}
+        primaryAction={{ id: 'new-board', label: 'New board', icon: <PlusIcon />, disabled: project === null, onSelect: () => setCreating(true) }}
+        meta={
+          props.projects.length > 1 ? (
           <Select {...(project === null ? {} : { value: project })} onValueChange={props.onProjectChange}>
             <SelectTrigger aria-label="Project" size="sm" className="dshx:max-w-56">
               <SelectValue placeholder="Choose a project" />
@@ -259,11 +264,9 @@ export function BoardsPanel(props: {
               ))}
             </SelectContent>
           </Select>
-        ) : null}
-        <Button size="sm" disabled={project === null} onClick={() => setCreating(true)}>
-          <PlusIcon /> New board
-        </Button>
-      </PageHeader>
+          ) : undefined
+        }
+      >
 
       {notice === null ? null : (
         <Alert>
@@ -322,6 +325,7 @@ export function BoardsPanel(props: {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </Page>
     </main>
   )
 }

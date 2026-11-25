@@ -63,7 +63,7 @@ Given('an agent wrote whiteboard {string} from Mermaid {string}', async ({ page 
 
 When('the Whiteboards page is opened', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, PANEL)
-  await expect(page.getByRole('heading', { name: 'Whiteboards', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Whiteboard', exact: true })).toBeVisible()
 })
 
 When('a whiteboard {string} is created', async ({ page }: { page: Page }, title: string) => {
@@ -125,7 +125,7 @@ When('the Whiteboards page is reloaded', async ({ page }: { page: Page }) => {
   })
   navigationAborts.set(page, admitted)
   await openGlobalPanel(page, PANEL)
-  await expect(page.getByRole('heading', { name: 'Whiteboards', exact: true })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Whiteboard', exact: true })).toBeVisible()
 })
 
 When('whiteboard {string} is opened', async ({ page }: { page: Page }, title: string) => {

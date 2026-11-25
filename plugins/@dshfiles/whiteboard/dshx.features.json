@@ -23,7 +23,7 @@
       "title": "Project whiteboards",
       "summary": "Draw on whiteboards kept per project, with autosave and a Recently deleted list.",
       "details": "Excalidraw boards stored per project on the Host: create, draw with autosave, rename, delete to Recently deleted and restore; the editor bundle loads only when a board opens.",
-      "reach": ["click tab \"Knowledge\"", "click button \"Whiteboard\"", "expect heading \"Whiteboards\""],
+      "reach": ["click tab \"Knowledge\"", "click button \"Whiteboard\"", "expect heading \"Whiteboard\""],
       "surfaces": ["client", "host", "tool", "api", "storage"],
       "surface": "destinationSection",
       "destination": "knowledge",
