@@ -1,6 +1,6 @@
 # AI Accounts
 
-![Reference-faithful Models and inline settings](docs/screenshots/reference-dashboard-models.png)
+![The Models tab: the models table, with the account defaults one link away on Settings](docs/screenshots/reference-dashboard-models.png)
 
 [Settings](docs/screenshots/reference-dashboard-settings.png) · [Usage](docs/screenshots/reference-dashboard-usage.png) · [Design-to-implementation checklist](docs/reference-dashboard.md)
 
