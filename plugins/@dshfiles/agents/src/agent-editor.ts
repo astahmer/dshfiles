@@ -1,4 +1,13 @@
-import { AGENT_DELEGATION_UNRESTRICTED, AGENT_HANDLE_PATTERN, agentLimits, Agents, type Agent, type AgentDraft, type AgentRoute } from './agent.js'
+import {
+  AGENT_DELEGATION_UNRESTRICTED,
+  AGENT_SUBAGENTS_UNRESTRICTED,
+  AGENT_HANDLE_PATTERN,
+  agentLimits,
+  Agents,
+  type Agent,
+  type AgentDraft,
+  type AgentRoute,
+} from './agent.js'
 import type { AgentModelOption } from './dispatch.js'
 
 /** The fields the editor can flag; each maps to one control so a message sits under the field it is about. */
@@ -94,6 +103,11 @@ export class AgentEditor {
         agent === null
           ? { ...AGENT_DELEGATION_UNRESTRICTED, handles: [] }
           : { messaging: agent.delegation.messaging, handles: [...agent.delegation.handles], subagents: agent.delegation.subagents },
+      tools: agent === null ? { tools: {}, groups: {} } : { tools: { ...agent.tools.tools }, groups: { ...agent.tools.groups } },
+      subagents:
+        agent === null
+          ? { ...AGENT_SUBAGENTS_UNRESTRICTED }
+          : { allowed: agent.subagents.allowed === 'any' ? 'any' : [...agent.subagents.allowed], default: agent.subagents.default },
       enabled: agent?.enabled ?? true,
     }
   }

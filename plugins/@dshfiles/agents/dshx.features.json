@@ -5,7 +5,7 @@
     {
       "id": "agent-registry",
       "title": "Manage persistent agents",
-      "summary": "Create, edit, enable, duplicate and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
+      "summary": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
       "reach": [
         "click button \"Agents\"",
         "expect text \"Start from a template\"",
@@ -103,7 +103,7 @@
           "kind": "unit-test",
           "id": "agents.registry-thread-prune",
           "file": "plugins/@dshfiles/agents/src/store.test.ts",
-          "testName": "lists an agent\u2019s threads newest first and drops one when the agent goes"
+          "testName": "lists an agent’s threads newest first and drops one when the agent goes"
         },
         {
           "kind": "gherkin",
@@ -120,7 +120,7 @@
           "kind": "unit-test",
           "id": "agents.routine-schedule-catalog",
           "file": "plugins/@dshfiles/agents/src/dispatch.test.ts",
-          "testName": "narrows the schedule catalog to one agent\u2019s threads"
+          "testName": "narrows the schedule catalog to one agent’s threads"
         },
         {
           "kind": "unit-test",
@@ -154,7 +154,7 @@
     {
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
-      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was \u2014 the backlog reports the new thread in a toast whose Open action shows it \u2014 the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
+      "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was — the backlog reports the new thread in a toast whose Open action shows it — the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -200,7 +200,7 @@
           "kind": "unit-test",
           "id": "agents.comment-autocomplete-scopes",
           "file": "plugins/@dshfiles/backlog/src/inline-completion.test.ts",
-          "testName": "another source\u2019s scope keeps its own meaning, so no agent row appears"
+          "testName": "another source’s scope keeps its own meaning, so no agent row appears"
         },
         {
           "kind": "gherkin",
@@ -301,6 +301,82 @@
         "click button \"Reply\"",
         "click button \"Preview agent @luna\"",
         "expect button \"Open in Agents\""
+      ]
+    },
+    {
+      "id": "agent-tool-access",
+      "title": "An agent decides its threads' tools",
+      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as. Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; UI in a later wave",
+      "configuration": [],
+      "states": ["explicit", "inherited", "project-default", "default", "override-agent", "override-all"],
+      "failureModes": [
+        "A project default naming a removed agent falls back to @dsh for threads started afterwards.",
+        "An override naming an unknown agent is refused (missing-agent) and the thread keeps its tools.",
+        "A custom threads directory is attributed by the default <repository>-threads layout until the VCS providers' answer lands."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-agent-order",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "decides a thread agent in order: explicit, inherited by a subagent, project default (thread workspaces too), then @dsh"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-agent-stable",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "keeps a decided thread on its agent and tools when the project default or the agent changes, across a restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-override",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "sets, reports and clears a thread override, and refuses an unknown agent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-late-dispatch",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "makes a dispatch recorded after the thread attached its explicit agent and reports the change"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-access-edits",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "edits tool access entry by entry and reverses an edit, and stores subagent choices"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-access-provider",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "provides dshfilesToolAccess on the Host while the plugin lives and withdraws it on unload"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.api-schema-parity",
+          "file": "plugins/@dshfiles/agents/tests/api-schema-parity.spec.ts",
+          "testName": "keeps the published API and agent-tool schemas stable"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.tool-access-no-ui-yet",
+          "reason": "This wave ships the Host contract and agent tools only; the tool-access controls in the Agents panel and composer come with the UI wave and its journeys."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
       ]
     }
   ]

@@ -92,8 +92,47 @@ follows [DESIGN.md](../../../DESIGN.md).
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Agents sidebar panel | List, create (blank or from a template), edit, duplicate, enable/disable and remove agents with undo (the built-in `@dsh` is not removable), start a thread, and open a thread the agent started. |
 | `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                                                                     |
-| Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                                                                                     |
+| Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in), and the [tool access](#tool-access) tools.                                          |
 | Mention preview      | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                                                                               |
+
+## Tool access
+
+An agent decides which tools its threads get. This plugin provides the
+[`@dshfiles/tool-search/access`](../tool-search/README.md#per-agent-tool-access) contract (the `dshfilesToolAccess`
+Cordis service); tool-search applies it. Without tool-search installed nothing changes.
+
+- **Per agent: `tools`.** Sparse entries keyed by tool name (`tools`) or group key (`groups`: `mcp:<server>`,
+  `plugin:<package>`, `native`), each `{ enabled?, pinned? }`. Every tool is on and deferred by default, tools that
+  appear later included; a tool entry beats its group entry beats the default, and a tool added later to a disabled group
+  is disabled. `tool_search` and `tool_call` are never disabled.
+- **Per agent: `subagents`.** `{ allowed: 'any' | handles[], default: handle | null }`: which agents its subagents may
+  run as and which one they run as by default (null: the parent thread's agent). Stored now; the `subagent` tool reads
+  it in a later wave.
+- **Per project: a default agent**, keyed by the project's workspace id. A Session belongs to a project by the shared
+  [`@dshfiles/vcs-provider-port/workspace-attribution`](../vcs-provider-port/README.md) rule, so a thread workspace
+  (`<repo>-threads/thread-…`, or a provider's custom threads folder) counts for its project.
+- **Per thread: its agent, decided once.** When the thread's DSH agent attaches: a recorded dispatch or mention
+  (`explicit`) → a subagent's parent thread's agent (`inherited`) → the project's default agent → `@dsh`. The decision and
+  the agent's tools at that moment are stored (`sessions` table, newest 5,000 threads), so editing the agent or the project
+  default reaches only threads started afterwards. A dispatch recorded after the thread attached still makes it the
+  thread's explicit agent and reports the change. Dispatches record the agent before sending the opening message.
+- **Per thread: an override**, reversible: another agent's tools (as they are when chosen) or every tool. tool-search
+  applies it from the thread's next model request; that request loses its prompt cache once.
+
+| Capability                               | API method               | Agent tool                                   |
+| ---------------------------------------- | ------------------------ | -------------------------------------------- |
+| Tool catalog, grouped, first sentences   | `toolCatalog`            | `agents_tool_catalog` (read-only)            |
+| Read an agent's tool access              | `toolAccess` (and `get`) | `agents_tool_access_get` (read-only)         |
+| Enable/disable/pin/unpin tools or groups | `setToolAccess`          | `agents_tool_access_set` (entry null undoes) |
+| Subagent choices                         | `setSubagents`           | `agents_subagents_set`                       |
+| Project default agents                   | `projectDefaults`        | `agents_project_defaults` (read-only)        |
+| Set or clear a project default           | `setProjectDefault`      | `agents_project_default_set`                 |
+| A thread's agent and effective policy    | `threadAccess`           | `agents_thread_access` (read-only)           |
+| Set or clear a thread override           | `setThreadOverride`      | `agents_thread_override_set`                 |
+| Record a thread's agent explicitly       | `recordThreadAgent`      | none (a cross-plugin write for subagents)    |
+
+Write tools run only when the user asked. The calling thread can read its own agent and access with tool-search's
+`tool_search_access`.
 
 ## Decisions
 

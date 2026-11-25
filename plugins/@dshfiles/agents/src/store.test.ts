@@ -11,7 +11,9 @@ import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Layer } from 'effect'
 import { TestClock } from 'effect/testing'
 import type { AgentDraft } from './agent.js'
+import { ProjectLocator } from './project-locator.js'
 import { AgentsRegistry } from './store.js'
+import { ToolAccessProviderLayer } from './tool-access-provider.js'
 
 /** A real JSON-backed storage domain facility in a temporary directory, as the Host serves it. */
 const storageHost = Layer.effect(
@@ -36,7 +38,20 @@ const storageHost = Layer.effect(
 )
 
 /** Open the registry for one scope; closing the scope closes the domain, as a plugin unload does. */
-const openRegistry = Effect.map(Layer.build(AgentsRegistry.layer.pipe(Layer.provide(StorageDomain.layer))), services => Context.get(services, AgentsRegistry))
+/** One project checkout, one of its thread workspaces, and an unrelated folder. */
+const workspaces = [
+  { workspaceId: 'ws-app', path: '/dev/app', sessionIds: ['in-app'] },
+  { workspaceId: 'ws-app-thread', path: '/dev/app-threads/thread-1a2b3c', sessionIds: ['in-thread-workspace'] },
+  { workspaceId: 'ws-other', path: '/dev/other', sessionIds: [] },
+]
+
+const openRegistry = Effect.map(
+  Layer.build(AgentsRegistry.layer.pipe(Layer.provide(Layer.merge(StorageDomain.layer, ProjectLocator.layerTest(workspaces))))),
+  services => Context.get(services, AgentsRegistry),
+)
+
+/** The registry writes a decision in the background; give that write time to land before a restart. */
+const settle = Effect.promise(() => new Promise(resolve => setTimeout(resolve, 50)))
 
 const draftOf = (handle: string): AgentDraft => ({
   handle,
@@ -49,6 +64,8 @@ const draftOf = (handle: string): AgentDraft => ({
   memoryScope: null,
   routine: '',
   delegation: { messaging: 'any', handles: [], subagents: true },
+  tools: { tools: {}, groups: {} },
+  subagents: { allowed: 'any', default: null },
   enabled: true,
 })
 
@@ -199,6 +216,179 @@ describe('AgentsRegistry', () => {
         yield* TestClock.setTime(1_000)
         const reopened = yield* Effect.scoped(Effect.flatMap(openRegistry, registry => registry.snapshot))
         expect(reopened.revision).toBeGreaterThanOrEqual(saved.kind === 'applied' ? saved.agent.updatedAt : 0)
+      }),
+    )
+  })
+
+  it.layer(storageHost)(it => {
+    it.effect('decides a thread agent in order: explicit, inherited by a subagent, project default (thread workspaces too), then @dsh', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(10_000)
+          const registry = yield* openRegistry
+          yield* registry.save(draftOf('reviewer'))
+          yield* registry.save(draftOf('planner'))
+          yield* registry.recordUse('reviewer', { sessionId: 'dispatched', title: 'Review' })
+          expect((yield* registry.setProjectDefault('ws-app', 'planner')).kind).toBe('applied')
+
+          const policy = (sessionId: string, extra: { readonly cwd?: string; readonly parentSessionId?: string } = {}) =>
+            registry.threadPolicyNow({ sessionId, cwd: extra.cwd, parentSessionId: extra.parentSessionId })
+
+          expect(policy('dispatched', { cwd: '/dev/app' })).toMatchObject({ agent: 'reviewer', source: 'agent' })
+          expect(policy('child', { cwd: '/dev/app', parentSessionId: 'dispatched' })).toMatchObject({ agent: 'reviewer', source: 'agent' })
+          expect((yield* registry.threadAccess({ sessionId: 'child' })).agent).toMatchObject({ resolution: 'inherited', inheritedFrom: 'dispatched' })
+          expect(policy('in-app')).toMatchObject({ agent: 'planner', source: 'project-default' })
+          expect(policy('in-thread-workspace')).toMatchObject({ agent: 'planner', source: 'project-default' })
+          expect(policy('forgotten-thread-workspace', { cwd: '/dev/app-threads/thread-9z8y7x' })).toMatchObject({ agent: 'planner', source: 'project-default' })
+          expect(policy('elsewhere', { cwd: '/dev/other' })).toMatchObject({ agent: 'dsh', source: 'default' })
+          expect(policy('nowhere')).toMatchObject({ agent: 'dsh', source: 'default' })
+          expect(policy('orphan-child', { cwd: '/dev/other', parentSessionId: 'never-seen' })).toMatchObject({ agent: 'dsh', source: 'default' })
+        }),
+      ),
+    )
+  })
+
+  it.layer(storageHost)(it => {
+    it.effect('keeps a decided thread on its agent and tools when the project default or the agent changes, across a restart', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(11_000)
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const registry = yield* openRegistry
+            yield* registry.save(draftOf('planner'))
+            yield* registry.save(draftOf('reviewer'))
+            yield* registry.setProjectDefault('ws-app', 'planner')
+            expect(registry.threadPolicyNow({ sessionId: 'early', cwd: '/dev/app', parentSessionId: undefined }).agent).toBe('planner')
+
+            yield* registry.setProjectDefault('ws-app', 'reviewer')
+            yield* registry.editToolAccess('planner', [{ target: { kind: 'tool', key: 'bash' }, entry: { enabled: false } }])
+            expect(registry.threadPolicyNow({ sessionId: 'early', cwd: '/dev/app', parentSessionId: undefined })).toMatchObject({
+              agent: 'planner',
+              access: { tools: {}, groups: {} },
+            })
+            expect(registry.threadPolicyNow({ sessionId: 'late', cwd: '/dev/app', parentSessionId: undefined }).agent).toBe('reviewer')
+            yield* settle
+          }),
+        )
+        const restored = yield* Effect.scoped(openRegistry)
+        expect(restored.threadPolicyNow({ sessionId: 'early', cwd: '/dev/app', parentSessionId: undefined }).agent).toBe('planner')
+        expect((yield* restored.projectDefaults).map(row => [row.projectId, row.handle])).toEqual([['ws-app', 'reviewer']])
+        expect((yield* restored.resolve('planner'))?.tools).toEqual({ tools: { bash: { enabled: false } }, groups: {} })
+      }),
+    )
+  })
+
+  it.layer(storageHost)(it => {
+    it.effect('sets, reports and clears a thread override, and refuses an unknown agent', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(12_000)
+          const registry = yield* openRegistry
+          yield* registry.save({ ...draftOf('locked'), tools: { tools: {}, groups: { native: { enabled: false } } } })
+          yield* registry.save({ ...draftOf('pinned'), tools: { tools: { read: { pinned: true } }, groups: {} } })
+          yield* registry.setProjectDefault('ws-app', 'locked')
+          const changed: string[] = []
+          const unsubscribe = registry.subscribe(sessionId => changed.push(sessionId))
+          const subject = { sessionId: 'in-app', cwd: '/dev/app', parentSessionId: undefined }
+          expect(registry.threadPolicyNow(subject)).toMatchObject({ source: 'project-default', access: { groups: { native: { enabled: false } } } })
+
+          const all = yield* registry.setThreadOverride('in-app', { kind: 'all' })
+          expect(all.kind).toBe('applied')
+          expect(registry.threadPolicyNow(subject)).toMatchObject({ agent: 'locked', source: 'override', toolsFrom: null, access: { tools: {}, groups: {} } })
+          yield* registry.setThreadOverride('in-app', { kind: 'agent', handle: 'pinned' })
+          expect(registry.threadPolicyNow(subject)).toMatchObject({ source: 'override', toolsFrom: 'pinned', access: { tools: { read: { pinned: true } } } })
+          expect((yield* registry.setThreadOverride('in-app', { kind: 'agent', handle: 'ghost' })).kind).toBe('missing-agent')
+          yield* registry.setThreadOverride('in-app', null)
+          expect(registry.threadPolicyNow(subject)).toMatchObject({ agent: 'locked', source: 'project-default', toolsFrom: 'locked' })
+          expect(changed).toEqual(['in-app', 'in-app', 'in-app'])
+          unsubscribe()
+        }),
+      ),
+    )
+  })
+
+  it.layer(storageHost)(it => {
+    it.effect('makes a dispatch recorded after the thread attached its explicit agent and reports the change', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(13_000)
+          const registry = yield* openRegistry
+          yield* registry.save(draftOf('reviewer'))
+          const changed: string[] = []
+          registry.subscribe(sessionId => changed.push(sessionId))
+          expect(registry.threadPolicyNow({ sessionId: 'race', cwd: undefined, parentSessionId: undefined }).agent).toBe('dsh')
+          yield* registry.recordUse('reviewer', { sessionId: 'race', title: 'Review' })
+          expect(registry.threadPolicyNow({ sessionId: 'race', cwd: undefined, parentSessionId: undefined })).toMatchObject({
+            agent: 'reviewer',
+            source: 'agent',
+          })
+          expect(changed).toEqual(['race'])
+          expect((yield* registry.recordThreadAgent('preset-child', 'reviewer'))?.agent.resolution).toBe('explicit')
+          expect(yield* registry.recordThreadAgent('preset-child', 'ghost')).toBeNull()
+        }),
+      ),
+    )
+  })
+
+  it.layer(storageHost)(it => {
+    it.effect('edits tool access entry by entry and reverses an edit, and stores subagent choices', () =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          yield* TestClock.setTime(14_000)
+          const registry = yield* openRegistry
+          yield* registry.save(draftOf('reviewer'))
+          const edited = yield* registry.editToolAccess('reviewer', [
+            { target: { kind: 'group', key: 'mcp:github' }, entry: { enabled: false } },
+            { target: { kind: 'tool', key: 'mcp__github__list_issues' }, entry: { enabled: true, pinned: true } },
+          ])
+          if (edited.kind !== 'applied') return expect.fail('the edit should apply')
+          expect(edited.agent.tools).toEqual({
+            tools: { mcp__github__list_issues: { enabled: true, pinned: true } },
+            groups: { 'mcp:github': { enabled: false } },
+          })
+          const reverted = yield* registry.editToolAccess('reviewer', [{ target: { kind: 'group', key: 'mcp:github' }, entry: null }])
+          if (reverted.kind !== 'applied') return expect.fail('the revert should apply')
+          expect(reverted.agent.tools.groups).toEqual({})
+          expect((yield* registry.editToolAccess('ghost', [{ target: { kind: 'tool', key: 'read' }, entry: null }])).kind).toBe('missing')
+
+          const subagents = yield* registry.setSubagents('reviewer', { allowed: ['planner'], default: 'planner' })
+          if (subagents.kind !== 'applied') return expect.fail('the subagents should apply')
+          expect(subagents.agent.subagents).toEqual({ allowed: ['planner'], default: 'planner' })
+          expect((yield* registry.resolve('dsh'))?.subagents).toEqual({ allowed: 'any', default: null })
+        }),
+      ),
+    )
+  })
+
+  it.layer(storageHost)(it => {
+    it.effect('provides dshfilesToolAccess on the Host while the plugin lives and withdraws it on unload', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(15_000)
+        const host = yield* HostContext
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const services = yield* Layer.build(
+              ToolAccessProviderLayer.pipe(
+                Layer.provideMerge(AgentsRegistry.layer.pipe(Layer.provide(Layer.merge(StorageDomain.layer, ProjectLocator.layerTest(workspaces))))),
+              ),
+            )
+            const registry = Context.get(services, AgentsRegistry)
+            yield* registry.save({ ...draftOf('reviewer'), tools: { tools: { bash: { enabled: false } }, groups: {} } })
+            yield* registry.setProjectDefault('ws-app', 'reviewer')
+            const provider = host.ctx.get('dshfilesToolAccess')
+            if (provider === undefined || provider === null) return expect.fail('the provider should be registered')
+            const changed: string[] = []
+            provider.subscribe(sessionId => changed.push(sessionId))
+            expect(provider.resolve({ sessionId: 'in-app', cwd: '/dev/app', parentSessionId: undefined })).toMatchObject({
+              agent: 'reviewer',
+              source: 'project-default',
+              access: { tools: { bash: { enabled: false } } },
+            })
+            yield* registry.setThreadOverride('in-app', { kind: 'all' })
+            expect(changed).toEqual(['in-app'])
+          }),
+        )
+        expect(host.ctx.get('dshfilesToolAccess')).toBeUndefined()
       }),
     )
   })

@@ -35,6 +35,8 @@
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/tool-search": "workspace:*",
+    "@dshfiles/vcs-provider-port": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

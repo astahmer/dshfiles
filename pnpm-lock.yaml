@@ -1256,6 +1256,12 @@ importers:
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/tool-search':
+        specifier: workspace:*
+        version: link:../tool-search
+      '@dshfiles/vcs-provider-port':
+        specifier: workspace:*
+        version: link:../vcs-provider-port
       effect:
         specifier: 'catalog:'
         version: 4.1.2

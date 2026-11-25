@@ -1,3 +1,4 @@
+import { TOOL_ACCESS_ALL, toolAccessSchema } from '@dshfiles/tool-search/access'
 import { Effect, Schema } from 'effect'
 
 export const AGENT_HANDLE_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u
@@ -52,6 +53,23 @@ export const agentDelegationSchema = Schema.Struct({
   subagents: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true))),
 }).pipe(Schema.withDecodingDefaultKey(Effect.sync(() => ({ ...AGENT_DELEGATION_UNRESTRICTED }))))
 
+/**
+ * Which agents this agent's subagents may run as (wave 2 wires the `subagent` tool's `agent` argument to it): `any`
+ * or a list of handles, and the agent a subagent runs as when none is named (null: the parent thread's own agent).
+ */
+export const AGENT_SUBAGENTS_UNRESTRICTED = { allowed: 'any' as const, default: null }
+
+export const agentSubagentsSchema = Schema.Struct({
+  allowed: Schema.Union([Schema.Literal('any'), Schema.Array(handleSchema).check(Schema.isMaxLength(MAX_PEER_HANDLES))]),
+  default: Schema.NullOr(handleSchema),
+}).pipe(Schema.withDecodingDefaultKey(Effect.sync(() => ({ ...AGENT_SUBAGENTS_UNRESTRICTED }))))
+
+/**
+ * The tools this agent's threads get: sparse enabled/pinned entries per tool and per tool group, the
+ * `@dshfiles/tool-search/access` contract. Empty (the default) means every tool on, none pinned.
+ */
+export const agentToolsSchema = toolAccessSchema.pipe(Schema.withDecodingDefaultKey(Effect.sync(() => ({ tools: {}, groups: {} }))))
+
 /** Everything a person or an agent decides about an agent; the rest is usage metadata. */
 const agentDraftFields = {
   handle: handleSchema,
@@ -66,6 +84,8 @@ const agentDraftFields = {
   /** A routine line the opening message asks the thread to keep with DSH's own schedule tools; empty means none. */
   routine: Schema.String.check(Schema.isMaxLength(MAX_ROUTINE_CHARS)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(''))),
   delegation: agentDelegationSchema,
+  tools: agentToolsSchema,
+  subagents: agentSubagentsSchema,
   enabled: Schema.Boolean,
 }
 
@@ -95,6 +115,8 @@ export type AgentThread = typeof agentThreadSchema.Type
 
 export type AgentRoute = typeof agentRouteSchema.Type
 export type AgentDelegation = typeof agentDelegationSchema.Type
+export type AgentSubagents = typeof agentSubagentsSchema.Type
+export type AgentTools = typeof agentToolsSchema.Type
 export type AgentDraft = typeof agentDraftSchema.Type
 export type Agent = typeof agentSchema.Type
 
@@ -166,6 +188,8 @@ export class Agents {
       memoryScope: null,
       routine: '',
       delegation: { ...AGENT_DELEGATION_UNRESTRICTED },
+      tools: { ...TOOL_ACCESS_ALL },
+      subagents: { ...AGENT_SUBAGENTS_UNRESTRICTED },
       enabled: true,
       builtIn: true,
       createdAt: now,
