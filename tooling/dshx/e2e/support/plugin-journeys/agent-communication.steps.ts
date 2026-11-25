@@ -3,6 +3,12 @@ import { globalPanelEntryPoint, openGlobalPanel } from '../plugin-view-names.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 
+/** Diagnostics is a tool, so it sits under the page's overflow menu. */
+const openDiagnostics = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Diagnostics', exact: true }).click()
+}
+
 When('the Agent communication panel is opened', async ({ page }: { page: Page }) => {
   await expect(globalPanelEntryPoint(page, 'Messages')).toBeVisible()
   await openGlobalPanel(page, 'Messages')
@@ -11,15 +17,16 @@ When('the Agent communication panel is opened', async ({ page }: { page: Page })
 
 Then('diagnostics show the connected Host and truthful activity history', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'communication-host-connection', async () => {
-    await expect(page.getByText('Connected to DSH', { exact: true })).toBeVisible()
+    // A healthy page draws no connection chip.
+    await expect(page.getByText('Connected to DSH', { exact: true })).toHaveCount(0)
     await expect(page.getByText(/Browsing never starts, resumes, or redirects an agent/)).toBeVisible()
   })
-  await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click()
+  await openDiagnostics(page)
   await recordAssertion(page, 'communication-empty-tool-history', async () => {
     await expect(page.getByText(/No agent tool activity has been recorded yet/)).toBeVisible()
     await expect(page.getByText('No tool activity recorded yet.', { exact: true })).toBeVisible()
   })
-  await page.getByRole('tab', { name: 'Messages', exact: true }).click()
+  await page.locator('[data-page-action="messages"]').click()
   await recordAssertion(page, 'communication-empty-browser', async () => {
     await expect(page.getByText('No messages here yet.', { exact: true })).toBeVisible()
     await expect(page.getByRole('textbox', { name: 'Search messages', exact: true })).toBeVisible()
@@ -33,7 +40,7 @@ Then('a human post is browsable and remains passive', async ({ page }: { page: P
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
 
   await recordAssertion(page, 'communication-human-message-stored', async () => {
-    await expect(page.getByText('Message stored · 0 recipient(s)', { exact: true })).toBeVisible()
+    await expect(page.getByText('Message stored · 0 recipients', { exact: true })).toBeVisible()
     await expect(page.getByText('A stored message, not an Agent turn.', { exact: true })).toBeVisible()
     await expect(page.getByText('Local browser user', { exact: true })).toBeVisible()
     await expect(page.getByText('Untrusted peer text', { exact: true })).toBeVisible()
@@ -58,7 +65,7 @@ Then('a direct message remains unread until its recipient reads it', async ({ pa
   await page.getByRole('button', { name: 'Send message', exact: true }).click()
 
   await recordAssertion(page, 'communication-offline-direct-message', async () => {
-    await expect(page.getByText('Message stored · 1 recipient(s)', { exact: true })).toBeVisible()
+    await expect(page.getByText('Message stored · 1 recipient', { exact: true })).toBeVisible()
     await expect(page.getByRole('img', { name: 'Idle · completion unknown', exact: true }).first()).toBeVisible()
     await expect(page.getByText('A delayed message stays passive.', { exact: true })).toBeVisible()
     await expect(page.getByText('Local browser user', { exact: true })).toBeVisible()
@@ -73,7 +80,7 @@ Then('a direct message remains unread until its recipient reads it', async ({ pa
 })
 
 Then("workspace diagnostics show the active Agent's workspace subscription", async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Diagnostics', exact: true }).click()
+  await openDiagnostics(page)
   // The Agent joins its workspace channel asynchronously and the panel polls every 30s, so a loaded Host can show the
   // first snapshot without the subscription; Refresh reads it again.
   await expect(async () => {

@@ -161,7 +161,7 @@ const MessageRow = (props: {
           {props.message.intent === 'request' ? props.t('request') : props.t('notice')}
         </Badge>
         <Badge variant="outline">{props.message.priority === 'urgent' ? props.t('urgent') : props.t('normal')}</Badge>
-        <Badge variant="secondary">{props.t('recipientCount', { count: props.message.recipients.length })}</Badge>
+        <Badge variant="secondary">{props.message.recipients.length === 1 ? props.t('recipientCountOne') : props.t('recipientCount', { count: props.message.recipients.length })}</Badge>
       </div>
     </div>
     <div className="dshx:mt-3 dshx:rounded-md dshx:bg-muted/60 dshx:p-3">
@@ -255,6 +255,7 @@ const DiagnosticPanel = (props: {
   const diagnostics = props.data
   const missingWorkspace = diagnostics.agents.filter(agent => agent.workspaceTopic !== null && agent.workspaceSubscribed === false && !agent.workspaceOptedOut)
   const topicMap = new Map(diagnostics.topics.map(topic => [topic.topic, topic.subscribers]))
+  const subscriberTotal = diagnostics.topics.reduce((sum, topic) => sum + topic.subscribers, 0)
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-4">
       <div className="dshx:grid dshx:grid-cols-4 dshx:gap-3 dshx:@max-pane-compact:grid-cols-2">
@@ -274,14 +275,14 @@ const DiagnosticPanel = (props: {
       </div>
       {missingWorkspace.length === 0 ? null : (
         <Alert variant="destructive">
-          <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspace.length })}</AlertDescription>
+          <AlertDescription>{missingWorkspace.length === 1 ? t('missingWorkspaceSubscriptionsOne') : t('missingWorkspaceSubscriptions', { count: missingWorkspace.length })}</AlertDescription>
         </Alert>
       )}
       <div className="dshx:grid dshx:gap-4 dshx:@min-[56rem]:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>{t('channels')}</CardTitle>
-            <CardDescription>{t('topicSubscribers', { count: diagnostics.topics.reduce((sum, topic) => sum + topic.subscribers, 0) })}</CardDescription>
+            <CardDescription>{subscriberTotal === 1 ? t('topicSubscribersOne') : t('topicSubscribers', { count: subscriberTotal })}</CardDescription>
           </CardHeader>
           <CardContent className="dshx:p-0">
             {diagnostics.topics.length === 0 ? <EmptyState>{t('noTopics')}</EmptyState> : null}
@@ -364,7 +365,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
       if (!topic.startsWith('workspace/')) return topic
       const member = diagnostics?.agents.find(agent => agent.workspaceTopic === topic)
       const cwd = member === undefined ? null : sessionCwd(member.id)
-      if (cwd === null) return `${props.t('workspace')} · ${topic.slice('workspace/'.length, 'workspace/'.length + 8)}`
+      // Until a member's Session is known the channel is named by its kind, never by the Host's folder hash.
+      if (cwd === null) return props.t('workspaceTopic')
       const project = projectLabel({ path: cwd })
       // A thread workspace is named by its thread, never its folder (b:212a).
       return EntityLabels.isThreadWorkspace(cwd) ? `${project} · ${sessionLabel(member?.id ?? '')}` : project
@@ -425,6 +427,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     .reverse()
     .flatMap(page => page.items)
   const historyPageCount = messagesQuery.data?.pages.length ?? 0
+  // The count beside the conversation title is the rows its list shows (DESIGN.md › Layout, counts).
+  const shownMessageCount = messages.length
   const messageQueryIdentity = JSON.stringify(browseQueryKey)
   const messagesScroll = useRef<HTMLDivElement>(null)
   const captureOlderAnchor = usePrependScrollAnchor({ root: messagesScroll, pageCount: historyPageCount, scope: messageQueryIdentity })
@@ -488,7 +492,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   })
   const t = props.t
   const [tab, setTab] = useState<'messages' | 'diagnostics'>('messages')
-  const connected = diagnostics !== undefined && diagnosticsQuery.error === null
   const currentTopic = selection.kind === 'topic' ? selection.topic : null
   const currentDirectAgent = selection.kind === 'direct' ? selection.agentId : null
   const currentTitle =
@@ -547,7 +550,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
       <Page
         heading={t('messages')}
         description={t('noTurnGuarantee')}
-        meta={<Badge variant={connected ? 'secondary' : 'destructive'}>{connected ? t('connected') : t('unavailable')}</Badge>}
+        // A healthy page draws no connection chip (the failure has its own alert below); Diagnostics is a tool, so it
+        // sits under the overflow menu, and its view offers the way back to the messages.
         actions={[
           {
             id: 'refresh',
@@ -556,20 +560,12 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
             onSelect: () => void diagnosticsQuery.refetch(),
             pending: diagnosticsQuery.isFetching,
           },
+          ...(diagnostics === undefined
+            ? []
+            : tab === 'messages'
+              ? [{ id: 'diagnostics', label: t('diagnostics'), placement: 'overflow', onSelect: () => setTab('diagnostics') } as const]
+              : [{ id: 'messages', label: t('messages'), onSelect: () => setTab('messages') } as const]),
         ]}
-        {...(diagnostics === undefined
-          ? {}
-          : {
-              tabs: {
-                label: t('messages'),
-                value: tab,
-                onValueChange: (value: string) => setTab(value === 'diagnostics' ? 'diagnostics' : 'messages'),
-                items: [
-                  { value: 'messages', label: t('messages') },
-                  { value: 'diagnostics', label: t('diagnostics') },
-                ],
-              },
-            })}
       >
         {diagnosticsQuery.isPending ? <Spinner className="dshx:mx-auto dshx:my-6" /> : null}
         {diagnosticsQuery.error !== null ? (
@@ -604,7 +600,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                     <div className="dshx:flex dshx:flex-col dshx:gap-1">
                       <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{t('channels')}</p>
                       {topicEntries.length === 0 ? <EmptyState className="dshx:py-3">{t('noTopics')}</EmptyState> : null}
-                      {topicEntries.map(([topic, subscribers]) => (
+                      {topicEntries.map(([topic]) => (
                         <Button
                           key={topic}
                           variant={selection.kind === 'topic' && selection.topic === topic ? 'secondary' : 'ghost'}
@@ -619,7 +615,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                             </TooltipTrigger>
                             <TooltipContent>{topic}</TooltipContent>
                           </Tooltip>
-                          <span className="dshx:text-xs dshx:text-muted-foreground">{subscribers}</span>
                         </Button>
                       ))}
                     </div>
@@ -679,7 +674,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                   <CardHeader className="dshx:flex-row dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3">
                     <div className="dshx:min-w-0">
                       <CardTitle className="dshx:truncate">{currentTitle}</CardTitle>
-                      <CardDescription>{t('messageCount', { count: messagePages[0]?.totalMatching ?? 0 })}</CardDescription>
+                      <CardDescription>{shownMessageCount === 0 ? null : shownMessageCount === 1 ? t('messageCountOne') : t('messageCount', { count: shownMessageCount })}</CardDescription>
                     </div>
                     <SearchInput
                       className="dshx:w-full dshx:max-w-xs dshx:@max-pane-narrow:max-w-none"
@@ -791,7 +786,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       ) : null}
                       {receiptCount === null ? null : (
                         <p role="status" className="dshx:text-xs dshx:text-muted-foreground">
-                          {t('sendReceipt', { count: receiptCount })}
+                          {receiptCount === 1 ? t('sendReceiptOne') : t('sendReceipt', { count: receiptCount })}
                         </p>
                       )}
                     </form>
@@ -874,7 +869,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
               <div className="dshx:flex dshx:flex-col dshx:gap-3">
                 {missingWorkspaceCount > 0 ? (
                   <Alert variant="destructive">
-                    <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription>
+                    <AlertDescription>{missingWorkspaceCount === 1 ? t('missingWorkspaceSubscriptionsOne') : t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription>
                   </Alert>
                 ) : null}
                 <DiagnosticPanel
