@@ -714,7 +714,7 @@ label and example, waits for the URL before **Test** and **Save**, and saving on
 (“share the page with the integration”, “check the key”) rather than a generic refusal; only a call that never reached
 the provider reads as `transport` or `unsupported`. The backlog lists served providers once a minute; a built-in kind
 wins over one of the same name. The built-ins implement the same in-process `BacklogProvider` interface. `@dshfiles/backlog-notion` is the
-reference external provider.
+reference external provider; `@dshfiles/backlog-jira` and `@dshfiles/backlog-gitea` (Gitea and Forgejo) follow it.
 
 ## Search and saved views
 
