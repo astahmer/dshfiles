@@ -175,7 +175,9 @@ section heading: a Settings category's sections, an Inbox card title. The page `
 
 **Floating surfaces.** A dialog, an alert dialog and the command palette sit on `dshx:surface-dialog`
 (`src/surfaces.css`): light keeps the page fill, the hairline and s3; dark is a raised warm fill
-(`oklch(0.24 0.006 60)`), a faint light edge (`oklch(1 0 0 / 0.08)`) and one deep shadow (`0 24px 64px rgb(0 0 0 / 0.55)`).
+(`oklch(0.27 0.006 60)`), a faint light edge (`oklch(1 0 0 / 0.08)`) and one deep shadow (`0 24px 64px rgb(0 0 0 / 0.55)`).
+Inside it, in dark, the selection wash lifts to L 0.30 and the faint text step to L 0.68 (AA on that selection), and
+`bg-popover` takes the dialog fill, so a `Command` inside is one tone with its card.
 `Kbd` reads `--dshx-kbd-fill`/`--dshx-kbd-border`: in dark a faint light cap (8%) with a 12% edge, in light the muted
 fill with a transparent edge, so the keycap keeps one box. A palette the kit does not draw adds `dshx:border
 dshx:surface-dialog` to its own card.

@@ -32,7 +32,7 @@ colors:
   wash-failed-dark: '#311d1b'
   primary: '#312d29'
   primary-dark: '#dad7d3'
-  surface-dialog-dark: '#211f1c'
+  surface-dialog-dark: '#292624'
   signal-indigo-dark: '#839ffc'
   danger-red-dark: '#fa8880'
   success-green-dark: '#65c67d'
@@ -460,8 +460,10 @@ kit dialogs/sheets 1050, floating layers (select, popover, menu, tooltip) 1100. 
 dims the page with `bg-scrim`: the warm ink at 32% in light, black at 50% in dark.
 
 Dialogs, alert dialogs and the command palette sit on `surface-dialog`: in light the page fill, the hairline and s3;
-in dark a raised warm fill `oklch(0.24 0.006 60)`, a faint light edge `oklch(1 0 0 / 0.08)` and one deep shadow
-`0 24px 64px rgb(0 0 0 / 0.55)`. A keycap (`Kbd`) in dark is a faint light cap (`oklch(1 0 0 / 0.08)`) with a 12% edge.
+in dark a raised warm fill `oklch(0.27 0.006 60)` (`#292624`, clear of the scrim), a faint light edge
+`oklch(1 0 0 / 0.08)` and one deep shadow `0 24px 64px rgb(0 0 0 / 0.55)`. That fill sits on the page's selection
+wash, so inside a dark dialog the selection lifts to L 0.30 and the faint step to L 0.68 (AA on that selection), and a
+popover-level fill (the palette's `Command`) takes the dialog fill, so the card is one tone. A keycap (`Kbd`) in dark is a faint light cap (`oklch(1 0 0 / 0.08)`) with a 12% edge.
 
 ## Motion
 
