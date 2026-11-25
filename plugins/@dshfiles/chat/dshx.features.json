@@ -481,7 +481,7 @@
     {
       "id": "turn-map",
       "title": "Typed turn map with filters and Turn keys",
-      "summary": "The turn rail marks each Turn by what happened: a question (accent), a failure (danger), an edit (muted fill) or a plain prompt; a band shows the Turns on screen; previous / next buttons and [ / ] (or ⌥↑ / ⌥↓) step between Turns of the current filter (All, Questions, Errors, Edits). The facts come from turn-summary's whole-log projection, so unloaded Turns are typed too. A quiet hairline marks the read boundary: the first Turn after the last one this browser has scrolled through, the same place Chat's New divider marks (the Host unread record seeds it when a thread opens with unseen Turns). On a phone or a narrow pane, Turns in the thread ⋯ menu opens a bottom sheet listing every prompt with its kind and the same filters; tapping one jumps there.",
+      "summary": "The turn rail marks each Turn by what happened: a question (accent), a failure (danger), an edit (muted fill) or a plain prompt; a band shows the Turns on screen; previous / next buttons and [ / ] (or ⌥↑ / ⌥↓) step between Turns of the current filter (All, Questions, Errors, Edits). The facts come from turn-summary's whole-log projection, so unloaded Turns are typed too. A quiet hairline marks the read boundary: the first Turn after the last one this browser has scrolled through, the same place Chat's New divider marks (the Host unread record seeds it when a thread opens with unseen Turns). On a phone or a narrow pane, Turns in the thread ⋯ menu opens a bottom sheet listing every prompt with its kind, the same filters and the same read boundary above its first unseen row; tapping one jumps there.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -529,6 +529,12 @@
           "id": "chat.turn-rail-boundary",
           "file": "plugins/@dshfiles/chat/tests/turn-rail-seen.test.tsx",
           "testName": "draws the boundary between the seen Turns and the unseen ones"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.turn-sheet-boundary",
+          "file": "plugins/@dshfiles/chat/tests/turn-rail-seen.test.tsx",
+          "testName": "marks the first unseen row with a labelled divider"
         },
         {
           "kind": "not-applicable",

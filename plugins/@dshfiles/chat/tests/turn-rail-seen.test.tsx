@@ -36,3 +36,26 @@ describe('turn rail read boundary', () => {
     }
   })
 })
+
+describe('Turns sheet read boundary', () => {
+  it('marks the first unseen row with a labelled divider', async () => {
+    const { TurnsSheet } = await import('../src/native/chat/TurnsSheet.tsx')
+    render(
+      <TurnsSheet
+        open
+        onOpenChange={() => {}}
+        items={[1, 2, 3].map(item)}
+        activeTurn={1}
+        filter="all"
+        counts={{ all: 3, questions: 0, errors: 0, edits: 0 }}
+        onFilterChange={() => {}}
+        onNavigate={() => {}}
+        seenTurn={1}
+        t={t}
+      />,
+    )
+    const divider = await screen.findByRole('separator', { name: 'chat.turnMap.unreadBoundary' })
+    expect(divider.dataset.seenBoundary).toBe('')
+    expect(divider.textContent).toBe('chat.turnMap.unreadBoundary')
+  })
+})

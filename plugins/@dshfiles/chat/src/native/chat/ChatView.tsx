@@ -634,6 +634,7 @@ export function ChatView({
         counts={filterCounts}
         onFilterChange={setTurnFilter}
         onNavigate={item => { jumpToTurn(item.turn) }}
+        seenTurn={seenTurn}
         t={t}
       />}
       <div className={css.root} data-chat-following-tail={scroll.followingTail ? '' : undefined}>
