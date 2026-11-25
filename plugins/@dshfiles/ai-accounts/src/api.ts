@@ -78,7 +78,44 @@ export class AccountsRules {
     if (isLoopbackHost(url.hostname)) return url.protocol === 'https:' || url.protocol === 'http:'
     return url.protocol === 'https:' && (url.hostname === 'commandcode.ai' || url.hostname.endsWith('.commandcode.ai'))
   }
+
+  /** `272000` → `272k`, `1048576` → `1049k`: a window as people read it. */
+  static formatTokens = (tokens: number): string => (tokens >= 1_000 ? `${String(Math.round(tokens / 1_000))}k` : String(tokens))
+
+  /** The catalog tool's window note: the effective window, and the default, override and maximum it came from. */
+  static contextWindowSummary = (model: {
+    readonly contextWindow?: number | undefined
+    readonly maxContextWindow?: number | undefined
+    readonly contextWindowOverride?: number | undefined
+    readonly effectiveContextWindow?: number | undefined
+  }): string => {
+    const effective = model.effectiveContextWindow ?? model.contextWindow
+    if (effective === undefined) return ''
+    const details = [
+      ...(model.contextWindowOverride !== undefined && model.contextWindow !== undefined ? [`default ${AccountsRules.formatTokens(model.contextWindow)}`] : []),
+      ...(model.contextWindowOverride !== undefined ? [`override ${AccountsRules.formatTokens(model.contextWindowOverride)}`] : []),
+      ...(model.maxContextWindow !== undefined ? [`max ${AccountsRules.formatTokens(model.maxContextWindow)}`] : []),
+    ]
+    return ` · context ${AccountsRules.formatTokens(effective)}${details.length === 0 ? '' : ` (${details.join(', ')})`}`
+  }
 }
+
+/** A context window in tokens: a positive integer, bounded so a typo cannot ask for an absurd window. */
+const contextWindowTokensSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1_000), Schema.isLessThanOrEqualTo(10_000_000))
+
+export const modelContextWindowResultSchema = Schema.Struct({
+  instanceId: AiAccountsSchema.id(64),
+  modelId: AiAccountsSchema.id(160),
+  /** The saved override after clamping; null when the model uses the provider default. */
+  contextWindowOverride: Schema.NullOr(contextWindowTokensSchema),
+  /** The provider maximum the value was clamped to, when known. */
+  maxContextWindow: Schema.NullOr(contextWindowTokensSchema),
+  /** True when the requested window exceeded the maximum and was lowered to it. */
+  clamped: Schema.Boolean,
+  /** The window the model now runs with, when the account offers the model. */
+  effectiveContextWindow: Schema.NullOr(contextWindowTokensSchema),
+})
+export type ModelContextWindowResult = typeof modelContextWindowResultSchema.Type
 
 // A Windows Host's homes are drive-absolute (`C:\Users\…`) and split on either separator; this schema also runs in the
 // browser, so no node:path. A POSIX path keeps its `/`-only rules.
@@ -206,6 +243,11 @@ export const accountProfileSchema = Schema.Struct({
    * order after the listed ones, so adding a model never reshuffles the rest.
    */
   modelOrder: AiAccountsSchema.list(Schema.String.check(Schema.isMaxLength(160)), 500).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  /**
+   * Context window per model id, in tokens, instead of the provider's default. Clamped to the provider's disclosed
+   * maximum (Codex `max_context_window`) when known. Applies whether or not the account inherits its model curation.
+   */
+  contextWindowOverrides: Schema.optional(Schema.Record(Schema.String.check(Schema.isMaxLength(160)), contextWindowTokensSchema)),
 })
 
 /** What the page may write: identity and health are observed, never authored. */
@@ -241,6 +283,7 @@ export const accountDraftSchema = Schema.Struct({
   hiddenModelIds: accountProfileSchema.fields.hiddenModelIds,
   favoriteModelIds: accountProfileSchema.fields.favoriteModelIds,
   modelOrder: accountProfileSchema.fields.modelOrder,
+  contextWindowOverrides: accountProfileSchema.fields.contextWindowOverrides,
   useExtraUsage: accountProfileSchema.fields.useExtraUsage,
 })
 
@@ -354,6 +397,14 @@ export const accountsCatalogSchema = Schema.Struct({
       defaultEffort: Schema.NullOr(Schema.String.check(Schema.isMaxLength(32))),
       /** True only for an account-added ID absent from native and discovered provider catalogs. */
       accountAdditional: Schema.optional(Schema.Boolean),
+      /** The provider's default context window for this model (the discovered one when the provider lists it). */
+      contextWindow: Schema.optional(contextWindowTokensSchema),
+      /** The largest context window the provider accepts for this model, when it disclosed one. */
+      maxContextWindow: Schema.optional(contextWindowTokensSchema),
+      /** This account's saved window for the model, before clamping. */
+      contextWindowOverride: Schema.optional(contextWindowTokensSchema),
+      /** The window requests and compaction use: the override clamped to the maximum, else the default. */
+      effectiveContextWindow: Schema.optional(contextWindowTokensSchema),
     }),
   ),
   warning: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
@@ -687,8 +738,30 @@ export const aiAccountsApi = defineApi({
         readOnly: true,
         render: output =>
           output.models
-            .map(model => `${model.id} · ${model.name}${model.efforts.length === 0 ? '' : ` · effort ${model.efforts.map(effort => effort.id).join('/')}`}`)
+            .map(
+              model =>
+                `${model.id} · ${model.name}${model.efforts.length === 0 ? '' : ` · effort ${model.efforts.map(effort => effort.id).join('/')}`}${AccountsRules.contextWindowSummary(model)}`,
+            )
             .join('\n') || `${output.instanceId} exposes no models.`,
+      },
+    }),
+    /** Set or clear one model's context window override on one account. */
+    setModelContextWindow: method({
+      input: Schema.Struct({
+        instanceId: AiAccountsSchema.id(64),
+        modelId: AiAccountsSchema.id(160),
+        /** Tokens; null restores the provider's default window. */
+        contextWindow: Schema.NullOr(contextWindowTokensSchema),
+      }),
+      output: modelContextWindowResultSchema,
+      description:
+        'Set the context window (tokens) one account uses for one model, or null to restore the provider default. The value is clamped to the provider maximum shown by ai_accounts_catalog (maxContextWindow). A larger window changes when DSH compacts and how many tokens a request may carry. Call only when the user asked to change that window.',
+      tool: {
+        name: 'ai_accounts_set_context_window',
+        render: output =>
+          output.contextWindowOverride === null
+            ? `${output.modelId} on ${output.instanceId} now uses the provider default window${output.effectiveContextWindow === null ? '' : ` (${String(output.effectiveContextWindow)} tokens)`}.`
+            : `${output.modelId} on ${output.instanceId} now uses a ${String(output.contextWindowOverride)}-token window${output.clamped ? ` (clamped to the provider maximum ${String(output.maxContextWindow)})` : ''}.`,
       },
     }),
     /**
