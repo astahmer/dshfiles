@@ -94,4 +94,23 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('prose caps at 34em')
     expect(design).not.toContain('a quiet low-chroma\n   accent wash')
   })
+
+  it('records the fourth council pass: one Settings column, rail surface, nav tones, attention badge, heading, phone dock (council round 4 A6)', () => {
+    for (const text of [
+      '**One Settings navigation.**',
+      '**Rail surface.**',
+      '**Nav tone constraints**',
+      '**Attention badge.**',
+      '`AttentionBadge`',
+      '`--dshx-badge-ring`',
+      '15/20 (`text-heading`)',
+      '**Phone dock.**',
+      'never over text',
+      "  primary: '#312d29'",
+      "  surface-dialog-dark: '#292624'",
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: the rail's tones are no longer borrowed from the identity ramp.
+    expect(design).not.toContain('Threads identity-7, Inbox 2')
+  })
 })

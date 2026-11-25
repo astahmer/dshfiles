@@ -326,6 +326,9 @@ work on any surface.
     lower (teal and cyan in light, about 0.105), so no tone reads muddy; every hue 25° or more from the status hues
     (25, 80, 150, 270); Threads at hue 235 or less and 30° or more from Land; every pair ΔE 0.06 or more; the glyph
     3:1 on bg, panel, raised and its own 14% tile, the ink label AA on that tile. The phone tab bar uses the same tones.
+    **Rail surface.** The rail is one surface in every state: the panel step (`--dsw-specific-sidebar-fill`) beside a
+    page on bg, whichever destination is open, whether its side column is open or folded. A destination never repaints
+    the rail.
 
 Use semantic tokens only, never raw hex in plugin code. The exceptions are brand artwork
 (`ai-accounts/src/account-labels.ts`, `model-effort-picker/src/brand-marks.ts`) and a project colour the user
@@ -349,6 +352,7 @@ than size:
 | ------------- | ------------------------------- | ------------ | ----------------------------------------------- |
 | Display       | 26/32 (`text-display`)          | 600, -0.02em | Hero headline (new thread)                      |
 | Page title    | 22/28 (`text-title`)            | 650, -0.01em | The page `h1`, exactly one per page             |
+| Heading       | 15/20 (`text-heading`)          | 600          | In-page section heading: a Settings category's sections, an Inbox card title |
 | Section title | 13px, 15px phone (`text-sm`)    | 600          | `PageSection` `h2`, card titles                 |
 | Body / UI     | 13px, 15px phone (`text-sm`) / 1.45 | 400      | Rows, descriptions, forms                       |
 | Prose         | 14px, 15px phone (`text-base`)  | 400          | Assistant messages, long descriptions           |
@@ -395,6 +399,11 @@ A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not 
 in a 44px top-bar status button on Threads and Inbox that opens the status sheet (with the usage ring); there is no
 permanent band above the tab bar, and a strip returns only for an actionable condition (quota low, disconnected).
 
+**Phone dock.** On a phone the transcript scroller ends above the dock (composer and its docked rows), never under
+it: a 24px fade at its bottom edge instead of a hard clip line through text, and bottom padding that clears the last
+line. The jump-to-latest control sits in the dock's trailing seat, or 16px above the dock's top edge outside the text
+column; it is never over text.
+
 Every control on a phone screen has a 44px hit area. Kit controls have it; a native-fork control takes the kit's
 `dshx-hit-44` class. A full-screen surface on a phone has a visible way out (Cancel or ‹) in its first row. With
 the keyboard up, a floating list is clamped between the top bar and the composer, and opens below the caret when
@@ -434,6 +443,12 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   tool call, a summary line) is as wide as its content and no wider than that column; its duration or count follows the label after 8px, and its
   hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
   message column. Everything docked above the composer shares the composer card's two edges.
+- **One Settings navigation.** While any Settings page is on stage (General or another), the side column stays open
+  and lists, once each, the preference categories (General, Appearance, Keyboard shortcuts, Thread list, Layout,
+  Composer, Transcript, Editor, Models & accounts…, grouped) and the Settings pages (AI accounts, MCP servers,
+  Secrets, Plugins, Plugin market, Capabilities hub, Developer…). The General page has no in-page category list and
+  no second "General" heading: the page header, then the selected category's fields, its sections headed with
+  `text-heading`. Settings never folds the column; other one-page destinations (Inbox) may.
 - Counts: the count beside a heading is the number of rows its list shows with no filter; a filter's count is what
   it would show; a zero is not drawn. A count the list cannot reproduce is a bug.
 - One name per destination: the rail row, the tab title, the palette row and the `h1` are the same words, with no
@@ -530,6 +545,12 @@ Finished / All) is a `ToggleGroup`.
 fill; the select trigger is 32px with its chevron in secondary ink at full strength. A Host select the kit does not draw
 takes the `select-look` utility. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
 reader hears), never a number glued to a second control.
+
+**Attention badge.** A Needs-you count on a nav glyph or a tab is one `AttentionBadge`
+(`components/ui/attention-badge`, or `badge-attention` on a span): a 16px pill, tabular figures, in the attention fill
+(light the Needs-you colour with white text; dark the accent hue at L 0.72 with L 0.2 text, never a white blob), with
+a 2px ring in the surface it sits on (the rail's panel step; elsewhere set `--dshx-badge-ring`). It sits in a trailing
+seat beside the glyph and never covers it. A zero draws nothing; past 99 it reads `99+`.
 
 **DiffStat.** Every change count is `DiffStat` from `@dshfiles/plugin-ui/components/diff-stat`: `+N` then `−N`, sans,
 tabular, 12px, additions in success and deletions in danger (AA on bg, panel, raised and the selected wash), a zero side
