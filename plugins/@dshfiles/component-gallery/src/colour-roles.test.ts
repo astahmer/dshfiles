@@ -21,4 +21,11 @@ describe('colour roles demo', () => {
     expect(source).toContain("(['ok', 'limited', 'down', 'off'] as const).map(health =>")
     expect(source).toContain('<HealthDot health={health} />')
   })
+
+  it('shows every project tone as a ProjectMark, at both sizes, beside a muted name', () => {
+    expect(source).toContain("import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'")
+    expect(source.match(/const projectNames = \[([^\]]*)\]/)?.[1]?.split(',').filter(name => name.trim().length > 0)).toHaveLength(6)
+    expect(source).toContain('<ProjectMark name={name} tone={tone} />')
+    expect(source).toContain('<ProjectMark name={name} tone={tone} size="dense" />')
+  })
 })

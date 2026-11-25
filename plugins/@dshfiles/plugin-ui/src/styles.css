@@ -149,18 +149,24 @@
 
 @layer base {
   :root {
-    --dshx-project-balanced-0: #0369a1;
-    --dshx-project-balanced-1: #15803d;
-    --dshx-project-balanced-2: #b45309;
-    --dshx-project-balanced-3: #7e22ce;
-    --dshx-project-balanced-4: #be123c;
-    --dshx-project-balanced-5: #4338ca;
-    --dshx-project-cool-0: #0369a1;
-    --dshx-project-cool-1: #4338ca;
-    --dshx-project-cool-2: #7e22ce;
-    --dshx-project-cool-3: #be123c;
-    --dshx-project-cool-4: #0f766e;
-    --dshx-project-cool-5: #15803d;
+    /*
+     * Project identity tones (DESIGN.md › Colour roles 5; round five K4): six hues kept at least 25° away from the
+     * status hues (danger 25, warning 80, success 150, accent 270), text-safe at L 0.50 light and 0.78 dark, so a
+     * project never reads as a state. `ProjectMark` paints them at 14% behind two letters in the tone itself.
+     * Index order keeps each slot near its former hue: azure, olive, copper, violet, magenta, teal.
+     */
+    --dshx-project-balanced-0: oklch(0.5 0.11 225);
+    --dshx-project-balanced-1: oklch(0.5 0.11 110);
+    --dshx-project-balanced-2: oklch(0.5 0.11 55);
+    --dshx-project-balanced-3: oklch(0.5 0.11 305);
+    --dshx-project-balanced-4: oklch(0.5 0.11 340);
+    --dshx-project-balanced-5: oklch(0.5 0.11 195);
+    --dshx-project-cool-0: oklch(0.5 0.11 225);
+    --dshx-project-cool-1: oklch(0.5 0.11 195);
+    --dshx-project-cool-2: oklch(0.5 0.11 305);
+    --dshx-project-cool-3: oklch(0.5 0.11 340);
+    --dshx-project-cool-4: oklch(0.5 0.11 110);
+    --dshx-project-cool-5: oklch(0.5 0.11 55);
     --dshx-kit-teal: oklch(0.58 0.1 185);
     --dshx-kit-violet: oklch(0.55 0.19 295);
     --dshx-kit-graph-1: oklch(0.6 0.11 185);
@@ -250,18 +256,18 @@
     color: var(--dshx-project-cool-5);
   }
   body[data-ds-dark-theme] {
-    --dshx-project-balanced-0: #7dd3fc;
-    --dshx-project-balanced-1: #86efac;
-    --dshx-project-balanced-2: #fcd34d;
-    --dshx-project-balanced-3: #d8b4fe;
-    --dshx-project-balanced-4: #fda4af;
-    --dshx-project-balanced-5: #a5b4fc;
-    --dshx-project-cool-0: #7dd3fc;
-    --dshx-project-cool-1: #a5b4fc;
-    --dshx-project-cool-2: #d8b4fe;
-    --dshx-project-cool-3: #fda4af;
-    --dshx-project-cool-4: #5eead4;
-    --dshx-project-cool-5: #86efac;
+    --dshx-project-balanced-0: oklch(0.78 0.1 225);
+    --dshx-project-balanced-1: oklch(0.78 0.1 110);
+    --dshx-project-balanced-2: oklch(0.78 0.1 55);
+    --dshx-project-balanced-3: oklch(0.78 0.1 305);
+    --dshx-project-balanced-4: oklch(0.78 0.1 340);
+    --dshx-project-balanced-5: oklch(0.78 0.1 195);
+    --dshx-project-cool-0: oklch(0.78 0.1 225);
+    --dshx-project-cool-1: oklch(0.78 0.1 195);
+    --dshx-project-cool-2: oklch(0.78 0.1 305);
+    --dshx-project-cool-3: oklch(0.78 0.1 340);
+    --dshx-project-cool-4: oklch(0.78 0.1 110);
+    --dshx-project-cool-5: oklch(0.78 0.1 55);
     --dshx-kit-teal: oklch(0.76 0.11 182);
     --dshx-kit-violet: oklch(0.72 0.15 300);
     --dshx-kit-graph-1: oklch(0.76 0.11 182);

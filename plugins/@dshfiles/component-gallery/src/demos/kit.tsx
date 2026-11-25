@@ -6,6 +6,7 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { HealthDot, StatusDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
@@ -87,6 +88,9 @@ const identityText = [
 
 const healthLabels = { ok: 'Connected', limited: 'Rate limited', down: 'Signed out', off: 'Off' } as const
 
+/** One project per tone, in palette order, so each of the six project hues shows as a mark. */
+const projectNames = ['billing-api', 'web-app', 'docs-site', 'dshfiles', 'mobile shell', 'infra'] as const
+
 function ColourRolesDemo() {
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-4">
@@ -107,6 +111,15 @@ function ColourRolesDemo() {
         {identityText.map((tone, index) => (
           <span key={tone} className={tone}>
             Project {index + 1}
+          </span>
+        ))}
+      </section>
+      <section aria-label="Projects" className="dshx:flex dshx:flex-wrap dshx:gap-4 dshx:text-sm">
+        {projectNames.map((name, tone) => (
+          <span key={name} className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
+            <ProjectMark name={name} tone={tone} />
+            {name}
+            <ProjectMark name={name} tone={tone} size="dense" />
           </span>
         ))}
       </section>
@@ -195,7 +208,7 @@ export const kitDemos: readonly GalleryDemo[] = [
   {
     id: 'kit-colour-roles',
     title: 'Colour roles',
-    description: 'Attention, result, identity and data: the four jobs colour has, and the health dot.',
+    description: 'Attention, result, identity and data: the four jobs colour has, the project mark and the health dot.',
     source: "import { HealthDot } from '@dshfiles/plugin-ui/components/ui/status-dot'",
     static: true,
     wide: true,
