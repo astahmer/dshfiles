@@ -153,7 +153,7 @@ export const AccountDetail = (props: {
               ] as const
             ).map(tab => (
               <TabsTrigger
-                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-(--dsw-alias-state-business-primary)"
+                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-foreground"
                 key={tab.id}
                 value={tab.id}
               >

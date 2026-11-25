@@ -94,8 +94,9 @@ describe('Usage filter row (council round 5 A1/D1)', () => {
 })
 
 describe('Usage page width (council round 5 A2)', () => {
-  it('sits on the wide data frame and marks the current section with the kit accent', () => {
+  it('sits on the wide data frame and marks the current section with the kit ink bar (council round 7, D6)', () => {
     expect(read('panel.tsx')).toMatch(/<Page\s+scroll\s+(?:\/\/[^\n]*\n\s*)?width="wide"/u)
-    expect(read('panel.tsx')).toContain('dshx:after:bg-(--dsw-alias-state-business-primary)')
+    expect(read('panel.tsx')).toContain('dshx:after:bg-foreground')
+    expect(read('panel.tsx')).not.toContain('dshx:after:bg-(--dsw-alias-state-business-primary)')
   })
 })

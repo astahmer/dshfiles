@@ -260,7 +260,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-(--dsw-alias-state-business-primary)"
+                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-foreground"
               >
                 {tab.label}
               </TabsTrigger>
