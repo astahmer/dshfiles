@@ -6,7 +6,7 @@ from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a
 are the draft PR astahmer/dshfiles#271 (branch `contribute/unslop-ui` on the tbrowang fork); nothing is landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** round one's 14 steps and round two's five lanes are done; round three's five lanes are done; round four's audits are running (see [Round four](#round-four)). Round two started 2026-11-24 after feedback that the monochrome changes
+**Resume here:** round one's 14 steps and round two's five lanes are done; round three's five lanes are done; round four's lanes are running (see [Round four](#round-four)). Round two started 2026-11-24 after feedback that the monochrome changes
 were dull: bring purposeful colour back and make daily use smoother, without undoing upstream's coloured project
 chips (#287). See [Round two](#round-two). Round one's leftovers are under [Follow-ups](#follow-ups).
 
@@ -18,6 +18,29 @@ stress, meaning approvals, errors and recovery, reconnect, loading, first run, w
 motion (`states/`); keyboard-only use, screen-reader semantics, phone portrait and landscape, the virtual keyboard and
 zoom (`access/`). Design decisions then go to a Fable 5.2 (high) consultation and taste questions to the owner; fixes
 to lanes by plugin ownership.
+
+Audits found, among others: a lost connection files real threads under "Empty drafts", whose one-click cleanup
+archives them; nothing says DSH is unreachable and clocks keep counting; the Inbox says nothing needs you while 8
+threads wait on approvals and failures, and five surfaces disagree about a waiting approval; a first run with no
+account dead-ends on a raw error; a plugin that fails to load leaves a blank page; "All settings" closes Settings;
+the thread board's "Active" contradicts the list; Backlog uses status colours as decoration; the phone search has no
+way out; the header re-announces a clock every second to screen readers; under 1024 px the sidebar vanishes; the
+focus ring is 2.1:1.
+
+Decisions (Fable 5.2 high; the owner chose every recommended option): unknown is not empty (a draft needs proof it
+has no turns, cleanup asks and offers Undo); one connection strip on every layout, clocks freeze while it shows, data
+refetches when back; an approval is Needs you everywhere and in the Inbox, decided on its card; with no account the
+composer leads with "Connect an account"; Schedules and Automations stay two pages, named by what they do; the board
+uses the list's groups; Backlog in ink; a 2 px solid indigo focus ring; "Reply ready" at turn end; an "Open
+sidebar" button below 1024 px. Brief: `.cache/unslop-audit/r4/round-four-brief.md`.
+
+| Lane | Items | State |
+| --- | --- | --- |
+| K kit (plugin-ui, ui-styles, dshx transport errors, ratchets, DESIGN.md) | connection store, error copy and LoadError, hit areas and phone tops, focus ring, DESIGN.md | running |
+| T threads (thread-sidebar, session-controller, activity-timeline, command-palette, workbench, main-tabs) | drafts and reconnect (data safety), one approval status, Inbox approvals, failed-plugin page, Open sidebar, board, Settings row, keyboard and announcements, palette exit, tabs | running |
+| S shell (settings-shell, frame-layout, shortcuts) | connection strip, status strip, shortcuts, Settings faults | after K |
+| C conversation (chat, rich-composer, tool-meta, agent-plan, model-effort-picker, onboarding, user-questions, ai-accounts) | credential failures, first run, offline send, approval row, landscape keyboard and targets, Reply ready, full output | after K |
+| P pages (schedule, project-automations, backlog, jj-integration, diffs-review, jujutsu, background-jobs, agent-communication, agent-toolkit, capabilities-hub, traces, usage, secret-catalog, whiteboard, agentsview) | Schedules naming, Backlog in ink, counts, colours and controls, kit Page, Land page words | after K |
 
 ## Round three
 
