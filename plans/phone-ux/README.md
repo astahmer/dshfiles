@@ -4,6 +4,36 @@
 each picked item gets its own revision, scratch before/after shots at 390 px, and a real-phone check when
 [real-phone verification](../real-phone-verification/README.md) is set up.
 
+## Progress (2026-11-25)
+
+Audit rerun against the live Host (started 2026-11-23 21:28) at 390×844, Android UA, touch, DPR 2, in headless
+Chromium. Cold first load to usable composer: 20.2 s in this harness (not comparable with the 4×-throttled 7.0 s
+below until the same throttling is applied). Still reproduce:
+
+1. **P5** — picking Inbox in the drawer keeps the drawer open and shows the Inbox section list (Needs you / Waiting
+   threads). Picking a thread does close the drawer, and system Back closes the drawer without leaving the page.
+   Opening a destination straight on its content is still a design choice: which section, and how the other section
+   stays reachable.
+2. **P6** — the composer `+` picker opens a 343×95 dropdown whose listbox background is transparent (rgba(0,0,0,0))
+   with a loading skeleton and no rows in the harness; Escape handling could not be measured because the menu never
+   settled.
+3. **P29** — phone destination lists drew the page description under the top bar (which already names the page) and
+   descriptions on section rows, both truncated at 390 px.
+4. **P31** — the launch log still warned that `mainTabs.newTab` and `commandPalette.newThread` claimed Mod+T together.
+
+Shipped in the `thread-1a2f07` workspace (not on main yet):
+
+1. **P31a** — the workspace segment read `Own workspacefrom main`; the two flex spans now carry a real space, so the
+   composer summary is `Own workspace from main`.
+2. **P31b** — `mainTabs.newTab` no longer claims Mod+T on desktop (kept the web binding), so `newThread` registers.
+3. **P29** — phone lists keep the page heading for assistive tech only, omit the page description, and render rows
+   without descriptions; covered by a focused test.
+
+Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
+restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
+build only the touched plugin and prefer focused tests, or run the scratch instance with its own plugin subset.
+
+
 Goal: DSH on a phone (owner: Redmi, HyperOS, Android Chrome PWA over Tailscale HTTPS, ~393 CSS px, gesture navigation)
 feels as smooth and obvious as the best phone apps, for driving many agent threads: switch, read, steer, approve, land.
 
