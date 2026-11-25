@@ -159,6 +159,8 @@ const rowsLocator = page.locator('button[data-thread-main-action][data-thread-id
 const listButton = page.locator('[data-phone-sidebar]')
 const backButton = page.locator('[data-phone-back]')
 const openList = async () => {
+  // Already open: tapping Show threads again would only close it.
+  if (await rowsLocator.first().isVisible().catch(() => false)) return
   if (await listButton.isVisible().catch(() => false)) await listButton.tap()
   else if (await backButton.isVisible().catch(() => false)) await backButton.tap()
 }
@@ -173,10 +175,6 @@ if (
 await rowsLocator.first().waitFor({ timeout: 120_000 })
 const loadMs = Date.now() - loadStart
 await page.waitForTimeout(8000)
-const ids = await rowsLocator.evaluateAll(rows =>
-  rows.map(row => ({ id: row.getAttribute('data-thread-id'), label: (row.getAttribute('aria-label') ?? row.textContent ?? '').replace(/\s+/g, ' ').trim() })),
-)
-const picks = ids.filter(pick => !/^(New chat|New thread)/.test(pick.label)).slice(0, rowCount)
 const out = []
 const summarize = async (longBefore, extra) => {
   const after = await page.evaluate(
@@ -210,10 +208,18 @@ const summarize = async (longBefore, extra) => {
     byMethod,
   }
 }
-for (const pick of picks) {
-  // Back/openList leaves the list open, but its slide needs a frame before the row is tappable again.
+for (let index = 0; index < rowCount; index += 1) {
+  // The list is virtualized: re-read the mounted rows each time instead of trusting an earlier snapshot.
+  await openList()
+  await rowsLocator.first().waitFor({ state: 'visible', timeout: 30_000 }).catch(() => undefined)
+  const mounted = (
+    await rowsLocator.evaluateAll(rows =>
+      rows.map(row => ({ id: row.getAttribute('data-thread-id'), label: (row.getAttribute('aria-label') ?? row.textContent ?? '').replace(/\s+/g, ' ').trim() })),
+    )
+  ).filter(pick => pick.id !== null && !/^(New chat|New thread)/.test(pick.label))
+  const pick = mounted[index % mounted.length]
+  if (pick === undefined) break
   const row = page.locator(`button[data-thread-main-action][data-thread-id="${pick.id}"]`)
-  // The list is virtualized: a row from an earlier snapshot may sit outside the mounted window.
   await row.scrollIntoViewIfNeeded().catch(() => undefined)
   await row.waitFor({ state: 'visible', timeout: 30_000 })
   const expectedTitle = await row.evaluate(row => {
@@ -268,7 +274,7 @@ for (const row of out)
 console.log(
   JSON.stringify({
     rtt,
-    rows: ids.length,
+    rows: opens.length,
     cpu,
     loadMs,
     open: {
