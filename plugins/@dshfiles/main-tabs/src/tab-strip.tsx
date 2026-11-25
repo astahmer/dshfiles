@@ -363,7 +363,13 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                               onCommit={title => void renameTab(tab, title)}
                             />
                           ) : (
-                            <span className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', tab.preview && 'dshx:text-(--dsw-alias-label-tertiary)')}>
+                            // The active tab's label is ink at 500 (round five B5): preview muting marks a background tab only.
+                            <span
+                              className={cn(
+                                'dshx:min-w-0 dshx:flex-1 dshx:truncate',
+                                tab.active ? 'dshx:font-medium' : tab.preview && 'dshx:text-(--dsw-alias-label-tertiary)',
+                              )}
+                            >
                               {tab.title}
                             </span>
                           )}
