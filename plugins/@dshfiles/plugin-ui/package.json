@@ -41,6 +41,10 @@
       "types": "./src/lib/phone-shell.ts",
       "default": "./src/lib/phone-shell.ts"
     },
+    "./lib/host-connection": {
+      "types": "./src/lib/host-connection.ts",
+      "default": "./src/lib/host-connection.ts"
+    },
     "./motion": {
       "types": "./src/motion/index.ts",
       "default": "./src/motion/index.ts"

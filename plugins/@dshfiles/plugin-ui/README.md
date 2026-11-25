@@ -231,7 +231,24 @@ import { RollingNumber, ShimmerText } from '@dshfiles/plugin-ui/components/motio
 import { PluginQueryProvider, errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 ```
 
-Wrap each slot root once (inside dshx `decorate(...)`). Prefix every key with the plugin id, forward `signal` to the dshx client, invalidate by key after mutations. One client per plugin bundle.
+Wrap each slot root once (inside dshx `decorate(...)`). Prefix every key with the plugin id, forward `signal` to the dshx client, invalidate by key after mutations. One client per plugin bundle. When DSH answers again after an outage (below), the provider invalidates its client's queries once, however many providers share the client.
+
+## Connection
+
+```tsx
+import { HostConnection, useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
+
+const connection = useHostConnection() // 'online' | 'reconnecting' | 'offline'
+{connection === 'online' && <Button onClick={cleanUp}>Clean up</Button>}
+```
+
+settings-shell is the one publisher (`HostConnection.publish(view)`, where its probe's `checking` reads as
+`reconnecting`); everyone else reads. The state lives on the page, not in the module: `publish` sets
+`html[data-host-connection]` (absent when online) and dispatches `dshfiles:host-connection` on `document`, and
+`read`, `subscribe` and `useHostConnection` read that attribute, so a bundle with its own inlined kit copy agrees.
+While it is set, every `LiveElapsed` stops at its last value, the `StatusGlyph` and native StateDot spinners and the
+working shimmer stand still, and a verb that archives, lands or cleans up is not offered (DESIGN.md Connection).
+`LiveElapsed` is a silent `role="timer"`.
 
 ## Table (TanStack Table v9)
 

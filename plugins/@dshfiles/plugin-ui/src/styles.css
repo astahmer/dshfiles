@@ -827,6 +827,15 @@
 }
 
 /*
+ * While DSH is away (DESIGN.md Connection: settings-shell sets `html[data-host-connection]` through
+ * lib/host-connection) nothing on the page may look like work in progress: the StatusGlyph spinner, the native StateDot
+ * spinner and the working shimmer stop where they are, as `LiveElapsed` stops its text.
+ */
+html[data-host-connection] :where([data-glyph-spinner], .dshx-live-shimmer-sweep, .dshx-live-shimmer-copy, [class*='_spinnerMotion_']) {
+  animation-play-state: paused !important;
+}
+
+/*
  * The native StateDot "ongoing" spinner (@deepseek-ai/dsh-client-ui-primitives StateDot.module.css) rotates its glyph
  * and also breathes its arc's `stroke-dasharray`: that second animation repaints the SVG on every display frame, in
  * every working row, header and subagent lineage. The arc keeps the length the native reduced-motion rule gives it and
