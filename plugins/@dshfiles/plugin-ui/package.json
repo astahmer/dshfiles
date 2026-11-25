@@ -37,6 +37,10 @@
       "types": "./src/lib/format-duration.ts",
       "default": "./src/lib/format-duration.ts"
     },
+    "./lib/format-clock-time": {
+      "types": "./src/lib/format-clock-time.ts",
+      "default": "./src/lib/format-clock-time.ts"
+    },
     "./lib/phone-shell": {
       "types": "./src/lib/phone-shell.ts",
       "default": "./src/lib/phone-shell.ts"

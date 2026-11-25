@@ -297,6 +297,9 @@ import { RollingNumber, ShimmerText } from '@dshfiles/plugin-ui/components/motio
 - Live clocks and running bars use `everyFrame`/`useElapsed`, never `setInterval` inside a component. Simulated data
   belongs to gallery demos; components stay controlled by props. A clock's text comes from `formatElapsed`
   (`lib/format-duration`); `LiveElapsed` ticks it on the page's one shared second timer.
+- A time of day comes from `formatClockTime(at, { seconds?, locale? })` (`lib/format-clock-time`, council round 5 A6):
+  the locale's 12/24 h choice, printed one way everywhere — `15:45` / `09:05` in a 24-hour locale (the transcript's
+  turn time), `3:45 PM` in a 12-hour one, never `24:00`. Never a local `toLocaleTimeString` with its own options.
 - Do not put Tailwind `scale-*`/`rotate-*`/`translate-*` classes on an element Motion animates: they set the separate
   CSS `scale`/`rotate`/`translate` properties, which compound with Motion's `transform`.
 - Inline styles cannot use the `--dshx-color-*` theme variables (they are declared on `:root`, where the Host's
