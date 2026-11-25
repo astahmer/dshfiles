@@ -60,7 +60,9 @@ restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a seco
 build only the touched plugin and prefer focused tests, or run the scratch instance with its own plugin subset.
 
 The phone switch probe now understands drawer mode (`Show threads` instead of `Back`): it timed out on hidden rows
-before, so P2/P3 had no fresh measurement in drawer mode.
+before, so P2/P3 had no fresh measurement in drawer mode. First live numbers are in
+[performance.md](../../docs/performance.md#drawer-mode-on-live-2026-11-25): title 265 ms (target met), first message
+1565 ms (still above the 800 ms goal), Back 234 ms, 2.4 s of long tasks per open.
 
 ### Verified on a scratch DSH (2026-11-25, this workspace)
 
