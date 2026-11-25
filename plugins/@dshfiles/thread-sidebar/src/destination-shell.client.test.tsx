@@ -368,6 +368,8 @@ describe('DestinationShell', () => {
     }
     renderShell({ collapsed: false, activePanelId: 'dshfiles-usage' })
     const open = rail()
+    // The rail paints the panel step itself, so it reads the same beside the list and on the frame's folded track.
+    expect(open.width).toContain('dshx:bg-[var(--dsw-specific-sidebar-fill)]')
     expect(open.labels).toContain('Knowledge')
     expect(open.active).toBe('observe')
     cleanup()

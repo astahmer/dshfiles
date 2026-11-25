@@ -1024,6 +1024,9 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
           // One width open and folded: the frame's folded track (56px) holds the rail whole (round five B1). Unpadded
           // buttons: "Knowledge", the longest destination, fits whole at the label size (productivity pass Q5, T5.3).
           'dshx:w-14 dshx:px-0',
+          // One rail surface open and folded, on every destination (council round 4 B2): the panel step the frame's folded
+          // track paints, not the base of the pane the open column sits in.
+          'dshx:bg-[var(--dsw-specific-sidebar-fill)]',
         )}
         data-stage-folded={stageFolded ? '' : undefined}
       >
