@@ -159,6 +159,17 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-testid="thread-row-verb"]')).toBeNull()
     expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
   })
+
+  it('lets the question take two lines and keeps a failed reason to one (round five B4)', async () => {
+    const row = await renderRow(asking)
+    const detail = row.querySelector<HTMLElement>('[data-testid="thread-row-status-detail"]')
+    expect(detail?.className).toContain('dshx:line-clamp-2')
+    expect(detail?.className).not.toContain('dshx:truncate')
+    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:items-start')
+    cleanup()
+    const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
+    expect(failed.querySelector('[data-testid="thread-row-status-detail"]')?.className).toContain('dshx:truncate')
+  })
 })
 
 describe('colour in a row', () => {

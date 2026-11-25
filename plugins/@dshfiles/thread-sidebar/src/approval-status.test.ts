@@ -35,7 +35,8 @@ describe('a thread waiting on an approval', () => {
       now: NOW,
     })
     expect(status.group).toBe('needs-you')
-    expect(status.detail).toBe('Approve: git push --force origin…')
+    // The row says the command; its glyph and Review verb say it waits for an approval (round five B4).
+    expect(status.detail).toBe('git push --force origin…')
 
     const working = WorkingThreadsProjection.ids([{ session: { id: selected.id, running: true }, activity: { running: true } }], {
       statusOf: () => status.status,

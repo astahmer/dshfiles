@@ -1883,7 +1883,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               {metaLine ? (
                 <span
                   className={cn(
-                    'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
+                    'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
+                    // A two-line question keeps the project mark on its first line.
+                    workStatus?.status === 'needs-you' && liveStep === undefined && statusDetail !== undefined ? 'dshx:items-start' : 'dshx:items-center',
                     // Room for what sits at the end of this line: the verb, the subagent counter, or both.
                     verbSeat === 'meta' ? (childCount > 0 ? 'dshx:pr-34' : 'dshx:pr-17.5') : childCount > 0 && 'dshx:pr-16',
                   )}
@@ -1918,7 +1920,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         // The reason takes the line: the project name no longer follows it (the tile names the project).
-                        'dshx:min-w-0 dshx:flex-1 dshx:truncate',
+                        // A Needs-you row's question or command may take a second line (round five B4): it is what you
+                        // decide on, so more of it reads before you open the thread.
+                        'dshx:min-w-0 dshx:flex-1',
+                        workStatus?.status === 'needs-you' ? 'dshx:line-clamp-2 dshx:break-words' : 'dshx:truncate',
                         (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
                       )}
                       data-testid="thread-row-status-detail"
@@ -4083,19 +4088,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
   const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
   const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
-  // What an approval asks, for the row's detail line: the command its live step names (`Approve: git push --force…`).
+  // What an approval asks, for the row's detail line: the command its live step names (`git push --force…`); the glyph and
+  // the Review verb say it waits for an approval (round five B4).
   const waitingDetailById = useMemo(() => {
     const details = new Map<SessionSummary['id'], string>()
     for (const session of approvalNeededRows) {
       const interaction = sessionStatus.get(session.id)?.pendingInteraction
       const detail = ApprovalDetail.of(
         { kind: interaction?.kind, step: liveTurns.get(session.id)?.step, reason: ApprovalDetail.reasonOf(interaction) },
-        subject => tSidebar('threadSidebarApproveDetail', { command: subject }),
+        subject => subject,
       )
       if (detail !== undefined) details.set(session.id, detail)
     }
     return details
-  }, [approvalNeededRows, liveTurns, sessionStatus, tSidebar])
+  }, [approvalNeededRows, liveTurns, sessionStatus])
   const childStatusById = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
     if (!statusGlyphs) return statuses

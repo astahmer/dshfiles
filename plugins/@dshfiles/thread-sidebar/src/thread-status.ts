@@ -54,6 +54,17 @@ export interface FailedTurnSignal {
   readonly reason: 'error' | 'max-tokens'
 }
 
+/**
+ * The row's detail is the thing itself (round five B4): the question's start, the command. The glyph and the verb
+ * already say that it asks or wants an approval, so the Inbox's `Approve: ` and `Asks: ` lead-ins are dropped.
+ */
+const VERB_LEAD_IN = /^(?:Approve|Asks):\s*/u
+const subjectOf = (reason: string | undefined): string | undefined => {
+  if (reason === undefined) return undefined
+  const subject = reason.replace(VERB_LEAD_IN, '')
+  return subject.length === 0 ? reason : subject
+}
+
 /** Why the last turn failed, for the row's detail line. */
 const FAILED_TURN_DETAIL = { error: 'Turn failed', 'max-tokens': 'Stopped at the output limit' } as const satisfies Record<FailedTurnSignal['reason'], string>
 
@@ -69,7 +80,7 @@ export interface ThreadStatusInput {
   /** The sidebar's own attention labels for this thread (not its children). */
   readonly labels: readonly ThreadAttentionLabel[]
   readonly inbox: InboxThreadSignal | undefined
-  /** What the thread waits on, when the list knows it and no inbox item says it (`Approve: git push --force…`). */
+  /** What the thread waits on, when the list knows it and no inbox item says it (`git push --force…`). */
   readonly waitingDetail?: string | undefined
   /** Set while the thread's last finished turn is a failed one, read or not. */
   readonly failedTurn?: FailedTurnSignal | undefined
@@ -122,7 +133,7 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
     const fromInbox = inbox?.severity === 'blocking'
     return {
       status: 'needs-you',
-      detail: fromInbox ? inbox.reason : input.waitingDetail,
+      detail: subjectOf(fromInbox ? inbox.reason : input.waitingDetail),
       verb: (fromInbox ? inbox.verb : undefined) ?? (needsLabel === undefined ? undefined : LABEL_VERB[needsLabel]),
       itemId: fromInbox ? inbox.itemId : undefined,
       since: fromInbox ? inbox.openedAt : input.activityAt,

@@ -87,6 +87,17 @@ describe('thread status', () => {
     expect(status).toMatchObject({ status: 'needs-you', group: 'needs-you', verb: 'Answer', itemId: 'i1', detail: 'A question waits.', since: NOW - 5 })
   })
 
+  it('says what a Needs-you row asks without the Inbox lead-in: the glyph and verb say it (round five B4)', () => {
+    const blocking = { itemId: 'i1', severity: 'blocking', verb: 'Answer', openedAt: NOW } as const
+    const asks = ThreadStatusModel.statusOf(input({ inbox: { ...blocking, reason: 'Asks: Which rate should I use?' } }))
+    expect(asks.detail).toBe('Which rate should I use?')
+    const approve = ThreadStatusModel.statusOf(input({ inbox: { ...blocking, verb: 'Approve', reason: 'Approve: Publish the preview build' } }))
+    expect(approve.detail).toBe('Publish the preview build')
+    // A reason that only names its kind keeps it, and one without a lead-in is left as written.
+    expect(ThreadStatusModel.statusOf(input({ inbox: { ...blocking, reason: 'Asks:' } })).detail).toBe('Asks:')
+    expect(ThreadStatusModel.statusOf(input({ inbox: { ...blocking, reason: 'A question waits.' } })).detail).toBe('A question waits.')
+  })
+
   it('puts failed threads in the Needs you group with a Retry from the inbox', () => {
     const status = ThreadStatusModel.statusOf(input({ inbox: { itemId: 'i2', severity: 'failed', reason: 'Turn failed.', verb: 'Retry', openedAt: NOW } }))
     expect(status).toMatchObject({ status: 'failed', group: 'needs-you', verb: 'Retry' })
