@@ -57,14 +57,18 @@ describe('core Plugins page (round five A7)', () => {
     expect(sheet).not.toMatch(/@layer/u)
   })
 
-  it('aligns the page frame to the shared 24px inset (12px narrow), filling the pane instead of a centred 960px column', () => {
+  it('aligns the page frame to the shared 24px inset (12px narrow), with the list in a 920px lane on the header edge', () => {
     const frame = ruleFor('[data-plugin-panel][data-plugin-panel]')
     expect(frame).toMatch(/--plugin-page-inset:\s*24px;/u)
     expect(frame).toMatch(/--plugin-page-top-inset:\s*24px;/u)
     expect(frame).toMatch(/align-items:\s*stretch;/u)
     expect(sheet).toMatch(/@media \(width < 28rem\)\s*\{\s*section\[data-plugin-panel\]\[data-plugin-panel\]\s*\{\s*--plugin-page-inset:\s*12px;/u)
-    const columns = ruleFor("[class*='_pageBody'] > *")
-    expect(columns).toMatch(/max-width:\s*none;/u)
+    // Council round 3, D4: the list and the header stop at one 920px lane, left on the page edge, so the switches sit in a
+    // column under the header's actions instead of at the window's edge. The sticky header bar keeps its full width.
+    const columns = ruleFor("[class*='_pageBody'] > :not([class*='_pageBar'])")
+    expect(columns).toMatch(/max-width:\s*920px;/u)
+    expect(ruleFor("[class*='_pageBar'] > [class*='_pageHead']")).toMatch(/max-width:\s*920px;[\s\S]*align-self:\s*flex-start;/u)
+    expect(ruleFor("[class*='_pageBody'] {")).toMatch(/align-items:\s*flex-start;/u)
     // The module rules are (0,1,0) and (0,2,0); every override out-ranks them.
     for (const [selector] of rules) for (const part of selector.split(',')) expect(beats(specificity(part.trim()), [0, 2, 0]), part).toBe(true)
   })
@@ -78,19 +82,56 @@ describe('core Plugins page (round five A7)', () => {
     const art = ruleFor("[class*='_cardIcon'] > *")
     expect(art).toMatch(/filter:\s*drop-shadow\(var\(--dshx-plugin-tile-shift\) 0 0 var\(--dshx-plugin-tone\)\);/u)
     expect(art).toMatch(/transform:\s*translateX\(calc\(-1 \* var\(--dshx-plugin-tile-shift\)\)\);/u)
-    for (let n = 1; n <= 8; n += 1) expect(sheet, `tone ${n}`).toContain(`li:nth-child(8n + ${n}) { --dshx-plugin-tone: var(--dshx-identity-${n}); }`)
+  })
+
+  it('picks a tile tone from the plugin name, not its place in the list (council round 3, D4)', () => {
+    // CSS cannot hash a string: suffix rules stand in for one, so a row keeps its tone when the list reorders, filters
+    // or grows. The cascade is resolved here as a browser would: the last matching rule at equal specificity wins.
+    expect(sheet).not.toMatch(/li:nth-child\(8n/u)
+    const toneRules = [...sheet.matchAll(/li\[data-plugin-package\$='([^']+)'\], section\[data-plugin-panel\] li\[data-plugin-item\$='\1'\] \{ --dshx-plugin-tone: var\(--dshx-identity-(\d)\); \}/gu)].map(
+      ([, suffix = '', tone = '']) => [suffix, Number(tone)] as const,
+    )
+    const toneOf = (name: string): number | undefined => toneRules.filter(([suffix]) => name.endsWith(suffix)).at(-1)?.[1]
+    for (const character of 'abcdefghijklmnopqrstuvwxyz0123456789') expect(toneOf(`-${character}`), character).toBeDefined()
+    // The commonest endings never share a tone.
+    expect(new Set([...'estnrydl'].map(character => toneOf(`-${character}`))).size).toBe(8)
+    // Names from the round-3 capture, most ending in e or -bundle, each take their own tone.
+    const names = [
+      '@deepseek-ai/dsh-experimental-voice-input-bundle',
+      '@deepseek-ai/dsh-hmr-bundle',
+      '@deepseek-ai/dsh-plugin-market-index',
+      '@deepseek-ai/dsh-experimental-auto-review',
+      '@deepseek-ai/dsh-experimental-worktree',
+      '@dshfiles/activity-timeline',
+      '@dshfiles/agent-communication',
+    ]
+    expect(new Set(names.map(toneOf)).size).toBe(names.length)
+    expect(toneOf('@dshfiles/activity-timeline')).toBe(toneOf('@dshfiles/activity-timeline'))
   })
 
   it('draws Experimental as a quiet neutral chip, once per group when every row is experimental', () => {
     const chip = ruleFor("[class*='_statusTag'][data-tone='info']")
     expect(chip).toMatch(/background:\s*var\(--dsw-alias-bg-module-platform\);/u)
     expect(chip).toMatch(/color:\s*var\(--dsw-alias-label-secondary\);/u)
-    const once = rules.find(([selector]) => selector.includes(':has('))
+    const once = rules.find(([selector]) => selector.includes('[data-plugin-group]:not(:has('))
     expect(once?.[0]).toContain(
       "[data-plugin-group]:not(:has(li[data-plugin-package] [class*='_cardOpen']:last-child, li[data-plugin-package] [class*='_cardOpen'] + [class*='_statusTag']:not([data-tone='info'])))",
     )
     // `:has()` cannot nest: a browser drops the whole rule (round five capture showed the chip on every row).
     for (const [selector] of rules) expect(/:has\([^)]*:has\(/u.test(selector), selector).toBe(false)
     expect(once?.[1]).toMatch(/display:\s*none;/u)
+  })
+
+  it('seats icons at 40px, puts the switch in a fixed column and parts rows with a quiet rule (council round 3, D4)', () => {
+    const frame = ruleFor('[data-plugin-panel][data-plugin-panel] {')
+    expect(frame).toMatch(/--card-icon-size:\s*40px;/u)
+    const end = ruleFor("[class*='_cardEnd']")
+    expect(end).toMatch(/min-width:\s*44px;/u)
+    expect(end).toMatch(/justify-content:\s*flex-end;/u)
+    // A row with no switch keeps the column empty, so every description ends at the same edge.
+    expect(ruleFor("[class*='_cardHead']:not(:has([class*='_cardEnd']))::after")).toMatch(/flex:\s*0 0 44px;/u)
+    const rule = ruleFor("[class*='_cards'] > li + li::before")
+    expect(rule).toMatch(/border-top:\s*1px solid var\(--dsw-alias-border-l3\);/u)
+    expect(rule).toMatch(/pointer-events:\s*none;/u)
   })
 })

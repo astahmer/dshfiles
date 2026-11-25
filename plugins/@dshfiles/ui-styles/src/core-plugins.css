@@ -6,10 +6,16 @@
  * module rule it overrides; tests/core-plugins.test.ts fails when a DSH bump renames a hook.
  */
 
-/* The page frame takes the shared page inset (24px, 12px narrow) and fills the pane instead of a centred 960px column. */
+/*
+ * The page frame takes the shared page inset (24px, 12px narrow). The list and its header stop at one 920px lane on the
+ * page's left edge instead of a centred 960px column (council round 3, D4), so the switches line up under the header's
+ * actions; the sticky header bar keeps its full width for its background and compact rule. Icon seats are 40px.
+ */
 section[data-plugin-panel][data-plugin-panel] {
   --plugin-page-inset: 24px;
   --plugin-page-top-inset: 24px;
+  --card-icon-size: 40px;
+  --card-head-gap: 12px;
   --dshx-plugin-tone: var(--dshx-identity-7);
   align-items: stretch;
 }
@@ -20,17 +26,54 @@ section[data-plugin-panel][data-plugin-panel] {
   }
 }
 
-section[data-plugin-panel][data-plugin-panel] > *,
-section[data-plugin-panel] [class*='_pageBody'] > *,
-section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
+section[data-plugin-panel][data-plugin-panel] > * {
   max-width: none;
+}
+
+section[data-plugin-panel] [class*='_pageBody'] {
+  align-items: flex-start;
+  padding-bottom: 24px;
+}
+
+section[data-plugin-panel] [class*='_pageBody'] > :not([class*='_pageBar']) {
+  max-width: 920px;
+}
+
+section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
+  max-width: 920px;
+  align-self: flex-start;
+}
+
+/* The switch sits in a fixed column; a row with no switch keeps the column empty, so descriptions end at one edge. */
+section[data-plugin-panel] [class*='_cardEnd'] {
+  min-width: 44px;
+  justify-content: flex-end;
+}
+
+section[data-plugin-panel] [class*='_cardHead']:not(:has([class*='_cardEnd']))::after {
+  content: '';
+  flex: 0 0 44px;
+}
+
+/* A quiet rule between rows, from the text edge to the row's end; the full-row hover stays the Host's. */
+section[data-plugin-panel] [class*='_cards'] > li + li::before {
+  content: '';
+  position: absolute;
+  top: -1px;
+  left: calc(var(--card-head-inset) + var(--card-icon-size) + var(--card-head-gap));
+  right: var(--card-head-inset);
+  border-top: 1px solid var(--dsw-alias-border-l3);
+  pointer-events: none;
 }
 
 /*
  * Icon tiles on identity tones: the tile is the tone at 14% with no border, and the artwork is drawn in the tone itself,
  * as its own silhouette shifted back into the tile by a drop shadow while the original is clipped away. Any artwork (a
- * package image or an inline SVG) takes the tone; overlapping translucent parts keep their depth. A row's tone follows
- * its place in the list, cycling through identity-1..8.
+ * package image or an inline SVG) takes the tone; overlapping translucent parts keep their depth. A row's tone comes from
+ * its plugin name, so it survives reordering and filtering: CSS cannot hash a string, so the name's last character
+ * picks one of identity-1..8 (council round 3, D4). Characters are dealt to the tones in order of how often names end
+ * with them (e s t n r y d l first). Most names end in e and many in -bundle, so two later layers refine those: the
+ * character before a final e, then the character before -bundle (later rules win at equal specificity).
  */
 section[data-plugin-panel] [class*='_cardIcon'] {
   --dshx-plugin-tile-shift: 96px;
@@ -44,14 +87,118 @@ section[data-plugin-panel] [class*='_cardIcon'] > * {
   transform: translateX(calc(-1 * var(--dshx-plugin-tile-shift)));
 }
 
-section[data-plugin-panel] li:nth-child(8n + 1) { --dshx-plugin-tone: var(--dshx-identity-1); }
-section[data-plugin-panel] li:nth-child(8n + 2) { --dshx-plugin-tone: var(--dshx-identity-2); }
-section[data-plugin-panel] li:nth-child(8n + 3) { --dshx-plugin-tone: var(--dshx-identity-3); }
-section[data-plugin-panel] li:nth-child(8n + 4) { --dshx-plugin-tone: var(--dshx-identity-4); }
-section[data-plugin-panel] li:nth-child(8n + 5) { --dshx-plugin-tone: var(--dshx-identity-5); }
-section[data-plugin-panel] li:nth-child(8n + 6) { --dshx-plugin-tone: var(--dshx-identity-6); }
-section[data-plugin-panel] li:nth-child(8n + 7) { --dshx-plugin-tone: var(--dshx-identity-7); }
-section[data-plugin-panel] li:nth-child(8n + 8) { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='a'], section[data-plugin-panel] li[data-plugin-item$='a'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='b'], section[data-plugin-panel] li[data-plugin-item$='b'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='c'], section[data-plugin-panel] li[data-plugin-item$='c'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='d'], section[data-plugin-panel] li[data-plugin-item$='d'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='e'], section[data-plugin-panel] li[data-plugin-item$='e'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='f'], section[data-plugin-panel] li[data-plugin-item$='f'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='g'], section[data-plugin-panel] li[data-plugin-item$='g'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='h'], section[data-plugin-panel] li[data-plugin-item$='h'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='i'], section[data-plugin-panel] li[data-plugin-item$='i'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='j'], section[data-plugin-panel] li[data-plugin-item$='j'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='k'], section[data-plugin-panel] li[data-plugin-item$='k'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='l'], section[data-plugin-panel] li[data-plugin-item$='l'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='m'], section[data-plugin-panel] li[data-plugin-item$='m'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='n'], section[data-plugin-panel] li[data-plugin-item$='n'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='o'], section[data-plugin-panel] li[data-plugin-item$='o'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='p'], section[data-plugin-panel] li[data-plugin-item$='p'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='q'], section[data-plugin-panel] li[data-plugin-item$='q'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='r'], section[data-plugin-panel] li[data-plugin-item$='r'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='s'], section[data-plugin-panel] li[data-plugin-item$='s'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='t'], section[data-plugin-panel] li[data-plugin-item$='t'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='u'], section[data-plugin-panel] li[data-plugin-item$='u'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='v'], section[data-plugin-panel] li[data-plugin-item$='v'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='w'], section[data-plugin-panel] li[data-plugin-item$='w'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='x'], section[data-plugin-panel] li[data-plugin-item$='x'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='y'], section[data-plugin-panel] li[data-plugin-item$='y'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='z'], section[data-plugin-panel] li[data-plugin-item$='z'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='0'], section[data-plugin-panel] li[data-plugin-item$='0'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='1'], section[data-plugin-panel] li[data-plugin-item$='1'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='2'], section[data-plugin-panel] li[data-plugin-item$='2'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='3'], section[data-plugin-panel] li[data-plugin-item$='3'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='4'], section[data-plugin-panel] li[data-plugin-item$='4'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='5'], section[data-plugin-panel] li[data-plugin-item$='5'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='6'], section[data-plugin-panel] li[data-plugin-item$='6'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='7'], section[data-plugin-panel] li[data-plugin-item$='7'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='8'], section[data-plugin-panel] li[data-plugin-item$='8'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='9'], section[data-plugin-panel] li[data-plugin-item$='9'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+
+/* Names ending in e (most do): the character before it decides, four tones on, so `…ne` and `…n` differ. */
+section[data-plugin-panel] li[data-plugin-package$='ae'], section[data-plugin-panel] li[data-plugin-item$='ae'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='be'], section[data-plugin-panel] li[data-plugin-item$='be'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='ce'], section[data-plugin-panel] li[data-plugin-item$='ce'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='de'], section[data-plugin-panel] li[data-plugin-item$='de'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='ee'], section[data-plugin-panel] li[data-plugin-item$='ee'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='fe'], section[data-plugin-panel] li[data-plugin-item$='fe'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='ge'], section[data-plugin-panel] li[data-plugin-item$='ge'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='he'], section[data-plugin-panel] li[data-plugin-item$='he'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='ie'], section[data-plugin-panel] li[data-plugin-item$='ie'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='je'], section[data-plugin-panel] li[data-plugin-item$='je'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='ke'], section[data-plugin-panel] li[data-plugin-item$='ke'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='le'], section[data-plugin-panel] li[data-plugin-item$='le'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='me'], section[data-plugin-panel] li[data-plugin-item$='me'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='ne'], section[data-plugin-panel] li[data-plugin-item$='ne'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='oe'], section[data-plugin-panel] li[data-plugin-item$='oe'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='pe'], section[data-plugin-panel] li[data-plugin-item$='pe'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='qe'], section[data-plugin-panel] li[data-plugin-item$='qe'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='re'], section[data-plugin-panel] li[data-plugin-item$='re'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='se'], section[data-plugin-panel] li[data-plugin-item$='se'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='te'], section[data-plugin-panel] li[data-plugin-item$='te'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='ue'], section[data-plugin-panel] li[data-plugin-item$='ue'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='ve'], section[data-plugin-panel] li[data-plugin-item$='ve'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='we'], section[data-plugin-panel] li[data-plugin-item$='we'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='xe'], section[data-plugin-panel] li[data-plugin-item$='xe'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='ye'], section[data-plugin-panel] li[data-plugin-item$='ye'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='ze'], section[data-plugin-panel] li[data-plugin-item$='ze'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='0e'], section[data-plugin-panel] li[data-plugin-item$='0e'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='1e'], section[data-plugin-panel] li[data-plugin-item$='1e'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='2e'], section[data-plugin-panel] li[data-plugin-item$='2e'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='3e'], section[data-plugin-panel] li[data-plugin-item$='3e'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='4e'], section[data-plugin-panel] li[data-plugin-item$='4e'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='5e'], section[data-plugin-panel] li[data-plugin-item$='5e'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='6e'], section[data-plugin-panel] li[data-plugin-item$='6e'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='7e'], section[data-plugin-panel] li[data-plugin-item$='7e'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='8e'], section[data-plugin-panel] li[data-plugin-item$='8e'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='9e'], section[data-plugin-panel] li[data-plugin-item$='9e'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+
+/* Bundles (`…-bundle`): the character before the suffix decides, four tones on. */
+section[data-plugin-panel] li[data-plugin-package$='a-bundle'], section[data-plugin-panel] li[data-plugin-item$='a-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='b-bundle'], section[data-plugin-panel] li[data-plugin-item$='b-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='c-bundle'], section[data-plugin-panel] li[data-plugin-item$='c-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='d-bundle'], section[data-plugin-panel] li[data-plugin-item$='d-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='e-bundle'], section[data-plugin-panel] li[data-plugin-item$='e-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='f-bundle'], section[data-plugin-panel] li[data-plugin-item$='f-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='g-bundle'], section[data-plugin-panel] li[data-plugin-item$='g-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='h-bundle'], section[data-plugin-panel] li[data-plugin-item$='h-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='i-bundle'], section[data-plugin-panel] li[data-plugin-item$='i-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='j-bundle'], section[data-plugin-panel] li[data-plugin-item$='j-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='k-bundle'], section[data-plugin-panel] li[data-plugin-item$='k-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='l-bundle'], section[data-plugin-panel] li[data-plugin-item$='l-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='m-bundle'], section[data-plugin-panel] li[data-plugin-item$='m-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='n-bundle'], section[data-plugin-panel] li[data-plugin-item$='n-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='o-bundle'], section[data-plugin-panel] li[data-plugin-item$='o-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='p-bundle'], section[data-plugin-panel] li[data-plugin-item$='p-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='q-bundle'], section[data-plugin-panel] li[data-plugin-item$='q-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='r-bundle'], section[data-plugin-panel] li[data-plugin-item$='r-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='s-bundle'], section[data-plugin-panel] li[data-plugin-item$='s-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='t-bundle'], section[data-plugin-panel] li[data-plugin-item$='t-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='u-bundle'], section[data-plugin-panel] li[data-plugin-item$='u-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='v-bundle'], section[data-plugin-panel] li[data-plugin-item$='v-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='w-bundle'], section[data-plugin-panel] li[data-plugin-item$='w-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='x-bundle'], section[data-plugin-panel] li[data-plugin-item$='x-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='y-bundle'], section[data-plugin-panel] li[data-plugin-item$='y-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='z-bundle'], section[data-plugin-panel] li[data-plugin-item$='z-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='0-bundle'], section[data-plugin-panel] li[data-plugin-item$='0-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='1-bundle'], section[data-plugin-panel] li[data-plugin-item$='1-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
+section[data-plugin-panel] li[data-plugin-package$='2-bundle'], section[data-plugin-panel] li[data-plugin-item$='2-bundle'] { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li[data-plugin-package$='3-bundle'], section[data-plugin-panel] li[data-plugin-item$='3-bundle'] { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li[data-plugin-package$='4-bundle'], section[data-plugin-panel] li[data-plugin-item$='4-bundle'] { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li[data-plugin-package$='5-bundle'], section[data-plugin-panel] li[data-plugin-item$='5-bundle'] { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li[data-plugin-package$='6-bundle'], section[data-plugin-panel] li[data-plugin-item$='6-bundle'] { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li[data-plugin-package$='7-bundle'], section[data-plugin-panel] li[data-plugin-item$='7-bundle'] { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li[data-plugin-package$='8-bundle'], section[data-plugin-panel] li[data-plugin-item$='8-bundle'] { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li[data-plugin-package$='9-bundle'], section[data-plugin-panel] li[data-plugin-item$='9-bundle'] { --dshx-plugin-tone: var(--dshx-identity-8); }
 
 /* Experimental (and Update available) as a quiet neutral chip at the 11px floor, not an accent pill at 10px. */
 section[data-plugin-panel] [class*='_statusTag'][data-tone='info'] {
