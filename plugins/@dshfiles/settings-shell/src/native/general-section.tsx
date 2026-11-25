@@ -71,10 +71,10 @@ export const GeneralSection = (
         'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:w-full!',
         // Round three item 30: the Language note reads as the Language row's own caption, under one divider.
         'dshx:[&_[class$=row]:has(+[data-settings-language-note])]:border-b-0! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:pb-1!',
-        // Round five P4: the chosen Appearance cube (core theme row, unlayered module CSS) at the tint rung: the selected
-        // wash, a 1px accent border and a 2px accent tick in its top-end corner. Narrow panes get shorter cubes.
-        'dshx:[&_[class*=_themeCube][aria-pressed=true]]:relative dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:border-ring! dshx:[&_[class*=_themeCube][aria-pressed=true]]:bg-selected-wash! dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-marker!',
-        "dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:absolute dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:top-2.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:right-3.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:bottom-auto dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:left-auto dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:h-2.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:w-1.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:rotate-45 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:border-r-2 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:border-b-2 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:border-ring dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:content-['']",
+        // The chosen Appearance cube (core theme row, unlayered module CSS) is the kit's selected card (council round 3
+        // B3, A1): the wash, a ring edge and a check badge in its top-end corner, and no inset row marker. Narrow panes get
+        // shorter cubes.
+        'dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-card!',
         'dshx:@max-pane-narrow:[&_[class*=_themeCube]]:py-2! dshx:@max-pane-narrow:[&_[class*=_themeCube]]:gap-1!',
         // Each card's theme swatch under its label (`themeSwatches`): cards in core order, Light, Dark, System.
         "dshx:[&_[class*=_themeCube]]:before:order-last dshx:[&_[class*=_themeCube]]:before:mt-1 dshx:[&_[class*=_themeCube]]:before:h-3 dshx:[&_[class*=_themeCube]]:before:w-10 dshx:[&_[class*=_themeCube]]:before:content-['']",

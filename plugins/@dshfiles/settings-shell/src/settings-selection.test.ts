@@ -13,14 +13,13 @@ describe('Settings selection at the tint rung (round five P4, K2)', () => {
     expect(active).not.toContain('sidebar-nav-item-active')
   })
 
-  it('draws the chosen appearance cube with the selected wash, an accent border and a check', () => {
+  it('draws the chosen appearance cube as the kit selected card: wash, ring edge and check, no row marker', () => {
     const general = read('native/general-section.tsx')
     const cube = "[&_[class*=_themeCube][aria-pressed=true]]"
-    expect(general).toContain(`dshx:${cube}:bg-selected-wash!`)
-    expect(general).toContain(`dshx:${cube}:border-ring!`)
-    // The check: a 2 px accent tick drawn by ::after in the cube's top-end corner.
-    expect(general).toContain(`dshx:${cube}:after:border-ring`)
-    expect(general).toContain(`dshx:${cube}:after:rotate-45`)
+    // Council round 3 B3: one card selection look (kit A1) instead of a hand-built border, tick and the row marker.
+    expect(general).toContain(`dshx:${cube}:selected-card!`)
+    expect(general).not.toContain(`dshx:${cube}:selected-marker!`)
+    expect(general).not.toContain(`dshx:${cube}:after:rotate-45`)
     // Smaller cubes in a narrow pane.
     expect(general).toContain('dshx:@max-pane-narrow:[&_[class*=_themeCube]]:py-2!')
   })
