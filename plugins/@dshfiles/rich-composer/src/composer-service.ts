@@ -7,7 +7,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { formatFileMention } from '@deepseek-ai/dsh-file-reference/grammar'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { relativizeToCwd, workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
-import type { ComposerService, Subscribable } from '@dshfiles/dshx/client'
+import type { ComposerAnnotation, ComposerService, ComposerTarget, Subscribable } from '@dshfiles/dshx/client'
 
 interface ModelDirectories {
   directoryFor(sessionId: SessionId): { select(selection: { provider: string; model: string; reasoningEffort?: string }): Promise<{ readonly ok: boolean }> }
@@ -34,6 +34,37 @@ export const createComposerService = (ctx: Context): ComposerService => {
   const current: Subscribable<string | undefined> = {
     get: currentId,
     subscribe: listener => ctx.uiSession.adapter.current.subscribe(listener),
+  }
+  const annotations = (target?: ComposerTarget): Subscribable<readonly ComposerAnnotation[]> => {
+    const listeners = new Set<() => void>()
+    const notify = (): void => { for (const listener of listeners) listener() }
+    let boundShell: SessionInputShell | undefined
+    let unsubscribeAnnotations: (() => void) | undefined
+    let unsubscribeCurrent: (() => void) | undefined
+    const bind = (): void => {
+      const shell = resolve(target?.sessionId)?.shell
+      if (shell === boundShell) return
+      unsubscribeAnnotations?.()
+      boundShell = shell
+      unsubscribeAnnotations = shell?.annotations.subscribe(notify)
+    }
+    return {
+      get: () => resolve(target?.sessionId)?.shell.annotations.snapshot() ?? [],
+      subscribe: (listener) => {
+        listeners.add(listener)
+        if (listeners.size === 1) {
+          unsubscribeCurrent = current.subscribe(() => { bind(); notify() })
+          bind()
+        }
+        return () => {
+          listeners.delete(listener)
+          if (listeners.size > 0) return
+          unsubscribeAnnotations?.()
+          unsubscribeCurrent?.()
+          boundShell = undefined
+        }
+      },
+    }
   }
   const focused: Subscribable<boolean> = {
     get: () => {
@@ -74,7 +105,7 @@ export const createComposerService = (ctx: Context): ComposerService => {
       const attachment = input.attachment
       if (attachment.kind === 'annotation') {
         if (!editable(target.shell)) return false
-        target.shell.annotations.add({ text: attachment.text, source: attachment.source ?? '' })
+        target.shell.annotations.add({ text: attachment.text, source: attachment.source ?? '', comment: attachment.comment ?? '' })
         return true
       }
       if (attachment.kind !== 'file') return target.shell.addFiles([ComposerSnippets.reference(attachment)], [])
@@ -83,6 +114,19 @@ export const createComposerService = (ctx: Context): ComposerService => {
       if (mention === undefined) return false
       const label = workspaceTitleOf(attachment.path) || attachment.path
       return target.shell.addFiles([{ source: 'reference', ref: mention, label, appearance: 'file', clipboardText: mention }], [])
+    },
+    annotations,
+    setAnnotationComment: input => {
+      const shell = resolve(input.sessionId)?.shell
+      if (shell === undefined) return false
+      shell.annotations.setComment({ id: input.id, comment: input.comment })
+      return true
+    },
+    removeAnnotation: input => {
+      const shell = resolve(input.sessionId)?.shell
+      if (shell === undefined) return false
+      shell.annotations.remove(input.id)
+      return true
     },
     setModel: async input => {
       const target = resolve(input.sessionId)

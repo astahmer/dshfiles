@@ -150,7 +150,19 @@ export type ComposerAttachment =
       readonly text: string
       /** Opaque locator of the quoted message, handed back when the user asks to see it. */
       readonly source?: string
+      /** The comment written with the annotation in one step; empty or absent adds none. */
+      readonly comment?: string
     }
+
+/** One unsent annotation on the composer's draft: a quoted passage and the comment written on it. */
+export interface ComposerAnnotation {
+  readonly id: number
+  readonly text: string
+  /** The user's comment; empty until one is written. */
+  readonly comment: string
+  /** Opaque locator of the quoted passage, handed back when the user asks to see it; empty when unknown. */
+  readonly source: string
+}
 
 export interface ComposerModelSelection {
   readonly provider: string
@@ -172,6 +184,12 @@ export interface ComposerService {
   /** Insert at the caret, or at the end when the composer never had focus. */
   insert(input: ComposerTarget & { readonly text: string }): boolean
   attach(input: ComposerTarget & { readonly attachment: ComposerAttachment }): boolean
+  /** The target composer's annotations, in the order they were added; empty until one exists. */
+  annotations(target?: ComposerTarget): Subscribable<readonly ComposerAnnotation[]>
+  /** Write, or clear with an empty string, the comment on one draft annotation. */
+  setAnnotationComment(input: ComposerTarget & { readonly id: number; readonly comment: string }): boolean
+  /** Remove one annotation from the draft. */
+  removeAnnotation(input: ComposerTarget & { readonly id: number }): boolean
   /** Choose the model and variant the next message uses. */
   setModel(input: ComposerTarget & { readonly selection: ComposerModelSelection }): Promise<boolean>
   focus(target?: ComposerTarget): boolean
