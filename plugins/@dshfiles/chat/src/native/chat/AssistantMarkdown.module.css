@@ -12,8 +12,9 @@
   /* dshfiles (visual refresh T2.1): plain prose at the density's prose size (14px, 15px on a phone), never below
      the Settings font-size preference. */
   font-size: max(var(--dsh-content-font-size, 14px), var(--dshx-density-text-prose, 14px));
-  /* dshfiles (productivity pass T1.1): 14/23 on desktop, 15/24 on a phone (the prose step plus 9px leading). */
-  line-height: calc(var(--dshx-density-text-prose, 14px) + 9px + var(--dsh-content-font-delta, 0px));
+  /* dshfiles (unslop r5 C4): prose leads at 1.62 of its size (14/22.7 on desktop, 15/24.3 on a phone), which also
+     holds for a larger Settings font size; it was the prose step plus a fixed 9px. */
+  line-height: 1.62;
   color: var(--dsw-alias-label-primary);
 }
 
@@ -112,6 +113,25 @@
 
 .body :global([data-dsh-markdown]) :where(h1, h2, h3, h4, h5, h6) + :where(p, ul, ol) {
   margin-top: 0;
+}
+
+/* dshfiles (unslop r5 C4): in dark a code card sat on the panel step, darker than the page, and read as a hole. It takes
+   the raised surface with a 1px hairline. The hairline is an inset outline, drawn over the card's own banner and
+   costing no layout. */
+:global(body[data-ds-dark-theme]) .body :global([data-dsh-markdown] .md-code-block) {
+  background-color: var(--dshx-tone-raised);
+  outline: 1px solid var(--dshx-tone-line);
+  outline-offset: -1px;
+}
+
+/* Its header band (language, wrap, copy) is the same surface, and, being sticky, it paints over the card's outline, so it
+   draws the hairline's top and sides itself. */
+:global(body[data-ds-dark-theme]) .body :global([data-dsh-markdown] .md-code-block [data-code-block-banner]) {
+  background-color: var(--dshx-tone-raised);
+  box-shadow:
+    inset 0 1px 0 var(--dshx-tone-line),
+    inset 1px 0 0 var(--dshx-tone-line),
+    inset -1px 0 0 var(--dshx-tone-line);
 }
 
 /* Wide markdown tables (the renderer's ≥4-column md-table-wide hook) span
