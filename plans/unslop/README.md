@@ -29,6 +29,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | --- | --- | --- | --- | --- |
 | 1 (round-0 shots) | 6.5 | 6.5 | 7.5 | GLM 6.5 (non-blocking): coloured pixels cover 0.03–0.5 % of 12 of 14 screens |
 | 2 (round-1 shots) | 7.5 | 7.5 | 8 | GLM 7.5: the round-1 fixes are in the pixels; Needs-you washes too faint to see |
+| 3 (round-2 shots) | 7.5 | 8 | 8.5 | colour now reads; consistency (chrome, widths, controls) and phone space remain |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -75,6 +76,13 @@ the selected row on the quieter wash plus marker, Failed titles wrap, whole-unit
 group chips; the subagent wait shown once in the header; the active tab label in ink at 500 in main-tabs and Workbench;
 palette with one keycap, relative times and one frame; Settings theme swatches and stacked narrow rows; new-thread
 starter chips kept after the first thread; dshx seed and e2e helpers reopen the folded Settings list).
+
+Round 3 findings, merged in `.cache/unslop-audit/r5/council/round-3-fixes.md`: the folded rail drops its labels and the
+wordmark, so the chrome changes between destinations; selection still shares the Needs-you hue (now neutral with the
+indigo marker); no shared page container or header (Settings General has none); three tab and two select styles; two
+diff-count formats; the phone status pill band and the jump band take a row; Inbox counts a Failed item as Needs you;
+rail, starter chips, tool rows and Usage flows still ink-only (now identity tones). Lanes A kit, B chrome and Settings,
+C transcript/Inbox/phone, D Usage/Backlog/AI accounts/Plugins running.
 
 ## Round four
 
