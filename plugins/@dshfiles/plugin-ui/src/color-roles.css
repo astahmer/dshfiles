@@ -107,8 +107,9 @@
   &::after {
     content: '';
     position: absolute;
-    inset-block-start: 6px;
-    inset-inline-end: 6px;
+    /* All four insets: a coarse pointer's 44px hit area also draws with a raw button's ::after (styles.css). */
+    inset-block: 6px auto;
+    inset-inline: auto 6px;
     width: 16px;
     height: 16px;
     background-color: var(--dsw-alias-state-business-primary);

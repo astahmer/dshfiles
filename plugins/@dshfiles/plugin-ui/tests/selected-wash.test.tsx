@@ -119,6 +119,10 @@ describe('selected card (council round 3 A1)', () => {
     expect(card).toMatch(/&::after\s*\{[^}]*mask[^}]*\}/u)
     expect(card).toMatch(/&::after\s*\{[^}]*background-color: var\(--dsw-alias-state-business-primary\);/u)
     expect(card).toMatch(/&::after\s*\{[^}]*pointer-events: none;/u)
+
+    // A coarse pointer's 44px hit area (styles.css) also draws with a raw button's ::after and sets all four insets:
+    // the badge resets them, so it stays a 16px corner badge instead of stretching to the leading edge.
+    expect(card).toMatch(/&::after\s*\{[^}]*inset-block: 6px auto;[^}]*inset-inline: auto 6px;/u)
   })
 
   it.each(schemes)('holds the check and the edge at 3:1 on the wash (%s)', scheme => {
