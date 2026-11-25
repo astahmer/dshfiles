@@ -108,3 +108,68 @@ describe('ChatViewport unread answer', () => {
     expect(document.querySelectorAll('[data-chat-unread-label]')).toHaveLength(0)
   })
 })
+
+/** Give an element a layout box: its viewport top moves with the scroller's scrollTop, as in a browser. */
+const place = (element: HTMLElement, scroller: HTMLElement, top: number, height: number): void => {
+  element.getBoundingClientRect = () => {
+    const y = top - scroller.scrollTop
+    // SAFETY: the viewport reads only the box fields set here; DOMRect's other members are never called.
+    return { top: y, bottom: y + height, height, left: 0, right: 600, width: 600, x: 0, y, toJSON: () => ({}) } as DOMRect
+  }
+}
+
+describe('ChatViewport unread landing geometry (round five C3)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', InertResizeObserver)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    document.body.replaceChildren()
+  })
+
+  const flowItem = (kind: string, child?: HTMLElement): HTMLElement => {
+    const element = document.createElement('div')
+    element.dataset.chatFlowKind = kind
+    if (child !== undefined) element.append(child)
+    return element
+  }
+
+  const landing = (withWorkedFor: boolean) => {
+    const answer = row({ key: 'answer', turn: 2, answer: true })
+    const prompt = flowItem('user')
+    const worked = flowItem('turn-process')
+    const answerItem = flowItem('assistant-step', answer)
+    const scroller = document.createElement('div')
+    scroller.dataset.conversationScroll = ''
+    const list = document.createElement('div')
+    const column = document.createElement('div')
+    column.append(...(withWorkedFor ? [prompt, worked, answerItem] : [prompt, answerItem]))
+    list.append(column)
+    scroller.append(list)
+    document.body.append(scroller)
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 600 })
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 3000 })
+    // SAFETY: the viewport reads only the box fields set here; DOMRect's other members are never called.
+    scroller.getBoundingClientRect = () => ({ top: 0, bottom: 600, height: 600, left: 0, right: 600, width: 600, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    // The prompt, then "Worked for" (24px) 12px above the answer, as the flow lays them out.
+    place(prompt, scroller, 800, 100)
+    place(worked, scroller, 964, 24)
+    place(answerItem, scroller, 1000, 400)
+    place(answer, scroller, 1000, 400)
+    const viewport = new ChatViewport()
+    viewport.attach(list, column)
+    viewport.updateTurns([{ turn: 2, anchorKey: 'turn-2', prompt: '', response: '' }])
+    viewport.landAtUnread(answer, 'New')
+    return { scrollTop: scroller.scrollTop }
+  }
+
+  it('lands the Turn\'s "Worked for" row whole, 12px below the top edge, never a clipped sliver of it', () => {
+    // "Worked for" starts at 964: it lands at 12px from the top.
+    expect(landing(true).scrollTop).toBe(964 - 12)
+  })
+
+  it('lands an answer with no row directly above it 12px below the top edge', () => {
+    // The prompt above ends 100px before the answer: nothing of it shows within the 12px inset.
+    expect(landing(false).scrollTop).toBe(1000 - 12)
+  })
+})

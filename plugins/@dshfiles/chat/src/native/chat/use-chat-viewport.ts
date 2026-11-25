@@ -75,6 +75,8 @@ const READING_INTENTS = ['wheel', 'touchstart', 'pointerdown', 'keydown', 'befor
 const SCROLL_KEYS = new Set(['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '])
 /** How long after a wheel, touch or key a scroll still belongs to the reader; wheel momentum keeps renewing it. */
 const READER_GESTURE_MS = 300
+/** An unread landing's distance below the scrollport's top edge: within the smallest flow gap above an answer (12px). */
+const UNREAD_TOP_INSET = 12
 
 /** Owns one Chat scrollport's DOM operations, event listeners, and size observer. */
 export class ChatViewport {
@@ -840,7 +842,24 @@ export class ChatViewport {
     this.clearUnread()
     row.dataset.chatUnreadLabel = label
     const turn = Number(row.dataset.chatTurn)
-    return this.align(row, 24, Number.isInteger(turn) ? turn : null)
+    // dshfiles (unslop r5 C3): a 24px inset showed the bottom half of the Turn's "Worked for" row (12px above the
+    // answer) cut by the scrollport's top edge. That row now lands whole, 12px below the edge; with no such row
+    // directly above, the answer lands 12px below it, inside the smallest flow gap, so nothing above shows clipped.
+    return this.align(row, UNREAD_TOP_INSET + this.leadIn(row), Number.isInteger(turn) ? turn : null)
+  }
+
+  /**
+   * How far above an answer its Turn's "Worked for" row starts, when that row is the visible flow item directly above.
+   * @param row - the final answer row.
+   * @returns the distance in pixels, or 0 when another row (or none) precedes the answer.
+   */
+  private leadIn(row: HTMLElement): number {
+    let previous = row.closest<HTMLElement>('[data-chat-flow-kind]')?.previousElementSibling ?? null
+    while (previous instanceof HTMLElement && (previous.hidden || previous.getBoundingClientRect().height === 0)) {
+      previous = previous.previousElementSibling
+    }
+    if (!(previous instanceof HTMLElement) || previous.dataset.chatFlowKind !== 'turn-process') return 0
+    return Math.max(0, row.getBoundingClientRect().top - previous.getBoundingClientRect().top)
   }
 
   /** Remove the unread divider, once the reader's own input starts newer content. */

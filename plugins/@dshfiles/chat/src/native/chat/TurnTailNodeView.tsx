@@ -53,8 +53,8 @@ export const TurnTailNodeView = memo(function TurnTailNodeView({
     <div
       className={css.root}
       data-turn-tail={data.turn}
-      // dshfiles (productivity pass T1.5): every reply's actions show on hover or focus on a pointer device (touch keeps
-      // them visible), the latest one included.
+      // dshfiles (productivity pass T1.5): a reply's actions show on hover or focus on a pointer device (touch keeps them
+      // visible); unslop r5 C3: the latest reply's stay visible (MessageIconActions.module.css).
       data-actions-reveal="hover"
     >
       {tail}

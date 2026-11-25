@@ -11,8 +11,9 @@ describe('the "Back to bottom" control', () => {
     expect(slot).toContain('calc((100% - var(--dsh-chat-content-width)) / 2 - var(--dsh-to-bottom-size) - 12px)')
     // The old inset ended the control flush with the column's right edge, over the text.
     expect(slot).not.toMatch(/calc\(\(100% - var\(--dsh-chat-content-width\)\) \/ 2\)\s*\)/)
-    // A pane with no gutter keeps the control inside the pane.
-    expect(slot).toContain('calc(var(--dsh-composer-side-clearance) + 16px)')
+    // A pane with no gutter keeps the control on the column's edge, which the dock shares (round five C3).
+    expect(slot).toContain('var(--dsh-composer-side-clearance),')
+    expect(slot).not.toContain('calc(var(--dsh-composer-side-clearance) + 16px)')
   })
 
   // Unslop round five C2 (council round 2): a 44px control on the dock's edge, outside the prose; no gradient that leaves a
@@ -39,7 +40,7 @@ describe('the "Back to bottom" control', () => {
     expect(band).toMatch(/box-shadow: inset 0 1px var\(--dsw-alias-border-l2/)
     expect(band).toMatch(/pointer-events: none/)
     // Zero height whenever the gutter holds the control: the overlap is measured against the frame (100cqw).
-    expect(band).toMatch(/--dsh-to-bottom-overlap: calc\(\s*var\(--dsh-to-bottom-size\) \+ 12px \+ var\(--dsh-composer-side-clearance, 16px\) \+ 16px -/)
+    expect(band).toMatch(/--dsh-to-bottom-overlap: calc\(\s*var\(--dsh-to-bottom-size\) \+ 12px \+ var\(--dsh-composer-side-clearance, 16px\) -/)
     expect(band).toContain('100cqw')
   })
 })

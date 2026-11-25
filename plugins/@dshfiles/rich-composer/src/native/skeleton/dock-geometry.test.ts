@@ -53,3 +53,16 @@ describe('composer dock geometry', () => {
     for (const block of blocks().filter(candidate => candidate.selector === entry)) expect(block.body).not.toMatch(/height|grid-template-rows/)
   })
 })
+
+describe('one transcript column (round five C3)', () => {
+  const block = (selector: string): string => blocks().find(candidate => candidate.selector === selector && candidate.context === '')?.body ?? ''
+
+  it('caps the default column at 720px, so code, cards and the turn summary share one edge with the prose start', () => {
+    expect(block('.body')).toMatch(/--dsh-chat-content-width:\s*var\(\s*--dsh-chat-user-width,\s*clamp\(680px, calc\(var\(--dsh-conversation-column-width, 0px\) \* 0\.64\), 720px\)\s*\)/)
+  })
+
+  it('gives the dock and the composer card the transcript column edges, not 16px more on each side', () => {
+    expect(block('.body')).toMatch(/--dsh-composer-card-max-width:\s*var\(--dsh-chat-content-width\);/)
+    expect(block('.embeddedBody')).toMatch(/--dsh-composer-card-max-width:\s*var\(--dsh-chat-content-width\);/)
+  })
+})
