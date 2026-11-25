@@ -1386,6 +1386,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "PhoneStatus",
+      "importFrom": "@dshfiles/frame-layout/status-strip",
+      "owner": "@dshfiles/frame-layout",
+      "source": "plugins/@dshfiles/frame-layout/src/status-strip.ts:61",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/frame-layout.phone-status",
+      "kind": "contract",
+      "title": "PhoneStatus",
+      "summary": "Provided by frame-layout; `useContract(PhoneStatus)` is not active without it, and the bar shows no status control.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(PhoneStatus) to consume; only @dshfiles/frame-layout provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/frame-layout's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/frame-layout.phone-status"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/input-trigger/caret-token",
       "kind": "module",
       "title": "@dshfiles/input-trigger/caret-token",
