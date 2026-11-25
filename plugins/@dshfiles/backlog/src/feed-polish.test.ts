@@ -120,8 +120,9 @@ describe('Backlog feed (council round 3, D2)', () => {
 
 describe('Backlog feed lane (council round 3, D2)', () => {
   const panel = read('backlog-panel.tsx')
-  it('holds the page (header, toolbar, feed and capture box) to the kit lane (920 px); the board runs full width', () => {
-    expect(panel).toMatch(/<Page\s+fill\s+(?:\/\/[^\n]*\n\s*)?width=\{view === 'board' \? 'full' : 'lane'\}/u)
+  it('holds the page (header, toolbar, feed and capture box) to the kit lane (880 px of content, 960 px on wide panes); the board runs full width', () => {
+    expect(panel).toMatch(/<Page\s+fill\s+(?:\/\/[^\n]*\n\s*)*width=\{view === 'board' \? 'full' : 'lane'\}/u)
+    expect(panel).not.toContain('920 px')
   })
 })
 

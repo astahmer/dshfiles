@@ -7,9 +7,10 @@
  */
 
 /*
- * The page frame takes the shared page inset (24px, 12px narrow). The list and its header stop at the kit's 880px lane
- * frame (`Page width="lane"`, council round 5 D5) on the page's left edge instead of a centred 960px column, so the
- * switches line up under the header's actions; the sticky header bar keeps its full width for its background and
+ * The page frame takes the shared page inset (24px, 12px narrow). The list and its header stop at the kit's lane
+ * (`Page width="lane"`): 880px of content, 960px on a pane of 1280px or more, the inset outside the cap (council round
+ * 6, D7), on the page's left edge instead of a centred 960px column, so the switches line up under the header's actions
+ * and end where Inbox and Backlog content ends. The sticky header bar keeps its full width for its background and
  * compact rule. Icon seats are 32px with 18px glyphs (council round 4, D5).
  */
 section[data-plugin-panel][data-plugin-panel] {
@@ -31,7 +32,13 @@ section[data-plugin-panel][data-plugin-panel] > * {
   max-width: none;
 }
 
+/*
+ * The body is the pane container (the kit Page root's role). Its border box is the pane; its content box is the pane
+ * less the two 24px insets, so the kit's 1280px pane threshold reads 1232px here. Named, so the header bar's own
+ * inline-size container (`plugin-page-bar`) does not answer for the header.
+ */
 section[data-plugin-panel] [class*='_pageBody'] {
+  container: dshx-plugin-pane / inline-size;
   align-items: flex-start;
   padding-bottom: 24px;
 }
@@ -43,6 +50,16 @@ section[data-plugin-panel] [class*='_pageBody'] > :not([class*='_pageBar']) {
 section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
   max-width: 880px;
   align-self: flex-start;
+}
+
+@container dshx-plugin-pane (width >= 1232px) {
+  section[data-plugin-panel] [class*='_pageBody'] > :not([class*='_pageBar']) {
+    max-width: 960px;
+  }
+
+  section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
+    max-width: 960px;
+  }
 }
 
 /*

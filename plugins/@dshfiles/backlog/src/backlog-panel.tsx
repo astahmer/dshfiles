@@ -558,7 +558,8 @@ export const BacklogPanel = (props: {
       >
         <Page
           fill
-          // A list page in the kit's 920 px lane; the board's columns take the full width (council round 3, D2).
+          // A list page in the kit's lane (880 px of content, 960 px on a pane of 1280 px or more); the board's columns take the
+          // full width (council round 3, D2).
           width={view === 'board' ? 'full' : 'lane'}
           heading="Backlog"
           {...(list.data === undefined ? {} : { count: list.data.total })}

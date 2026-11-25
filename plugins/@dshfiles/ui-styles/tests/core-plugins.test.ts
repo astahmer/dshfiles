@@ -190,3 +190,20 @@ describe('core Plugins navigable rows (council round 5, D5)', () => {
     expect(chevron).toMatch(/mask:\s*url\("data:image\/svg\+xml,[^"]+"\)\s*right 11px center \/ 14px 14px no-repeat;/u)
   })
 })
+
+describe('core Plugins lane (council round 6, D7)', () => {
+  // The kit lane caps the CONTENT box at 880px, or 960px when the pane (the Page root, a container with no padding) is
+  // 1280px or wider; padding sits outside the cap. Here the pane is `_pageBody`'s border box, whose content box is the
+  // pane less the two 24px insets, so "pane >= 1280px" is "content >= 1232px".
+  const wide = /@container dshx-plugin-pane \(width >= 1232px\)\s*\{([\s\S]*?)\n\}/u.exec(sheet.replace(/\/\*[\s\S]*?\*\//gu, ''))?.[1] ?? ''
+
+  it('makes the page body the pane container, named so the header bar\'s own container does not answer', () => {
+    expect(ruleFor("[class*='_pageBody'] {")).toMatch(/container:\s*dshx-plugin-pane \/ inline-size;/u)
+  })
+
+  it('caps the list and the header at 960px of content on a pane of 1280px or more, 880px below', () => {
+    expect(ruleFor("[class*='_pageBody'] > :not([class*='_pageBar'])")).toMatch(/max-width:\s*880px;/u)
+    expect(wide).toMatch(/section\[data-plugin-panel\] \[class\*='_pageBody'\] > :not\(\[class\*='_pageBar'\]\)[\s\S]*?max-width:\s*960px;/u)
+    expect(wide).toMatch(/section\[data-plugin-panel\] \[class\*='_pageBar'\] > \[class\*='_pageHead'\][\s\S]*?max-width:\s*960px;/u)
+  })
+})
