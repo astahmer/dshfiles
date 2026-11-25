@@ -11,7 +11,7 @@ import { BacklogViewSwitch, FilterMenu, ViewMenu } from './backlog-toolbar.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { KeyRoundIcon, PlusIcon, SearchIcon, Settings2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
+import { KeyRoundIcon, ListTodoIcon, PlusIcon, SearchIcon, Settings2Icon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useAutosave } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, keepPreviousData, useIsMutating, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -561,6 +561,9 @@ export const BacklogPanel = (props: {
           // A list page in the kit's lane (880 px of content, 960 px on a pane of 1280 px or more); the board's columns take the
           // full width (council round 3, D2).
           width={view === 'board' ? 'full' : 'lane'}
+          // The Work destination's glyph in its tone before the h1 (council round 7, D1).
+          mark={<ListTodoIcon />}
+          markTone="work"
           heading="Backlog"
           {...(list.data === undefined ? {} : { count: list.data.total })}
           description="Tasks, bugs, ideas and notes you and your agents capture."

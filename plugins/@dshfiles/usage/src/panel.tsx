@@ -15,7 +15,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { panelOccurrence, useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
-import { CalendarIcon, ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, CalendarIcon, ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -238,6 +238,9 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
       // A data page sits on the wide frame, min(100%, 1200px): charts and tables share the header's edges (round 5 A2).
       width="wide"
       className="dshx:bg-background dshx:text-foreground"
+      // The Observe destination's glyph in its tone before the h1 (council round 7, D1).
+      mark={<ActivityIcon />}
+      markTone="observe"
       heading="Usage"
       description={USAGE_PAGE_DESCRIPTION}
       meta={

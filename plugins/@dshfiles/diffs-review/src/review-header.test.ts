@@ -114,3 +114,18 @@ describe('the Review file header (council round 6, D2)', () => {
     expect(toggle).not.toContain('dshx:border-border')
   })
 })
+
+describe('Review page title mark (council round 7, D1)', () => {
+  const panel = readFileSync(fileURLToPath(new URL('panel.tsx', import.meta.url)), 'utf8')
+  it('marks both Review pages with the Land destination glyph in its nav tone', () => {
+    const pages = panel
+      .split('<Page')
+      .slice(1)
+      .map(part => part.slice(0, part.indexOf('heading="Review"')))
+    expect(pages).toHaveLength(2)
+    for (const page of pages) {
+      expect(page).toContain('mark={<GitMerge />}')
+      expect(page).toContain('markTone="land"')
+    }
+  })
+})

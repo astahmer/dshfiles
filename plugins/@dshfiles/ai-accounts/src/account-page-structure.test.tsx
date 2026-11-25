@@ -211,3 +211,17 @@ describe('AI accounts page (council round 5, D2)', () => {
     expect(panel).not.toContain('max-w-[1680px]')
   })
 })
+
+describe('AI accounts page title mark (council round 7, D1)', () => {
+  it('marks the page, loading or loaded, with the Settings destination glyph in its nav tone', () => {
+    const pages = source('accounts-panel.tsx')
+      .split('<Page')
+      .slice(1)
+      .map(part => part.slice(0, part.indexOf('heading="AI accounts"')))
+    expect(pages).toHaveLength(2)
+    for (const page of pages) {
+      expect(page).toContain('mark={<SettingsIcon />}')
+      expect(page).toContain('markTone="settings"')
+    }
+  })
+})

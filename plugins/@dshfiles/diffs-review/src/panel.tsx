@@ -10,7 +10,7 @@ import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { ReviewLook } from './review-look.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
-import { ArrowLeft, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeft, ChevronDown, GitMerge, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
@@ -52,6 +52,8 @@ const Stat = (props: { readonly label: string }): ReactNode => <span className="
 const CombinedReviewPage = (props: { readonly workspacePath: string; readonly revisions: readonly string[] }): ReactNode => (
   <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
     <Page
+      mark={<GitMerge />}
+      markTone="land"
       heading="Review"
       description="The selected revisions, each as its own change, on the graph they form."
       actions={[
@@ -294,6 +296,9 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
     <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
       <Page
         width="wide"
+        // The Land destination's glyph in its tone before the h1 (council round 7, D1).
+        mark={<GitMerge />}
+        markTone="land"
         heading="Review"
         description="Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers."
         // The base is named once, in the branch control ("Base: main"), not again in a chip beside the title (round 5, D3).

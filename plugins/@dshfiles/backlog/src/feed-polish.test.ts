@@ -137,3 +137,12 @@ describe('Backlog feed times (council round 6, D3)', () => {
     expect(feed).toMatch(/\{props\.showAuthor \? <FeedEntryAuthor author=\{author\} \/> : null\}/u)
   })
 })
+
+describe('Backlog page title mark (council round 7, D1)', () => {
+  it('marks the h1 with the Work destination glyph in its nav tone', () => {
+    const panel = read('backlog-panel.tsx')
+    const page = panel.slice(panel.indexOf('<Page'), panel.indexOf('heading="Backlog"'))
+    expect(page).toContain('mark={<ListTodoIcon />}')
+    expect(page).toContain('markTone="work"')
+  })
+})

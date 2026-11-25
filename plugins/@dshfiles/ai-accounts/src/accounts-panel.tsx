@@ -2,7 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { PlusIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi } from '@dshfiles/dshx/client'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
@@ -54,7 +54,7 @@ export const AccountsPanel = (props: {
     })
   if (state.file === null)
     return (
-      <Page heading="AI accounts" description="Manage your accounts and model settings.">
+      <Page mark={<SettingsIcon />} markTone="settings" heading="AI accounts" description="Manage your accounts and model settings.">
         <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="status">
           {state.notice === null ? <Spinner /> : null}
           {state.notice ?? 'Loading accounts…'}
@@ -76,6 +76,8 @@ export const AccountsPanel = (props: {
         scroll
         width="wide"
         className="dshx:surface-stage"
+        mark={<SettingsIcon />}
+        markTone="settings"
         heading="AI accounts"
         description="Manage your accounts and model settings."
         count={accountsPageCount({ accounts: state.file.accounts, native: nativeProviders.data })}

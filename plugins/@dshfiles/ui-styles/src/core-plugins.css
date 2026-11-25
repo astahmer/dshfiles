@@ -62,12 +62,28 @@ section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
   }
 }
 
-/* The page title is set like every kit page h1 (`text-title font-title`): 22/28 at 650, -0.01em (council round 6, D4). */
+/*
+ * The page title is set like every kit page h1 (`text-title font-title`): 22/28 at 650, -0.01em (council round 6, D4),
+ * after the kit page title mark (`Page mark`, council round 7 A2/D1): the destination's glyph, here Settings' gear in
+ * its neutral nav tone, 18px on the title's 28px first line, 8px before the text. A glyph only, no tile.
+ */
 section[data-plugin-panel] [class*='_pageTitle'] {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
   font-size: 22px;
   line-height: 28px;
   font-weight: 650;
   letter-spacing: -0.01em;
+}
+
+section[data-plugin-panel] [class*='_pageTitle']::before {
+  content: '';
+  flex: 0 0 18px;
+  height: 28px;
+  background-color: var(--dshx-nav-tone-settings);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E")
+    center / 18px 18px no-repeat;
 }
 
 /*

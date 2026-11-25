@@ -227,7 +227,7 @@ describe('core Plugins page title and descriptions (council round 6, D4)', () =>
   })
 })
 
-describe('core Plugins header (council round 7, D5)', () => {
+describe('core Plugins header (council round 7, D1 and D5)', () => {
   it('still renders the toolbar, its Refresh button and the title hooks', () => {
     expect(page.includes('"data-plugin-toolbar"') || page.includes('data-plugin-toolbar'), 'toolbar').toBe(true)
     expect(new RegExp('"addButton":\\s*`[A-Za-z0-9]+_[A-Za-z0-9]+_addButton`', 'u').test(page), 'addButton').toBe(true)
@@ -243,4 +243,16 @@ describe('core Plugins header (council round 7, D5)', () => {
     expect(refresh).toMatch(/box-shadow:\s*none;/u)
   })
 
+  it('marks the page title with the Settings glyph in its neutral nav tone, 18px, 8px before the h1 (A2)', () => {
+    const title = ruleFor("[class*='_pageTitle']")
+    expect(title).toMatch(/display:\s*flex;/u)
+    expect(title).toMatch(/gap:\s*8px;/u)
+    const mark = ruleFor("[class*='_pageTitle']::before")
+    expect(mark).toMatch(/flex:\s*0 0 18px;/u)
+    expect(mark).toMatch(/height:\s*28px;/u)
+    expect(mark).toMatch(/background-color:\s*var\(--dshx-nav-tone-settings\);/u)
+    // lucide `settings`, the gear the rail's Settings destination and the page's tab draw.
+    expect(mark).toMatch(/mask:\s*url\("data:image\/svg\+xml,[^"]*M9\.671 4\.136[^"]*"\)/u)
+    expect(mark).toMatch(/center \/ 18px 18px no-repeat;/u)
+  })
 })
