@@ -1,6 +1,6 @@
 # @dshfiles/agent-toolkit
 
-![Agent toolkit page](docs/screenshots/agent-toolkit-page.png)
+![The Capabilities page: the tools one thread's agent can use and where each comes from](docs/screenshots/agent-toolkit-page.png)
 
 An **Agent Toolkit: Capabilities** reusable view (sidebar, or the command palette's _Open the agent toolkit_) showing what the agent
 can use in one thread. With `@dshfiles/main-tabs` it opens as a tab like any panel. It replaces the Tools tab that
