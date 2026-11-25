@@ -300,35 +300,35 @@ const UpdateStatusView = (props: StatusItemProps): JSX.Element | null => {
   const label = statusLabel(job, failed, data.incomingCount)
   if (label === undefined) return null
   return (
-    <span
-      className={cn(
-        'dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1',
-        failed && job?.state === 'failed' && 'dshx:text-destructive',
-        props.compact && 'dshx:text-xs',
-      )}
-      data-testid="status-item-update-dsh"
-      // Waiting revisions or a stopped update are the user's to act on; a running one only reports (council round 3 B6).
-      data-status-actionable={job?.state === 'running' ? undefined : ''}
+    <button
+      type="button"
+      className="dshx-root dshx:inline-flex dshx:h-5 dshx:min-w-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+      onClick={openUpdateDshSettings}
     >
-      {job?.state === 'running' ? <Spinner className="dshx:size-3" /> : <DownloadIcon aria-hidden className="dshx:size-3" />}
-      <span className="dshx:truncate">{label}</span>
-    </span>
+      <span
+        className={cn(
+          'dshx-root dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1',
+          failed && job?.state === 'failed' && 'dshx:text-destructive',
+          props.compact && 'dshx:text-xs',
+        )}
+        data-testid="status-item-update-dsh"
+        // Waiting revisions or a stopped update are the user's to act on; a running one only reports (council round 3 B6).
+        data-status-actionable={job?.state === 'running' ? undefined : ''}
+      >
+        {job?.state === 'running' ? <Spinner className="dshx:size-3" /> : <DownloadIcon aria-hidden className="dshx:size-3" />}
+        <span className="dshx:truncate">{label}</span>
+      </span>
+    </button>
   )
 }
 
 /**
- * The status strip's Update notice: hidden while DSH is up to date; it opens Settings › Update DSH. It shares the
- * restart item's seat (it is that item's fallback), so the strip holds one control for "update, then restart".
+ * The status strip's Update notice: nothing while DSH is up to date, so the strip's seat stays empty and draws no
+ * divider; it opens Settings › Update DSH. It shares the restart item's seat (it is that item's fallback), so the strip
+ * holds one control for "update, then restart".
  */
 export const UpdateStatusItem = (props: StatusItemProps): JSX.Element => (
   <PluginQueryProvider>
-    <button
-      type="button"
-      // Empty while DSH is up to date: an empty button takes no room and no tab stop.
-      className="dshx-root dshx:inline-flex dshx:h-5 dshx:min-w-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:empty:hidden"
-      onClick={openUpdateDshSettings}
-    >
-      <UpdateStatusView {...props} />
-    </button>
+    <UpdateStatusView {...props} />
   </PluginQueryProvider>
 )
