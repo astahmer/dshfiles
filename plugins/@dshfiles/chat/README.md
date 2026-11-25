@@ -115,6 +115,7 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/chat/TurnProcessNodeView.module.css` (also), `MessageItem.tsx` (also), `MessageItem.module.css` (also), `ChatView.module.css` (also), `src/native/locale.ts` (also) | unslop round three C15, C16, C7, F11: "Worked for" takes the tool rows' size (`--dsh-content-font-size-secondary`, 13px), the failure card leads with the kit's `StatusGlyph` (the list's red cross, or the stopped square for "Task stopped") and its title is ink, a job trigger reads "Background job updated", and "Back to bottom" has a 44px hit area on a coarse pointer |
 | `src/turn-admission-panel.tsx`, `src/client-entry.tsx` (also) | new: the Settings › General **Running threads limit** row and the composer's **Waits to start** notice for `@dshfiles/session-controller`'s running-thread limit (see its README) |
 | `src/native/locale.ts` (also) | unslop round five C5: the General row title reads "When to collapse work details" (sentence case, like every other settings title; `src/settings-copy.test.ts` checks the English titles) |
+| `src/native/chat/ChatView.module.css` (also) | unslop round five C2 (council round 2): "Back to bottom" is 36px with a fine pointer and 44px on a touch screen (`--dsh-to-bottom-size`), 8px above the dock; where the pane leaves no gutter its band is solid page colour under an inset hairline instead of a fade, so no half-faded line of text sits above the dock (`tests/to-bottom-placement.test.ts`) |
 
 ### Open an unread thread at its final answer
 

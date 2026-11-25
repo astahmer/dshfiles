@@ -373,6 +373,8 @@
 /* Floating controls sit outside the clipped transcript. A standalone Chat
    anchors them to its frame; the shared host supplies the sticky scrollport. */
 .toBottomSlot {
+  /* dshfiles (unslop r5 C2, council round 2): 36px with a fine pointer, 44px on a touch screen (below). */
+  --dsh-to-bottom-size: 36px;
   position: absolute;
   right: 0;
   bottom: 16px;
@@ -389,9 +391,15 @@
      covers the last line of a user bubble or a row's timing. A pane too narrow for a gutter keeps the edge inset. */
   padding-right: max(
     calc(var(--dsh-composer-side-clearance) + 16px),
-    calc((100% - var(--dsh-chat-content-width)) / 2 - 34px - 12px)
+    calc((100% - var(--dsh-chat-content-width)) / 2 - var(--dsh-to-bottom-size) - 12px)
   );
   pointer-events: none;
+}
+
+@media (pointer: coarse) {
+  .toBottomSlot {
+    --dsh-to-bottom-size: 44px;
+  }
 }
 
 :global([data-conversation-scroll]) .toBottomSlot {
@@ -399,31 +407,30 @@
   /* Clears the sticky composer stack (docks + input card + stats): the live
      height rides --dsh-composer-height (ConversationRoot's seat observer) so
      the control follows a growing textarea; the fallback covers the first
-     paint before the observer fires. dshfiles (unslop r5 C2): 12px above the dock. */
-  bottom: calc(var(--dsh-composer-height, 152px) + 12px);
+     paint before the observer fires. dshfiles (unslop r5 C2): 8px above the dock. */
+  bottom: calc(var(--dsh-composer-height, 152px) + 8px);
 }
 
 /* dshfiles (unslop r5 C2): where the pane leaves no gutter beside the text column (a phone, a narrow pane), the control
-   would float over the last lines of prose. It gets its own band instead: from the dock's top edge up to 12px above the
-   control, in the page colour, so the transcript fades out under it. The band's height is zero whenever the gutter
-   holds the control: `--dsh-to-bottom-overlap` is how far the control (34px + 12px clear) reaches into the column,
-   measured against this frame's width (100cqw); the column is never wider than the frame minus its 32px sides. */
+   would float over the last lines of prose. It gets its own band instead: from the dock's top edge up to 8px above the
+   control, solid page colour under a hairline, so the transcript ends cleanly at the band (council round 2: a fade left
+   a half-faded line of text above the dock). The band's height is zero whenever the gutter holds the control:
+   `--dsh-to-bottom-overlap` is how far the control (plus 12px clear) reaches into the column, measured against this
+   frame's width (100cqw); the column is never wider than the frame minus its two side clearances. */
 .toBottomSlot::before {
   --dsh-to-bottom-overlap: calc(
-    34px + 12px + var(--dsh-composer-side-clearance, 16px) + 16px -
+    var(--dsh-to-bottom-size) + 12px + var(--dsh-composer-side-clearance, 16px) + 16px -
       (100cqw - min(var(--dsh-chat-content-width, 100cqw), 100cqw - 2 * (var(--dsh-composer-side-clearance, 16px) + 16px))) / 2
   );
   content: '';
   position: absolute;
   right: 0;
-  bottom: -12px;
+  bottom: -8px;
   left: 0;
-  height: clamp(0px, var(--dsh-to-bottom-overlap) * 100, 58px);
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
-    var(--dsw-alias-bg-base) 12px
-  );
+  height: clamp(0px, var(--dsh-to-bottom-overlap) * 100, calc(var(--dsh-to-bottom-size) + 16px));
+  /* An inset line, not a border: a zero-height band then draws nothing. */
+  box-shadow: inset 0 1px var(--dsw-alias-border-l2, transparent);
+  background: var(--dsw-alias-bg-base);
   pointer-events: none;
 }
 
@@ -432,9 +439,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  margin-top: -34px;
+  width: var(--dsh-to-bottom-size);
+  height: var(--dsh-to-bottom-size);
+  margin-top: calc(-1 * var(--dsh-to-bottom-size));
   padding: 0;
   border: 0;
   --dsw-elevation-stroke-color: var(--dsw-alias-border-l3);
@@ -453,15 +460,6 @@
   }
 }
 
-/* dshfiles (unslop F11): a 44px target on a touch screen; the control keeps its 34px face and its gutter. */
-@media (pointer: coarse) {
-  .toBottom::after {
-    content: '';
-    position: absolute;
-    inset: -5px;
-    border-radius: inherit;
-  }
-}
 
 /* Host open-path refusal: same dialog family as the workspace folder error. */
 .modalAction {
