@@ -16,12 +16,16 @@ const LEAF_LIMIT = 6
 const LEAF_MAX_WIDTH = 280
 const REST_ID = 'other:rest'
 
+/**
+ * Each breakdown's card tone on the data ramp, in order, so Accounts and Projects read as their own series instead of
+ * grey (council round 7, D3). The grouped breakdown takes its top entry's chart colour instead.
+ */
 const DIMENSIONS = [
-  { id: 'model', label: 'Models', icon: <BoxIcon aria-hidden /> },
-  { id: 'provider', label: 'Accounts', icon: <KeyRoundIcon aria-hidden /> },
-  { id: 'project', label: 'Projects', icon: <FolderIcon aria-hidden /> },
-  { id: 'purpose', label: 'Purposes', icon: <TargetIcon aria-hidden /> },
-] as const satisfies readonly { readonly id: ChartQuery['groupBy']; readonly label: string; readonly icon: ReactNode }[]
+  { id: 'model', label: 'Models', icon: <BoxIcon aria-hidden />, tone: DATA_SERIES[0] },
+  { id: 'provider', label: 'Accounts', icon: <KeyRoundIcon aria-hidden />, tone: DATA_SERIES[1] },
+  { id: 'project', label: 'Projects', icon: <FolderIcon aria-hidden />, tone: DATA_SERIES[2] },
+  { id: 'purpose', label: 'Purposes', icon: <TargetIcon aria-hidden />, tone: DATA_SERIES[3] },
+] as const satisfies readonly { readonly id: ChartQuery['groupBy']; readonly label: string; readonly icon: ReactNode; readonly tone: string }[]
 
 const purposeLabels = new Map<string, string>(Object.entries(UsageFormattingModel.purposeLabels))
 
@@ -87,7 +91,8 @@ export const spendDimensions = (input: {
       const amount = rest.reduce((sum, row) => sum + amountOf(row, input.metric), 0)
       leaves.push({ id: REST_ID, label: `${String(rest.length)} more`, amount, share: shareOf(amount) })
     }
-    return [{ id: dimension.id, label: dimension.label, icon: dimension.icon, leaves }]
+    const cardColor = (dimension.id === input.groupBy ? leaves[0]?.color : undefined) ?? dimension.tone
+    return [{ id: dimension.id, label: dimension.label, icon: dimension.icon, leaves, color: cardColor }]
   })
 }
 

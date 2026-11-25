@@ -76,4 +76,17 @@ describe('usage spend map', () => {
     expect(dimensions[0]?.leaves[0]).toMatchObject({ id: 'm1', amount: 2 })
     expect(dimensions[0]?.leaves[0]?.flag).toBeUndefined()
   })
+
+  it('keys each breakdown card to its own data tone, the grouped one to its top series (council round 7, D3)', () => {
+    const dimensions = spendDimensions({ view, metric: 'cost', groupBy: 'model' })
+    expect(dimensions.map(dimension => dimension.color)).toEqual([
+      dimensions[0]?.leaves[0]?.color,
+      'var(--dshx-data-2)',
+      'var(--dshx-data-3)',
+      'var(--dshx-data-4)',
+    ])
+    expect(dimensions[0]?.color).toMatch(/^var\(--dshx-data-\d\)$/u)
+    const byProject = spendDimensions({ view, metric: 'cost', groupBy: 'project' })
+    expect(byProject[0]?.color).toBe('var(--dshx-data-1)')
+  })
 })
