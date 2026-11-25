@@ -15,7 +15,7 @@ import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
-import { workStatusValues, workStatusLabels } from '@dshfiles/plugin-ui/components/work-status'
+import { StatusCount, workStatusValues, workStatusLabels } from '@dshfiles/plugin-ui/components/work-status'
 import { PlusIcon, RefreshCwIcon, TrashIcon } from '@dshfiles/plugin-ui/icons'
 import type { GalleryDemo } from './types.js'
 
@@ -213,9 +213,23 @@ export const kitDemos: readonly GalleryDemo[] = [
     render: () => (
       <EntityList>
         {workStatusValues.map(status => (
-          <EntityRow key={status} role="listitem" status={status} heading={workStatusLabels[status]} meta={<span>{status}</span>} />
+          <EntityRow key={status} role="listitem" status={status} heading={workStatusLabels[status]} meta={<span>{status}</span>} selected={status === 'idle'} />
         ))}
       </EntityList>
+    ),
+  },
+  {
+    id: 'kit-status-count',
+    title: 'StatusCount',
+    description: 'A count that names its status with the glyph, so it reads without its colour.',
+    source: "import { StatusCount } from '@dshfiles/plugin-ui/components/work-status'",
+    static: true,
+    render: () => (
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3">
+        {workStatusValues.map((status, index) => (
+          <StatusCount key={status} status={status} count={index + 1} />
+        ))}
+      </div>
     ),
   },
   {

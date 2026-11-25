@@ -49,6 +49,8 @@ export interface StatusGlyphProps extends Omit<React.ComponentPropsWithoutRef<'s
   readonly label?: string
   /** Hide from assistive technology when the row already names its state in text. */
   readonly decorative?: boolean
+  /** `small` draws the mark in a 10px seat for a count chip (`StatusCount`); rows keep the 16px seat. */
+  readonly size?: 'default' | 'small'
 }
 
 /**
@@ -70,7 +72,7 @@ const glyphClass = {
 export const STATUS_SPINNER_PERIOD_MS = 900
 
 /** The working mark: a faint ring with a turning arc, phase-locked to the page clock and paused off screen. */
-const Spinner = (): React.JSX.Element => {
+const Spinner = ({ small }: { readonly small: boolean }): React.JSX.Element => {
   const ref = useOffscreenPause<SVGSVGElement>()
   // A negative delay equal to the page clock modulo the period starts every spinner at the same angle.
   const [delay] = React.useState(() => `-${String(Math.round((typeof performance === 'undefined' ? 0 : performance.now()) % STATUS_SPINNER_PERIOD_MS))}ms`)
@@ -80,7 +82,7 @@ const Spinner = (): React.JSX.Element => {
       aria-hidden
       viewBox="0 0 16 16"
       data-glyph-spinner=""
-      className="dshx:size-3.5 dshx:animate-spin dshx:motion-reduce:animate-none"
+      className={cn(small ? 'dshx:size-2.5' : 'dshx:size-3.5', 'dshx:animate-spin dshx:motion-reduce:animate-none')}
       style={{ animationDelay: delay, animationDuration: `${String(STATUS_SPINNER_PERIOD_MS)}ms` }}
       fill="none"
     >
@@ -90,28 +92,35 @@ const Spinner = (): React.JSX.Element => {
   )
 }
 
-const GlyphMark = ({ status }: { readonly status: StatusGlyphState }): React.JSX.Element => {
+/** Mark sizes per seat: the 16px row seat (round five K6) and the 10px count-chip seat (round five A6). */
+const markSize = {
+  default: { mark: 'dshx:size-3.5', dot: 'dshx:size-2.5', ring: 'dshx:size-2' },
+  small: { mark: 'dshx:size-2.5', dot: 'dshx:size-1.5', ring: 'dshx:size-1.5' },
+} as const
+
+const GlyphMark = ({ status, size }: { readonly status: StatusGlyphState; readonly size: keyof typeof markSize }): React.JSX.Element => {
+  const { mark, dot, ring } = markSize[size]
   switch (status) {
     case 'working':
-      return <Spinner />
+      return <Spinner small={size === 'small'} />
     case 'needs-you':
       return (
-        <svg aria-hidden viewBox="0 0 16 16" className="dshx:size-3.5">
+        <svg aria-hidden viewBox="0 0 16 16" className={mark}>
           <path d="M8 1.5 14.5 8 8 14.5 1.5 8Z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
       )
     case 'failed':
-      return <XIcon aria-hidden className="dshx:size-3.5" strokeWidth={3} />
+      return <XIcon aria-hidden className={mark} strokeWidth={3} />
     case 'ready':
-      return <span aria-hidden className="dshx:size-2.5 dshx:rounded-full dshx:bg-current" />
+      return <span aria-hidden className={cn(dot, 'dshx:rounded-full dshx:bg-current')} />
     case 'idle':
-      return <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:border dshx:border-current" />
+      return <span aria-hidden className={cn(ring, 'dshx:rounded-full dshx:border dshx:border-current')} />
     case 'done':
-      return <CheckIcon aria-hidden className="dshx:size-3.5" strokeWidth={2.5} />
+      return <CheckIcon aria-hidden className={mark} strokeWidth={2.5} />
     case 'stale':
-      return <span aria-hidden className="dshx:size-2.5 dshx:rounded-full dshx:border dshx:border-dashed dshx:border-current" />
+      return <span aria-hidden className={cn(dot, 'dshx:rounded-full dshx:border dshx:border-dashed dshx:border-current')} />
     case 'stopped':
-      return <span aria-hidden className="dshx:size-2 dshx:rounded-xs dshx:bg-current" />
+      return <span aria-hidden className={cn(ring, 'dshx:rounded-xs dshx:bg-current')} />
   }
 }
 
@@ -139,7 +148,7 @@ function useChangedWhileMounted(status: StatusGlyphState): boolean {
  * cross-fades in 120ms.
  */
 export const StatusGlyph = React.forwardRef<HTMLSpanElement, StatusGlyphProps>(function StatusGlyph(
-  { status, label, decorative = false, className, ...props },
+  { status, label, decorative = false, size = 'default', className, ...props },
   ref,
 ) {
   const changed = useChangedWhileMounted(status)
@@ -151,12 +160,60 @@ export const StatusGlyph = React.forwardRef<HTMLSpanElement, StatusGlyphProps>(f
       role={decorative ? undefined : 'img'}
       aria-label={decorative ? undefined : (label ?? glyphLabels[status])}
       aria-hidden={decorative ? true : undefined}
-      className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', glyphClass[status], className)}
+      className={cn('dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center', size === 'small' ? 'dshx:size-2.5' : 'dshx:size-4', glyphClass[status], className)}
       {...props}
     >
       <span key={status} data-glyph-mark="" className={cn('dshx:inline-flex dshx:items-center dshx:justify-center', changed && markEnter)}>
-        <GlyphMark status={status} />
+        <GlyphMark status={status} size={size} />
       </span>
+    </span>
+  )
+})
+
+export interface StatusCountProps extends Omit<React.ComponentPropsWithoutRef<'span'>, 'children'> {
+  readonly status: StatusGlyphState
+  readonly count: number
+  /**
+   * What a screen reader hears after the number, and the whole text when it starts with the number; defaults to the
+   * English status label ("3 Needs you"). Pass a translated or more specific one ("2 failed threads").
+   */
+  readonly label?: string
+}
+
+/** Needs you and Failed take their tint pair; every other state is a muted chip. */
+const countTint = (status: StatusGlyphState): string =>
+  status === 'needs-you'
+    ? 'dshx:bg-attention-tint dshx:text-attention-foreground'
+    : status === 'failed'
+      ? 'dshx:bg-danger-tint dshx:text-danger-tint-foreground'
+      : 'dshx:bg-muted dshx:text-muted-foreground'
+
+/**
+ * A status count chip (round five A6): the status glyph at 10px beside a tabular number, so a coloured count still
+ * reads without its colour. Needs you and Failed sit at the tint rung of their hue; every other state is a muted chip
+ * with its grey or green glyph. A zero draws nothing (DESIGN.md › Layout › Counts). Use it for a group header's count,
+ * a page title's count of what waits on you, a tab or filter count that names a status.
+ */
+export const StatusCount = React.forwardRef<HTMLSpanElement, StatusCountProps>(function StatusCount({ status, count, label, className, ...props }, ref) {
+  if (count <= 0) return null
+  const number = String(count)
+  const spoken = label ?? glyphLabels[status]
+  const rest = spoken.startsWith(`${number} `) ? spoken.slice(number.length + 1) : spoken
+  return (
+    <span
+      ref={ref}
+      data-slot="status-count"
+      data-status={status}
+      className={cn(
+        'dshx:inline-flex dshx:h-4.5 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-2xs dshx:leading-none dshx:font-medium dshx:tabular-nums',
+        countTint(status),
+        className,
+      )}
+      {...props}
+    >
+      <StatusGlyph status={status} size="small" decorative />
+      {number}
+      <span className="dshx:sr-only"> {rest}</span>
     </span>
   )
 })

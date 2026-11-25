@@ -114,7 +114,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 | `PageSection`              | A `section` named by its `h2` `heading` (`text-sm font-semibold`), optional muted `meta` ("3 enabled"), `actions` and description.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | `EmptyState`               | One sentence, centred and muted, plus at most one outline action. It draws no frame: the list or card around it does. Not for loading (use `Spinner`).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | `WorkStatus`               | Exactly six states (`working`, `needs-you`, `failed`, `ready`, `idle`, `done`, ADE plan §4.7). Map plugin states onto them; add detail text, never a new colour. `WorkStatusModel` has the labels and the attention/emphasis predicates.                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| `StatusGlyph`              | Fixed 16px box. Dark cockpit: working is a colourless ring spinner (all spinners phase-synced, paused off screen), needs-you the `info` diamond, failed the `destructive` cross, ready a solid foreground dot, idle a faint ring, done a muted check; glyph-only `stale` (dashed ring) and `stopped` (muted square). Labelled by default; `decorative` when the row already states it in text.                                                                                                                                                                                                                                                                                                                |
+| `StatusGlyph`              | Fixed 16px box (`size="small"`: a 10px seat for `StatusCount`). Dark cockpit: working is a colourless ring spinner (all spinners phase-synced, paused off screen), needs-you the `info` diamond, failed the `destructive` cross, ready a solid foreground dot, idle a faint ring, done a muted check; glyph-only `stale` (dashed ring) and `stopped` (muted square). Labelled by default; `decorative` when the row already states it in text.                                                                                                                                                                                                                                                                                                                |
 | `EntityRow` / `EntityList` | `leading` (checkbox, chevron) · glyph · `heading` · muted `meta` chips · `description` line · `trailing` inline verb; `children` render full width below (an output pane). `onSelect` makes the middle one button; `leading`/`trailing` stay separate controls. Ready titles are bold, done titles muted, nothing else is coloured. In narrow panes meta wraps under the title and trailing verbs drop to their own line. `EntityList` is the one bordered list with hairline dividers; give its rows `role="listitem"`.                                                                                                                                                                                      |
 
 **Primary button: black.** The primary action is `Button` `variant="default"`, which is `bg-primary` = the Host
@@ -130,11 +130,23 @@ text is the status colour pulled 30% toward the ink, so it holds AA on its own t
 that is not a button uses the same pair: `bg-attention-tint text-attention-foreground`, `bg-danger-tint
 text-danger-tint-foreground`. Neither is a page primary: that stays the one ink button.
 
-**Selection: the selected wash.** A selection is the accent at the tint rung: `bg-selected-wash` (`--dshx-selected-wash`,
-generated per accent hue: light `oklch(0.95 0.03 h)`, dark `oklch(0.29 0.055 h)`) with ink text (`text-foreground`).
-The kit uses it for the selected `EntityRow`, the highlighted `CommandItem` and a pressed `Toggle`/`ToggleGroupItem`;
-use it for an active rail item, settings category or list row too. Hover stays the ink wash (`bg-accent`). The page's
-segmented `TabsList` keeps its paper pill.
+**Selection: the selected wash and marker.** A selection is a quiet accent wash: `bg-selected-wash`
+(`--dshx-selected-wash`, generated per accent hue: light `oklch(0.955 0.012 h)`, dark `oklch(0.255 0.022 h)`) with ink
+text (`text-foreground`). A selected list row adds the non-colour cue: `selected-marker`, a 2px accent bar inset on the
+leading edge (an inset shadow, so it follows a rounded row), and its title at `font-selected` (550). The kit applies
+wash and marker to the selected `EntityRow` and the highlighted `CommandItem`, and the wash alone to a pressed
+`Toggle`/`ToggleGroupItem`; use the same classes for an active rail item, settings category or list row. Hover stays
+the ink wash (`bg-accent`). The page's segmented `TabsList` keeps its paper pill.
+
+**Attention washes.** A row that waits on you outranks a selected one: a Needs-you row takes `bg-wash-needs-you`
+(`--dshx-wash-needs-you`, accent hue, light `oklch(0.94 0.035 h)`, dark `oklch(0.29 0.045 h)`) and a Failed row
+`bg-wash-failed` (`--dshx-wash-failed`, hue 25, light `oklch(0.95 0.025 25)`, dark `oklch(0.28 0.04 25)`). Ink,
+secondary and faint text and the status glyphs hold AA on both (`tests/attention-wash.test.ts`).
+
+**Counts that name a status.** `StatusCount` (`components/work-status`) is a pill with the status glyph at 10px
+(`StatusGlyph size="small"`) and a tabular number: `<StatusCount status="needs-you" count={3} />`. Needs you and Failed
+sit on their tint pair; other states are a muted chip. A zero draws nothing; `label` sets what a screen reader hears
+(default "3 Needs you"). Use it for a group header's count and a page title's count of what waits on you.
 
 ## Shared components
 
