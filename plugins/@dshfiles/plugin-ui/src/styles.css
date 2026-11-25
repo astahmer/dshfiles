@@ -61,6 +61,8 @@
   --color-popover-foreground: var(--dsw-alias-label-primary);
   --color-primary: var(--dsw-alias-brand-primary);
   --color-primary-foreground: var(--dsw-alias-label-primary-foreground);
+  /* The primary's hover (council round 4 A2): darker in light, toward the page in dark. */
+  --color-primary-hover: var(--dshx-primary-hover);
   --color-secondary: var(--dsw-alias-bg-module-platform);
   --color-secondary-foreground: var(--dsw-alias-label-primary);
   --color-muted: var(--dsw-alias-bg-module-platform);

@@ -65,11 +65,14 @@ export interface Palette {
   readonly needsYouBandWash: Oklch
   readonly failedWash: Oklch
   /**
-   * The primary button's fill (council round 3 A3): the ink in light; in dark a softened warm light grey
-   * (oklch 0.88 0.006 on the grey hue), so the one primary stops being the brightest thing on the screen. Its label is
-   * the page colour, AA at rest and on hover.
+   * The primary button's fill: in light a soft warm near-black (council round 4 A2: oklch 0.30 0.01 on the grey hue, a
+   * step off the 0.22 ink so it is not a black slab); in dark a softened warm light grey (council round 3 A3: oklch 0.88
+   * 0.006), so the one primary stops being the brightest thing on the screen. Its label is the page colour, AA at rest
+   * and on hover.
    */
   readonly primaryFill: Oklch
+  /** The primary's hover: darker in light (L 0.24), 86% of the fill toward the page in dark. */
+  readonly primaryHover: Oklch
 }
 
 export const NEUTRAL_STEP_NAMES = ['bg', 'panel', 'raised', 'selected', 'line', 'border', 'border-strong', 'strong', 'faint', 'muted', 'text'] as const
@@ -122,6 +125,8 @@ function palette(input: PaletteInput): Palette {
   const dark = scheme === 'dark'
   // SAFETY: `neutral` maps LIGHTNESS, whose ramps have all eleven steps, so steps 0 and 2 exist.
   const [bg, , raised] = neutral as [Oklch, Oklch, Oklch]
+  // The light primary's warmth: 0.01 for warm stone (grey chroma 0.007), none for a neutral preset.
+  const primaryChroma = round(chroma / 0.7, 4)
   const accentFg = fitAccent(dark ? { l: 0.72, c: 0.14, h: accentHue } : { l: 0.53, c: 0.19, h: accentHue - 2 }, raised, dark)
   const status = (h: number): Oklch => (dark ? { l: 0.75, c: 0.14, h } : { l: 0.5, c: 0.15, h })
   return {
@@ -139,8 +144,10 @@ function palette(input: PaletteInput): Palette {
     needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
     // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
     failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
-    // SAFETY: the ramp has all eleven steps, so step 10 exists.
-    primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : (neutral[10] as Oklch),
+    primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
+    primaryHover: dark
+      ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue }
+      : { l: 0.24, c: primaryChroma, h: hue },
   }
 }
 

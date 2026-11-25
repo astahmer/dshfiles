@@ -99,16 +99,12 @@ export const HOST_ALIASES: readonly AliasRow[] = [
   ['--dsw-alias-border-l2-darkmode-thin', 4, 4],
   ['--dsw-alias-border-l3', 5, 5],
   ['--dsw-alias-border-l4', 6, 6],
-  // The primary fill (council round 3 A3): the ink in light, a softened warm grey in dark (`--dshx-primary-fill`).
-  ['--dsw-alias-brand-primary', 10, 'var(--dshx-primary-fill)'],
+  // The primary fill and its hover (council round 3 A3, round 4 A2): `--dshx-primary-fill` / `--dshx-primary-hover`.
+  ['--dsw-alias-brand-primary', 'var(--dshx-primary-fill)', 'var(--dshx-primary-fill)'],
   ['--dsw-alias-brand-primary-invert', 0, 0],
   ['--dsw-alias-brand-text', 10, 10],
   ['--dsw-alias-brand-primary-new-colorprimary-new-color', 'var(--dshx-tone-accent)', 'var(--dshx-tone-accent)'],
-  [
-    '--dsw-alias-button-primary-hover',
-    'color-mix(in oklch, var(--dshx-tone-10) 86%, var(--dshx-tone-0))',
-    'color-mix(in oklch, var(--dshx-primary-fill) 86%, var(--dshx-tone-0))',
-  ],
+  ['--dsw-alias-button-primary-hover', 'var(--dshx-primary-hover)', 'var(--dshx-primary-hover)'],
   ['--dsw-alias-interactive-bg-hover', mixText(6), mixText(7)],
   ['--dsw-alias-interactive-bg-active', mixText(10), mixText(12)],
   ['--dsw-alias-interactive-bg-hover-accent', mixText(14), mixText(20)],
@@ -211,6 +207,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-wash-needs-you-band', PaletteMath.toCss(p.needsYouBandWash))
   push('--dshx-wash-failed', PaletteMath.toCss(p.failedWash))
   push('--dshx-primary-fill', PaletteMath.toCss(p.primaryFill))
+  push('--dshx-primary-hover', PaletteMath.toCss(p.primaryHover))
   for (const key of ['success', 'warning', 'danger', 'info'] as const) {
     push(`--dshx-tone-${key}`, PaletteMath.toCss(p[key].fg))
     push(`--dshx-tone-${key}-bg`, PaletteMath.toCss(p[key].bg))

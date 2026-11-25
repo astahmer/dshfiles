@@ -13,7 +13,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'dshx:bg-primary dshx:text-primary-foreground dshx:hover:bg-primary/90 dshx:active:bg-primary/80',
+        default: 'dshx:bg-primary dshx:text-primary-foreground dshx:hover:bg-primary-hover dshx:active:bg-primary/80',
         destructive:
           'dshx:bg-destructive-solid dshx:text-white dshx:hover:bg-destructive-solid/90 dshx:active:bg-destructive-solid/80 dshx:focus-visible:ring-destructive/20 dshx:dark:focus-visible:ring-destructive/40',
         outline:

@@ -30,6 +30,7 @@ colors:
   wash-needs-you-dark: '#232a42'
   wash-needs-you-band-dark: '#242b3d'
   wash-failed-dark: '#311d1b'
+  primary: '#312d29'
   primary-dark: '#dad7d3'
   surface-dialog-dark: '#211f1c'
   signal-indigo-dark: '#839ffc'
@@ -508,9 +509,11 @@ Heights: 24 compact · 28 default control · 32 list row · 36 composer bar · 4
 
 ## Components
 
-**Primary button — ink.** `Button` `variant="default"` is the Host brand fill: the ink in light, and in dark a
-softened warm grey `oklch(0.88 0.006 65)` (`--dshx-primary-fill`) so the one primary is never the brightest thing on
-the screen. Never indigo. One per page. Header secondary actions are
+**Primary button — ink.** `Button` `variant="default"` is the Host brand fill (`--dshx-primary-fill`): in light a soft
+warm near-black `oklch(0.30 0.01 h)` (`#312d29`, a step off the ink so it is not a black slab) that darkens to
+`oklch(0.24 0.01 h)` on hover (`--dshx-primary-hover`, also the Host's primary hover), and in dark a softened warm grey
+`oklch(0.88 0.006 65)` so the one primary is never the brightest thing on the screen; `h` is the preset's grey hue.
+Its label is the page colour at weight 500, 13:1 or more at rest and on hover. Never indigo. One per page. Header secondary actions are
 `outline` `sm`; row verbs are `outline` or `ghost` `sm`, and a row verb that answers what waits on you is
 `attention` (`danger-tint` on a failed row; see the tint rung); destructive verbs `destructive` and always behind a
 confirmation when they lose work.
