@@ -85,6 +85,20 @@ Landing state (2026-11-25): the whole stack was rebased onto the current `main` 
 `jj-rewrite-preflight` reported every descendant mutable and conflict-free. `jj_thread_status` now reports `behind:
 false`, 44 unlanded revisions, no conflicts. Nothing was pushed and the `main` bookmark was not advanced.
 
+### Closing reads (2026-11-25)
+
+1. **P19 not reproduced** — opening the Context panel on the scratch phone reached its content with 2 HTTP calls and no
+   WebSocket traffic in the measured window (the earlier 55-request figure predates the lazy detail slot and hidden
+   panel unmounting). Kept as a regression watch rather than a fix.
+2. **P16 wrap toggle** — the installed `@pierre/diffs` 1.5.2 exposes no line-wrap option and renders inside shadow
+   roots, so wrapping needs a renderer change; recorded as an owner decision. The one-file phone view already replaced
+   the need for a file sheet.
+3. **P20 log controls** — the transcript already follows its tail, jumps to latest and has thread find; the remaining
+   per-tool-output search/copy lives in the native tool-output renderer this repo does not own, so its scope is a
+   decision, not an unblocked fix.
+4. **P21–P23** — push actions, share target and manifest shortcuts need real-phone checks and, for shortcuts, a
+   destination URL route; all three are native/real-phone work, not repo-local fixes.
+
 ### Verified on a scratch DSH (2026-11-25, this workspace)
 
 Built only the seven touched plugins (`--concurrency=2`), booted `dshx dev up --name phone --skip-build`, drove it with
