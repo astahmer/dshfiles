@@ -31,6 +31,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 2 (round-1 shots) | 7.5 | 7.5 | 8 | GLM 7.5: the round-1 fixes are in the pixels; Needs-you washes too faint to see |
 | 3 (round-2 shots) | 7.5 | 8 | 8.5 | colour now reads; consistency (chrome, widths, controls) and phone space remain |
 | 4 (round-3 shots) | 8 | 8 | 8.5 | one system now; phone transcript clip, two Settings layouts, rail surface, muddy tones remain |
+| 5 (round-4 shots) | 8 | 8.5 | 8.5 | no redesign needed; page frames, control heights, phone density, colour in persistent chrome |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -117,6 +118,14 @@ Settings navigation in the side column, one rail surface, 680 px Settings fields
 title, denser phone list, 10.5 px rail labels, a 48 px palette search lane). Follow-ups: shell tone chroma 0.09; native
 Bash rows without a kind glyph; "Worked for" not folded into the summary line; the phone Ready row still cut at 390×844;
 the first-run wizard can open after the seed's dismissal window.
+
+Before round 5 the lead fixed the phone Inbox bar, whose status button ran over the centred title (`vyyvsrnz`). A DOM
+measurement in a scratch DSH (1440×900, DPR 2) settled the scale question: root font 16 px, no zoom or transform, rail 56
+and the Settings column 680 CSS px, so desktop shots are exactly 2×. Round 5 findings, merged in
+`.cache/unslop-audit/r5/council/round-5-fixes.md`: two page frames (880 lane, 1200 wide), one 32 px control height,
+nav and stage surface roles, the destination tone on the active tab, Settings glyphs and a phone drill-down, a 60 px rail
+with 11 px labels, the phone list's trailing column, the phone dock's chevrons and model label, Inbox verbs in the card
+head, a Usage stat card, Review's base control, Backlog alignment and Plugins row affordances.
 
 ## Round four
 
