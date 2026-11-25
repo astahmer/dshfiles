@@ -9,14 +9,17 @@ import { join } from 'node:path'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { PageTitleMark } from '../src/components/page.js'
+import { toggleVariants } from '../src/components/ui/toggle.js'
 
 type Compiler = { build(candidates: readonly string[]): string }
+type CompileOptions = { readonly base: string; readonly onDependency: (path: string) => void }
 let compiler: Compiler
 
 beforeAll(async () => {
   // @tailwindcss/node is the compiler the kit's Vite plugin uses; reach it through that plugin.
   const vite = createRequire(join(process.cwd(), 'package.json')).resolve('@tailwindcss/vite')
-  const node = (await import(createRequire(vite).resolve('@tailwindcss/node'))) as { compile(css: string, options: object): Promise<Compiler> }
+  // SAFETY: the module is the Tailwind v4 compiler the kit's Vite plugin loads; `compile` and `build` are its public API.
+  const node = (await import(createRequire(vite).resolve('@tailwindcss/node'))) as { compile(css: string, options: CompileOptions): Promise<Compiler> }
   compiler = await node.compile(readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8'), { base: join(process.cwd(), 'src'), onDependency: () => undefined })
 })
 
@@ -41,5 +44,13 @@ describe('page title mark in the compiled sheet', () => {
     const body = rule(sheet, height[0]!)
     expect(body).toContain(`height: ${title!};`)
     for (const name of classes) expect(undefinedVariables(sheet, rule(sheet, name)), name).toEqual([])
+  })
+})
+
+describe('Toggle label', () => {
+  it('sets its line box to the font size, so the label centres in the control height instead of sitting 1px high', () => {
+    const classes = toggleVariants().split(' ')
+    expect(classes).toContain('dshx:leading-none')
+    expect(rule(compiler.build(classes), 'dshx:leading-none')).toContain('line-height: 1;')
   })
 })
