@@ -24,7 +24,7 @@ function SheetOverlay({ className, ...props }: React.ComponentProps<typeof Sheet
     <SheetPrimitive.Overlay
       data-slot="sheet-overlay"
       className={cn(
-        'dshx:fixed dshx:inset-0 dshx:z-[1050] dshx:bg-black/50 dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0',
+        'dshx:fixed dshx:inset-0 dshx:z-[1050] dshx:bg-scrim dshx:data-[state=closed]:animate-out dshx:data-[state=closed]:fade-out-0 dshx:data-[state=open]:animate-in dshx:data-[state=open]:fade-in-0',
         className,
       )}
       {...props}

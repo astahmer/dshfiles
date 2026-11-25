@@ -34,6 +34,8 @@
    * Text on it stays ink (`text-foreground`).
    */
   --color-selected-wash: var(--dshx-selected-wash);
+  /* Behind a kit dialog, alert dialog or sheet (round five K8): warm ink at 32% in light, black at 50% in dark. */
+  --color-scrim: var(--dshx-scrim);
   --color-attention-foreground: var(--dshx-attention-foreground);
   --color-danger-tint-foreground: var(--dshx-danger-tint-foreground);
   --color-attention-tint: color-mix(in oklab, var(--dsw-alias-state-business-primary) 12%, transparent);
@@ -78,6 +80,7 @@
     --dshx-data-4: oklch(0.6 0.12 340);
     --dshx-data-5: oklch(0.6 0.12 110);
     --dshx-data-6: oklch(0.6 0.12 225);
+    --dshx-scrim: rgb(27 26 25 / 0.32);
     /* How long a row that just became Needs you, Failed or Ready holds its tint (DESIGN.md › Motion). */
     --dshx-duration-hold: 1200ms;
   }
@@ -102,6 +105,7 @@
     --dshx-data-4: oklch(0.7 0.11 340);
     --dshx-data-5: oklch(0.7 0.11 110);
     --dshx-data-6: oklch(0.7 0.11 225);
+    --dshx-scrim: rgb(0 0 0 / 0.5);
     /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
     --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
   }
