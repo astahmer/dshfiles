@@ -16,7 +16,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
-import { CheckCheckIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, CheckCheckIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useState, useSyncExternalStore } from 'react'
 import { notificationHistoryApi, type NotificationHistoryEntry } from './notification-history-api.js'
 import type { NotificationHistoryTranslate } from './notification-history-locales.js'
@@ -117,6 +117,9 @@ export const NotificationHistoryPanel = (props: {
     <Page
       scroll
       heading={t('title')}
+      // An Observe page: the Observe rail glyph in its tone (council round 7 B6).
+      mark={<ActivityIcon />}
+      markTone="observe"
       description={t('subtitle')}
       // Fills its pane (DESIGN.md: no centred column); Clear history loses work, so it waits in ⋯ behind a confirmation.
       actions={[

@@ -5,6 +5,7 @@ import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { InboxIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
 import { useMemo, useState } from 'react'
 import { useInboxThreadSignals } from './inbox-signals.js'
@@ -62,6 +63,9 @@ export const WaitingThreadsPanel = (props: {
     <Page
       scroll
       heading={t('waitingThreadsTitle')}
+      // An Inbox page: the Inbox rail glyph in its tone (council round 7 B6).
+      mark={<InboxIcon />}
+      markTone="inbox"
       description={t('waitingThreadsDescription')}
       className="dshx:mx-auto dshx:w-full dshx:max-w-3xl"
       tabs={{

@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -31,6 +32,20 @@ const renderPanel = (props: { readonly confirmLand?: (sessionId: string) => bool
 afterEach(() => {
   cleanup()
   vi.clearAllMocks()
+})
+
+describe('page title marks (council round 7 B6)', () => {
+  it('marks Waiting threads with the Inbox rail glyph in the inbox tone', () => {
+    renderPanel({})
+    const mark = document.querySelector('[data-slot="page-title-mark"]')
+    expect(mark?.className).toContain('dshx:text-nav-inbox')
+    expect(mark?.querySelector('svg')?.getAttribute('class')).toContain('lucide-inbox')
+  })
+
+  it('marks Notifications with the Observe rail glyph in the observe tone', () => {
+    const source = readFileSync('src/notification-history-panel.tsx', 'utf8')
+    expect(source).toMatch(/mark=\{<ActivityIcon \/>\}\s+markTone="observe"/u)
+  })
 })
 
 describe('Inbox › Waiting threads Land', () => {
