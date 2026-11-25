@@ -58,7 +58,50 @@ export type PageStatusCounts = Partial<Readonly<Record<WorkStatus, number>>>
 const STATUS_COUNT_ORDER: readonly WorkStatus[] = ['needs-you', 'failed', 'working', 'ready', 'idle', 'done']
 const SEGMENTED_MAX = 4
 
-export interface PageProps extends Omit<React.ComponentPropsWithoutRef<'div'>, 'title'> {
+/** The rail destinations whose tone a page title mark can take (`--dshx-nav-tone-<id>`, DESIGN.md › Navigation identity). */
+export const NAV_TONE_IDS = ['threads', 'inbox', 'land', 'work', 'agents', 'observe', 'knowledge', 'settings'] as const
+export type NavToneId = (typeof NAV_TONE_IDS)[number]
+
+/** Each destination's glyph colour as a literal class, so Tailwind sees it (`text-nav-<id>`). */
+export const NAV_TONE_TEXT_CLASS = {
+  threads: 'dshx:text-nav-threads',
+  inbox: 'dshx:text-nav-inbox',
+  land: 'dshx:text-nav-land',
+  work: 'dshx:text-nav-work',
+  agents: 'dshx:text-nav-agents',
+  observe: 'dshx:text-nav-observe',
+  knowledge: 'dshx:text-nav-knowledge',
+  settings: 'dshx:text-nav-settings',
+} as const satisfies Record<NavToneId, string>
+
+/** The page's identity mark (council round 7 A2): `mark` and `markTone` on `Page` and `PageHeader`. */
+export interface PageTitleMarkProps {
+  /** The destination glyph (a lucide icon), drawn at 18px before the h1. Decorative: the h1 names the page. */
+  readonly mark?: React.ReactNode
+  /** Colours the glyph in that destination's nav tone; without it, the secondary ink. */
+  readonly markTone?: NavToneId
+}
+
+/**
+ * The glyph before a page's h1 (council round 7 A2): the destination's own icon in its nav tone, 18px, 8px from the
+ * title (the row's gap), centred on the title's first line so it sits on the title's baseline band when the title
+ * wraps. A glyph only: no tile, no tinted header. Nav tones hold 3:1 on bg, panel and raised (tests/nav-tone.test.ts).
+ */
+export const PageTitleMark = ({ mark, markTone }: PageTitleMarkProps): React.ReactNode =>
+  mark === undefined || mark === null || mark === false ? null : (
+    <span
+      data-slot="page-title-mark"
+      aria-hidden="true"
+      className={cn(
+        'dshx:flex dshx:h-(--text-title--line-height) dshx:shrink-0 dshx:items-center dshx:self-start dshx:[&_svg]:size-[18px] dshx:[&_svg]:shrink-0',
+        markTone === undefined ? 'dshx:text-muted-foreground' : NAV_TONE_TEXT_CLASS[markTone],
+      )}
+    >
+      {mark}
+    </span>
+  )
+
+export interface PageProps extends Omit<React.ComponentPropsWithoutRef<'div'>, 'title'>, PageTitleMarkProps {
   readonly heading: React.ReactNode
   readonly description?: React.ReactNode
   /** A count shown after the title in tertiary ink (e.g. how many items the page lists). */
@@ -189,6 +232,8 @@ export const PageTitleCount = (props: {
 /** The page header: `h1` title, count and meta chips, one-line description; one primary action and an overflow. */
 const PageHeaderRow = (props: {
   readonly heading: React.ReactNode
+  readonly mark?: React.ReactNode
+  readonly markTone?: NavToneId | undefined
   readonly description?: React.ReactNode | undefined
   readonly count?: number | string | undefined
   readonly statusCounts?: PageStatusCounts | undefined
@@ -205,6 +250,7 @@ const PageHeaderRow = (props: {
     <header data-slot="page-header" className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-3">
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1">
+          <PageTitleMark mark={props.mark} {...(props.markTone === undefined ? {} : { markTone: props.markTone })} />
           <h1 className="dshx:min-w-0 dshx:text-title dshx:font-title dshx:break-words">{props.heading}</h1>
           <PageTitleCount count={props.count} statusCounts={props.statusCounts} />
           {props.meta === undefined || props.meta === null ? null : (
@@ -264,6 +310,8 @@ const PageHeaderRow = (props: {
 export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
   {
     heading,
+    mark,
+    markTone,
     description,
     count,
     meta,
@@ -326,6 +374,8 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
       >
         <PageHeaderRow
           heading={heading}
+          mark={mark}
+          markTone={markTone}
           description={description}
           count={count}
           statusCounts={statusCounts}

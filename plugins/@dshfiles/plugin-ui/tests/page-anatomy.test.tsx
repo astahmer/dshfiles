@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Page, type PageTab, type PageTabs } from '../src/components/page.js'
+import { NAV_TONE_IDS, Page, type PageTab, type PageTabs } from '../src/components/page.js'
 import { PageHeader } from '../src/components/ui/page-header.js'
 import { PaletteMath, WARM_STONE, type Scheme } from '../src/theme/palette.ts'
 
@@ -182,5 +182,38 @@ describe('page tabs (council round 3 A5)', () => {
     cleanup()
     const auto = render(<Page heading="Backlog" tabs={tabs(views(5))} />)
     expect(auto.getByRole('tablist').getAttribute('data-variant')).toBe('line')
+  })
+})
+
+describe('page title mark (council round 7 A2)', () => {
+  const Glyph = () => <svg data-testid="glyph" />
+
+  it.each(['page', 'header'] as const)('draws the destination glyph before the h1 in its nav tone, 18px, 8px gap, no tile (%s)', kind => {
+    const view =
+      kind === 'page' ? render(<Page heading="Usage" mark={<Glyph />} markTone="observe" />) : render(<PageHeader heading="Usage" mark={<Glyph />} markTone="observe" />)
+    const heading = view.getByRole('heading', { level: 1 })
+    const mark = view.container.querySelector('[data-slot="page-title-mark"]')!
+    expect(mark).not.toBeNull()
+    expect(mark.nextElementSibling).toBe(heading)
+    expect(mark.getAttribute('aria-hidden')).toBe('true')
+    expect(mark.contains(view.getByTestId('glyph'))).toBe(true)
+    // The row's own 8px gap, a box one title line tall that centres the glyph on the first line, the tone as text.
+    expect(classes(mark.parentElement)).toContain('dshx:gap-x-2')
+    expect(classes(mark)).toEqual(expect.arrayContaining(['dshx:text-nav-observe', 'dshx:h-(--text-title--line-height)', 'dshx:self-start', 'dshx:[&_svg]:size-[18px]']))
+    expect(mark.className).not.toMatch(/(?:^| )dshx:(?:bg|border|rounded)/u)
+    // The h1 still names only the page.
+    expect(heading.textContent).toBe('Usage')
+  })
+
+  it('maps every nav tone to its text-nav class and falls back to the secondary ink', () => {
+    for (const tone of NAV_TONE_IDS) {
+      const view = render(<Page heading="X" mark={<Glyph />} markTone={tone} />)
+      expect(classes(view.container.querySelector('[data-slot="page-title-mark"]'))).toContain(`dshx:text-nav-${tone}`)
+      cleanup()
+    }
+    const plain = render(<Page heading="X" mark={<Glyph />} />)
+    expect(classes(plain.container.querySelector('[data-slot="page-title-mark"]'))).toContain('dshx:text-muted-foreground')
+    cleanup()
+    expect(render(<Page heading="X" />).container.querySelector('[data-slot="page-title-mark"]')).toBeNull()
   })
 })
