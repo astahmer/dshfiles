@@ -25,11 +25,12 @@ class NoopResizeObserver implements ResizeObserver {
 const roles = readFileSync(join(process.cwd(), 'src/color-roles.css'), 'utf8')
 const schemes: readonly Scheme[] = ['light', 'dark']
 
-describe('selected wash (round five K2, quieter in A1)', () => {
-  it.each(schemes)('is a soft accent tint generated from the accent hue (%s)', scheme => {
+describe('selected wash (round five K2, quieter in A1, neutral in council round 3)', () => {
+  it.each(schemes)('is a neutral warm wash that ignores the accent hue (%s)', scheme => {
     const { selectedWash } = PaletteMath.palette({ ...WARM_STONE, scheme })
-    expect(selectedWash).toEqual(scheme === 'light' ? { l: 0.955, c: 0.012, h: 270 } : { l: 0.255, c: 0.022, h: 270 })
-    expect(PaletteMath.palette({ ...WARM_STONE, accentHue: 150, scheme }).selectedWash.h).toBe(150)
+    expect(selectedWash).toEqual(scheme === 'light' ? { l: 0.935, c: 0.004, h: 80 } : { l: 0.275, c: 0.006, h: 60 })
+    // Indigo fills mean attention only: a different accent leaves the selection unchanged.
+    expect(PaletteMath.palette({ ...WARM_STONE, accentHue: 150, scheme }).selectedWash).toEqual(selectedWash)
   })
 
   it.each(schemes)('keeps ink and secondary text at AA and every glyph at 3:1 on it (%s)', scheme => {
@@ -40,21 +41,19 @@ describe('selected wash (round five K2, quieter in A1)', () => {
     for (const key of ['accent', 'danger', 'success', 'warning'] as const) expect(PaletteMath.contrastRatio(p[key].fg, wash), key).toBeGreaterThanOrEqual(3)
   })
 
-  it.each(schemes)('sits below the Needs-you and Failed washes (%s)', scheme => {
+  it.each(schemes)('leaves hue to the Needs-you and Failed washes (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    for (const wash of [p.needsYouWash, p.failedWash]) {
-      expect(wash.c).toBeGreaterThan(p.selectedWash.c)
-      // Further from the page than the selection: a Needs-you row stands out more than the selected one.
-      const bg = p.neutral[0]!
-      expect(PaletteMath.contrastRatio(wash, bg)).toBeGreaterThanOrEqual(PaletteMath.contrastRatio(p.selectedWash, bg))
-    }
+    // The selection is a grey step; only attention carries chroma, so a Needs-you row reads as colour and the
+    // selected one as a tone (the marker carries the accent).
+    expect(p.selectedWash.c).toBeLessThanOrEqual(0.006)
+    for (const wash of [p.needsYouWash, p.failedWash]) expect(wash.c).toBeGreaterThanOrEqual(5 * p.selectedWash.c)
   })
 
   it('is emitted in both theme blocks and exposed as the selected-wash colour', () => {
     const light = ThemeCss.blockDeclarations(WARM_STONE, 'light').join('\n')
     const dark = ThemeCss.blockDeclarations(WARM_STONE, 'dark').join('\n')
-    expect(light).toContain('--dshx-selected-wash: oklch(0.955 0.012 270);')
-    expect(dark).toContain('--dshx-selected-wash: oklch(0.255 0.022 270);')
+    expect(light).toContain('--dshx-selected-wash: oklch(0.935 0.004 80);')
+    expect(dark).toContain('--dshx-selected-wash: oklch(0.275 0.006 60);')
     expect(roles).toContain('--color-selected-wash: var(--dshx-selected-wash);')
   })
 
@@ -99,6 +98,30 @@ describe('selected wash (round five K2, quieter in A1)', () => {
   })
 
   it.each(schemes)('draws the marker at 3:1 on the selection wash (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    expect(PaletteMath.contrastRatio(p.accent.fg, p.selectedWash)).toBeGreaterThanOrEqual(3)
+  })
+})
+
+describe('selected card (council round 3 A1)', () => {
+  const card = /@utility selected-card\s*\{([\s\S]*?)\n\}/u.exec(roles)?.[1] ?? ''
+
+  it('draws a 2px ring edge and the wash with no inset marker and no layout shift', () => {
+    expect(card).toContain('background-color: var(--dshx-selected-wash);')
+    // A 1px border in the ring colour plus a 1px inset ring: 2px on a bordered card, without changing its box.
+    expect(card).toContain('border-color: var(--dsw-alias-state-business-primary);')
+    expect(card).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);')
+    expect(card).not.toContain('inset 2px 0 0')
+    expect(card).not.toMatch(/border-width|padding|margin/u)
+  })
+
+  it('shows a check in the corner, drawn in the ring colour, so the choice reads without colour', () => {
+    expect(card).toMatch(/&::after\s*\{[^}]*mask[^}]*\}/u)
+    expect(card).toMatch(/&::after\s*\{[^}]*background-color: var\(--dsw-alias-state-business-primary\);/u)
+    expect(card).toMatch(/&::after\s*\{[^}]*pointer-events: none;/u)
+  })
+
+  it.each(schemes)('holds the check and the edge at 3:1 on the wash (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     expect(PaletteMath.contrastRatio(p.accent.fg, p.selectedWash)).toBeGreaterThanOrEqual(3)
   })

@@ -47,9 +47,10 @@ export interface Palette {
   readonly danger: Trio
   readonly info: Trio
   /**
-   * The accent at the tint rung for a selection (round five K2): the selected list row, the active rail item and
-   * settings category, a pressed toggle, the palette's highlighted row. Opaque, on the accent hue, low chroma (A1) so
-   * the attention washes outrank it; text on it stays ink and a list row adds the `selected-marker` bar.
+   * The selection fill (round five K2): the selected list row, the settings category, a pressed toggle, the palette's
+   * highlighted row, a chosen card. Neutral since council round 3 (A1): a warm grey step with no accent hue, so indigo
+   * fills mean attention only and the attention washes outrank it by colour. Text on it stays ink; a list row adds the
+   * `selected-marker` bar (which carries the accent) and a card the `selected-card` edge and check.
    */
   readonly selectedWash: Oklch
   /**
@@ -121,8 +122,8 @@ function palette(input: PaletteInput): Palette {
     warning: trio(dark ? status(STATUS_HUES.warning) : { l: 0.48, c: 0.12, h: STATUS_HUES.warning }),
     danger: trio(status(STATUS_HUES.danger)),
     info: trio(accentFg),
-    // Quieter than the attention washes (round five A1): low chroma, with the kit's selection marker as the cue.
-    selectedWash: dark ? { l: 0.255, c: 0.022, h: accentHue } : { l: 0.955, c: 0.012, h: accentHue },
+    // Neutral (council round 3 A1): the marker or the card's edge carries the accent, not the fill.
+    selectedWash: dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 },
     needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
     failedWash: dark ? { l: 0.28, c: 0.04, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
   }

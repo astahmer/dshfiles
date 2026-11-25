@@ -93,6 +93,35 @@ const identityText = [
   'dshx:text-identity-8',
 ] as const
 
+const cardChoices = ['Warm stone', 'Neutral', 'High contrast'] as const
+
+/** A chosen card (`selected-card`: ring edge, neutral wash, check) beside a selected list row (wash, marker, 550). */
+function SelectionDemo() {
+  const [chosen, setChosen] = React.useState<string>(cardChoices[0])
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-3">
+      <div role="radiogroup" aria-label="Theme" className="dshx:grid dshx:grid-cols-3 dshx:gap-2">
+        {cardChoices.map(choice => (
+          <button
+            key={choice}
+            type="button"
+            role="radio"
+            aria-checked={chosen === choice}
+            onClick={() => setChosen(choice)}
+            className={`dshx:flex dshx:h-16 dshx:items-end dshx:rounded-lg dshx:border dshx:p-2 dshx:text-left dshx:text-sm ${chosen === choice ? 'dshx:selected-card dshx:font-selected' : 'dshx:border-border dshx:bg-background'}`}
+          >
+            {choice}
+          </button>
+        ))}
+      </div>
+      <EntityList>
+        <EntityRow role="listitem" heading="Selected row" selected onSelect={() => undefined} />
+        <EntityRow role="listitem" heading="Another row" onSelect={() => undefined} />
+      </EntityList>
+    </div>
+  )
+}
+
 const healthLabels = { ok: 'Connected', limited: 'Rate limited', down: 'Signed out', off: 'Off' } as const
 
 /** One project per tone, in palette order, so each of the six project hues shows as a mark. */
@@ -240,6 +269,14 @@ export const kitDemos: readonly GalleryDemo[] = [
     static: true,
     wide: true,
     render: () => <ColourRolesDemo />,
+  },
+  {
+    id: 'kit-selection',
+    title: 'Selection',
+    description: 'A neutral wash: a chosen card takes the ring edge and a check, a selected row the leading marker.',
+    source: "className={chosen ? 'dshx:selected-card' : undefined}",
+    static: true,
+    render: () => <SelectionDemo />,
   },
   {
     id: 'kit-controls',

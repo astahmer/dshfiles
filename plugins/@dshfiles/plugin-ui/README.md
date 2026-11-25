@@ -130,13 +130,17 @@ text is the status colour pulled 30% toward the ink, so it holds AA on its own t
 that is not a button uses the same pair: `bg-attention-tint text-attention-foreground`, `bg-danger-tint
 text-danger-tint-foreground`. Neither is a page primary: that stays the one ink button.
 
-**Selection: the selected wash and marker.** A selection is a quiet accent wash: `bg-selected-wash`
-(`--dshx-selected-wash`, generated per accent hue: light `oklch(0.955 0.012 h)`, dark `oklch(0.255 0.022 h)`) with ink
-text (`text-foreground`). A selected list row adds the non-colour cue: `selected-marker`, a 2px accent bar inset on the
-leading edge (an inset shadow, so it follows a rounded row), and its title at `font-selected` (550). The kit applies
-wash and marker to the selected `EntityRow` and the highlighted `CommandItem`, and the wash alone to a pressed
-`Toggle`/`ToggleGroupItem`; use the same classes for an active rail item, settings category or list row. Hover stays
-the ink wash (`bg-accent`). The page's segmented `TabsList` keeps its paper pill.
+**Selection: the selected wash and marker.** A selection is a neutral wash: `bg-selected-wash`
+(`--dshx-selected-wash`, a warm grey step with no accent hue: light `oklch(0.935 0.004 80)`, dark
+`oklch(0.275 0.006 60)`) with ink text (`text-foreground`), so indigo fills mean attention only. The accent rides on the
+cue: a selected list row adds `selected-marker`, a 2px accent bar inset on the leading edge (an inset shadow, so it
+follows a rounded row), and its title at `font-selected` (550). The kit applies wash and marker to the selected
+`EntityRow` and the highlighted `CommandItem`, and the wash alone to a pressed `Toggle`/`ToggleGroupItem`; use the same
+classes for a settings category or list row. A chosen card or tile (a theme card, a starter, a plan option) takes
+`dshx:selected-card` instead: the wash, a 2px ring edge (its 1px border in the ring colour plus a 1px inset ring, so the
+box keeps its size) and a 16px check badge in the trailing top corner, with no leading marker. Give the card `border`
+and drop its own border colour while chosen (`chosen ? 'dshx:selected-card' : 'dshx:border-border'`). Hover stays the
+ink wash (`bg-accent`). The page's segmented `TabsList` keeps its paper pill.
 
 **Attention washes.** A row that waits on you outranks a selected one: a Needs-you row takes `bg-wash-needs-you`
 (`--dshx-wash-needs-you`, accent hue, light `oklch(0.94 0.035 h)`, dark `oklch(0.29 0.045 h)`) and a Failed row
