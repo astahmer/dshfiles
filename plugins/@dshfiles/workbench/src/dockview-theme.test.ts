@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest'
 
 const css = readFileSync(new URL('./dockview-theme.css', import.meta.url), 'utf8')
 
-describe('the tab chrome (round five T5)', () => {
-  it('sets inactive tabs on the panel step and hovered ones on the raised step, the selected tab on bg', () => {
-    expect(css).toMatch(/--dsh-main-tab-bg: var\(--dshx-tone-panel, /u)
+describe('the tab chrome (round five T5, council round 6 B6)', () => {
+  it('sets the strip on the nav surface with transparent inactive tabs, only the selected tab on the canvas', () => {
+    expect(css).toMatch(/--dv-tabs-and-actions-container-background-color: var\(--dshx-surface-nav, /u)
+    expect(css).toMatch(/--dsh-main-tab-bg: transparent;/u)
     expect(css).toMatch(/--dsh-main-tab-bg-hover: var\(--dshx-tone-raised, /u)
     expect(css).toMatch(/--dv-activegroup-visiblepanel-tab-background-color: var\(--dshx-tone-bg, /u)
   })
