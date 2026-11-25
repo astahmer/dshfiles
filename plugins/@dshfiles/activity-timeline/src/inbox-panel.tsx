@@ -27,7 +27,7 @@ import {
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { PeekCard, RowPeek } from '@dshfiles/plugin-ui/components/peek'
-import { StatusCount, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
@@ -1244,7 +1244,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   if (triaging) {
     const progress = TriageModel.progress(triage.context)
     return (
-      <Page scroll heading={t('triage')} description={t('subtitle')}>
+      <Page scroll width="lane" heading={t('triage')} description={t('subtitle')}>
         <div
           ref={triageRoot}
           tabIndex={-1}
@@ -1280,7 +1280,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                 onSkip={() => sendTriage({ type: 'skip' })}
                 onExit={() => sendTriage({ type: 'exit' })}
               />
-              <EntityList aria-label={t('triage')} className={cn(INBOX_STACK, InboxView.LIST_WIDTH)}>
+              <EntityList aria-label={t('triage')} className={INBOX_STACK}>
                 <InboxRow
                   key={triageItem.id}
                   item={triageItem}
@@ -1316,23 +1316,14 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     <Page
       scroll
       heading={t('title')}
-      // One count per status present beside the title (◆2 ✕1, round five C3), glyph and tint (kit StatusCount).
-      meta={
-        <>
-          {InboxView.titleCounts(counts).map(entry => (
-            <StatusCount
-              key={entry.status}
-              status={entry.status}
-              count={entry.count}
-              label={`${String(entry.count)} ${statusLabelOf(entry.status, t)}`}
-            />
-          ))}
-        </>
-      }
+      // One StatusCount per status present beside the title (◆2 ✕1, round five C3; the kit Page draws them, A5).
+      statusCounts={InboxView.titleCounts(counts)}
       // On a phone the top bar names the page (its own h1) and holds its actions (InboxPhoneBar), so the page header
       // goes and the segmented control leads the page.
       description={<span className="dshx:in-data-shell-phone-nav:hidden">{t('subtitle')}</span>}
-      className={cn('dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden', InboxView.HEADER_WIDTH)}
+      className="dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden"
+      // The kit's list lane (920px): header and list share one container, so Start triage ends on the list's edge.
+      width="lane"
       {...(primaryAction === undefined ? {} : { primaryAction })}
       actions={headerActions}
       overflowLabel={t('more')}
@@ -1394,7 +1385,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
               {t('updates', { count: updates })}
             </Button>
           ) : null}
-          <EntityList aria-label={tabs.find(tab => tab.view === view)?.label ?? t('title')} className={cn(INBOX_STACK, InboxView.LIST_WIDTH)}>
+          <EntityList aria-label={tabs.find(tab => tab.view === view)?.label ?? t('title')} className={INBOX_STACK}>
             {shownItems.map(item => (
               <InboxRow
                 key={item.id}

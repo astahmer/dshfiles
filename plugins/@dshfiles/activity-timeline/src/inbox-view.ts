@@ -68,19 +68,11 @@ const attentionVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'ou
  * neutral body. Ink and muted text hold AA on both washes (plugin-ui tests/attention-wash.test.ts).
  */
 const headerBand = (status: WorkStatus): string =>
-  status === 'needs-you' ? 'dshx:[&>div:first-child]:bg-wash-needs-you' : status === 'failed' ? 'dshx:[&>div:first-child]:bg-wash-failed' : ''
+  status === 'needs-you' ? 'dshx:[&>div:first-child]:bg-wash-needs-you-band' : status === 'failed' ? 'dshx:[&>div:first-child]:bg-wash-failed' : ''
 
 /** One card surface per item, desktop and phone: rounded and clipped, so the head band meets its top edge. */
 const CARD = 'dshx:relative dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card'
 
-/** The list stops at a readable width on a wide pane (about 880 px), left-aligned with the page header. */
-const LIST_WIDTH = 'dshx:max-w-[880px]'
-
-/**
- * The page header stops at the list's width (round five C3, council round 3): Start triage and the page menu end at the
- * list's trailing edge instead of the window's.
- */
-const HEADER_WIDTH = 'dshx:[&_[data-slot=page-header]]:max-w-[880px]'
 
 /**
  * A card's question, note and verbs start under its title on a wide pane (36px, past the glyph); on a phone (a narrow
@@ -100,14 +92,8 @@ const PHONE_HEAD = 'dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pan
  */
 const titleCounts = (
   counts: { readonly needsYou: number; readonly blocking: number } | undefined,
-): readonly { readonly status: 'needs-you' | 'failed'; readonly count: number }[] => {
-  if (counts === undefined) return []
-  const failed = Math.max(0, counts.needsYou - counts.blocking)
-  return [
-    ...(counts.blocking > 0 ? [{ status: 'needs-you', count: counts.blocking } as const] : []),
-    ...(failed > 0 ? [{ status: 'failed', count: failed } as const] : []),
-  ]
-}
+): { readonly 'needs-you'?: number; readonly failed?: number } =>
+  counts === undefined ? {} : { 'needs-you': counts.blocking, failed: Math.max(0, counts.needsYou - counts.blocking) }
 
 /**
  * The Inbox's header actions on a phone: a bar in the trailing corner of thread-sidebar's top bar, shown only while that
@@ -254,8 +240,6 @@ export class InboxView {
   static readonly attentionVariant = attentionVariant
   static readonly headerBand = headerBand
   static readonly CARD = CARD
-  static readonly LIST_WIDTH = LIST_WIDTH
-  static readonly HEADER_WIDTH = HEADER_WIDTH
   static readonly BODY_INSET = BODY_INSET
   static readonly BAND_MENU = BAND_MENU
   static readonly PHONE_HEAD = PHONE_HEAD

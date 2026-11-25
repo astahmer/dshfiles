@@ -8,20 +8,18 @@ const phoneBar = readFileSync(new URL('./inbox-phone-bar.tsx', import.meta.url),
 
 describe('the Inbox title (round five C3, council round 3)', () => {
   it('counts each status present, ◆2 ✕1, instead of one Needs-you count that hides a failure', () => {
-    expect(InboxView.titleCounts({ needsYou: 3, blocking: 2 })).toEqual([
-      { status: 'needs-you', count: 2 },
-      { status: 'failed', count: 1 },
-    ])
-    expect(InboxView.titleCounts({ needsYou: 2, blocking: 2 })).toEqual([{ status: 'needs-you', count: 2 }])
-    expect(InboxView.titleCounts({ needsYou: 1, blocking: 0 })).toEqual([{ status: 'failed', count: 1 }])
-    expect(InboxView.titleCounts(undefined)).toEqual([])
-    expect(panel).toMatch(/InboxView\.titleCounts\(counts\)\.map\(entry => \(\s*<StatusCount/u)
+    expect(InboxView.titleCounts({ needsYou: 3, blocking: 2 })).toEqual({ 'needs-you': 2, failed: 1 })
+    expect(InboxView.titleCounts({ needsYou: 2, blocking: 2 })).toEqual({ 'needs-you': 2, failed: 0 })
+    expect(InboxView.titleCounts({ needsYou: 1, blocking: 0 })).toEqual({ 'needs-you': 0, failed: 1 })
+    expect(InboxView.titleCounts(undefined)).toEqual({})
+    // The kit Page draws one StatusCount per status present (A5).
+    expect(panel).toMatch(/statusCounts=\{InboxView\.titleCounts\(counts\)\}/u)
   })
 
   it("ends Start triage and the page menu at the list's trailing edge, not the window's", () => {
-    expect(InboxView.LIST_WIDTH).toBe('dshx:max-w-[880px]')
-    expect(InboxView.HEADER_WIDTH).toBe('dshx:[&_[data-slot=page-header]]:max-w-[880px]')
-    expect(panel.match(/InboxView\.HEADER_WIDTH/gu)?.length).toBeGreaterThanOrEqual(1)
+    // The kit lane width holds header and list in one container, so the actions end on the list's edge (A5).
+    expect(panel.match(/width="lane"/gu)?.length).toBeGreaterThanOrEqual(2)
+    expect(panel).not.toContain('InboxView.LIST_WIDTH')
   })
 })
 

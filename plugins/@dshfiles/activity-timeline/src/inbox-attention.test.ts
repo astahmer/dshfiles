@@ -30,7 +30,8 @@ describe('Inbox colour on things you act on (round five P2)', () => {
   })
 
   it('bands the head of a Needs-you or Failed card in its attention wash (round five C4, kit A2)', () => {
-    expect(InboxView.headerBand('needs-you')).toBe('dshx:[&>div:first-child]:bg-wash-needs-you')
+    // Round five C3 (council round 3): a full-width band takes the kit's calmer band wash (A2), rows keep the row wash.
+    expect(InboxView.headerBand('needs-you')).toBe('dshx:[&>div:first-child]:bg-wash-needs-you-band')
     expect(InboxView.headerBand('failed')).toBe('dshx:[&>div:first-child]:bg-wash-failed')
     expect(InboxView.headerBand('ready')).toBe('')
     expect(row).toContain('InboxView.headerBand(status)')
@@ -38,7 +39,7 @@ describe('Inbox colour on things you act on (round five P2)', () => {
 
   it.each<Scheme>(['light', 'dark'])('keeps ink and muted text at AA on the band (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    for (const band of [p.needsYouWash, p.failedWash]) {
+    for (const band of [p.needsYouBandWash, p.failedWash]) {
       expect(PaletteMath.contrastRatio(p.neutral[9]!, band), 'muted on the band').toBeGreaterThanOrEqual(4.5)
       expect(PaletteMath.contrastRatio(p.neutral[10]!, band), 'ink on the band').toBeGreaterThanOrEqual(4.5)
     }
@@ -86,9 +87,8 @@ describe('Inbox card (round five C4)', () => {
     expect(row).toContain('InboxView.bodyReason(text.reason, title)')
   })
 
-  it('caps the list at a readable width (about 880 px) instead of stretching across a wide pane', () => {
-    expect(InboxView.LIST_WIDTH).toBe('dshx:max-w-[880px]')
-    expect(panel).toContain('InboxView.LIST_WIDTH')
+  it('caps the page at the kit list lane (920 px) instead of stretching across a wide pane (round five C3, kit A5)', () => {
+    expect(panel.match(/width="lane"/gu)?.length).toBeGreaterThanOrEqual(2)
   })
 })
 

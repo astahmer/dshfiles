@@ -32,11 +32,11 @@ A question a subagent asked its parent thread also shows in that thread, above i
 (`src/thread-question-dock.tsx`): **Answer** on a thread row opens the thread, and this is the answerable card it lands
 on. It reads the Needs you list the badge reads, so answering in either place clears both.
 
-Each item is one card (desktop and phone, the list capped at 880 px): a head band flush with its top holds the status
-glyph, the title, the type and the age, on the kit's attention wash for Needs you and Failed; the neutral body below
+Each item is one card (desktop and phone, the page on the kit's 920 px list lane): a head band flush with its top holds the status
+glyph, the title, the type and the age, on the kit's attention wash for Needs you (the calmer band wash) and Failed; the neutral body below
 holds the question or detail and the actions. The recommended answer says **Recommended** in words, **Write your
 own…** beside the answers opens the thread to reply in free text, and a failed turn's card names its thread once. The
-page title carries one count chip per status present, ◆2 ✕1 (the kit's `StatusCount`), and the header ends at the
+page title carries one count chip per status present, ◆2 ✕1 (the kit Page's `statusCounts`), and the header ends at the
 list's trailing edge, so Start triage and the page menu line up with the cards. On a phone the type leaves the band (the
 body says "Asks:" or "Approve:"), the band is 44 pt tall with the card's `⋯` menu in its corner, the body takes the
 card's 16 pt inset and a long answer wraps inside its 44 pt row; **Start triage**, the page menu and the frame's status
