@@ -270,7 +270,7 @@ work on any surface.
    `identity-1..8` tone. Identity colour always sits beside the name, and a list colours one identity dimension:
    the one that differs between its rows. Identity never uses `info`, `success`, `warning`, `destructive` or
    `chart-1..5`. A project shows as one `ProjectMark` (`components/ui/project-mark`): a 20px tile (16px dense), 4px
-   radius, its tone at 14% behind two letters in that tone, with the project name beside it in muted text. The six
+   radius, its tone at 18% behind two letters in that tone, with the project name beside it in muted text. The six
    project tones (hues 225, 110, 55, 305, 340, 195) keep 25° or more from every status hue.
 6. **Accent indigo means interaction.** Focus ring, links, text selection, the active tab bar, and the on state of
    switches, checkboxes and radios. Never a button fill, never decoration. The primary button is ink.

@@ -263,7 +263,7 @@
 @layer components {
   /*
    * `ProjectMark` letters: the project tone (inherited from the tile) pulled 25% toward the ink, so two 11px letters hold
-   * AA on their own 14% tile over bg, panel, raised and selected in both schemes (tests/project-mark.test.tsx).
+   * AA on their own 18% tile over bg, panel, raised and selected in both schemes (tests/project-mark.test.tsx).
    */
   .dshx-project-mark-letters {
     color: color-mix(in oklab, currentColor 75%, var(--dsw-alias-label-primary));

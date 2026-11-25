@@ -42,7 +42,7 @@ export interface ProjectMarkProps extends Omit<React.ComponentPropsWithoutRef<'s
 }
 
 /**
- * A project's identity tile (DESIGN.md › Colour roles 5): the project colour at 14% behind two letters in that colour
+ * A project's identity tile (DESIGN.md › Colour roles 5): the project colour at 18% behind two letters (council round 5 A3: up from 14%, so the tile reads as a colour) in that colour
  * (pulled a quarter toward the ink so they hold AA on the tile), 4px radius. Put the project name beside it in muted text. The tile widens instead of clipping a wide pair of letters.
  */
 export const ProjectMark = React.forwardRef<HTMLSpanElement, ProjectMarkProps>(function ProjectMark(
@@ -60,7 +60,7 @@ export const ProjectMark = React.forwardRef<HTMLSpanElement, ProjectMarkProps>(f
       data-slot="project-mark"
       data-size={size}
       className={cn(
-        'dshx:inline-flex dshx:w-auto dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-current/14 dshx:px-0.5',
+        'dshx:inline-flex dshx:w-auto dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-current/18 dshx:px-0.5',
         'dshx:font-sans dshx:text-2xs dshx:leading-none dshx:font-semibold dshx:tracking-tight dshx:whitespace-nowrap dshx:tabular-nums dshx:select-none',
         size === 'dense' ? 'dshx:h-4 dshx:min-w-4' : 'dshx:h-5 dshx:min-w-5',
         toneClass,

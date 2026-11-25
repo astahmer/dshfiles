@@ -185,7 +185,7 @@
     /*
      * Project identity tones (DESIGN.md › Colour roles 5; round five K4): six hues kept at least 25° away from the
      * status hues (danger 25, warning 80, success 150, accent 270), text-safe at L 0.50 light and 0.78 dark, so a
-     * project never reads as a state. `ProjectMark` paints them at 14% behind two letters in the tone itself.
+     * project never reads as a state. `ProjectMark` paints them at 18% behind two letters in the tone itself.
      * Index order keeps each slot near its former hue: azure, olive, copper, violet, magenta, teal.
      */
     --dshx-project-balanced-0: oklch(0.5 0.11 225);

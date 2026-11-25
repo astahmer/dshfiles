@@ -87,7 +87,7 @@ describe('project tones (round five K4)', () => {
     for (const tone of ramps[scheme].balanced) {
       const letters = mixOklab(tone, p.neutral[10]!, letterInk)
       for (const [surface, step] of Object.entries(markSurfaces)) {
-        const tile = composite(p.neutral[step]!, tone, 0.14)
+        const tile = composite(p.neutral[step]!, tone, 0.18)
         expect(PaletteMath.contrastRatio(letters, tile), `hue ${tone.h} letters on its tile over ${surface}`).toBeGreaterThanOrEqual(4.5)
       }
     }
@@ -112,14 +112,14 @@ describe('ProjectMark', () => {
     expect(projectMarkLetters('')).toBe('?')
   })
 
-  it('draws a 20px tile with the identity colour at 14% behind its letters', () => {
+  it('draws a 20px tile with the identity colour at 18% behind its letters (council round 5 A3)', () => {
     const view = render(<ProjectMark name="billing-api" tone={3} />)
     const mark = view.container.querySelector<HTMLElement>('[data-slot="project-mark"]')!
     expect(mark.textContent).toBe('BA')
     expect(mark.querySelector('.dshx-project-mark-letters')?.textContent).toBe('BA')
     expect(mark.getAttribute('aria-hidden')).toBe('true')
     const classes = mark.className.split(/\s+/)
-    expect(classes).toEqual(expect.arrayContaining(['dshx:h-5', 'dshx:min-w-5', 'dshx:rounded-sm', 'dshx:bg-current/14', 'project-tone-balanced-3']))
+    expect(classes).toEqual(expect.arrayContaining(['dshx:h-5', 'dshx:min-w-5', 'dshx:rounded-sm', 'dshx:bg-current/18', 'project-tone-balanced-3']))
     expect(mark.getAttribute('data-size')).toBe('default')
   })
 
