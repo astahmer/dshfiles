@@ -973,20 +973,13 @@ button.crumbEditable {
   margin-bottom: 16px;
 }
 
-/* dshfiles (unslop r5 C5, council round 5): in a pane at least 800px tall the heading and the composer are the pane's
-   centre (a phone keeps its bottom-anchored stack), with the suggestions hanging below them: the centred box takes, above, what hangs below the composer (the
-   8px gap, the suggestions' 12px inset and each 28px line, 12px apart) instead of a 32px foot that lifted the pair. */
+/* dshfiles (unslop r5 C5, council round 5): in a pane at least 800px tall the New thread block is the pane's centre (a
+   phone keeps its bottom-anchored stack), with no 32px foot lifting it. Council round 7 C7: the heading, the composer
+   and the suggestion lines centre as one block, equal space above and below; centring the heading and composer alone
+   (a 48 or 88px top pad for what hung below) left the whole block ~43px under the pane's centre at 1440x900. */
 @media (min-height: 800px) and (min-width: 640px) {
   .composerHero {
     padding-bottom: 0;
-  }
-
-  .composerHero:has(> .heroSuggestions :global([data-hero-card])) {
-    padding-top: 48px;
-  }
-
-  .composerHero:has(> .heroSuggestions :global([data-hero-card^='starter-'])):has(> .heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-']))) {
-    padding-top: 88px;
   }
 
   /* Round six C5: the main hero always sits under the blank header (36px, no rule), which reads as part of the pane, but

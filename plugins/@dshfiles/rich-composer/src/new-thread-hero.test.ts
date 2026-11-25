@@ -12,12 +12,13 @@ describe('the New thread hero (round five C5, council round 5)', () => {
     expect(root).toMatch(/:global\(html\[data-shell-phone-nav\]\) \.composerHero > :global\(\[data-hero-shell\]\) \{[^}]*margin-bottom: 0;/u)
   })
 
-  it('centres the heading and the composer in a tall pane, with the suggestions hanging below', () => {
+  it('centres heading, composer and suggestion lines as one block in a tall pane (council round 7 C7)', () => {
     expect(root).toContain('@media (min-height: 800px) and (min-width: 640px) {')
     expect(tall).toMatch(/\.composerHero \{\s*padding-bottom: 0;/u)
-    // One line of suggestions under the composer (8px gap, 12px inset, a 28px line), or both lines (12px between).
-    expect(tall).toMatch(/\.composerHero:has\(> \.heroSuggestions :global\(\[data-hero-card\]\)\) \{\s*padding-top: 48px;/u)
-    expect(tall).toMatch(/\{\s*padding-top: 88px;/u)
+    // Round five centred the heading and composer only, padding the top by what hung below (48px or 88px): the whole
+    // block then sat ~43px under the pane's centre at 1440x900. Nothing offsets the block now.
+    expect(root).not.toMatch(/\.composerHero:has\(> \.heroSuggestions[^{]*\{\s*padding-top/u)
+    expect(root).not.toMatch(/padding-top: (48|88)px;/u)
   })
 
   it("draws every run chip's icon in the secondary ink, leaving brand marks and project tiles their colour", () => {
