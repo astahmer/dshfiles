@@ -6594,7 +6594,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // Productivity pass Q5 (T5.3): above the first row the list keeps the project picker and one Filter menu; the
           // views, grouping, status and source filters, the Threads pages (Board) and both settings live in that menu.
           // The trigger keeps the former filter button's accessible name, "Filter: <active filters>".
-          <header className="dshx:px-2 dshx:py-1">
+          // On touch the row sits 4px under the 44px search and directly over the first group head (council round 6 B8).
+          <header className="dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0">
             <div className="dshx:flex dshx:items-center dshx:gap-1">
               <Combobox
                 contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
@@ -7558,10 +7559,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   return (
                     <section
                       className={cn(
-                        // Groups stand 20px apart in the list: the last row's 6px gap and this 14px; 6px on a phone, and none
-                        // above the first, so the first Ready row shows above the tab bar (round five B1).
+                        // Groups stand 20px apart in the list: the last row's 6px gap and this 14px; on a phone the last row's
+                        // gap alone, and none above the first, so the first Ready row shows above the tab bar under the 44px
+                        // search (round five B1, council round 6 B8).
                         'dshx:mt-1 dshx:rounded-md',
-                        !isBoard && 'dshx:not-pointer-coarse:not-first:mt-3.5 dshx:pointer-coarse:not-first:mt-0.5 dshx:pointer-coarse:first:mt-0',
+                        !isBoard && 'dshx:not-pointer-coarse:not-first:mt-3.5 dshx:pointer-coarse:not-first:mt-0 dshx:pointer-coarse:first:mt-0',
                         isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
                       )}
                       key={group.key}

@@ -831,7 +831,11 @@ const ListPane = (
           <Button
             size="sm"
             variant="outline"
-            className="dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:font-normal dshx:text-muted-foreground"
+            className={cn(
+              'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:font-normal dshx:text-muted-foreground',
+              // A phone's search is a 44px control (council round 6 B8); the list's touch gaps give the height back.
+              props.phone === true && 'dshx:h-11 dshx:gap-2 dshx:px-3 dshx:text-base',
+            )}
             onClick={props.searchThreads}
           >
             <SearchIcon className="dshx:size-3.5" aria-hidden="true" />

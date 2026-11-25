@@ -6,8 +6,8 @@ const header = readFileSync(new URL('thread-group-header.tsx', import.meta.url),
 const rows = readFileSync(new URL('virtual-thread-rows.tsx', import.meta.url), 'utf8')
 
 describe('phone thread list density (round five B1)', () => {
-  it('stands groups 6px apart on touch (the last row gap and 2px), none above the first, 20px with a mouse', () => {
-    expect(client).toContain("'dshx:not-pointer-coarse:not-first:mt-3.5 dshx:pointer-coarse:not-first:mt-0.5 dshx:pointer-coarse:first:mt-0'")
+  it('stands groups 4px apart on touch (the last row gap alone, council round 6 B8), none above the first, 20px with a mouse', () => {
+    expect(client).toContain("'dshx:not-pointer-coarse:not-first:mt-3.5 dshx:pointer-coarse:not-first:mt-0 dshx:pointer-coarse:first:mt-0'")
     expect(rows).toContain("const ROW_GAP = 'dshx:pb-1.5 dshx:pointer-coarse:pb-1'")
   })
 

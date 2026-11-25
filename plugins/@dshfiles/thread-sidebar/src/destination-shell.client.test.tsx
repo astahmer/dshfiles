@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 // @vitest-environment jsdom
 import { ListHeaderExtras } from './list-header-extras.js'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
@@ -551,6 +552,27 @@ describe('DestinationShell', () => {
     } finally {
       phoneStatus.Button = undefined
     }
+  })
+
+  it('gives the phone thread list a 44px search, the touch control height (council round 6 B8)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const search = within(document.querySelector<HTMLElement>('[data-phone-list]') ?? document.body).getByRole('button', { name: 'Search threads' })
+    expect(search.className).toContain('dshx:h-11')
+    cleanup()
+    // The desktop column keeps its compact 28px search.
+    setPhone(false)
+    renderShell({ collapsed: false })
+    expect(screen.getByRole('button', { name: 'Search threads' }).className).not.toContain('dshx:h-11')
+  })
+
+  it('reclaims the search\'s extra 16px from the gaps around the filter row and the group heads on touch (council round 6 B8)', () => {
+    const source = readFileSync('src/client.tsx', 'utf8')
+    // The project and Filter row sits 4px under the search and directly over the first group head on touch.
+    expect(source).toContain("<header className=\"dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0\">")
+    // Groups stand flush on touch: the 2px each group added above its head is gone.
+    expect(source).toContain('dshx:pointer-coarse:not-first:mt-0 dshx:pointer-coarse:first:mt-0')
+    expect(source).not.toContain('dshx:pointer-coarse:not-first:mt-0.5')
   })
 
   it('keeps the phone shell on a phone turned sideways (844x390, coarse pointer)', () => {
