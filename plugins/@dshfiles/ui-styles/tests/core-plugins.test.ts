@@ -207,3 +207,22 @@ describe('core Plugins lane (council round 6, D7)', () => {
     expect(wide).toMatch(/section\[data-plugin-panel\] \[class\*='_pageBar'\] > \[class\*='_pageHead'\][\s\S]*?max-width:\s*960px;/u)
   })
 })
+
+describe('core Plugins page title and descriptions (council round 6, D4)', () => {
+  it('still renders the title hook at the module\'s 20/500', () => {
+    expect(new RegExp('"pageTitle":\\s*`[A-Za-z0-9]+_[A-Za-z0-9]+_pageTitle`', 'u').test(page), 'pageTitle').toBe(true)
+    expect(/_pageTitle\{margin:0;font-size:20px;font-weight:500;line-height:28px\}/u.test(page), 'module title').toBe(true)
+  })
+
+  it('sets the h1 like every kit page title: 22/28 at 650, -0.01em', () => {
+    const title = ruleFor("[class*='_pageTitle']")
+    expect(title).toMatch(/font-size:\s*22px;/u)
+    expect(title).toMatch(/line-height:\s*28px;/u)
+    expect(title).toMatch(/font-weight:\s*650;/u)
+    expect(title).toMatch(/letter-spacing:\s*-0\.01em;/u)
+  })
+
+  it('leads each description with a summary line of at most 70ch before its two-line clamp', () => {
+    expect(ruleFor("[class*='_cardDesc']")).toMatch(/max-width:\s*70ch;/u)
+  })
+})

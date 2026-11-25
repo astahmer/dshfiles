@@ -62,6 +62,14 @@ section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
   }
 }
 
+/* The page title is set like every kit page h1 (`text-title font-title`): 22/28 at 650, -0.01em (council round 6, D4). */
+section[data-plugin-panel] [class*='_pageTitle'] {
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
 /*
  * The switch sits in a fixed column, so descriptions end at one edge. A row with no switch opens a page (a settings
  * item): the column holds a 14px chevron in secondary ink, centred on the switch's axis (the 36px Host switch sits flush
@@ -123,6 +131,8 @@ section[data-plugin-panel] [class*='_cardIcon'] > * {
  * + an 18px line), its title centred, so rows are even.
  */
 section[data-plugin-panel] [class*='_cardDesc'] {
+  /* A first line of at most 70ch reads as the row's summary; the rest wraps once, then clamps (council round 6, D4). */
+  max-width: 70ch;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   text-wrap: pretty;
