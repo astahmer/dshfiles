@@ -1,0 +1,71 @@
+/*
+ * The core Plugins page (round five A7; DESIGN.md › Do's and Don'ts, accepted exception). The page is DSH's own
+ * (`@deepseek-ai/dsh-client-ui-plugin-manager`) and has no fork here, so ui-styles restyles it through its stable hooks:
+ * the `data-plugin-*` attributes, the Tag primitive's `data-tone`, and the suffix of its CSS-module class names
+ * (`X_2TxG_cardIcon` → `[class*='_cardIcon']`). Unlayered like the Host module sheets, and every rule out-ranks the
+ * module rule it overrides; tests/core-plugins.test.ts fails when a DSH bump renames a hook.
+ */
+
+/* The page frame takes the shared page inset (24px, 12px narrow) and fills the pane instead of a centred 960px column. */
+section[data-plugin-panel][data-plugin-panel] {
+  --plugin-page-inset: 24px;
+  --plugin-page-top-inset: 24px;
+  --dshx-plugin-tone: var(--dshx-identity-7);
+  align-items: stretch;
+}
+
+@media (width < 28rem) {
+  section[data-plugin-panel][data-plugin-panel] {
+    --plugin-page-inset: 12px;
+  }
+}
+
+section[data-plugin-panel][data-plugin-panel] > *,
+section[data-plugin-panel] [class*='_pageBody'] > *,
+section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
+  max-width: none;
+}
+
+/*
+ * Icon tiles on identity tones: the tile is the tone at 14% with no border, and the artwork is drawn in the tone itself,
+ * as its own silhouette shifted back into the tile by a drop shadow while the original is clipped away. Any artwork (a
+ * package image or an inline SVG) takes the tone; overlapping translucent parts keep their depth. A row's tone follows
+ * its place in the list, cycling through identity-1..8.
+ */
+section[data-plugin-panel] [class*='_cardIcon'] {
+  --dshx-plugin-tile-shift: 96px;
+  overflow: hidden;
+  border-color: transparent;
+  background: color-mix(in oklab, var(--dshx-plugin-tone) 14%, transparent);
+}
+
+section[data-plugin-panel] [class*='_cardIcon'] > * {
+  filter: drop-shadow(var(--dshx-plugin-tile-shift) 0 0 var(--dshx-plugin-tone));
+  transform: translateX(calc(-1 * var(--dshx-plugin-tile-shift)));
+}
+
+section[data-plugin-panel] li:nth-child(8n + 1) { --dshx-plugin-tone: var(--dshx-identity-1); }
+section[data-plugin-panel] li:nth-child(8n + 2) { --dshx-plugin-tone: var(--dshx-identity-2); }
+section[data-plugin-panel] li:nth-child(8n + 3) { --dshx-plugin-tone: var(--dshx-identity-3); }
+section[data-plugin-panel] li:nth-child(8n + 4) { --dshx-plugin-tone: var(--dshx-identity-4); }
+section[data-plugin-panel] li:nth-child(8n + 5) { --dshx-plugin-tone: var(--dshx-identity-5); }
+section[data-plugin-panel] li:nth-child(8n + 6) { --dshx-plugin-tone: var(--dshx-identity-6); }
+section[data-plugin-panel] li:nth-child(8n + 7) { --dshx-plugin-tone: var(--dshx-identity-7); }
+section[data-plugin-panel] li:nth-child(8n + 8) { --dshx-plugin-tone: var(--dshx-identity-8); }
+
+/* Experimental (and Update available) as a quiet neutral chip at the 11px floor, not an accent pill at 10px. */
+section[data-plugin-panel] [class*='_statusTag'][data-tone='info'] {
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dshx-density-text-min);
+}
+
+/*
+ * A group whose every package row is Experimental already says so in its heading: its rows drop the chip. The chip is
+ * the first tag after a row's title. A group holds a row that is not experimental when a title has no tag after it, or
+ * its first tag is not an info tag (`:has()` cannot nest, so the test is on those two shapes). A non-experimental row
+ * whose only tag is Update available still reads as experimental here; DSH shows no such row on the main list today.
+ */
+section[data-plugin-panel] [data-plugin-group]:not(:has(li[data-plugin-package] [class*='_cardOpen']:last-child, li[data-plugin-package] [class*='_cardOpen'] + [class*='_statusTag']:not([data-tone='info']))) [class*='_cardOpen'] + [class*='_statusTag'][data-tone='info'] {
+  display: none;
+}

@@ -599,10 +599,14 @@ translate DSH's built-in parts only.
 - **Don't** put a clock, a toolbar or a streaming line inside a live region.
 - **Don't** print an endpoint, a route id, an environment variable or model-directed text to the user.
 - **Don't** give one destination two names, or draw a count its list does not show.
-- **Accepted exception:** the core Plugins page (centred column, 10px text) is DSH's own and has no fork here; only
-  its tab title is ours. Its switches are the one thing we restyle: a checked Host primitives `Switch`
-  (`button[role=switch][aria-checked=true]`) takes `control-on` like every kit switch, through one unlayered rule in
-  `ui-styles/src/client.css` that `ui-styles/tests/core-switch.test.ts` guards across DSH bumps.
+- **Accepted exception:** the core Plugins page is DSH's own and has no fork here; only its tab title is ours. We
+  restyle it from `@dshfiles/ui-styles` through its stable hooks (`data-plugin-*` attributes, the Tag primitive's
+  `data-tone`, the suffix of its CSS-module class names), never its markup: a checked Host primitives `Switch`
+  (`button[role=switch][aria-checked=true]`) takes `control-on` like every kit switch (`src/client.css`, guarded by
+  `tests/core-switch.test.ts`); and `src/core-plugins.css` (guarded by `tests/core-plugins.test.ts`) gives the page the
+  shared 24px inset (12px narrow) instead of a centred 960px column, draws each icon tile as an identity tone at 14%
+  with the artwork in that tone (cycling `identity-1..8` by row), and makes Experimental a quiet neutral chip at 11px,
+  dropped from the rows of a group whose every row is experimental (its heading says so).
 
 Two ratchets in `check:green` and CI hold these rules: they count findings per rule and plugin and fail only when a
 count rises ([repository checks](docs/repository-checks.md#design-and-copy-ratchets)). `check:design-tokens` counts

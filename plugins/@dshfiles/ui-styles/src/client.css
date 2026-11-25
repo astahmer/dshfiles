@@ -9,6 +9,8 @@
 @import './transcript.css';
 /* Native core controls widened for touch (visual refresh T5.4): the Settings font-size stepper. */
 @import './phone-touch.css';
+/* The core Plugins page (round five A7): shared page inset, identity icon tiles, a quiet Experimental chip. */
+@import './core-plugins.css';
 
 /* The kit sheet scans every owned plugin (`@source '../..'`), which also reads test files and markdown that never
    ship to a browser: they cost roughly a third of the scan and produce no class the app can render. */
