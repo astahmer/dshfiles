@@ -435,8 +435,10 @@
 }
 
 /* dshfiles (unslop r5 C1, council round 4): a phone has no gutter, so the control sits in the dock's trailing seat
-   (rich-composer's PhoneDockHead), on the dock, never over prose; there it is an ordinary box in a row. */
+   (rich-composer's PhoneDockHead), on the dock, never over prose; there it is an ordinary box in a row. Round five C1
+   (council round 5): a 32px circle in that 44px seat, its own control beside Live work. */
 .toBottomInDock {
+  --dsh-to-bottom-size: 32px;
   margin-top: 0;
 }
 
@@ -446,6 +448,10 @@
     content: '';
     position: absolute;
     inset: -4px;
+  }
+
+  .toBottomInDock::after {
+    inset: -6px;
   }
 }
 
