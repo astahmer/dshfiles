@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import type { ChartView } from './api.js'
@@ -126,5 +127,33 @@ describe('Usage › Where it went (council round 5, D1)', () => {
   })
   it('caps the end nodes at 280 px through the kit prop, not a class override', () => {
     expect(html).toMatch(/<div role="radiogroup" aria-label="Models"[^>]*style="max-width:280px"/u)
+  })
+})
+
+describe('Usage › one card rhythm (council round 6, D1)', () => {
+  const sectionClass = (): string =>
+    (/<section aria-label="Where it went" class="([^"]*)"/u.exec(render('cost'))?.[1] ?? '').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
+
+  it('sets "Where it went" in the 8 px card the numbers take, not the kit map\'s 16 px one', () => {
+    expect(sectionClass()).toContain('dshx:rounded-lg')
+    expect(sectionClass()).not.toContain('dshx:rounded-2xl')
+  })
+
+  it("leads into the first node in 12 px: the header's 12 and none of the map's top padding", () => {
+    expect(sectionClass()).toContain('dshx:[&_[data-spend-map-inset]>div]:pt-0')
+  })
+
+  it("spends no slot on an empty Jev block and keeps the chart card's foot at 6 px, so the map's first result clears the fold", () => {
+    const source = readFileSync(new URL('charts.tsx', import.meta.url), 'utf8')
+    expect(source).toContain('<div className="dshx:empty:hidden" data-usage-jev-card>')
+    expect(/export const TREND_CARD =\s*'([^']*)'/u.exec(source)?.[1]).toContain('dshx:pb-1.5')
+  })
+
+  it('draws the trend chart in the same hairline card, title 14 px from the top', () => {
+    const source = readFileSync(new URL('charts.tsx', import.meta.url), 'utf8')
+    const TREND_CARD = /export const TREND_CARD =\s*'([^']*)'/u.exec(source)?.[1] ?? ''
+    for (const look of ['dshx:rounded-lg', 'dshx:border', 'dshx:border-border', 'dshx:bg-card', 'dshx:px-4', 'dshx:pt-3.5']) expect(TREND_CARD).toContain(look)
+    expect(source).toContain('<ChartFrame className={TREND_CARD}>')
+    expect(source).not.toContain('<Panel className="dshx:border-t-0 dshx:pt-1">')
   })
 })

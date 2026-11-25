@@ -31,6 +31,13 @@ const TREND_METRICS: readonly SlidingSegmentOption<'cost' | 'tokens' | 'requests
 /** Purpose ids arrive as series keys; the legend and tooltips show their product names. */
 const purposeLabelsByKey = new Map(Object.entries(UsageFormattingModel.purposeLabels))
 
+/**
+ * The trend chart's card: the hairline card the numbers above and "Where it went" below take (8 px radius, 16 px sides,
+ * the title 14 px from the top edge), so the three read as one rhythm. Its foot is 6 px: the chart already leaves room
+ * under its legend (council round 6, D1).
+ */
+export const TREND_CARD = 'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:pt-3.5 dshx:pb-1.5 dshx:@max-pane-narrow:px-3'
+
 const Panel = (props: { readonly title?: string; readonly description?: string; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
   <ChartFrame title={props.title} description={props.description} className={cn('dshx:border-t dshx:border-border dshx:pt-4', props.className)}>
     {props.children}
@@ -306,7 +313,8 @@ export const UsageCharts = (props: {
   const days = Math.max(1, (Math.min(now, props.range.to) - props.range.from) / DAY_MS)
   // The Jev block is month to date, whatever range is selected, and draws nothing until a Jev call is recorded.
   const jevCard = (
-    <div data-usage-jev-card>
+    // Empty until a Jev call is recorded: hidden then, so it takes no slot in the page's 12 px stack (council round 6, D1).
+    <div className="dshx:empty:hidden" data-usage-jev-card>
       <JevUsageCard usage={jevUsage.data} error={jevUsage.error} failed={jevUsage.isError} />
     </div>
   )
@@ -326,7 +334,7 @@ export const UsageCharts = (props: {
 
       {jevCard}
 
-      <Panel className="dshx:border-t-0 dshx:pt-1">
+      <ChartFrame className={TREND_CARD}>
         {/*
          * The page's one metric switch, beside the card's title, so the title and what it measures read as one phrase
          * (council round 5, D1): "Where it went" and the daily calendar follow it. The grouping is on the filter row.
@@ -348,7 +356,7 @@ export const UsageCharts = (props: {
           definition={trendChart}
           height={CHART_HEIGHT}
         />
-      </Panel>
+      </ChartFrame>
 
       {/* "$0.00 / 0%" says nothing: the map waits for a range that cost something. */}
       {view.summary.cost > 0 ? (

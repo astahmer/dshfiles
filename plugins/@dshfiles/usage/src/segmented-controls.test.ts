@@ -79,8 +79,8 @@ describe('Usage control row and chart header (council round 4, D1)', () => {
     const titleRow = /<span className="[^"]*" data-usage-chart-title-row>([\s\S]*?)<\/span>\s*<span className="dshx:text-xs">/u.exec(header?.[2] ?? '')
     expect(titleRow?.[1]).toContain('over time')
     expect(titleRow?.[1]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
-    // The stats card's edge already parts it from the chart: no second hairline right under the card.
-    expect(charts).toMatch(/<Panel className="dshx:border-t-0 dshx:pt-1">\s*\{\/\*[\s\S]*?\*\/\}\s*<header className="[^"]*" data-usage-chart-header>/u)
+    // The chart is its own hairline card (council round 6, D1): no loose hairline right under the stats card.
+    expect(charts).toMatch(/<ChartFrame className=\{TREND_CARD\}>\s*\{\/\*[\s\S]*?\*\/\}\s*<header className="[^"]*" data-usage-chart-header>/u)
   })
 })
 

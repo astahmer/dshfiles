@@ -46,9 +46,10 @@ const Change = (props: { readonly current: number; readonly previous: number }):
 }
 
 /**
- * The Overview tab's numbers: cost, requests and cache hit lead, in one hairline card split by two dividers, with
- * "More numbers" on its trailing edge (council round 5, D1); the other five open under a hairline inside the same card.
- * The estimate's caveat (list price, catalog age) is a tooltip on the cost label.
+ * The Overview tab's numbers: cost, requests and cache hit lead, in one hairline card split by two dividers; the other
+ * five open under a hairline inside the same card. "More numbers" is a 13 px link under the card, on its trailing edge,
+ * so the third cell holds only its number (council round 6, D1). The estimate's caveat (list price, catalog age) is a
+ * tooltip on the cost label.
  */
 export const CostSummary = (props: { readonly summary: Summary; readonly days: number; readonly pricingNote: string }): JSX.Element => {
   const [open, setOpen] = useState(false)
@@ -59,9 +60,9 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
   const change = (current: number, previous: number): JSX.Element | undefined =>
     UsageFormattingModel.changeRatio(current, previous) === null ? undefined : <Change current={current} previous={previous} />
   return (
-    <div data-usage-stats className="dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card">
-      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:items-stretch">
-        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-3 dshx:divide-x dshx:divide-border" data-usage-stats-row>
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
+      <div data-usage-stats className="dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card">
+        <div className="dshx:grid dshx:min-w-0 dshx:grid-cols-3 dshx:divide-x dshx:divide-border" data-usage-stats-row>
           <LeadTile
             label={
               <>
@@ -88,51 +89,51 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
             detail={cacheHit === null ? undefined : `${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
           />
         </div>
-        <div
-          className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:px-3 dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:border-t dshx:@max-pane-narrow:border-border dshx:@max-pane-narrow:px-1 dshx:@max-pane-narrow:py-1"
-          data-usage-stats-more
-        >
-          <Button aria-controls={moreId} aria-expanded={open} onClick={() => setOpen(!open)} size="xs" type="button" variant="ghost">
-            <ChevronDownIcon
-              aria-hidden
-              className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
+        {open ? (
+          <div
+            className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3 dshx:@min-[42rem]:grid-cols-3 dshx:@min-[64rem]:grid-cols-5 dshx:@max-pane-narrow:px-3"
+            id={moreId}
+          >
+            <Tile
+              label="Per day"
+              value={UsageFormattingModel.formatCost(summary.cost / props.days)}
+              detail={summary.unpriced === 0 ? undefined : `${summary.unpriced.toLocaleString()} requests unpriced`}
             />
-            {open ? 'Fewer numbers' : 'More numbers'}
-          </Button>
-        </div>
+            <Tile
+              label="Failed / aborted"
+              value={`${summary.failed.toLocaleString()} / ${summary.aborted.toLocaleString()}`}
+              detail={summary.failed === 0 ? undefined : UsageFormattingModel.formatPercent(summary.failed / summary.requests)}
+            />
+            <Tile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} detail={change(tokens, summary.previous.tokens)} />
+            <Tile
+              label="Cache savings (estimate)"
+              value={UsageFormattingModel.formatCost(summary.cacheSavings)}
+              detail={
+                cacheHit === null
+                  ? undefined
+                  : `${UsageFormattingModel.formatPercent(cacheHit)} of prompt tokens billed at the cache-read rate${summary.unpriced === 0 ? '' : ' · priced routes only'}`
+              }
+            />
+            <Tile
+              label="Cost per turn"
+              value={summary.turns === 0 ? '–' : UsageFormattingModel.formatCost(summary.cost / summary.turns)}
+              detail={summary.turns === 0 ? undefined : `${summary.turns.toLocaleString()} turns · ${summary.requests.toLocaleString()} requests`}
+            />
+          </div>
+        ) : null}
       </div>
-      {open ? (
-        <div
-          className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3 dshx:@min-[42rem]:grid-cols-3 dshx:@min-[64rem]:grid-cols-5 dshx:@max-pane-narrow:px-3"
-          id={moreId}
-        >
-          <Tile
-            label="Per day"
-            value={UsageFormattingModel.formatCost(summary.cost / props.days)}
-            detail={summary.unpriced === 0 ? undefined : `${summary.unpriced.toLocaleString()} requests unpriced`}
+      <div className="dshx:flex dshx:justify-end" data-usage-stats-more>
+        <Button aria-controls={moreId} aria-expanded={open} className={STATS_MORE_LINK} onClick={() => setOpen(!open)} type="button" variant="link">
+          {open ? 'Fewer numbers' : 'More numbers'}
+          <ChevronDownIcon
+            aria-hidden
+            className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
           />
-          <Tile
-            label="Failed / aborted"
-            value={`${summary.failed.toLocaleString()} / ${summary.aborted.toLocaleString()}`}
-            detail={summary.failed === 0 ? undefined : UsageFormattingModel.formatPercent(summary.failed / summary.requests)}
-          />
-          <Tile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} detail={change(tokens, summary.previous.tokens)} />
-          <Tile
-            label="Cache savings (estimate)"
-            value={UsageFormattingModel.formatCost(summary.cacheSavings)}
-            detail={
-              cacheHit === null
-                ? undefined
-                : `${UsageFormattingModel.formatPercent(cacheHit)} of prompt tokens billed at the cache-read rate${summary.unpriced === 0 ? '' : ' · priced routes only'}`
-            }
-          />
-          <Tile
-            label="Cost per turn"
-            value={summary.turns === 0 ? '–' : UsageFormattingModel.formatCost(summary.cost / summary.turns)}
-            detail={summary.turns === 0 ? undefined : `${summary.turns.toLocaleString()} turns · ${summary.requests.toLocaleString()} requests`}
-          />
-        </div>
-      ) : null}
+        </Button>
+      </div>
     </div>
   )
 }
+
+/** "More numbers": a 13 px ink link, 20 px tall (44 px under a coarse pointer), its text on the card's trailing edge. */
+export const STATS_MORE_LINK = 'dshx:h-5 dshx:gap-1 dshx:px-0 dshx:text-sm dshx:has-[>svg]:px-0 dshx:pointer-coarse:h-11'

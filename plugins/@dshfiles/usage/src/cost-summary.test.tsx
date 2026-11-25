@@ -49,7 +49,7 @@ describe('Usage › Cost numbers', () => {
   it('leads with three numbers and folds the rest', () => {
     for (const label of ['Cost (estimate)', 'Requests', 'Cache hit']) expect(markup).toContain(`>${label}<`)
     for (const label of ['Per day', 'Failed / aborted', 'Cache savings (estimate)', 'Cost per turn']) expect(markup).not.toContain(label)
-    expect(markup).toMatch(/<button[^>]*aria-expanded="false"[^>]*>(?:(?!<\/button>).)*More numbers<\/button>/u)
+    expect(markup).toMatch(/<button[^>]*aria-expanded="false"[^>]*>More numbers(?:(?!<\/button>).)*<\/button>/u)
   })
   it('draws each lead number in neutral ink at 22/650 tabular figures, with no series dot (council round 5, D1)', () => {
     const values = [...markup.matchAll(/<span class="([^"]*)" data-kpi-value="true">/gu)].map(match => match[1])
@@ -59,14 +59,17 @@ describe('Usage › Cost numbers', () => {
     expect(markup).not.toContain('data-kpi-dot')
     expect(markup).not.toMatch(/style="background:/u)
   })
-  it('makes "More numbers" a ghost button with a chevron on the stats card\'s trailing edge', () => {
-    const button = /<button([^>]*)>((?:(?!<\/button>).)*)More numbers<\/button>/u.exec(markup)
+  it('makes "More numbers" a 13 px link under the stats card, on its trailing edge (council round 6, D1)', () => {
+    const button = /<button([^>]*)>More numbers((?:(?!<\/button>).)*)<\/button>/u.exec(markup)
     expect(button?.[1]).toContain('aria-expanded="false"')
+    expect(button?.[1]).toContain('dshx:text-sm')
+    expect(button?.[1]).toContain('dshx:hover:underline')
     expect(button?.[2]).toMatch(/^<svg[^>]*aria-hidden="true"[^>]*>.*<\/svg>$/u)
-    // The button is the card's last cell, after the three numbers, pushed to the trailing edge.
-    const card = /<div data-usage-stats="true" class="[^"]*">(.*)<\/div>$/u.exec(markup)?.[1] ?? ''
-    expect(card.indexOf('More numbers')).toBeGreaterThan(card.indexOf('Cache hit'))
-    expect(card).toMatch(/<div class="[^"]*dshx:ml-auto[^"]*" data-usage-stats-more="true"><button/u)
+    // Not a cell of the card: the Cache hit cell holds only its number, and the link row follows the card.
+    const card = /<div data-usage-stats="true" class="[^"]*">(.*?)<\/div><div class="([^"]*)" data-usage-stats-more="true"><button/u.exec(markup)
+    expect(card?.[1]).toContain('Cache hit')
+    expect(card?.[1]).not.toContain('More numbers')
+    expect(card?.[2]).toContain('dshx:justify-end')
   })
   it('explains no absent number and puts the price caveat on the cost, never in a native title', () => {
     expect(markup).not.toContain('no earlier usage to compare')

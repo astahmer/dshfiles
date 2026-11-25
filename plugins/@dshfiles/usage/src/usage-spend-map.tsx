@@ -2,6 +2,7 @@ import { ModelMark, modelFamily } from '@dshfiles/plugin-ui/components/model-mar
 import { SpendMap, type SpendDimension, type SpendLeaf } from '@dshfiles/plugin-ui/components/motion/spend-map'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { BoxIcon, FolderIcon, KeyRoundIcon, TargetIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 import type { ChartQuery, ChartView } from './api.js'
 import { DATA_SERIES } from './data-series.js'
@@ -99,6 +100,13 @@ const formatDay = (at: number): string => new Date(at).toLocaleDateString(undefi
 const PLAIN_TOTAL =
   'dshx:[&_[data-node-anchor=root]_svg]:hidden dshx:[&_[data-node-anchor=root]>div]:size-auto dshx:[&_[data-node-anchor=root]>div>div]:static dshx:[&_[data-node-anchor=root]>div>div]:px-1'
 
+/**
+ * The card the numbers and the trend chart take (8 px radius, not the kit map's 16), and a 12 px lead-in from the heading
+ * to the first node: the header's 12 px and none of the map's top padding, so the map's first result shows above the
+ * fold at 1440 × 900 (council round 6, D1). Follow-up: a kit prop for the map's top padding.
+ */
+export const SPEND_MAP_CARD = 'dshx:rounded-lg dshx:[&_[data-spend-map-inset]>div]:pt-0'
+
 export const UsageSpendMap = (props: {
   readonly view: ChartView
   /** The chart's measure: the page has one metric switch, on the chart card. */
@@ -122,7 +130,7 @@ export const UsageSpendMap = (props: {
   return (
     <SpendMap
       data-usage-spend-map
-      className={PLAIN_TOTAL}
+      className={cn(PLAIN_TOTAL, SPEND_MAP_CARD)}
       inset="flush"
       leafMaxWidth={LEAF_MAX_WIDTH}
       detailPeriod="this range"
