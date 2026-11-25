@@ -110,3 +110,23 @@ describe('Live work on a narrow phone (unslop r5 C1)', () => {
     expect(css).toMatch(/\n\.liveWork \{\s*display: none;\s*\}/)
   })
 })
+
+describe('the collapsed Live work row (round five C2, council round 3)', () => {
+  it('is a flat 44px disclosure with one separator, not an outlined card', async () => {
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    await act(async () =>
+      root.render(<LiveWorkSummary counts={{ jobs: 1, subagents: 1 }} open={false} onToggle={() => undefined} label="Live work" detail="1 job · 1 subagent" />),
+    )
+    const row = host.querySelector<HTMLButtonElement>('[data-live-work-summary]')
+    const classes = row?.className.split(/\s+/u) ?? []
+    expect(classes).toContain('dshx:h-11')
+    expect(classes).toContain('dshx:border-t')
+    // Opaque page fill: the row sits over the transcript's scroll range, so text never shows through it.
+    expect(classes).toContain('dshx:bg-background')
+    for (const card of ['dshx:border', 'dshx:rounded-lg', 'dshx:bg-popover']) expect(classes).not.toContain(card)
+    await act(async () => root.unmount())
+    host.remove()
+  })
+})

@@ -128,7 +128,8 @@ export function LiveWorkSummary(props: {
       type="button"
       aria-expanded={props.open}
       className={cn(
-        'dshx-root dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:flex-none dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-popover dshx:px-3 dshx:text-left dshx:text-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60',
+        // Round five C2 (council round 3): a flat disclosure on the page with one separator above it, not an outlined card.
+        'dshx-root dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-background dshx:px-1 dshx:text-left dshx:text-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60',
         props.className,
       )}
       data-live-work-summary=""
