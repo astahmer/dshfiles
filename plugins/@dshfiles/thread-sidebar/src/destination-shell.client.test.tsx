@@ -115,7 +115,12 @@ describe('DestinationShell', () => {
       within(rail)
         .getAllByRole('tab')
         .map(tab => tab.textContent),
-    ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', 'Settings'])
+    ).toEqual(['Threads', 'Inbox', 'Land', 'Work', 'Agents', 'Observe', 'Knowledge', ''])
+    // The bottom cluster is glyphs only, like New folder and the rail actions beside it (council round 4 B6).
+    expect(within(rail).getByRole('tab', { name: 'Settings' }).querySelector('[data-rail-icon] + span')).toBeNull()
+    // Labels at 10.5px, -0.01em.
+    expect(within(rail).getByText('Knowledge').className).toContain('dshx:text-[10.5px]')
+    expect(within(rail).getByText('Knowledge').className).toContain('dshx:tracking-[-0.01em]')
     expect(screen.getByText('Thread list')).toBeTruthy()
     // Productivity pass Q5 (T5.3): the Threads pages (Board) are items of the list's Filter menu, published through
     // ListHeaderExtras rather than drawn as buttons above the list.

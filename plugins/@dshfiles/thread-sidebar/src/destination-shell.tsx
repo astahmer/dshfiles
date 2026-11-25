@@ -391,7 +391,8 @@ const RailButton = (props: {
         {props.icon}
       </span>
       {props.showLabel ? (
-        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-tight', props.active && 'dshx:font-semibold')}>
+        // 10.5px at -0.01em (council round 4 B6): "Knowledge", the longest, keeps side room in the 56px rail.
+        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-[10.5px] dshx:leading-tight dshx:tracking-[-0.01em]', props.active && 'dshx:font-semibold')}>
           {props.folder.label}
         </span>
       ) : null}
@@ -981,7 +982,9 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         key={candidate.id}
         folder={candidate}
         active={active}
-        showLabel
+        // The bottom cluster (New folder, the rail actions, Settings) is glyphs only, each with its tooltip: label all of
+        // a cluster or none of it (council round 4 B6).
+        showLabel={!candidate.bottom}
         controls={props.collapsed ? undefined : listId}
         icon={folderIcon(props, candidate, active)}
         onSelect={() => choose(candidate)}
