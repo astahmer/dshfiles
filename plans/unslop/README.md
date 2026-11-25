@@ -104,7 +104,19 @@ earlier 0.77 scale claim was wrong): the phone transcript is clipped above the d
 Settings has two layouts (in-page list on General, side column elsewhere), now one side column; the rail surface
 changes tone when the column folds; olive and brown rail tones read muddy; the Inbox badge is an ink blob over its
 glyph; plus Inbox card order, transcript rhythm, Usage colour consistency, AI accounts tabs, Review action weight,
-Backlog tag stability and Plugins row heights. Lanes A kit, B navigation/Settings, C transcript/Inbox/phone, D pages.
+Backlog tag stability and Plugins row heights. Lanes A kit, B navigation/Settings, C transcript/Inbox/phone, D pages,
+started a couple of minutes apart. All done: A 9 revisions `xkxvuovz` … `kuoxkpou` (AttentionBadge, `text-heading`, re-picked
+rail tones with a chroma floor or the sRGB gamut edge, softer light primary, dark dialog fill clear of the scrim, DESIGN.md,
+`text-query`, `cn` that keeps kit type and weight steps); C 7 revisions `kpnppyyt` … `lmpxzvzk` (phone transcript ends
+in a fade, jump control in the dock head, a finished turn 24 px above the dock and edits named once, Inbox cards with the
+title once and a one-row failure, ProjectMark in the new-thread heading, no trailing status divider, the Inbox badge
+beside its glyph); D 8 revisions `ptskvymy` … `pnssqzsk` (one Usage filter row and one series colour per model across
+views, AI accounts underline tabs and a labelled switch, Review action weights and a 13/18 file name, fixed tag tones
+and one shared time per day in Backlog, even two-line Plugins rows); B 11 revisions `nrprqszo` … `zxmzotzz` (one
+Settings navigation in the side column, one rail surface, 680 px Settings fields, separate phone Back and centred
+title, denser phone list, 10.5 px rail labels, a 48 px palette search lane). Follow-ups: shell tone chroma 0.09; native
+Bash rows without a kind glyph; "Worked for" not folded into the summary line; the phone Ready row still cut at 390×844;
+the first-run wizard can open after the seed's dismissal window.
 
 ## Round four
 
