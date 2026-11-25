@@ -114,8 +114,10 @@
 /* A narrow bar keeps the location on one line, truncating it before ⋯ (shown only when there are readings), and moves
    the readings behind ⋯. A phone wrapped "project / Own workspace · ahead of <bookmark> / ⋯" onto three lines. */
 @container (max-width: 560px) {
+  /* Round five C1 (council round 5): one 24px line, its 22px items 2px under the card. */
   .dock:not([data-meter-expanded]) {
     flex-wrap: nowrap;
+    padding-top: 2px;
   }
 
   .dock:not([data-meter-expanded]) > :global([data-run-summary]),
