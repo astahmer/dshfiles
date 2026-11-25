@@ -3455,17 +3455,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Add or fix credentials\"",
+          "text": "expect button \"Connect an account\"",
           "action": "expect",
           "by": "button",
-          "name": "Add or fix credentials",
+          "name": "Connect an account",
           "value": null
         },
         {
-          "text": "click button \"Add or fix credentials\"",
+          "text": "click button \"Connect an account\"",
           "action": "click",
           "by": "button",
-          "name": "Add or fix credentials",
+          "name": "Connect an account",
           "value": null
         },
         {
