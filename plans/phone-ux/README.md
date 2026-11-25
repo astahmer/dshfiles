@@ -47,6 +47,22 @@ Verification limit: a full `dshx dev up` build of every owned plugin ran the liv
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
 build only the touched plugin and prefer focused tests, or run the scratch instance with its own plugin subset.
 
+### Verified on a scratch DSH (2026-11-25, this workspace)
+
+Built only the seven touched plugins (`--concurrency=2`), booted `dshx dev up --name phone --skip-build`, drove it with
+Playwright at 390×844 (Android UA, touch):
+
+1. **P6 sheet** — the picker is a viewport sheet: x0, y721, h123, bottom gap 0, width 390, 16px top radius, opaque
+   surface (`oklch(0.945 0.0035 65)`), grabber visible; Escape closes it. Before: a 343×95 transparent dropdown at
+   y581 inside the composer card. Evidence: `phone-fix-audit/b04-picker-plus.png` (before) and
+   `phone-fix-audit/a02-scratch-picker.png` (after).
+2. **P29** — the Inbox page shows the top-bar title, then `Needs you` / `Waiting threads` with no page description and no
+   row descriptions. Evidence: `phone-fix-audit/b02-inbox-after-pick.png` (before) and
+   `phone-fix-audit/a04-scratch-inbox.png` (after).
+3. **P31b** — no `mainTabs.newTab` / `Conflicting shortcut defaults` warning in the scratch console.
+4. P4's back gesture, P28 keycaps and P32 focus were not exercised on the scratch phone (no thread with a menu there);
+   their proofs stay unit-level for now.
+
 ### Code sweep (2026-11-25): already present, no work left
 
 A pass over the owners after the restart shows most Tier 2/3 items already shipped by other lanes. Present in code,
