@@ -81,3 +81,38 @@ describe('the new-thread hero (round five C4, council round 3)', () => {
     expect(nav).toMatch(/border-color: transparent;/)
   })
 })
+
+describe('the desktop live work dock (round six C2)', () => {
+  const DESK = `:global(html:not([data-shell-phone-nav])) .composerStack > ${DOCK} > :global([data-dshfiles-live-preview-dock])`
+  const rule = (selector: string): string => blocks().find(candidate => candidate.selector === selector)?.body ?? ''
+
+  it('draws running jobs and working subagents on one neutral surface with the composer card edges', () => {
+    const surface = rule(DESK)
+    expect(surface).toMatch(/background: var\(--dshx-tone-panel, var\(--dsw-alias-bg-layer-1\)\);/)
+    expect(surface).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+    expect(surface).toMatch(/width: calc\(100% - var\(--dsh-composer-side-clearance, 0px\) \* 2\);/)
+    expect(surface).toMatch(/max-width: var\(--dsh-composer-card-max-width\);/)
+  })
+
+  it('joins a jobs dock and a subagents dock that follow each other under one 1px divider', () => {
+    expect(rule(`${DESK}:has(+ :global([data-dshfiles-live-preview-dock]))`)).toMatch(/border-bottom-width: 0;/)
+    const second = rule(`${DESK} + :global([data-dshfiles-live-preview-dock])`)
+    expect(second).toMatch(/margin-top: calc\(-1 \* var\(--dsh-composer-stack-gap\)\);/)
+    expect(second).toMatch(/border-top-left-radius: 0;/)
+    expect(rule(`${DESK} > * + *`)).toMatch(/border-top: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+  })
+
+  it('drops each row\'s own card frame and keeps a collapsed row 32px', () => {
+    const rows = rule(`${DESK} > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold]))`)
+    expect(rows).toMatch(/border: 0;/)
+    expect(rows).toMatch(/margin-block: 0;/)
+    expect(rows).toMatch(/border-radius: 0;/)
+    const jobLine = blocks().find(candidate => candidate.selector === `${DESK} :global([data-slot='composer-row']) > :global(div:first-child)`)
+    expect(jobLine?.context).toBe('@media (pointer: fine)')
+    expect(jobLine?.body).toMatch(/height: 32px;/)
+  })
+
+  it('ends 8px above the composer', () => {
+    expect(rule(`${DESK}:last-child`)).toMatch(/margin-bottom: calc\(8px - var\(--dsh-composer-stack-gap\)\);/)
+  })
+})

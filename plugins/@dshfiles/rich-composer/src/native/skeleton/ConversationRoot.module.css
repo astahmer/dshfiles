@@ -693,6 +693,68 @@ button.crumbEditable {
   --dsh-composer-dock-inset: 0px;
 }
 
+/* Round six C2: on a wide screen the live work above the composer (background-jobs' running jobs, thread-sidebar's
+   working subagents) reads as one dock: one neutral surface with the composer card's edges, 32px collapsed rows split
+   by a 1px divider, 8px above the composer. The rows stay their owners'; the stack takes away their card frames. The
+   phone shell keeps its chips and its Live work fold (below). */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
+  width: calc(100% - var(--dsh-composer-side-clearance, 0px) * 2);
+  max-width: var(--dsh-composer-card-max-width);
+  margin-inline: auto;
+  background: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
+  border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  border-radius: var(--dsw-radius-md, 8px);
+}
+
+/* A jobs dock and a subagents dock that follow each other are one surface: the second joins the first under a 1px
+   divider instead of standing a stack gap away. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):has(+ :global([data-dshfiles-live-preview-dock])) {
+  border-bottom-width: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) + :global([data-dshfiles-live-preview-dock]) {
+  margin-top: calc(-1 * var(--dsh-composer-stack-gap));
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) > * + * {
+  border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+}
+
+/* Each row (and a fold row) gives up its own card: no border, radius or margin; the fold row stays opaque while sticky. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold])) {
+  margin-block: 0;
+  border: 0;
+  border-radius: 0;
+  background: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
+}
+
+/* A job row is the kit's dock row: it fills the surface instead of drawing a card inside it. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row'][data-variant='card']) {
+  width: 100%;
+  max-width: none;
+  margin-inline: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+/* 32px collapsed rows, the subagent row's height; a touch screen keeps the owners' 44pt targets. */
+@media (pointer: fine) {
+  :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) {
+    height: 32px;
+    min-height: 32px;
+  }
+}
+
+/* The dock ends 8px above the composer card. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):last-child {
+  margin-bottom: calc(8px - var(--dsh-composer-stack-gap));
+}
+
 /* An entry fades in where it lands; the seat is pinned to the floor, so the input never moves. */
 .composerStack > :global([data-slot='conversation.input.dock']) > * {
   transition:
