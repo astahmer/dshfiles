@@ -32,6 +32,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 3 (round-2 shots) | 7.5 | 8 | 8.5 | colour now reads; consistency (chrome, widths, controls) and phone space remain |
 | 4 (round-3 shots) | 8 | 8 | 8.5 | one system now; phone transcript clip, two Settings layouts, rail surface, muddy tones remain |
 | 5 (round-4 shots) | 8 | 8.5 | 8.5 | no redesign needed; page frames, control heights, phone density, colour in persistent chrome |
+| 6 (round-5 shots) | 8 | 8.5 | 8.5 | colour and type at the bar; craft and alignment (phone Inbox head, Settings header edge, indigo selection) |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -136,6 +137,12 @@ destination glyph on the active page tab, Settings glyphs and surface roles, pho
 previews, list fade); C 12 revisions `ktsynvnn` … `zlqqrlkl` (60 px folded rail, model name and Can edit on the phone bar,
 an arrow jump control, unwrapped code with an edge fade, 24 px turn rhythm, Inbox verbs in the card head, centred New
 thread, full-width header rule, locale clock times). settings-shell needs a restart when this lands.
+
+Round 6 findings, merged in `.cache/unslop-audit/r5/council/round-6-fixes.md`: indigo only for attention (ink selection
+marker); a field boundary at 3:1; a 960 px lane on wide panes; dark layering; a faint cool prompt bubble; the phone Inbox
+card's title on its own row with the verb below; the Settings header on the field column, per-group tones and distinct
+glyphs; the status gauge leading on every phone root tab; one live-work dock; Usage in one card rhythm; Review's file
+header; Backlog's open glyph and time runs; the Plugins title weight.
 
 ## Round four
 
