@@ -245,12 +245,13 @@ export class TurnActivity {
   }
 
   /**
-   * Whether each footer part draws "·" before it: never the first part, and never a part right after one that ends in
-   * a chevron, which already separates the two ("ran 1 command › 5s", not "ran 1 command › · 5s").
+   * Whether each footer part draws "·" before it: every part but the first (round six C6). A chevron belongs to the
+   * part it opens and never stands in for the separator, so "ran 2 commands › · read 1 file" reads by the same rule as
+   * "+3 −3 · ran 2 commands": skipping it after a chevron made that one pair run together.
    * @param endsWithChevron - for each part in reading order, whether it ends in a disclosure chevron.
    */
   static separators(endsWithChevron: readonly boolean[]): readonly boolean[] {
-    return endsWithChevron.map((_chevron, index) => index > 0 && endsWithChevron[index - 1] !== true)
+    return endsWithChevron.map((_chevron, index) => index > 0)
   }
 
   /** "1m 12s" for a finished turn's wall time: the kit's grammar (DESIGN.md › Durations). */

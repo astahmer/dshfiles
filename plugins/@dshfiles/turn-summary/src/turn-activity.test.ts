@@ -173,11 +173,13 @@ describe('TurnActivity.summarize', () => {
       expect(TurnActivity.segments(passing, options).some(part => part.failed === true)).toBe(false)
     })
 
-    it('draws no separator first, nor right after a chevron', () => {
-      // "ran 1 command ›" "1 of 8 tests failed ›" "6s" "Walkthrough ›": the chevrons already separate.
-      expect(TurnActivity.separators([true, true, false, true])).toEqual([false, false, false, true])
+    it('separates every part after the first with one "·", whether or not the part before ends in a chevron', () => {
+      // Round six C6: "ran 2 commands ›" ran into "read 1 file" with no separator while every other pair had one, so the
+      // strip read as two rules. A chevron belongs to its own part (it opens that part's list); "·" separates parts.
+      expect(TurnActivity.separators([true, false])).toEqual([false, true])
+      expect(TurnActivity.separators([true, true, false, true])).toEqual([false, true, true, true])
       // chips, "ran 1 command ›", "5s"
-      expect(TurnActivity.separators([false, true, false])).toEqual([false, true, false])
+      expect(TurnActivity.separators([false, true, false])).toEqual([false, true, true])
       expect(TurnActivity.separators([false])).toEqual([false])
     })
   })

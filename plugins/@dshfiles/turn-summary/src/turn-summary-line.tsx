@@ -87,8 +87,8 @@ export const CommandList = (props: {
 
 /**
  * One part of the footer. Its separator sits in its left padding, which the row clips at the start of each line, so a
- * wrapped line never begins with "·" and a lone part has none. A part right after a chevron draws none either
- * (`TurnActivity.separators`): the chevron already separates the two.
+ * wrapped line never begins with "·" and a lone part has none. Every other part draws one, after a chevron too
+ * (`TurnActivity.separators`, round six C6).
  */
 const Part = (props: { readonly separator: boolean; readonly children: ReactNode }): JSX.Element => (
   <span
@@ -110,7 +110,7 @@ interface LinePart {
 }
 
 /**
- * The footer under a finished Turn: "Edited 3 files +42 −7 › ran 6 commands › 2 of 42 tests failed › 1m 12s". The file
+ * The footer under a finished Turn: "Edited 3 files +42 −7 › · ran 6 commands › · 2 of 42 tests failed › · 1m 12s". The file
  * and command counts open their lists (each file opens in the editor), and the one red part opens the failed commands.
  */
 export const TurnSummaryLine = (props: {
