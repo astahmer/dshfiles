@@ -147,6 +147,9 @@
   --text-heading: 15px;
   --text-heading--line-height: 20px;
   --text-heading--font-weight: 600;
+  /* The palette query (council round 4 B7): 16/22 at the body weight, the one field that reads larger than the UI. */
+  --text-query: 16px;
+  --text-query--line-height: 22px;
   --text-display: 1.625rem;
   --text-display--line-height: 1.2308;
   --text-display--letter-spacing: -0.02em;

@@ -42,6 +42,12 @@ describe('page header (council round 3 A5)', () => {
     expect(styles).toContain('--text-heading--font-weight: 600;')
   })
 
+  it('offers a 16/22 query step for a palette search field, at the body weight (council round 4 B7)', () => {
+    expect(resolved('--text-query')).toBe(16)
+    expect(resolved('--text-query--line-height')).toBe(22)
+    expect(styles).not.toContain('--text-query--font-weight')
+  })
+
   it('shows a plain count in tertiary ink', () => {
     const view = render(<Page heading="Hosts" count={3} />)
     expect(classes(view.container.querySelector('[data-slot="page-count"]'))).toContain('dshx:text-faint-foreground')
