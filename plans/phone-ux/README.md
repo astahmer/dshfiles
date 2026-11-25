@@ -103,6 +103,10 @@ Second scratch pass (same day, after a phone-sized failed prompt created a real 
    hardware screen-lock behavior is still the owner's phone check.
 3. The menu also still shows `Open in side panel` / `Open plugin in side panel`; on a phone that opens the workbench
    sheet, so it is not counted as a leak here.
+4. **P11 (partial, already present)** — a failed turn renders inline in the thread with `Failed`, the provider message, the
+   error code, a Retry button, `Ask to fix`, and `Add or fix credentials`; the composer stays usable below. Evidence:
+   `phone-fix-audit/b13-failed-thread.png`. Not present: automatic resend of a client-side submission failure after
+   reconnect (a policy choice), so P11's remaining scope is that decision rather than missing UI.
 
 ### Code sweep (2026-11-25): already present, no work left
 
@@ -116,6 +120,8 @@ not re-checked on a phone:
 3. **P14** — `inbox-panel.tsx` has `InboxSwipe` (left Done, right Snooze), Done/snooze views and presets.
 4. **P9 (partial)** — `chat/ApprovalCommand.tsx` renders approvals inline, and `agent-questions` has the parent
    question path (`parent-questions.test.ts`); subagent requests reaching the parent needs a live check.
+   **P11 (partial)** — a failed turn shows `Failed`, its provider message and code, Retry, Ask to fix and Add or fix
+   credentials inline (scratch-verified); only automatic resend of a client submission failure is left, as a policy choice.
 5. **P30** — the phone thread menu is a labeled bottom sheet with submenus at one level; its only leak was keycaps,
    which P28 hides.
 6. **P26** — the phone shell sets `viewport-fit=cover` and pads the drawer, top bar, sheet and tab bar with the
