@@ -326,10 +326,14 @@ work on any surface.
    theme reading the `--shiki-token-*` values the theme block generates (keyword violet, function blue, string teal,
    constant copper, parameter magenta, every hue 25° or more from the status hues), each fitted per scheme to hold
    4.6:1 on the page, the code block, raised and every diff band. The diff body sits on the ramp (the page in light,
-   the panel step in dark, never a near-black); added and removed lines are a 12% tint of success and danger over it
-   (a changed word 20%), written as `color-mix()` over the theme tones so every preset follows; the gutter shows `+`
-   and `−`, so a change reads without its colour; the collapsed-lines bar is a 3% ink wash. Comments are the faint
-   step, darkened only as far as the deletion band needs.
+   the panel step in dark, never a near-black); in light, added and removed lines are a 12% tint of success and danger
+   over it (a changed word 20%), written as `color-mix()` over the theme tones so every preset follows; in dark, where
+   that tint barely moved off the panel, each band is its own step in the tone's hue, L 0.27 at chroma 0.045 (a
+   changed word L 0.32 at 0.065). The gutter shows `+` and `−`, so a change reads without its colour. The
+   collapsed-lines bar is a 3% ink wash that reaches both card edges: where it expands, a 14px chevron in the
+   line-number gutter and "Show N unchanged lines" where the code starts; where it cannot (a patch without the file),
+   "N unchanged lines" at the same inset and no chevron. Comments are the faint step, darkened only as far as the
+   deletion band needs.
 10. **Colour through meaning.** Colour enters a grey page through what it means, not as decoration: a provider's
     brand mark wherever a model or provider is named, a `ProjectMark` wherever a project is named, each theme's real
     swatch in the appearance cards, identity tones on the core Plugins icon tiles, a `StatusCount` on the Inbox title.
@@ -471,7 +475,11 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   bleed (`width="full"`, the default for a `fill` master–detail page); `width="page"` (1080px) is the legacy default
   that new pages do not choose. The header actions sit on the frame's trailing edge, never the window's. A page that
   owns its layout puts the standalone `PageHeader` inside the same frame (`PAGE_FRAME_CLASS.lane` / `.wide`). The `h1` is 22px/650 (`text-title font-title`); its count is tertiary ink, or one
-  `StatusCount` per status present (`statusCounts`). Spacing scale: page padding 24px, 20px between the header and
+  `StatusCount` per status present (`statusCounts`). **Page title mark.** A destination page (Inbox, Backlog,
+  Usage, Review, AI accounts, Settings…) carries one identity mark: the destination's rail glyph before the `h1`,
+  18px, 8px from the title and centred on its first line, in the destination's nav tone (`Page` or `PageHeader`
+  `mark` and `markTone`, a `NavToneId`; `text-nav-<id>`). A glyph only: never a tile, a tinted header or a coloured
+  title, and `aria-hidden` (the `h1` names the page). Spacing scale: page padding 24px, 20px between the header and
   the body, body sections stacked 16px apart; narrow panes and phones keep 12px. Rows stay 32px, so density stays
   compact.
 - Size by container, never by viewport: the page root is `@container`; children query `@max-pane-narrow` (< 28rem,
@@ -480,7 +488,9 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 - No horizontal page overflow at 390px. Filter rows scroll sideways (`overflow-x-auto`) instead of wrapping into a
   column of chips.
 - Transcript measure: one 680px column. Prose reads at about 66ch at the transcript size, and cards and code blocks
-  are at most 680px, aligned left with the prose. A succeeded tool row shows a 16px kind glyph (`ToolCard` `kind`:
+  are at most 680px, aligned left with the prose. **Short code on narrow panes.** Below 448px of pane, a code block of
+  12 lines or fewer soft-wraps at 12/18 mono with a continuation indent, so it reads without a sideways gesture; a
+  longer block keeps horizontal scroll with the right-edge fade; the Wrap toggle flips either way. A succeeded tool row shows a 16px kind glyph (`ToolCard` `kind`:
   edit, shell and subagent in identity tones; read and search neutral). A work row (a turn's "Worked for" header, a
   tool call, a summary line) is as wide as its content and no wider than that column; its duration or count follows the label after 8px, and its
   hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
@@ -598,7 +608,10 @@ Finished / All) is a `ToggleGroup`.
 fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#88827d`, dark
 `#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); the combobox
 trigger, checkbox and radio edges use it too. Dividers and card hairlines stay `border-border`, subtle. The select trigger is 32px with its chevron in secondary ink at full strength. A Host select the kit does not draw
-takes the `select-look` utility. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
+takes the `select-look` utility. **Field trigger.** A popover or menu trigger that shows a value rather than running
+an action (a date range, a purpose filter, a project picker) is `Button` `variant="field"`: the select trigger's look,
+its value in ink at 400 and its chevron in secondary ink, with no hover fill. A filter row never mixes the field edge
+with the quiet outline edge; an action beside it (Refresh) stays `outline`. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
 reader hears), never a number glued to a second control.
 
 **Attention badge.** A Needs-you count on a nav glyph or a tab is one `AttentionBadge`

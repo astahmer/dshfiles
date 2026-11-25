@@ -156,4 +156,25 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     // Retired by this pass: the selection marker no longer carries the accent.
     expect(design).not.toContain('a 2px accent bar inset on its leading edge')
   })
+
+  it('records the seventh council pass: ink on states, page title mark, field trigger, short-code wrap, diff bar and dark bands (council round 7 A5)', () => {
+    for (const text of [
+      '**Indigo is attention, focus and links; every on state is ink.**',
+      '`control-on-foreground`',
+      'a 2px ink ring edge and an ink check badge',
+      'over a 2px ink bar',
+      '**Page title mark.**',
+      '`markTone`',
+      '**Field trigger.**',
+      '`variant="field"`',
+      '**Short code on narrow panes.**',
+      '12 lines or fewer',
+      'Show N unchanged lines',
+      'L 0.27 at chroma 0.045',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: indigo on the active tab bar and on control on states.
+    expect(design).not.toContain('**Accent indigo means interaction.**')
+    expect(design).not.toContain('a 2px accent bar')
+  })
 })
