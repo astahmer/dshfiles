@@ -703,6 +703,46 @@ describe('ThreadPalette goes to threads', () => {
     await waitFor(() => expect(screen.getAllByRole('option')[0]?.textContent).toContain('Fake provider seeds'))
   })
 
+  it('draws one ⌘N keycap per recent, shown on the highlighted row and under the pointer only (round five B6)', async () => {
+    render(palette())
+    const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
+    const caps = row.querySelectorAll('[data-slot="kbd"]')
+    expect(caps).toHaveLength(1)
+    expect(caps[0]?.textContent).toBe('⌘1')
+    expect(caps[0]?.className).toContain('dshx:opacity-0')
+    expect(caps[0]?.className).toContain('dshx:group-data-[selected=true]/item:opacity-100')
+    expect(caps[0]?.className).toContain('dshx:group-hover/item:opacity-100')
+    expect(row.className).toContain('dshx:group/item')
+  })
+
+  it("says a same-day recent's time in whole units, and draws the palette in one frame (round five B6)", async () => {
+    const today = [{ id: 'session-today', title: 'Today work', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: Date.now() - 2 * 60_000 - 5_000 }]
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={today}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const row = await screen.findByRole('option', { name: /Today work/ })
+    expect(row.textContent).toContain('dshfiles · 2m')
+    expect(row.textContent).not.toContain(new Date().toLocaleDateString())
+    const search = screen.getByRole('combobox').closest('[data-slot="command-input-wrapper"]')?.parentElement
+    expect(search?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:outline-none!')
+    const dialog = document.querySelector('[data-slot="dialog-content"]')
+    expect(dialog?.className).toContain('dshx:shadow-s3')
+    expect(dialog?.className).toContain('dshx:dark:bg-(--dshx-tone-raised)')
+  })
+
   it("draws a thread's status with the list's glyph and word", async () => {
     // A thread that waits for an answer read "Working" here while the list said Needs you.
     render(palette({ threadStatusOf: thread => (thread.id === 'session-fake-2' ? { status: 'needs-you', label: 'Needs you' } : undefined) }))

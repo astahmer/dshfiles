@@ -19,6 +19,7 @@ import { PaletteRules, type PalettePrefix, type ThreadCandidate } from './palett
 import { PaletteApi } from './palette-api.js'
 import type { PaletteAction, PaletteActionContext, PaletteMode, PaletteProjectColor, PaletteThreadStatus } from './palette-contract.js'
 import { paletteActionMachine } from './palette-action-machine.js'
+import { recentTime } from './recent-time.js'
 
 export interface ThreadPaletteCopy {
   readonly title: string
@@ -594,16 +595,20 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           </KbdGroup>
         ) : null}
         {index < 0 ? null : (
-          <KbdGroup>
-            <Kbd>{props.mac ? '⌘' : 'Ctrl'}</Kbd>
-            <Kbd>{index + 1}</Kbd>
-          </KbdGroup>
+          // One keycap, on the highlighted row and under the pointer only (round five B6): a column of ⌘ 1…⌘ 8 on
+          // every row read as noise. It keeps its width while hidden, so nothing moves when it shows.
+          <Kbd
+            data-palette-number=""
+            className="dshx:opacity-0 dshx:transition-opacity dshx:duration-(--dshx-duration-hover) dshx:group-hover/item:opacity-100 dshx:group-data-[selected=true]/item:opacity-100"
+          >
+            {`${props.mac ? '⌘' : 'Ctrl+'}${String(index + 1)}`}
+          </Kbd>
         )}
       </span>
     )
   }
 
-  const itemClass = 'dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
+  const itemClass = 'dshx:group/item dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
   const viewCopy = {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
@@ -674,7 +679,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                     <span className="dshx:min-w-0 dshx:truncate">
                       {[
                         project,
-                        thread.updatedAt > 0 ? new Date(thread.updatedAt).toLocaleDateString() : null,
+                        thread.updatedAt > 0 ? recentTime(thread.updatedAt) : null,
                         listed !== undefined || thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle,
                       ]
                         .filter(value => value !== null)
@@ -705,6 +710,9 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       <DialogContent
         className={cn(
           'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl',
+          // One frame (round five B6): the raised surface with a hairline and the top elevation step; in dark it sits
+          // one tone above the page (tone 2) so it does not sink into the dimmed stage.
+          'dshx:border-(color:--dshx-tone-line) dshx:shadow-s3 dshx:dark:bg-(--dshx-tone-raised)',
           // A phone gets a full-screen search: the input at the top, results down to the software keyboard (the visual
           // viewport, published below), no centred card.
           'dshx:phone:top-[var(--palette-top,0px)] dshx:phone:left-0 dshx:phone:translate-x-0 dshx:phone:translate-y-0 dshx:phone:w-full dshx:phone:max-w-none! dshx:phone:h-[var(--palette-height,100dvh)] dshx:phone:max-h-none dshx:phone:flex dshx:phone:flex-col dshx:phone:rounded-none dshx:phone:border-0 dshx:phone:pt-[env(safe-area-inset-top,0px)] dshx:phone:shadow-none',
@@ -727,7 +735,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           loop
           className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1"
         >
-          <div className="dshx:relative">
+          {/* The dialog is the field's one frame: no second ring around the search row inside it (round five B6). */}
+          <div className="dshx:relative dshx:[&_[data-slot=command-input-wrapper]]:outline-none!">
             <CommandInput
               autoFocus
               aria-label={props.copy.searchLabel}
