@@ -1,6 +1,6 @@
 /**
  * The Inbox header's actions on a phone (round five C4): in the trailing corner of the shell's top bar, beside the
- * "Inbox" title, instead of a row of their own above the segmented control. The page renders inside a workbench pane
+ * "Inbox" title, with the frame's status button in the leading corner, instead of a row of their own above the segmented control. The page renders inside a workbench pane
  * whose `transform` and `contain` would pin a fixed bar to the pane, so one bar is registered in the frame's root overlay
  * (`shell.overlay`) and reads the open page's actions from this store; it portals to the document body, because the
  * overlay layer is its own stacking context under the top bar. `InboxView.PHONE_BAR` shows it only while the top bar
@@ -62,7 +62,9 @@ export const usePublishInboxPhoneActions = (value: InboxPhoneActions): void => {
 /** The bar itself, registered in `shell.overlay`. */
 export const InboxPhoneBar = (): JSX.Element | null => {
   const value = useSyncExternalStore(InboxPhoneActionsStore.subscribe, InboxPhoneActionsStore.read, () => undefined)
-  // Round five C2: the frame's status button (usage, working threads) leads the bar; no band above the tab bar.
+  // Round five C2: the frame's status button (usage, working threads); no band above the tab bar. Round five C4 (council
+  // round 5): it takes the bar's leading seat, left of the centred title, so the trailing corner (⋯, Start triage) never
+  // runs over "Inbox" at 390 px.
   const status = useContract(PhoneStatus)
   if (value === undefined || (value.primary === undefined && value.actions.length === 0 && status.status !== 'active')) return null
   const primary = value.primary
@@ -70,9 +72,12 @@ export const InboxPhoneBar = (): JSX.Element | null => {
   return (
     <Dialog open modal={false}>
       <DialogPortal>
-        <div data-inbox-phone-bar="" className={InboxView.PHONE_BAR}>
-          {/* With Start triage present the three controls run over the centred title at 390 px; Threads keeps status. */}
-          {primary === undefined && status.status === 'active' ? <status.value.Button /> : null}
+        {status.status === 'active' ? (
+          <div data-inbox-phone-bar="leading" className={InboxView.PHONE_BAR_LEADING}>
+            <status.value.Button />
+          </div>
+        ) : null}
+        <div data-inbox-phone-bar="trailing" className={InboxView.PHONE_BAR}>
           {value.actions.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

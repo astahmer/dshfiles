@@ -66,13 +66,13 @@ describe('Inbox card (round five C4)', () => {
   })
 
   it('labels the recommended answer in words, not only in its tint', () => {
-    const choices = row.slice(row.indexOf('item.choices.map('), row.indexOf('PROVIDER_VERBS.filter'))
+    const choices = row.slice(row.indexOf('item.choices.map('), row.indexOf('const row = '))
     expect(choices).toContain('data-inbox-recommended')
     expect(choices).not.toMatch(/dshx:sr-only"> \(\{t\('recommended'\)\}\)/u)
   })
 
   it('offers a custom reply beside the answer rows', () => {
-    const choices = row.slice(row.indexOf('item.choices.map('), row.indexOf('PROVIDER_VERBS.filter'))
+    const choices = row.slice(row.indexOf('item.choices.map('), row.indexOf('const row = '))
     expect(choices).toContain("t('writeOwn')")
     expect(choices).toContain('data-inbox-write-own')
     // On a phone it shares its line with the card's menu instead of taking a full-width row and leaving the menu alone.
@@ -113,13 +113,14 @@ describe('Inbox on a phone (round five P2)', () => {
 
   it('keeps the phone head band to one line: the type label leaves narrow panes', () => {
     expect(row).toContain('<span className="dshx:@max-pane-narrow:hidden">{InboxView.sourceLabel(item.source)}</span>')
+    expect(row).toMatch(/data-inbox-project="" className="[^"]*dshx:@max-pane-narrow:hidden/u)
   })
 
   it('draws answer options as full-width 44 px rows with an 8 px radius, not 48 px pills', () => {
     expect(INBOX_CHIP).toContain('dshx:pointer-coarse:h-11')
     expect(INBOX_CHIP).toContain('dshx:pointer-coarse:rounded-lg')
     expect(INBOX_CHIP).not.toContain('rounded-full')
-    const choices = row.slice(row.indexOf('item.choices.map('), row.indexOf('PROVIDER_VERBS.filter'))
+    const choices = row.slice(row.indexOf('item.choices.map('), row.indexOf('const row = '))
     expect(choices).toContain('dshx:pointer-coarse:w-full')
     expect(choices).toContain('dshx:pointer-coarse:justify-start')
   })

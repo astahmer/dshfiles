@@ -81,13 +81,22 @@ const CARD = 'dshx:relative dshx:overflow-hidden dshx:rounded-lg dshx:border dsh
 const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-4'
 
 /**
- * The card's menu sits in its head band's trailing corner, not on the row of verbs: centred in the 36px band on a wide
- * pane (council round 4, C3), a 44pt target flush with the 44pt band on a phone.
+ * The verb a card asks for sits in its head row, trailing, before the menu (round five C4, council round 5): 28px on a
+ * wide pane, pulled 4px into the row's padding so the 36px band keeps its height; a 44pt target on a touch screen.
  */
-const BAND_MENU = 'dshx:absolute dshx:top-1 dshx:right-1 dshx:@max-pane-narrow:top-0'
+const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
 
-/** The head band keeps the menu's corner free at every width, and is 44pt tall on a phone. */
-const CARD_HEAD = 'dshx:[&>div:first-child]:pr-12 dshx:@max-pane-narrow:[&>div:first-child]:py-3'
+/**
+ * The head row's trailing seat (the verbs and the menu) is an ordinary part of the row at every width. On a phone it
+ * stays beside the title instead of wrapping under it (the kit drops it to a line of its own on a narrow pane), and the
+ * band is the 44pt seat's height with the title centred on it.
+ */
+const CARD_HEAD =
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-center dshx:@max-pane-narrow:[&>div:first-child]:py-0 dshx:@max-pane-narrow:[&>div:first-child]:min-h-11 dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto'
+
+/** Sources whose type says nothing a card does not (a finished turn): the card names the thread's project instead. */
+const PROJECT_SOURCES: ReadonlySet<string> = new Set(['thread-sidebar.finished-turn'])
+const namesProject = (source: string): boolean => PROJECT_SOURCES.has(source)
 
 /** A card's title at the kit's contextual heading step, 15/20 at 600 (council round 4, A4/C3). */
 const TITLE = 'dshx:text-heading'
@@ -148,6 +157,13 @@ const titleCounts = (
  */
 const PHONE_BAR =
   'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:right-[max(12px,env(safe-area-inset-right,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:gap-1 dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
+
+/**
+ * The bar's leading seat (round five C4, council round 5): the frame's status button sits left of the centred "Inbox"
+ * title, so the trailing corner holds only the menu and Start triage and never runs over the title at 390 px.
+ */
+const PHONE_BAR_LEADING =
+  'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:left-[max(12px,env(safe-area-inset-left,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
 
 /**
  * The reason a card prints under its head band, or null when it only repeats the title the band already shows (a failed
@@ -287,14 +303,16 @@ export class InboxView {
   static readonly headerBand = headerBand
   static readonly CARD = CARD
   static readonly BODY_INSET = BODY_INSET
-  static readonly BAND_MENU = BAND_MENU
+  static readonly HEAD_VERB = HEAD_VERB
   static readonly CARD_HEAD = CARD_HEAD
+  static readonly namesProject = namesProject
   static readonly TITLE = TITLE
   static readonly COMMAND = COMMAND
   static readonly cardText = cardText
   static readonly compact = compact
   static readonly titleCounts = titleCounts
   static readonly PHONE_BAR = PHONE_BAR
+  static readonly PHONE_BAR_LEADING = PHONE_BAR_LEADING
   static readonly bodyReason = bodyReason
   static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge

@@ -13,11 +13,9 @@ const approval = {
 
 describe('an Inbox card (round five C3, council round 4)', () => {
   it('keeps the card menu in the head band on every width, not on the row of verbs', () => {
-    expect(InboxView.BAND_MENU).not.toContain('@max-pane-narrow:absolute')
-    expect(InboxView.BAND_MENU).toContain('dshx:absolute')
-    // The band keeps the menu's corner free at every width, and is 44pt tall on a phone.
-    expect(InboxView.CARD_HEAD).toContain('dshx:[&>div:first-child]:pr-12')
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
+    // Round five C4 (council round 5): the menu ends the head row's trailing seat, beside the verbs, at every width.
+    expect(row).toMatch(/trailing=\{props\.actionRow === false && !compact \? undefined : headVerbs\}/u)
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:min-h-11')
     expect(row).toContain('InboxView.CARD_HEAD')
   })
 
@@ -52,8 +50,9 @@ describe('an Inbox card (round five C3, council round 4)', () => {
     expect(InboxView.compact('failed', { reason: null, detail: null })).toBe(true)
     expect(InboxView.compact('failed', { reason: 'Turn failed: HTTP 529', detail: null })).toBe(false)
     expect(InboxView.compact('needs-you', { reason: null, detail: null })).toBe(false)
-    // The recovery verbs ride the band's trailing seat instead of a row of their own under an empty body.
-    expect(row).toMatch(/trailing=\{compact \? actions\(true\) : undefined\}/u)
-    expect(row).toMatch(/\{compact \|\| props\.actionRow === false \? null : actions\(false\)\}/u)
+    // The recovery verbs ride the band's trailing seat instead of a row of their own under an empty body (every card's
+    // verbs do since round five C4, council round 5; triage keeps a compact card's).
+    expect(row).toMatch(/trailing=\{props\.actionRow === false && !compact \? undefined : headVerbs\}/u)
+    expect(row).toMatch(/\{props\.actionRow === false \? null : answers\}/u)
   })
 })

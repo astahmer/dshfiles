@@ -27,16 +27,17 @@ describe('an Inbox card on a phone (round five C3, council round 3)', () => {
   it('insets the body 16px from the card edge, not under the 36px glyph indent', () => {
     expect(InboxView.BODY_INSET).toBe('dshx:pl-9 dshx:@max-pane-narrow:px-4')
     const body = row.slice(row.indexOf('data-inbox-card-body'), row.indexOf('data-inbox-card-body') + 400)
-    const actions = row.slice(row.indexOf('data-inbox-row-actions'), row.indexOf('data-inbox-row-actions') + 400)
+    const answers = row.slice(row.indexOf('data-inbox-row-actions=""'), row.indexOf('data-inbox-row-actions=""') + 400)
     expect(body).toContain('InboxView.BODY_INSET')
-    expect(actions).toContain('InboxView.BODY_INSET')
+    expect(answers).toContain('InboxView.BODY_INSET')
   })
 
   it('puts the card menu in the head band', () => {
-    expect(InboxView.BAND_MENU).toBe('dshx:absolute dshx:top-1 dshx:right-1 dshx:@max-pane-narrow:top-0')
-    expect(row).toMatch(/aria-label=\{t\('more'\)\}[^>]*\n?[^>]*InboxView\.BAND_MENU|InboxView\.BAND_MENU[^>]*aria-label=\{t\('more'\)\}/u)
-    // The head is 44pt tall with room for it, so a long title never runs under the menu.
-    expect(InboxView.CARD_HEAD).toBe('dshx:[&>div:first-child]:pr-12 dshx:@max-pane-narrow:[&>div:first-child]:py-3')
+    // Round five C4 (council round 5): the menu ends the head row's trailing seat instead of being pinned over it.
+    const verbs = row.slice(row.indexOf('const headVerbs = '), row.indexOf('const answers = '))
+    expect(verbs).toMatch(/aria-label=\{t\('more'\)\}/u)
+    // The head is 44pt tall on a phone.
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:min-h-11')
     expect(row).toContain('InboxView.CARD_HEAD')
   })
 
@@ -50,8 +51,8 @@ describe('an Inbox card on a phone (round five C3, council round 3)', () => {
     expect(phoneBar).toMatch(/const status = useContract\(PhoneStatus\)/u)
   })
 
-  it('leaves the centred title clear: the status button only shows when the bar has no primary (council round 5)', () => {
-    // Status, ⋯ and Start triage together ran over the centred "Inbox" title at 390 px; the Threads bar keeps status.
-    expect(phoneBar).toMatch(/primary === undefined && status\.status === 'active' \? <status\.value\.Button \/> : null/u)
+  it('leaves the centred title clear: the status button takes the leading seat (council round 5)', () => {
+    // Status, ⋯ and Start triage together ran over the centred "Inbox" title at 390 px.
+    expect(phoneBar).toMatch(/status\.status === 'active' \? \(\s*<div data-inbox-phone-bar="leading"/u)
   })
 })
