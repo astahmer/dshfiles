@@ -35,8 +35,7 @@ const en = {
   review: 'Review',
   reviewUnavailable: 'The Changes view is not available. Open the thread and review its changes from its side panel.',
   landConfirmTitle: 'Land this work?',
-  landConfirmHint:
-    'Adds this thread’s work to the project. Nothing is pushed.',
+  landConfirmHint: 'Adds this thread’s work to the project. Nothing is pushed.',
   cancel: 'Cancel',
   done: 'Done',
   jumpNextWaiting: 'Jump to next waiting',
@@ -121,6 +120,7 @@ const en = {
   quickReplies: 'Quick replies',
   quickReplySent: 'Sent “{text}” to the thread.',
   quickReplyFailed: 'The reply did not reach the thread. Open it and send the reply there.',
+  writeOwn: 'Write your own…',
 } as const
 
 const zh = {
@@ -239,6 +239,7 @@ const zh = {
   quickReplies: '快捷回复',
   quickReplySent: '已向线程发送“{text}”。',
   quickReplyFailed: '回复未能送达线程。请打开线程并在那里发送。',
+  writeOwn: '自己填写…',
 } as const
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

@@ -27,13 +27,13 @@ import {
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { PeekCard, RowPeek } from '@dshfiles/plugin-ui/components/peek'
-import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+import { StatusCount, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -60,10 +60,14 @@ import { INBOX_CHIP, TriageBar, TriageReply, TriageZero } from './triage-stage.j
 import { triageMachine, TriageModel, type TriageRequest } from './triage-machine.js'
 import type { PrimaryAction } from './inbox-keys.js'
 import type { InboxTranslate } from './inbox-locales.js'
+import { usePublishInboxPhoneActions } from './inbox-phone-bar.js'
 import { InboxSwipe, InboxView, type SnoozeChoice } from './inbox-view.js'
 import { ThreadReferences } from './thread-reference.js'
 
 const PROVIDER_VERBS: readonly AttentionProviderVerb[] = ['Approve', 'Land', 'Retry', 'Resume']
+
+/** The list is a stack of cards (each item draws its own surface, InboxView.CARD), not one bordered box of rows. */
+const INBOX_STACK = 'dshx:gap-2 dshx:divide-y-0 dshx:rounded-none dshx:border-0 dshx:bg-transparent'
 
 /** A prompt-library reply a stopped thread's card offers in its menu. */
 interface InboxQuickReply {
@@ -211,7 +215,10 @@ const InboxRow = (props: {
   const statusLabel = statusLabelOf(status, t)
   const title = InboxView.subjectTitleOf(item, props.sessionLabel)
   const text = InboxView.textOf(item)
+  const reason = InboxView.bodyReason(text.reason, title)
   const clamped = InboxView.clampsText(item, props.view)
+  // A question the card answers reads at body size in ink; any other text is a muted note under the head band.
+  const answerable = open && item.verbs.includes('Answer') && item.choices.length > 0
   const doneable = open && item.verbs.includes('Done')
   const snoozable = open && props.view !== 'snoozed' && item.verbs.includes('Snooze')
   const mutable = open && item.verbs.includes('MuteSource')
@@ -236,8 +243,9 @@ const InboxRow = (props: {
       selected={props.selected === true}
       data-cursor={props.cursor === true ? '' : undefined}
       className={cn(
-        'dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
-        phone && 'dshx:relative dshx:bg-card dshx:py-1',
+        // The card draws the surface (InboxView.CARD); the row fills it edge to edge, so the head band is flush with its top.
+        'dshx:rounded-none dshx:bg-card dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
+        phone && 'dshx:relative',
         phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
         InboxView.headerBand(status),
       )}
@@ -248,7 +256,8 @@ const InboxRow = (props: {
       heading={title}
       meta={
         <>
-          <span>{InboxView.sourceLabel(item.source)}</span>
+          {/* On a phone the band keeps one line (title and age): the body already says what is asked ("Asks:", "Approve:"). */}
+          <span className="dshx:@max-pane-narrow:hidden">{InboxView.sourceLabel(item.source)}</span>
           {referencedThreadId === null ? null : (
             <button
               type="button"
@@ -269,31 +278,71 @@ const InboxRow = (props: {
           ) : null}
         </>
       }
-      description={
-        <>
-          <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{text.reason}</span>
-          {text.detail === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{text.detail}</span>}
-        </>
-      }
     >
+      {reason === null && text.detail === null ? null : (
+        <div
+          data-inbox-card-body=""
+          className={cn(
+            'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:pt-2 dshx:pl-9',
+            answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
+            props.actionRow === false && 'dshx:pb-3',
+          )}
+        >
+          {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
+          {text.detail === null ? null : (
+            <span
+              className={cn(
+                clamped && 'dshx:line-clamp-2',
+                'dshx:break-words',
+                answerable && 'dshx:text-xs dshx:text-muted-foreground',
+                InboxView.TEXT_MEASURE,
+              )}
+            >
+              {text.detail}
+            </span>
+          )}
+        </div>
+      )}
       {props.actionRow === false ? null : (
-        <div data-inbox-row-actions="" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pb-2 dshx:pl-9">
-          {open && item.verbs.includes('Answer') && item.choices.length > 0
-            ? item.choices.map((choice, index) => (
-                <Button
-                  key={choice.id}
-                  size="sm"
-                  variant={choice.recommended === true ? 'attention' : 'outline'}
-                  // On a phone each option is a full-width 44 px row: an answer reads in full and is easy to hit.
-                  className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP, 'dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start')}
-                  disabled={props.busy}
-                  onClick={() => props.onAct(item, 'Answer', choice.id)}
-                >
-                  {props.showChoiceKeys === true && index < 9 ? <KeyHint keys={String(index + 1)} className="dshx:opacity-70" /> : null}
-                  <span className="dshx:truncate">{choice.label}</span>
-                  {choice.recommended === true ? <span className="dshx:sr-only"> ({t('recommended')})</span> : null}
-                </Button>
-              ))
+        <div data-inbox-row-actions="" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2.5 dshx:pb-3 dshx:pl-9">
+          {answerable
+            ? [
+                ...item.choices.map((choice, index) => (
+                  <Button
+                    key={choice.id}
+                    size="sm"
+                    variant={choice.recommended === true ? 'attention' : 'outline'}
+                    // On a phone each option is a full-width 44 px row: an answer reads in full and is easy to hit.
+                    className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP, 'dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start')}
+                    disabled={props.busy}
+                    onClick={() => props.onAct(item, 'Answer', choice.id)}
+                  >
+                    {props.showChoiceKeys === true && index < 9 ? <KeyHint keys={String(index + 1)} className="dshx:opacity-70" /> : null}
+                    <span className="dshx:truncate">{choice.label}</span>
+                    {/* The recommendation reads in words, not only in the tint (round five C4). */}
+                    {choice.recommended === true ? (
+                      <span data-inbox-recommended="" className="dshx:shrink-0 dshx:text-xs dshx:font-normal dshx:pointer-coarse:ml-auto">
+                        {t('recommended')}
+                      </span>
+                    ) : null}
+                  </Button>
+                )),
+                // A custom reply sits beside the answers: it opens the thread, where the composer takes free text.
+                openable ? (
+                  <Button
+                    key="write-own"
+                    size="sm"
+                    variant="ghost"
+                    data-inbox-write-own=""
+                    // Not a full-width row on a phone: it shares its line with the card's menu.
+                    className={cn('dshx:shrink dshx:max-w-full dshx:text-muted-foreground', INBOX_CHIP)}
+                    onClick={() => props.onOpen(item)}
+                  >
+                    <PencilLineIcon aria-hidden />
+                    <span className="dshx:truncate">{t('writeOwn')}</span>
+                  </Button>
+                ) : null,
+              ]
             : null}
           {open
             ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
@@ -327,7 +376,7 @@ const InboxRow = (props: {
               {t('review')}
             </Button>
           ) : null}
-          {openable ? (
+          {openable && !answerable ? (
             <Button
               size="sm"
               variant={open && !item.verbs.includes('Answer') ? InboxView.attentionVariant(status) : 'ghost'}
@@ -449,15 +498,14 @@ const InboxRow = (props: {
       ) : null}
     </EntityRow>
   )
-  if (!phone) return row
   return (
-    <div role="none" data-inbox-card="" className="dshx:relative dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-muted">
+    <div role="none" data-inbox-card="" className={InboxView.CARD}>
       {revealed === undefined ? null : (
         <div
           aria-hidden="true"
           data-inbox-swipe-reveal={revealed}
           className={cn(
-            'dshx:absolute dshx:inset-0 dshx:flex dshx:items-center dshx:px-5 dshx:text-sm dshx:font-medium dshx:text-foreground',
+            'dshx:absolute dshx:inset-0 dshx:flex dshx:items-center dshx:bg-muted dshx:px-5 dshx:text-sm dshx:font-medium dshx:text-foreground',
             revealed === 'done' ? 'dshx:justify-end' : 'dshx:justify-start',
           )}
         >
@@ -1175,6 +1223,15 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   ]
   const visibleTabs = tabs.filter(tab => tab.view === 'needs-you' || tab.view === 'other' || tab.count > 0 || tab.view === view)
   const peekAnchor = cursor === null ? null : (rowElements.current.get(cursor) ?? null)
+  const primaryAction = resumeAllAction ?? (triageOnTop ? triageAction : undefined)
+  const headerActions = InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available(), triageable }).map(action =>
+    action.id === 'triage' ? triageAction : { ...alertSettingsAction, placement: action.placement },
+  )
+  // On a phone these actions sit in the shell's top bar (inbox-phone-bar.tsx), not in a row of their own; triage
+  // draws its own bar, so the top bar holds none then.
+  usePublishInboxPhoneActions(
+    triaging ? { primary: undefined, actions: [], moreLabel: t('more') } : { primary: primaryAction, actions: headerActions, moreLabel: t('more') },
+  )
   if (triaging) {
     const progress = TriageModel.progress(triage.context)
     return (
@@ -1214,7 +1271,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
                 onSkip={() => sendTriage({ type: 'skip' })}
                 onExit={() => sendTriage({ type: 'exit' })}
               />
-              <EntityList aria-label={t('triage')}>
+              <EntityList aria-label={t('triage')} className={cn(INBOX_STACK, InboxView.LIST_WIDTH)}>
                 <InboxRow
                   key={triageItem.id}
                   item={triageItem}
@@ -1250,12 +1307,14 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     <Page
       scroll
       heading={t('title')}
-      // On a phone the top bar names the page; without the sentence, Start triage leads the first row.
+      // The Needs-you count beside the title, glyph and tint (kit StatusCount, A6); 0 draws nothing.
+      meta={<StatusCount status="needs-you" count={counts?.needsYou ?? 0} label={`${String(counts?.needsYou ?? 0)} ${t('needsYou')}`} />}
+      // On a phone the top bar names the page (its own h1) and holds its actions (InboxPhoneBar), so the page header
+      // goes and the segmented control leads the page.
       description={<span className="dshx:in-data-shell-phone-nav:hidden">{t('subtitle')}</span>}
-      {...(resumeAllAction !== null ? { primaryAction: resumeAllAction } : triageOnTop ? { primaryAction: triageAction } : {})}
-      actions={InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available(), triageable }).map(action =>
-        action.id === 'triage' ? triageAction : { ...alertSettingsAction, placement: action.placement },
-      )}
+      className="dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden"
+      {...(primaryAction === undefined ? {} : { primaryAction })}
+      actions={headerActions}
       overflowLabel={t('more')}
       tabs={{
         label: t('title'),
@@ -1315,10 +1374,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
               {t('updates', { count: updates })}
             </Button>
           ) : null}
-          <EntityList
-            aria-label={tabs.find(tab => tab.view === view)?.label ?? t('title')}
-            className="dshx:pointer-coarse:gap-2 dshx:pointer-coarse:divide-y-0 dshx:pointer-coarse:rounded-none dshx:pointer-coarse:border-0 dshx:pointer-coarse:bg-transparent"
-          >
+          <EntityList aria-label={tabs.find(tab => tab.view === view)?.label ?? t('title')} className={cn(INBOX_STACK, InboxView.LIST_WIDTH)}>
             {shownItems.map(item => (
               <InboxRow
                 key={item.id}

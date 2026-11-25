@@ -14,6 +14,7 @@ import { ActivityTimelinePanel } from './panel.js'
 import { InboxGlyph } from './inbox-glyph.js'
 import { INBOX_LOCALE_NAMESPACE, inboxLocale, type InboxTranslate } from './inbox-locales.js'
 import { InboxPanel, openThread } from './inbox-panel.js'
+import { InboxPhoneBar } from './inbox-phone-bar.js'
 import { ThreadQuestionDock } from './thread-question-dock.js'
 import { ACTIVITY_TIMELINE_LOCALE_NAMESPACE, activityTimelineLocale } from './locales.js'
 
@@ -69,6 +70,9 @@ export default defineClient({
         )),
       ),
     )
+    // On a phone the Inbox's header actions sit in the shell's top bar; the frame's root overlay escapes the workbench
+    // pane (its transform would pin a fixed bar inside the page).
+    ctx.slots.inject('shell.overlay', () => ctx.slots.register({ name: 'shell.overlay', id: 'dshfiles-inbox-phone-bar', order: 130 }, InboxPhoneBar))
     // A subagent's question is answerable in its parent thread, above the composer: where "Answer" on a thread row lands.
     ctx.slots.inject('conversation.input.dock', () =>
       ctx.slots.register(

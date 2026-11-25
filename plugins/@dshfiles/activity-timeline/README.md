@@ -32,6 +32,14 @@ A question a subagent asked its parent thread also shows in that thread, above i
 (`src/thread-question-dock.tsx`): **Answer** on a thread row opens the thread, and this is the answerable card it lands
 on. It reads the Needs you list the badge reads, so answering in either place clears both.
 
+Each item is one card (desktop and phone, the list capped at 880 px): a head band flush with its top holds the status
+glyph, the title, the type and the age, on the kit's attention wash for Needs you and Failed; the neutral body below
+holds the question or detail and the actions. The recommended answer says **Recommended** in words, **Write your
+own…** beside the answers opens the thread to reply in free text, and a failed turn's card names its thread once. The
+page title carries a Needs-you count chip (the kit's `StatusCount`). On a phone the type leaves the band (the body says
+"Asks:" or "Approve:"), and **Start triage** and the page menu sit in the top bar beside the "Inbox" title
+(`src/inbox-phone-bar.tsx`, drawn from the frame's root overlay) instead of a row of their own.
+
 An item that asks a question never offers the prompt library's quick replies, and a row prints a question as plain
 words: the first paragraph of its Markdown, at most two lines (`src/inbox-preview.ts`). **Start triage** shows one item
 at a time with a single action row (the bar): the item's answers or verb, Open, Done, Snooze, Skip and Exit. This

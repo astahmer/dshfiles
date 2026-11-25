@@ -63,15 +63,35 @@ const attentionVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'ou
   status === 'needs-you' ? 'attention' : status === 'failed' ? 'danger-tint' : 'outline'
 
 /**
- * A soft band in the status tint behind the head of a waiting card (glyph, title, age and its text), so Needs you and
- * Failed read at a glance; the verbs below stay on the card's own surface. Ink and muted text hold AA on it.
+ * The head band of a waiting card (round five C4): glyph, title, type and age on the kit's attention wash (A2), flush
+ * with the card's top, so Needs you and Failed read at a glance; the question and the verbs below stay on the card's
+ * neutral body. Ink and muted text hold AA on both washes (plugin-ui tests/attention-wash.test.ts).
  */
 const headerBand = (status: WorkStatus): string =>
-  status === 'needs-you'
-    ? 'dshx:overflow-hidden dshx:[&>div:first-child]:bg-status-needs-you/6'
-    : status === 'failed'
-      ? 'dshx:overflow-hidden dshx:[&>div:first-child]:bg-status-failed/6'
-      : ''
+  status === 'needs-you' ? 'dshx:[&>div:first-child]:bg-wash-needs-you' : status === 'failed' ? 'dshx:[&>div:first-child]:bg-wash-failed' : ''
+
+/** One card surface per item, desktop and phone: rounded and clipped, so the head band meets its top edge. */
+const CARD = 'dshx:relative dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card'
+
+/** The list stops at a readable width on a wide pane (about 880 px), left-aligned with the page header. */
+const LIST_WIDTH = 'dshx:max-w-[880px]'
+
+/**
+ * The Inbox's header actions on a phone: a bar in the trailing corner of thread-sidebar's top bar, shown only while that
+ * bar names the Inbox (`data-phone-stage` is the stage's panel id), so Start triage shares the title row instead of
+ * taking a row of its own. Hidden everywhere else, including every wider screen.
+ */
+const PHONE_BAR =
+  'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:right-[max(12px,env(safe-area-inset-right,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:gap-1 dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
+
+/**
+ * The reason a card prints under its head band, or null when it only repeats the title the band already shows (a failed
+ * turn reads “<title>” failed: the red cross and the band say failed).
+ */
+const bodyReason = (reason: string, title: string): string | null => {
+  const rest = reason.replace(/^[“"](.*)[”"]\s*/u, (quoted: string, inner: string) => (inner === title ? '' : quoted)).trim()
+  return rest !== reason.trim() && /^\p{L}+[.!]?$/u.test(rest) ? null : reason
+}
 
 /** A question the card can answer shows in full; any other text clamps to two lines. */
 const clampsText = (item: Pick<AttentionItem, 'verbs' | 'choices'>, view: AttentionView): boolean =>
@@ -200,6 +220,10 @@ export class InboxView {
   static readonly statusOf = statusOf
   static readonly attentionVariant = attentionVariant
   static readonly headerBand = headerBand
+  static readonly CARD = CARD
+  static readonly LIST_WIDTH = LIST_WIDTH
+  static readonly PHONE_BAR = PHONE_BAR
+  static readonly bodyReason = bodyReason
   static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge
   static readonly undoOf = undoOf
