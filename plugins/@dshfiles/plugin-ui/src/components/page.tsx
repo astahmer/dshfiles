@@ -372,7 +372,7 @@ const TabCount = ({ count }: { readonly count: number | undefined }): React.Reac
 
 /**
  * Page sections as underline tabs (council round 3 A5): ink labels on a hairline, the active one in ink with a 2px
- * accent bar on the hairline (the accent marks the current place, as the selection marker does).
+ * accent bar on the hairline (the accent marks the current place: interaction, not selection, whose marker is ink).
  */
 function UnderlineTabList({ tabs }: { readonly tabs: PageTabs }) {
   return (

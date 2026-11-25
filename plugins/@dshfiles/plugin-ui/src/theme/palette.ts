@@ -50,7 +50,7 @@ export interface Palette {
    * The selection fill (round five K2): the selected list row, the settings category, a pressed toggle, the palette's
    * highlighted row, a chosen card. Neutral since council round 3 (A1): a warm grey step with no accent hue, so indigo
    * fills mean attention only and the attention washes outrank it by colour. Text on it stays ink; a list row adds the
-   * `selected-marker` bar (which carries the accent) and a card the `selected-card` edge and check.
+   * `selected-marker` bar (ink since council round 6 A1) and a card the `selected-card` edge and check.
    */
   readonly selectedWash: Oklch
   /**

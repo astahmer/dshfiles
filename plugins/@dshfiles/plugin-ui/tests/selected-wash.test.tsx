@@ -87,9 +87,11 @@ describe('selected wash (round five K2, quieter in A1, neutral in council round 
     expect(toggle.join(' ')).not.toContain('data-[state=on]:bg-accent')
   })
 
-  it('marks a selection without colour: a 2px accent bar inset on the leading edge, and 550 text', () => {
+  it('marks a selection without colour: a 2px ink bar inset on the leading edge, and 550 text', () => {
     const marker = /@utility selected-marker\s*\{([^}]*)\}/u.exec(roles)?.[1] ?? ''
-    expect(marker).toContain('box-shadow: inset 2px 0 0 var(--dsw-alias-state-business-primary);')
+    // Indigo means attention only (council round 6 A1): the bar is the ink, never the accent.
+    expect(marker).toContain('box-shadow: inset 2px 0 0 var(--dsw-alias-label-primary);')
+    expect(marker).not.toContain('business')
     expect(roles).toContain('--font-weight-selected: 550;')
     // An unselected row draws neither.
     const view = render(<EntityRow heading="Fix invoice tax rounding" onSelect={() => undefined} />)
@@ -97,9 +99,13 @@ describe('selected wash (round five K2, quieter in A1, neutral in council round 
     expect(view.container.querySelector('[data-slot="entity-row-title"]')!.className).not.toContain('font-selected')
   })
 
-  it.each(schemes)('draws the marker at 3:1 on the selection wash (%s)', scheme => {
+  it.each(schemes)('draws the ink marker at 3:1 on the selection wash, in a colour that is not the accent (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    expect(PaletteMath.contrastRatio(p.accent.fg, p.selectedWash)).toBeGreaterThanOrEqual(3)
+    // `--dsw-alias-label-primary` is neutral step 10 (theme-css.ts).
+    const ink = p.neutral[10]!
+    expect(PaletteMath.contrastRatio(ink, p.selectedWash)).toBeGreaterThanOrEqual(3)
+    expect(ink).not.toEqual(p.accent.fg)
+    expect(ink.c).toBeLessThan(0.03)
   })
 })
 

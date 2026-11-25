@@ -121,7 +121,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 `--dsw-alias-brand-primary`: the ink in light, and in dark a softened warm grey (`--dshx-primary-fill`,
 `oklch(0.88 0.006 65)`) so it is not the brightest thing on the screen; its label is the page colour, AA at rest and on
 hover (`tests/primary-fill.test.ts`). Native primary buttons read the same alias. Blue (`info`, `--dsw-alias-state-business-primary`) is never a button fill: it is
-reserved for focus rings, selection and the Needs-you glyph. One primary per page; everything else is `outline`
+reserved for focus rings, the active tab bar, a control's on state and the Needs-you glyph. One primary per page; everything else is `outline`
 (header) or `ghost`/`outline` `sm` (rows).
 
 **Row attention verbs: the tint rung.** A row-level verb that answers what waits on you (Review, Answer, Rate…) is
@@ -133,9 +133,10 @@ text-danger-tint-foreground`. Neither is a page primary: that stays the one ink 
 
 **Selection: the selected wash and marker.** A selection is a neutral wash: `bg-selected-wash`
 (`--dshx-selected-wash`, a warm grey step with no accent hue: light `oklch(0.935 0.004 80)`, dark
-`oklch(0.275 0.006 60)`) with ink text (`text-foreground`), so indigo fills mean attention only. The accent rides on the
-cue: a selected list row adds `selected-marker`, a 2px accent bar inset on the leading edge (an inset shadow, so it
-follows a rounded row), and its title at `font-selected` (550). The kit applies wash and marker to the selected
+`oklch(0.275 0.006 60)`) with ink text (`text-foreground`), so indigo means attention only. A selected list row, nav
+item or palette row adds `selected-marker`, a 2px ink bar (`--dsw-alias-label-primary`) inset on the leading edge (an
+inset shadow, so it follows a rounded row), and its title at `font-selected` (550). The active underline tab keeps its
+2px accent bar: that is interaction, not selection. The kit applies wash and marker to the selected
 `EntityRow` and the highlighted `CommandItem`, and the wash alone to a pressed `Toggle`/`ToggleGroupItem`; use the same
 classes for a settings category or list row. A chosen card or tile (a theme card, a starter, a plan option) takes
 `dshx:selected-card` instead: the wash, a 2px ring edge (its 1px border in the ring colour plus a 1px inset ring, so the

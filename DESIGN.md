@@ -286,9 +286,9 @@ work on any surface.
    Their text is the status colour pulled 30% toward the ink so it holds AA on its own tint. A chip or band reuses
    the pair (`bg-attention-tint text-attention-foreground`). A selection (the selected row, the settings category, a pressed
    toggle, the palette's highlighted row, a chosen card) is `bg-selected-wash`, a neutral warm grey step with no accent
-   hue, with ink text. Indigo fills mean attention only: the accent rides on the selection's cue, never its fill. A
-   selected list row adds `selected-marker` (a 2px accent bar inset on its leading edge, which follows a rounded row)
-   and sets its title at `font-selected` (550); a chosen card or tile (a theme card, a starter) takes `selected-card`
+   hue, with ink text. Indigo fills mean attention only, and a selection's cue is ink too. A
+   selected list row, nav item, palette row or account row adds `selected-marker` (a 2px ink bar,
+   `--dsw-alias-label-primary`, inset on its leading edge, which follows a rounded row; 3:1 on the wash) and sets its title at `font-selected` (550); a chosen card or tile (a theme card, a starter) takes `selected-card`
    instead: the wash, a 2px ring edge and a check badge in its trailing top corner, with no leading marker. The current
    place shows strongly once: a leaf row takes the wash, marker and 550; its parent rail item only an ink label and its
    glyph in colour. Hover stays the ink wash.
