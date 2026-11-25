@@ -236,7 +236,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           <PopoverTrigger asChild>
             <Button
               aria-label={`${shortLabel?.title ?? triggerLabel}, reasoning ${effortLabel ?? 'provider default'}`}
-              className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-0 dshx:shrink dshx:justify-start dshx:gap-1 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:px-1.5 dshx:in-data-model-icon:px-1"
+              className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-20 dshx:in-data-model-icon:min-w-0 dshx:shrink dshx:justify-start dshx:gap-1 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:px-1.5 dshx:in-data-model-icon:px-1"
               data-model-trigger=""
               disabled={locked}
               size="sm"

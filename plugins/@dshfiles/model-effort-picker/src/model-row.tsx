@@ -99,7 +99,7 @@ export const ModelRow = (props: {
   return (
     <div
       className={cn(
-        'dshx:group/row dshx:flex dshx:h-7 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-1.5 dshx:transition-colors dshx:hover:bg-accent/60',
+        'dshx:group/row dshx:flex dshx:h-7 dshx:pointer-coarse:h-11 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-1.5 dshx:transition-colors dshx:hover:bg-accent/60',
         props.active && 'dshx:bg-info/10 dshx:ring-1 dshx:ring-info/60',
         props.fanOutSelected && 'dshx:bg-primary/10 dshx:ring-1 dshx:ring-primary/60',
       )}
@@ -111,7 +111,7 @@ export const ModelRow = (props: {
       <button
         aria-label={`Use ${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`}
         aria-pressed={props.active || props.fanOutSelected}
-        className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+        className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:self-stretch dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-left dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
         data-model-picker-option
         disabled={props.busy}
         onClick={event => {
@@ -180,7 +180,7 @@ export const ModelRow = (props: {
       </span>
       <button
         aria-label={`Details for ${name}`}
-        className="dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+        className="dshx-hit-44 dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
         data-model-details-trigger
         onClick={props.onInspect}
         type="button"
