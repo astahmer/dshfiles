@@ -199,7 +199,7 @@ describe('page title mark (council round 7 A2)', () => {
     expect(mark.contains(view.getByTestId('glyph'))).toBe(true)
     // The row's own 8px gap, a box one title line tall that centres the glyph on the first line, the tone as text.
     expect(classes(mark.parentElement)).toContain('dshx:gap-x-2')
-    expect(classes(mark)).toEqual(expect.arrayContaining(['dshx:text-nav-observe', 'dshx:h-(--text-title--line-height)', 'dshx:self-start', 'dshx:[&_svg]:size-[18px]']))
+    expect(classes(mark)).toEqual(expect.arrayContaining(['dshx:text-nav-observe', 'dshx:h-[28px]', 'dshx:self-start', 'dshx:[&_svg]:size-[18px]']))
     expect(mark.className).not.toMatch(/(?:^| )dshx:(?:bg|border|rounded)/u)
     // The h1 still names only the page.
     expect(heading.textContent).toBe('Usage')

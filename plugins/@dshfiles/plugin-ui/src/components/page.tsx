@@ -85,7 +85,9 @@ export interface PageTitleMarkProps {
 /**
  * The glyph before a page's h1 (council round 7 A2): the destination's own icon in its nav tone, 18px, 8px from the
  * title (the row's gap), centred on the title's first line so it sits on the title's baseline band when the title
- * wraps. A glyph only: no tile, no tinted header. Nav tones hold 3:1 on bg, panel and raised (tests/nav-tone.test.ts).
+ * wraps. The box is a literal 28px, the `text-title` line height: the kit sheet emits theme variables under the `dshx`
+ * prefix and drops unused ones, so `h-(--text-title--line-height)` resolved to nothing and left the glyph 5px high
+ * (Geist's caps centre at 14.2 of the 28px line; tests/compiled-sheet.test.tsx checks the compiled rule). A glyph only: no tile, no tinted header. Nav tones hold 3:1 on bg, panel and raised (tests/nav-tone.test.ts).
  */
 export const PageTitleMark = ({ mark, markTone }: PageTitleMarkProps): React.ReactNode =>
   mark === undefined || mark === null || mark === false ? null : (
@@ -93,7 +95,7 @@ export const PageTitleMark = ({ mark, markTone }: PageTitleMarkProps): React.Rea
       data-slot="page-title-mark"
       aria-hidden="true"
       className={cn(
-        'dshx:flex dshx:h-(--text-title--line-height) dshx:shrink-0 dshx:items-center dshx:self-start dshx:[&_svg]:size-[18px] dshx:[&_svg]:shrink-0',
+        'dshx:flex dshx:h-[28px] dshx:shrink-0 dshx:items-center dshx:self-start dshx:[&_svg]:size-[18px] dshx:[&_svg]:shrink-0',
         markTone === undefined ? 'dshx:text-muted-foreground' : NAV_TONE_TEXT_CLASS[markTone],
       )}
     >
