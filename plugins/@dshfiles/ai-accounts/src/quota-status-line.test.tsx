@@ -163,6 +163,13 @@ describe('quota status line', () => {
     expect(toneOf(container, 'fine')).toBe('ok')
   })
 
+  it('marks the item actionable only while an account is low or spent, so the phone strip shows then (round five C2)', async () => {
+    const actionable = (container: HTMLElement): boolean => container.querySelector('[data-quota-status-line]')?.hasAttribute('data-status-actionable') ?? false
+    expect(actionable(await mount({ cards: [card('fine', 'Fine', 70)] }))).toBe(false)
+    expect(actionable(await mount({ cards: [card('near', 'Near', 12), card('fine', 'Fine', 70)] }))).toBe(true)
+    expect(actionable(await mount({ cards: [card('spent', 'Spent', 0)], compact: true }))).toBe(true)
+  })
+
   it('shows six and eight accounts at once while unmeasured, an account that is off dimmed in its place (b:hbtt)', async () => {
     const eight = Array.from({ length: 8 }, (_, index) => card(`cc${String(index + 1)}`, `Command Code ${String(index + 1)}`, 10 * (index + 1)))
     const container = await mount({ cards: eight.map(entry => (entry.instanceId === 'cc5' ? { ...entry, enabled: false } : entry)) })

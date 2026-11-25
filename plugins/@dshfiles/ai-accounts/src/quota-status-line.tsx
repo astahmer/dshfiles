@@ -414,6 +414,8 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
             )}
             data-quota-status-line=""
             data-quota-segments={props.compact ? undefined : inline.length}
+            // A quota running low or spent is worth the phone strip's row; frame-layout shows it only for this mark.
+            data-status-actionable={items.some(item => UsageOverviewModel.stripTone(item) !== 'ok') ? '' : undefined}
             ref={attachRoot}
             role="group"
           >
