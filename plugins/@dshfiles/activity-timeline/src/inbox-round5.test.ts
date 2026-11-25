@@ -52,7 +52,7 @@ describe('an Inbox card (round five C4, council round 5)', () => {
     expect(InboxView.namesProject('thread-sidebar.finished-turn')).toBe(true)
     expect(InboxView.namesProject('thread-sidebar.approval')).toBe(false)
     expect(InboxView.namesProject('agent-questions.native-question')).toBe(false)
-    expect(row).toMatch(/<ProjectMark name=\{project\} size="dense" \/>/u)
+    expect(row).toMatch(/<ProjectMark name=\{head\.project\} size="dense" \/>/u)
     expect(panel).toContain('EntityLabels.useWorkspaceLabel(props.workspaces)')
   })
 

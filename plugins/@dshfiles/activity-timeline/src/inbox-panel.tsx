@@ -34,7 +34,7 @@ import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, InboxIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -236,7 +236,8 @@ const InboxRow = (props: {
   const opener = item.subject.kind === 'session' ? undefined : props.openers.get(item.subject.kind)
   const openable = item.subject.kind === 'session' || opener !== undefined
   const openLabel = openLabelOf(item, opener, t)
-  const project = item.subject.kind === 'session' && InboxView.namesProject(item.source) ? props.projectOf(item.subject.id) : undefined
+  const project = item.subject.kind === 'session' ? props.projectOf(item.subject.id) : undefined
+  const head = InboxView.headMeta(item.source, project)
   const referencedThreadId =
     item.subject.kind === 'session'
       ? null
@@ -318,7 +319,14 @@ const InboxRow = (props: {
           {doneable || snoozable || quickReplies.length > 0 || mutable ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="icon-sm" variant="ghost" className="dshx:size-7 dshx:pointer-coarse:size-11" aria-label={t('more')} disabled={props.busy}>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  data-inbox-card-menu=""
+                  className="dshx:size-7 dshx:pointer-coarse:size-11"
+                  aria-label={t('more')}
+                  disabled={props.busy}
+                >
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
@@ -454,15 +462,15 @@ const InboxRow = (props: {
       meta={
         <>
           {/* On a phone the band keeps one line (title and age): the body says what is asked ("Asks:", or an approval's command).
-              A finished turn names its thread's project instead of its source, "Thread turns" (round five C4, council round 5). */}
-          {project === undefined ? (
-            <span className="dshx:@max-pane-narrow:hidden">{InboxView.sourceLabel(item.source)}</span>
-          ) : (
+              Every head reads title · project · kind · time (council round 7 C1); a finished turn's project replaces its
+              "Thread turns" kind (round five C4). */}
+          {head.project === undefined ? null : (
             <span data-inbox-project="" className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:@max-pane-narrow:hidden">
-              <ProjectMark name={project} size="dense" />
-              <span className="dshx:truncate">{project}</span>
+              <ProjectMark name={head.project} size="dense" />
+              <span className="dshx:truncate">{head.project}</span>
             </span>
           )}
+          {head.kind === undefined ? null : <span className="dshx:@max-pane-narrow:hidden">{head.kind}</span>}
           {referencedThreadId === null ? null : (
             <button
               type="button"
@@ -493,6 +501,8 @@ const InboxRow = (props: {
             answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
             // The body ends the card unless answers follow it.
             (answers === null || props.actionRow === false) && 'dshx:pb-3',
+            // A phone's foot verbs sit 8px under the body (council round 7 C2).
+            answers === null && footed && hasVerbs && props.actionRow !== false && 'dshx:@max-pane-narrow:pb-2',
           )}
         >
           {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
@@ -1314,7 +1324,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   if (triaging) {
     const progress = TriageModel.progress(triage.context)
     return (
-      <Page scroll width="lane" heading={t('triage')} description={t('subtitle')}>
+      <Page scroll width="lane" mark={<InboxIcon />} markTone="inbox" heading={t('triage')} description={t('subtitle')}>
         <div
           ref={triageRoot}
           tabIndex={-1}
@@ -1386,13 +1396,20 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   return (
     <Page
       scroll
+      // The rail's Inbox glyph in its tone before the title (council round 7 C1, kit A2).
+      mark={<InboxIcon />}
+      markTone="inbox"
       heading={t('title')}
       // One StatusCount per status present beside the title (◆2 ✕1, round five C3; the kit Page draws them, A5).
       statusCounts={InboxView.titleCounts(counts)}
       // On a phone the top bar names the page (its own h1) and holds its actions (InboxPhoneBar), so the page header
       // goes and the segmented control leads the page.
       description={<span className="dshx:in-data-shell-phone-nav:hidden">{t('subtitle')}</span>}
-      className="dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden"
+      className={cn(
+        'dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden',
+        // Council round 7 C2: 8px, not 12, above the segmented control and under it, so the failed card clears the tab bar.
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]]:pt-2 dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:gap-2',
+      )}
       // The kit's list lane (920px): header and list share one container, so Start triage ends on the list's edge.
       width="lane"
       {...(primaryAction === undefined ? {} : { primaryAction })}

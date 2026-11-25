@@ -63,7 +63,7 @@ export const usePublishInboxPhoneActions = (value: InboxPhoneActions): void => {
 export const InboxPhoneBar = (): JSX.Element | null => {
   const value = useSyncExternalStore(InboxPhoneActionsStore.subscribe, InboxPhoneActionsStore.read, () => undefined)
   // Round five C2: the frame's status button (usage, working threads); no band above the tab bar. Round five C4 (council
-  // round 5): it takes the bar's leading seat, left of the centred title, so the trailing corner (⋯, Start triage) never
+  // round 5): it takes the bar's leading seat, left of the centred title, so the trailing corner (Start triage, ⋯) never
   // runs over "Inbox" at 390 px.
   const status = useContract(PhoneStatus)
   if (value === undefined || (value.primary === undefined && value.actions.length === 0 && status.status !== 'active')) return null
@@ -78,10 +78,27 @@ export const InboxPhoneBar = (): JSX.Element | null => {
           </div>
         ) : null}
         <div data-inbox-phone-bar="trailing" className={InboxView.PHONE_BAR}>
+          {/* Council round 7 C2: Start triage is a quiet 36px outline button (44px hit), not the screen's heaviest object,
+              and the page menu takes the trailing edge, as on every other top bar. Its 12px label and the 36px ⋯ (the
+              kit keeps 44px hit areas) leave the centred "Inbox" title clear at 390px. */}
+          {primary === undefined ? null : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="dshx-hit-44 dshx:h-9"
+              data-page-action={primary.id}
+              disabled={primary.disabled === true || primary.pending === true}
+              onClick={primary.onSelect}
+            >
+              {primary.icon ?? null}
+              {primary.label}
+            </Button>
+          )}
           {value.actions.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" size="icon" variant="ghost" className="dshx:size-11 dshx:text-muted-foreground" aria-label={value.moreLabel}>
+                <Button type="button" size="icon" variant="ghost" className="dshx:size-9 dshx:text-muted-foreground" aria-label={value.moreLabel}>
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
@@ -94,19 +111,6 @@ export const InboxPhoneBar = (): JSX.Element | null => {
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
-          )}
-          {primary === undefined ? null : (
-            <Button
-              type="button"
-              size="sm"
-              className="dshx-hit-44"
-              data-page-action={primary.id}
-              disabled={primary.disabled === true || primary.pending === true}
-              onClick={primary.onSelect}
-            >
-              {primary.icon ?? null}
-              {primary.label}
-            </Button>
           )}
         </div>
       </DialogPortal>

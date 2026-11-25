@@ -16,14 +16,14 @@ describe('a phone Inbox card (round six C1)', () => {
     expect(InboxView.HEAD_SEAT).toContain('dshx:@max-pane-narrow:-my-3!')
   })
 
-  it('moves the verb of a card with a body to a full-width 44px button at the bottom of the body', () => {
+  it('moves the verb of a card with a body to a full-width button at the bottom of the body (36px since council round 7 C2)', () => {
     expect(InboxView.footsVerbs(false)).toBe(true)
     expect(InboxView.FOOT_VERBS).toContain('dshx:hidden')
     expect(InboxView.FOOT_VERBS).toContain('dshx:@max-pane-narrow:flex')
     expect(InboxView.FOOT_VERBS).toContain('dshx:px-4')
-    expect(InboxView.FOOT_VERBS).toContain('dshx:pb-3')
+    expect(InboxView.FOOT_VERBS).toContain('dshx:pb-2')
     expect(InboxView.FOOT_VERB).toContain('dshx:w-full')
-    expect(InboxView.FOOT_VERB).toContain('dshx:h-11')
+    expect(InboxView.FOOT_VERB).toContain('dshx:h-9!')
     // The head keeps the verbs on a wide pane and only the menu on a compact one.
     expect(InboxView.HEAD_VERBS_WIDE).toContain('dshx:@max-pane-narrow:hidden')
     const foot = between('data-inbox-row-actions="foot"', '</div>')

@@ -109,18 +109,24 @@ const footsVerbs = (compactCard: boolean): boolean => !compactCard
 const HEAD_VERBS_WIDE = 'dshx:contents dshx:@max-pane-narrow:hidden'
 
 /**
- * The verbs at the bottom of a card's body on a compact pane (round six C1): each a full-width 44px button, 12px from the
- * text above and the card's edge, so the title never wraps for a button. Hidden on a wide pane, where the head holds them.
+ * The verbs at the bottom of a card's body on a compact pane (round six C1): each a full-width button, so the title never
+ * wraps for a button. Hidden on a wide pane, where the head holds them. Council round 7 C2: 36px tall (the kit's ::after
+ * keeps a 44px hit area), 8px from the text above and from the card's edge, so a phone fits the failed card.
  */
-const FOOT_VERBS = 'dshx:hidden dshx:flex-col dshx:gap-2 dshx:px-4 dshx:pb-3 dshx:@max-pane-narrow:flex'
-const FOOT_VERB = 'dshx:w-full dshx:h-11'
+const FOOT_VERBS = 'dshx:hidden dshx:flex-col dshx:gap-2 dshx:px-4 dshx:pb-2 dshx:@max-pane-narrow:flex'
+const FOOT_VERB = 'dshx:w-full dshx:h-9!'
 
 /**
  * A bodyless (compact) card on a compact pane: its verb and menu keep to the title line, top-aligned, and the age wraps
  * under the title, so the row never grows the verb's band past the title line.
  */
 const COMPACT_SEAT =
-  'dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0'
+  'dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0' +
+  // Council round 7 C2: its verb and ⋯ are 36px (44px hit areas), pulled 4px into the 12px head padding, so the pill
+  // sits 8px inside the card's edge instead of flush with the band.
+  ' dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:-my-1! dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]_[data-slot=button]]:h-9!' +
+  // The ⋯ is a menu trigger, not a kit button slot: it takes 36px by its own hook.
+  ' dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]_[data-inbox-card-menu]]:size-9!'
 
 /**
  * That verb's 10px inset on a compact pane (a touch screen gives chips 16px) and no gap before the ghost ⋯, so a title
@@ -134,6 +140,23 @@ const shortOpenLabelKey = (action: InboxOpenAction): 'review' | 'open' => (actio
 /** Sources whose type says nothing a card does not (a finished turn): the card names the thread's project instead. */
 const PROJECT_SOURCES: ReadonlySet<string> = new Set(['thread-sidebar.finished-turn'])
 const namesProject = (source: string): boolean => PROJECT_SOURCES.has(source)
+
+/**
+ * What a card head prints after its title, always in one order (council round 7 C1): glyph · title · project · kind ·
+ * time. The project shows whenever the client knows the thread's folder; the kind is left out only where it says nothing
+ * the card does not (a finished turn's "Thread turns") and a project names the card instead.
+ */
+export interface InboxHeadMeta {
+  /** The thread's project, by name, when the client knows its folder. */
+  readonly project: string | undefined
+  /** The item's kind in words ("Approval"), unless the project already names the card. */
+  readonly kind: string | undefined
+}
+
+const headMeta = (source: string, project: string | undefined): InboxHeadMeta => ({
+  project,
+  kind: project !== undefined && namesProject(source) ? undefined : sourceLabel(source),
+})
 
 /** A card's title at the kit's contextual heading step, 15/20 at 600 (council round 4, A4/C3). */
 const TITLE = 'dshx:text-heading'
@@ -351,6 +374,7 @@ export class InboxView {
   static readonly COMPACT_SEAT = COMPACT_SEAT
   static readonly SHORT_VERB = SHORT_VERB
   static readonly namesProject = namesProject
+  static readonly headMeta = headMeta
   static readonly TITLE = TITLE
   static readonly COMMAND = COMMAND
   static readonly cardText = cardText

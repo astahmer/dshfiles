@@ -112,7 +112,7 @@ describe('Inbox on a phone (round five P2)', () => {
   })
 
   it('keeps the phone head band to one line: the type label leaves narrow panes', () => {
-    expect(row).toContain('<span className="dshx:@max-pane-narrow:hidden">{InboxView.sourceLabel(item.source)}</span>')
+    expect(row).toContain('<span className="dshx:@max-pane-narrow:hidden">{head.kind}</span>')
     expect(row).toMatch(/data-inbox-project="" className="[^"]*dshx:@max-pane-narrow:hidden/u)
   })
 
