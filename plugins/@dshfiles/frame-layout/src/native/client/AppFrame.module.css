@@ -430,7 +430,9 @@
   padding: 0 8px;
 }
 
-.statusSide > .statusItem + .statusItem::before {
+/* dshfiles (unslop r5 C6, council round 4): a divider sits before an item only when a shown item precedes it, so a
+   blank item (status-blank.ts) never leaves a hairline at either end. */
+.statusSide > .statusItem:not([data-status-blank], :empty, :has(> .statusItemButton:empty)) ~ .statusItem::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -462,7 +464,8 @@
 }
 
 .statusItem:empty,
-.statusItem:has(> .statusItemButton:empty) {
+.statusItem:has(> .statusItemButton:empty),
+.statusItem[data-status-blank] {
   display: none;
 }
 

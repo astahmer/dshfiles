@@ -10,6 +10,7 @@ import { Component, createContext, memo, useContext, useEffect, useMemo, useRef,
 import type { ComponentType, ErrorInfo, ReactNode } from 'react'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { phoneStatus, PhoneStatusModel } from '../../phone-status.ts'
+import { useStatusBlank } from '../../status-blank.ts'
 import { openStatusBarSettings } from '../../status-bar.ts'
 import { StatusItems, type StatusItem } from '../../status-strip.ts'
 import { DEFAULT_STATUS_STRIP_PREFERENCES, StatusStripPreferencesModel } from '../../status-strip-preferences.ts'
@@ -78,6 +79,7 @@ const StatusItemView = (props: {
   readonly hidden: readonly StatusItem[]
 }): ReactNode => {
   const { item, settings } = props
+  const blankRef = useStatusBlank()
   const showActions = showHiddenActions(settings, props.hidden)
   const View = item.component
   const content = (
@@ -89,7 +91,7 @@ const StatusItemView = (props: {
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <span className={css.statusItem} data-status-item={item.id} data-status-side={item.side} data-status-controls={item.controls === true ? '' : undefined}>
+        <span ref={blankRef} className={css.statusItem} data-status-item={item.id} data-status-side={item.side} data-status-controls={item.controls === true ? '' : undefined}>
           {item.open === undefined || item.controls === true ? (
             content
           ) : (
