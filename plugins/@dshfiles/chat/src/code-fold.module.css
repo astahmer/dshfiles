@@ -20,6 +20,20 @@
   cursor: pointer;
 }
 
+/* Round six C3: a card whose lines run past its edge names the toggle, "Wrap" at 12px beside the icon, so the cue to the
+   hidden code is a word, not only a fade. */
+.wrap:has(.wrapLabel) {
+  gap: 4px;
+  width: auto;
+  padding: 0 6px 0 4px;
+}
+
+.wrapLabel {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .wrap:hover {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
@@ -42,17 +56,30 @@
   mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent);
 }
 
-/* Round five C2 (council round 5): unwrapped code keeps its lines and scrolls sideways; its last 16px fade, so a line
-   that runs past the card's edge reads as one that scrolls instead of one cut off. The card's own fill behind the
-   `pre` is the same colour, so the fade never shows through to the page. */
-.fold :global(.md-code-block[data-code-wrap='false']) pre {
-  mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
+/* Round five C2 (council round 5): unwrapped code keeps its lines and scrolls sideways, and a 16px fade says a line runs
+   on. Round six C3: only an edge that hides code fades (CodeFold sets `data-code-overflow-edges` from the scroll
+   position), so a card that fits draws no fade and one scrolled to its end fades its start. The card's own fill behind
+   the `pre` is the same colour, so the fade never shows through to the page. */
+.fold[data-code-overflow-edges='end'] {
+  --code-overflow-mask: linear-gradient(to right, black calc(100% - 16px), transparent);
 }
 
-.fold[data-code-fold='closed'] :global(.md-code-block[data-code-wrap='false']) pre {
+.fold[data-code-overflow-edges='start'] {
+  --code-overflow-mask: linear-gradient(to left, black calc(100% - 16px), transparent);
+}
+
+.fold[data-code-overflow-edges='both'] {
+  --code-overflow-mask: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+}
+
+.fold[data-code-overflow-edges] :global(.md-code-block[data-code-wrap='false']) pre {
+  mask-image: var(--code-overflow-mask);
+}
+
+.fold[data-code-fold='closed'][data-code-overflow-edges] :global(.md-code-block[data-code-wrap='false']) pre {
   mask-image:
     linear-gradient(to bottom, black calc(100% - 40px), transparent),
-    linear-gradient(to right, black calc(100% - 16px), transparent);
+    var(--code-overflow-mask);
   mask-composite: intersect;
 }
 
@@ -101,6 +128,17 @@
     content: '';
     position: absolute;
     inset: -10px -2px;
+  }
+
+  /* Copy, the native toolbar's last button, keeps a 44pt target beside the wider Wrap (round six C3). */
+  .fold :global([data-code-block-banner]) > :last-child > button:not(.wrap) {
+    position: relative;
+  }
+
+  .fold :global([data-code-block-banner]) > :last-child > button:not(.wrap)::after {
+    content: '';
+    position: absolute;
+    inset: -10px -10px -10px -2px;
   }
 
   .toggle::after {

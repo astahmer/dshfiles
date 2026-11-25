@@ -4,10 +4,8 @@ import { describe, expect, it } from 'vitest'
 const css = readFileSync(new URL('../src/code-fold.module.css', import.meta.url), 'utf8')
 
 describe('an unwrapped code card (round five C2, council round 5)', () => {
-  it('fades its last 16px, so a line that runs on reads as scrollable', () => {
-    expect(css).toMatch(
-      /\.fold :global\(\.md-code-block\[data-code-wrap='false'\]\) pre \{[^}]*mask-image: linear-gradient\(to right, black calc\(100% - 16px\), transparent\);/u,
-    )
+  it('fades its last 16px while a line runs past it, so the line reads as scrollable (round six C3: only then)', () => {
+    expect(css).toMatch(/\.fold\[data-code-overflow-edges='end'\] \{[^}]*--code-overflow-mask: linear-gradient\(to right, black calc\(100% - 16px\), transparent\);/u)
   })
 
   it('draws no scrollbar under the card on a touch screen, where the fade and a swipe carry the scroll', () => {
@@ -17,7 +15,7 @@ describe('an unwrapped code card (round five C2, council round 5)', () => {
   })
 
   it('keeps the fold fade when it is folded too, both masks intersected', () => {
-    expect(css).toMatch(/\.fold\[data-code-fold='closed'\] :global\(\.md-code-block\[data-code-wrap='false'\]\) pre \{[^}]*mask-composite: intersect;/u)
+    expect(css).toMatch(/\.fold\[data-code-fold='closed'\]\[data-code-overflow-edges\] :global\(\.md-code-block\[data-code-wrap='false'\]\) pre \{[^}]*mask-composite: intersect;/u)
   })
 })
 
