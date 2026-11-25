@@ -1,4 +1,5 @@
 import { FilePath } from '@dshfiles/plugin-ui/components/code-block'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { ToolCard, type ToolStatus } from '@dshfiles/plugin-ui/components/tool-card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { PatchView } from '@dshfiles/plugin-ui/diff'
@@ -70,9 +71,7 @@ const HunkRow = (props: {
       className="dshx:flex dshx:w-full dshx:items-center dshx:gap-1.5 dshx:px-3 dshx:py-1 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
     >
       <ChevronRightIcon className={cn('dshx:size-3 dshx:transition-transform', props.open && 'dshx:rotate-90')} />
-      <span className="dshx:shrink-0 dshx:font-mono dshx:tabular-nums">
-        <span className="dshx:text-success">+{props.entry.added}</span> <span className="dshx:text-destructive">−{props.entry.removed}</span>
-      </span>
+      <DiffStat added={props.entry.added} removed={props.entry.removed} className="dshx:shrink-0" />
       {props.showPath && <FilePath path={props.entry.hunk.path} />}
     </CollapsibleTrigger>
     <CollapsibleContent>
@@ -105,7 +104,7 @@ export const DiffToolCard = (props: DiffToolCardProps): ReactNode => {
   return (
     <ToolCard
       {...cardLabel(applied.title)}
-      meta={`+${totals.added} −${totals.removed}`}
+      meta={<DiffStat added={totals.added} removed={totals.removed} />}
       onToggle={disclosure.toggle}
       open={disclosure.expanded}
       status={applied.status}

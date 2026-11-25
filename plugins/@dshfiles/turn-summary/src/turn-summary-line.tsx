@@ -1,5 +1,6 @@
 import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { ChatFocusModel, type ChatTurnTailExtras } from '@dshfiles/chat/chat-focus'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { useSettings } from '@dshfiles/dshx/client'
 import { ChevronDownIcon, ChevronRightIcon, CircleCheckIcon, CircleXIcon, FileIcon, ListChecksIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -36,11 +37,7 @@ const FileList = (props: { readonly summary: TurnActivitySummary; readonly openF
         >
           {file.path}
         </button>
-        {file.added + file.removed > 0 && (
-          <span className="dshx:shrink-0 dshx:tabular-nums">
-            <span className="dshx:text-success">+{file.added}</span> <span className="dshx:text-destructive">−{file.removed}</span>
-          </span>
-        )}
+        {file.added + file.removed > 0 && <DiffStat added={file.added} removed={file.removed} className="dshx:shrink-0" />}
       </li>
     ))}
   </ul>

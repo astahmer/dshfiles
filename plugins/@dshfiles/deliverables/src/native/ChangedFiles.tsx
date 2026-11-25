@@ -11,6 +11,7 @@ import diffCss from './FileDiff.module.css'
 import { basename } from './turn-deliverables.ts'
 import type { NS } from './locales.ts'
 import css from './ChangedFiles.module.css'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 
 type PreviewProps = Pick<InjectFace<DeliverablesInjected>, 'useChangesDiff' | 'loadChangesDiff'>
   & Pick<SessionStandardProps, 'sessionId'>
@@ -18,14 +19,9 @@ type PreviewProps = Pick<InjectFace<DeliverablesInjected>, 'useChangesDiff' | 'l
 /** Rows shown before the fold; the design's summary height for a closing message. */
 const COLLAPSED_ROWS = 4
 
-const GROUPED = new Intl.NumberFormat('en-US')
-
-/** Added and deleted line counts in the card's colors. */
-function Counts({ added, deleted, t }: { added: number; deleted: number } & PropsLocale<typeof NS>) {
-  return <>
-    <span className={css.added}>{t('changes.added', { count: GROUPED.format(added) })}</span>
-    <span className={css.deleted}>{t('changes.deleted', { count: GROUPED.format(deleted) })}</span>
-  </>
+/** Added and deleted line counts: dshfiles (unslop r5 C1) the kit's one change count, `+2 −2`, in its colours. */
+function Counts({ added, deleted }: { added: number; deleted: number } & PropsLocale<typeof NS>) {
+  return <DiffStat added={added} removed={deleted} />
 }
 
 /**

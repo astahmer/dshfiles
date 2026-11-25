@@ -1,3 +1,4 @@
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import type { EditedFile } from './turn-activity.js'
 
 /** Chips shown before the rest fold into "+N more"; a turn that touched more files shows them in its walkthrough. */
@@ -32,11 +33,7 @@ export const TurnFileChips = (props: {
           type="button"
         >
           <span className="dshx:min-w-0 dshx:truncate">{baseName(file.path)}</span>
-          {file.added + file.removed > 0 && (
-            <span className="dshx:shrink-0 dshx:tabular-nums">
-              <span className="dshx:text-success">+{file.added}</span> <span className="dshx:text-destructive">−{file.removed}</span>
-            </span>
-          )}
+          {file.added + file.removed > 0 && <DiffStat added={file.added} removed={file.removed} className="dshx:shrink-0" />}
         </button>
       ))}
       {hidden > 0 && (

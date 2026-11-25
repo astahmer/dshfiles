@@ -3088,6 +3088,9 @@ importers:
       '@dshfiles/image-preview':
         specifier: workspace:*
         version: link:../image-preview
+      '@dshfiles/plugin-ui':
+        specifier: workspace:*
+        version: link:../plugin-ui
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

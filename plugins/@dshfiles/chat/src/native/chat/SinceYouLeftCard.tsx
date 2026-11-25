@@ -5,6 +5,7 @@
  * nor for a single unseen Turn, which is on screen right below.
  */
 import { createContext, memo, type ReactNode } from 'react'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { RECAP_FILE_CHIPS, SinceYouLeftRecapModel, type SinceYouLeftRecap } from './since-you-left.ts'
@@ -70,11 +71,7 @@ export const SinceYouLeftCard = memo(function SinceYouLeftCard({ recap, onJump, 
             {chips.map(file => (
               <button key={file.path} type="button" className={css.chip} data-file-chip="" onClick={() => onJump(file.turn)}>
                 <span className={css.fileName}>{SinceYouLeftRecapModel.fileName(file.path)}</span>
-                {file.added + file.removed > 0 && (
-                  <span className={css.lines}>
-                    +{file.added} −{file.removed}
-                  </span>
-                )}
+                {file.added + file.removed > 0 && <DiffStat added={file.added} removed={file.removed} className={css.lines} />}
               </button>
             ))}
             {more > 0 && <span className={css.more}>+{more}</span>}

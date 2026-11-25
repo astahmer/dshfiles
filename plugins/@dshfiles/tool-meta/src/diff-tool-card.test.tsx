@@ -39,7 +39,7 @@ describe('DiffToolCard', () => {
   it('summarizes the applied lines and keeps the diff closed until the card is opened', () => {
     const view = render(card(editCall([{ oldText: 'a\nb\nc', newText: 'a\nB\nc' }])))
     expect(view.getByText('Edit')).toBeTruthy()
-    expect(view.getByText('+1 −1')).toBeTruthy()
+    expect(view.getByText('1 line added, 1 line removed')).toBeTruthy()
     expect(view.container.querySelector('[data-diff-path]')).toBeNull()
   })
 
@@ -85,7 +85,7 @@ describe('DiffToolCard', () => {
     }
     const view = render(card(patch))
     expect(view.getByText('apply_patch')).toBeTruthy()
-    expect(view.getByText('+2 −2')).toBeTruthy()
+    expect(view.getAllByText('2 lines added, 2 lines removed').length).toBeGreaterThan(0)
     fireEvent.click(view.getByRole('button', { name: /apply_patch/ }))
     expect(view.container.querySelectorAll('[data-diff-path]')).toHaveLength(2)
     expect(view.getAllByRole('button', { name: 'Collapse diff' })).toHaveLength(2)

@@ -127,9 +127,8 @@
 }
 
 .lines {
+  /* The kit DiffStat colours each side (round five C1); the chip only keeps it from shrinking. */
   flex: none;
-  color: var(--dsw-alias-label-tertiary);
-  font-variant-numeric: tabular-nums;
 }
 
 .more {
