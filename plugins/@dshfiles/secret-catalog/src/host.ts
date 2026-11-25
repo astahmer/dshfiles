@@ -10,6 +10,7 @@ import { CatalogPorts } from './catalog-ports-promise.js'
 import { DshCredentials } from './dsh-credentials-promise.js'
 import { SecretCatalog, SecretCatalogOperationError, type SecretCreateInput } from './secret-catalog.js'
 import { SecretCli } from './secret-cli.js'
+import { SecretMcp } from './secret-mcp-service.js'
 import { checkSecretReference } from './secret-reference-status.js'
 import { SecretRequests } from './secret-requests.js'
 import { secretTools } from './secret-tools.js'
@@ -41,7 +42,7 @@ const RequestEvents = Layer.effectDiscard(
 
 const SecretCatalogLive = Layer.mergeAll(CatalogPorts, RequestEvents).pipe(
   Layer.provideMerge(SecretRequests.layer),
-  Layer.provideMerge(Layer.mergeAll(CatalogLive, DshCredentials.layer)),
+  Layer.provideMerge(Layer.mergeAll(CatalogLive, SecretMcp.layer, DshCredentials.layer)),
   Layer.provideMerge(NodeFileSystem.layer),
 )
 
