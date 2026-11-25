@@ -43,7 +43,9 @@
      keeps narrow windows sane. */
   max-width: 100%;
   box-sizing: border-box;
-  background: var(--dsw-specific-bubble);
+  /* dshfiles (council round 6, C4): the kit's faint cool prompt tint (hue 230, kept 40°+ from the attention indigo), so
+     a prompt reads as the user's without a second accent; the Host fill stays the fallback without ui-styles. */
+  background: var(--dshx-prompt-fill, var(--dsw-specific-bubble));
   /* dshfiles (visual refresh T2.1): xl is the 12px step of the P0 scale; the fill is the raised tone. */
   border-radius: var(--dsw-radius-xl);
   /* dshfiles (b:d5wg): over a theme's backdrop scene the raised fill can match the scene behind the veil; the theme
