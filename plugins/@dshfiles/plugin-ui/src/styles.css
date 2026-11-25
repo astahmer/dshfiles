@@ -792,7 +792,8 @@ svg [class*='_spinnerArc_'] {
       > [data-slot='select-content'],
       > [data-slot='popover-content']
     ),
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'],
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu] {
     position: fixed !important;
     top: auto !important;
     right: 0 !important;
@@ -816,7 +817,8 @@ svg [class*='_spinnerArc_'] {
       [data-slot='select-content'],
       [data-slot='popover-content']
     ),
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'],
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu] {
     position: relative;
     box-sizing: border-box;
     width: 100% !important;
@@ -864,7 +866,8 @@ svg [class*='_spinnerArc_'] {
       [data-slot='select-content'],
       [data-slot='popover-content']
     )::before,
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu']::before {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu']::before,
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu]::before {
     content: '';
     position: absolute;
     top: 8px;

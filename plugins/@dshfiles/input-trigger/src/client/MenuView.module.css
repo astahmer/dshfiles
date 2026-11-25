@@ -291,21 +291,20 @@
   color: var(--dsw-alias-menu-icon);
 }
 
-/* Phone: the picker covers the composer as a touch surface. It painted no
-   background at all (the listbox computed to rgba(0,0,0,0)), so the thread
-   showed through the menu; rows also stayed at the desktop 34px. */
+/* Phone: the picker is a touch sheet. The kit's phone rule gives it the sheet
+   geometry, surface and grabber once `[data-trigger-menu]` is listed there; this
+   keeps its rows at a comfortable size. */
 @media (max-width: 639.98px) {
-  .menu {
-    background: var(--dsw-specific-menu);
-    backdrop-filter: var(--dsw-menu-backdrop-filter);
-    border: 1px solid var(--dsw-alias-border-l1);
-    border-radius: var(--dsw-radius-lg);
-    padding: 6px;
+  /* One scroller: the sheet surface clamps at 72dvh and scrolls; the list inside
+     grows instead of nesting a second scrollbar. */
+  .viewport {
+    overflow-y: visible;
   }
 
   .item {
     min-height: 44px;
     padding: 10px 10px;
+    font-size: 15px;
   }
 
   .itemIcon,
