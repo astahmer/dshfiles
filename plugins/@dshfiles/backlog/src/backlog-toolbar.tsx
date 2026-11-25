@@ -51,12 +51,12 @@ const sortOrders = ['updated', 'created', 'priority', 'due'] as const
 /**
  * An underline tab, drawn on buttons so each view stays a navigation link with `aria-current`: page sections are
  * underline tabs, a segmented track is only for a few view modes (council round 3, D2). The 2 px marker sits on the
- * toolbar row's bottom rule.
+ * toolbar row's bottom rule and is the kit underline tab's bar (`Page` tabs): square, in the accent (council round 6, D6).
  */
 const tabClass = (active: boolean): string =>
   cn(
     'dshx:relative dshx:inline-flex dshx:h-full dshx:items-center dshx:gap-1.5 dshx:rounded-none dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50',
-    'dshx:after:absolute dshx:after:inset-x-0 dshx:after:bottom-[-1px] dshx:after:h-0.5 dshx:after:rounded-full dshx:after:bg-(--dsw-alias-state-business-primary)',
+    'dshx:after:absolute dshx:after:inset-x-0 dshx:after:bottom-[-1px] dshx:after:h-0.5 dshx:after:bg-(--dsw-alias-state-business-primary) dshx:after:transition-opacity',
     active ? 'dshx:text-foreground dshx:after:opacity-100' : 'dshx:text-muted-foreground dshx:after:opacity-0 dshx:hover:text-foreground',
   )
 
@@ -66,7 +66,11 @@ const tabClass = (active: boolean): string =>
  */
 export const BacklogViewSwitch = (props: { readonly view: View; readonly onSelect: (view: View) => void; readonly modifierHeld: boolean }): JSX.Element => (
   <>
-    <nav aria-label="Backlog views" data-tabs="underline" className="dshx:flex dshx:h-full dshx:shrink-0 dshx:items-stretch dshx:gap-5 dshx:@max-pane-narrow:hidden">
+    <nav
+      aria-label="Backlog views"
+      data-tabs="underline"
+      className="dshx:flex dshx:h-full dshx:shrink-0 dshx:items-stretch dshx:gap-5 dshx:@max-pane-narrow:hidden"
+    >
       {views.map((entry, index) => (
         <Tooltip key={entry}>
           <TooltipTrigger asChild>
