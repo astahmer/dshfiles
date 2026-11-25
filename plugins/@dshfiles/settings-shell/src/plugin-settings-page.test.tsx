@@ -135,6 +135,17 @@ describe('plugin settings page', () => {
     await show({ visible: true })
     expect(container.querySelector('h2')?.className).toContain('dshx:text-heading')
     expect(container.querySelector('section')?.className).toContain('dshx:max-w-[680px]')
+  })
+
+  it('keeps its title for screen readers only beside the side column row that names it (council round 4 B1)', async () => {
+    await act(async () =>
+      root.render(
+        <PageViewMemoryProvider>
+          <PluginSettingsPageView form={form} heading="named" page={page} t={t} />
+        </PageViewMemoryProvider>,
+      ),
+    )
+    expect(container.querySelector('h2')?.className).toContain('dshx:sr-only')
     expect(container.querySelector('h2')?.className).not.toContain('dshx:text-title')
   })
 })

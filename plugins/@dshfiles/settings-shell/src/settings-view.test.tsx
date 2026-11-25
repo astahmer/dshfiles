@@ -238,6 +238,24 @@ describe('settings view: one title per entry', () => {
     expect(headings).toEqual(['theme:none', 'fonts:section'])
     view.unmount()
   })
+
+  it('leaves a whole-entry page title to the side column row that names it (council round 4 B1)', () => {
+    const page: PluginSettingsPage = { pageId: 'plugin:dshfiles-ui-styles', ns: 'dshfiles-ui-styles', title: 'Appearance', description: '', group: 'plugins', fields: [], modifiedPaths: [] }
+    const groups = [
+      {
+        group: { id: 'general' as const, label: 'General', description: '' },
+        entries: [{ id: page.pageId, group: 'general' as const, label: 'Appearance', order: 0, pages: [page], hiddenPages: [], keywords: '' }],
+      },
+    ]
+    const headings: string[] = []
+    const renderPluginPage = (_page: PluginSettingsPage, heading: string): null => {
+      headings.push(heading)
+      return null
+    }
+    mount({ groups, activeId: page.pageId, renderPluginPage }).unmount()
+    mount({ groups, activeId: page.pageId, renderPluginPage, columnNavigation: true }).unmount()
+    expect(headings).toEqual(['page', 'named'])
+  })
 })
 
 describe('settings view: narrow panes', () => {

@@ -40,7 +40,8 @@ const navCellActive = 'dshx:bg-selected-wash dshx:selected-marker dshx:hover:bg-
 const navGroupBlock = 'dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0'
 const navGroup = 'dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
 
-export type PluginPageHeading = 'page' | 'section' | 'none'
+/** `named`: the page is the whole entry and the side column's current row names it (council round 4 B1). */
+export type PluginPageHeading = 'page' | 'named' | 'section' | 'none'
 
 export interface SettingsViewProps {
   /** Every Settings entry, by task group (plan §4.6). */
@@ -298,7 +299,7 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
   const section = useSingleTitle(entry.sectionLabel ?? entry.label)
   const pages = entry.pages.map(page => <Fragment key={page.pageId}>{props.renderPluginPage(page, headingOf(page))}</Fragment>)
   function headingOf(page: PluginSettingsPage): PluginPageHeading {
-    if (!ownHeading) return 'page'
+    if (!ownHeading) return props.columnNavigation === true ? 'named' : 'page'
     return sameTitle(page.title, entry.label) ? 'none' : 'section'
   }
   return (

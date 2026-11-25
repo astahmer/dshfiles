@@ -39,8 +39,11 @@ export const PluginSettingsPageView = (props: {
   readonly form: ConfigForm<unknown>
   readonly t: ShellTranslate
   readonly focusPath?: readonly string[]
-  /** `page` (default): the page titles itself. `section`: a subheading under an entry title. `none`: no title. */
-  readonly heading?: 'page' | 'section' | 'none'
+  /**
+   * `page` (default): the page titles itself. `named`: it does for screen readers only, beside the side column's row that
+   * names it. `section`: a subheading under an entry title. `none`: no title.
+   */
+  readonly heading?: 'page' | 'named' | 'section' | 'none'
   /**
    * The page sits under a Settings navigation that names it: once that navigation collapses into the Sections select
    * (a narrow pane), the select reads the same words, so the page title stays for assistive technology only.
@@ -94,8 +97,15 @@ export const PluginSettingsPageView = (props: {
   return (
     <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[680px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
       {props.heading === 'section' && <h3 className={SECTION_TITLE_CLASS}>{props.page.title}</h3>}
-      {(props.heading === undefined || props.heading === 'page') && (
-        <h2 className={cn(SECTION_TITLE_CLASS, props.namedByNavigation === true && 'dshx:@max-pane-compact:sr-only')}>{props.page.title}</h2>
+      {(props.heading === undefined || props.heading === 'page' || props.heading === 'named') && (
+        <h2
+          className={cn(
+            SECTION_TITLE_CLASS,
+            props.heading === 'named' ? 'dshx:sr-only' : props.namedByNavigation === true && 'dshx:@max-pane-compact:sr-only',
+          )}
+        >
+          {props.page.title}
+        </h2>
       )}
       {props.page.description !== '' && <p className="dshx:m-0 dshx:text-sm dshx:text-muted-foreground">{props.page.description}</p>}
       <div className="dshx:mt-3" hidden={view !== 'form'}>
