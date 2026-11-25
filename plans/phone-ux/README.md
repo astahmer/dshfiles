@@ -42,6 +42,9 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
    21 drawer journey tests pass. Still open: `inert` on the stage, reduced motion everywhere, large-text check.
 9. **P15 (partial)** — the phone thread-panel sheet resumes the last real view instead of opening on the chooser, with
    the selection logic covered by 3 tests. Still open: unmounting hidden dock views.
+10. **P27** — on a coarse pointer the thread row menu offers Keep screen on / Allow screen to sleep: one page-level
+    Screen Wake Lock, re-requested when the page becomes visible while wanted, off when the platform refuses. 4 tests;
+    the real-phone check (does the screen stay on) is still the owner's.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
