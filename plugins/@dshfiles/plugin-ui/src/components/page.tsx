@@ -229,7 +229,10 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
   )
   const compact = useCompact(rootRef)
   const body = (
-    <div data-slot="page-body" className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3', fill && 'dshx:min-h-0 dshx:flex-1', bodyClassName)}>
+    <div
+      data-slot="page-body"
+      className={cn('dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:@max-pane-narrow:gap-3', fill && 'dshx:min-h-0 dshx:flex-1', bodyClassName)}
+    >
       {children}
     </div>
   )
@@ -248,7 +251,9 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
     >
       <div
         className={cn(
-          'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4 dshx:p-5 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:p-3',
+          // Spacing scale (round five K9): page padding 24, 20 between the header and the sections, a 16px body stack;
+          // narrow panes and phones keep 12.
+          'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-5 dshx:p-6 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:p-3',
           fill && 'dshx:min-h-0 dshx:flex-1',
         )}
       >
