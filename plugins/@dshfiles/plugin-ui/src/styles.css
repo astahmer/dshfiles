@@ -1040,3 +1040,20 @@ html[data-phone-stack-motion='pop']::view-transition-new(root) {
 :where([data-slot^='conversation.']) :is(ol, ul) {
   list-style: revert;
 }
+
+/*
+ * Phone: no keycaps. The shell has no hardware keyboard (plan phone rules), so a
+ * shortcut hint costs a row of width and names keys that cannot be pressed; the
+ * phone sheet keeps the labels and actions.
+ */
+@media (max-width: 639.98px) {
+  html[data-shell-phone-nav]
+    :is(
+      [data-slot='key-hint'],
+      [data-slot='dropdown-menu-shortcut'],
+      [data-slot='context-menu-shortcut'],
+      [data-slot='command-shortcut']
+    ) {
+    display: none;
+  }
+}
