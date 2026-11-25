@@ -9,6 +9,7 @@ import { NoFolderWorkspace } from '@dshfiles/jj-integration/no-folder'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
+import { DraftsSection } from './drafts-section.js'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { isListedUnsentThread, presentUnsentRows } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
@@ -51,6 +52,7 @@ import { activeQuestionSessionIds } from './pending-questions.js'
 import { IconPinFillRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
+import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -2567,8 +2569,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [archivedSessionIds, pinnedSessionIds, selectedSessionId, sessions, unsentDrafts],
   )
   const draftSessionIds = useMemo(() => new Set(draftSessions.map(draft => draft.id)), [draftSessions])
+  // Read at confirm time: the dialog's list is a snapshot, the archive acts on what still qualifies.
+  const draftSessionsRef = useRef(draftSessions)
+  draftSessionsRef.current = draftSessions
   const [draftsOpen, setDraftsOpen] = useState(false)
   const [draftsCleaning, setDraftsCleaning] = useState(false)
+  const hostConnection = useHostConnection()
+  // A cleanup verb runs only on loaded, current data: never while the list is pending or DSH is away.
+  const draftsCleanable = sessionState.phase === 'ready' && hostConnection === 'online'
   const [detachedBranchBusy, setDetachedBranchBusy] = useState<ReadonlySet<string>>(() => new Set())
   const attentionSessions = useMemo(
     () => sessions.filter(session => SidebarOrganization.isAttentionSessionIncluded(session, preferences.includeSubagentAttention)),
@@ -3233,26 +3241,63 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   /**
-   * Archive every empty draft and forget the thread workspaces that hold nothing but drafts. Archiving is reversible
-   * from the archive section; jj-integration still refuses a workspace with unlanded revisions or uncommitted edits, so
-   * a folder that turns out to hold work stays.
+   * Archive the confirmed empty drafts that still qualify and forget the thread workspaces that hold nothing but
+   * drafts. Each id is re-checked at confirm time (a draft prompted since the dialog opened is skipped), the toast
+   * offers Undo (unarchive), and jj-integration still refuses a workspace with unlanded revisions or uncommitted
+   * edits, so a folder that turns out to hold work stays.
+   * @param confirmed - the drafts the confirmation named.
    */
-  const cleanUpDrafts = async (): Promise<void> => {
-    if (draftsCleaning) return
+  const cleanUpDrafts = async (confirmed: readonly SessionSummary['id'][]): Promise<void> => {
+    if (draftsCleaning || !draftsCleanable) return
     setDraftsCleaning(true)
     try {
-      const plan = DraftThreadsModel.planCleanup({ drafts: draftSessions, workspaces: workspaceItems, threadDirectories })
-      let archived = 0
+      const current = draftSessionsRef.current
+      const stillDrafts = new Set(DraftThreadsModel.stillDraftIds({ confirmed, sessions: current }))
+      const drafts = current.filter(draft => stillDrafts.has(draft.id))
+      if (drafts.length === 0) {
+        setNotice({ tone: 'success', message: props.tSidebar('threadSidebarDraftsNoneLeft') })
+        return
+      }
+      const plan = DraftThreadsModel.planCleanup({ drafts, workspaces: workspaceItems, threadDirectories })
+      const archivedIds: SessionSummary['id'][] = []
       for (const sessionId of plan.sessionIds) {
         try {
           await props.archiveSession(sessionId)
-          archived += 1
+          archivedIds.push(sessionId)
         } catch {
           // One refused archive must not stop the rest of the cleanup.
         }
       }
       for (const path of plan.workspacePaths) await jjThreads.discard({ path, force: false }).catch(() => undefined)
-      setNotice({ tone: 'success', message: props.tSidebar('threadSidebarDraftsCleaned', { count: archived }) })
+      let undoInFlight = false
+      setNotice({
+        tone: 'success',
+        message: plural(props.tSidebar, 'threadSidebarDraftsCleaned', archivedIds.length),
+        ...(archivedIds.length === 0
+          ? {}
+          : {
+              actionLabel: props.tSidebar('threadSidebarUndo'),
+              durationMs: preferences.archiveUndoDurationSeconds * 1_000,
+              onAction: () => {
+                if (undoInFlight) return
+                undoInFlight = true
+                void (async () => {
+                  let undoFailed = false
+                  for (const archivedId of archivedIds) {
+                    try {
+                      await props.unarchiveSession(archivedId)
+                    } catch {
+                      undoFailed = true
+                    }
+                  }
+                  setNotice({
+                    tone: undoFailed ? 'danger' : 'success',
+                    message: props.tSidebar(undoFailed ? 'threadSidebarActionFailure' : 'threadSidebarUndone'),
+                  })
+                })()
+              },
+            }),
+      })
       setDraftsOpen(false)
       void refetchJjRepositories()
     } catch {
@@ -7499,44 +7544,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             />
           ) : null}
           {isBoard || draftSessions.length === 0 ? null : (
-            <section className="dshx:mt-1" key="drafts" aria-label={props.tSidebar('threadSidebarDrafts')}>
-              <div
-                className={cn(
-                  stickyHeaderClass,
-                  'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:px-1 dshx:text-sm dshx:text-muted-foreground',
-                )}
-              >
-                <button
-                  type="button"
-                  data-thread-section-header=""
-                  className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
-                  aria-expanded={draftsOpen}
-                  onClick={() => setDraftsOpen(current => !current)}
-                >
-                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                    <ArchiveIcon strokeWidth={1.5} size={14} />
-                  </span>
-                  <span className="dshx:whitespace-nowrap">{props.tSidebar('threadSidebarDrafts')}</span>
-                  <span className="dshx:text-xs dshx:tabular-nums">({draftSessions.length})</span>
-                  <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                  <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                    {draftsOpen ? <ChevronUpIcon strokeWidth={1.5} size={12} /> : <ChevronDownIcon strokeWidth={1.5} size={12} />}
-                  </span>
-                </button>
-                <Button
-                  size="icon-xs"
-                  variant="ghost"
-                  className="dshx:shrink-0"
-                  aria-label={props.tSidebar('threadSidebarDraftsCleanUp')}
-                  title={props.tSidebar('threadSidebarDraftsCleanUpHint')}
-                  disabled={draftsCleaning}
-                  onClick={() => void cleanUpDrafts()}
-                >
-                  <ArchiveIcon strokeWidth={1.5} size={13} />
-                </Button>
-              </div>
-              {draftsOpen ? draftSessions.map(session => renderThreadRow(session, undefined)) : null}
-            </section>
+            <DraftsSection
+              key="drafts"
+              drafts={draftSessions}
+              open={draftsOpen}
+              onOpenChange={setDraftsOpen}
+              cleanable={draftsCleanable}
+              cleaning={draftsCleaning}
+              onConfirm={ids => void cleanUpDrafts(ids)}
+              renderRow={session => renderThreadRow(session, undefined)}
+              headerClassName={stickyHeaderClass}
+              t={props.tSidebar}
+            />
           )}
           {sessionState.phase === 'ready' &&
           (isBoard || draftSessions.length === 0) &&

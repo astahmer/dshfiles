@@ -3,13 +3,17 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
 import { DraftThreadsModel } from './draft-threads.js'
 
+type DraftInput = Pick<SessionSummary, 'id' | 'title' | 'running' | 'blank'> & { readonly projectionValues?: object }
+
+/** A never-prompted thread by default: the Host reports zero prompted turns. */
 const session = (
   id: string,
-  overrides: Partial<Pick<SessionSummary, 'title' | 'running' | 'blank'>> = {},
-): Pick<SessionSummary, 'id' | 'title' | 'running' | 'blank'> => ({
+  overrides: Partial<Omit<DraftInput, 'id'>> = {},
+): DraftInput => ({
   id: SessionId(id),
   running: false,
   blank: false,
+  projectionValues: { promptedTurnCount: 0 },
   ...overrides,
 })
 
@@ -17,6 +21,13 @@ describe('isDraftThread', () => {
   it('counts an untitled idle thread that is past the blank reuse state', () => {
     expect(DraftThreadsModel.isDraftThread(session('session-a'))).toBe(true)
     expect(DraftThreadsModel.isDraftThread(session('session-a', { title: '   ' }))).toBe(true)
+  })
+
+  it('needs the Host to say no turn was prompted: an unknown count is not a draft', () => {
+    expect(DraftThreadsModel.isDraftThread(session('session-a', { projectionValues: {} }))).toBe(false)
+    const { projectionValues: _omitted, ...unloaded } = session('session-a')
+    expect(DraftThreadsModel.isDraftThread(unloaded)).toBe(false)
+    expect(DraftThreadsModel.isDraftThread(session('session-a', { projectionValues: { promptedTurnCount: 2 } }))).toBe(false)
   })
 
   it('never hides a titled, running or blank thread', () => {
@@ -37,6 +48,16 @@ describe('draftThreadsOf', () => {
       },
     })
     expect(drafts.map(draft => draft.id)).toEqual(['session-a'])
+  })
+})
+
+describe('stillDraftIds', () => {
+  it('keeps only the confirmed ids that are still drafts at click time', () => {
+    const now = [session('session-a'), session('session-b', { title: 'Named since' }), session('session-c', { running: true })]
+    expect(DraftThreadsModel.stillDraftIds({
+      confirmed: [SessionId('session-a'), SessionId('session-b'), SessionId('session-c'), SessionId('session-gone')],
+      sessions: now,
+    })).toEqual(['session-a'])
   })
 })
 

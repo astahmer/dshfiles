@@ -345,6 +345,17 @@ workspace to archive. This does not establish cross-device draft sync or
 arbitrary plugin compatibility. New profile rows require user-controlled
 activation/restart; merely building an isolated worktree does not update the GUI.
 
+**Empty drafts.** A thread folds into **Empty drafts** only on positive evidence:
+no title, not running, and a prompted-turn count of 0 from the Host (jj-integration's
+`promptedTurnCount` list projection; without it no thread is a draft). A row whose
+projections have not arrived (a reconnect, a failed list pull) stays where it was.
+**Clean up empty drafts** is offered only while the list is loaded and DSH is
+online. It asks first: the dialog names up to five drafts with their age, each id
+is re-checked when you confirm (a draft prompted since is skipped), and the toast
+offers **Undo**, which unarchives them. A thread workspace that held nothing but
+drafts is removed and does not come back with Undo; jj-integration still refuses
+one with edits or unlanded revisions.
+
 **Moving a row between sections.** Drag a thread row onto another section header
 (or anywhere inside that section) to put it there; while a row is in flight every
 section shows, including the empty ones, and the target highlights. The section
