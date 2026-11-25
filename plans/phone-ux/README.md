@@ -68,7 +68,9 @@ build only the touched plugin and prefer focused tests, or run the scratch insta
 The phone switch probe now understands drawer mode (`Show threads` instead of `Back`): it timed out on hidden rows
 before, so P2/P3 had no fresh measurement in drawer mode. First live numbers are in
 [performance.md](../../docs/performance.md#drawer-mode-on-live-2026-11-25): title 265 ms (target met), first message
-1565 ms (still above the 800 ms goal), Back 234 ms, 2.4 s of long tasks per open.
+1565 ms (still above the 800 ms goal), Back 234 ms, 2.4 s of long tasks per open. A second two-row run measured title
+297/506 ms, first message 2061/2244 ms and 2.9/4.3 s of long tasks over 4.2–4.8k DOM elements: the remaining P2 lever
+is windowed transcript rendering, a product choice between scroll-back completeness and open latency.
 
 ### Verified on a scratch DSH (2026-11-25, this workspace)
 

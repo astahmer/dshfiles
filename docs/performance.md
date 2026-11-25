@@ -145,6 +145,13 @@ cheaper than the 1126 ms stack baseline. The first message (1565 ms) is still ab
 long tasks per open: the remaining cost is rendering the opened transcript, not naming the thread. Single-row sample
 under machine load; treat it as directional.
 
+A second run (two rows, same command and setup) widened the picture: title 297 / 506 ms, first message
+2061 / 2244 ms, long tasks 2951 / 4321 ms (max 602–629), DOM 4759 / 4242 elements, 16 / 10 requests and 28 / 16
+calls per open, Show threads → list 288 / 271 ms. Threads with more mounted history push the first message further
+while the title stays cheap; the probe's JSON summary crashed after these rows on a stale `rows` field (fixed).
+Windowed rendering of the transcript (render the last page first, fill earlier turns on scroll) is the remaining P2
+lever, and it is a product choice: scroll-back completeness versus open latency.
+
 ### Duplicate reads per switch and the auto-archive retry (2026-11-16)
 
 `METHODS=1` on the phone probe expands every batched dshx call by API method. Live, read-only (main build, emulated
