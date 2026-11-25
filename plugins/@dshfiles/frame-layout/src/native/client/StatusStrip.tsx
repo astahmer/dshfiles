@@ -130,7 +130,11 @@ const textOf = (element: Element): string => {
   return parts.join(' ')
 }
 
-/** Renders nothing until a plugin adds a visible item, so a profile without providers keeps the frame exactly as before. */
+/**
+ * Renders nothing until a plugin adds a visible item, so a profile without providers keeps the frame exactly as before.
+ * The strip is a labelled group, not a live region: its items hold counts that follow clocks, so a screen reader would
+ * hear it on every change during a turn. Each item that must be heard owns its own polite node (DESIGN.md Announcements).
+ */
 const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStripSettings }): ReactNode => {
   const items = useRegistry(StatusItems)
   const preferences = props.settings.preferences
@@ -163,7 +167,7 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   if (count === 0 && hidden.length === 0) return null
   if (count === 0) {
     return (
-      <div className={css.statusStrip} data-status-strip={props.narrow ? 'compact' : 'hidden'} role="status" aria-label="Status">
+      <div className={css.statusStrip} data-status-strip={props.narrow ? 'compact' : 'hidden'} role="group" aria-label="Status">
         <div className={css.statusSide}>
           <HiddenItemsControl settings={props.settings} hidden={hidden} />
         </div>
@@ -172,7 +176,7 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
   }
   if (props.narrow) {
     return (
-      <div className={css.statusStrip} data-status-strip="compact" role="status">
+      <div className={css.statusStrip} data-status-strip="compact" role="group" aria-label="Status">
         <div ref={measureRef} hidden>
           {[...arranged.global, ...arranged.thread].map(item => (
             <span key={item.id} data-status-label={item.summaryLabel === false ? '' : item.label}>
@@ -184,7 +188,7 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
         </div>
         <button
           type="button"
-          className={css.statusChip}
+          className={`${css.statusChip} dshx-hit-44`}
           aria-expanded={open}
           aria-label={summary === '' ? 'Status' : `Status: ${summary}`}
           data-status-summary={summary}
@@ -207,7 +211,7 @@ const StatusStripRow = (props: StatusStripProps & { readonly settings: StatusStr
     )
   }
   return (
-    <div className={css.statusStrip} data-status-strip="full" role="status" aria-label="Status">
+    <div className={css.statusStrip} data-status-strip="full" role="group" aria-label="Status">
       <div className={css.statusSide}>
         {arranged.global.map(item => renderItem(item, false))}
         {hidden.length === 0 ? null : <HiddenItemsControl settings={props.settings} hidden={hidden} />}
