@@ -88,6 +88,32 @@ describe('ai-accounts queries', () => {
     )
     const usage = await new QueryClient().fetchQuery(options)
     expect(usage?.cards[0]?.displayName).toBe('work')
+    expect(usage?.cards[0]?.useExtraUsage).toBeUndefined()
+  })
+
+  it('keeps the Host’s extra-usage gate beside the provider’s own extra-usage reading', async () => {
+    const options = aiAccountsQueries.usage(
+      {
+        usage: async () =>
+          toWire({
+            readAt: 1,
+            hostName: 'mac',
+            cards: [
+              {
+                instanceId: 'work',
+                kind: 'claude',
+                enabled: true,
+                useExtraUsage: false,
+                usage: { ...usageCard, extraUsage: { enabled: true, used: 12, monthlyLimit: 50, currency: 'EUR', percentUsed: 24, resetsAt: null } },
+              },
+            ],
+          }),
+      },
+      60_000,
+    )
+    const usage = await new QueryClient().fetchQuery(options)
+    expect(usage?.cards[0]?.useExtraUsage).toBe(false)
+    expect(usage?.cards[0]?.usage.extraUsage?.enabled).toBe(true)
   })
 
   it('reports an unreadable usage answer as null rather than failing the surface', async () => {

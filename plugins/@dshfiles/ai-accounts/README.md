@@ -208,7 +208,10 @@ follows its routed account.
 
 Agents change the same setting with the `ai_accounts_set_extra_usage` tool,
 which runs only when the user asks. It is stored in the accounts file as
-`useExtraUsage` next to the other per-account settings.
+`useExtraUsage` next to the other per-account settings. A quota card carries
+that gate as `useExtraUsage` beside the provider's own reading
+(`usage.extraUsage.enabled`): they are independent, so a provider that keeps
+reporting its extra usage on is not the DSH switch turning itself back on.
 
 Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
