@@ -559,11 +559,14 @@ describe('DestinationShell', () => {
     renderShell({ collapsed: false })
     const search = within(document.querySelector<HTMLElement>('[data-phone-list]') ?? document.body).getByRole('button', { name: 'Search threads' })
     expect(search.className).toContain('dshx:h-11')
+    // It looks like a field, with the field edge (council round 7 B3).
+    expect(search.className).toContain('dshx:border-field-border')
     cleanup()
-    // The desktop column keeps its compact 28px search.
+    // The desktop column keeps its compact 28px search, on the same field edge.
     setPhone(false)
     renderShell({ collapsed: false })
     expect(screen.getByRole('button', { name: 'Search threads' }).className).not.toContain('dshx:h-11')
+    expect(screen.getByRole('button', { name: 'Search threads' }).className).toContain('dshx:border-field-border')
   })
 
   it('reclaims the search\'s extra 16px from the gaps around the filter row and the group heads on touch (council round 6 B8)', () => {

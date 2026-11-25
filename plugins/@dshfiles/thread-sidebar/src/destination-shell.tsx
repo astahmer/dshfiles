@@ -829,7 +829,8 @@ const ListPane = (
             size="sm"
             variant="outline"
             className={cn(
-              'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:font-normal dshx:text-muted-foreground',
+              // A launcher that looks like a field takes the field edge (council round 7 B3).
+              'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:border-field-border dshx:font-normal dshx:text-muted-foreground',
               // A phone's search is a 44px control (council round 6 B8); the list's touch gaps give the height back.
               props.phone === true && 'dshx:h-11 dshx:gap-2 dshx:px-3 dshx:text-base',
             )}
