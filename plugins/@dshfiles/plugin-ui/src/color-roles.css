@@ -156,6 +156,33 @@
   background-color: color-mix(in oklab, var(--dshx-nav-tone, currentColor) 14%, transparent);
 }
 
+/*
+ * The attention badge (council round 4 A3): a Needs-you count on a nav glyph or a tab (`AttentionBadge`, or
+ * `dshx:badge-attention` on a span). A 16px pill in the attention fill: the Needs-you colour with white text in light;
+ * in dark a lifted fill of the accent hue (L 0.72) with dark text (L 0.2), so it is never a white blob. A 2px ring in
+ * the surface it sits on cuts it off the glyph; the rail's panel step by default, `--dshx-badge-ring` elsewhere (the
+ * phone tab bar sets its own). Text AA on the fill and fill 3:1 on bg, panel and raised (tests/attention-badge.test.tsx).
+ * Seat it beside the glyph, never over it.
+ */
+@utility badge-attention {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 16px;
+  min-width: 16px;
+  padding-inline: 4px;
+  border-radius: 9999px;
+  background-color: var(--dshx-badge-attention-fill);
+  color: var(--dshx-badge-attention-foreground);
+  box-shadow: 0 0 0 2px var(--dshx-badge-ring, var(--dsw-specific-sidebar-fill));
+  font-size: var(--dshx-density-text-min);
+  font-weight: 600;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 @layer base {
   :root {
     /* teal, violet, orange, pink, green, olive, sky, brown */
@@ -195,6 +222,8 @@
     --dshx-destructive-solid: var(--dsw-alias-state-error-primary);
     --dshx-attention-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary));
     --dshx-danger-tint-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
+    --dshx-badge-attention-fill: var(--dsw-alias-state-business-primary);
+    --dshx-badge-attention-foreground: oklch(1 0 0);
   }
   body[data-ds-dark-theme] {
     --dshx-identity-1: oklch(0.78 0.09 195);
@@ -214,6 +243,9 @@
     --dshx-scrim: rgb(0 0 0 / 0.5);
     /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
     --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
+    /* The attention badge follows the accent hue (indigo 270 by default) at a fixed lightness and chroma. */
+    --dshx-badge-attention-fill: oklch(from var(--dsw-alias-state-business-primary) 0.72 0.14 h);
+    --dshx-badge-attention-foreground: oklch(from var(--dsw-alias-state-business-primary) 0.2 0.02 h);
   }
 }
 
