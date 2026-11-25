@@ -16,7 +16,19 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
 import { StatusCount, workStatusValues, workStatusLabels } from '@dshfiles/plugin-ui/components/work-status'
-import { PlusIcon, RefreshCwIcon, TrashIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ActivityIcon,
+  BotIcon,
+  GitMergeIcon,
+  InboxIcon,
+  LibraryIcon,
+  ListTodoIcon,
+  MessagesSquareIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  SettingsIcon,
+  TrashIcon,
+} from '@dshfiles/plugin-ui/icons'
 import type { GalleryDemo } from './types.js'
 
 const row = 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2'
@@ -119,6 +131,41 @@ function SelectionDemo() {
         <EntityRow role="listitem" heading="Another row" onSelect={() => undefined} />
       </EntityList>
     </div>
+  )
+}
+
+/** The rail destinations and their identity tones (`nav-tone-<id>`); classes are literal so Tailwind keeps them. */
+const navItems = [
+  ['Threads', MessagesSquareIcon, 'dshx:nav-tone-threads'],
+  ['Inbox', InboxIcon, 'dshx:nav-tone-inbox'],
+  ['Land', GitMergeIcon, 'dshx:nav-tone-land'],
+  ['Work', ListTodoIcon, 'dshx:nav-tone-work'],
+  ['Agents', BotIcon, 'dshx:nav-tone-agents'],
+  ['Observe', ActivityIcon, 'dshx:nav-tone-observe'],
+  ['Knowledge', LibraryIcon, 'dshx:nav-tone-knowledge'],
+  ['Settings', SettingsIcon, 'dshx:nav-tone-settings'],
+] as const
+
+/** Each destination glyph in its tone; the current one takes the 14% tile and an ink 600 label. */
+function NavToneDemo() {
+  const [current, setCurrent] = React.useState<string>('Threads')
+  return (
+    <nav aria-label="Destinations" className="dshx:flex dshx:w-44 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:bg-card dshx:p-1.5">
+      {navItems.map(([label, Icon, tone]) => (
+        <button
+          key={label}
+          type="button"
+          aria-current={current === label ? 'page' : undefined}
+          onClick={() => setCurrent(label)}
+          className={`${tone} dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-left dshx:text-sm dshx:hover:bg-accent ${current === label ? 'dshx:font-semibold dshx:text-foreground' : 'dshx:text-muted-foreground'}`}
+        >
+          <span className={`dshx:flex dshx:size-6 dshx:items-center dshx:justify-center dshx:rounded-md ${current === label ? 'dshx:bg-nav-tile' : ''}`}>
+            <Icon aria-hidden className="dshx:text-nav-tone dshx:size-4" />
+          </span>
+          {label}
+        </button>
+      ))}
+    </nav>
   )
 }
 
@@ -277,6 +324,14 @@ export const kitDemos: readonly GalleryDemo[] = [
     source: "className={chosen ? 'dshx:selected-card' : undefined}",
     static: true,
     render: () => <SelectionDemo />,
+  },
+  {
+    id: 'kit-nav-tones',
+    title: 'Navigation tones',
+    description: 'Each destination glyph in its identity tone; the current destination adds a 14% tile and an ink label.',
+    source: "className='dshx:nav-tone-threads' · <Icon className='dshx:text-nav-tone' /> · 'dshx:bg-nav-tile'",
+    static: true,
+    render: () => <NavToneDemo />,
   },
   {
     id: 'kit-controls',

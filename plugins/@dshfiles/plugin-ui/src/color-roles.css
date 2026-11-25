@@ -70,6 +70,19 @@
   --color-data-4: var(--dshx-data-4);
   --color-data-5: var(--dshx-data-5);
   --color-data-6: var(--dshx-data-6);
+  /*
+   * Navigation identity (council round 3 A7): each rail destination's glyph draws in its own identity tone, so colour
+   * enters the chrome through what a place is, never as a tinted panel. `dshx:text-nav-<id>`, `dshx:bg-nav-<id>/14`;
+   * or the `nav-tone-<id>` + `text-nav-tone` / `bg-nav-tile` utilities below.
+   */
+  --color-nav-threads: var(--dshx-nav-tone-threads);
+  --color-nav-inbox: var(--dshx-nav-tone-inbox);
+  --color-nav-land: var(--dshx-nav-tone-land);
+  --color-nav-work: var(--dshx-nav-tone-work);
+  --color-nav-agents: var(--dshx-nav-tone-agents);
+  --color-nav-observe: var(--dshx-nav-tone-observe);
+  --color-nav-knowledge: var(--dshx-nav-tone-knowledge);
+  --color-nav-settings: var(--dshx-nav-tone-settings);
 }
 
 /* The selection marker (round five A1): `dshx:selected-marker`, applied wherever a list row takes `bg-selected-wash`. */
@@ -102,6 +115,44 @@
   }
 }
 
+/*
+ * Navigation identity utilities (council round 3 A7). `nav-tone-<id>` names a destination on the rail item (or tab-bar
+ * tab); inside it, `text-nav-tone` draws the icon in that tone (glyph only, the label stays ink) and `bg-nav-tile` gives the
+ * active item's icon seat a 14% tile of the same tone. The `text-`/`bg-` names keep them clear of the kit's
+ * `[&_svg:not([class*=text-])]` icon colour inside buttons and menu rows. Glyph and ink label hold 3:1 and AA on the tile over bg, panel
+ * and raised in both schemes (tests/nav-tone.test.ts). No tinted rows, panels or headers.
+ */
+@utility nav-tone-threads {
+  --dshx-nav-tone: var(--dshx-nav-tone-threads);
+}
+@utility nav-tone-inbox {
+  --dshx-nav-tone: var(--dshx-nav-tone-inbox);
+}
+@utility nav-tone-land {
+  --dshx-nav-tone: var(--dshx-nav-tone-land);
+}
+@utility nav-tone-work {
+  --dshx-nav-tone: var(--dshx-nav-tone-work);
+}
+@utility nav-tone-agents {
+  --dshx-nav-tone: var(--dshx-nav-tone-agents);
+}
+@utility nav-tone-observe {
+  --dshx-nav-tone: var(--dshx-nav-tone-observe);
+}
+@utility nav-tone-knowledge {
+  --dshx-nav-tone: var(--dshx-nav-tone-knowledge);
+}
+@utility nav-tone-settings {
+  --dshx-nav-tone: var(--dshx-nav-tone-settings);
+}
+@utility text-nav-tone {
+  color: var(--dshx-nav-tone, currentColor);
+}
+@utility bg-nav-tile {
+  background-color: color-mix(in oklab, var(--dshx-nav-tone, currentColor) 14%, transparent);
+}
+
 @layer base {
   :root {
     /* teal, violet, orange, pink, green, olive, sky, brown */
@@ -126,6 +177,18 @@
   }
   /* On body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing). */
   body {
+    /*
+     * The rail destinations onto the identity ramp (council round 3 A7), declared on body so the dark ramp follows.
+     * Identity-5 (green, hue 145) is left out: it sits beside the success green. Settings is neutral.
+     */
+    --dshx-nav-tone-threads: var(--dshx-identity-7);
+    --dshx-nav-tone-inbox: var(--dshx-identity-2);
+    --dshx-nav-tone-land: var(--dshx-identity-1);
+    --dshx-nav-tone-work: var(--dshx-identity-3);
+    --dshx-nav-tone-agents: var(--dshx-identity-4);
+    --dshx-nav-tone-observe: var(--dshx-identity-6);
+    --dshx-nav-tone-knowledge: var(--dshx-identity-8);
+    --dshx-nav-tone-settings: var(--dsw-alias-label-secondary);
     --dshx-destructive-solid: var(--dsw-alias-state-error-primary);
     --dshx-attention-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary));
     --dshx-danger-tint-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));

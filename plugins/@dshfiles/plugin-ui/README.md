@@ -142,6 +142,14 @@ box keeps its size) and a 16px check badge in the trailing top corner, with no l
 and drop its own border colour while chosen (`chosen ? 'dshx:selected-card' : 'dshx:border-border'`). Hover stays the
 ink wash (`bg-accent`). The page's segmented `TabsList` keeps its paper pill.
 
+**Navigation identity.** Each rail destination draws its icon in its own identity tone, glyph only:
+`--dshx-nav-tone-<id>` maps threads → identity-7, inbox → 2, land → 1, work → 3, agents → 4, observe → 6,
+knowledge → 8, and settings to the secondary ink (identity-5 green is left out: it sits beside the success green). Put
+`dshx:nav-tone-<id>` on the item, `dshx:text-nav-tone` on its icon, and `dshx:bg-nav-tile` (the tone at 14%) on the
+active item's icon seat; the label stays ink (600 when active). The `text-`/`bg-` names keep them clear of the kit's
+`[&_svg:not([class*=text-])]` icon colour inside buttons and menu rows. Direct colours exist too:
+`dshx:text-nav-threads`, `dshx:bg-nav-threads/14`. Never tint a row, panel or header with them.
+
 **Attention washes.** A row that waits on you outranks a selected one: a Needs-you row takes `bg-wash-needs-you`
 (`--dshx-wash-needs-you`, accent hue, light `oklch(0.94 0.035 h)`, dark `oklch(0.29 0.045 h)`) and a Failed row
 `bg-wash-failed` (`--dshx-wash-failed`, hue 25, light `oklch(0.95 0.025 25)`, dark `oklch(0.28 0.04 25)`). Ink,
