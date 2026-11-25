@@ -450,7 +450,7 @@ export const en = {
   'chat.unreadDivider': 'New',
   'settings.transcript.title': 'View mode',
   'settings.transcript.description': 'Summary folds each turn\'s tool work under one row, Normal folds finished turns, Verbose shows every call and the context loaded at the start of each turn',
-  'settings.collapse.title': 'When to Collapse Work Details',
+  'settings.collapse.title': 'When to collapse work details',
   'settings.collapse.description': 'Choose when to automatically collapse work details',
   'settings.collapse.completion': 'On completion',
   'settings.collapse.nextInput': 'On next message',
