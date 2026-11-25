@@ -19,14 +19,16 @@ export interface ChartFrameProps {
 /**
  * Figure around a TanStack chart. Charts paint with `currentColor` and the
  * `--ts-chart-*` palette, so this maps both onto DSH tokens and the chart
- * follows the active theme without rebuilding its definition.
+ * follows the active theme without rebuilding its definition. The palette is
+ * the data ramp (`--dshx-data-1..6`, DESIGN.md › Colour roles 8): a status hue
+ * appears only where a series is that status, named explicitly in its scale.
  */
 export const ChartFrame = (props: ChartFrameProps): JSX.Element => (
   <figure
     className={cn(
       'dshx:m-0 dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground',
-      'dshx:[--ts-chart-1:var(--dsw-alias-state-business-primary)] dshx:[--ts-chart-2:var(--dsw-alias-state-success-primary)] dshx:[--ts-chart-3:var(--dsw-alias-state-warn-primary)]',
-      'dshx:[--ts-chart-4:var(--dsw-alias-state-error-primary)] dshx:[--ts-chart-5:var(--dsw-alias-brand-primary)] dshx:[--ts-chart-6:var(--dsw-alias-label-tertiary)]',
+      'dshx:[--ts-chart-1:var(--dshx-data-1)] dshx:[--ts-chart-2:var(--dshx-data-2)] dshx:[--ts-chart-3:var(--dshx-data-3)]',
+      'dshx:[--ts-chart-4:var(--dshx-data-4)] dshx:[--ts-chart-5:var(--dshx-data-5)] dshx:[--ts-chart-6:var(--dshx-data-6)]',
       props.className,
     )}
   >

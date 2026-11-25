@@ -8,8 +8,9 @@
  * - Identity tells projects, providers and agents apart and never says state: a text-safe ramp at oklch L 0.50
  *   (light) and 0.78 with chroma capped at 0.13 (dark), every tone at AA on bg, panel and raised in both schemes
  *   (tests/palette.test.ts).
- * - Data is the categorical chart order: the accent, then five identity tones (green, sky and brown stay out of charts
- *   so a series never reads as a status).
+ * - Data is the categorical chart order (round five K5): six identity hues at a chart step, teal, violet, copper,
+ *   magenta, olive, cyan, so no series starts with the interaction accent or reads as a status. Each is a real CSS
+ *   variable (`--dshx-data-<n>`) a plot spec can name; marks hold 3:1 where charts sit.
  *
  * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
  */
@@ -51,12 +52,12 @@
   --color-identity-6: var(--dshx-identity-6);
   --color-identity-7: var(--dshx-identity-7);
   --color-identity-8: var(--dshx-identity-8);
-  --color-data-1: var(--dsw-alias-state-business-primary);
-  --color-data-2: var(--dshx-identity-1);
-  --color-data-3: var(--dshx-identity-3);
-  --color-data-4: var(--dshx-identity-2);
-  --color-data-5: var(--dshx-identity-4);
-  --color-data-6: var(--dshx-identity-6);
+  --color-data-1: var(--dshx-data-1);
+  --color-data-2: var(--dshx-data-2);
+  --color-data-3: var(--dshx-data-3);
+  --color-data-4: var(--dshx-data-4);
+  --color-data-5: var(--dshx-data-5);
+  --color-data-6: var(--dshx-data-6);
 }
 
 @layer base {
@@ -70,6 +71,13 @@
     --dshx-identity-6: oklch(0.5 0.1 100);
     --dshx-identity-7: oklch(0.5 0.12 235);
     --dshx-identity-8: oklch(0.5 0.08 70);
+    /* teal, violet, copper, magenta, olive, cyan */
+    --dshx-data-1: oklch(0.6 0.12 195);
+    --dshx-data-2: oklch(0.6 0.12 305);
+    --dshx-data-3: oklch(0.6 0.12 55);
+    --dshx-data-4: oklch(0.6 0.12 340);
+    --dshx-data-5: oklch(0.6 0.12 110);
+    --dshx-data-6: oklch(0.6 0.12 225);
     /* How long a row that just became Needs you, Failed or Ready holds its tint (DESIGN.md › Motion). */
     --dshx-duration-hold: 1200ms;
   }
@@ -88,6 +96,12 @@
     --dshx-identity-6: oklch(0.78 0.1 100);
     --dshx-identity-7: oklch(0.78 0.12 235);
     --dshx-identity-8: oklch(0.78 0.08 70);
+    --dshx-data-1: oklch(0.7 0.11 195);
+    --dshx-data-2: oklch(0.7 0.11 305);
+    --dshx-data-3: oklch(0.7 0.11 55);
+    --dshx-data-4: oklch(0.7 0.11 340);
+    --dshx-data-5: oklch(0.7 0.11 110);
+    --dshx-data-6: oklch(0.7 0.11 225);
     /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
     --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
   }

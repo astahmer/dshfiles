@@ -127,16 +127,33 @@ describe('colour roles (DESIGN.md › Colour roles)', () => {
       'status-idle': 'var(--dsw-alias-label-tertiary)',
       'health-off': 'var(--dsw-alias-label-tertiary)',
       'status-done': 'var(--dsw-alias-label-secondary)',
-      'data-1': 'var(--dsw-alias-state-business-primary)',
-      'data-2': 'var(--dshx-identity-1)',
-      'data-3': 'var(--dshx-identity-3)',
-      'data-4': 'var(--dshx-identity-2)',
-      'data-5': 'var(--dshx-identity-4)',
-      'data-6': 'var(--dshx-identity-6)',
+      'data-1': 'var(--dshx-data-1)',
+      'data-2': 'var(--dshx-data-2)',
+      'data-3': 'var(--dshx-data-3)',
+      'data-4': 'var(--dshx-data-4)',
+      'data-5': 'var(--dshx-data-5)',
+      'data-6': 'var(--dshx-data-6)',
     }
     for (const [role, value] of Object.entries(roles)) expect(theme, role).toContain(`--color-${role}: ${value};`)
     for (let n = 1; n <= 8; n += 1) expect(theme).toContain(`--color-identity-${n}: var(--dshx-identity-${n});`)
     expect(block(':root')).toContain('--dshx-duration-hold: 1200ms;')
+  })
+
+  const data = (body: string): readonly Oklch[] =>
+    [...body.matchAll(/--dshx-data-(\d):\s*oklch\(([\d.]+) ([\d.]+) ([\d.]+)\)/g)].map(([, , l, c, h]) => ({ l: Number(l), c: Number(c), h: Number(h) }))
+  const dataRamps = { light: data(block(':root')), dark: data(block('body[data-ds-dark-theme]')) } as const
+
+  it.each(schemes)('starts the data ramp with identity tones, never the accent or a status hue (%s, round five K5)', scheme => {
+    const ramp = dataRamps[scheme]
+    expect(ramp.map(tone => tone.h)).toEqual([195, 305, 55, 340, 110, 225])
+    for (const tone of ramp) expect(tone).toMatchObject(scheme === 'light' ? { l: 0.6, c: 0.12 } : { l: 0.7, c: 0.11 })
+    // A chart mark is a graphic: 3:1 where charts sit (the page and panels; raised too in dark).
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const under = scheme === 'light' ? { bg: 0, panel: 1 } : surfaces
+    ramp.forEach((tone, index) => {
+      for (const [surface, step] of Object.entries(under))
+        expect(PaletteMath.contrastRatio(tone, p.neutral[step]!), `data-${index + 1} on ${surface}`).toBeGreaterThanOrEqual(3)
+    })
   })
 
   it('is imported by the kit stylesheet with one line', () => {
