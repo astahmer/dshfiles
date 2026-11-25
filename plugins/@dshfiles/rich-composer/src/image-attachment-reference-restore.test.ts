@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
-import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { imageAttachmentReferences } from './native/image-attachment-references.ts'
@@ -32,7 +31,6 @@ const shellWithRoot = () => {
   const ctx = new Context()
   cleanups.push(() => ctx.fiber.dispose())
   const shell = new SessionInputShell({
-    sessionId: SessionId('test-session'),
     actx: ctx,
     inputTriggers: triggers,
     defaultSink: async () => ({ kind: 'success' }),

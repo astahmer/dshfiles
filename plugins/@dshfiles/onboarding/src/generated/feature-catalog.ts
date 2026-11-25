@@ -462,7 +462,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "rich-composer",
       "description": "Owned fork of DSH's native Conversation plugin with structured session-reference paste.",
       "ui": true,
-      "features": 12
+      "features": 13
     },
     {
       "name": "schedule",
@@ -20813,6 +20813,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "A queued message comes back into the composer as plain text; every trigger source's own restore grammar turns the serialized references it still names back into the chips the composer sent, without changing the draft text.",
       "destination": "composer",
       "currentSurface": "composer: restored draft references",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "rich-composer#sent-annotations",
+      "plugin": "rich-composer",
+      "id": "sent-annotations",
+      "title": "Keep sent annotations across browsers",
+      "summary": "An accepted message's annotations move into a Host-stored per-session review history, so markers and comments stay on the passage after sending and come back in any browser. Edits and removals follow the same record, and the Composer contract exposes draft and sent annotations t…",
+      "destination": "none",
+      "currentSurface": "host: plugin storage per Session · client: Composer annotations",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
-import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SessionInputShell } from './native/input/facade.ts'
 import { DraftAnnotations } from './native/input/draft-annotations.ts'
 import { COMMENT_QUOTE_COMMAND, $isQuoteNode } from './native/input/editor/QuoteNode.tsx'
@@ -16,8 +15,6 @@ const cleanups: (() => void)[] = []
 afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup()
 })
-// Sent history is per-browser and this file shares one session id; each test starts empty.
-beforeEach(() => { localStorage.clear() })
 
 const shellSendingTo = (sink: (text: string) => Promise<SubmitOutcome>): SessionInputShell => {
   const ctx = new Context()
@@ -36,7 +33,6 @@ const shellSendingTo = (sink: (text: string) => Promise<SubmitOutcome>): Session
     toggleSource: () => undefined,
   }
   const shell = new SessionInputShell({
-    sessionId: SessionId('test-session'),
     actx: ctx,
     inputTriggers: () => triggers,
     defaultSink: text => sink(text),

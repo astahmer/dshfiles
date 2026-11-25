@@ -9,7 +9,6 @@
  * listeners onto it.
  */
 import type { Context } from '@deepseek-ai/cordis'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import {
   createSnapshotStore, type ObservableSnapshot, type SnapshotStore,
@@ -31,7 +30,7 @@ import { resolveDraftInput, snapshotDraft } from '../draft.ts'
 import { DraftEditorRuntime } from './editor/runtime.ts'
 import type { QuoteNodeLabels } from './editor/QuoteNode.tsx'
 import { DraftAnnotations, type DraftAnnotation } from './draft-annotations.ts'
-import { SentAnnotations } from './sent-annotations.ts'
+import { SentAnnotations, type SentAnnotationHistory } from './sent-annotations.ts'
 import type { EditorProjection } from './editor/projection.ts'
 
 /** Popup face the shell needs (dismissal only; typed structurally to avoid a value import). */
@@ -45,8 +44,8 @@ export interface PopupDismissFace {
  * owns the lexicon subscription through the Session scope's inject lifecycle.
  */
 export interface SessionInputDeps {
-  /** Session this shell edits; its sent-annotation history is keyed by it. */
-  sessionId: SessionId
+  /** Host-backed sent-annotation history for this Session; absent when the composer runs without one. */
+  annotationHistory?: SentAnnotationHistory | undefined
   /** Session-scope ctx handed to claim.submit transactions. */
   actx: Context
   /** Snapshot the Session facts before asynchronous command arbitration. */
@@ -192,7 +191,7 @@ export class SessionInputShell implements SessionInput {
   private readonly unsubscribeInbox: (() => void) | undefined
 
   constructor(private readonly deps: SessionInputDeps) {
-    this.sentAnnotations = new SentAnnotations(deps.sessionId)
+    this.sentAnnotations = new SentAnnotations(deps.annotationHistory)
     this.draftEditor = new DraftEditorRuntime({
       onUpdate: () => { this.onEditorUpdate() },
       quoteLabels: () => this.quoteLabels(),

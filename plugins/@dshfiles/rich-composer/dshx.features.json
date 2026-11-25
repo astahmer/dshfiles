@@ -647,6 +647,48 @@
           "reason": "Client-side draft composition: restoring chips re-imports the existing draft text in the composer editor, with no new Host work."
         }
       ]
+    },
+    {
+      "id": "sent-annotations",
+      "title": "Keep sent annotations across browsers",
+      "summary": "An accepted message's annotations move into a Host-stored per-session review history, so markers and comments stay on the passage after sending and come back in any browser. Edits and removals follow the same record, and the Composer contract exposes draft and sent annotations together to Chat's inline markers.",
+      "surfaces": ["client", "host", "api"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: plugin storage per Session · client: Composer annotations",
+      "configuration": [],
+      "states": ["empty", "stored", "unreachable-host", "removed"],
+      "failureModes": [
+        "Without the profile's storage-domain row the API answers storage-unavailable and the history stays in this tab until reload.",
+        "A Session over the 200-annotation bound drops its oldest annotations.",
+        "An unreachable Host keeps the marker in this tab only; a reload reads what the Host actually stored."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.sent-annotations-client",
+          "file": "plugins/@dshfiles/rich-composer/src/native/input/sent-annotations.test.ts",
+          "testName": "keeps the marker immediately, then takes the Host record id"
+        },
+        {
+          "kind": "unit-test",
+          "id": "rich-composer.sent-annotations-ids",
+          "file": "plugins/@dshfiles/rich-composer/src/sent-annotations-host.test.ts",
+          "testName": "continues the stored sequence after the highest id"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "rich-composer.sent-annotations-browser",
+          "reason": "Walked in a scratch DSH: annotate an assistant paragraph, send, reload, and the marker plus its popover comment return from the Host store."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

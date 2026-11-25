@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
-import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SessionInputShell } from './native/input/facade.ts'
@@ -49,7 +48,6 @@ function fixture(sink: (text: string) => Promise<SubmitOutcome>) {
     toggleSource: () => undefined,
   }
   const shell = new SessionInputShell({
-    sessionId: SessionId('test-session'),
     actx: ctx,
     inputTriggers: () => triggers,
     defaultSink: text => sink(text),

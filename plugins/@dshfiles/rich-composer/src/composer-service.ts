@@ -9,7 +9,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { relativizeToCwd, workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ComposerAnnotation, ComposerService, ComposerTarget, Subscribable } from '@dshfiles/dshx/client'
 import type { DraftAnnotation } from './native/input/draft-annotations.ts'
-import type { SentAnnotation } from './native/input/sent-annotations.ts'
+import type { SentAnnotation } from './sent-annotations-api.ts'
 
 const DRAFT_ID_PREFIX = 'draft:'
 const SENT_ID_PREFIX = 'sent:'
