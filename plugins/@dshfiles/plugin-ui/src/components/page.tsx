@@ -46,8 +46,11 @@ export interface PageTabs {
   readonly variant?: 'underline' | 'segmented'
 }
 
-/** How wide a page runs (council round 3 A5): 1080px, a 920px list lane, or the whole pane (a diff, a chart, a table). */
-export type PageWidth = 'page' | 'lane' | 'full'
+/**
+ * How wide a page runs. Two frames (council round 5 A2): `lane` (880px) for lists and forms, `wide` (min(100%, 1200px))
+ * for data pages. `page` (1080px) stays for older callers; `full` is the whole pane (a diff, a chart, a table).
+ */
+export type PageWidth = 'page' | 'lane' | 'wide' | 'full'
 
 /** The statuses a page title counts, attention first: one `StatusCount` per status present. */
 export type PageStatusCounts = Partial<Readonly<Record<WorkStatus, number>>>
@@ -76,12 +79,25 @@ export interface PageProps extends Omit<React.ComponentPropsWithoutRef<'div'>, '
    * its children own their scroll. Exclusive with `scroll`.
    */
   readonly fill?: boolean
-  /** `page` (1080px, the default), `lane` (920px, a list page) or `full` (a diff, chart or table; `fill` defaults to it). */
+  /**
+   * `lane` (880px: lists and forms), `wide` (min(100%, 1200px): data), `page` (1080px, the default for older callers) or
+   * `full` (a diff, chart or table; `fill` defaults to it). Every frame starts at the same pane inset.
+   */
   readonly width?: PageWidth
   readonly bodyClassName?: string
 }
 
-const WIDTH_CLASS = { page: 'dshx:max-w-page', lane: 'dshx:max-w-lane', full: '' } as const satisfies Record<PageWidth, string>
+/**
+ * The frame caps as classes, for a page that owns its layout (Settings with `PageHeader`, a split view): put the header
+ * and the body in one start-aligned element with the same `dshx:p-6` inset `Page` uses, so its actions sit on the
+ * frame's trailing edge.
+ */
+export const PAGE_FRAME_CLASS = {
+  page: 'dshx:max-w-page',
+  lane: 'dshx:max-w-lane',
+  wide: 'dshx:w-full dshx:max-w-wide',
+  full: '',
+} as const satisfies Record<PageWidth, string>
 
 /** Width of the `pane-compact` container tier (42rem): below it, inline header actions fold into the overflow menu. */
 const COMPACT_WIDTH_PX = 672
@@ -303,7 +319,7 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
           // narrow panes and phones keep 12. Width (council round 3 A5): header and body share one capped,
           // start-aligned container, so the header actions sit on the content's trailing edge, not the window's.
           'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-5 dshx:p-6 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:p-3',
-          WIDTH_CLASS[width ?? (fill ? 'full' : 'page')],
+          PAGE_FRAME_CLASS[width ?? (fill ? 'full' : 'page')],
           fill && 'dshx:min-h-0 dshx:flex-1',
         )}
       >

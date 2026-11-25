@@ -424,11 +424,13 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 
 - At most one primary action. Secondary actions are outline buttons while the page is at least 42rem wide and fold
   into the `⋯` overflow menu below that; the primary never folds.
-- One page container: the header and the body share one start-aligned container capped at 1080px (`Page`
-  `width="page"`, the default, `max-w-page`); a list page takes the 920px lane (`width="lane"`, `max-w-lane`); only a
-  diff, a chart or a table runs full bleed (`width="full"`, the default for a `fill` master–detail page). The header
-  actions sit on that container's trailing edge, never the window's. A page that owns its layout puts the standalone
-  `PageHeader` inside the same cap. The `h1` is 22px/650 (`text-title font-title`); its count is tertiary ink, or one
+- **Two page frames, not four widths.** The header and the body share one start-aligned container: `lane`, 880px,
+  for lists and forms (Inbox, Backlog, Plugins, Settings; the Settings field column stays 680px inside it), and
+  `wide`, min(100%, 1200px), for data (Usage, Review, AI accounts) — `Page` `width="lane"` / `width="wide"`
+  (`max-w-lane`, `max-w-wide`). Both start at the same 24px pane inset. Only a diff, a chart or a table runs full
+  bleed (`width="full"`, the default for a `fill` master–detail page); `width="page"` (1080px) is the legacy default
+  that new pages do not choose. The header actions sit on the frame's trailing edge, never the window's. A page that
+  owns its layout puts the standalone `PageHeader` inside the same frame (`PAGE_FRAME_CLASS.lane` / `.wide`). The `h1` is 22px/650 (`text-title font-title`); its count is tertiary ink, or one
   `StatusCount` per status present (`statusCounts`). Spacing scale: page padding 24px, 20px between the header and
   the body, body sections stacked 16px apart; narrow panes and phones keep 12px. Rows stay 32px, so density stays
   compact.

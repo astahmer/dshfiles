@@ -164,12 +164,14 @@
   --container-pane-narrow: 28rem;
   --container-pane-compact: 42rem;
   /*
-   * Page widths (council round 3 A5): `max-w-page` caps a page (header and body) at 1080px, `max-w-lane` a list page or
-   * a list lane at 920px. Full bleed is for a diff, a chart or a table only. In px, not rem: the Host's root font is
-   * about 12.5px, so a rem cap came out a fifth short.
+   * Page frames (council round 5 A2): two frames, not four widths. `max-w-lane` (880px) for lists and forms (Inbox,
+   * Backlog, Plugins, Settings), `max-w-wide` (min(100%, 1200px)) for data (Usage, Review, AI accounts). Both start at
+   * the same pane inset. `max-w-page` (1080px) stays for older callers. Full bleed is for a diff, chart or table only.
+   * In px, not rem, so the caps hold whatever the Host's root font is.
    */
   --container-page: 1080px;
-  --container-lane: 920px;
+  --container-lane: 880px;
+  --container-wide: 1200px;
 }
 
 @layer base {

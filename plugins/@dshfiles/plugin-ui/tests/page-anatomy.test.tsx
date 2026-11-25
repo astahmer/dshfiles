@@ -103,15 +103,37 @@ describe('page container (council round 3 A5)', () => {
     expect(view.getByText('body').closest('[data-slot="page-container"]')).toBe(box)
     // Computed under the Host's root font: the caps are px, not rem.
     expect(resolved('--container-page')).toBe(1080)
-    expect(resolved('--container-lane')).toBe(920)
+    expect(resolved('--container-lane')).toBe(880)
+    expect(resolved('--container-wide')).toBe(1200)
   })
 
-  it('takes a 920px lane for a list page and full bleed only on request (diff, chart, table)', () => {
+  it('takes a 880px lane for a list page and full bleed only on request (diff, chart, table)', () => {
     const lane = render(<Page heading="Plugins" width="lane" />)
     expect(classes(container(lane.container))).toContain('dshx:max-w-lane')
     cleanup()
     const full = render(<Page heading="Review" width="full" />)
     expect(classes(container(full.container)).join(' ')).not.toMatch(/max-w-/u)
+  })
+
+  it('offers two frames (council round 5 A2): lane 880 for lists and forms, wide min(100%, 1200px) for data, same start inset', () => {
+    const lane = render(<Page heading="Inbox" width="lane" />)
+    const laneBox = container(lane.container)!
+    cleanup()
+    const wide = render(<Page heading="Usage" width="wide" primaryAction={{ id: 'refresh', label: 'Refresh', onSelect: vi.fn() }} />)
+    const wideBox = container(wide.container)!
+    expect(classes(wideBox)).toEqual(expect.arrayContaining(['dshx:w-full', 'dshx:max-w-wide']))
+    // Neither frame centres: both start at the pane's 24px inset, so the two page kinds line up.
+    for (const box of [laneBox, wideBox]) {
+      expect(classes(box)).toContain('dshx:p-6')
+      expect(classes(box).join(' ')).not.toMatch(/mx-auto|justify-center|items-center/u)
+    }
+    // Header actions sit on the frame's trailing edge.
+    expect(wide.getByRole('button', { name: 'Refresh' }).closest('[data-slot="page-container"]')).toBe(wideBox)
+    // At a 1440px pane: min(100%, cap). The frame is the content box plus its padding (border-box).
+    const frame = (pane: number, cap: number): number => Math.min(pane, cap)
+    expect(frame(1440, resolved('--container-lane'))).toBe(880)
+    expect(frame(1440, resolved('--container-wide'))).toBe(1200)
+    expect(frame(1000, resolved('--container-wide'))).toBe(1000)
   })
 
   it('lets a master-detail page (fill) use the whole pane unless it asks for a width', () => {
