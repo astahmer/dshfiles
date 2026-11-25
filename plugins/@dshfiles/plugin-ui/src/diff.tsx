@@ -114,7 +114,9 @@ export class PatchLook {
     '[data-separator=line-info]:not([data-expand-index]) [data-separator-content] { padding-inline: calc(var(--dshx-diff-gutter) + 2ch) 1ch; } ' +
     '[data-separator=line-info] [data-expand-button] { min-width: 0; border-radius: 0; } ' +
     '[data-expand-button] [data-icon] { width: 14px; height: 14px; } ' +
-    '[data-unmodified-lines] { font-family: var(--diffs-header-font-family, var(--diffs-header-font-fallback)); }'
+    '[data-unmodified-lines] { font-family: var(--diffs-header-font-family, var(--diffs-header-font-fallback)); } ' +
+    // Dark diff lines paint their band as is (council round 7 A6, theme/diff-look.ts): the library's dark 20% mix off.
+    '[data-line], [data-no-newline], [data-gutter-buffer], [data-column-number] { --mix-dark: 0%; }'
 
   /**
    * The bar's label in our words (council round 7 A3): "Show N unchanged lines" where it expands, "N unchanged lines"

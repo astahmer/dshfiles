@@ -5,9 +5,12 @@
  * check contrast on them.
  *
  * - The body sits on the ramp: the page in light, the panel step in dark (never the library's near-black).
- * - Added and removed lines are a 12% tint of the success and danger tones over the body; a changed word inside them
- *   20%. Line numbers take the same band. The library mixes its line override into the body itself (12% in light, 20%
- *   in dark), so the override is the colour whose mix lands at 12%: the tone in light, a 60% mix of it in dark.
+ * - Light: added and removed lines are a 12% tint of the success and danger tones over the body; a changed word inside
+ *   them 20%. The library mixes its line override into the body itself (12% in light), so the override is the tone.
+ * - Dark (council round 7 A6): a 12% tint over the dark panel moved L by about 0.005 and barely separated from the
+ *   page, so each band is its own step in the tone's hue, L 0.27 at chroma 0.045 (a changed word L 0.32 at 0.065).
+ *   `PatchLook` turns the library's dark mix off (`--mix-dark: 0%`), so the override is exactly what paints.
+ * - Line numbers take the same band.
  * - The collapsed-lines bar is a 3% ink wash: a quiet band, not a grey slab.
  */
 // Type-only, as `.js`: `PatchView` imports this file, and plugins that compile it reject `.ts` import paths.
@@ -32,6 +35,9 @@ const BODY_STEP = { light: 0, dark: 1 } as const satisfies Record<Scheme, number
 const LINE_TINT = 0.12
 const EMPHASIS_TINT = 0.2
 const SEPARATOR_INK = 0.03
+/** The dark line bands and changed-word fills (council round 7 A6), in the success and danger hues. */
+const DARK_BAND = { l: 0.27, c: 0.045 } as const
+const DARK_EMPHASIS = { l: 0.32, c: 0.065 } as const
 /** How much of a line override `@pierre/diffs` mixes into the body (`--mix-light` 88%, `--mix-dark` 80%). */
 const LIBRARY_LINE_MIX = { light: 0.12, dark: 0.2 } as const satisfies Record<Scheme, number>
 
@@ -47,13 +53,23 @@ export interface DiffSurfaces {
 function surfaces(p: Palette): DiffSurfaces {
   // SAFETY: the generated ramp has all eleven steps; BODY_STEP (0 or 1) and 10 are below eleven.
   const [body, ink] = [p.neutral[BODY_STEP[p.scheme]], p.neutral[10]] as [Oklch, Oklch]
+  const separator = mixOklab(body, ink, SEPARATOR_INK)
+  if (p.scheme === 'dark')
+    return {
+      body,
+      addition: { ...DARK_BAND, h: p.success.fg.h },
+      deletion: { ...DARK_BAND, h: p.danger.fg.h },
+      additionEmphasis: { ...DARK_EMPHASIS, h: p.success.fg.h },
+      deletionEmphasis: { ...DARK_EMPHASIS, h: p.danger.fg.h },
+      separator,
+    }
   return {
     body,
     addition: mixOklab(body, p.success.fg, LINE_TINT),
     deletion: mixOklab(body, p.danger.fg, LINE_TINT),
     additionEmphasis: mixOklab(body, p.success.fg, EMPHASIS_TINT),
     deletionEmphasis: mixOklab(body, p.danger.fg, EMPHASIS_TINT),
-    separator: mixOklab(body, ink, SEPARATOR_INK),
+    separator,
   }
 }
 
@@ -63,11 +79,15 @@ const percent = (amount: number): string => `${String(Math.round(amount * 100))}
 function style(scheme: Scheme) {
   const body = `var(--dshx-tone-${String(BODY_STEP[scheme])})`
   const tint = (tone: string, amount: number): string => `color-mix(in oklab, var(--dshx-tone-${tone}) ${percent(amount)}, ${body})`
-  // The library mixes this target into the body at its own amount; aim it so the line lands at LINE_TINT.
+  // The library mixes this target into the body at its own amount; aim it so the line lands at LINE_TINT. Dark paints
+  // the band itself (PatchLook sets `--mix-dark: 0%`), in the tone's own hue so a preset's success and danger follow.
+  const band = (tone: string, step: { readonly l: number; readonly c: number }): string => `oklch(from var(--dshx-tone-${tone}) ${String(step.l)} ${String(step.c)} h)`
   const target = (tone: string): string => {
+    if (scheme === 'dark') return band(tone, DARK_BAND)
     const amount = LINE_TINT / LIBRARY_LINE_MIX[scheme]
     return amount >= 1 ? `var(--dshx-tone-${tone})` : tint(tone, amount)
   }
+  const emphasis = (tone: string): string => (scheme === 'dark' ? band(tone, DARK_EMPHASIS) : tint(tone, EMPHASIS_TINT))
   const addition = target('success')
   const deletion = target('danger')
   return {
@@ -80,8 +100,8 @@ function style(scheme: Scheme) {
     '--diffs-bg-addition-number-override': addition,
     '--diffs-bg-deletion-override': deletion,
     '--diffs-bg-deletion-number-override': deletion,
-    '--diffs-bg-addition-emphasis-override': tint('success', EMPHASIS_TINT),
-    '--diffs-bg-deletion-emphasis-override': tint('danger', EMPHASIS_TINT),
+    '--diffs-bg-addition-emphasis-override': emphasis('success'),
+    '--diffs-bg-deletion-emphasis-override': emphasis('danger'),
     '--diffs-bg-separator-override': `color-mix(in oklab, var(--dshx-tone-10) ${percent(SEPARATOR_INK)}, ${body})`,
     '--diffs-addition-color-override': 'var(--dshx-tone-success)',
     '--diffs-deletion-color-override': 'var(--dshx-tone-danger)',
