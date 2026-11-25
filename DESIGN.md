@@ -11,7 +11,7 @@ colors:
   border-hairline: '#dedcda'
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
-  selected-wash: '#e6eeff'
+  selected-wash: '#edf0f9'
   label-faint: '#737170'
   label-secondary: '#646362'
   signal-indigo: '#3b5bd4'
@@ -24,7 +24,7 @@ colors:
   surface-raised-dark: '#23201d'
   border-hairline-dark: '#2f2c29'
   label-secondary-dark: '#a7a4a1'
-  selected-wash-dark: '#212947'
+  selected-wash-dark: '#1f222e'
   signal-indigo-dark: '#839ffc'
   danger-red-dark: '#fa8880'
   success-green-dark: '#65c67d'
@@ -209,7 +209,7 @@ No slate shell: navigation surfaces keep the warm stone.
 | 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#737170` | `#8e8b89` |
 | 9 muted         | secondary text (AA)                  | `muted-foreground`           | `--dsw-alias-label-secondary`                                  | `#646362` | `#a7a4a1` |
 | 10 text         | primary text, primary fill (AA)      | `foreground`, `primary`      | `--dsw-alias-label-primary`                                    | `#1b1a19` | `#eae7e4` |
-| selected wash   | selection at the tint rung           | `selected-wash`              | `--dshx-selected-wash` (accent hue)                            | `#e6eeff` | `#212947` |
+| selected wash   | selection at the tint rung           | `selected-wash`              | `--dshx-selected-wash` (accent hue)                            | `#edf0f9` | `#1f222e` |
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |

@@ -98,7 +98,7 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
     <CommandPrimitive.Item
       data-slot="command-item"
       className={cn(
-        'dshx:relative dshx:flex dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:outline-hidden dshx:select-none dshx:data-[disabled=true]:pointer-events-none dshx:data-[disabled=true]:opacity-50 dshx:data-[selected=true]:bg-selected-wash dshx:data-[selected=true]:text-foreground dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4 dshx:[&_svg:not([class*=text-])]:text-muted-foreground',
+        'dshx:relative dshx:flex dshx:cursor-default dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:outline-hidden dshx:select-none dshx:data-[disabled=true]:pointer-events-none dshx:data-[disabled=true]:opacity-50 dshx:data-[selected=true]:bg-selected-wash dshx:data-[selected=true]:text-foreground dshx:data-[selected=true]:selected-marker dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4 dshx:[&_svg:not([class*=text-])]:text-muted-foreground',
         className,
       )}
       {...props}

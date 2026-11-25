@@ -37,7 +37,7 @@ html body {
   --dshx-tone-accent-bg: oklch(0.52 0.19 268 / 0.12);
   --dshx-tone-accent-border: oklch(0.52 0.19 268 / 0.3);
   --dshx-tone-accent-on-solid: oklch(0.99 0 270);
-  --dshx-selected-wash: oklch(0.95 0.03 270);
+  --dshx-selected-wash: oklch(0.955 0.012 270);
   --dshx-wash-needs-you: oklch(0.94 0.035 270);
   --dshx-wash-failed: oklch(0.95 0.025 25);
   --dshx-tone-success: oklch(0.5 0.15 150);
@@ -189,7 +189,7 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dshx-tone-accent-bg: oklch(0.72 0.14 270 / 0.12);
   --dshx-tone-accent-border: oklch(0.72 0.14 270 / 0.3);
   --dshx-tone-accent-on-solid: oklch(0.185 0.007 65);
-  --dshx-selected-wash: oklch(0.29 0.055 270);
+  --dshx-selected-wash: oklch(0.255 0.022 270);
   --dshx-wash-needs-you: oklch(0.29 0.045 270);
   --dshx-wash-failed: oklch(0.28 0.04 25);
   --dshx-tone-success: oklch(0.75 0.14 150);

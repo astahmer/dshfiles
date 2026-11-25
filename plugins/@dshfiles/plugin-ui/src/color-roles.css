@@ -31,9 +31,12 @@
   /*
    * A selection at the tint rung (round five K2): a soft accent wash, generated per accent hue in theme.generated.css.
    * The selected row, the active rail item and settings category, a pressed toggle, the palette's highlighted row.
-   * Text on it stays ink (`text-foreground`).
+   * Text on it stays ink (`text-foreground`). Round five A1 made it a low-chroma wash, quieter than the attention
+   * washes below; a selected list row adds the non-colour cue: `selected-marker` (a 2px accent bar inset on the
+   * leading edge, which follows a rounded row) and its title at `font-selected` (550).
    */
   --color-selected-wash: var(--dshx-selected-wash);
+  --font-weight-selected: 550;
   /*
    * Attention washes (round five A2): the persistent fill of a Needs-you row (accent hue) and a Failed row (danger hue),
    * stronger than the selection wash, generated in theme.generated.css. Ink, secondary text and the status glyphs
@@ -67,6 +70,11 @@
   --color-data-4: var(--dshx-data-4);
   --color-data-5: var(--dshx-data-5);
   --color-data-6: var(--dshx-data-6);
+}
+
+/* The selection marker (round five A1): `dshx:selected-marker`, applied wherever a list row takes `bg-selected-wash`. */
+@utility selected-marker {
+  box-shadow: inset 2px 0 0 var(--dsw-alias-state-business-primary);
 }
 
 @layer base {

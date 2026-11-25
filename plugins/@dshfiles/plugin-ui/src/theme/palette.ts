@@ -48,7 +48,8 @@ export interface Palette {
   readonly info: Trio
   /**
    * The accent at the tint rung for a selection (round five K2): the selected list row, the active rail item and
-   * settings category, a pressed toggle, the palette's highlighted row. Opaque, on the accent hue; text on it stays ink.
+   * settings category, a pressed toggle, the palette's highlighted row. Opaque, on the accent hue, low chroma (A1) so
+   * the attention washes outrank it; text on it stays ink and a list row adds the `selected-marker` bar.
    */
   readonly selectedWash: Oklch
   /**
@@ -120,7 +121,8 @@ function palette(input: PaletteInput): Palette {
     warning: trio(dark ? status(STATUS_HUES.warning) : { l: 0.48, c: 0.12, h: STATUS_HUES.warning }),
     danger: trio(status(STATUS_HUES.danger)),
     info: trio(accentFg),
-    selectedWash: dark ? { l: 0.29, c: 0.055, h: accentHue } : { l: 0.95, c: 0.03, h: accentHue },
+    // Quieter than the attention washes (round five A1): low chroma, with the kit's selection marker as the cue.
+    selectedWash: dark ? { l: 0.255, c: 0.022, h: accentHue } : { l: 0.955, c: 0.012, h: accentHue },
     needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
     failedWash: dark ? { l: 0.28, c: 0.04, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
   }
