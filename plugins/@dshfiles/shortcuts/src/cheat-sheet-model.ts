@@ -55,20 +55,32 @@ const intent = (label: string): string =>
     .replace(/\s+/gu, ' ')
     .trim()
 
+/** One chord's keycaps in any order and case (`⇧⌘O` = `⌘⇧O`), to spot a Host row on a chord a command claims first. */
+const chordSignature = (caps: readonly string[]): string =>
+  caps
+    .map(cap => cap.toLocaleLowerCase())
+    .sort()
+    .join('\u0000')
+
 /** Sections in reading order; any other section title follows them alphabetically. */
 const ORDER = ['Global', 'Go to', 'Lists', 'Triage', 'Changes', 'Composer', 'App']
 
 /**
  * Group every bound key by where it works: a command's own `section`, else its scope. Commands without keys are not
  * shortcuts and stay out; the same title and keys listed twice (two mounted lists) collapse into one row. Host
- * registry chords go under "App", minus any a command already lists.
+ * registry chords go under "App", minus any a command already lists, and minus any on a chord a command claims: the
+ * capture-phase command runs first, so the Host row's chord never does (a chord shows only on the row it runs).
  */
 const sections = (input: {
   readonly commands: readonly CommandItem[]
   readonly keys: ReadonlyMap<string, readonly string[]>
   readonly host: readonly HostShortcutRow[]
   readonly singleKeys: boolean
+  /** Whether the primary modifier is ⌘; the current platform's by default. */
+  readonly mac?: boolean
 }): readonly CheatSheetSection[] => {
+  const mac = input.mac ?? CommandKeys.currentIsMac()
+  const claimedChords = new Set<string>()
   const byTitle = new Map<string, CheatSheetRow[]>()
   const seen = new Set<string>()
   const add = (title: string, row: CheatSheetRow): void => {
@@ -86,6 +98,11 @@ const sections = (input: {
       return parsed !== undefined && (input.singleKeys || !parsed.characterKey)
     })
     if (specs.length === 0) continue
+    // Only a global command claims its chord everywhere; a list or composer key leaves it to the Host elsewhere.
+    for (const spec of (command.scope ?? 'global') === 'global' ? specs : []) {
+      const steps = CommandKeys.keycaps(spec, mac)
+      if (steps.length === 1 && steps[0] !== undefined) claimedChords.add(chordSignature(steps[0]))
+    }
     add(command.section ?? SCOPE_TITLES.get(command.scope ?? 'global') ?? 'Global', {
       id: command.id,
       label: command.title,
@@ -96,7 +113,7 @@ const sections = (input: {
   // ("New Session" beside "New thread") stays out.
   const listedIntents = new Set([...byTitle.values()].flat().map(row => intent(row.label)))
   for (const entry of input.host) {
-    if (entry.keys.length === 0 || listedIntents.has(intent(entry.label))) continue
+    if (entry.keys.length === 0 || listedIntents.has(intent(entry.label)) || claimedChords.has(chordSignature(entry.keys))) continue
     add('App', {
       id: entry.id,
       label: glossary(entry.label),

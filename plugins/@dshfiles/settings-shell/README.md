@@ -19,7 +19,8 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
 - **Open**: the rail's **Settings**, the sidebar gear, `Mod+,` (Desktop) / `Mod+Alt+,` (Web), the command palette
   (_Open Settings_, or _Settings: <entry>_ for each entry), or another plugin (below). Every one of them opens the same
   page; with `@dshfiles/main-tabs` it gets a tab like any other page. Picking that tab, or a reload that lands on it,
-  reopens Settings; leaving it closes Settings. With no other tab left, main-tabs keeps showing Settings.
+  reopens Settings; leaving it closes Settings. With no other tab left, main-tabs keeps showing Settings. The page
+  opens with its search field focused, unless focus already sits on another control (the rail entry you clicked).
 - **Task groups**: the navigation lists **General** (appearance, shortcuts, the thread list, layout, composer,
   transcript), **Models & accounts**, **Agents**, **Tools & MCP**, **Projects & workspaces**, **Hosts & network**,
   **Security**, **Notifications**, **Plugins** and **About**. The map lives in

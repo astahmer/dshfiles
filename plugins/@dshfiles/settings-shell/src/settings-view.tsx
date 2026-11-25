@@ -6,7 +6,7 @@ import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Fragment, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
@@ -332,9 +332,41 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
   )
 }
 
+/** How many frames the search field waits for the stage to show the page before it gives up taking focus. */
+const SEARCH_FOCUS_FRAMES = 30
+
+/**
+ * Settings opens with its search field focused (DESIGN.md: a shortcut that opens a page focuses its first field).
+ * `autoFocus` alone runs while the stage still hides the page's host, so the field cannot take focus and focus falls to
+ * `body` (Option+Cmd+, from the composer). This retries for a few frames, and only while focus is nowhere: a control
+ * the user moved to, the rail they clicked, keeps it.
+ */
+const useSearchFocusOnShow = (search: RefObject<HTMLInputElement | null>): void => {
+  useEffect(() => {
+    let frame = 0
+    let tries = 0
+    const attempt = (): void => {
+      const input = search.current
+      if (input === null || document.activeElement === input) return
+      const active = document.activeElement
+      const nowhere = active === null || active === document.body || (active instanceof HTMLElement && active.checkVisibility?.() === false)
+      if (!nowhere) return
+      input.focus()
+      if (document.activeElement !== input && tries < SEARCH_FOCUS_FRAMES) {
+        tries += 1
+        frame = requestAnimationFrame(attempt)
+      }
+    }
+    frame = requestAnimationFrame(attempt)
+    return () => cancelAnimationFrame(frame)
+  }, [search])
+}
+
 /** Search field, the grouped navigation and the active entry, or the search results. */
 const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): JSX.Element => {
   const { t } = props
+  const search = useRef<HTMLInputElement>(null)
+  useSearchFocusOnShow(search)
   const searching = props.query.trim() !== ''
   const result = SettingsSearch.search({
     query: props.query,
@@ -382,6 +414,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
               <SearchIcon />
             </InputGroupAddon>
             <InputGroupInput
+              ref={search}
               aria-label={t('search.placeholder')}
               autoComplete="off"
               autoFocus

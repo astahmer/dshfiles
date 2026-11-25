@@ -76,6 +76,41 @@ describe('settings view: section entries', () => {
   })
 })
 
+describe('settings view: search focus', () => {
+  const frames = (count: number) =>
+    act(async () => {
+      for (let index = 0; index < count; index += 1) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()))
+    })
+
+  it('focuses its search field once the stage shows the page, when focus fell to body', async () => {
+    // The stage mounts the page into a host it still hides: the field cannot take focus until it shows.
+    let hidden = true
+    const focus = HTMLElement.prototype.focus
+    const spy = vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement, options?: FocusOptions) {
+      if (!hidden) focus.call(this, options)
+    })
+    const view = mount({})
+    expect(document.activeElement).toBe(document.body)
+    hidden = false
+    await frames(3)
+    expect(document.activeElement).toBe(view.host.querySelector('[role="searchbox"]'))
+    spy.mockRestore()
+    view.unmount()
+  })
+
+  it('leaves focus where the user put it', async () => {
+    const rail = document.createElement('button')
+    document.body.append(rail)
+    rail.focus()
+    const view = mount({})
+    // autoFocus took it on mount; the user moves on before the page shows.
+    rail.focus()
+    await frames(3)
+    expect(document.activeElement).toBe(rail)
+    view.unmount()
+  })
+})
+
 describe('settings view: one title per entry', () => {
   const entry = (view: { readonly host: HTMLElement }): HTMLElement | null => view.host.querySelector('[data-settings-entry]')
   const shown = (element: Element | null | undefined): boolean => element instanceof HTMLElement && element.style.display !== 'none'

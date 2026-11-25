@@ -1,7 +1,7 @@
 import type { ILayout } from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { ShortcutCatalogEntry, Shortcuts } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
-import { Command, CommandKeys, createSettingsClientRuntime, defineClient, runHostCommand, type Subscribable } from '@dshfiles/dshx/client'
+import { Command, createSettingsClientRuntime, defineClient, runHostCommand, type Subscribable } from '@dshfiles/dshx/client'
 import { CheatSheet, CheatSheetState } from './cheat-sheet.js'
 import type { HostShortcutRow } from './cheat-sheet-model.js'
 import { CommandBindings } from './command-bindings.js'
@@ -60,25 +60,11 @@ export default defineClient({
     const settings = createSettingsClientRuntime(ctx).binding(shortcutsSettings).scope
     // An old Host without this namespace reads as unavailable: single keys stay on, the documented default.
     const singleKeys = (): boolean => settings.getSnapshot().value?.singleKeys ?? true
-    const panelChord = (id: string, spec: string, label: string): ShortcutBinding | undefined => {
-      const keys = CommandKeys.parse(spec)
-      if (keys === undefined) return undefined
-      return {
-        id,
-        keys,
-        scope: 'global',
-        label,
-        run: () => {
-          // Selecting the conversation panel is the closest the layout service comes to "start something new"; the
-          // composer takes it from there.
-          requireLayout(layout).selectPanel(null)
-        },
-      }
-    }
-    // Cmd/Ctrl+N belongs to the browser on the web (it opens a window); New thread is Mod+Shift+O, owned by the palette.
-    const fixed = [panelChord('shortcuts.settings', 'Mod+,', 'Settings')].flatMap(binding => (binding === undefined ? [] : [binding]))
+    // No fixed chords: Cmd/Ctrl+N and Cmd+, belong to the browser on the web. New thread is Mod+Shift+O (the palette's),
+    // and Settings is the Host's own settings.open (Option+Cmd+, on the web); a "Settings" Mod+, here only selected the
+    // conversation panel while claiming the key from the browser.
     let commandBindings: readonly ShortcutBinding[] = []
-    ctx.effect(() => ShortcutLayer.install(window, { bindings: () => [...commandBindings, ...fixed], singleKeys }), 'shortcuts: keyboard')
+    ctx.effect(() => ShortcutLayer.install(window, { bindings: () => commandBindings, singleKeys }), 'shortcuts: keyboard')
 
     ctx.slots.inject('shell.overlay', () =>
       ctx.slots.register(

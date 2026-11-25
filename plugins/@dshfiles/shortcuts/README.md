@@ -37,8 +37,12 @@ menus and tooltips show them with `keys` on `DropdownMenuItem`, `ContextMenuItem
 ## Shortcut sheet
 
 `?` or ⌘/ opens every bound key grouped by section (Global, Go to, Lists, Triage, Changes, Composer, App), generated from
-the registry plus the Host shortcut catalog. **Customize keys** opens the Host's own rebinding editor, which ⌘/ opened
-before.
+the registry plus the Host shortcut catalog. A chord shows only on the row that pressing it runs: a Host row on a chord
+a global command claims first (core's "Open locally" on ⇧⌘O, which New thread takes) is left out. **Customize keys**
+opens the Host's own rebinding editor, which ⌘/ opened before.
+
+The layer binds no chord of its own: ⌘, belongs to the browser on the web, and Settings opens with the Host's ⌥⌘,
+there (⌘, on Desktop), focused on its search field.
 
 A chord is claimed only where it cannot type anything and nothing else already answered it. The focused element decides the region the same way the Host adapter does: a terminal (`.xterm`) comes first, then a text field, then the page. Commands claimed through the `Command` registry keep their keys everywhere, except while a terminal has focus, where `allowInTerminal: false` leaves the key to the shell (`Ctrl+J` is a line feed).
 
