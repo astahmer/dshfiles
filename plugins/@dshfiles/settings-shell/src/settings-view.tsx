@@ -441,7 +441,8 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             <PageHeader heading={<span id={props.titleId}>{props.renderSlot('settings.header', {})}</span>} description={t('description')} />
           </div>
           <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-compact:gap-2', headerWidth)} data-settings-toolbar="">
-          <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1">
+          {/* On a phone the search, Modified and the file menu are one 44px row (council round 4 B3). */}
+          <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1 dshx:@max-pane-compact:h-11">
             <InputGroupAddon>
               <SearchIcon />
             </InputGroupAddon>
@@ -477,7 +478,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           </InputGroup>
           <Toggle
             aria-label={t('search.modified')}
-            className="dshx:shrink-0"
+            className="dshx:shrink-0 dshx:@max-pane-compact:h-11 dshx:@max-pane-compact:px-3"
             data-settings-modified-filter=""
             onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
             pressed={SettingsSearch.hasModifiedFilter(props.query)}

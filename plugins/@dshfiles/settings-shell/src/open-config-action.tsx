@@ -63,7 +63,8 @@ export const OpenConfigAction = (props: {
         </span>
       )}
       {/* No overflow clip on the split button: it would cut the kit's 44px touch hit area of both halves. */}
-      <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs">
+      {/* A narrow pane (a phone) gives it the 44px of the search and Modified beside it (council round 4 B3). */}
+      <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs dshx:@max-pane-compact:h-11">
         <Tooltip>
           <TooltipTrigger asChild>
             {/* A narrow pane has no room for the label: the menu (whose first item opens the file) takes the seat. */}
@@ -86,11 +87,11 @@ export const OpenConfigAction = (props: {
             <DropdownMenuTrigger asChild>
               <button
                 aria-label={t('config.more')}
-                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-r-md dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:@max-pane-compact:w-7 dshx:@max-pane-compact:rounded-md dshx:@max-pane-compact:border-l-0"
+                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-r-md dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:@max-pane-compact:w-11 dshx:@max-pane-compact:rounded-md dshx:@max-pane-compact:border-l-0"
                 type="button"
               >
                 <ChevronDownIcon className="dshx:size-3.5 dshx:@max-pane-compact:hidden" />
-                <EllipsisIcon className="dshx:hidden dshx:size-3.5 dshx:@max-pane-compact:block" />
+                <EllipsisIcon className="dshx:hidden dshx:size-4 dshx:@max-pane-compact:block" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="dshx:min-w-56">

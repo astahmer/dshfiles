@@ -1,5 +1,6 @@
 import { act, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
+import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
@@ -8,6 +9,7 @@ import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsGroups } from './settings-groups.js'
 import { SettingsTab, type SettingsViewProps } from './settings-view.js'
 
+const read = (file: string): string => readFileSync(new URL(file, import.meta.url), 'utf8')
 const t: ShellTranslate = (key, values) => (values === undefined ? key : `${key} ${JSON.stringify(values)}`)
 const rows = [
   { id: 'general', order: 0, label: 'General' },
@@ -363,6 +365,18 @@ describe('settings view: one grouped page', () => {
     const byKeys = mount({ query: '⌘,' })
     expect(byKeys.host.querySelector('[data-settings-shortcut="settings.open"]')).not.toBeNull()
     byKeys.unmount()
+  })
+})
+
+describe('settings view: phone toolbar (council round 4 B3)', () => {
+  it('gives the search, Modified and the file menu one 44px row in a narrow pane', () => {
+    const view = mount({})
+    const search = view.host.querySelector('[data-settings-toolbar] [role="searchbox"]')?.closest('[data-slot="input-group"]')
+    expect(search?.className).toContain('dshx:@max-pane-compact:h-11')
+    expect(view.host.querySelector('[data-settings-modified-filter]')?.className).toContain('dshx:@max-pane-compact:h-11')
+    expect(read('open-config-action.tsx')).toContain('dshx:shadow-xs dshx:@max-pane-compact:h-11')
+    expect(read('open-config-action.tsx')).toContain('dshx:@max-pane-compact:w-11')
+    view.unmount()
   })
 })
 
