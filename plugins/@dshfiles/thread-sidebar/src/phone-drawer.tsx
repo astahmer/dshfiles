@@ -68,6 +68,15 @@ export const PhoneDrawer = (props: {
   const { open, swipeToOpen } = props
   // Focus stays inside the open drawer: Tab cannot reach the stage behind the scrim.
   useDialogFocus({ open, container: panelRef, trap: true })
+  // The stage behind the scrim is inert, so assistive tech and Tab cannot reach it either; the shell portal holds
+  // the drawer and its top bar, so only the app root is marked.
+  useEffect(() => {
+    if (!open) return
+    const appRoot = document.getElementById('root')
+    if (appRoot === null) return
+    appRoot.setAttribute('inert', '')
+    return () => appRoot.removeAttribute('inert')
+  }, [open])
 
   /** Follow the finger: the drawer and scrim leave their transitions and track `progress` directly. */
   const follow = (progress: number): void => {

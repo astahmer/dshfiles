@@ -326,6 +326,19 @@ describe('phone navigation: drawer', () => {
     expect(closed.toggleSidebar).toHaveBeenCalledTimes(1)
   })
 
+  it('marks the app root inert while the drawer is open and restores it on close', () => {
+    setPhone(true)
+    const appRoot = document.createElement('div')
+    appRoot.id = 'root'
+    document.body.append(appRoot)
+    render(shell({ ...threadProps(), phoneNavigation: 'drawer' }))
+    showThreads()
+    expect(appRoot.hasAttribute('inert')).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(appRoot.hasAttribute('inert')).toBe(false)
+    appRoot.remove()
+  })
+
   it('returns a thread opened from the Inbox page to the Inbox, keeping the sidebar button', () => {
     setPhone(true)
     const onInbox = props({
