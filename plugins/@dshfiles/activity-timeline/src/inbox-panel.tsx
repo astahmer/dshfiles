@@ -141,6 +141,7 @@ export const coarsePointer = (): boolean => {
 /** What Open is called for an item: review a finished turn, open its thread, or the page its provider registered. */
 const openLabelOf = (item: AttentionItem, opener: AttentionSubjectOpener | undefined, t: InboxTranslate): string => {
   const openAction = InboxView.openActionOf(item)
+  if (openAction === 'approval') return t('review')
   return openAction === 'review' ? t('reviewThread') : openAction === 'thread' ? t('openThread') : t('openSubject', { label: opener?.label ?? '' })
 }
 

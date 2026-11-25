@@ -58,6 +58,8 @@ export class FailedTurns extends Context.Service<
       readonly time: number
       readonly reason: AttentionFinishReason
     }) => Effect.Effect<boolean, AttentionStorageFailed>
+    /** Forget a thread's failure (the user marked its inbox item Done); resolves to whether it was failed. */
+    readonly clear: (sessionId: string) => Effect.Effect<boolean, AttentionStorageFailed>
   }
 >()('@dshfiles/thread-sidebar/FailedTurns') {
   static readonly layer = Layer.effect(
@@ -88,6 +90,17 @@ export class FailedTurns extends Context.Service<
               const trimmed = keysToTrim([...next.values()])
               yield* Effect.forEach(trimmed, sessionId => table.delete(sessionId), { discard: true })
               for (const sessionId of trimmed) next.delete(sessionId)
+              return [true, next] as const
+            }).pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation: 'record', cause }))),
+          )
+        }),
+        clear: Effect.fn('thread failed turn clear')(function* (sessionId) {
+          return yield* SynchronizedRef.modifyEffect(state, current =>
+            Effect.gen(function* () {
+              if (!current.has(sessionId)) return [false, current] as const
+              yield* table.delete(sessionId)
+              const next = new Map(current)
+              next.delete(sessionId)
               return [true, next] as const
             }).pipe(Effect.mapError(cause => new AttentionStorageFailed({ operation: 'record', cause }))),
           )

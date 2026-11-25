@@ -111,6 +111,11 @@ describe('inbox view', () => {
     })
     expect(InboxView.openActionOf(finishedTurn)).toBe('review')
 
+    const approval = item({ source: 'thread-sidebar.approval', severity: 'blocking', verbs: ['Open', 'Snooze', 'MuteSource'], reason: 'Approve: Force-push main' })
+    expect(InboxView.openActionOf(approval)).toBe('approval')
+    expect(InboxView.offersQuickReplies(approval, 'needs-you')).toBe(false)
+    expect(InboxView.sourceLabel(approval.source)).toBe('Approval')
+
     const waitingItem = item({
       source: 'backlog.attention',
       severity: 'ready',

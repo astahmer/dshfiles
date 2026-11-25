@@ -7,6 +7,7 @@ import { InboxPreview } from './inbox-preview.js'
 const SOURCE_LABELS = new Map([
   ['agent-questions.child-question', 'Subagent question'],
   ['thread-sidebar.finished-turn', 'Thread turns'],
+  ['thread-sidebar.approval', 'Approval'],
   ['agent-questions.native-question', 'Thread question'],
   ['jj-integration.land-blocked', 'Land blocked'],
   ['jj-integration.ready-to-land', 'Ready to land'],
@@ -65,11 +66,13 @@ const relativeAge = (at: number, now: number): string => {
 }
 
 /** Which open control a row offers: review a finished turn, open a thread, or open a provider-owned page. */
-export type InboxOpenAction = 'review' | 'thread' | 'subject'
+export type InboxOpenAction = 'review' | 'approval' | 'thread' | 'subject'
 
 /** A finished turn is work to review, not a thread to open for its own sake. */
 const openActionOf = (item: AttentionItem): InboxOpenAction => {
   if (item.subject.kind !== 'session') return 'subject'
+  // An approval is decided on its card in the thread, never in the Inbox: its one action opens the card (D4).
+  if (item.source === 'thread-sidebar.approval') return 'approval'
   return item.source === 'thread-sidebar.finished-turn' ? 'review' : 'thread'
 }
 
@@ -101,7 +104,13 @@ const asksQuestion = (item: AttentionItem): boolean => QUESTION_SOURCES.has(item
  * one that asked a question: "Continue" does not answer "Which layout?".
  */
 const offersQuickReplies = (item: AttentionItem, view: AttentionView): boolean =>
-  view !== 'closed' && view !== 'muted' && item.subject.kind === 'session' && item.severity !== 'ready' && !asksQuestion(item)
+  view !== 'closed' &&
+  view !== 'muted' &&
+  item.subject.kind === 'session' &&
+  item.severity !== 'ready' &&
+  !asksQuestion(item) &&
+  // A thread held on an approval cannot take a prompt: the approval is decided on its card (Review).
+  openActionOf(item) !== 'approval'
 
 /**
  * What a row prints under its title: the first paragraph of the reason and the detail, both as plain words. Providers

@@ -22,6 +22,7 @@ import { FailedTurns } from './failed-turns.js'
 import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
 import { LiveTurns } from './live-turns.js'
+import { PendingApprovals } from './pending-approvals.js'
 import { threadSidebarLiveTurnsApi } from './live-turns-api.js'
 import { threadSidebarMachineApi } from './machine-api.js'
 import { threadMentionCandidateApi } from './mention-candidate-api.js'
@@ -146,6 +147,7 @@ const services = Layer.mergeAll(
   threads,
   MachineName.layer,
   LiveTurns.layer,
+  PendingApprovals.layer,
   UserNotifications.layer,
 ).pipe(Layer.provideMerge(runtimeState))
 
