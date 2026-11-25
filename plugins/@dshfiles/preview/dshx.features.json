@@ -55,7 +55,7 @@
           "kind": "unit-test",
           "id": "preview.thread-isolation",
           "file": "plugins/@dshfiles/preview/src/browser-pool-promise.test.ts",
-          "testName": "isolates threads and closes a thread’s pages when it ends"
+          "testName": "isolates threads and closes a thread\u2019s pages when it ends"
         },
         {
           "kind": "unit-test",
@@ -108,7 +108,7 @@
     {
       "id": "thread-dev-servers",
       "title": "Thread dev servers",
-      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on — processes from its jobs or bash calls, and processes running inside its workspace — plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. A dev server this browser has not opened yet gets a Preview button beside the chip, which opens it beside the thread; autoOpenDevServers opens it there without the click. The same list is the Dev servers tab of Observe › Processes (every thread that runs a job) and part of the thread panel's Jobs facet.",
+      "summary": "The thread header shows a chip with the TCP ports a thread's processes listen on \u2014 processes from its jobs or bash calls, and processes running inside its workspace \u2014 plus its open preview pages. Each row opens its URL in the browser tab beside the thread or stops the server (a live job through the job registry, otherwise SIGTERM then SIGKILL on that exact process). thread_dev_servers and thread_dev_server_stop give the agent the same list and stop. A dev server this browser has not opened yet gets a Preview button beside the chip, which opens it beside the thread; autoOpenDevServers opens it there without the click. The same list is the Dev servers tab of Observe \u203a Processes (every thread that runs a job) and part of the thread panel's Jobs facet. Before a URL reaches that tab, the Host checks once whether the page allows framing at all: a site that sends X-Frame-Options or a frame-ancestors policy, or a port nothing answers on, opens in a browser tab (or leaves a notice) instead of the tab's permanently blank page, which an iframe cannot explain by itself.",
       "reach": ["click button \"Dev servers and previews\"", "expect region \"Dev servers\""],
       "surfaces": ["host", "tool", "client"],
       "surface": "threadFacet",
@@ -123,14 +123,26 @@
           "coveredBy": ["preview.dev-server-offer"]
         }
       ],
-      "states": ["hidden", "listed", "stop-armed", "stopped", "open-in-tab", "unsupported-platform", "preview-offered", "auto-opened"],
+      "states": [
+        "hidden",
+        "listed",
+        "stop-armed",
+        "stopped",
+        "open-in-tab",
+        "unsupported-platform",
+        "preview-offered",
+        "auto-opened",
+        "embedding-refused",
+        "port-unreachable"
+      ],
       "failureModes": [
         "The DSH Host and the processes that launched it are never listed, so their ports can never be stopped from here.",
         "A pid recycled between the list and the stop is refused because the stop re-reads the process table and matches pid and start time.",
         "Several threads sharing one checkout all list a server no job attributes; the job owner wins when a job matches.",
         "Listening sockets no thread accounts for (other apps, system services) are not listed.",
         "Open is disabled when no browser tab is available beside the thread on screen.",
-        "From a GUI on another machine a loopback URL would load the viewer's own machine, so Open and Preview load it in a Host preview page and show it in the Agent browser, a page row drops Open for Watch, a reveal opens the Agent browser, and autoOpenDevServers falls back to the Preview button."
+        "From a GUI on another machine a loopback URL would load the viewer's own machine, so Open and Preview load it in a Host preview page and show it in the Agent browser, a page row drops Open for Watch, a reveal opens the Agent browser, and autoOpenDevServers falls back to the Preview button.",
+        "A page that refuses embedding (X-Frame-Options: deny/sameorigin, or Content-Security-Policy frame-ancestors without a wildcard) never loads in the Browser tab, and neither does a port nothing listens on: the Host reports the reason, a browser tab opens for the refusal, and the pane stays out of both cases. A typed address in the tab still fails silently, because the pane is the native package and cannot report it."
       ],
       "externalDependencies": [
         {
@@ -159,7 +171,7 @@
           "kind": "unit-test",
           "id": "preview.dev-server-attribution",
           "file": "plugins/@dshfiles/preview/src/dev-servers.test.ts",
-          "testName": "attributes a Host job’s descendant to the job owner and an orphan to the thread whose workspace holds it"
+          "testName": "attributes a Host job\u2019s descendant to the job owner and an orphan to the thread whose workspace holds it"
         },
         {
           "kind": "unit-test",
@@ -184,6 +196,12 @@
           "id": "preview.remote-gui-open",
           "file": "plugins/@dshfiles/preview/src/preview-opener.test.ts",
           "testName": "marks a Host loopback URL host-only when the GUI runs on another machine"
+        },
+        {
+          "kind": "unit-test",
+          "id": "preview.embed-refusal",
+          "file": "plugins/@dshfiles/preview/src/embed-policy.test.ts",
+          "testName": "refuses every frame-ancestors list that cannot name the pane"
         }
       ],
       "telemetry": [
@@ -206,6 +224,12 @@
           "span": "preview session-list",
           "file": "plugins/@dshfiles/preview/src/preview-dev-servers-promise.test.ts",
           "testName": "runs each probe command under a preview port-probe span and caches one probe for every caller"
+        },
+        {
+          "kind": "custom",
+          "span": "preview preflight",
+          "file": "plugins/@dshfiles/preview/src/preview-preflight-promise.test.ts",
+          "testName": "records one preview preflight span per check"
         }
       ]
     },

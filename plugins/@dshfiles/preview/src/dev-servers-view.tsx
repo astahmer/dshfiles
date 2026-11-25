@@ -6,11 +6,11 @@ import { EmptyState, PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ExternalLinkIcon, PanelRightIcon, SquareIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, queryOptions, useMutation, useQueries, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { previewApi, type DevServerView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
 import { PreviewOpener } from './preview-opener.js'
-import { LoopbackNoticeView } from './loopback-notice.js'
+import { PreviewNoticeView } from './preview-notice.js'
 
 /**
  * Dev servers in Observe › Processes and in the thread panel's Jobs facet (docs/ade-ux §6 "Processes in 3 boards").
@@ -20,6 +20,11 @@ const ServerRows = (props: { readonly sessionId: string; readonly servers: reado
   const api = useApi(previewApi)
   const opener = PreviewOpener.use()
   const OpenIcon = opener.paneAvailable ? PanelRightIcon : ExternalLinkIcon
+  // The Host answers before the click: a refused page or a stopped port then never reaches the pane.
+  const ports = useMemo(() => props.servers.flatMap(server => server.ports), [props.servers])
+  useEffect(() => {
+    opener.warmPorts(ports)
+  }, [opener.warmPorts, ports])
   const queryClient = useQueryClient()
   const [armed, setArmed] = useState<number | null>(null)
   const stop = useMutation({
@@ -31,7 +36,7 @@ const ServerRows = (props: { readonly sessionId: string; readonly servers: reado
   })
   return (
     <>
-      <LoopbackNoticeView notice={opener.notice} onDismiss={opener.dismissNotice} />
+      <PreviewNoticeView notice={opener.notice} onDismiss={opener.dismissNotice} />
       <EntityList>
         {props.servers.map(server => (
           <EntityRow

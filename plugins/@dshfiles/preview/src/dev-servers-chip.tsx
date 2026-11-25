@@ -11,7 +11,7 @@ import * as Schema from 'effect/Schema'
 import { previewApi, type DevServerView, type PreviewPageView } from './api.js'
 import { DevServerPoll } from './dev-server-poll.js'
 import { PreviewOpener } from './preview-opener.js'
-import { LoopbackNoticeView } from './loopback-notice.js'
+import { PreviewNoticeView } from './preview-notice.js'
 import type { ListeningPort } from './remote-reach.js'
 import { PreviewReveal, type RevealRequest } from './preview-reveal.js'
 import { previewSettings } from './settings.js'
@@ -153,6 +153,12 @@ export const DevServersChip = (props: {
   }
 
   const servers = serversQuery.data?.servers ?? []
+  const ports = useMemo(() => servers.flatMap(server => server.ports), [servers])
+  // The Host answers before the click: a refused page or a stopped port then never reaches the pane.
+  useEffect(() => {
+    opener.warmPorts(ports)
+  }, [opener.warmPorts, ports])
+
   const pages = pagesQuery.data?.pages ?? []
   if (servers.length === 0 && pages.length === 0) return null
 
@@ -180,7 +186,7 @@ export const DevServersChip = (props: {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="dshx-root dshx:w-96 dshx:max-w-[90vw] dshx:p-2">
-        <LoopbackNoticeView notice={opener.notice} onDismiss={opener.dismissNotice} />
+        <PreviewNoticeView notice={opener.notice} onDismiss={opener.dismissNotice} />
         <section aria-label="Dev servers" className="dshx:flex dshx:flex-col dshx:gap-1">
           {servers.map(server => (
             <div key={server.pid} className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:py-1 dshx:hover:bg-accent">

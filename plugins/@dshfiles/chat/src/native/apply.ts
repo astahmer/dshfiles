@@ -34,6 +34,7 @@ import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
 import { sessionFilePath } from './file-path.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { openChatExternalLink } from './chat/external-link-opening.ts'
+import { LinkEmbedPort } from '../link-embed-port.ts'
 import { sessionSidebar } from './chat/session-sidebar.ts'
 import { ChatFlow } from './chat/ChatFlow.tsx'
 import { detachedFlow, detachedView } from '../detached-injected.ts'
@@ -367,12 +368,18 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           resolveFilePath: sessionFilePath(ctx, sessionId),
           openExternalLink: (href) => {
             const url = new URL(href)
+            LinkEmbedPort.warm(url.href)
             openChatExternalLink({
               url,
               currentOrigin: window.location.origin,
               linkOpening: linkOpening.getSnapshot(),
               browserAvailable: ctx.get('sidebarRightTabs')?.get('browser') !== undefined,
-              openInSidebar: sidebarUrl => sessionSidebar(ctx.sidebarRight, sessionId).openTab('browser', { params: { url: sidebarUrl } }),
+              paneRefused: href => LinkEmbedPort.refused(href),
+              openInSidebar: sidebarUrl => {
+                sessionSidebar(ctx.sidebarRight, sessionId).openTab('browser', { params: { url: sidebarUrl } })
+                // The pane cannot report a framing refusal, so say it once the Host has answered.
+                LinkEmbedPort.sayIfRefused(sidebarUrl)
+              },
               openInNewTab: newTabUrl => { window.open(newTabUrl, '_blank', 'noopener,noreferrer') },
             })
           },

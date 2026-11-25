@@ -20,6 +20,10 @@ Resume here: P4c's real-tab measurement.
 ## Decisions to keep
 
 - The pane is the native package as shipped (iframe on Web, `<webview>` on Desktop); we do not fork it.
+- The pane cannot see a framing refusal, so the Host answers first: `previewApi.probeEmbed` classifies
+  `X-Frame-Options` / `frame-ancestors` and reachability, and every dshfiles opener (dev-server Open, chat links, the
+  **Open web page…** action) opens a browser tab with the reason instead of a pane that can only be blank. A typed
+  address in the pane still cannot be checked; that is the price of not forking it.
 - The Agent browser is a mirror of the Host page, not a second browser: it works from a GUI on another machine.
 - The mirror currently polls; the standalone screenshot and scratch Host API measurements do not yet justify CDP
   `Page.startScreencast`. The actual watched tab still needs measurement.
