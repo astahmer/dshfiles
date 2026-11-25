@@ -275,7 +275,9 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
             onValueChange={tabs.onValueChange}
             className={cn('dshx:min-w-0 dshx:gap-3', fill && 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col')}
           >
-            <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:pb-0.5">
+            {/* Sideways only: overflow-x alone makes overflow-y auto, and the triggers' touch hit areas overflow it, so
+                WebKit drew a vertical scrollbar beside every page's tabs. The tab ring draws inward, so nothing is cut. */}
+            <div data-slot="page-tab-strip" className="dshx:min-w-0 dshx:overflow-x-auto dshx:overflow-y-hidden dshx:pb-0.5">
               <PageTabList tabs={tabs} />
             </div>
             <TabsContent value={tabs.value} className={cn('dshx:min-w-0', fill && 'dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col')}>

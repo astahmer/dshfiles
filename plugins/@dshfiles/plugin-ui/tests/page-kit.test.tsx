@@ -251,6 +251,17 @@ describe('Page', () => {
     expect(view.getByText('body')).toBeTruthy()
   })
 
+  it('scrolls the tab strip sideways only, so WebKit draws no vertical scrollbar beside it', () => {
+    const view = render(
+      <Page heading="Inbox" tabs={{ label: 'Inbox views', value: 'needs-you', onValueChange: () => {}, items: [{ value: 'needs-you', label: 'Needs you' }] }}>
+        <p>body</p>
+      </Page>,
+    )
+    // overflow-x: auto alone computes overflow-y to auto too; the triggers' touch hit areas overflow by a few pixels.
+    const strip = view.getByRole('tablist', { name: 'Inbox views' }).closest('[data-slot="page-tab-strip"]')
+    expect(strip?.className.split(/\s+/)).toEqual(expect.arrayContaining(['dshx:overflow-x-auto', 'dshx:overflow-y-hidden']))
+  })
+
   it('fills the pane height and hands the rest to the active tab in fill mode', () => {
     const view = render(
       <Page heading="Memory" fill tabs={{ label: 'Memory views', value: 'notes', onValueChange: () => {}, items: [{ value: 'notes', label: 'Notes' }] }}>
