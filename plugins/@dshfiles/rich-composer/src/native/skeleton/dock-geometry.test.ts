@@ -57,8 +57,8 @@ describe('composer dock geometry', () => {
 describe('one transcript column (round five C3)', () => {
   const block = (selector: string): string => blocks().find(candidate => candidate.selector === selector && candidate.context === '')?.body ?? ''
 
-  it('caps the default column at 720px, so code, cards and the turn summary share one edge with the prose start', () => {
-    expect(block('.body')).toMatch(/--dsh-chat-content-width:\s*var\(\s*--dsh-chat-user-width,\s*clamp\(680px, calc\(var\(--dsh-conversation-column-width, 0px\) \* 0\.64\), 720px\)\s*\)/)
+  it('sets the default column at 680px, so code, cards and the turn summary share one column with ~66ch prose (round five C1)', () => {
+    expect(block('.body')).toMatch(/--dsh-chat-content-width:\s*var\(--dsh-chat-user-width, 680px\);/)
   })
 
   it('gives the dock and the composer card the transcript column edges, not 16px more on each side', () => {

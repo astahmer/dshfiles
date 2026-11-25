@@ -743,13 +743,10 @@ button.crumbEditable {
   /* Shared width axis for the transcript, dock cards, composer, and takeover
      cards. Main width controls publish the live body width and optional user
      preference; embedded occurrences override this adaptive axis below. */
-  /* dshfiles (unslop r5 C3): one transcript column. The default caps at 720px (code blocks, cards and the turn summary
-     reach this edge while prose keeps its measure), and the dock and the input card share the column's edges instead
-     of standing 16px out on each side. A width the user dragged (--dsh-chat-user-width) still wins. */
-  --dsh-chat-content-width: var(
-    --dsh-chat-user-width,
-    clamp(680px, calc(var(--dsh-conversation-column-width, 0px) * 0.64), 720px)
-  );
+  /* dshfiles (unslop r5 C3): one transcript column; the dock and the input card share the column's edges instead of
+     standing 16px out on each side. Round five C1 (council round 3): the default is 680px, with prose at 66ch (613px),
+     so code, cards and prose read as one column. A width the user dragged (--dsh-chat-user-width) still wins. */
+  --dsh-chat-content-width: var(--dsh-chat-user-width, 680px);
   --dsh-composer-card-max-width: var(--dsh-chat-content-width);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;

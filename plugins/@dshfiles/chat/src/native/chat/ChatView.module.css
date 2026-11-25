@@ -67,12 +67,12 @@
 /* Message column: shared chat width (ConversationRoot --dsh-chat-content-width),
    centered on the same axis as the input box (which caps at chat + 16px); the
    scroller itself stays full-bleed. */
-/* dshfiles (unslop R4): --dsh-chat-prose-measure is the width prose stops at (34em of the prose size, see
-   AssistantMarkdown), in pixels so a 13px work row caps at the same edge. A one-line work row ("Worked for", a
+/* dshfiles (unslop R4): --dsh-chat-prose-measure is the width prose stops at (44em of the prose size, about the 66ch
+   AssistantMarkdown sets; round five C1), in pixels so a 13px work row caps at the same edge. A one-line work row ("Worked for", a
    collapsed tool row, the turn summary) is as wide as its content up to this measure; blocks with a body keep the
    column. */
 .column {
-  --dsh-chat-prose-measure: calc(34 * max(var(--dsh-content-font-size, 14px), var(--dshx-density-text-prose, 14px)));
+  --dsh-chat-prose-measure: calc(44 * max(var(--dsh-content-font-size, 14px), var(--dshx-density-text-prose, 14px)));
   position: relative;
   max-width: var(--dsh-chat-content-width);
   width: 100%;
