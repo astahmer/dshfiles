@@ -15,7 +15,7 @@ describe('an Inbox card (round five C3, council round 4)', () => {
   it('keeps the card menu in the head band on every width, not on the row of verbs', () => {
     // Round five C4 (council round 5): the menu ends the head row's trailing seat, beside the verbs, at every width.
     expect(row).toMatch(/trailing=\{props\.actionRow === false && !compact \? undefined : headVerbs\}/u)
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:min-h-11')
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
     expect(row).toContain('InboxView.CARD_HEAD')
   })
 

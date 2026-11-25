@@ -67,8 +67,12 @@ import { ThreadReferences } from './thread-reference.js'
 
 const PROVIDER_VERBS: readonly AttentionProviderVerb[] = ['Approve', 'Land', 'Retry', 'Resume']
 
-/** The list is a stack of cards (each item draws its own surface, InboxView.CARD), not one bordered box of rows. */
-const INBOX_STACK = 'dshx:gap-4 dshx:divide-y-0 dshx:rounded-none dshx:border-0 dshx:bg-transparent'
+/**
+ * The list is a stack of cards (each item draws its own surface, InboxView.CARD), not one bordered box of rows: 16px
+ * apart, 8px on a compact pane, where the band and the border already part them and the third card's action stays above
+ * the fold (round six C1).
+ */
+const INBOX_STACK = 'dshx:gap-4 dshx:divide-y-0 dshx:rounded-none dshx:border-0 dshx:bg-transparent dshx:@max-pane-narrow:gap-2'
 
 /** A prompt-library reply a stopped thread's card offers in its menu. */
 interface InboxQuickReply {
@@ -238,11 +242,18 @@ const InboxRow = (props: {
       ? null
       : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
   /**
-   * The card's verbs in its head row, trailing, before the menu (round five C4, council round 5): what it asks for and
-   * every other verb on one line with the title, so the body holds only what it says and its answers.
+   * The card's verbs (round five C4, council round 5): in its head row, trailing, before the menu, on a wide pane. On a
+   * compact pane a card with a body draws them at the bottom of its body as full-width 44px buttons instead (round six
+   * C1), so the title owns its row; a bodyless Failed card keeps its one verb in the head, under a short name.
    */
-  const headVerbs = (
-        <div data-inbox-row-actions="band" className="dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0">
+  const hasVerbs =
+    (open && PROVIDER_VERBS.some(verb => item.verbs.includes(verb))) || (open && props.onReview !== undefined) || (openable && !answerable) || undo !== null
+  const footed = InboxView.footsVerbs(compact)
+  const verbButtons = (place: 'head' | 'foot'): JSX.Element => {
+    const size = place === 'head' ? cn('dshx:shrink', InboxView.HEAD_VERB) : InboxView.FOOT_VERB
+    const shortLabel = place === 'head' && !footed ? t(InboxView.shortOpenLabelKey(InboxView.openActionOf(item))) : null
+    return (
+      <>
           {open
             ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
                 verb === 'Land' ? (
@@ -250,7 +261,7 @@ const InboxRow = (props: {
                     key={verb}
                     size="sm"
                     variant="outline"
-                    className={cn('dshx:shrink', INBOX_CHIP, InboxView.HEAD_VERB)}
+                    className={cn(INBOX_CHIP, size)}
                     disabled={props.busy}
                     onClick={() => setConfirmingLand(true)}
                   >
@@ -261,7 +272,7 @@ const InboxRow = (props: {
                     key={verb}
                     size="sm"
                     variant="outline"
-                    className={cn('dshx:shrink', INBOX_CHIP, InboxView.HEAD_VERB)}
+                    className={cn(INBOX_CHIP, size)}
                     disabled={props.busy}
                     onClick={() => props.onAct(item, verb)}
                   >
@@ -271,7 +282,7 @@ const InboxRow = (props: {
               )
             : null}
           {open && props.onReview !== undefined ? (
-            <Button size="sm" variant="outline" className={cn(INBOX_CHIP, InboxView.HEAD_VERB)} onClick={() => props.onReview?.(item)}>
+            <Button size="sm" variant="outline" className={cn(INBOX_CHIP, size)} onClick={() => props.onReview?.(item)}>
               {t('review')}
             </Button>
           ) : null}
@@ -279,28 +290,30 @@ const InboxRow = (props: {
             <Button
               size="sm"
               variant={open && !item.verbs.includes('Answer') ? InboxView.attentionVariant(status) : 'ghost'}
-              className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP, InboxView.HEAD_VERB)}
+              className={cn('dshx:max-w-full', INBOX_CHIP, size, shortLabel !== null && InboxView.SHORT_VERB)}
+              aria-label={openLabel}
               onClick={() => props.onOpen(item)}
             >
-              <span className="dshx:truncate">{openLabel}</span>
+              <span className={cn('dshx:truncate', shortLabel !== null && 'dshx:@max-pane-narrow:hidden')}>{openLabel}</span>
+              {shortLabel === null ? null : <span className="dshx:hidden dshx:truncate dshx:@max-pane-narrow:inline">{shortLabel}</span>}
             </Button>
           ) : null}
           {undo === 'reopen' || undo === 'unsnooze' ? (
-            <Button size="sm" variant="outline" className={cn('dshx:shrink', InboxView.HEAD_VERB)} disabled={props.busy} onClick={() => props.onReopen(item)}>
+            <Button size="sm" variant="outline" className={size} disabled={props.busy} onClick={() => props.onReopen(item)}>
               {undo === 'reopen' ? t('reopen') : t('unsnooze')}
             </Button>
           ) : null}
           {undo === 'unmute' ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className={cn('dshx:shrink', InboxView.HEAD_VERB)}
-              disabled={props.busy}
-              onClick={() => props.onMute(item.source, false)}
-            >
+            <Button size="sm" variant="outline" className={size} disabled={props.busy} onClick={() => props.onMute(item.source, false)}>
               {t('unmuteSource')}
             </Button>
           ) : null}
+      </>
+    )
+  }
+  const headVerbs = (
+        <div data-inbox-row-actions="band" className={InboxView.HEAD_SEAT}>
+          {footed ? <span className={InboxView.HEAD_VERBS_WIDE}>{verbButtons('head')}</span> : verbButtons('head')}
           {/* Utility verbs live in the card's menu (round five P2): the row shows the one verb it asks for. */}
           {doneable || snoozable || quickReplies.length > 0 || mutable ? (
             <DropdownMenu>
@@ -354,7 +367,15 @@ const InboxRow = (props: {
   )
   /** The answers a question offers, under it: the one row of controls a card body keeps. */
   const answers = !answerable ? null : (
-        <div data-inbox-row-actions="" className={cn('dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2 dshx:pb-3', InboxView.BODY_INSET)}>
+        <div
+          data-inbox-row-actions=""
+          className={cn(
+            'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2 dshx:pb-3',
+            // A 44pt "Write your own…" ends a phone card: its own target already leaves 14px under its words (round six C1).
+            openable && 'dshx:@max-pane-narrow:pointer-coarse:pb-0',
+            InboxView.BODY_INSET,
+          )}
+        >
           {[
                 ...item.choices.map((choice, index) => (
                   <Button
@@ -419,6 +440,8 @@ const InboxRow = (props: {
         'dshx:relative',
         // The verbs and the menu share the head row with the title on every width (round five C4, council round 5).
         InboxView.CARD_HEAD,
+        // A bodyless Failed card's verb and menu sit beside its title line, its age under the title (round six C1).
+        !footed && InboxView.COMPACT_SEAT,
         phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
         InboxView.headerBand(status),
       )}
@@ -489,6 +512,17 @@ const InboxRow = (props: {
         </div>
       )}
       {props.actionRow === false ? null : answers}
+      {props.actionRow === false || !footed || !hasVerbs ? null : (
+        <div data-inbox-row-actions="foot" className={cn(
+            InboxView.FOOT_VERBS,
+            // 12px from what is above: the body's or the answers' own padding gives it, a bodyless card adds it here.
+            reason === null && card.detail === null && answers === null && 'dshx:pt-3',
+            answers !== null && openable && 'dshx:@max-pane-narrow:pointer-coarse:pt-3',
+          )}
+        >
+          {verbButtons('foot')}
+        </div>
+      )}
       {/* Land rebases the thread's work onto the bookmark and moves it: say what lands before it runs (never one click). */}
       <AlertDialog open={confirmingLand} onOpenChange={setConfirmingLand}>
         <AlertDialogContent className="dshx-root">

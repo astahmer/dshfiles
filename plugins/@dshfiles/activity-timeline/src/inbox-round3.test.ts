@@ -36,8 +36,8 @@ describe('an Inbox card on a phone (round five C3, council round 3)', () => {
     // Round five C4 (council round 5): the menu ends the head row's trailing seat instead of being pinned over it.
     const verbs = row.slice(row.indexOf('const headVerbs = '), row.indexOf('const answers = '))
     expect(verbs).toMatch(/aria-label=\{t\('more'\)\}/u)
-    // The head is 44pt tall on a phone.
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:min-h-11')
+    // The head is 44pt tall on a phone: 12px padding around the 20px title (round six C1).
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
     expect(row).toContain('InboxView.CARD_HEAD')
   })
 

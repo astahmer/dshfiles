@@ -17,8 +17,10 @@ describe('an Inbox card (round five C4, council round 5)', () => {
   it('puts the verbs in the head row, trailing, before the menu, on every card', () => {
     // Every card, not only a bodyless Failed one, hands its verbs to the row's trailing seat.
     expect(row).toMatch(/trailing=\{props\.actionRow === false && !compact \? undefined : headVerbs\}/u)
-    const verbs = between('const headVerbs = ', 'const answers = ')
+    // Round six C1: one set of verb buttons, drawn in the head (and, on a compact pane, at the foot of a card's body).
+    const verbs = between('const verbButtons = ', 'const answers = ')
     expect(verbs).toContain('data-inbox-row-actions="band"')
+    expect(verbs).toContain("verbButtons('head')")
     expect(verbs).toContain('PROVIDER_VERBS.filter')
     expect(verbs).toContain('{openLabel}')
     // The menu is the seat's last control, not a box pinned over the band.
@@ -31,7 +33,8 @@ describe('an Inbox card (round five C4, council round 5)', () => {
     expect(InboxView.HEAD_VERB).toContain('dshx:h-7')
     const open = between('{openable && !answerable ? (', '{openLabel}')
     expect(open).toContain('InboxView.attentionVariant(status)')
-    expect(open).toContain('InboxView.HEAD_VERB')
+    expect(open).toContain('size')
+    expect(between('const verbButtons = ', 'const headVerbs = ')).toContain("place === 'head' ? cn('dshx:shrink', InboxView.HEAD_VERB)")
   })
 
   it('keeps only content and answers in the body', () => {

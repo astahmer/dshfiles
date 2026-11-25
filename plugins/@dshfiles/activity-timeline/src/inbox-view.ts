@@ -87,12 +87,49 @@ const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-4'
 const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
 
 /**
- * The head row's trailing seat (the verbs and the menu) is an ordinary part of the row at every width. On a phone it
- * stays beside the title instead of wrapping under it (the kit drops it to a line of its own on a narrow pane), and the
- * band is the 44pt seat's height with the title centred on it.
+ * The head row's trailing seat (the menu, and on a wide pane the verbs) is an ordinary part of the row at every width.
+ * On a compact pane (round six C1) the head is padded 12px by 16px and the seat stays beside the title instead of
+ * wrapping under it (the kit drops it to a line of its own on a narrow pane): the title owns the row with its age and ⋯.
  */
 const CARD_HEAD =
-  'dshx:@max-pane-narrow:[&>div:first-child]:items-center dshx:@max-pane-narrow:[&>div:first-child]:py-0 dshx:@max-pane-narrow:[&>div:first-child]:min-h-11 dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto'
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-center dshx:@max-pane-narrow:[&>div:first-child]:px-4 dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto'
+
+/**
+ * The head row's seat: 28px controls pulled 4px into the row's padding on a wide pane; on a compact pane the 44pt ⋯ sits
+ * inside the 12px padding, so the head stays 44px tall (important: the touch rule `my-0` is emitted after the container
+ * query and would otherwise win on a phone).
+ */
+const HEAD_SEAT =
+  'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-3!'
+
+/** A card with a body hands its verbs to the foot on a compact pane; a bodyless (compact) Failed card keeps them in its head. */
+const footsVerbs = (compactCard: boolean): boolean => !compactCard
+
+/** The head's verbs of a card that foots them: shown on a wide pane only. */
+const HEAD_VERBS_WIDE = 'dshx:contents dshx:@max-pane-narrow:hidden'
+
+/**
+ * The verbs at the bottom of a card's body on a compact pane (round six C1): each a full-width 44px button, 12px from the
+ * text above and the card's edge, so the title never wraps for a button. Hidden on a wide pane, where the head holds them.
+ */
+const FOOT_VERBS = 'dshx:hidden dshx:flex-col dshx:gap-2 dshx:px-4 dshx:pb-3 dshx:@max-pane-narrow:flex'
+const FOOT_VERB = 'dshx:w-full dshx:h-11'
+
+/**
+ * A bodyless (compact) card on a compact pane: its verb and menu keep to the title line, top-aligned, and the age wraps
+ * under the title, so the row never grows the verb's band past the title line.
+ */
+const COMPACT_SEAT =
+  'dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0'
+
+/**
+ * That verb's 10px inset on a compact pane (a touch screen gives chips 16px) and no gap before the ghost ⋯, so a title
+ * of about 177px ("Upgrade the router to v8") keeps one line at 390px.
+ */
+const SHORT_VERB = 'dshx:@max-pane-narrow:px-2.5!'
+
+/** The short name a compact card's open verb shows on a phone, so its title keeps one line ("Review", not "Review thread"). */
+const shortOpenLabelKey = (action: InboxOpenAction): 'review' | 'open' => (action === 'review' || action === 'approval' ? 'review' : 'open')
 
 /** Sources whose type says nothing a card does not (a finished turn): the card names the thread's project instead. */
 const PROJECT_SOURCES: ReadonlySet<string> = new Set(['thread-sidebar.finished-turn'])
@@ -305,6 +342,14 @@ export class InboxView {
   static readonly BODY_INSET = BODY_INSET
   static readonly HEAD_VERB = HEAD_VERB
   static readonly CARD_HEAD = CARD_HEAD
+  static readonly HEAD_SEAT = HEAD_SEAT
+  static readonly footsVerbs = footsVerbs
+  static readonly HEAD_VERBS_WIDE = HEAD_VERBS_WIDE
+  static readonly FOOT_VERBS = FOOT_VERBS
+  static readonly FOOT_VERB = FOOT_VERB
+  static readonly shortOpenLabelKey = shortOpenLabelKey
+  static readonly COMPACT_SEAT = COMPACT_SEAT
+  static readonly SHORT_VERB = SHORT_VERB
   static readonly namesProject = namesProject
   static readonly TITLE = TITLE
   static readonly COMMAND = COMMAND
