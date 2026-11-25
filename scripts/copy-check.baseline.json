@@ -11,13 +11,12 @@
     "raw-error-echo": 13,
     "status-word": 19,
     "transport-failure": 0,
-    "code-echo": 4,
+    "code-echo": 2,
     "try-again": 0,
     "ascii-ellipsis": 0
   },
   "counts": {
     "code-echo/jj-integration": 1,
-    "code-echo/model-effort-picker": 2,
     "code-echo/multi-host": 1,
     "conversation/agent-preset": 1,
     "conversation/backlog": 5,

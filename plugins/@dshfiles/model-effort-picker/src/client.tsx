@@ -1,6 +1,7 @@
 import type { ModelDirectory, ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
+import { errorSentence } from '@dshfiles/plugin-ui/lib/error-copy'
 import { multiHostApi } from '@dshfiles/multi-host/api'
 import { readSessionRuntime } from '@dshfiles/multi-host/session-runtime-read'
 import { modelPickerLocale, MODEL_PICKER_LOCALE_NAMESPACE } from './locales.js'
@@ -10,6 +11,10 @@ import { RemoteModelDirectory } from './remote-model-directory.js'
 type RemoteModelCatalog = Pick<ModelDirectoryState, 'groups' | 'failures'>
 
 const remoteDirectories = new WeakMap<ModelDirectory, RemoteModelDirectory>()
+
+/** A remote host's refusal in one sentence (DESIGN.md Error copy): its own words when they read as one, never its code. */
+const catalogFailure = (failure: { readonly message: string; readonly code: string }): string =>
+  errorSentence({ subject: 'The model list', error: { message: failure.message, code: failure.code, kind: 'remote' } }).sentence
 
 export default defineClientPlugin({
   id: 'dshfiles-model-effort-picker',
@@ -39,10 +44,10 @@ export default defineClientPlugin({
                 throw cause
               })
               if (ownership === undefined) return localCatalog()
-              if (!ownership.ok) throw new Error(`${ownership.message} (${ownership.code})`)
+              if (!ownership.ok) throw new Error(catalogFailure(ownership))
               if (ownership.runtimeId === null) return localCatalog()
               const catalog = await remoteApi.runtimeModels({ runtimeId: ownership.runtimeId })
-              if (!catalog.ok) throw new Error(`${catalog.message} (${catalog.code})`)
+              if (!catalog.ok) throw new Error(catalogFailure(catalog))
               return {
                 groups: catalog.groups.map(group => ({
                   id: group.id,

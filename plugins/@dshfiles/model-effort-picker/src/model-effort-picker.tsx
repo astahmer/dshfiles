@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, SearchIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
@@ -173,9 +174,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
 
   // The chip's name, its account tag (b:4qjm) and its accessible name all come from the catalog: read it as soon as the
   // picker is available, not only once its menu opens.
+  // A catalog read that failed while DSH was away is read again once it answers (a fresh catalog answers from cache).
+  const connection = useHostConnection()
   useEffect(() => {
-    if (available) load()
-  }, [available, load])
+    if (available && connection === 'online') load()
+  }, [available, connection, load])
 
   useEffect(() => {
     if (!open) return

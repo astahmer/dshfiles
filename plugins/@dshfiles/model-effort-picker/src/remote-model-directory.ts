@@ -126,7 +126,9 @@ export class RemoteModelDirectory {
   private syncSelection(): void {
     const selection = this.base.store.getSnapshot()
     this.store.update(state => {
-      state.current = selection.current
+      // A Session never loses its model: a null after a known one is the projection reloading (a reconnect clears it
+      // until the new baseline lands), so the chip keeps the last known model instead of reading "Choose model".
+      state.current = selection.current ?? state.current
       if (selection.retainedEffort === undefined) delete state.retainedEffort
       else state.retainedEffort = selection.retainedEffort
       state.pending = selection.pending
