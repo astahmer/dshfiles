@@ -64,12 +64,12 @@ export const NEUTRAL_STEP_NAMES = ['bg', 'panel', 'raised', 'selected', 'line', 
 
 /**
  * Lightness per step at contrast 1. Steps 0–3 are fills, 4–6 borders, 7–8 strong, 9–10 text. Round five (K1) widened
- * the surface steps, mostly in dark, so panel and raised read apart from the page, softened the dark ink, and darkened
- * faint text until it reads at AA on bg in light and on raised in dark.
+ * the surface steps, mostly in dark, so panel and raised read apart from the page, and softened the dark ink. Faint text
+ * (step 8) reads at AA on bg, panel, raised and every row wash in both schemes (round five A3).
  */
 const LIGHTNESS = {
-  dark: [0.185, 0.21, 0.245, 0.27, 0.295, 0.335, 0.37, 0.45, 0.64, 0.72, 0.93],
-  light: [0.992, 0.962, 0.935, 0.915, 0.895, 0.87, 0.8, 0.7, 0.55, 0.5, 0.22],
+  dark: [0.185, 0.21, 0.245, 0.27, 0.295, 0.335, 0.37, 0.45, 0.66, 0.72, 0.93],
+  light: [0.992, 0.962, 0.935, 0.915, 0.895, 0.87, 0.8, 0.7, 0.52, 0.5, 0.22],
 } as const satisfies Record<Scheme, readonly number[]>
 
 const STATUS_HUES = { success: 150, warning: 80, danger: 25 } as const

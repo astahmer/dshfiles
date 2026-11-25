@@ -12,7 +12,7 @@ colors:
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
   selected-wash: '#edf0f9'
-  label-faint: '#737170'
+  label-faint: '#6a6967'
   label-secondary: '#646362'
   signal-indigo: '#3b5bd4'
   danger-red: '#a83634'
@@ -193,7 +193,8 @@ Each step has one job. Plugins reach them through the semantic Tailwind tokens; 
 
 **Surface steps.** The surfaces stay warm and step clearly apart, mostly in dark (round five): dark bg, panel, raised
 and selected sit at oklch L 0.185, 0.21, 0.245 and 0.27, with the ink softened to 0.93; light panel and raised sit at
-0.962 and 0.935 under the 0.992 page. Faint text reads at AA where it is read: on the page in light, on raised in dark.
+0.962 and 0.935 under the 0.992 page. Faint text (light L 0.52, dark 0.66) reads at AA on bg, panel, raised and every
+row wash in both schemes.
 No slate shell: navigation surfaces keep the warm stone.
 
 | Step            | Job                                  | Tailwind token               | Host variable                                                  | Light     | Dark      |
@@ -206,7 +207,7 @@ No slate shell: navigation surfaces keep the warm stone.
 | 5 border        | control border                       | `input`                      | `--dsw-alias-border-l3`                                        | `#d6d4d2` | `#393633` |
 | 6 border-strong | hover border, emphasis               | —                            | `--dsw-alias-border-l4`                                        | `#bfbdbb` | `#423f3c` |
 | 7 strong        | idle glyphs, scrollbars              | —                            | (ramp)                                                         | `#9f9e9d` | `#575552` |
-| 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#737170` | `#8e8b89` |
+| 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#6a6967` | `#94928f` |
 | 9 muted         | secondary text (AA)                  | `muted-foreground`           | `--dsw-alias-label-secondary`                                  | `#646362` | `#a7a4a1` |
 | 10 text         | primary text, primary fill (AA)      | `foreground`, `primary`      | `--dsw-alias-label-primary`                                    | `#1b1a19` | `#eae7e4` |
 | selected wash   | selection at the tint rung           | `selected-wash`              | `--dshx-selected-wash` (accent hue)                            | `#edf0f9` | `#1f222e` |

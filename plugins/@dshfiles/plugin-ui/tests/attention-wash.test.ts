@@ -23,7 +23,7 @@ describe('attention washes (round five A2)', () => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     for (const [name, wash] of Object.entries({ needsYou: p.needsYouWash, failed: p.failedWash })) {
       for (const step of [9, 10]) expect(PaletteMath.contrastRatio(p.neutral[step]!, wash), `${name}: step ${step}`).toBeGreaterThanOrEqual(4.5)
-      expect(PaletteMath.contrastRatio(p.neutral[8]!, wash), `${name}: faint`).toBeGreaterThanOrEqual(3)
+      expect(PaletteMath.contrastRatio(p.neutral[8]!, wash), `${name}: faint`).toBeGreaterThanOrEqual(4.5)
       for (const key of ['accent', 'danger'] as const) expect(PaletteMath.contrastRatio(p[key].fg, wash), `${name}: ${key}`).toBeGreaterThanOrEqual(4.5)
     }
   })

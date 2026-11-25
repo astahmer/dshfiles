@@ -19,7 +19,7 @@ html body {
   --dshx-tone-5: oklch(0.87 0.0035 65);
   --dshx-tone-6: oklch(0.8 0.0035 65);
   --dshx-tone-7: oklch(0.7 0.0025 65);
-  --dshx-tone-8: oklch(0.55 0.0025 65);
+  --dshx-tone-8: oklch(0.52 0.0025 65);
   --dshx-tone-9: oklch(0.5 0.0025 65);
   --dshx-tone-10: oklch(0.22 0.0025 65);
   --dshx-tone-bg: var(--dshx-tone-0);
@@ -171,7 +171,7 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dshx-tone-5: oklch(0.335 0.007 65);
   --dshx-tone-6: oklch(0.37 0.007 65);
   --dshx-tone-7: oklch(0.45 0.005 65);
-  --dshx-tone-8: oklch(0.64 0.005 65);
+  --dshx-tone-8: oklch(0.66 0.005 65);
   --dshx-tone-9: oklch(0.72 0.005 65);
   --dshx-tone-10: oklch(0.93 0.005 65);
   --dshx-tone-bg: var(--dshx-tone-0);

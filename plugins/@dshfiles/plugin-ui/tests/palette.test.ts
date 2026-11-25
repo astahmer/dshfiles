@@ -56,12 +56,14 @@ describe('palette', () => {
     for (const color of PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' }).neutral.slice(0, 7)) expect(color).toMatchObject({ c: 0.007, h: 65 })
   })
 
-  it('keeps faint text at AA where it is read: on bg in light, on raised in dark (round five K1)', () => {
-    const light = PaletteMath.palette({ ...WARM_STONE, scheme: 'light' })
-    const dark = PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' })
-    expect(PaletteMath.contrastRatio(light.neutral[8]!, light.neutral[0]!)).toBeGreaterThanOrEqual(4.5)
-    expect(light.neutral[8]!.l).toBeCloseTo(0.55, 2)
-    for (const step of [0, 1, 2]) expect(PaletteMath.contrastRatio(dark.neutral[8]!, dark.neutral[step]!), `dark faint on ${step}`).toBeGreaterThanOrEqual(4.5)
+  it.each(schemes)('keeps faint text at AA on bg, panel, raised and every row wash (%s, round five A3)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const faint = p.neutral[8]!
+    const under = { bg: p.neutral[0]!, panel: p.neutral[1]!, raised: p.neutral[2]!, selected: p.selectedWash, needsYou: p.needsYouWash, failed: p.failedWash }
+    for (const [surface, color] of Object.entries(under)) expect(PaletteMath.contrastRatio(faint, color), `faint on ${surface}`).toBeGreaterThanOrEqual(4.5)
+    expect(faint.l).toBe(scheme === 'light' ? 0.52 : 0.66)
+    // Still a step below secondary text.
+    expect(PaletteMath.contrastRatio(faint, p.neutral[0]!)).toBeLessThan(PaletteMath.contrastRatio(p.neutral[9]!, p.neutral[0]!))
   })
 
   it('spreads borders and text further at a higher contrast without moving the fills', () => {

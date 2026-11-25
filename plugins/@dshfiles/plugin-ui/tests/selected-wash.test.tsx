@@ -36,7 +36,7 @@ describe('selected wash (round five K2, quieter in A1)', () => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     const wash = p.selectedWash
     for (const step of [9, 10]) expect(PaletteMath.contrastRatio(p.neutral[step]!, wash), `step ${step}`).toBeGreaterThanOrEqual(4.5)
-    expect(PaletteMath.contrastRatio(p.neutral[8]!, wash), 'faint').toBeGreaterThanOrEqual(3)
+    expect(PaletteMath.contrastRatio(p.neutral[8]!, wash), 'faint').toBeGreaterThanOrEqual(4.5)
     for (const key of ['accent', 'danger', 'success', 'warning'] as const) expect(PaletteMath.contrastRatio(p[key].fg, wash), key).toBeGreaterThanOrEqual(3)
   })
 
