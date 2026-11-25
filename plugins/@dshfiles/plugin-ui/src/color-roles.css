@@ -21,6 +21,8 @@
   --color-status-idle: var(--dsw-alias-label-tertiary);
   --color-status-done: var(--dsw-alias-label-secondary);
   --color-control-on: var(--dsw-alias-state-business-primary);
+  /* A destructive button's fill: white text holds 4.5:1 on it in both schemes (the dark danger text tone does not). */
+  --color-destructive-solid: var(--dshx-destructive-solid);
   --color-health-ok: var(--dsw-alias-state-success-primary);
   --color-health-limited: var(--dsw-alias-state-warn-primary);
   --color-health-down: var(--dsw-alias-state-error-primary);
@@ -55,6 +57,10 @@
     /* How long a row that just became Needs you, Failed or Ready holds its tint (DESIGN.md › Motion). */
     --dshx-duration-hold: 1200ms;
   }
+  /* On body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing). */
+  body {
+    --dshx-destructive-solid: var(--dsw-alias-state-error-primary);
+  }
   body[data-ds-dark-theme] {
     --dshx-identity-1: oklch(0.78 0.09 195);
     --dshx-identity-2: oklch(0.78 0.13 300);
@@ -64,5 +70,7 @@
     --dshx-identity-6: oklch(0.78 0.1 100);
     --dshx-identity-7: oklch(0.78 0.12 235);
     --dshx-identity-8: oklch(0.78 0.08 70);
+    /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
+    --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
   }
 }

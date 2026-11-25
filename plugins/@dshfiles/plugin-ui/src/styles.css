@@ -549,11 +549,12 @@
 
 /*
  * One title on a phone (unslop phone 25). While thread-sidebar's phone top bar names the page on the stage ("‹ Observe
- * Usage"), a kit `Page` (its `page-header` slot) keeps its `h1` for screen readers but hides it visually; its count, meta chips and actions keep
- * their row. A thread stage is left alone: pages in its panel sheet are not what the bar names.
+ * Usage"), a kit `Page` (its `page-header` slot) keeps its `h1` for screen readers but hides it visually, and its count
+ * goes with it (a bare "5" names nothing, DESIGN.md Layout); meta chips and actions keep their row. A thread stage is
+ * left alone: pages in its panel sheet are not what the bar names.
  */
 @layer base {
-  html:has([data-phone-top-bar]:not([data-phone-stage='thread'])) :where([data-slot='page-header'] h1) {
+  html:has([data-phone-top-bar]:not([data-phone-stage='thread'])) :where([data-slot='page-header'] h1, [data-slot='page-header'] [data-slot='page-count']) {
     position: absolute;
     width: 1px;
     height: 1px;
@@ -614,6 +615,21 @@
       button[data-slot='sheet-close'],
       .dshx-root button:not([data-slot]):not([class*='after:']):not([data-slot^='conversation.'] *)
     )::after {
+      content: '';
+      position: absolute;
+      inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));
+    }
+
+    /*
+     * The same 44px hit area as a plain class, for a control the kit does not draw: a native-fork CSS-module button,
+     * a chip, a row's `⋯` (DESIGN.md Density). It draws with ::after, so it does not suit an element whose ::after
+     * already draws something.
+     */
+    :where(.dshx-hit-44) {
+      position: relative;
+    }
+
+    :where(.dshx-hit-44)::after {
       content: '';
       position: absolute;
       inset: min(0px, calc((100% - 44px) / 2)) min(0px, calc((100% - 44px) / 2));

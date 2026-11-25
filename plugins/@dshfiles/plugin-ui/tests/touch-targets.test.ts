@@ -11,8 +11,8 @@ describe('touch targets', () => {
     expect(styles).toContain('@media (pointer: coarse)')
     for (const slot of ['button', 'toggle', 'toggle-group-item']) expect(coarse).toContain(`[data-slot='${slot}']`)
     expect(coarse).toContain("[data-slot='tabs-trigger'])::before")
-    expect(coarse.match(/inset: min\(0px, calc\(\(100% - 44px\) \/ 2\)\) min\(0px, calc\(\(100% - 44px\) \/ 2\)\);/gu)).toHaveLength(2)
-    // The rule is base layer: a positioning utility on a control still wins.
+    expect(coarse.match(/inset: min\(0px, calc\(\(100% - 44px\) \/ 2\)\) min\(0px, calc\(\(100% - 44px\) \/ 2\)\);/gu)).toHaveLength(3)
+    // Kit controls, page tabs (::before) and the plain dshx-hit-44 class. The rule is base layer: a positioning utility on a control still wins.
     expect(styles.lastIndexOf('@layer base', styles.indexOf('@media (pointer: coarse)'))).toBeGreaterThan(-1)
   })
 

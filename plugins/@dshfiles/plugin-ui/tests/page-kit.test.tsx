@@ -174,7 +174,7 @@ describe('Page', () => {
     const title = view.getByRole('heading', { level: 1, name: 'Usage' })
     expect(title.closest('[data-slot="page-header"]')).not.toBeNull()
     const styles = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8')
-    const rule = /html:has\(\[data-phone-top-bar\]:not\(\[data-phone-stage='thread'\]\)\) :where\(\[data-slot='page-header'\] h1\) \{([^}]*)\}/u.exec(styles)
+    const rule = /html:has\(\[data-phone-top-bar\]:not\(\[data-phone-stage='thread'\]\)\) :where\(\[data-slot='page-header'\] h1, \[data-slot='page-header'\] \[data-slot='page-count'\]\) \{([^}]*)\}/u.exec(styles)
     expect(rule).not.toBeNull()
     for (const declaration of ['position: absolute', 'width: 1px', 'height: 1px', 'overflow: hidden', 'clip-path: inset(50%)', 'white-space: nowrap']) {
       expect(rule?.[1]).toContain(declaration)

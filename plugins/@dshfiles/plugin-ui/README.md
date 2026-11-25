@@ -415,7 +415,14 @@ Client UI uses `@dshfiles/plugin-ui` (shadcn/ui on Tailwind v4); skills
   `<button>` under `.dshx-root` gets a 44px hit area through `::after` (tabs
   triggers use `::before`). A raw button that draws with an `after:` utility is
   skipped; one that draws with a hand-written `::after` rule loses its drawing, so
-  use an `after:` utility or `::before` instead.
+  use an `after:` utility or `::before` instead. A control the kit does not draw
+  (a native-fork CSS-module button, a chip) takes the plain class `dshx-hit-44`
+  for the same hit area.
+- Where nothing can hover (`(hover: none)`) a kit `Tooltip` does not open on its
+  own: a tap would leave the label over the content. Pass `open` to control one.
+- A `destructive` button fills with `bg-destructive-solid` (white text holds
+  4.5:1 in both schemes; the dark `destructive` tone is a text colour). A
+  required field's `*` is muted: red means Failed only.
 - Avoid native JSX `<select>` controls; use `Combobox` from
   `@dshfiles/plugin-ui/components/ui/combobox` instead, matching the New Thread
   picker for consistent, searchable selection. The `no-native-select` lint rule

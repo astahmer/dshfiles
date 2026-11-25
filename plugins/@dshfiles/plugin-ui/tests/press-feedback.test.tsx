@@ -19,7 +19,7 @@ describe('button press feedback', () => {
   it('washes every pressable variant on :active within the 80ms hover token', () => {
     const wash = {
       default: 'dshx:active:bg-primary/80',
-      destructive: 'dshx:active:bg-destructive/80',
+      destructive: 'dshx:active:bg-destructive-solid/80',
       secondary: 'dshx:active:bg-secondary/70',
       outline: 'dshx:active:bg-(--dsw-alias-interactive-bg-active)',
       ghost: 'dshx:active:bg-(--dsw-alias-interactive-bg-active)',

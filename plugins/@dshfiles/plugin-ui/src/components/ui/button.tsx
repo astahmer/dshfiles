@@ -15,7 +15,7 @@ const buttonVariants = cva(
       variant: {
         default: 'dshx:bg-primary dshx:text-primary-foreground dshx:hover:bg-primary/90 dshx:active:bg-primary/80',
         destructive:
-          'dshx:bg-destructive dshx:text-white dshx:hover:bg-destructive/90 dshx:active:bg-destructive/80 dshx:focus-visible:ring-destructive/20 dshx:dark:bg-destructive/60 dshx:dark:focus-visible:ring-destructive/40',
+          'dshx:bg-destructive-solid dshx:text-white dshx:hover:bg-destructive-solid/90 dshx:active:bg-destructive-solid/80 dshx:focus-visible:ring-destructive/20 dshx:dark:focus-visible:ring-destructive/40',
         outline:
           'dshx:border dshx:bg-background dshx:shadow-xs dshx:hover:bg-accent dshx:hover:text-accent-foreground dshx:dark:border-input dshx:dark:bg-input/30 dshx:dark:hover:bg-input/50 dshx:active:bg-(--dsw-alias-interactive-bg-active) dshx:dark:active:bg-(--dsw-alias-interactive-bg-active)',
         secondary: 'dshx:bg-secondary dshx:text-secondary-foreground dshx:hover:bg-secondary/80 dshx:active:bg-secondary/70',
