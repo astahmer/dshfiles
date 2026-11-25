@@ -8,6 +8,7 @@ import { serializedSchemaBytes } from './schema-measurement.js'
 import { ToolSearchModel } from './search.js'
 import { TOOL_CALL_NAME, toolCallDefinition } from './tool-call.js'
 import { ToolSetDeltaModel } from './tool-set-delta.js'
+import { makeToolSearchVisibility, type ToolSearchVisibility } from './tool-visibility.js'
 
 const TOOL_SET_SOURCE = 'dshfiles-tool-search'
 /** The native executor's batch concurrency (`@deepseek-ai/dsh-tool-executor-native`), kept for the agents this plugin executes for. */
@@ -137,7 +138,7 @@ class ToolSearch extends Context.Service<
     readonly globalsChanged: Effect.Effect<void>
   }
 >()('@dshfiles/tool-search/ToolSearch') {
-  static readonly layer = (config: ToolSearchConfig) =>
+  static readonly layer = (config: ToolSearchConfig, visibility: ToolSearchVisibility) =>
     Layer.effect(
       ToolSearch,
       Effect.gen(function* () {
@@ -164,7 +165,7 @@ class ToolSearch extends Context.Service<
           globalCatalog ??= new Map(ctx.tools.schemas().map(schema => [schema.name, schema]))
           return globalCatalog
         }
-        const isAlwaysVisible = (name: string) => alwaysVisible.some(pattern => pattern.test(name))
+        const isAlwaysVisible = (name: string) => alwaysVisible.some(pattern => pattern.test(name)) || visibility.names().has(name)
 
         const reportGlobalSchemas = Effect.gen(function* () {
           if (!config.reportSchemaMetrics) return
@@ -457,21 +458,29 @@ class ToolSearch extends Context.Service<
 }
 
 /** Attach every live and future agent, follow global tool changes, and detach on dispose or unload. */
-const attachAgents = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const ctx = (yield* HostContext).ctx
-    const search = yield* ToolSearch
-    const logged = (effect: Effect.Effect<void, ToolSearchFailure>) => effect.pipe(Effect.catchTag('ToolSearchFailure', Effect.logWarning))
-    yield* HostEvents.on('agent/created', event => logged(search.install(event.agent)))
-    yield* HostEvents.on('agent/disposed', event => search.uninstall(event.agent))
-    yield* HostEvents.on('tools/change', () => search.globalsChanged)
-    for (const agent of ctx.agents.list()) yield* search.install(agent)
-  }),
-)
+const attachAgents = (visibility: ToolSearchVisibility) =>
+  Layer.effectDiscard(
+    Effect.gen(function* () {
+      const ctx = (yield* HostContext).ctx
+      const search = yield* ToolSearch
+      ctx.provide('toolSearchVisibility', visibility)
+      const logged = (effect: Effect.Effect<void, ToolSearchFailure>) => effect.pipe(Effect.catchTag('ToolSearchFailure', Effect.logWarning))
+      yield* HostEvents.on('agent/created', event => logged(search.install(event.agent)))
+      yield* HostEvents.on('agent/disposed', event => search.uninstall(event.agent))
+      yield* HostEvents.on('tools/change', () => search.globalsChanged)
+      for (const agent of ctx.agents.list()) yield* search.install(agent)
+    }),
+  )
+
+/**
+ * One registry per process, not per layer build: dshx may build the plugin layer more than once (host setup and
+ * activation), and a per-build registry would let the provided service and the engine's closure disagree.
+ */
+const hostVisibility = makeToolSearchVisibility()
 
 export default DshxPlugin.make({
   name: '@dshfiles/tool-search',
   inject: ['agents', 'tools'],
   Config: configSchema,
-  layer: config => Layer.provideMerge(attachAgents, ToolSearch.layer(config)),
+  layer: config => Layer.provideMerge(attachAgents(hostVisibility), ToolSearch.layer(config, hostVisibility)),
 })
