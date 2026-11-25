@@ -106,6 +106,8 @@ const runtimeStatusSchema = Schema.Union([
     runtime: runtimeSummarySchema,
     workspaces: Schema.Array(workspaceSchema),
     sessions: Schema.Array(sessionSchema),
+    /** The owning runtime's archived set: its session list still carries archived threads, so a row needs this read. */
+    archivedSessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(10_000)),
     stale: Schema.optional(Schema.Literal(true)),
     refreshing: Schema.optional(Schema.Boolean),
   }),
@@ -1271,6 +1273,33 @@ const effectMultiHostApi = defineApi({
       tool: {
         name: 'multi_host_thread_stop',
         render: output => (output.ok ? 'Asked the remote thread to stop.' : `Failed: ${output.message}`),
+      },
+    }),
+    /** Archive on the runtime that owns the Session, then report its archived set so the sidebar can move the row. */
+    threadArchive: method({
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), archivedSessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(10_000)) }),
+        failedSchema,
+      ]),
+      description:
+        'Archive one thread on the runtime that owns it, through the same reversible Workspace API its own sidebar uses; the thread leaves the sidebar until restored. Refused while its turn runs: stop it first. Call only when the user asked to archive that thread.',
+      tool: {
+        name: 'multi_host_thread_archive',
+        render: output => (output.ok ? `Archived the remote thread; ${output.archivedSessionIds.length} archived there.` : `Failed: ${output.message}`),
+      },
+    }),
+    threadUnarchive: method({
+      input: Schema.Struct({ runtimeId: idSchema, sessionId: sessionIdSchema }),
+      output: Schema.Union([
+        Schema.Struct({ ok: Schema.Literal(true), archivedSessionIds: Schema.Array(sessionIdSchema).check(Schema.isMaxLength(10_000)) }),
+        failedSchema,
+      ]),
+      description:
+        'Restore one archived thread on the runtime that owns it, through the same reversible Workspace API its own sidebar uses. Call only when the user asked to restore that thread.',
+      tool: {
+        name: 'multi_host_thread_unarchive',
+        render: output => (output.ok ? `Restored the remote thread; ${output.archivedSessionIds.length} still archived there.` : `Failed: ${output.message}`),
       },
     }),
 

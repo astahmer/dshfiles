@@ -101,9 +101,11 @@ describe('multi-host tool exposure', () => {
       'multi_host_start_thread',
       'multi_host_status',
       'multi_host_test',
+      'multi_host_thread_archive',
       'multi_host_thread_reply',
       'multi_host_thread_stop',
       'multi_host_thread_transcript',
+      'multi_host_thread_unarchive',
       'multi_host_threads',
       'multi_host_update',
     ])

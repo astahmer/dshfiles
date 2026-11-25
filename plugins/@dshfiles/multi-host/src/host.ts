@@ -708,6 +708,50 @@ const stopRemoteThread = Effect.fn('multi-host thread stop')(function* (input: {
   )
 })
 
+/** The archived set an archive reply carries, narrowed from the wire value the native RPC already validated. */
+const decodeArchivedSessionIds = Schema.decodeUnknownOption(Schema.Struct({ archivedSessionIds: Schema.Array(Schema.String) }))
+
+/**
+ * Archive or restore one remote thread on the runtime that owns it, then drop the cached status so the next read
+ * carries the new set. The reply is that set too, so a sidebar can move the row without waiting for a refresh.
+ */
+const setRemoteThreadArchived = Effect.fn('multi-host thread archive')(function* (input: {
+  readonly runtimeId: string
+  readonly sessionId: string
+  readonly archived: boolean
+}) {
+  return yield* withRuntime(
+    input.runtimeId,
+    gateway =>
+      NativeRpc.call(gateway, {
+        namespace: 'workspace',
+        method: input.archived ? 'archiveSession' : 'unarchiveSession',
+        args: { request: { sessionId: input.sessionId } },
+      }),
+    { mutation: true, broken: brokenRpc },
+  ).pipe(
+    Effect.flatMap(result =>
+      Effect.gen(function* () {
+        const status = yield* RuntimeStatus
+        if (!result.ok) {
+          yield* status.invalidate(input.runtimeId)
+          return { ok: false as const, code: result.code, message: result.message }
+        }
+        const parsed = decodeArchivedSessionIds(result.value)
+        if (Option.isNone(parsed))
+          return {
+            ok: false as const,
+            code: 'invalid-response',
+            message: 'The runtime changed the archive set but did not report it; reopen the host list to see the thread.',
+          }
+        yield* status.recordArchived(input.runtimeId, parsed.value.archivedSessionIds)
+        return { ok: true as const, archivedSessionIds: parsed.value.archivedSessionIds }
+      }),
+    ),
+    Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+  )
+})
+
 const handlers = Api.handlers(multiHostApi, {
   identity: Effect.fn('multi-host identity')(function* () {
     const identity = yield* RuntimeIdentity
@@ -1578,6 +1622,8 @@ const handlers = Api.handlers(multiHostApi, {
     )
   }),
   threadStop: stopRemoteThread,
+  threadArchive: input => setRemoteThreadArchived({ runtimeId: input.runtimeId, sessionId: input.sessionId, archived: true }),
+  threadUnarchive: input => setRemoteThreadArchived({ runtimeId: input.runtimeId, sessionId: input.sessionId, archived: false }),
   runtimeCall: Effect.fn('multi-host runtime call')(function* (input) {
     const mutation = NativeRpc.isMutation(input.request)
     return yield* withRuntime(input.runtimeId, gateway => NativeRpc.call(gateway, input.request), { mutation, broken: brokenRpc }).pipe(

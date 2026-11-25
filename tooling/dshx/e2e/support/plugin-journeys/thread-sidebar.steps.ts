@@ -922,8 +922,8 @@ Then("the remote row offers the sidebar's own verbs and no Host verb", async ({ 
     await expect(page.getByRole('menuitem', { name: 'Settle', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Park', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Copy thread ID', exact: true })).toBeVisible()
-    // Archive, pin and rename run on the runtime that owns the Session, so a mirrored row never offers them.
-    await expect(menu.getByRole('menuitem', { name: 'Archive', exact: true })).toHaveCount(0)
+    // Archive runs on the runtime that owns the Session through multi-host; pin and rename stay only there.
+    await expect(menu.getByRole('menuitem', { name: 'Archive', exact: true })).toBeVisible()
     await expect(menu.getByRole('menuitem', { name: /Pin/u })).toHaveCount(0)
     await expect(menu.getByRole('menuitem', { name: 'Rename thread', exact: true })).toHaveCount(0)
     await pressRemoteRowMenuItem(page, 'Settle')

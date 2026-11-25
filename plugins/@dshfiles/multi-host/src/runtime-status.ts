@@ -49,6 +49,11 @@ const decodeWorkspaceContainer = Schema.decodeUnknownOption(
   }),
 )
 const decodeResourceSnapshot = Schema.decodeUnknownOption(resourceSnapshotSchema)
+const decodeArchivedSessionIds = Schema.decodeUnknownOption(
+  passthrough({
+    archivedSessionIds: Schema.Array(Schema.String.check(Schema.isMaxLength(256))).check(Schema.isMaxLength(10_000)),
+  }),
+)
 
 /** Every workspace row anywhere in the follow frames, bounded in depth and count. */
 const collectWorkspaces = (frames: readonly unknown[]): WorkspaceRow[] => {
@@ -70,6 +75,37 @@ const collectWorkspaces = (frames: readonly unknown[]): WorkspaceRow[] => {
   }
   for (const frame of frames) visit(frame, 0)
   return [...results.values()]
+}
+
+/**
+ * The owning runtime's archived Session set from the same follow frames: the baseline and replace values carry it, and
+ * so does the archived increment. A runtime whose Session list keeps archived threads needs this read to place a row.
+ */
+const collectArchivedSessionIds = (frames: readonly unknown[]): string[] => {
+  const results = new Set<string>()
+  const visit = (value: unknown, depth: number): void => {
+    if (depth > 16 || results.size >= 10_000) return
+    if (Array.isArray(value)) {
+      for (const item of value.slice(0, 512)) visit(item, depth + 1)
+      return
+    }
+    const archived = decodeArchivedSessionIds(value)
+    if (Option.isSome(archived)) for (const sessionId of archived.value.archivedSessionIds) results.add(sessionId)
+    const container = decodeWorkspaceContainer(value)
+    if (Option.isNone(container)) return
+    for (const key of ['items', 'value', 'workspace', 'workspaces', 'baseline', 'snapshot'] as const) {
+      const child = container.value[key]
+      if (child !== undefined) visit(child, depth + 1)
+    }
+  }
+  for (const frame of frames) visit(frame, 0)
+  return [...results.values()]
+}
+
+/** The follow-frame reads the runtime status composes, exposed for their own focused checks. */
+export class RuntimeStatusModel {
+  static readonly workspaces = collectWorkspaces
+  static readonly archivedSessionIds = collectArchivedSessionIds
 }
 
 const failureText = (error: TaggedFailure & { readonly message: string }) => ({ code: failureCodeOf(error), message: error.message })
@@ -101,6 +137,11 @@ export class RuntimeStatus extends Context.Service<
   {
     readonly status: (runtimeId: string) => Effect.Effect<RuntimeStatusValue>
     readonly invalidate: (runtimeId: string) => Effect.Effect<void>
+    /**
+     * The archived set a mutation reply just reported: it patches the cached snapshot so a sidebar moves the row at
+     * once, instead of waiting for the snapshot's own refresh.
+     */
+    readonly recordArchived: (runtimeId: string, archivedSessionIds: readonly string[]) => Effect.Effect<void>
   }
 >()('@dshfiles/multi-host/RuntimeStatus') {
   static readonly layer = Layer.effect(
@@ -148,7 +189,13 @@ export class RuntimeStatus extends Context.Service<
                   sessionIds: item.sessionIds ?? [],
                 }))
                 const refreshed = (yield* directory.findRuntime(runtime.id).pipe(Effect.orElseSucceed(() => undefined))) ?? runtime
-                return { ok: true as const, runtime: yield* runtimeSummary(refreshed), workspaces, sessions }
+                return {
+                  ok: true as const,
+                  runtime: yield* runtimeSummary(refreshed),
+                  workspaces,
+                  sessions,
+                  archivedSessionIds: collectArchivedSessionIds(frames),
+                }
               }),
             ),
             Effect.catch(error =>
@@ -207,7 +254,12 @@ export class RuntimeStatus extends Context.Service<
         } satisfies RuntimeStatusValue
       })
 
-      return RuntimeStatus.of({ status, invalidate: snapshots.invalidate })
+      return RuntimeStatus.of({
+        status,
+        invalidate: snapshots.invalidate,
+        recordArchived: (runtimeId, archivedSessionIds) =>
+          snapshots.update(runtimeId, status => (status.ok ? { ...status, archivedSessionIds: [...archivedSessionIds] } : status)),
+      })
     }),
   )
 }

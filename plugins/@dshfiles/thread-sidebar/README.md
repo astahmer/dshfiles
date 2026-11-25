@@ -64,9 +64,10 @@ their live running state, while date, project, and flat views group them
 alongside local threads. Enable **Show remote threads in a separate group** in
 **Thread list settings** to restore a standalone Remote section; in status views its
 header joins the saved `sectionOrder` and can be reordered like local sections.
-Remote runtime status does not include pinned, parked, settled, archived, or
-attention state, so integrated remote sessions only participate in
-Active/Inactive status grouping.
+Remote runtime status carries pinned, archived, and attention state for the runtime's own threads: an
+integrated remote session joins Active/Inactive from its live running state, and once its runtime reports it
+archived, its row moves to the Archived section. The row's menu and hover strip archive and restore it through
+multi-host on the runtime that owns it; pin, rename, and the rest stay local to that runtime.
 A local status section with no rows folds away and keeps its saved slot while the
 shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
@@ -329,8 +330,10 @@ threshold, so a drop there records `idleSectionOverrides` (with its instant) and
 keeps the row in that section until the thread's next turn; Archived keeps the
 thread's other statuses, so restoring brings it back where it was. Pin, settle
 and archive keep their usual refusals (a running thread cannot be parked, settled
-or archived), and every move honors Apply actions to child threads. The row
-context menu's Move to group submenu performs the same moves from the keyboard.
+or archived), and every move honors Apply actions to child threads. A remote row
+follows the same plan, except that its archive and restore run on the runtime
+owning it (its Host-only pin is the one verb it never applies). The row context
+menu's Move to group submenu performs the same moves from the keyboard.
 
 **The thread board page.** The sidebar only ever shows the list; the board is a
 full-width page opened from the thread board row in the sidebar's panel list (or

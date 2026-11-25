@@ -1424,7 +1424,7 @@
     {
       "id": "section-order",
       "title": "Group remote threads with each view",
-      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
+      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default, and their rows archive or restore on the runtime that owns them. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
       "reach": [
         "click button \"Filter: *\"",
         "click menuitemradio \"All threads*\"",
@@ -1454,7 +1454,7 @@
         "Remote grouping is shown by default instead of following the current view.",
         "Empty sections can shift the drag position even though they are not rendered.",
         "A reordered section order or separate-group choice does not survive a reload.",
-        "A remote row offers archive or pin, which only the runtime owning the Session can run."
+        "A remote row offers pin, which only the runtime owning the Session can run."
       ],
       "externalDependencies": [
         {
@@ -1502,7 +1502,7 @@
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "Client-only: Group remote threads with each view renders browser state and starts no Host work of its own."
+          "reason": "Client-only: Group remote threads with each view renders browser state; the archive verb it offers dispatches through multi-host, which records its own API span."
         }
       ]
     },

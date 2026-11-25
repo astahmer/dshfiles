@@ -325,10 +325,12 @@ checkout; `apply: false` fetches and reports without changing files, and it neve
 pushes). Provisioning never installs fnm itself:
 that is the machine's own setup, reported as a blocked step.
 
-The remote inventory adds no user verb: it renders the `sessions` that
-`multi_host_status`/`runtimeStatus` already returns, and that read already has
-its agent tool. The waiting-on-host banner is presentation over the same
-transcript read (`multi_host_thread_transcript`).
+The remote inventory adds one user verb through the runtime that owns a thread: `threadArchive` and
+`threadUnarchive` (`multi_host_thread_archive`, `multi_host_thread_unarchive`) archive or restore it through the
+Workspace API that runtime's own sidebar uses. The rest of the inventory renders the `sessions` that
+`multi_host_status`/`runtimeStatus` already returns, including that runtime's archived set, and that read already
+has its agent tool. The waiting-on-host banner is presentation over the same transcript read
+(`multi_host_thread_transcript`).
 
 Deliberately untooled, pinned by a test:
 
@@ -343,9 +345,10 @@ Deliberately untooled, pinned by a test:
 | `runtimeUpsert` / `hostUpsert`         | Registration steps `multi_host_save_ssh_host` already performs                                       |
 | `sessionCursor`                        | Internal polling cursor                                                                              |
 
-Replying to and stopping a remote thread now have dedicated methods
-(`threadReply`, `threadStop`) and tools (`multi_host_thread_reply`,
-`multi_host_thread_stop`), so no Agent needs the raw `runtimeCall` for them.
+Replying to, stopping, archiving and restoring a remote thread now have dedicated methods
+(`threadReply`, `threadStop`, `threadArchive`, `threadUnarchive`) and tools
+(`multi_host_thread_reply`, `multi_host_thread_stop`, `multi_host_thread_archive`,
+`multi_host_thread_unarchive`), so no Agent needs the raw `runtimeCall` for them.
 
 ### agent-toolkit
 

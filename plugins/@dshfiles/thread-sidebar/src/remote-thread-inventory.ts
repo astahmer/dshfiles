@@ -2,8 +2,9 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useApi } from '@dshfiles/dshx/client'
 import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 import { InventoryPoll, multiHostApi, multiHostKeys, multiHostQueries, type MultiHostClient, type RemoteThreadSummary } from '@dshfiles/multi-host/destination'
+import { errorMessage, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { ThreadViewModel, type ThreadStatusFilters, type ThreadSourceFilter } from './thread-view.js'
 import { useQueries, useQuery } from '@dshfiles/plugin-ui/query'
 
@@ -17,6 +18,7 @@ export type RemoteSidebarThread = {
   readonly hostName: string
   readonly connected: boolean
   readonly running: boolean
+  readonly archived: boolean
   readonly updatedAt: number
   readonly workspaceId: string | undefined
   readonly workspaceTitle: string | undefined
@@ -27,7 +29,6 @@ const filterRemoteSidebarThreads = (input: {
   readonly threads: readonly RemoteSidebarThread[]
   readonly filters: ThreadStatusFilters
   readonly sourceFilter: ThreadSourceFilter
-  readonly archivedSessionIds: ReadonlySet<string>
   readonly settledSessionIds: ReadonlySet<string>
   readonly mutedSessionIds: ReadonlySet<string>
 }): readonly RemoteSidebarThread[] => {
@@ -39,7 +40,7 @@ const filterRemoteSidebarThreads = (input: {
       running: thread.running,
       labels: [],
       unread: false,
-      archived: input.archivedSessionIds.has(sessionId),
+      archived: thread.archived,
       settled: input.settledSessionIds.has(sessionId),
       muted: input.mutedSessionIds.has(sessionId),
     })
@@ -83,6 +84,7 @@ const buildRemoteSidebarThreads = (input: {
 
   for (const entry of input.statuses) {
     if (!entry.status.ok || hidden.has(entry.runtimeId)) continue
+    const archivedSessionIds = new Set(entry.status.archivedSessionIds)
     for (const session of entry.status.sessions) {
       const key = threadKey(session.runtimeId, session.sessionId)
       if (session.blank) {
@@ -103,6 +105,7 @@ const buildRemoteSidebarThreads = (input: {
         hostName: entry.hostName,
         connected: entry.status.runtime.connected,
         running: session.running,
+        archived: archivedSessionIds.has(session.sessionId),
         updatedAt: validTimestamp(session.updatedAt),
         workspaceTitle,
         workspacePath: workspace?.path ?? cwd,
@@ -123,6 +126,8 @@ const buildRemoteSidebarThreads = (input: {
       hostName: thread.hostName,
       connected: thread.connected,
       running: false,
+      // A runtime that did not answer carries no archived set: the row stays until its next status read says otherwise.
+      archived: false,
       updatedAt: createdTimestamp(thread.createdAt),
       workspaceTitle,
       workspacePath: thread.cwd,
@@ -252,5 +257,40 @@ export const useRemoteSidebarThreads = (enabled: boolean, localProjects: readonl
         origins: origins.isError ? undefined : origins.data?.origins,
       }),
     [localProjects, origins.data?.origins, origins.isError, threads],
+  )
+}
+
+/** The result of one remote archive or restore, as the caller's notice needs it. */
+export type RemoteThreadArchiveOutcome = { readonly ok: true } | { readonly ok: false; readonly message: string }
+
+/**
+ * Archive or restore one mirrored thread on the runtime that owns it. The reply carries that runtime's archived set,
+ * so the cached status moves the row at once; the runtime's next status refresh confirms it.
+ */
+export const useRemoteThreadArchive = (): ((input: {
+  readonly runtimeId: string
+  readonly sessionId: string
+  readonly archived: boolean
+}) => Promise<RemoteThreadArchiveOutcome>) => {
+  const api = useApi(multiHostApi)
+  const queryClient = useQueryClient()
+  return useCallback(
+    async (input: { readonly runtimeId: string; readonly sessionId: string; readonly archived: boolean }): Promise<RemoteThreadArchiveOutcome> => {
+      let result: Awaited<ReturnType<MultiHostClient['threadArchive']>>
+      try {
+        result = input.archived
+          ? await api.threadUnarchive({ runtimeId: input.runtimeId, sessionId: input.sessionId })
+          : await api.threadArchive({ runtimeId: input.runtimeId, sessionId: input.sessionId })
+      } catch (error) {
+        return { ok: false, message: errorMessage(error, input.archived ? 'The thread could not be restored.' : 'The thread could not be archived.') }
+      }
+      if (!result.ok) return { ok: false, message: result.message }
+      const archivedSessionIds = result.archivedSessionIds
+      queryClient.setQueryData<RemoteRuntimeStatus>(multiHostKeys.status(input.runtimeId), current =>
+        current === undefined || !current.ok ? current : { ...current, archivedSessionIds },
+      )
+      return { ok: true }
+    },
+    [api, queryClient],
   )
 }
