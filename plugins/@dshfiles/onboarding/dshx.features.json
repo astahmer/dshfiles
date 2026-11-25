@@ -309,7 +309,7 @@
       "id": "starter-tasks",
       "title": "First tasks for your project on the new-thread screen",
       "summary": "The new-thread screen offers three tasks for the project that put a prompt in the composer without sending it.",
-      "details": "The new-thread screen offers three tasks for the project on screen (explain it, find a rough edge, add a missing test) as outline chips beside the other suggestion cards; until the first thread has a message one sentence above them explains them. A task puts its prompt in the composer and never sends it. Nothing shows without a project on screen.",
+      "details": "The new-thread screen offers three tasks for the project on screen (explain it, find a rough edge, add a missing test) as 28px ghost chips with an identity-tone tile, on their own line under the quiet Resume and Inbox line; until the first thread has a message one sentence above them explains them. A task puts its prompt in the composer and never sends it. Nothing shows without a project on screen.",
       "reach": ["expect button \"Explain the project\""],
       "surfaces": ["client"],
       "surface": "composerContribution",

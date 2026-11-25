@@ -1009,9 +1009,27 @@ button.crumbEditable {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  /* dshfiles (unslop r5 C4, council round 3): Resume and Inbox form one quiet navigation line 12px below the composer;
+     the starters (onboarding) take their own line under it. */
+  column-gap: 8px;
+  row-gap: 12px;
   min-width: 0;
-  padding: 8px var(--dsh-composer-side-clearance) 0;
+  padding: 12px var(--dsh-composer-side-clearance) 0;
+}
+
+/* The navigation entries (thread-sidebar's Resume, Review and Inbox) read as quiet 28px links on that line, not
+   outlined cards: the hero's one card is the composer. */
+.heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-'])) {
+  height: 28px;
+  padding-inline: 8px;
+  border-color: transparent;
+}
+
+/* A touch screen keeps the 44pt target. */
+@media (pointer: coarse) {
+  .heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-'])) {
+    height: 44px;
+  }
 }
 
 .heroSuggestions > * {

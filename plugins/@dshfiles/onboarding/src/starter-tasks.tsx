@@ -14,6 +14,16 @@ interface SessionRow {
 
 const ICONS = { explain: BookOpenIcon, 'rough-edge': BugIcon, test: FlaskConicalIcon } as const
 
+/**
+ * Each starter's 20px tile in its own identity tone (round five C4, council round 3): glyph at the tone, a 14% tile
+ * behind it, the label in ink. Identity 5 (green) is never used: it sits beside the success hue.
+ */
+const TILES = {
+  explain: 'dshx:bg-identity-7/14 dshx:text-identity-7',
+  'rough-edge': 'dshx:bg-identity-3/14 dshx:text-identity-3',
+  test: 'dshx:bg-identity-2/14 dshx:text-identity-2',
+} as const satisfies Record<StarterTask['id'], string>
+
 /** Three first tasks for one project, or for "this project" when none is named; each one only reads or proposes first. */
 const list = (input: { readonly project: string | undefined }): readonly StarterTask[] => {
   const project = input.project ?? 'this project'
@@ -36,9 +46,11 @@ export class StarterTasks {
   static readonly beforeFirstThread = beforeFirstThread
 }
 
-// The hero's flat suggestion cards (thread-sidebar's Resume / Review / Inbox): a hairline, 48pt rows on touch.
-const CARD =
-  'dshx-root dshx:inline-flex dshx:h-9 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-12 dshx:pointer-coarse:text-base dshx:[&_svg]:size-4 dshx:[&_svg]:flex-none'
+// A starter is a 28px ghost chip (round five C4, council round 3): no outline, a hover fill, 44pt on touch.
+const CHIP =
+  'dshx-root dshx:inline-flex dshx:h-7 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:bg-transparent dshx:pr-2.5 dshx:pl-1 dshx:text-sm dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base'
+
+const TILE = 'dshx:grid dshx:size-5 dshx:flex-none dshx:place-items-center dshx:rounded-sm dshx:[&_svg]:size-3.5'
 
 /**
  * The new-thread hero's suggested tasks (calm-onboarding C2, round five B8): three outline chips for the project on
@@ -60,15 +72,22 @@ export const StarterTaskCards = (props: {
           Pick a first task for {project}; it goes into the composer and nothing is sent.
         </p>
       ) : null}
-      {StarterTasks.list({ project }).map(task => {
-        const Icon = ICONS[task.id]
-        return (
-          <button className={CARD} data-hero-card={`starter-${task.id}`} key={task.id} onClick={() => props.insert(task.prompt)} type="button">
-            <Icon aria-hidden="true" />
-            <span className="dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">{task.label}</span>
-          </button>
-        )
-      })}
+      {/* The starters take a line of their own under Resume and Inbox (the hero's navigation line). */}
+      <div className="dshx-root dshx:flex dshx:basis-full dshx:flex-wrap dshx:justify-center dshx:gap-2 dshx:order-1" data-starter-row="">
+        {StarterTasks.list({ project })
+          .slice(0, 3)
+          .map(task => {
+            const Icon = ICONS[task.id]
+            return (
+              <button className={CHIP} data-hero-card={`starter-${task.id}`} key={task.id} onClick={() => props.insert(task.prompt)} type="button">
+                <span aria-hidden="true" className={`${TILE} ${TILES[task.id]}`} data-starter-tile="">
+                  <Icon />
+                </span>
+                <span className="dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">{task.label}</span>
+              </button>
+            )
+          })}
+      </div>
     </>
   )
 }

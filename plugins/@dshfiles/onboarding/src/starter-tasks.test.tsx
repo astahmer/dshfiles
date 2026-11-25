@@ -39,3 +39,25 @@ describe('StarterTasks.beforeFirstThread', () => {
     expect(StarterTasks.beforeFirstThread({ ids: ['a', 'b'], byId: { a: blank, b: sent } })).toBe(false)
   })
 })
+
+describe('the starter line (round five C4, council round 3)', () => {
+  it('sets at most three starters on a line of their own, as 28px ghost chips each with a 20px identity-tone tile', () => {
+    const { container } = render(<StarterTaskCards beforeFirstThread={false} insert={() => undefined} project="sample" />)
+    const line = container.querySelector<HTMLElement>('[data-starter-row]')
+    expect(line).not.toBeNull()
+    expect(line?.className).toContain('dshx:basis-full')
+    const chips = [...(line?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+    expect(chips).toHaveLength(3)
+    for (const chip of chips) {
+      const classes = chip.className.split(/\s+/u)
+      expect(classes).toContain('dshx:h-7')
+      expect(classes).not.toContain('dshx:border')
+      const tile = chip.querySelector<HTMLElement>('[data-starter-tile]')
+      expect(tile?.className).toContain('dshx:size-5')
+      expect(tile?.className).toMatch(/dshx:bg-identity-\d\/14 dshx:text-identity-\d/u)
+      // Green (identity 5) sits beside the success hue: never on a starter.
+      expect(tile?.className).not.toContain('identity-5')
+    }
+    expect(new Set(chips.map(chip => chip.querySelector('[data-starter-tile]')?.className)).size).toBe(3)
+  })
+})

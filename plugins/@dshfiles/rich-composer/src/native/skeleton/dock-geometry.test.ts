@@ -66,3 +66,18 @@ describe('one transcript column (round five C3)', () => {
     expect(block('.embeddedBody')).toMatch(/--dsh-composer-card-max-width:\s*var\(--dsh-chat-content-width\);/)
   })
 })
+
+describe('the new-thread hero (round five C4, council round 3)', () => {
+  const block = (selector: string): string => blocks().find(candidate => candidate.selector === selector && candidate.context === '')?.body ?? ''
+
+  it('starts its navigation line 12px below the composer and keeps the starters on their own line', () => {
+    expect(block('.heroSuggestions')).toMatch(/padding: 12px var\(--dsh-composer-side-clearance\) 0;/)
+    expect(block('.heroSuggestions')).toMatch(/row-gap: 12px;/)
+  })
+
+  it('draws Resume, Review and Inbox as quiet 28px links, not outlined cards', () => {
+    const nav = block(".heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-']))")
+    expect(nav).toMatch(/height: 28px;/)
+    expect(nav).toMatch(/border-color: transparent;/)
+  })
+})
