@@ -55,7 +55,12 @@ selected wash outshouts 6 % Needs-you washes); Settings still shows two navigati
 quarter of the thread screen; dark diff body is off-ramp near-black with invisible add/remove tints and light syntax at
 2.79:1 on deletions; Inbox cards washed whole instead of a header band; Usage has six segmented controls and 2.95:1 axis
 labels; Backlog capture box and repeated author; the active tab label dimmest. Lanes A kit/diff/syntax, B navigation
-and list, C transcript/Inbox/phone shell, D Usage/Backlog/Review/AI accounts all running.
+and list, C transcript/Inbox/phone shell running; D done (5 revisions `xzmusyts` … `uwquwxrt`: Usage underline section tabs,
+two segmented controls, granularity and grouping as selects, neutral KPIs, plain total; Backlog one-line capture box
+with a placeholder (blank Enter lines were being saved as a draft), one row grid, no repeated author, All/Inbox in the
+filter; Review ProjectMark, sans counters, one Reviewed checkbox per file, card hugs its files; AI accounts 300 px rail,
+DeepSeek mark, provider marks on model ids, "In picker"). Follow-ups: DESIGN.md's "no underline page tabs" vs Usage;
+brand marks duplicated in model-effort-picker and ai-accounts; SpendMap needs a no-gauge option.
 
 ## Round four
 
