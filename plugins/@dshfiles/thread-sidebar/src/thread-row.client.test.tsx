@@ -38,8 +38,9 @@ describe('a working thread row', () => {
     const row = await renderRow({ ...working, liveTurn: { startedAt: Date.now() - 471_000, step: 'Running pnpm test' } })
     expect(row.querySelectorAll('[data-live-elapsed]')).toHaveLength(1)
     expect(row.querySelector('[data-thread-where] [data-live-elapsed]')).toBeNull()
-    expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m 51s')
-    // The static age would be a second, coarser reading of the same turn.
+    // Whole units in the list (round five B3): "7m", never "7m 51s".
+    expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m')
+    // The static age would be a second reading of the same turn.
     expect(row.textContent).not.toContain('7m7m')
     expect(whereLine(row)).toContain('Running pnpm test')
   })
@@ -123,6 +124,23 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-testid="thread-row-verb"]')?.getAttribute('data-variant')).toBe('danger-tint')
   })
 
+  it('lets a Failed title wrap to two lines like a Needs-you one', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
+    const title = row.querySelector<HTMLElement>('[data-thread-title]')
+    expect(title?.className).toContain('dshx:line-clamp-2')
+    expect(title?.className).not.toContain('dshx:truncate')
+  })
+
+  it('opens its sub-rows from a real chevron in a 24 px seat, not a 12 px caret', async () => {
+    const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const row = await renderRow({ childThreads: children })
+    const toggle = row.querySelector<HTMLElement>('[data-thread-children-toggle]')
+    expect(toggle?.className).toContain('dshx:h-6')
+    const seat = toggle?.querySelector<HTMLElement>('[data-children-chevron]')
+    expect(seat?.className).toContain('dshx:size-6')
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('dshx:size-4')
+  })
+
   it('keeps the question readable beside a subagent counter', async () => {
     // The verb and the counter share line 2's end; the question keeps the rest of the line.
     const children = ['c1', 'c2', 'c3'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
@@ -133,14 +151,13 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-34')
   })
 
-  it('keeps the verb beside the title on a row with no second line', async () => {
+  it('keeps the attention verb to Needs-you and Failed rows: a Ready row carries no Land button', async () => {
     const row = await renderRow({
       workStatus: rowStatus({ status: 'ready', verb: 'Land' }),
       projectMark: false,
     })
-    expect(row.querySelector('[data-thread-where]')).toBeNull()
-    expect(row.querySelector('[data-testid="thread-row-verb"]')?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('head')
-    expect(row.querySelector('[data-thread-head]')?.className).toContain('dshx:pr-17.5')
+    expect(row.querySelector('[data-testid="thread-row-verb"]')).toBeNull()
+    expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
   })
 })
 
@@ -150,11 +167,11 @@ describe('colour in a row', () => {
   it('holds a soft indigo wash on a Needs-you row and a softer red one on a Failed row', async () => {
     const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
     expect(wash(asking)?.getAttribute('data-row-wash')).toBe('needs-you')
-    expect(wash(asking)?.className).toContain('dshx:bg-status-needs-you/6')
+    expect(wash(asking)?.className).toContain('dshx:bg-wash-needs-you')
     cleanup()
     const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
     expect(wash(failed)?.getAttribute('data-row-wash')).toBe('failed')
-    expect(wash(failed)?.className).toContain('dshx:bg-status-failed/5')
+    expect(wash(failed)?.className).toContain('dshx:bg-wash-failed')
     cleanup()
     const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
     expect(wash(idle)).toBeNull()
@@ -164,7 +181,17 @@ describe('colour in a row', () => {
     const row = await renderRow({ selected: true })
     const fill = row.querySelector<HTMLElement>('article > div')
     expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:bg-selected-wash')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:selected-marker')
     expect(fill?.className).not.toContain('dshx:group-data-[selected=true]/row:bg-accent')
+    expect(row.querySelector('[data-thread-title]')?.className).toContain('dshx:group-data-[selected=true]/row:font-selected')
+  })
+
+  it('keeps a selected Needs-you row on its attention wash and adds only the marker', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    const fill = row.querySelector<HTMLElement>('[data-row-wash]')
+    expect(fill?.className).toContain('dshx:bg-wash-needs-you')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:selected-marker')
+    expect(fill?.className).not.toContain('dshx:group-data-[selected=true]/row:bg-selected-wash')
   })
 })
 

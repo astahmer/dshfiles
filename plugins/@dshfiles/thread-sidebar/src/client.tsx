@@ -696,6 +696,12 @@ export interface ThreadRowProps {
   readonly subscriberCount?: number | undefined
 }
 
+/**
+ * A row's clock in whole units (round five B3): "1m 41s" reads "1m", "1h 04m" reads "1h", like the ages beside it. The
+ * thread header keeps the precise clock.
+ */
+const wholeUnit = (elapsed: string): string => elapsed.split(' ')[0] ?? elapsed
+
 const workStatusLabelKeys = {
   working: 'threadSidebarStateWorking',
   'needs-you': 'threadSidebarStateNeedsYou',
@@ -1489,7 +1495,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const arrival = RowArrivalTintModel.useTint(session.id, workStatus?.status)
   // The status glyph keeps its own 16px seat on line 1; line 2's seat holds the project mark under it.
   const leadSeat = workStatus !== undefined || rowStyle.statusDot
-  const inlineVerb = workStatus?.verb
+  // The row's verb is an attention verb (round five B3): only a row that needs you or failed carries one. A Ready row's
+  // Land lives in the thread header and the row menu, so the list's colour is left to the rows that need you.
+  const inlineVerb = workStatus?.status === 'needs-you' || workStatus?.status === 'failed' ? workStatus.verb : undefined
   const showAgent = workStatus !== undefined && props.agent !== undefined
   // "Waiting on 1 subagent" already says what keeps the thread busy; a job chip beside it read as a second count of it.
   const waitingOnSubagents = workStatus?.status === 'working' && !session.running && props.childThreads.length > 0
@@ -1528,8 +1536,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   // The tint rung (round five K3): Needs-you verbs on the attention tint, a failed row's on the danger tint; a Ready
   // row's Land stays an outline, so the ink primary is left to the page.
   const verbVariant = workStatus?.status === 'needs-you' ? 'attention' : workStatus?.status === 'failed' ? 'danger-tint' : 'outline'
-  // A Needs-you title may take two lines (13/18, 550): it is the row you act on, so it reads whole.
-  const wrapTitle = workStatus?.status === 'needs-you'
+  // A Needs-you or Failed title may take two lines (13/18, 550): it is the row you act on, so it reads whole.
+  const wrapTitle = workStatus?.status === 'needs-you' || workStatus?.status === 'failed'
   // Colour in the list (round five T2): Needs you and Failed hold a soft wash of their hue after the arrival tint fades.
   const rowWash = workStatus?.status === 'needs-you' || workStatus?.status === 'failed' ? workStatus.status : undefined
   const verbButton =
@@ -1719,10 +1727,14 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         )}
         <div
           className={cn(
-            'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-selected-wash dshx:group-data-[selected=true]/row:text-foreground dshx:pointer-coarse:touch-pan-y',
+            'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:text-foreground dshx:pointer-coarse:touch-pan-y',
+            // Selection is the quieter cue (round five B3): its low-chroma wash plus the leading accent bar. A Needs-you or
+            // Failed row keeps its stronger attention wash when selected and takes only the bar.
+            'dshx:group-data-[selected=true]/row:selected-marker',
+            rowWash === undefined && 'dshx:group-data-[selected=true]/row:bg-selected-wash',
             swipe.offset === 0 ? 'dshx:transition-transform dshx:duration-150' : 'dshx:bg-(--dsw-specific-sidebar-fill)',
-            swipe.offset === 0 && rowWash === 'needs-you' && 'dshx:bg-status-needs-you/6',
-            swipe.offset === 0 && rowWash === 'failed' && 'dshx:bg-status-failed/5',
+            swipe.offset === 0 && rowWash === 'needs-you' && 'dshx:bg-wash-needs-you',
+            swipe.offset === 0 && rowWash === 'failed' && 'dshx:bg-wash-failed',
           )}
           data-row-wash={rowWash}
           style={swipe.offset === 0 ? undefined : { transform: `translateX(${String(swipe.offset)}px)` }}
@@ -1816,7 +1828,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         ? 'dshx:line-clamp-2 dshx:text-sm/[18px] dshx:font-[550] dshx:break-words'
                         : cn('dshx:truncate', compact ? 'dshx:text-sm' : 'dshx:text-base'),
                       // Dark cockpit: in the status list only Ready rows are bold and Done rows are muted.
-                      (workStatus === undefined ? unread : workStatus.status === 'ready') && 'dshx:font-semibold',
+                      (workStatus === undefined ? unread : workStatus.status === 'ready') ? 'dshx:font-semibold' : 'dshx:group-data-[selected=true]/row:font-selected',
                       workStatus?.status === 'done' && 'dshx:text-muted-foreground',
                     )}
                   >
@@ -1863,7 +1875,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       )}
                       data-thread-time=""
                     >
-                      {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} since={liveStartedAt} />}
+                      {liveStartedAt === undefined ? props.age : <LiveElapsed active={nearViewport} since={liveStartedAt} format={wholeUnit} />}
                     </span>
                   ) : null}
                 </span>
@@ -1970,7 +1982,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             <button
               type="button"
               data-thread-children-toggle=""
-              className="dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              // 24 px tall, the chevron in its own 24 px seat; the kit gives a raw button its 44 px hit area on touch.
+              className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pl-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
               aria-expanded={props.childrenOpen}
               aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
               onClick={() => props.actions.toggleChildren(session.id, props.childrenOpen)}
@@ -1995,11 +2008,13 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 })}
               </span>
               <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span>
-              {props.childrenOpen ? (
-                <ChevronUpIcon className="dshx:size-3" aria-hidden="true" />
-              ) : (
-                <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
-              )}
+              {/* A real chevron in a 24 px seat (round five B3), not a 12 px caret: it turns over when the sub-rows open. */}
+              <span className="dshx:inline-flex dshx:size-6 dshx:items-center dshx:justify-center" data-children-chevron="" aria-hidden="true">
+                <ChevronDownIcon
+                  className={cn('dshx:size-4 dshx:transition-transform dshx:duration-(--dshx-duration-hover)', props.childrenOpen && 'dshx:rotate-180')}
+                  strokeWidth={1.5}
+                />
+              </span>
             </button>
               ) : null}
             </div>
