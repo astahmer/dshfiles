@@ -5,7 +5,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
-import { ArrowUpRightIcon, ChevronLeftIcon, ChevronRightIcon, ListFilterIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpRightIcon, ChevronLeftIcon, ChevronRightIcon, ListFilterIcon, SearchIcon, SettingsIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -509,7 +509,13 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         >
           <div className={cn(headerWidth, 'dshx:@max-pane-compact:sr-only')} data-settings-page-header="">
-            <PageHeader heading={<span id={props.titleId}>{title}</span>} description={t('description')} />
+            {/* The Settings rail glyph in its tone marks the page (council round 7 B6). */}
+            <PageHeader
+              heading={<span id={props.titleId}>{title}</span>}
+              description={t('description')}
+              mark={<SettingsIcon />}
+              markTone="settings"
+            />
           </div>
           {/* One 8px rhythm (council round 6 B2): the search grows, then Modified and the action group, all 32px. */}
           <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2', headerWidth)} data-settings-toolbar="">

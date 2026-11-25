@@ -126,6 +126,14 @@ describe('settings view: the page title names the category (council round 7 B2)'
     appearance.unmount()
   })
 
+  it('marks the title with the Settings rail glyph in the settings tone (council round 7 B6)', () => {
+    const view = mount({ columnNavigation: true, activeId: 'general' })
+    const mark = view.host.querySelector('[data-settings-page-header] [data-slot="page-title-mark"]')
+    expect(mark?.className).toContain('dshx:text-nav-settings')
+    expect(mark?.querySelector('svg')?.getAttribute('class')).toContain('lucide-settings')
+    view.unmount()
+  })
+
   it('titles the search results "Settings": they span every category', () => {
     const view = mount({ columnNavigation: true, activeId: 'general', query: 'dark' })
     expect(view.host.querySelector('[data-settings-page-header] h1')?.textContent).toBe('Settings')
