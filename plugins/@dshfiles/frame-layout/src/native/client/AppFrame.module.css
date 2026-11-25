@@ -658,6 +658,15 @@
     display: none;
   }
 
+  /* Round five C1: the pill belongs to the overview screens (Threads and Inbox). On a thread the composer owns the bottom
+     edge, and on Land, More and the pages opened from More (Settings) the 46px row is chrome the page needs; the auto
+     grid row collapses with it. thread-sidebar marks a thread on the stage (data-phone-in-thread) and the current tab
+     (aria-current on [data-phone-tab]); a drawer layout has no tab bar, so only its thread screen drops the pill. */
+  :global(html[data-phone-in-thread]) .statusStrip,
+  :global(html:has([data-phone-tab-bar]):not(:has([data-phone-tab='threads'][aria-current='page'], [data-phone-tab='inbox'][aria-current='page']))) .statusStrip {
+    display: none;
+  }
+
   :global([data-shell-phone-nav]) .statusChip {
     position: relative;
     max-width: min(80vw, 320px);

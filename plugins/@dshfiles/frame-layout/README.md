@@ -119,7 +119,10 @@ within a side and the first registration per `id` wins, so one plugin cannot fil
 `compact` (phone width) and the frame's `useSessions`, and returns null while it has nothing to say; one that throws
 hides only itself. The row is zero-height until an item is added. Below 640 px it collapses to one pill that
 names its first two items in their own words ("1 working · Quota CC1 56%", never a bare "Status"; the frame reads each
-item's rendered text) and opens the items as a list above it; it hides while the software keyboard is up. frame-layout owns this registry because it depends on no plugin, so any provider
+item's rendered text) and opens the items as a list above it; it hides while the software keyboard is up. The pill
+belongs to the overview screens: with the thread sidebar's phone navigation it shows only while the Threads or Inbox
+tab is current, so an open thread, Land, More and the pages opened from More (Settings, Backlog…) get its row back.
+frame-layout owns this registry because it depends on no plugin, so any provider
 (ai-accounts, thread-sidebar, hmr-gate) can depend on it without closing a cycle.
 
 An item may declare `open`: the strip renders it as a button that opens its full page (Working: the thread list on its
