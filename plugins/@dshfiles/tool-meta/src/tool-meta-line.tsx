@@ -3,6 +3,7 @@ import { useSettings } from '@dshfiles/dshx/client'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useRef, useSyncExternalStore, type ReactElement } from 'react'
+import { ApprovalWaits } from './approval-waits.js'
 import type { ToolMetaTranslate } from './locales.js'
 import { toolMetaSettings } from './settings.js'
 import { ToolTimingModel, type DescribedTiming, type TimeFormat, type ToolTiming, type WaitTimer } from './timing.js'
@@ -68,7 +69,10 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
   const enabled = settings.value?.enabled ?? true
   const format = settings.value?.timeFormat ?? 'absolute'
   const timing = ToolTimingModel.toolTimingOf(owner)
-  const live = enabled && timing !== undefined && timing !== null && (timing.kind === 'running' || format === 'relative')
+  // Round four D3: a call that waits on the user is not running; its line says so instead of drawing a clock.
+  const waitingOnUser = useSyncExternalStore(ApprovalWaits.subscribe, () => ApprovalWaits.isWaiting(owner.callId))
+  const approval = ApprovalWaits.stateOf(owner, waitingOnUser)
+  const live = approval === undefined && enabled && timing !== undefined && timing !== null && (timing.kind === 'running' || format === 'relative')
   /** A line whose next reading shows the same thing keeps its previous view, so that tick does not re-render it. */
   const shown = useRef<{ readonly key: string; readonly view: ToolMetaLineView } | undefined>(undefined)
   const read = (): ToolMetaLineView | undefined => {
@@ -84,6 +88,18 @@ export const ToolMetaLine = ({ owner, t }: ToolMetaLineProps): ReactElement | nu
     warnOnce('the tool.call.toolview owner no longer carries phase/block.time. Tool timings are hidden')
     return null
   }
+  if (approval !== undefined && enabled)
+    return (
+      <span
+        className={cn(
+          'dshx-root dshx:pointer-events-auto dshx:shrink-0 dshx:rounded-sm dshx:bg-background dshx:px-1.5 dshx:whitespace-nowrap dshx:text-xs dshx:text-muted-foreground',
+          approval === 'waiting' && 'dshx:text-foreground',
+        )}
+        data-dshfiles-tool-meta={approval === 'waiting' ? 'approval' : 'rejected'}
+      >
+        {approval === 'waiting' ? t('approvalWaiting') : t('approvalRejected')}
+      </span>
+    )
   if (timing === null || !enabled || view === undefined) return null
   const { text, label, waitTimer } = view
   // Nothing worth a line yet: a call under a second, or one whose start is outside the loaded history.

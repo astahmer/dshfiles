@@ -3,8 +3,9 @@ import type { ToolCallOwnerProps, ToolCallViewProps } from '@deepseek-ai/dsh-cli
 import type { PendingApproval } from '@deepseek-ai/dsh-client-ui-approval/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { defineClient, observeSettings, useRegistry, useSettings } from '@dshfiles/dshx/client'
-import { createElement, type ComponentType, type ReactNode } from 'react'
+import { createElement, useEffect, type ComponentType, type ReactNode } from 'react'
 import { ApprovalCard } from './approval-card.js'
+import { ApprovalWaits } from './approval-waits.js'
 import { DiffToolCard, type DiffTranslate } from './diff-tool-card.js'
 import { TOOL_META_LOCALE_NAMESPACE, toolMetaLocale } from './locales.js'
 import { NativeToolView } from './native-tool-view.js'
@@ -64,6 +65,8 @@ export default defineClient({
     const Card = (props: PropsRuntime<'conversation.composer'> & { readonly matched: PendingApproval }) => {
       const display = props.matched.displayReason
       const reason = display === undefined ? (props.matched.reason ?? t('approvalReason', { tool: props.matched.toolName })) : ctx.locale.resolveText(display)
+      // The row of the call that asks reads "Waiting for approval" instead of a clock until the decision settles.
+      useEffect(() => ApprovalWaits.track(props.matched), [props.matched])
       return <ApprovalCard {...props} reason={reason} t={t} />
     }
     ctx.slots.inject('conversation.composer', () =>

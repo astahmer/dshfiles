@@ -28,6 +28,8 @@ const en = {
   approvalAllowOnce: 'Allow once',
   approvalFailed: 'The decision did not reach the agent. Try again, or reject and ask the agent to retry.',
   approvalReason: '{tool} asks to run with more access',
+  approvalWaiting: 'Waiting for approval',
+  approvalRejected: 'Rejected',
 }
 
 const zh = {
@@ -55,6 +57,8 @@ const zh = {
   approvalAllowOnce: '允许一次',
   approvalFailed: '决定未送达智能体。请重试，或拒绝后让智能体重新尝试。',
   approvalReason: '{tool} 请求以更高权限运行',
+  approvalWaiting: '等待批准',
+  approvalRejected: '已拒绝',
 } satisfies Record<keyof typeof en, string>
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
