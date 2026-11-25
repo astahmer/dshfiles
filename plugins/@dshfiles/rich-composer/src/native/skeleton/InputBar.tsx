@@ -44,7 +44,7 @@ import { SendWhenUploaded, settleHeldSend, uploadGate, type HeldDraft, type Held
 import { isImageMediaType, withCanonicalImageType } from '../canonical-image-type.ts'
 import { ContextMeter } from './ContextMeter.tsx'
 import { AnnotationsPill } from './AnnotationsPill.tsx'
-import { observeControlRow } from './control-row-layout.ts'
+import { observeControlRow, PHONE_BAR_QUERY } from './control-row-layout.ts'
 import css from './InputBar.module.css'
 
 const noSubscription = (): (() => void) => () => {}
@@ -246,7 +246,10 @@ export const InputBar = memo(function InputBar({
   useLayoutEffect(() => {
     const row = rowRef.current
     if (row === null) return
-    return observeControlRow(row, { iconStep: () => !row.classList.contains(css.rowHero ?? '') })
+    const hero = (): boolean => row.classList.contains(css.rowHero ?? '')
+    // Unslop r5 C3: a started thread's bar on a phone shows the model as its brand mark and the mode as its icon.
+    const phone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_BAR_QUERY).matches
+    return observeControlRow(row, { iconStep: () => !hero(), markStep: () => !hero() && phone() })
   }, [])
   const cardRef = useRef<HTMLDivElement | null>(null)
   // dshfiles (round four R12): the `@`/`/` list stays between the top bar and the keyboard on a phone.

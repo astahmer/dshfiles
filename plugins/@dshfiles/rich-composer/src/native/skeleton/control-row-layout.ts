@@ -1,5 +1,8 @@
 /** Content-sized model collapse for the composer's two control groups. */
 
+/** A phone's bar (unslop r5 C3): the viewport the mark step serves, the same bound as the dock's Live work row. */
+export const PHONE_BAR_QUERY = '(max-width: 27.99rem)'
+
 /**
  * The row's flex items: a `display: contents` group (the new-thread bar dissolves its tool, run and mode groups into the
  * row, visual refresh T3.2) contributes its own children, which are the boxes that actually share the line.
@@ -36,9 +39,15 @@ const wraps = (row: HTMLElement): boolean => {
  * the observer's callback, which the browser reports as a ResizeObserver loop.
  * @param row - Composer control row with its leading and trailing groups.
  * @param options.iconStep - whether the row may take the second, icon-only step (default yes).
+ * @param options.markStep - whether the bar is a phone's (unslop r5 C3): then it always takes the compact step and the
+ *   mark step (`data-model-mark`), where the model chip is its brand mark and the mode chip its icon, so the bar never
+ *   truncates the model to "gpt-…"; the icon step stays for a model without a mark. Default no.
  * @returns Disconnect the layout observers and font listener.
  */
-export function observeControlRow(row: HTMLElement, options: { readonly iconStep?: () => boolean } = {}): () => void {
+export function observeControlRow(
+  row: HTMLElement,
+  options: { readonly iconStep?: () => boolean; readonly markStep?: () => boolean } = {},
+): () => void {
   const overflows = (): boolean => {
     const style = getComputedStyle(row)
     const available = row.getBoundingClientRect().width
@@ -65,6 +74,13 @@ export function observeControlRow(row: HTMLElement, options: { readonly iconStep
     // Always measure expanded demand, including text changed while collapsed.
     row.removeAttribute('data-model-compact')
     row.removeAttribute('data-model-icon')
+    row.removeAttribute('data-model-mark')
+    if (options.markStep?.() === true) {
+      row.setAttribute('data-model-compact', '')
+      row.setAttribute('data-model-mark', '')
+      measured = rowWidth()
+      return
+    }
     // A wrapped row is ground truth; the summed estimate still covers a bar that cannot wrap, where the overflow is
     // what the icon step answers.
     if (!wraps(row) && !overflows()) {

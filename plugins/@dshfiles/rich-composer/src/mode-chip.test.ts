@@ -110,6 +110,11 @@ describe('the mode chip in a narrow bar (unslop phone 6)', () => {
     expect(label).toContain('dshx:in-data-model-icon:hidden')
   })
 
+  // Unslop r5 C3: a phone's bar shows the mode as its icon (the mark step), next to the model's brand mark.
+  it('drops "Can edit" to its icon at the mark step of a phone bar', () => {
+    expect(classesOf('data-composer-mode-label=""')).toContain('dshx:in-data-model-mark:hidden')
+  })
+
   it('stops the chip from shrinking in the compact step, so the model name truncates first', () => {
     const chip = source.slice(source.indexOf('aria-label={`Access mode, current: ${label}`}'), source.indexOf('data-composer-mode-chip=""'))
     expect(chip).toContain('dshx:in-data-model-compact:shrink-0')

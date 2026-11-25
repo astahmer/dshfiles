@@ -233,3 +233,37 @@ describe('Send positioned outside the line (unslop phone 6)', () => {
     stop()
   })
 })
+
+describe("a phone's bar (unslop r5 C3)", () => {
+  it('takes the mark step even when the words would fit, so the model is its brand mark and the mode its icon', () => {
+    // The phone bar shrank the model seat instead of overflowing, so no step ever applied and the chip read "gpt-…".
+    const row = rowOf({ available: 292, expanded: [44, 105, 32, 95], compact: [44, 30, 32, 95], icon: [44, 30, 32, 32] })
+    const stop = observeControlRow(row, { markStep: () => true })
+    expect(row.hasAttribute('data-model-compact')).toBe(true)
+    expect(row.hasAttribute('data-model-mark')).toBe(true)
+    // The mark is the icon: the CPU glyph step stays for a model without one.
+    expect(row.hasAttribute('data-model-icon')).toBe(false)
+    stop()
+  })
+
+  it('leaves a wider bar to the content-sized steps', () => {
+    const row = rowOf({ available: 600, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
+    const stop = observeControlRow(row, { markStep: () => false })
+    expect(row.hasAttribute('data-model-mark')).toBe(false)
+    expect(row.hasAttribute('data-model-compact')).toBe(false)
+    stop()
+  })
+
+  it('draws the model trigger as its 16px brand mark in a 24px chip, and only when it has a mark', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { dirname, resolve } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
+    const trigger = ".row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand]))"
+    expect(css).toMatch(new RegExp(`${trigger.replace(/[[\]().:]/g, '\\$&')} \\{[^}]*padding-inline: 4px`))
+    expect(css).toContain(`${trigger} :is(:global([data-model-picker-text]), :global([data-model-picker-provider]))`)
+    expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]\) :global\(svg\[data-brand\]\) \{\s*width: 16px;\s*height: 16px;/)
+    // Zero-width plugin anchors each cost a gap, so the mark step drops them like the icon step: + · mode · ⋯ · model.
+    expect(css).toMatch(/\.row:is\(\[data-model-icon\], \[data-model-mark\]\) \.standardControls \{\s*column-gap: 0;/)
+  })
+})

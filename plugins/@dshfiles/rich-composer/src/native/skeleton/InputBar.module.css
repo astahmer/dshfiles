@@ -507,16 +507,37 @@
 /* The icon step (b:gyk7): the model is an icon now, so its seat keeps that icon's width instead of shrinking away,
    and the ghost buttons drop the gaps between them (each keeps its own padding), so + · mode · ⋯ · model fit the
    ~112px a 176px docked pane leaves before Send's seat. */
-.row[data-model-icon] .modelSeat,
-.row[data-model-icon] .standardControls {
+.row:is([data-model-icon], [data-model-mark]) .modelSeat,
+.row:is([data-model-icon], [data-model-mark]) .standardControls {
   flex: none;
 }
 
-.row[data-model-icon],
-.row[data-model-icon] .tools,
-.row[data-model-icon] .modes,
-.row[data-model-icon] .trailing,
-.row[data-model-icon] .standardControls {
+/* The mark step (unslop r5 C3): a phone's bar shows the model as its brand mark in a 24px chip instead of "gpt-…". The
+   model picker is its own plugin; this reads the markers its trigger already carries (`data-model-trigger`, the mark's
+   `svg[data-brand]`, `data-model-picker-text`), and a model without a mark keeps its truncating name. */
+.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) {
+  min-width: 0;
+  gap: 0;
+  padding-inline: 4px;
+}
+
+.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) :is(:global([data-model-picker-text]), :global([data-model-picker-provider])),
+.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) > svg:last-child {
+  display: none;
+}
+
+.row[data-model-mark] :global([data-model-trigger]) :global(svg[data-brand]) {
+  width: 16px;
+  height: 16px;
+}
+
+/* Both icon steps drop the gaps: the bar's zero-width plugin anchors each cost one, which left + · mode · ⋯ · model
+   unevenly spaced; each ghost control keeps its own padding. */
+.row:is([data-model-icon], [data-model-mark]),
+.row:is([data-model-icon], [data-model-mark]) .tools,
+.row:is([data-model-icon], [data-model-mark]) .modes,
+.row:is([data-model-icon], [data-model-mark]) .trailing,
+.row:is([data-model-icon], [data-model-mark]) .standardControls {
   column-gap: 0;
 }
 
