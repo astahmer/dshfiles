@@ -47,6 +47,8 @@ test('counts raw colours outside token files and comments, and each native icon 
   assert.deepEqual(rulesIn('plugins/@dshfiles/ui-styles/src/theme.generated.css', ':root { --x: oklch(0.5 0.1 65); }'), [])
   assert.ok(isTokenFile('plugins/@dshfiles/plugin-ui/src/styles.css'))
   assert.ok(isTokenFile('plugins/@dshfiles/plugin-ui/src/color-roles.css'))
+  // The floating-surface tokens (council round 3 A8): dialog fill, edge, shadow and keycap, in both schemes.
+  assert.ok(isTokenFile('plugins/@dshfiles/plugin-ui/src/surfaces.css'))
   assert.equal(isTokenFile('plugins/@dshfiles/plugin-ui/src/components/ui/button.tsx'), false)
 })
 

@@ -329,7 +329,7 @@ export const designTokenGroupRules: readonly DesignTokenGroupRule[] = [
 /** Files that define the tokens: colour literals there are the palette itself. */
 const isTokenFile = (rel: string): boolean =>
   /^plugins\/@dshfiles\/ui-styles\/src\//.test(rel) ||
-  /^plugins\/@dshfiles\/plugin-ui\/src\/(?:styles\.css|color-roles\.css|theme\/)/.test(rel) ||
+  /^plugins\/@dshfiles\/plugin-ui\/src\/(?:styles\.css|color-roles\.css|surfaces\.css|theme\/)/.test(rel) ||
   /\.generated\.(?:css|ts)$/.test(rel)
 
 const isSource = (rel: string): boolean =>

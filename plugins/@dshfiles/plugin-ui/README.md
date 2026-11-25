@@ -163,6 +163,13 @@ full-width head band (an Inbox card's) takes `bg-wash-needs-you-band` instead: t
 sit on their tint pair; other states are a muted chip. A zero draws nothing; `label` sets what a screen reader hears
 (default "3 Needs you"). Use it for a group header's count and a page title's count of what waits on you.
 
+**Floating surfaces.** A dialog, an alert dialog and the command palette sit on `dshx:surface-dialog`
+(`src/surfaces.css`): light keeps the page fill, the hairline and s3; dark is a raised warm fill
+(`oklch(0.24 0.006 60)`), a faint light edge (`oklch(1 0 0 / 0.08)`) and one deep shadow (`0 24px 64px rgb(0 0 0 / 0.55)`).
+`Kbd` reads `--dshx-kbd-fill`/`--dshx-kbd-border`: in dark a faint light cap (8%) with a 12% edge, in light the muted
+fill with a transparent edge, so the keycap keeps one box. A palette the kit does not draw adds `dshx:border
+dshx:surface-dialog` to its own card.
+
 **One field look.** `Input`, `Textarea`, `InputGroup` (so `SearchInput`) and the `Select` trigger share `fieldLook`
 (`components/ui/input`): a 1px `border-input` border, the page fill (`bg-background`), the 8px radius, no shadow and no
 dark fill. The trigger is 32px (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;

@@ -1,0 +1,32 @@
+/*
+ * Floating surfaces (council round 3 A8; DESIGN.md › Elevation & Depth). A dialog, an alert dialog and the command
+ * palette sit on `dshx:surface-dialog`: in light the page fill, the hairline and s3; in dark a raised warm fill
+ * (oklch 0.24, above the panel step), a faint light edge and one deep shadow, so the layer reads above near-black
+ * without a glowing border. A keycap reads its fill and edge here too: in dark a faint light cap with a faint edge;
+ * in light the muted fill with a transparent edge of the same width, so a `Kbd` has one box in both schemes.
+ *
+ * Declared on body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing).
+ * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
+ */
+@layer base {
+  body {
+    --dshx-dialog-fill: var(--dsw-alias-bg-base);
+    --dshx-dialog-border: var(--dsw-alias-border-l2);
+    --dshx-elevation-dialog: var(--dshx-elevation-3);
+    --dshx-kbd-fill: var(--dsw-alias-bg-module-platform);
+    --dshx-kbd-border: transparent;
+  }
+  body[data-ds-dark-theme] {
+    --dshx-dialog-fill: oklch(0.24 0.006 60);
+    --dshx-dialog-border: oklch(1 0 0 / 0.08);
+    --dshx-elevation-dialog: 0 24px 64px rgb(0 0 0 / 0.55);
+    --dshx-kbd-fill: oklch(1 0 0 / 0.08);
+    --dshx-kbd-border: oklch(1 0 0 / 0.12);
+  }
+}
+
+@utility surface-dialog {
+  background-color: var(--dshx-dialog-fill);
+  border-color: var(--dshx-dialog-border);
+  box-shadow: var(--dshx-elevation-dialog);
+}
