@@ -4,12 +4,17 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { Checkbox } from '../src/components/ui/checkbox.js'
 import { RadioGroup, RadioGroupItem } from '../src/components/ui/radio-group.js'
 import { Switch } from '../src/components/ui/switch.js'
+import { PaletteMath, WARM_STONE, type Scheme } from '../src/theme/palette.ts'
+import { ThemeCss } from '../src/theme/theme-css.ts'
 
 afterEach(cleanup)
 
 const classes = (element: Element | null): readonly string[] => (element?.getAttribute('class') ?? '').split(/\s+/)
 
-/** DESIGN.md › Colour roles 6: the on state of a switch, checkbox or radio is the accent (`control-on`), not ink. */
+/**
+ * DESIGN.md › Colour roles 6: the on state of a switch, checkbox or radio is `control-on`, the ink since council round 7
+ * A1 (indigo means attention, focus and links only), with its tick in `control-on-foreground`.
+ */
 describe('control on state', () => {
   it('fills a checked switch track with control-on and keeps a full-size background knob in dark', () => {
     const view = render(<Switch checked onCheckedChange={() => undefined} aria-label="On" />)
@@ -31,6 +36,9 @@ describe('control on state', () => {
     const box = classes(view.container.querySelector('[data-slot="checkbox"]'))
     expect(box).toEqual(expect.arrayContaining(['dshx:data-[state=checked]:border-control-on', 'dshx:data-[state=checked]:bg-control-on', 'dshx:dark:data-[state=checked]:bg-control-on']))
     expect(box.join(' ')).not.toMatch(/checked\]:(?:bg|border)-primary\b/)
+    // The tick is the inverse of the ink: white in light, the dark background in dark.
+    expect(box).toContain('dshx:data-[state=checked]:text-control-on-foreground')
+    expect(box).not.toContain('dshx:data-[state=checked]:text-primary-foreground')
     expect(box).toContain('dshx:duration-(--dshx-duration-fade)')
   })
 
@@ -45,5 +53,23 @@ describe('control on state', () => {
     expect(item).not.toContain('dshx:text-primary')
     const dot = view.container.querySelector('[data-slot="radio-group-indicator"] svg')
     expect(classes(dot)).toContain('dshx:fill-control-on')
+  })
+})
+
+describe('control on contrast (council round 7 A1)', () => {
+  const schemes: readonly Scheme[] = ['light', 'dark']
+  it.each(schemes)('holds the fill at 3:1 on bg, panel, raised and the selection wash, the tick and knob at 3:1 on the fill (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    // `--dsw-alias-label-primary` is step 10, `-foreground` step 0 and `--dsw-alias-bg-base` step 0 (theme-css.ts).
+    const fill = p.neutral[10]!
+    const tick = p.neutral[0]!
+    for (const [surface, under] of Object.entries({ bg: p.neutral[0]!, panel: p.neutral[1]!, raised: p.neutral[2]!, selected: p.selectedWash }))
+      expect(PaletteMath.contrastRatio(fill, under), `fill on ${surface}`).toBeGreaterThanOrEqual(3)
+    expect(PaletteMath.contrastRatio(tick, fill), 'tick and knob on the fill').toBeGreaterThanOrEqual(3)
+    expect(PaletteMath.toHex(fill)).toBe(scheme === 'light' ? '#1b1a19' : '#eae7e4')
+    expect(PaletteMath.toHex(tick)).toBe(scheme === 'light' ? '#fefcfa' : '#15120f')
+    const block = ThemeCss.blockDeclarations(WARM_STONE, scheme).join('\n')
+    expect(block).toContain('--dsw-alias-label-primary: var(--dshx-tone-10);')
+    expect(block).toContain('--dsw-alias-label-primary-foreground: var(--dshx-tone-0);')
   })
 })

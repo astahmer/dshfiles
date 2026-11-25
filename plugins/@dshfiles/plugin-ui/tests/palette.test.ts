@@ -119,7 +119,8 @@ describe('colour roles (DESIGN.md › Colour roles)', () => {
     const theme = block('@theme inline')
     const roles = {
       'status-needs-you': 'var(--dsw-alias-state-business-primary)',
-      'control-on': 'var(--dsw-alias-state-business-primary)',
+      'control-on': 'var(--dsw-alias-label-primary)',
+      'control-on-foreground': 'var(--dsw-alias-label-primary-foreground)',
       'status-failed': 'var(--dsw-alias-state-error-primary)',
       'health-down': 'var(--dsw-alias-state-error-primary)',
       'status-ready': 'var(--dsw-alias-state-success-primary)',

@@ -252,7 +252,7 @@ and links hold AA on it (`plugin-ui/tests/prompt-fill.test.ts`). Chat's bubble r
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |
-| Accent indigo (focus, tab bar, Needs you, links)   | `info`, `ring` | `--dsw-alias-state-business-primary`, `--dsw-alias-link` | `#3b5bd4` | `#839ffc` |
+| Accent indigo (Needs you, focus ring, links)       | `info`, `ring` | `--dsw-alias-state-business-primary`, `--dsw-alias-link` | `#3b5bd4` | `#839ffc` |
 | Danger (hue 25)                                    | `destructive`  | `--dsw-alias-state-error-primary`                        | `#a83634` | `#fa8880` |
 | Success (hue 150)                                  | `success`      | `--dsw-alias-state-success-primary`                      | `#00792f` | `#65c67d` |
 | Warning (hue 80)                                   | `warning`      | `--dsw-alias-state-warn-primary`                         | `#805400` | `#dca331` |
@@ -286,8 +286,12 @@ work on any surface.
    `chart-1..5`. A project shows as one `ProjectMark` (`components/ui/project-mark`): a 20px tile (16px dense), 4px
    radius, its tone at 18% behind two letters in that tone, with the project name beside it in muted text. The six
    project tones (hues 225, 110, 55, 305, 340, 195) keep 25° or more from every status hue.
-6. **Accent indigo means interaction.** Focus ring, links, text selection, the active tab bar, and the on state of
-   switches, checkboxes and radios. Never a button fill, never decoration. The primary button is ink.
+6. **Indigo is attention, focus and links; every on state is ink.** Indigo marks Needs you, the focus ring, links and
+   text selection, nothing else. The on state of a switch, checkbox or radio is `control-on`, the ink (light
+   `#1b1a19`, dark `#eae7e4`) with its tick or knob in `control-on-foreground` (white in light, `#15120f` in dark); a
+   chosen card's ring and check, and the active tab bar (2px, page tabs and the window tab strip alike) are ink too.
+   Fill on bg, panel, raised and the selection wash and tick on fill hold 3:1 (`plugin-ui/tests/control-on.test.tsx`).
+   Never a button fill, never decoration. The primary button is ink.
 7. **Strength ladder: mark, text, tint, fill.** A mark is a glyph, dot or logo up to 16px (20px in a header). Text
    in a colour must hold AA. A tint is the colour at 12–16% alpha behind text in that colour. Fill is reserved for
    the destructive button, the on state of a control, a provider tile up to 44px, and chart marks. A row carries at
@@ -301,7 +305,7 @@ work on any surface.
    hue, with ink text. Indigo fills mean attention only, and a selection's cue is ink too. A
    selected list row, nav item, palette row or account row adds `selected-marker` (a 2px ink bar,
    `--dsw-alias-label-primary`, inset on its leading edge, which follows a rounded row; 3:1 on the wash) and sets its title at `font-selected` (550); a chosen card or tile (a theme card, a starter) takes `selected-card`
-   instead: the wash, a 2px ring edge and a check badge in its trailing top corner, with no leading marker. The current
+   instead: the wash, a 2px ink ring edge and an ink check badge in its trailing top corner, with no leading marker. The current
    place shows strongly once: a leaf row takes the wash, marker and 550; its parent rail item only an ink label and its
    glyph in colour. Hover stays the ink wash.
    **Attention outranks selection.** A Needs-you row holds `bg-wash-needs-you` and a Failed row `bg-wash-failed` for as
@@ -585,7 +589,7 @@ Its label is the page colour at weight 500, 13:1 or more at rest and on hover. N
 confirmation when they lose work.
 
 **Tabs — the rule.** Underline tabs for page sections (`Page` `tabs.variant="underline"`): secondary-ink labels on a
-hairline, the active one in ink over a 2px accent bar. The segmented control (muted track, paper active pill) only for
+hairline, the active one in ink over a 2px ink bar, the same bar as the window tab strip. The segmented control (muted track, paper active pill) only for
 up to four view modes of one list; past four items the tabs are always underline. A filter over one list (Running /
 Finished / All) is a `ToggleGroup`.
 
@@ -770,7 +774,7 @@ translate DSH's built-in parts only.
 - **Accepted exception:** the core Plugins page is DSH's own and has no fork here; only its tab title is ours. We
   restyle it from `@dshfiles/ui-styles` through its stable hooks (`data-plugin-*` attributes, the Tag primitive's
   `data-tone`, the suffix of its CSS-module class names), never its markup: a checked Host primitives `Switch`
-  (`button[role=switch][aria-checked=true]`) takes `control-on` like every kit switch (`src/client.css`, guarded by
+  (`button[role=switch][aria-checked=true]`) takes `control-on`, the ink, like every kit switch (`src/client.css`, guarded by
   `tests/core-switch.test.ts`); and `src/core-plugins.css` (guarded by `tests/core-plugins.test.ts`) gives the page the
   shared 24px inset (12px narrow) instead of a centred 960px column, draws each icon tile as an identity tone at 14%
   with the artwork in that tone (cycling `identity-1..8` by row), and makes Experimental a quiet neutral chip at 11px,

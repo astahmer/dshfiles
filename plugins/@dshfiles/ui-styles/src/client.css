@@ -27,12 +27,12 @@
   display: none;
 }
 
-/* Every switch's on state is `control-on`, the accent (round five K10; DESIGN.md › Do's and Don'ts, accepted exception).
-   The core Plugins page draws the Host primitives Switch, a `button[role=switch]` whose module class fills
-   `[aria-checked='true']` with the ink; this out-ranks that (0,2,0) rule at (0,3,1). Kit switches carry `data-slot`
-   and already draw `control-on`. Unlayered, as the Host module sheet is. Guard: tests/core-switch.test.ts. */
+/* Every switch's on state is `control-on`, the ink (round five K10; ink since council round 7 A1). The core Plugins
+   page draws the Host primitives Switch, a `button[role=switch]` whose module class fills `[aria-checked='true']`; this
+   out-ranks that (0,2,0) rule at (0,3,1) so both switches draw the same ink. Kit switches carry `data-slot` and
+   already draw `control-on`. Unlayered, as the Host module sheet is. Guard: tests/core-switch.test.ts. */
 button[role='switch'][aria-checked='true']:not([data-slot]) {
-  background: var(--dsw-alias-state-business-primary);
+  background: var(--dsw-alias-label-primary);
 }
 
 /* Touch platform baseline: the tells that make the page feel like a website on a phone. Rules gate by capability,

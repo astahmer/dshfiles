@@ -373,7 +373,7 @@ const TabCount = ({ count }: { readonly count: number | undefined }): React.Reac
 
 /**
  * Page sections as underline tabs (council round 3 A5): ink labels on a hairline, the active one in ink with a 2px
- * accent bar on the hairline (the accent marks the current place: interaction, not selection, whose marker is ink).
+ * ink bar on the hairline, like the window tab strip (council round 7 A1: indigo means attention, focus and links).
  */
 function UnderlineTabList({ tabs }: { readonly tabs: PageTabs }) {
   return (
@@ -382,7 +382,7 @@ function UnderlineTabList({ tabs }: { readonly tabs: PageTabs }) {
         <TabsTrigger
           key={tab.value}
           value={tab.value}
-          className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:border-0 dshx:px-0 dshx:after:bg-info dshx:data-[state=active]:text-foreground dshx:group-data-[orientation=horizontal]/tabs:after:bottom-[-1px]"
+          className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:border-0 dshx:px-0 dshx:after:bg-foreground dshx:data-[state=active]:text-foreground dshx:group-data-[orientation=horizontal]/tabs:after:bottom-[-1px]"
         >
           {tab.label}
           <TabCount count={tab.count} />

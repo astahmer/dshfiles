@@ -24,10 +24,10 @@ describe('core switch on state (round five K10)', () => {
     expect(hostSheet).toContain(".switch[aria-checked='true'] {")
   })
 
-  it('fills a checked core switch with the accent, at a higher specificity than the Host module rule', () => {
+  it('fills a checked core switch with the ink (council round 7 A1), at a higher specificity than the Host module rule', () => {
     const at = client.indexOf(`${RULE} {`)
     expect(at).toBeGreaterThan(-1)
-    expect(client.slice(at, client.indexOf('}', at))).toContain('background: var(--dsw-alias-state-business-primary);')
+    expect(client.slice(at, client.indexOf('}', at))).toContain('background: var(--dsw-alias-label-primary);')
     // `.switch[aria-checked='true']` is (0,2,0); the rule is a type, two attributes and a :not() attribute: (0,3,1).
     expect(RULE.match(/\[/g)).toHaveLength(3)
     // Unlayered, like the Host module sheet: a layered rule would lose whatever its specificity.

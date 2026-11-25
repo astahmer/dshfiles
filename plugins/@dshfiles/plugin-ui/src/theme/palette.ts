@@ -19,7 +19,7 @@ export interface PaletteInput {
   readonly hue: number
   /** Chroma of dark-scheme fills and borders; text gets 5/7 of it and light mode half of both (D1). */
   readonly chroma: number
-  /** Hue of the accent (focus, the active tab bar, Needs you). */
+  /** Hue of the accent (Needs you, the focus ring, links). */
   readonly accentHue: number
   /** 1 is the standard spread; above 1 pushes borders and text away from the background (high contrast). */
   readonly contrast: number

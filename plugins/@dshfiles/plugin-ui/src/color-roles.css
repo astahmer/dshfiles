@@ -4,7 +4,9 @@
  *
  * - Status and health roles are new names for the existing semantic values: they follow the Host theme (and a custom
  *   accent hue) exactly as `info`, `success`, `warning` and `destructive` do.
- * - `control-on` is the accent: the on state of a switch, checkbox or radio.
+ * - `control-on` is the ink (council round 7 A1): the on state of a switch, checkbox or radio, its tick or knob in
+ *   `control-on-foreground` (the inverse ink). Indigo means attention, the focus ring and links only; every on state,
+ *   chosen card and active tab bar is ink.
  * - Identity tells projects, providers and agents apart and never says state: a text-safe ramp at oklch L 0.50
  *   (light) and 0.78 with chroma capped at 0.13 (dark), every tone at AA on bg, panel and raised in both schemes
  *   (tests/palette.test.ts).
@@ -23,7 +25,8 @@
   --color-status-working: var(--dsw-alias-label-primary);
   --color-status-idle: var(--dsw-alias-label-tertiary);
   --color-status-done: var(--dsw-alias-label-secondary);
-  --color-control-on: var(--dsw-alias-state-business-primary);
+  --color-control-on: var(--dsw-alias-label-primary);
+  --color-control-on-foreground: var(--dsw-alias-label-primary-foreground);
   /*
    * The tint rung on things you act on (round five K3): a row-level attention verb (Review, Answer, Rate…) is Needs-you
    * text on a 12% tint of it, a failed row's verb the danger pair. The text is pulled 30% toward the ink so it holds
@@ -104,7 +107,7 @@
 /*
  * The selection marker (round five A1; ink in council round 6 A1): `dshx:selected-marker`, applied wherever a list row,
  * nav item or palette row takes `bg-selected-wash`. Ink holds 3:1 on the wash in both schemes (tests/selected-wash).
- * An active underline tab keeps its 2px accent bar: that is interaction, not selection.
+ * An active underline tab draws the same 2px ink bar (council round 7 A1), under the tab instead of beside it.
  */
 @utility selected-marker {
   box-shadow: inset 2px 0 0 var(--dsw-alias-label-primary);
@@ -112,16 +115,17 @@
 
 /*
  * The chosen card or tile (council round 3 A1): `dshx:selected-card` on a bordered card (a theme card, a starter tile,
- * a plan option). The neutral wash, a 2px ring edge (its own 1px border in the ring colour plus a 1px inset ring, so
- * the box never changes size) and a 16px check badge in the trailing top corner, so the choice reads without colour.
- * No inset leading marker: that is the list row's cue. The badge is the ring colour with the check cut out to the
- * wash, which holds 3:1 both ways over any card artwork. Focus keeps the kit outline, which this never touches.
+ * a plan option). The neutral wash, a 2px ink ring edge (its own 1px border plus a 1px inset ring, so the box never
+ * changes size; ink since council round 7 A1) and a 16px check badge in the trailing top corner, so the choice reads
+ * without colour. No inset leading marker: that is the list row's cue. The badge is the ink with the check cut out to
+ * the wash, which holds 3:1 both ways over any card artwork. Focus keeps the indigo kit outline, which this never
+ * touches.
  */
 @utility selected-card {
   position: relative;
   background-color: var(--dshx-selected-wash);
-  border-color: var(--dsw-alias-state-business-primary);
-  box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);
+  border-color: var(--dsw-alias-label-primary);
+  box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);
   &::after {
     content: '';
     position: absolute;
@@ -130,7 +134,7 @@
     inset-inline: auto 6px;
     width: 16px;
     height: 16px;
-    background-color: var(--dsw-alias-state-business-primary);
+    background-color: var(--dsw-alias-label-primary);
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cmask id='m'%3E%3Crect width='16' height='16' fill='white'/%3E%3Cpath d='M4.5 8.2 7 10.6l4.5-5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/mask%3E%3Ccircle cx='8' cy='8' r='8' fill='white' mask='url(%23m)'/%3E%3C/svg%3E") center / 16px 16px no-repeat;
     pointer-events: none;
   }

@@ -167,12 +167,13 @@ describe('page tabs (council round 3 A5)', () => {
     expect(view.getByRole('tablist').getAttribute('data-variant')).toBe('default')
   })
 
-  it('draws page sections as underline tabs, with an accent bar under the active one', () => {
+  it('draws page sections as underline tabs, with an ink bar under the active one', () => {
     const view = render(<Page heading="Backlog" tabs={tabs(views(3), 'underline')} />)
     const list = view.getByRole('tablist')
     expect(list.getAttribute('data-variant')).toBe('line')
     expect(classes(list)).toEqual(expect.arrayContaining(['dshx:border-b', 'dshx:border-border']))
-    expect(classes(view.getAllByRole('tab')[0])).toContain('dshx:after:bg-info')
+    expect(classes(view.getAllByRole('tab')[0])).toContain('dshx:after:bg-foreground')
+    expect(classes(view.getAllByRole('tab')[0])).not.toContain('dshx:after:bg-info')
   })
 
   it('never draws a segmented control past four items', () => {

@@ -21,8 +21,8 @@ function Switch({
       )}
       {...props}
     >
-      {/* On is the accent track (DESIGN.md › Colour roles, `control-on`) with a background knob in both schemes, so the
-          hue says on; off keeps a dim knob on a dark track in dark mode. */}
+      {/* On is the ink track (DESIGN.md › Colour roles, `control-on`) with a background knob in both schemes, so the
+          knob's side and the fill say on; off keeps a dim knob on a dark track in dark mode. */}
       <SwitchPrimitive.Thumb
         data-slot="switch-thumb"
         className={cn(

@@ -115,15 +115,17 @@ describe('selected card (council round 3 A1)', () => {
   it('draws a 2px ring edge and the wash with no inset marker and no layout shift', () => {
     expect(card).toContain('background-color: var(--dshx-selected-wash);')
     // A 1px border in the ring colour plus a 1px inset ring: 2px on a bordered card, without changing its box.
-    expect(card).toContain('border-color: var(--dsw-alias-state-business-primary);')
-    expect(card).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-state-business-primary);')
+    // Ink, not the accent (council round 7 A1): indigo means attention, focus and links only.
+    expect(card).toContain('border-color: var(--dsw-alias-label-primary);')
+    expect(card).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);')
+    expect(card).not.toContain('business')
     expect(card).not.toContain('inset 2px 0 0')
     expect(card).not.toMatch(/border-width|padding|margin/u)
   })
 
   it('shows a check in the corner, drawn in the ring colour, so the choice reads without colour', () => {
     expect(card).toMatch(/&::after\s*\{[^}]*mask[^}]*\}/u)
-    expect(card).toMatch(/&::after\s*\{[^}]*background-color: var\(--dsw-alias-state-business-primary\);/u)
+    expect(card).toMatch(/&::after\s*\{[^}]*background-color: var\(--dsw-alias-label-primary\);/u)
     expect(card).toMatch(/&::after\s*\{[^}]*pointer-events: none;/u)
 
     // A coarse pointer's 44px hit area (styles.css) also draws with a raw button's ::after and sets all four insets:
@@ -133,6 +135,7 @@ describe('selected card (council round 3 A1)', () => {
 
   it.each(schemes)('holds the check and the edge at 3:1 on the wash (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    expect(PaletteMath.contrastRatio(p.accent.fg, p.selectedWash)).toBeGreaterThanOrEqual(3)
+    // `--dsw-alias-label-primary` is neutral step 10; the check is cut out to the wash.
+    expect(PaletteMath.contrastRatio(p.neutral[10]!, p.selectedWash)).toBeGreaterThanOrEqual(3)
   })
 })
