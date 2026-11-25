@@ -143,6 +143,15 @@ marker); a field boundary at 3:1; a 960 px lane on wide panes; dark layering; a 
 card's title on its own row with the verb below; the Settings header on the field column, per-group tones and distinct
 glyphs; the status gauge leading on every phone root tab; one live-work dock; Usage in one card rhythm; Review's file
 header; Backlog's open glyph and time runs; the Plugins title weight.
+All four lanes done: A kit 7 revisions `yvvrllwn` … `vmvvuxpm` (ink selection marker, `--dshx-field-border` at 3:1, prompt
+fill, lane caps content 880/960, dark nav surface 0.225, Idle and Ready glyph sizes, DESIGN.md); B 14 revisions `nsxkzoml` …
+`mrrzorxr` (hero Inbox split, phone gauge leading, Settings header on the field column, per-group glyph tones, group spacing
+and child indent, no duplicate Settings title, Transcript heading in General, tab strip on the nav surface with a compose
+glyph and ink tab mark, 44 px phone search); C 7 revisions `yplyvmmz` … `pqtukkty` (phone Inbox title row and bottom verbs,
+one desktop live-work dock, a Wrap cue on overflowing code, a truly centred New thread, one work-strip separator, the
+prompt tint, the status strip on nav); D 14 revisions `tskxtrqm` … `vtvwwvyk` (Usage in one card rhythm, Review's file
+header and Mark reviewed edge, Backlog solid open ring, time gutter, accent tab bar, Plugins title and lane). The lead fixed
+one lint finding in a new test, the Settings font size field border, and the diff collapsed-lines bar inset.
 
 ## Round four
 
