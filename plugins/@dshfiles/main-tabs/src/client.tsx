@@ -680,9 +680,11 @@ export default defineClient({
     }
     const commands: readonly TabCommand[] = [
       {
+        // DSH's own newThread command owns Mod+T on every desktop shell, and the Host's shortcut registry refuses two
+        // commands that claim one default (the launch log said so). This command ships without a desktop default and
+        // stays rebindable in Settings › Shortcuts, like closeActive below; the web binding has no such owner.
         id: 'mainTabs.newTab',
         label: () => translate('newTab'),
-        desktop: { code: 'KeyT', modifiers: ['primary'] },
         web: { code: 'KeyT', modifiers: ['primary', 'alt'] },
         event: { type: 'tab.new' },
       },
@@ -727,14 +729,15 @@ export default defineClient({
     ]
     const defaultsFor = (command: TabCommand): ShortcutCommand['defaults'] => {
       if (command.defaults !== undefined) return command.defaults
-      if (command.desktop === undefined) return {}
+      const webOnly: ShortcutCommand['defaults'] =
+        command.web === undefined ? {} : { 'web:macos': command.web, 'web:windows': command.web }
+      if (command.desktop === undefined) return webOnly
       const defaults: ShortcutCommand['defaults'] = {
         'desktop:macos': command.desktop,
         'desktop:windows': command.desktop,
         'desktop:linux': command.linux ?? command.desktop,
       }
-      if (command.web === undefined) return defaults
-      return { ...defaults, 'web:macos': command.web, 'web:windows': command.web }
+      return { ...defaults, ...webOnly }
     }
     for (const command of commands) {
       const commandId = command.id
