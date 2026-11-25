@@ -108,7 +108,12 @@ const CardFace = (props: {
             className="dshx:-mt-1 dshx:-mr-1.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/card:opacity-100"
             onPointerDown={event => event.stopPropagation()}
           >
-            <ItemPickers.Status itemLabel={BacklogReference.labelOf(item)} status={item.status} onPick={props.onPickStatus} />
+            <ItemPickers.Status
+              itemLabel={BacklogReference.labelOf(item)}
+              status={item.status}
+              stale={ItemGlyphs.isStale(item.freshness)}
+              onPick={props.onPickStatus}
+            />
           </span>
         )}
       </div>

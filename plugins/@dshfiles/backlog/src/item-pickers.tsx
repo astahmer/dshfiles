@@ -71,6 +71,8 @@ const StatusPicker = (props: {
   readonly status: BacklogStatus
   readonly onPick: (status: BacklogStatus) => void
   readonly withLabel?: boolean
+  /** The item is stale or dormant: its trigger draws the dashed faint ring. */
+  readonly stale?: boolean
 }): JSX.Element => (
   <Picker
     label={`Status of ${props.itemLabel}`}
@@ -80,7 +82,7 @@ const StatusPicker = (props: {
     triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-sm' : 'dshx:size-6 dshx:justify-center'}
     trigger={
       <>
-        <ItemGlyphs.StatusIcon status={props.status} />
+        <ItemGlyphs.StatusIcon status={props.status} stale={props.stale === true} />
         {props.withLabel === true ? <span>{ItemGlyphs.statusLabels[props.status]}</span> : null}
       </>
     }

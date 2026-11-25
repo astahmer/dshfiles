@@ -46,3 +46,21 @@ test('status groups with no items are not drawn', () => {
   const view = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'items-view.tsx'), 'utf8')
   expect(view).toContain('const visibleGroups = groups.filter(group => group.items.length > 0)')
 })
+
+test('an open item (Inbox, Todo) is a solid ink ring; only a stale item draws the dashed faint ring (council round 6, D3)', () => {
+  for (const status of ['inbox', 'todo'] as const) {
+    const markup = renderToStaticMarkup(<ItemGlyphs.StatusIcon status={status} />)
+    expect(markup, status).not.toContain('stroke-dasharray')
+    expect(markup, status).toContain('dshx:text-foreground')
+  }
+  for (const status of ['inbox', 'todo', 'doing'] as const) {
+    const stale = renderToStaticMarkup(<ItemGlyphs.StatusIcon status={status} stale />)
+    expect(stale, status).toContain('stroke-dasharray')
+    expect(stale, status).toContain('dshx:text-muted-foreground')
+  }
+  expect(ItemGlyphs.isStale('stale')).toBe(true)
+  expect(ItemGlyphs.isStale('dormant')).toBe(true)
+  expect(ItemGlyphs.isStale('fresh')).toBe(false)
+  const feed = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'feed-view.tsx'), 'utf8')
+  expect(feed).toContain('stale={ItemGlyphs.isStale(item.freshness)}')
+})

@@ -309,6 +309,7 @@ const Row = (props: {
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
               status={item.status}
+              stale={ItemGlyphs.isStale(item.freshness)}
               withLabel
               onPick={status => actions.update.mutate({ id: item.id, status })}
             />
@@ -317,6 +318,7 @@ const Row = (props: {
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
               status={item.status}
+              stale={ItemGlyphs.isStale(item.freshness)}
               onPick={status => actions.update.mutate({ id: item.id, status })}
             />
           </span>
@@ -497,11 +499,7 @@ export const ItemsView = (props: {
           <span className={roomyOnly}>People</span>
           <span className="dshx:text-right">{props.sort === 'updated' ? 'Updated' : 'Created'}</span>
         </div>
-        {entries.length === 0 && props.ready === true && !filtering ? (
-          <EmptyState className="dshx:py-20">
-            Nothing is ready to start.
-          </EmptyState>
-        ) : null}
+        {entries.length === 0 && props.ready === true && !filtering ? <EmptyState className="dshx:py-20">Nothing is ready to start.</EmptyState> : null}
         {entries.length === 0 && filtering ? (
           <EmptyState className="dshx:py-20" action={{ label: 'Show all statuses', onSelect: props.clearStatuses }}>
             No items match this status filter. Pick another status above, or clear the filter to see everything.

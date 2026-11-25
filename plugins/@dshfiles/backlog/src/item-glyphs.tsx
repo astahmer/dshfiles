@@ -26,23 +26,37 @@ const kindLabels = { task: 'Task', bug: 'Bug', idea: 'Idea', note: 'Note', quest
 const attentionLabels = { none: 'No attention', 'needs-input': 'Needs you', blocked: 'Blocked', waiting: 'Waiting' } satisfies Record<BacklogAttention, string>
 
 const statusTone = {
-  inbox: 'dshx:text-muted-foreground',
-  todo: 'dshx:text-muted-foreground',
+  inbox: 'dshx:text-foreground',
+  todo: 'dshx:text-foreground',
   doing: 'dshx:text-foreground',
   done: 'dshx:text-muted-foreground',
   dropped: 'dshx:text-muted-foreground',
 } satisfies Record<BacklogStatus, string>
 
-/** Linear-style progress rings: dashed for untriaged, empty, an ink half, then a muted check, or a muted ring with one
- * diagonal stroke for Dropped (DESIGN.md › Colour roles: the red cross is Failed's, and a page's own vocabulary takes
- * no status hue). A filled dot is what a project's own colour dot looks like. */
-const StatusIcon = (props: { readonly status: BacklogStatus; readonly className?: string }): JSX.Element => (
-  <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:size-3.5 dshx:shrink-0', statusTone[props.status], props.className)}>
-    {props.status === 'inbox' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.2 1.8" /> : null}
-    {props.status === 'todo' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" /> : null}
+/** Freshness the glyph draws as stale: an open item idle past its limit may be out of date. */
+const isStale = (freshness: string): boolean => freshness === 'stale' || freshness === 'dormant'
+
+/**
+ * Linear-style progress rings: an open item (Inbox, Todo) is a solid ink ring, In progress adds an ink half, then a
+ * muted check, or a muted ring with one diagonal stroke for Dropped (DESIGN.md › Colour roles: the red cross is
+ * Failed's, and a page's own vocabulary takes no status hue). The dashed faint ring is only for a stale item (DESIGN.md ›
+ * Status glyphs; council round 6, D3). A filled dot is what a project's own colour dot looks like.
+ */
+const StatusIcon = (props: { readonly status: BacklogStatus; readonly stale?: boolean; readonly className?: string }): JSX.Element => (
+  <svg
+    aria-hidden
+    viewBox="0 0 14 14"
+    width="14"
+    height="14"
+    data-stale={props.stale === true || undefined}
+    className={cn('dshx:size-3.5 dshx:shrink-0', props.stale === true ? 'dshx:text-muted-foreground' : statusTone[props.status], props.className)}
+  >
+    {props.status === 'inbox' || props.status === 'todo' ? (
+      <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray={props.stale === true ? '2.2 1.8' : undefined} />
+    ) : null}
     {props.status === 'doing' ? (
       <>
-        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray={props.stale === true ? '2.2 1.8' : undefined} />
         <path d="M7 3.5a3.5 3.5 0 0 1 0 7z" fill="currentColor" />
       </>
     ) : null}
@@ -175,7 +189,11 @@ const ActorAvatar = (props: { readonly actorId: string | undefined; readonly cla
         <span
           className={cn(
             'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-2xs dshx:font-semibold dshx:ring-2 dshx:ring-background',
-            agent ? 'dshx:bg-identity-2/20 dshx:text-identity-2' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-identity-1/20 dshx:text-identity-1',
+            agent
+              ? 'dshx:bg-identity-2/20 dshx:text-identity-2'
+              : system
+                ? 'dshx:bg-muted dshx:text-muted-foreground'
+                : 'dshx:bg-identity-1/20 dshx:text-identity-1',
             props.className,
           )}
         >
@@ -214,6 +232,7 @@ export class ItemGlyphs {
   static readonly kindLabels = kindLabels
   static readonly attentionLabels = attentionLabels
   static readonly StatusIcon = StatusIcon
+  static readonly isStale = isStale
   static readonly KindIcon = KindIcon
   static readonly AttentionBadge = AttentionBadge
   static readonly AttentionIcon = AttentionIcon

@@ -166,6 +166,7 @@ const FeedEntry = (props: {
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
               status={item.status}
+              stale={ItemGlyphs.isStale(item.freshness)}
               onPick={status => actions.update.mutate({ id: item.id, status })}
             />
           </span>
