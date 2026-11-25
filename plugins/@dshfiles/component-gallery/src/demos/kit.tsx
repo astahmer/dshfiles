@@ -13,6 +13,7 @@ import { HealthDot, StatusDot, healthTextClass } from '@dshfiles/plugin-ui/compo
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
 import { StatusCount, workStatusValues, workStatusLabels } from '@dshfiles/plugin-ui/components/work-status'
@@ -305,6 +306,21 @@ export const kitDemos: readonly GalleryDemo[] = [
         {workStatusValues.map((status, index) => (
           <StatusCount key={status} status={status} count={index + 1} />
         ))}
+      </div>
+    ),
+  },
+  {
+    id: 'kit-diff-stat',
+    title: 'DiffStat',
+    description: 'One change count everywhere: +N then −N, tabular, a zero side muted.',
+    source: "import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'",
+    static: true,
+    render: () => (
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-4">
+        <DiffStat added={48} removed={3} />
+        <DiffStat added={12} removed={0} />
+        <DiffStat added={0} removed={207} />
+        <DiffStat added={1204} removed={2400} />
       </div>
     ),
   },

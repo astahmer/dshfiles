@@ -160,6 +160,12 @@ secondary and faint text and the status glyphs hold AA on both (`tests/attention
 sit on their tint pair; other states are a muted chip. A zero draws nothing; `label` sets what a screen reader hears
 (default "3 Needs you"). Use it for a group header's count and a page title's count of what waits on you.
 
+**Change counts.** `DiffStat` (`components/diff-stat`) is the one reading of a diff's size:
+`<DiffStat added={48} removed={3} />` draws `+48 −3`, always both sides with additions first, sans with tabular figures
+at the 12px meta size, additions in `text-success` and deletions in `text-destructive` (AA on bg, panel, raised and the
+selected wash), a zero side muted, the minus U+2212. A screen reader hears "48 lines added, 3 lines removed" (`label`
+overrides it). Use it for review summaries, file headers, tool rows and change pills instead of hand-built spans.
+
 ## Shared components
 
 Audit of UI rebuilt across owned plugins (native forks excluded), October 2026. Add a component here only when three or
