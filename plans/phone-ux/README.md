@@ -43,6 +43,27 @@ Verification limit: a full `dshx dev up` build of every owned plugin ran the liv
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
 build only the touched plugin and prefer focused tests, or run the scratch instance with its own plugin subset.
 
+### Code sweep (2026-11-25): already present, no work left
+
+A pass over the owners after the restart shows most Tier 2/3 items already shipped by other lanes. Present in code,
+not re-checked on a phone:
+
+1. **P10** — `InputBar.tsx` resolves send, queue, steer and stop modes; `canSteerQueue` and the queue dock's per-row
+   steer exist.
+2. **P13 (except landing preference)** — `ChatView.tsx` has `jumpToTurn`, the Since-you-left card with jump/dismiss and
+   the older-rows sentinel; the first-unread-vs-newest landing stays the owner's decision.
+3. **P14** — `inbox-panel.tsx` has `InboxSwipe` (left Done, right Snooze), Done/snooze views and presets.
+4. **P9 (partial)** — `chat/ApprovalCommand.tsx` renders approvals inline, and `agent-questions` has the parent
+   question path (`parent-questions.test.ts`); subagent requests reaching the parent needs a live check.
+5. **P30** — the phone thread menu is a labeled bottom sheet with submenus at one level; its only leak was keycaps,
+   which P28 hides.
+6. **P26** — the phone shell sets `viewport-fit=cover` and pads the drawer, top bar, sheet and tab bar with the
+   safe-area insets.
+7. **P25 (partial)** — the transcript owns `overscroll-behavior` (`ChatView.module.css`); the
+   `interactive-widget=resizes-content` half waits for a real-phone keyboard check.
+8. **P15 (partial)** — `PhoneSheet` already has one header, a 44px close, focus trap, back-gesture layer and drag;
+   the chooser default and unmounted hidden views still need work.
+
 
 Goal: DSH on a phone (owner: Redmi, HyperOS, Android Chrome PWA over Tailscale HTTPS, ~393 CSS px, gesture navigation)
 feels as smooth and obvious as the best phone apps, for driving many agent threads: switch, read, steer, approve, land.
