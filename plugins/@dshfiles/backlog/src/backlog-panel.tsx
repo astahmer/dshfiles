@@ -59,9 +59,6 @@ import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 type OpenThread = (sessionId: string) => void
 type View = BacklogView
 
-/** A list lane reads as one column: the Feed, its toolbar and the capture box stop at 920 px (council round 3, D2). */
-const FEED_LANE = 'dshx:w-full dshx:max-w-[57.5rem]'
-
 const MAX_ANIMATED_ITEMS = 150
 
 /** Each view, and the full search results, keeps its own "Hide agent items" choice; hiding is the default. */
@@ -561,6 +558,8 @@ export const BacklogPanel = (props: {
       >
         <Page
           fill
+          // A list page in the kit's 920 px lane; the board's columns take the full width (council round 3, D2).
+          width={view === 'board' ? 'full' : 'lane'}
           heading="Backlog"
           {...(list.data === undefined ? {} : { count: list.data.total })}
           description="Tasks, bugs, ideas and notes you and your agents capture."
@@ -585,10 +584,7 @@ export const BacklogPanel = (props: {
         >
           {/* The view tabs' bottom rule: 36 px, the tabs' underline sits on it; the search and menus share the row. */}
           <div
-            className={cn(
-              'dshx:flex dshx:h-9 dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:flex-wrap dshx:@max-pane-narrow:border-b-0',
-              hugsContent && FEED_LANE,
-            )}
+            className="dshx:flex dshx:h-9 dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:flex-wrap dshx:@max-pane-narrow:border-b-0"
           >
             <BacklogViewSwitch view={view} onSelect={switchView} modifierHeld={modifierHeld} />
             <Tooltip>
@@ -692,7 +688,6 @@ export const BacklogPanel = (props: {
               'dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:overflow-clip dshx:rounded-lg dshx:border dshx:border-border dshx:@max-pane-compact:flex-col',
               // The feed card ends at its last row with the capture box under it, instead of an empty card to the page foot.
               hugsContent && 'dshx:flex-initial',
-              hugsContent && FEED_LANE,
             )}
           >
             {showsResults ? (
@@ -854,7 +849,7 @@ export const BacklogPanel = (props: {
             )}
           </div>
           {captureVisible({ view, requested: captureRequested }) ? (
-            <div className={cn('dshx:shrink-0', hugsContent && FEED_LANE)}>
+            <div className="dshx:shrink-0">
               <div>
                 <Composer
                   key={draftKey}
