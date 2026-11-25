@@ -82,7 +82,21 @@ wordmark, so the chrome changes between destinations; selection still shares the
 indigo marker); no shared page container or header (Settings General has none); three tab and two select styles; two
 diff-count formats; the phone status pill band and the jump band take a row; Inbox counts a Failed item as Needs you;
 rail, starter chips, tool rows and Usage flows still ink-only (now identity tones). Lanes A kit, B chrome and Settings,
-C transcript/Inbox/phone, D Usage/Backlog/AI accounts/Plugins running.
+C transcript/Inbox/phone, D Usage/Backlog/AI accounts/Plugins. The first attempt of three lanes failed at start (four Opus
+lanes launched at once; quota was fine), so they were restarted one at a time. All done: A kit 13 revisions
+`kuvzuspm` … `xrpvrwmz` (neutral selection + `selected-card`, nav identity tones, `DiffStat`, band wash, one field look and
+`UnitInput`, `Page` width/statusCounts/tabs rule and `PageHeader`, softer dark primary, raised dark dialogs and Kbd,
+`ToolCard kind`, DESIGN.md); C 13 revisions `qnkokpyl` … `mkwwuvxq` (phone status as a top-bar button with no band,
+floating jump button, flat Live work row, whole "Worked for", hover-only reply actions, one 680 px column, DiffStat in
+the transcript, tool-kind glyphs, Inbox counts ◆2 ✕1 and list-aligned actions, starter chips, 312 px default sidebar on
+wide windows); B 11 revisions `vtvtkulr` … `xotvlzox` (one labelled rail open or folded, rail tones, Needs-you rows without
+prefixes, active phone tab tone, Settings page header, kit field look and selected card, palette on the dialog surface,
+status button in the Threads bar); D 15 revisions `vkxupnzr` … `kktmpwmz` (Usage Overview, grouped KPIs, seven-day ticks,
+flows in series colours; Backlog underline tabs and a 920 px lane; AI accounts Models without the form; Plugins in a
+920 px lane with tones by name; one +N −M everywhere including PatchView; the scratch seed's wizard race). The lead
+removed four lint findings lane B left in two tests. Follow-ups: `--text-display` and the container-query tiers are rem;
+the captures render the whole UI at about 0.77 scale (cause not traced); native Bash and dock rows lack kind glyphs;
+deliverables ReviewTab and jujutsu still draw old diff counts.
 
 ## Round four
 
