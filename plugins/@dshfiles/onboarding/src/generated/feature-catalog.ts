@@ -23766,10 +23766,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "shortcuts#panel-selection-chords",
       "plugin": "shortcuts",
       "id": "panel-selection-chords",
-      "title": "Select native panels with keyboard shortcuts",
-      "summary": "Press Cmd+N or Cmd+, to open their panels, without taking keys from text fields or the terminal.",
+      "title": "Shortcuts that leave text fields and the terminal alone",
+      "summary": "Shortcuts never take keys from a text field or the terminal unless they are meant to.",
       "destination": "none",
-      "currentSurface": "keyboard: Mod+N / Mod+,",
+      "currentSurface": "keyboard: every bound chord",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
