@@ -10,6 +10,14 @@ are the draft PR astahmer/dshfiles#271 (branch `contribute/unslop-ui` on the tbr
 were dull: bring purposeful colour back and make daily use smoother, without undoing upstream's coloured project
 chips (#287). See [Round two](#round-two). Round one's leftovers are under [Follow-ups](#follow-ups).
 
+## Round five
+
+Started 2026-11-25: make the UI look better and easier on the eyes, with colour where it helps, judged by a council.
+A fixed screenshot set (10 desktop screens and 4 phone screens, light and dark) is captured from a scratch DSH by one
+script in `.cache/unslop-audit/r5/capture/`, so every round is scored on the same screens and data. The council is
+Claude Opus 5.5, GPT-6.2 Sol and Mistral Large 4 at high effort (core), with GLM-5.3 high as a non-blocking seat. The
+round ends when every core seat scores the set at least 9/10.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
