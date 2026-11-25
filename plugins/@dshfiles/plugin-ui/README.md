@@ -162,6 +162,15 @@ full-width head band (an Inbox card's) takes `bg-wash-needs-you-band` instead: t
 sit on their tint pair; other states are a muted chip. A zero draws nothing; `label` sets what a screen reader hears
 (default "3 Needs you"). Use it for a group header's count and a page title's count of what waits on you.
 
+**One field look.** `Input`, `Textarea`, `InputGroup` (so `SearchInput`) and the `Select` trigger share `fieldLook`
+(`components/ui/input`): a 1px `border-input` border, the page fill (`bg-background`), the 8px radius, no shadow and no
+dark fill. The trigger is 32px (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;
+`selectLook` (`components/ui/select`) is its whole class string. A control the kit does not draw (a Host select in a
+native settings row) takes the `dshx:select-look` utility through an arbitrary variant
+(`dshx:[&_[class*=_select]]:select-look`). A number with a unit is one `UnitInput` (`components/ui/unit-input`):
+`<UnitInput aria-label="Font size" unit="px" value={14} onChange={…} />`, the unit a muted inner suffix that a screen
+reader hears with the field, never a number glued to a second control.
+
 **Change counts.** `DiffStat` (`components/diff-stat`) is the one reading of a diff's size:
 `<DiffStat added={48} removed={3} />` draws `+48 −3`, always both sides with additions first, sans with tabular figures
 at the 12px meta size, additions in `text-success` and deletions in `text-destructive` (AA on bg, panel, raised and the

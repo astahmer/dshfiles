@@ -5,7 +5,7 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.js'
 
 import { Button } from './button.js'
-import { Input } from './input.js'
+import { Input, fieldLook } from './input.js'
 import { Textarea } from './textarea.js'
 
 function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
@@ -14,7 +14,8 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
       data-slot="input-group"
       role="group"
       className={cn(
-        'dshx:group/input-group dshx:relative dshx:flex dshx:w-full dshx:items-center dshx:rounded-md dshx:border dshx:border-input dshx:shadow-xs dshx:transition-[color,box-shadow] dshx:outline-none dshx:dark:bg-input/30',
+        fieldLook,
+        'dshx:group/input-group dshx:relative dshx:flex dshx:w-full dshx:items-center dshx:transition-[color,box-shadow] dshx:outline-none',
         'dshx:h-8 dshx:min-w-0 dshx:has-[>textarea]:h-auto',
 
         // Variants based on alignment.

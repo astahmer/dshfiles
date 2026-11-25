@@ -6,12 +6,14 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { HealthDot, StatusDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { UnitInput } from '@dshfiles/plugin-ui/components/ui/unit-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
@@ -40,6 +42,19 @@ function ControlsDemo() {
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
       <Input placeholder="Text input" aria-label="Text input" />
+      <div className={row}>
+        <Select defaultValue="system">
+          <SelectTrigger aria-label="Theme" className="dshx:min-w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="system">Match system</SelectItem>
+            <SelectItem value="light">Light</SelectItem>
+            <SelectItem value="dark">Dark</SelectItem>
+          </SelectContent>
+        </Select>
+        <UnitInput aria-label="Font size" unit="px" defaultValue={14} className="dshx:w-24" />
+      </div>
       <div className={row}>
         <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
           <Switch checked={on} onCheckedChange={setOn} /> Switch
@@ -353,7 +368,7 @@ export const kitDemos: readonly GalleryDemo[] = [
   {
     id: 'kit-controls',
     title: 'Inputs and toggles',
-    description: 'Input, Switch, Checkbox, ToggleGroup.',
+    description: 'One field look for Input, Select and UnitInput (the unit inside the field), then Switch, Checkbox, ToggleGroup.',
     source: "import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'",
     static: true,
     render: () => <ControlsDemo />,

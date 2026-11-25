@@ -1,0 +1,21 @@
+/*
+ * One field look (council round 3 A4; DESIGN.md › Components). Kit fields share it through `fieldLook`
+ * (components/ui/input): the 1px control border, the page fill and the 8px radius, no shadow and no dark fill.
+ * `dshx:select-look` is the same look at the select trigger's 32px for a control the kit does not draw, such as a Host
+ * select inside a native settings row, reached with an arbitrary variant
+ * (`dshx:[&_[class*=_select]]:select-look`). It never sets a font family or the focus ring: the kit sheet draws the one
+ * ring for every control.
+ *
+ * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
+ */
+@utility select-look {
+  box-sizing: border-box;
+  height: 32px;
+  padding-inline: 10px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-md, 8px);
+  background-color: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dshx-density-text-ui, 0.8125rem);
+  box-shadow: none;
+}
