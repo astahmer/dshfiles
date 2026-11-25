@@ -80,6 +80,10 @@ On this machine `pnpm --version` itself was taking ~28 s, so `dshx dev up` faile
 that answers only `--version` instantly and delegates everything else let the scratch instance boot; the scratch phone
 checks below were run that way.
 
+Landing state (2026-11-25): the whole stack was rebased onto the current `main` tip with one `jj rebase -s`, after
+`jj-rewrite-preflight` reported every descendant mutable and conflict-free. `jj_thread_status` now reports `behind:
+false`, 44 unlanded revisions, no conflicts. Nothing was pushed and the `main` bookmark was not advanced.
+
 ### Verified on a scratch DSH (2026-11-25, this workspace)
 
 Built only the seven touched plugins (`--concurrency=2`), booted `dshx dev up --name phone --skip-build`, drove it with
