@@ -56,6 +56,9 @@ Verification limit: a full `dshx dev up` build of every owned plugin ran the liv
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
 build only the touched plugin and prefer focused tests, or run the scratch instance with its own plugin subset.
 
+The phone switch probe now understands drawer mode (`Show threads` instead of `Back`): it timed out on hidden rows
+before, so P2/P3 had no fresh measurement in drawer mode.
+
 ### Verified on a scratch DSH (2026-11-25, this workspace)
 
 Built only the seven touched plugins (`--concurrency=2`), booted `dshx dev up --name phone --skip-build`, drove it with
