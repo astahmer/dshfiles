@@ -42,8 +42,9 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
    marks the app root `inert` so the stage cannot be browsed behind the scrim (22 drawer tests pass). Reduced motion is
    already covered by the kit's global rule. Still open: large-text check (real phone), and the same inert treatment for
    the workbench sheet (it lives inside the app root).
-9. **P15 (partial)** — the phone thread-panel sheet resumes the last real view instead of opening on the chooser, with
-   the selection logic covered by 3 tests. Still open: unmounting hidden dock views.
+9. **P15** — the phone thread-panel sheet resumes the last real view (3 tests) and its dock now uses Dockview's
+   `onlyWhenVisible` on the phone, so hidden panels unmount instead of running their queries (desktop keeps `always` so
+   editor drafts survive). A header, 44px close, focus trap, back layer and drag were already there.
 10. **P27** — on a coarse pointer the thread row menu offers Keep screen on / Allow screen to sleep: one page-level
     Screen Wake Lock, re-requested when the page becomes visible while wanted, off when the platform refuses. 4 tests;
     the real-phone check (does the screen stay on) is still the owner's.
