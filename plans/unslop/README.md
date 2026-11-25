@@ -28,6 +28,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | Council round | Claude Opus | GPT Sol | Mistral Large | Notes |
 | --- | --- | --- | --- | --- |
 | 1 (round-0 shots) | 6.5 | 6.5 | 7.5 | GLM 6.5 (non-blocking): coloured pixels cover 0.03–0.5 % of 12 of 14 screens |
+| 2 (round-1 shots) | 7.5 | 7.5 | 8 | GLM 7.5: the round-1 fixes are in the pixels; Needs-you washes too faint to see |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -48,6 +49,13 @@ an attention or danger-tint button, ProjectMark tiles, persistent Needs-you and 
 selected wash on the open thread and the active rail item, one Settings navigation, inactive tabs on the panel step with
 the project tile, palette status hues kept and one prefix hint). Follow-up: chat's "When to Collapse
 Work Details" in sentence case.
+
+Round 2 findings, merged in `.cache/unslop-audit/r5/council/round-2-fixes.md`: selection louder than attention (the dark
+selected wash outshouts 6 % Needs-you washes); Settings still shows two navigation columns; phone chrome takes about a
+quarter of the thread screen; dark diff body is off-ramp near-black with invisible add/remove tints and light syntax at
+2.79:1 on deletions; Inbox cards washed whole instead of a header band; Usage has six segmented controls and 2.95:1 axis
+labels; Backlog capture box and repeated author; the active tab label dimmest. Lanes A kit/diff/syntax, B navigation
+and list, C transcript/Inbox/phone shell, D Usage/Backlog/Review/AI accounts all running.
 
 ## Round four
 
