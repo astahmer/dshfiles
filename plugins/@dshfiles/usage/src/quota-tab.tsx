@@ -1,7 +1,7 @@
 import { AccountQuotaViews, USAGE_QUOTA_VIEWS, type UsageQuotaTarget, type UsageQuotaView } from '@dshfiles/ai-accounts/quota-views'
 import { useContract } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { SlidingSegments } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { panelOccurrence } from '@dshfiles/workbench/panel-occurrence'
 import { useSyncExternalStore } from 'react'
 
@@ -84,23 +84,12 @@ const QuotaTab = (props: { readonly panelId?: string | undefined }): JSX.Element
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4" data-usage-quota={current.view}>
       <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:pb-0.5">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
+        <SlidingSegments
           aria-label="Quota views"
+          options={USAGE_QUOTA_VIEWS.map(view => ({ value: view, label: VIEW_LABELS[view] }))}
           value={current.view}
-          onValueChange={value => {
-            const view = USAGE_QUOTA_VIEWS.find(candidate => candidate === value)
-            if (view !== undefined) location.set({ ...current, view })
-          }}
-        >
-          {USAGE_QUOTA_VIEWS.map(view => (
-            <ToggleGroupItem key={view} value={view} className="dshx:flex-none">
-              {VIEW_LABELS[view]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+          onValueChange={view => location.set({ ...current, view })}
+        />
       </div>
       <View key={`${current.view}:${String(current.visit)}`} {...account} />
     </div>

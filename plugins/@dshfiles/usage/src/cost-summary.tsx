@@ -3,6 +3,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { InfoIcon } from '@dshfiles/plugin-ui/icons'
 import { useId, useState, type ReactNode } from 'react'
 import type { ChartView } from './api.js'
+import { DATA_SERIES } from './data-series.js'
 import { UsageFormattingModel } from './format.js'
 
 type Summary = ChartView['summary']
@@ -14,6 +15,20 @@ const Tile = (props: { readonly label: ReactNode; readonly value: string; readon
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:py-1">
     <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
     <span className="dshx:text-base dshx:font-semibold dshx:tabular-nums">{props.value}</span>
+    {props.detail === undefined || props.detail === null ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
+  </div>
+)
+
+/** A lead number: 20 px tabular figures, keyed by a series dot so the three read as separate measures at a glance. */
+const LeadTile = (props: { readonly label: ReactNode; readonly value: string; readonly series: string; readonly detail?: ReactNode }): JSX.Element => (
+  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:py-1">
+    <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground">
+      <span aria-hidden className="dshx:size-2 dshx:shrink-0 dshx:rounded-full" data-kpi-dot style={{ background: props.series }} />
+      {props.label}
+    </span>
+    <span className="dshx:text-xl dshx:font-semibold dshx:tabular-nums dshx:leading-tight" data-kpi-value>
+      {props.value}
+    </span>
     {props.detail === undefined || props.detail === null ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
   </div>
 )
@@ -45,7 +60,8 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2">
       <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2">
-        <Tile
+        <LeadTile
+          series={DATA_SERIES[0]}
           label={
             <>
               Cost (estimate)
@@ -64,8 +80,9 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
           value={UsageFormattingModel.formatCost(summary.cost)}
           detail={change(summary.cost, summary.previous.cost)}
         />
-        <Tile label="Requests" value={summary.requests.toLocaleString()} detail={change(summary.requests, summary.previous.requests)} />
-        <Tile
+        <LeadTile series={DATA_SERIES[1]} label="Requests" value={summary.requests.toLocaleString()} detail={change(summary.requests, summary.previous.requests)} />
+        <LeadTile
+          series={DATA_SERIES[2]}
           label="Cache hit"
           value={UsageFormattingModel.formatPercent(cacheHit)}
           detail={cacheHit === null ? undefined : `${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
@@ -101,7 +118,7 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
         </div>
       ) : null}
       <div>
-        <Button aria-controls={moreId} aria-expanded={open} onClick={() => setOpen(!open)} size="xs" type="button" variant="ghost">
+        <Button aria-controls={moreId} aria-expanded={open} className="dshx:-ml-2" onClick={() => setOpen(!open)} size="xs" type="button" variant="ghost">
           {open ? 'Fewer numbers' : 'More numbers'}
         </Button>
       </div>

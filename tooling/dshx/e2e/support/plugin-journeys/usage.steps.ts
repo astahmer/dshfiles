@@ -141,9 +141,13 @@ Then('the status chips, the search and the purpose filter narrow the log', async
   await page.getByRole('textbox', { name: 'Search requests', exact: true }).fill('other')
   await recordAssertion(page, 'usage-search-narrows-by-project', () => expect.poll(async () => logRows(page).count()).toBe(4))
   await page.getByRole('textbox', { name: 'Search requests', exact: true }).fill('')
-  await page.getByRole('group', { name: 'Purpose' }).getByRole('button', { name: 'Compaction', exact: true }).click()
+  await page.getByRole('button', { name: 'Purpose: All', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'Compaction', exact: true }).click()
+  await page.keyboard.press('Escape')
   await recordAssertion(page, 'usage-purpose-filter-keeps-compactions', () => expect.poll(async () => logRows(page).count()).toBe(7))
-  await page.getByRole('group', { name: 'Purpose' }).getByRole('button', { name: 'All', exact: true }).click()
+  await page.getByRole('button', { name: 'Purpose: Compaction', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: 'All', exact: true }).click()
+  await page.keyboard.press('Escape')
 })
 
 Then('a failed request opens the thread that made it', async ({ page }: { page: Page }) => {

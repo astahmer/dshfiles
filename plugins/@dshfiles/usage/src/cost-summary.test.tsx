@@ -51,6 +51,18 @@ describe('Usage › Cost numbers', () => {
     for (const label of ['Per day', 'Failed / aborted', 'Cache savings (estimate)', 'Cost per turn']) expect(markup).not.toContain(label)
     expect(markup).toMatch(/<button[^>]*aria-expanded="false"[^>]*>More numbers<\/button>/u)
   })
+  it('draws each lead number at 20 px semibold tabular figures beside an 8 px series dot (round five P1)', () => {
+    const values = [...markup.matchAll(/<span class="([^"]*)" data-kpi-value="true">/gu)].map(match => match[1])
+    expect(values).toHaveLength(3)
+    for (const value of values) expect(value).toContain('dshx:text-xl dshx:font-semibold dshx:tabular-nums')
+    const dots = [...markup.matchAll(/<span aria-hidden="true" class="([^"]*)" data-kpi-dot="true" style="background:(var\([^)]*\))"/gu)]
+    expect(dots.map(match => match[2])).toHaveLength(3)
+    for (const dot of dots) expect(dot[1]).toMatch(/dshx:size-2 .*dshx:rounded-full/u)
+    expect(new Set(dots.map(match => match[2])).size).toBe(3)
+  })
+  it('aligns the "More numbers" ghost button with the numbers above it', () => {
+    expect(markup).toMatch(/<button[^>]*class="[^"]*dshx:-ml-2[^"]*"[^>]*>More numbers<\/button>/u)
+  })
   it('explains no absent number and puts the price caveat on the cost, never in a native title', () => {
     expect(markup).not.toContain('no earlier usage to compare')
     expect(markup).toContain('aria-label="About this estimate"')

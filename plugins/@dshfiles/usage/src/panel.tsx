@@ -1,11 +1,18 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
+import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { Page } from '@dshfiles/plugin-ui/components/page'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { panelOccurrence, useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
-import { RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -23,10 +30,20 @@ import { RequestLog } from './request-log.js'
 import { UsageToolsTab } from './tools-tab.js'
 import { UsageQuota } from './quota-tab.js'
 
-/** The Purpose filter's "All" item: no purpose filter. */
-const ALL_PURPOSES = '__all__'
-
 const PRESETS = ['today', '7d', '30d', '365d', 'custom'] as const
+
+const PRESET_OPTIONS: readonly SlidingSegmentOption<(typeof PRESETS)[number]>[] = [
+  { value: 'today', label: 'Today' },
+  { value: '7d', label: '7 d' },
+  { value: '30d', label: '30 d' },
+  { value: '365d', label: '1 y' },
+  { value: 'custom', label: 'Custom' },
+]
+
+const BUCKET_OPTIONS: readonly SlidingSegmentOption<'hour' | 'day'>[] = [
+  { value: 'hour', label: 'Hourly' },
+  { value: 'day', label: 'Daily' },
+]
 
 /** A stored view preference keeps the value it had when one field is stale, the rule `.catch(...)` carried. */
 const withFallback = <ValueSchema extends SchemaTypes.Top>(schema: ValueSchema, fallback: ValueSchema['Type']) =>
@@ -176,15 +193,16 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
   const range = rangeOf(preferences, now)
   const purposes = preferences.purposes.length === 0 ? undefined : preferences.purposes
   const status = statusQuery.data
-  /** The Purpose ToggleGroup's next value: picking All clears the others, picking a purpose drops All. */
-  const choosePurposes = (values: readonly string[]): void => {
-    const chosen = new Set(values)
-    if (chosen.has(ALL_PURPOSES) && purposes !== undefined) {
-      update({ purposes: [] })
-      return
-    }
+  /** Toggles one purpose in the Purpose menu; an empty choice is "All". */
+  const togglePurpose = (purpose: RequestPurpose, on: boolean): void => {
+    const chosen = new Set(preferences.purposes)
+    if (on) chosen.add(purpose)
+    else chosen.delete(purpose)
     update({ purposes: UsageFoldModel.REQUEST_PURPOSES.filter((item: RequestPurpose) => chosen.has(item)) })
   }
+  const onlyPurpose = purposes?.length === 1 ? purposes[0] : undefined
+  const purposeSummary =
+    purposes === undefined ? 'All' : onlyPurpose === undefined ? `${String(purposes.length)} selected` : UsageFormattingModel.purposeLabels[onlyPurpose]
 
   const indexState =
     status === undefined
@@ -238,29 +256,20 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
         <UsageQuota.Tab panelId={props.panelId} />
       ) : (
         <>
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" role="group" aria-label="Date range">
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
+          <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto dshx:@max-pane-narrow:pb-0.5" role="group" aria-label="Filters">
+            <SlidingSegments
+              aria-label="Time range"
+              options={PRESET_OPTIONS}
               value={preferences.preset}
-              onValueChange={value => {
-                const preset = Schema.decodeUnknownOption(Schema.Literals(PRESETS))(value)
-                if (Option.isNone(preset)) return
+              onValueChange={preset =>
                 update({
-                  preset: preset.value,
-                  bucket: preset.value === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
-                  ...(preset.value === 'custom' &&
+                  preset,
+                  bucket: preset === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+                  ...(preset === 'custom' &&
                     preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
                 })
-              }}
-            >
-              <ToggleGroupItem value="today">Today</ToggleGroupItem>
-              <ToggleGroupItem value="7d">7 d</ToggleGroupItem>
-              <ToggleGroupItem value="30d">30 d</ToggleGroupItem>
-              <ToggleGroupItem value="365d">1 y</ToggleGroupItem>
-              <ToggleGroupItem value="custom">Custom</ToggleGroupItem>
-            </ToggleGroup>
+              }
+            />
             {preferences.preset === 'custom' ? (
               <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs">
                 <Input
@@ -280,39 +289,33 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                 />
               </span>
             ) : null}
-            <ToggleGroup
-              type="single"
-              variant="outline"
-              size="sm"
-              aria-label="Group by time"
-              value={preferences.bucket}
-              onValueChange={value => {
-                if (value === 'hour' || value === 'day') update({ bucket: value })
-              }}
-            >
-              <ToggleGroupItem value="hour">Hourly</ToggleGroupItem>
-              <ToggleGroupItem value="day">Daily</ToggleGroupItem>
-            </ToggleGroup>
-          </div>
-
-          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-x-auto">
-            <span aria-hidden className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">Purpose</span>
-            {/* The same ToggleGroup as the range and grouping filters (DESIGN.md › Tabs — one style). */}
-            <ToggleGroup
-              type="multiple"
-              variant="outline"
-              size="sm"
-              aria-label="Purpose"
-              value={purposes === undefined ? [ALL_PURPOSES] : [...preferences.purposes]}
-              onValueChange={choosePurposes}
-            >
-              <ToggleGroupItem value={ALL_PURPOSES}>All</ToggleGroupItem>
-              {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
-                <ToggleGroupItem key={purpose} value={purpose} className="dshx:flex-none">
-                  {UsageFormattingModel.purposeLabels[purpose]}
-                </ToggleGroupItem>
-              ))}
-            </ToggleGroup>
+            <SlidingSegments aria-label="Group by time" options={BUCKET_OPTIONS} value={preferences.bucket} onValueChange={bucket => update({ bucket })} />
+            {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" aria-label={`Purpose: ${purposeSummary}`}>
+                  <span className="dshx:text-muted-foreground">Purpose:</span>
+                  {purposeSummary}
+                  <ChevronDownIcon aria-hidden />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="dshx-root">
+                <DropdownMenuCheckboxItem checked={purposes === undefined} onSelect={event => event.preventDefault()} onCheckedChange={() => update({ purposes: [] })}>
+                  All
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuSeparator />
+                {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
+                  <DropdownMenuCheckboxItem
+                    key={purpose}
+                    checked={purposes?.includes(purpose) ?? false}
+                    onSelect={event => event.preventDefault()}
+                    onCheckedChange={checked => togglePurpose(purpose, checked)}
+                  >
+                    {UsageFormattingModel.purposeLabels[purpose]}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {preferences.tab === 'log' ? (

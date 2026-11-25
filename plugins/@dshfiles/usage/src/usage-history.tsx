@@ -1,5 +1,5 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { SlidingSegments } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { useState } from 'react'
 import { UsageFormattingModel } from './format.js'
 import type { ChartQuery, ChartView } from './api.js'
@@ -186,20 +186,16 @@ export const UsageCalendar = (props: { readonly view: ChartView; readonly range:
     <section className="dshx:border-t dshx:border-border dshx:pt-4">
       <header className="dshx:mb-2 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
         <h3 className="dshx:text-sm dshx:font-semibold">Daily calendar</h3>
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          size="sm"
+        <SlidingSegments
           aria-label="Calendar metric"
+          options={[
+            { value: 'tokens', label: 'Tokens' },
+            { value: 'cost', label: 'Cost' },
+            { value: 'requests', label: 'Requests' },
+          ]}
           value={metric}
-          onValueChange={value => {
-            if (value === 'tokens' || value === 'cost' || value === 'requests') setMetric(value)
-          }}
-        >
-          <ToggleGroupItem value="tokens">Tokens</ToggleGroupItem>
-          <ToggleGroupItem value="cost">Cost</ToggleGroupItem>
-          <ToggleGroupItem value="requests">Requests</ToggleGroupItem>
-        </ToggleGroup>
+          onValueChange={setMetric}
+        />
       </header>
       <div className="dshx:overflow-x-auto">
         <div role="img" aria-label={`Daily ${suffix} over ${days.length} days`} className="dshx:grid dshx:w-max dshx:grid-flow-col dshx:grid-rows-7 dshx:gap-1">
