@@ -7,10 +7,10 @@
  */
 
 /*
- * The page frame takes the shared page inset (24px, 12px narrow). The list and its header stop at one 920px lane on the
- * page's left edge instead of a centred 960px column (council round 3, D4), so the switches line up under the header's
- * actions; the sticky header bar keeps its full width for its background and compact rule. Icon seats are 32px with
- * 18px glyphs (council round 4, D5).
+ * The page frame takes the shared page inset (24px, 12px narrow). The list and its header stop at the kit's 880px lane
+ * frame (`Page width="lane"`, council round 5 D5) on the page's left edge instead of a centred 960px column, so the
+ * switches line up under the header's actions; the sticky header bar keeps its full width for its background and
+ * compact rule. Icon seats are 32px with 18px glyphs (council round 4, D5).
  */
 section[data-plugin-panel][data-plugin-panel] {
   --plugin-page-inset: 24px;
@@ -37,15 +37,19 @@ section[data-plugin-panel] [class*='_pageBody'] {
 }
 
 section[data-plugin-panel] [class*='_pageBody'] > :not([class*='_pageBar']) {
-  max-width: 920px;
+  max-width: 880px;
 }
 
 section[data-plugin-panel] [class*='_pageBar'] > [class*='_pageHead'] {
-  max-width: 920px;
+  max-width: 880px;
   align-self: flex-start;
 }
 
-/* The switch sits in a fixed column; a row with no switch keeps the column empty, so descriptions end at one edge. */
+/*
+ * The switch sits in a fixed column, so descriptions end at one edge. A row with no switch opens a page (a settings
+ * item): the column holds a 14px chevron in secondary ink, centred on the switch's axis (the 36px Host switch sits flush
+ * right, so its axis is 18px in), and the Host's card-link hover fills the whole row (council round 5, D5).
+ */
 section[data-plugin-panel] [class*='_cardEnd'] {
   min-width: 44px;
   justify-content: flex-end;
@@ -54,6 +58,11 @@ section[data-plugin-panel] [class*='_cardEnd'] {
 section[data-plugin-panel] [class*='_cardHead']:not(:has([class*='_cardEnd']))::after {
   content: '';
   flex: 0 0 44px;
+  align-self: center;
+  height: 14px;
+  background-color: var(--dsw-alias-label-secondary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E")
+    right 11px center / 14px 14px no-repeat;
 }
 
 /* A quiet rule between rows, from the text edge to the row's end; the full-row hover stays the Host's. */

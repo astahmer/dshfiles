@@ -57,17 +57,17 @@ describe('core Plugins page (round five A7)', () => {
     expect(sheet).not.toMatch(/@layer/u)
   })
 
-  it('aligns the page frame to the shared 24px inset (12px narrow), with the list in a 920px lane on the header edge', () => {
+  it('aligns the page frame to the shared 24px inset (12px narrow), with the list in the 880px lane frame on the header edge', () => {
     const frame = ruleFor('[data-plugin-panel][data-plugin-panel]')
     expect(frame).toMatch(/--plugin-page-inset:\s*24px;/u)
     expect(frame).toMatch(/--plugin-page-top-inset:\s*24px;/u)
     expect(frame).toMatch(/align-items:\s*stretch;/u)
     expect(sheet).toMatch(/@media \(width < 28rem\)\s*\{\s*section\[data-plugin-panel\]\[data-plugin-panel\]\s*\{\s*--plugin-page-inset:\s*12px;/u)
-    // Council round 3, D4: the list and the header stop at one 920px lane, left on the page edge, so the switches sit in a
-    // column under the header's actions instead of at the window's edge. The sticky header bar keeps its full width.
+    // Council round 5, D5: the list and the header stop at the kit's 880px lane frame (Page width="lane"), left on the page
+    // edge, so the switches sit in a column under the header's actions. The sticky header bar keeps its full width.
     const columns = ruleFor("[class*='_pageBody'] > :not([class*='_pageBar'])")
-    expect(columns).toMatch(/max-width:\s*920px;/u)
-    expect(ruleFor("[class*='_pageBar'] > [class*='_pageHead']")).toMatch(/max-width:\s*920px;[\s\S]*align-self:\s*flex-start;/u)
+    expect(columns).toMatch(/max-width:\s*880px;/u)
+    expect(ruleFor("[class*='_pageBar'] > [class*='_pageHead']")).toMatch(/max-width:\s*880px;[\s\S]*align-self:\s*flex-start;/u)
     expect(ruleFor("[class*='_pageBody'] {")).toMatch(/align-items:\s*flex-start;/u)
     // The module rules are (0,1,0) and (0,2,0); every override out-ranks them.
     for (const [selector] of rules) for (const part of selector.split(',')) expect(beats(specificity(part.trim()), [0, 2, 0]), part).toBe(true)
@@ -169,5 +169,24 @@ describe('core Plugins rows and section titles (council round 4, D5)', () => {
       expect(title, hook).toMatch(/line-height:\s*20px;/u)
       expect(title, hook).toMatch(/font-weight:\s*650;/u)
     }
+  })
+})
+
+describe('core Plugins navigable rows (council round 5, D5)', () => {
+  it('still renders the hooks: a settings row is a card link with no switch, and the Host draws its full-row hover', () => {
+    expect(/function ItemCard\(\{[^}]*\}\)\{return[^;]*\.cardLink\}`,"data-plugin-item"/u.test(page), 'item row').toBe(true)
+    expect(/_cardLink:hover\{background:var\(--dsw-alias-interactive-bg-hover\)\}/u.test(page), 'row hover').toBe(true)
+    expect(/_cardOpen:after\{content:"";[^}]*inset:0\}/u.test(page), 'whole-row target').toBe(true)
+  })
+
+  it('ends a row with no switch on a 14px chevron, centred on the switch column axis', () => {
+    const chevron = ruleFor("[class*='_cardHead']:not(:has([class*='_cardEnd']))::after")
+    expect(chevron).toMatch(/flex:\s*0 0 44px;/u)
+    expect(chevron).toMatch(/height:\s*14px;/u)
+    expect(chevron).toMatch(/align-self:\s*center;/u)
+    // Secondary ink: a glyph at 3:1 or better on the page and on the hover fill in both schemes.
+    expect(chevron).toMatch(/background-color:\s*var\(--dsw-alias-label-secondary\);/u)
+    // The Host switch (36px) sits flush right in the 44px column: its axis is 18px in, so the 14px chevron ends 11px in.
+    expect(chevron).toMatch(/mask:\s*url\("data:image\/svg\+xml,[^"]+"\)\s*right 11px center \/ 14px 14px no-repeat;/u)
   })
 })
