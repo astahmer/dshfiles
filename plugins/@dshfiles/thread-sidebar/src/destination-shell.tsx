@@ -1147,9 +1147,16 @@ const PhoneNavigation = (
     if (!listOpen) toggleSidebar()
   }
   const stageOwner = Destinations.owning(props.destinations, props.activePanelId)?.id
-  /** The highlighted tab: with the list closed, an Inbox or Land page in the stage; with it open, the shown destination. */
+  /**
+   * The highlighted tab: with the list closed, an Inbox or Land page in the stage, or More for Settings and any other
+   * destination's page (council round 3 B6: you reached it through More); with it open, the shown destination.
+   */
   const currentTab = (): PhoneTab | null => {
-    if (!listOpen) return stageOwner === 'inbox' || stageOwner === 'land' ? stageOwner : null
+    if (!listOpen) {
+      if (stageOwner === 'inbox' || stageOwner === 'land') return stageOwner
+      const morePage = props.activePanelId === SETTINGS_PANEL_ID || (stageOwner !== undefined && stageOwner !== 'threads')
+      return morePage ? 'more' : null
+    }
     if (moreOpen || !TABBED_DESTINATIONS.includes(props.destination.id)) return 'more'
     return props.destination.id === 'inbox' ? 'inbox' : props.destination.id === 'land' ? 'land' : 'threads'
   }
@@ -1576,13 +1583,23 @@ const PhoneNavigation = (
               onClick={() => select(tab)}
               className={cn(
                 'dshx:flex dshx:h-14 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-0.5 dshx:text-(--dsw-alias-label-tertiary) dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:active:text-foreground',
+                // The current tab (council round 3 B6): its glyph in its destination's tone on that tone's 14% tile, and
+                // an ink label at 600. More stands for Settings and the other destinations: the neutral tone.
+                NAV_TONE[tab === 'more' ? 'settings' : tab],
                 current === tab && 'dshx:text-foreground',
               )}
             >
-              <span className="dshx:inline-flex dshx:size-6 dshx:items-center dshx:justify-center" aria-hidden="true">
+              <span
+                className={cn(
+                  'dshx:inline-flex dshx:h-7 dshx:w-11 dshx:items-center dshx:justify-center dshx:rounded-full',
+                  current === tab && 'dshx:bg-nav-tile dshx:text-nav-tone',
+                )}
+                aria-hidden="true"
+                data-phone-tab-seat=""
+              >
                 {tabIcon(tab)}
               </span>
-              <span className={cn('dshx:text-2xs dshx:leading-tight', current === tab && 'dshx:font-medium')}>{tabLabel[tab]}</span>
+              <span className={cn('dshx:text-2xs dshx:leading-tight', current === tab && 'dshx:font-semibold')}>{tabLabel[tab]}</span>
             </button>
           ))}
         </nav>

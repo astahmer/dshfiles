@@ -396,6 +396,24 @@ describe('DestinationShell', () => {
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(false)
   })
 
+  it('on a phone, lights the current tab with its tone tile and a 600 label, and More while Settings shows (council round 3 B6)', () => {
+    setPhone(true)
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    const bar = screen.getByRole('navigation', { name: 'Destinations' })
+    const more = within(bar).getByRole('button', { name: 'More' })
+    expect(more.getAttribute('aria-current')).toBe('page')
+    expect(more.className).toContain('dshx:nav-tone-settings')
+    expect(more.querySelector('[data-phone-tab-seat]')?.className).toContain('dshx:bg-nav-tile')
+    expect(within(more).getByText('More').className).toContain('dshx:font-semibold')
+    const threads = within(bar).getByRole('button', { name: 'Threads' })
+    expect(threads.getAttribute('aria-current')).toBeNull()
+    expect(threads.querySelector('[data-phone-tab-seat]')?.className).not.toContain('dshx:bg-nav-tile')
+    cleanup()
+    // Another destination's page reached through More keeps More lit too.
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-usage' })
+    expect(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'More' }).getAttribute('aria-current')).toBe('page')
+  })
+
   it('keeps the phone shell on a phone turned sideways (844x390, coarse pointer)', () => {
     // Only the landscape clause of the phone rule matches: the viewport is 844px wide.
     Object.defineProperty(window, 'matchMedia', {
