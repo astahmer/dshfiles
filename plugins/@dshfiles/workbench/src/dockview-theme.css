@@ -201,7 +201,8 @@
  * occupant marks the document with data-shell-phone-nav and draws a top bar with Back), the main region's tab rows
  * are desktop chrome that only crowd 390px: hide them; the list, Back and the thread panel sheet navigate instead.
  * Without that shell nothing changes, so a profile without phone navigation keeps its tabs. */
-@media (max-width: 639.98px) {
+/* The phone-shell rule (kit PHONE_SHELL_QUERY), not a width: a phone turned sideways (844x390) is still the phone. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   [data-shell-phone-nav] [data-workbench-region='main'] .dv-tabs-and-actions-container {
     display: none;
   }

@@ -479,7 +479,7 @@ export default defineClient({
                 ...base,
                 kind: 'panel',
                 panelId,
-                title: tab.title ?? panelLabels.get(panelId) ?? panelTitleFallback(panelId),
+                title: PanelTitlesModel.tabTitleOf(tab.title, panelLabels.get(panelId), panelTitleFallback(panelId)),
                 available: registeredPanels.has(panelId),
                 status: null,
               }

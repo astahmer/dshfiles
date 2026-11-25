@@ -20,4 +20,10 @@ describe('main tab titles', () => {
     expect(PanelTitlesModel.titleOf('unknown', 'Things', titles)).toBe('Things')
     expect(PanelTitlesModel.titleOf('unknown', undefined, titles)).toBeUndefined()
   })
+
+  it('draws a stored or requested tab title without its plugin prefix too', () => {
+    expect(PanelTitlesModel.tabTitleOf('Schedule: Schedules', undefined, 'Schedules')).toBe('Schedules')
+    expect(PanelTitlesModel.tabTitleOf(undefined, 'Plugins', 'Plugins')).toBe('Plugins')
+    expect(PanelTitlesModel.tabTitleOf(undefined, undefined, 'Agent toolkit')).toBe('Agent toolkit')
+  })
 })

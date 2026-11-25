@@ -1,5 +1,5 @@
 import { DESTINATIONS, KNOWN_SECTIONS, type DestinationSection } from '@dshfiles/thread-sidebar/destinations'
-import { panelTabTitle, type PanelTitle } from '@dshfiles/workbench/registry'
+import { panelTabTitle, withoutPluginPrefix, type PanelTitle } from '@dshfiles/workbench/registry'
 
 /**
  * Tab titles for pages the shell lists as destination sections (plan `docs/ade-ux` §5: labels never show plugin
@@ -16,7 +16,15 @@ const destinationTitles = (contributed: readonly DestinationSection[]): readonly
 const titleOf = (panelId: string, navigationLabel: string | undefined, titles: readonly PanelTitle[]): string | undefined =>
   panelTabTitle(panelId, navigationLabel, titles)
 
+/**
+ * A page tab's title as drawn: the title the tab was opened with (stored with the tab, possibly before this rule),
+ * else its navigation title, else a name from its id. Every one of them loses a `Plugin: ` prefix ("Schedule: Schedules").
+ */
+const tabTitleOf = (stored: string | undefined, navigationTitle: string | undefined, fallback: string): string =>
+  withoutPluginPrefix(stored ?? navigationTitle ?? fallback)
+
 export class PanelTitlesModel {
   static readonly destinationTitles = destinationTitles
   static readonly titleOf = titleOf
+  static readonly tabTitleOf = tabTitleOf
 }

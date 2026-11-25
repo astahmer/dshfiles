@@ -696,6 +696,9 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             defaultRenderer="always"
             {...(windowFloats ? { floatingGroupBounds: 'boundedWithinViewport' as const } : {})}
             theme={workbenchTheme}
+            // A tab opening is not a state change to announce (DESIGN.md Announcements): dockview's own live region
+            // said "X opened" on every switch.
+            announcements={false}
             onReady={onReady}
             onDidDrop={onDidDrop}
           />

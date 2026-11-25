@@ -16,7 +16,7 @@ import { SidebarFolderTargets } from './shell-merge.js'
 import { PinIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { DEFAULT_CLOSE_BUTTON_POSITION, workbenchTabs } from './tabs.js'
-import type { WorkbenchPanelRegistry } from './registry.js'
+import { withoutPluginPrefix, type WorkbenchPanelRegistry } from './registry.js'
 import { SurfaceAction } from './surface-action.js'
 import { NewViewTabs } from './new-view.js'
 import { closeWorkbenchPanel, type WorkbenchPanelIdentity } from './panel-close.js'
@@ -90,7 +90,9 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
     const definition = useSyncExternalStore(registry.subscribe, () => registry.get(sourceId))
     const tab = snapshot.tabs.find(candidate => candidate.id === definition?.tabId)
     const closeButtonPosition = snapshot.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
-    const title = definition?.newView ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : (definition?.title ?? tab?.title ?? props.api.title)
+    // A page title never carries its plugin's name, including a native panel's own dockview title ("Plugin Manager: Plugins").
+    const title =
+      definition?.newView === true ? 'New tab' : tab?.target.kind === 'thread' ? tab.title : withoutPluginPrefix(definition?.title ?? tab?.title ?? props.api.title ?? '')
     const project = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectNames?.[tab.workspaceId] : undefined
     const projectChip = tab?.kind === 'thread' && tab.workspaceId !== undefined ? snapshot.projectChips?.[tab.workspaceId] : undefined
     const [renaming, setRenaming] = useState(false)
