@@ -30,7 +30,9 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
    without descriptions; covered by a focused test.
 4. **P6 (partial)** — the picker now paints the menu surface (it computed to `rgba(0,0,0,0)`), gives rows 44px and
    18px glyphs on the phone rule, and Escape dismisses it from the document, so a tap on `+` no longer leaves the key
-   unanswered. Still open on P6: turning it into a bottom sheet, 48px rows, and files/threads before skills.
+   unanswered. The kit's existing phone-sheet rule now lists the picker's `[data-menu-material][data-trigger-menu]`
+   surface, so it rises as the app sheet (surface, grabber, scrim, 72dvh cap) instead of a 343×95 dropdown. Still open
+   on P6: 48px rows (waits for the 44→48 decision) and files/threads before skills.
 5. **P28** — the phone shell hides `KeyHint` and the menu shortcut slots under 640px: no keycaps without a keyboard.
 6. **P7 not reproduced** (2026-11-25 live check): the context meter panel opened at x114 y577, 264×159 in a 390×844
    viewport. Keep it open as a regression check rather than a fix.
