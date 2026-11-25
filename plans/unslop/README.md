@@ -6,9 +6,18 @@ from it. The fixes were built on upstream `astahmer/dshfiles` `main` at `b9ef35a
 are the draft PR astahmer/dshfiles#271 (branch `contribute/unslop-ui` on the tbrowang fork); nothing is landed. Authority for every rule cited: [DESIGN.md](../../DESIGN.md) and the
 [UX plan](../../docs/ade-ux/README.md).
 
-**Resume here:** round one's 14 steps and round two's five lanes are done; round three's five lanes are done (see [Round three](#round-three)). Round two started 2026-11-24 after feedback that the monochrome changes
+**Resume here:** round one's 14 steps and round two's five lanes are done; round three's five lanes are done; round four's audits are running (see [Round four](#round-four)). Round two started 2026-11-24 after feedback that the monochrome changes
 were dull: bring purposeful colour back and make daily use smoother, without undoing upstream's coloured project
 chips (#287). See [Round two](#round-two). Round one's leftovers are under [Follow-ups](#follow-ups).
+
+## Round four
+
+Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
+`.cache/unslop-audit/r4/`: every destination page against the page anatomy and its neighbours (`pages/`); states and
+stress, meaning approvals, errors and recovery, reconnect, loading, first run, worst-case data, dark theme and reduced
+motion (`states/`); keyboard-only use, screen-reader semantics, phone portrait and landscape, the virtual keyboard and
+zoom (`access/`). Design decisions then go to a Fable 5.2 (high) consultation and taste questions to the owner; fixes
+to lanes by plugin ownership.
 
 ## Round three
 
