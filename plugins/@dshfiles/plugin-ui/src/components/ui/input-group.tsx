@@ -23,8 +23,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
         'dshx:has-[>[data-align=block-start]]:h-auto dshx:has-[>[data-align=block-start]]:flex-col dshx:has-[>[data-align=block-start]]:[&>input]:pb-3',
         'dshx:has-[>[data-align=block-end]]:h-auto dshx:has-[>[data-align=block-end]]:flex-col dshx:has-[>[data-align=block-end]]:[&>input]:pt-3',
 
-        // Focus state.
-        'dshx:has-[[data-slot=input-group-control]:focus-visible]:border-ring dshx:has-[[data-slot=input-group-control]:focus-visible]:ring-[3px] dshx:has-[[data-slot=input-group-control]:focus-visible]:ring-ring/50',
+        // Focus state: the kit sheet draws the one ring on this wrapper while its field has focus (styles.css, K7).
 
         // Error state.
         'dshx:has-[[data-slot][aria-invalid=true]]:border-destructive dshx:has-[[data-slot][aria-invalid=true]]:ring-destructive/20 dshx:dark:has-[[data-slot][aria-invalid=true]]:ring-destructive/40',

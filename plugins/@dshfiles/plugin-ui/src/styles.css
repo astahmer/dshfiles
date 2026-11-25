@@ -738,6 +738,30 @@
 }
 
 /*
+ * Compound fields (round five K7): an input group or a command input is one box, so it draws one ring, on the wrapper
+ * that carries the border, while the field inside has focus; the field itself draws none (a higher-specificity rule
+ * after the ring rule above). The command input sits on the top edge of a clipping palette or list, so its ring draws
+ * 2px inside; an input group inside a clipping list (`data-focus-inset`) does too.
+ */
+:where([data-slot='input-group']):has(:is(input, textarea)[data-slot]:focus-visible:not([aria-invalid='true'])) {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+:where([data-slot='command-input-wrapper']):has(input[data-slot]:focus-visible) {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: -2px;
+}
+
+:where([data-focus-inset] [data-slot='input-group'], [data-slot='input-group'][data-focus-inset]):has(:is(input, textarea)[data-slot]:focus-visible:not([aria-invalid='true'])) {
+  outline-offset: -2px;
+}
+
+:where([data-slot='input-group'], [data-slot='command-input-wrapper']) :is(input, textarea)[data-slot]:focus-visible:not([aria-invalid='true']) {
+  outline: none;
+}
+
+/*
  * Motion (visual refresh T5.1, DESIGN.md Motion). Every kit layer that animates takes the P0 tokens instead of
  * tw-animate's 150ms `ease`: menus, popovers, selects, tooltips and hover cards enter in 160ms, dialogs in 220ms,
  * sheets in 280ms, all on the enter curve; every exit is 100ms on the exit curve. Unlayered, so it beats the
