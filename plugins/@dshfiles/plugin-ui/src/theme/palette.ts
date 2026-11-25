@@ -51,6 +51,12 @@ export interface Palette {
    * settings category, a pressed toggle, the palette's highlighted row. Opaque, on the accent hue; text on it stays ink.
    */
   readonly selectedWash: Oklch
+  /**
+   * Attention at the tint rung (round five A2): the persistent wash of a Needs-you row (accent hue) and of a Failed row
+   * (danger hue). Opaque and stronger than `selectedWash`, so what waits on you outranks what you selected.
+   */
+  readonly needsYouWash: Oklch
+  readonly failedWash: Oklch
 }
 
 export const NEUTRAL_STEP_NAMES = ['bg', 'panel', 'raised', 'selected', 'line', 'border', 'border-strong', 'strong', 'faint', 'muted', 'text'] as const
@@ -115,6 +121,8 @@ function palette(input: PaletteInput): Palette {
     danger: trio(status(STATUS_HUES.danger)),
     info: trio(accentFg),
     selectedWash: dark ? { l: 0.29, c: 0.055, h: accentHue } : { l: 0.95, c: 0.03, h: accentHue },
+    needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
+    failedWash: dark ? { l: 0.28, c: 0.04, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
   }
 }
 

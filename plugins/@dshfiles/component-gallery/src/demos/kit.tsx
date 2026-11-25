@@ -57,6 +57,8 @@ const roleSwatches = {
   ],
   'Tint rung': [
     ['selected-wash', 'dshx:bg-selected-wash'],
+    ['wash-needs-you', 'dshx:bg-wash-needs-you'],
+    ['wash-failed', 'dshx:bg-wash-failed'],
     ['attention-tint', 'dshx:bg-attention-tint'],
     ['danger-tint', 'dshx:bg-danger-tint'],
   ],

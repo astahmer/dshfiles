@@ -34,6 +34,13 @@
    * Text on it stays ink (`text-foreground`).
    */
   --color-selected-wash: var(--dshx-selected-wash);
+  /*
+   * Attention washes (round five A2): the persistent fill of a Needs-you row (accent hue) and a Failed row (danger hue),
+   * stronger than the selection wash, generated in theme.generated.css. Ink, secondary text and the status glyphs
+   * hold AA on them (tests/attention-wash.test.ts).
+   */
+  --color-wash-needs-you: var(--dshx-wash-needs-you);
+  --color-wash-failed: var(--dshx-wash-failed);
   /* Behind a kit dialog, alert dialog or sheet (round five K8): warm ink at 32% in light, black at 50% in dark. */
   --color-scrim: var(--dshx-scrim);
   --color-attention-foreground: var(--dshx-attention-foreground);
