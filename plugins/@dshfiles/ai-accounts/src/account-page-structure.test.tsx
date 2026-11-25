@@ -69,3 +69,44 @@ describe('account detail anatomy', () => {
     }
   })
 })
+
+describe('account detail sections (council round 3, D3)', () => {
+  it('keeps the Models tab to the models table, with a link to the defaults on the Settings tab', () => {
+    const detail = source('account-detail.tsx')
+    const models = detail.slice(detail.indexOf('value="models">'), detail.indexOf('value="settings">'))
+    expect(models).not.toContain('AccountInlineSettings')
+    expect(models).toMatch(/onClick=\{\(\) => props\.onSectionChange\('settings'\)\}/u)
+    expect(models).toContain('Model defaults')
+    expect(source('account-settings.tsx')).toMatch(/<AccountModelDefaults\s/u)
+  })
+
+  it('draws a model\'s reasoning effort as quiet text with a chevron, not a boxed field', () => {
+    const draft = AccountDraftModel.toDraft(
+      Schema.decodeUnknownSync(accountProfileSchema)({
+        ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
+        instanceId: 'work',
+        displayName: 'Work',
+        signedIn: true,
+        identity: null,
+        plan: null,
+        mode: 'direct',
+        state: 'healthy',
+        loginHint: '',
+        detail: null,
+      }),
+    )
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <ModelCuration
+          account={draft}
+          catalog={[{ id: 'gpt-6', name: 'GPT Six', efforts: [{ id: 'low', name: 'Low' }], defaultEffort: null }]}
+          onChange={noop}
+        />
+      </TooltipProvider>,
+    )
+    const trigger = /<button[^>]*aria-label="Default reasoning effort for GPT Six"[^>]*>/u.exec(markup)?.[0] ?? /<button(?:(?!<button).)*?aria-label="Default reasoning effort for GPT Six"/su.exec(markup)?.[0] ?? ''
+    expect(trigger).toContain('dshx:border-transparent')
+    expect(trigger).toContain('dshx:bg-transparent')
+    expect(trigger).toContain('dshx:shadow-none')
+  })
+})

@@ -10,7 +10,7 @@ import { AccountLabels, KIND_LABEL } from './account-labels.js'
 import { AccountConnection } from './account-connection-status.js'
 import { AccountIdentitySection } from './account-identity-section.js'
 import { ExtraUsageMeter } from './extra-usage-view.js'
-import { AccountDefaultReasoningControl, AccountInheritanceControl } from './account-model-defaults.js'
+import { AccountModelDefaults } from './account-model-defaults.js'
 import { RuntimePathsSection } from './runtime-paths-section.js'
 import type { AccountDraft, AccountsFile } from './api.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
@@ -107,69 +107,6 @@ const ExtraUsageSettings = (props: SettingsProps): JSX.Element | null => {
   )
 }
 
-const AccountAuthenticationDetails = (props: Pick<SettingsProps, 'draft' | 'state'> & { readonly onConnect: () => void }): JSX.Element => {
-  const profile = props.state.selected
-  const status = profile === null ? null : AccountConnection.status(profile, props.state.usage)
-  return (
-    <section aria-label="Authentication" className="dshx:min-w-0 dshx:space-y-3">
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
-        <h3 className="dshx:text-sm dshx:font-semibold">Authentication</h3>
-        <Button disabled={props.state.dirty || props.state.saving || profile === null} onClick={props.onConnect} size="sm" type="button" variant="outline">
-          <RefreshCwIcon />
-          Reauthenticate
-        </Button>
-      </div>
-      <dl className="dshx:grid dshx:grid-cols-[minmax(120px,0.7fr)_minmax(0,1fr)] dshx:gap-x-4 dshx:gap-y-3 dshx:text-xs dshx:@max-pane-narrow:grid-cols-1">
-        <dt className="dshx:text-muted-foreground">Authentication method</dt>
-        <dd>{AccountConnection.authenticationLabel(props.draft)}</dd>
-        <dt className="dshx:text-muted-foreground">Signed in as</dt>
-        <dd className="dshx:break-words">{profile?.identity ?? 'Not reported by provider'}</dd>
-        <dt className="dshx:text-muted-foreground">Token status</dt>
-        <dd className={status?.tone === 'warning' ? 'dshx:text-warning' : undefined}>
-          {status?.authenticated ? 'Authenticated' : (status?.label ?? 'Not verified')}
-        </dd>
-        <dt className="dshx:text-muted-foreground">Last checked</dt>
-        <dd>{status?.checkedAt == null ? 'No provider check available' : new Date(status.checkedAt).toLocaleString()}</dd>
-      </dl>
-    </section>
-  )
-}
-
-export const AccountInlineSettings = (props: SettingsProps & { readonly onConnect: () => void }): JSX.Element => {
-  const modelProps = {
-    draft: props.draft,
-    catalog: props.state.catalog?.models ?? [],
-    onChange: (patch: Partial<AccountDraft>) => props.state.setDraft({ ...props.draft, ...patch }),
-  }
-  return (
-    <PageSection className={sectionClass} description="Account-specific settings. Leave as default to use provider settings." heading="Settings">
-      <div className="dshx:grid dshx:grid-cols-3 dshx:items-start dshx:gap-4 dshx:@max-pane-compact:grid-cols-1">
-        <label className="dshx:min-w-0 dshx:space-y-1.5">
-          <span className="dshx:text-xs dshx:text-muted-foreground">Account name</span>
-          <Input
-            aria-label="Account name"
-            maxLength={120}
-            onChange={event => props.state.setDraft({ ...props.draft, displayName: event.target.value })}
-            value={props.draft.displayName}
-          />
-        </label>
-        <div className="dshx:min-w-0 dshx:space-y-1.5">
-          <span className="dshx:text-xs dshx:text-muted-foreground">Routing priority</span>
-          <PriorityControl {...props} />
-        </div>
-        <AccountDefaultReasoningControl {...modelProps} />
-      </div>
-      <div className="dshx:border-t dshx:pt-3">
-        <AccountInheritanceControl {...modelProps} />
-      </div>
-      <RoutingSwitch draft={props.draft} state={props.state} />
-      <div className="dshx:border-t dshx:pt-4">
-        <AccountAuthenticationDetails draft={props.draft} state={props.state} onConnect={props.onConnect} />
-      </div>
-    </PageSection>
-  )
-}
-
 export const AccountSettings = (props: SettingsProps & { readonly folderPicker: WorkspacePickerPorts; readonly onConnect: () => void }): JSX.Element => {
   const [editing, setEditing] = useState(false)
   const accountIdCopy = useCopyFeedback()
@@ -247,6 +184,15 @@ export const AccountSettings = (props: SettingsProps & { readonly folderPicker: 
         </div>
       </PageSection>
       <AccountRoutingSettings {...props} />
+      {AccountLabels.routedKind(props.draft.kind) ? (
+        <PageSection className={sectionClass} description="Used for every model that has no value of its own." heading="Model defaults">
+          <AccountModelDefaults
+            catalog={props.state.catalog?.models ?? []}
+            draft={props.draft}
+            onChange={patch => props.state.setDraft({ ...props.draft, ...patch })}
+          />
+        </PageSection>
+      ) : null}
       <ExtraUsageSettings {...props} />
       <details className="dshx:py-4">
         <summary className="dshx:cursor-pointer">

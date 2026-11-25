@@ -190,7 +190,8 @@ export const ModelCuration = (props: {
                         ...model.efforts.map(effort => ({ value: effort.id, label: effort.name })),
                       ]}
                       onValueChange={value => setEffort(model, value)}
-                      triggerClassName="dshx:h-8 dshx:w-full dshx:text-xs"
+                      // Quiet text with a chevron, not a boxed field: the value is the default most rows keep (council round 3, D3).
+                      triggerClassName="dshx:h-8 dshx:w-auto dshx:max-w-full dshx:justify-start dshx:border-transparent dshx:bg-transparent dshx:text-xs dshx:shadow-none dshx:hover:bg-accent dshx:dark:bg-transparent dshx:disabled:[&>svg]:hidden"
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">

@@ -19,9 +19,9 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { BarChart3Icon, LayersIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Settings2Icon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { BarChart3Icon, ChevronRightIcon, LayersIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Settings2Icon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { AccountSignOut } from './account-sign-out.js'
-import { AccountSettings, AccountInlineSettings } from './account-settings.js'
+import { AccountSettings } from './account-settings.js'
 import { AccountNameEditor } from './account-name-editor.js'
 import { AccountConnection, type AccountSection } from './account-connection-status.js'
 import { AccountLabels } from './account-labels.js'
@@ -161,8 +161,12 @@ export const AccountDetail = (props: {
                     {catalog.warning}
                   </p>
                 )}
+                {/* Models is the models table; the account-wide defaults live on Settings (council round 3, D3). */}
+                <Button className="dshx:self-start dshx:px-0" onClick={() => props.onSectionChange('settings')} size="sm" type="button" variant="link">
+                  Model defaults
+                  <ChevronRightIcon aria-hidden />
+                </Button>
               </div>
-              <AccountInlineSettings draft={draft} file={props.file} state={props.state} onConnect={connect} />
             </>
           ) : (
             <p className="dshx:py-6 dshx:text-sm dshx:text-muted-foreground">Cursor tracks quota here. Its models and threads use the Cursor Agent runtime.</p>
