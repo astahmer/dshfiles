@@ -27,7 +27,7 @@ describe('the status strip (round four item 19)', () => {
 
   it('gives the phone pill a 44px hit area inside a 44px row, so it never reaches into the tab bar', () => {
     expect(strip).toMatch(/className=\{`\$\{css\.statusChip\} dshx-hit-44`\}/u)
-    expect(rule(phoneBlock(), ":global([data-shell-phone-nav]) .statusStrip[data-status-strip='compact']")).toMatch(/height:\s*44px/u)
+    expect(rule(phoneBlock(), ":global([data-shell-phone-nav]) .statusStrip[data-status-strip='compact']")).toMatch(/height:\s*calc\(44px \+ max\(0px, /u)
   })
 
   it('pads the phone frame by the left and right safe areas', () => {

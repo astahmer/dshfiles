@@ -640,11 +640,16 @@
      upward from it. The top bar's trailing corner is left to the thread's `⋯` menu. */
   :global([data-shell-phone-nav]) .statusStrip[data-status-strip='compact'] {
     justify-content: center;
-    height: 44px;
+    /* With no tab bar below (an open thread) the row sits on the home indicator: it grows by the bottom safe area and
+       keeps the pill above it. Under the tab bar (which already pads that area) the difference is negative, so 0. */
+    height: calc(44px + max(0px, env(safe-area-inset-bottom, 0px) - var(--dsh-phone-nav-height, 0px)));
     /* The tab bar draws 1px taller than the --dsh-phone-nav-height it publishes and overlaps this row's last pixel:
        lifting the pill 2px (a 46px row) keeps its whole hit area on this row. */
-    padding: 0 0 2px;
-    border-top: none;
+    padding: 0;
+    padding-bottom: max(2px, calc(env(safe-area-inset-bottom, 0px) - var(--dsh-phone-nav-height, 0px)));
+    /* Round five P3: the stage scrolls behind nothing; a hairline ends it, so a card clipped at the stage's edge
+       reads as scrolled out of view, not as covered by the pill. */
+    border-top: 1px solid var(--dsw-alias-border-l2, transparent);
     background: transparent;
   }
 
