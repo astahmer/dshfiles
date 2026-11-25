@@ -58,6 +58,9 @@ describe('account detail anatomy', () => {
     )
     expect(markup).toContain('data-slot="page-section"')
     expect(markup).toMatch(/<h2[^>]*>Models<\/h2>/u)
+    // The Models tab already names the section: its heading stays for assistive tech only (council round 4, D2).
+    const section = /<section[^>]*data-slot="page-section"[^>]*class="([^"]*)"/u.exec(markup)?.[1]?.replaceAll('&amp;', '&').replaceAll('&gt;', '>')
+    expect(section).toContain('dshx:[&>div:first-child]:sr-only')
     // Controls keep their own border; the section and its table draw none around themselves.
     expect(markup).toContain('dshx:overflow-x-auto dshx:border-y')
     expect(markup).not.toContain('dshx:rounded-lg dshx:border dshx:bg-background')
@@ -67,6 +70,31 @@ describe('account detail anatomy', () => {
       expect(source(file), file).not.toContain('dshx:bg-card')
       expect(source(file), file).not.toMatch(/dshx:rounded-(md|lg|xl) dshx:border/u)
     }
+  })
+})
+
+describe('account detail header and tabs (council round 4, D2)', () => {
+  const detail = source('account-detail.tsx')
+  it('switches sections with underline tabs and no icons', () => {
+    expect(detail).toMatch(/<TabsList variant="line" aria-label="Account sections"/u)
+    const tabs = detail.slice(detail.indexOf('<TabsList'), detail.indexOf('</TabsList>'))
+    expect(tabs).not.toContain('Icon')
+  })
+  it('labels the enable switch with visible text', () => {
+    const header = detail.slice(detail.indexOf('<DetailHeader'), detail.indexOf('</DetailHeader>'))
+    expect(header).toMatch(/<Label[^>]*>\s*\{AccountLabels\.routedKind\(draft\.kind\) \? 'In model picker' : 'Track quota'\}\s*<Switch/u)
+    expect(header).not.toContain("'Enabled in model picker'")
+    // A hairline parts the health word from the switch label, so "Connected" and "In model picker" read as two things.
+    expect(header).toMatch(/<Label className="[^"]*dshx:border-l[^"]*dshx:pl-3/u)
+  })
+  it('keeps Sign out in the account actions menu, not as a header button', () => {
+    const menu = detail.slice(detail.indexOf('<DropdownMenuContent'), detail.indexOf('</DropdownMenuContent>'))
+    expect(menu).toMatch(/onSelect=\{\(\) => setSignOutOpen\(true\)\}/u)
+    expect(menu).toContain('Sign out…')
+    expect(detail).toMatch(/<AccountSignOut[^>]*open=\{signOutOpen\}[^>]*onOpenChange=\{setSignOutOpen\}/u)
+  })
+  it('moves the last check into the detail line; the state keeps the dot and its word', () => {
+    expect(detail).toMatch(/detail=\{\[[^\]]*AccountConnection\.checkedLabel\(status\)\]/u)
   })
 })
 
@@ -80,7 +108,7 @@ describe('account detail sections (council round 3, D3)', () => {
     expect(source('account-settings.tsx')).toMatch(/<AccountModelDefaults\s/u)
   })
 
-  it('draws a model\'s reasoning effort as quiet text with a chevron, not a boxed field', () => {
+  it("draws a model's reasoning effort as quiet text with a chevron, not a boxed field", () => {
     const draft = AccountDraftModel.toDraft(
       Schema.decodeUnknownSync(accountProfileSchema)({
         ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
@@ -104,7 +132,10 @@ describe('account detail sections (council round 3, D3)', () => {
         />
       </TooltipProvider>,
     )
-    const trigger = /<button[^>]*aria-label="Default reasoning effort for GPT Six"[^>]*>/u.exec(markup)?.[0] ?? /<button(?:(?!<button).)*?aria-label="Default reasoning effort for GPT Six"/su.exec(markup)?.[0] ?? ''
+    const trigger =
+      /<button[^>]*aria-label="Default reasoning effort for GPT Six"[^>]*>/u.exec(markup)?.[0] ??
+      /<button(?:(?!<button).)*?aria-label="Default reasoning effort for GPT Six"/su.exec(markup)?.[0] ??
+      ''
     expect(trigger).toContain('dshx:border-transparent')
     expect(trigger).toContain('dshx:bg-transparent')
     expect(trigger).toContain('dshx:shadow-none')

@@ -9,6 +9,7 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import {
@@ -19,7 +20,8 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { BarChart3Icon, ChevronRightIcon, LayersIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Settings2Icon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { ChevronRightIcon, LogOutIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { useState } from 'react'
 import { AccountSignOut } from './account-sign-out.js'
 import { AccountSettings } from './account-settings.js'
 import { AccountNameEditor } from './account-name-editor.js'
@@ -54,7 +56,9 @@ export const AccountDetail = (props: {
   const [removeSnapshot, sendRemove] = useMachine(accountRemoveMachine, { input: { removeAccount: remove } })
   const removing = removeSnapshot.matches('removing')
   const removeOpen = removeSnapshot.matches('confirming') || removing || removeSnapshot.matches('error')
-  const stateLine = selected === null ? null : AccountConnection.stateLine(AccountConnection.status(selected, props.state.usage))
+  const status = selected === null ? null : AccountConnection.status(selected, props.state.usage)
+  const stateLine = status === null ? null : AccountConnection.stateLine(status)
+  const [signOutOpen, setSignOutOpen] = useState(false)
   const connect = (): void => {
     if (selected !== null && !dirty && !saving) props.onConnectAccount(selected.instanceId)
   }
@@ -65,7 +69,9 @@ export const AccountDetail = (props: {
   return (
     <section aria-label="Selected account" className={DETAIL_PANE_CLASS}>
       <DetailHeader
-        detail={[selected?.plan == null ? null : AccountLabels.planLabel(selected.plan), selected?.identity].filter(Boolean).join(' · ')}
+        detail={[selected?.plan == null ? null : AccountLabels.planLabel(selected.plan), selected?.identity, status && AccountConnection.checkedLabel(status)]
+          .filter(Boolean)
+          .join(' · ')}
         mark={<ProviderGlyph kind={draft.kind} />}
         state={stateLine}
         title={
@@ -79,21 +85,20 @@ export const AccountDetail = (props: {
         }
       >
         <>
-          <Switch
-            aria-label={
-              AccountLabels.routedKind(draft.kind)
-                ? draft.enabled
-                  ? 'Enabled in model picker'
-                  : 'Hidden from model picker'
-                : draft.enabled
-                  ? 'Tracking quota'
-                  : 'Quota tracking off'
-            }
-            checked={draft.enabled}
-            disabled={saving}
-            onCheckedChange={enabled => void props.state.persist({ enabled })}
-          />
-          {selected === null ? null : <AccountSignOut account={selected} disabled={dirty || saving} onSignedOut={() => void props.state.load()} />}
+          {/* The switch says what it controls in visible text, not only to assistive tech (council round 4, D2). */}
+          <Label className="dshx:gap-2 dshx:border-l dshx:border-border dshx:pl-3 dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
+            {AccountLabels.routedKind(draft.kind) ? 'In model picker' : 'Track quota'}
+            <Switch checked={draft.enabled} disabled={saving} onCheckedChange={enabled => void props.state.persist({ enabled })} />
+          </Label>
+          {selected === null ? null : (
+            <AccountSignOut
+              account={selected}
+              disabled={dirty || saving}
+              open={signOutOpen}
+              onOpenChange={setSignOutOpen}
+              onSignedOut={() => void props.state.load()}
+            />
+          )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button aria-label="Account actions" size="icon-sm" type="button" variant="outline">
@@ -114,6 +119,12 @@ export const AccountDetail = (props: {
                 Refresh model catalog
               </DropdownMenuItem>
               <DropdownMenuSeparator />
+              {selected?.signedIn === true ? (
+                <DropdownMenuItem disabled={dirty || saving} onSelect={() => setSignOutOpen(true)}>
+                  <LogOutIcon />
+                  Sign out…
+                </DropdownMenuItem>
+              ) : null}
               <DropdownMenuItem disabled={selected === null} onSelect={requestRemove} variant="destructive">
                 <Trash2Icon />
                 Remove profile
@@ -131,17 +142,21 @@ export const AccountDetail = (props: {
         }}
         value={props.activeSection}
       >
-        <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:px-4 dshx:pt-3 dshx:pb-0.5">
-          <TabsList aria-label="Account sections">
+        {/* Underline tabs, the page-section pattern Usage and Backlog use (council round 4, D2). */}
+        <div className="dshx:mx-4 dshx:min-w-0 dshx:overflow-x-auto dshx:border-b dshx:border-border">
+          <TabsList variant="line" aria-label="Account sections" className="dshx:h-10 dshx:gap-5 dshx:p-0">
             {(
               [
-                { id: 'models', label: 'Models', Icon: LayersIcon },
-                { id: 'settings', label: 'Settings', Icon: Settings2Icon },
-                { id: 'usage', label: 'Usage', Icon: BarChart3Icon },
+                { id: 'models', label: 'Models' },
+                { id: 'settings', label: 'Settings' },
+                { id: 'usage', label: 'Usage' },
               ] as const
             ).map(tab => (
-              <TabsTrigger className="dshx:flex-none" key={tab.id} value={tab.id}>
-                <tab.Icon className="dshx:size-4" />
+              <TabsTrigger
+                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-(--dsw-alias-state-business-primary)"
+                key={tab.id}
+                value={tab.id}
+              >
                 {tab.label}
               </TabsTrigger>
             ))}

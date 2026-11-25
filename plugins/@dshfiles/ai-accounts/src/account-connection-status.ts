@@ -61,13 +61,14 @@ type ConnectionStatus = ReturnType<typeof accountConnectionStatus>
 const clockTime = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
 /**
- * The one line of state in the account header, drawn after its health dot ("Connected · checked 03:18 PM"). The
- * text is muted while healthy and takes the dot's colour when the account is limited or down.
+ * The one word of state in the account header, drawn after its health dot ("Connected"). The text is muted while
+ * healthy and takes the dot's colour when the account is limited or down. When it was checked is detail, not state:
+ * it reads in the detail line beside the plan (council round 4, D2).
  */
-const accountStateLine = (status: ConnectionStatus, time: (at: number) => string = clockTime) => {
-  const checked = status.checkedAt === null ? null : time(status.checkedAt)
-  return { text: checked === null ? status.label : `${status.label} · checked ${checked}`, health: status.health }
-}
+const accountStateLine = (status: ConnectionStatus) => ({ text: status.label, health: status.health })
+
+const accountCheckedLabel = (status: ConnectionStatus, time: (at: number) => string = clockTime): string | null =>
+  status.checkedAt === null ? null : `Checked ${time(status.checkedAt)}`
 
 const accountAuthenticationLabel = (account: Pick<AccountProfile, 'kind' | 'apiKeyEnv' | 'authSource'>): string => {
   if (account.kind === 'codex') return 'ChatGPT (OAuth)'
@@ -83,6 +84,7 @@ const accountAuthenticationLabel = (account: Pick<AccountProfile, 'kind' | 'apiK
 export class AccountConnection {
   static readonly status = accountConnectionStatus
   static readonly stateLine = accountStateLine
+  static readonly checkedLabel = accountCheckedLabel
   static readonly authenticationLabel = accountAuthenticationLabel
 }
 

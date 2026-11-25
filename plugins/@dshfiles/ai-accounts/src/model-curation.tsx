@@ -94,7 +94,8 @@ export const ModelCuration = (props: {
   }
   return (
     <PageSection
-      className="dshx-root dshx:@container dshx:gap-3"
+      // The Models tab names this section; its heading stays for assistive tech only (council round 4, D2).
+      className="dshx-root dshx:@container dshx:gap-3 dshx:[&>div:first-child]:sr-only"
       description={`Choose which models from ${KIND_LABEL[account.kind]} are available for this account.`}
       heading="Models"
     >

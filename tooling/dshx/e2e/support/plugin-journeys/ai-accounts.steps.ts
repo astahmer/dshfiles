@@ -169,7 +169,7 @@ const addCommandCodeAccount = async (page: Page, input: { readonly name: string;
   await keyDialog.getByRole('button', { name: 'Verify and add account', exact: true }).click()
   await expect(keyDialog).toBeHidden()
   await expect(selectedAccount(page).getByRole('heading', { name: input.name, exact: true })).toBeVisible()
-  await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
+  await expect(selectedAccount(page).getByRole('switch', { name: 'In model picker', exact: true })).toBeChecked()
   if (input.routeSlug === undefined) return
   // Only rename a successfully connected saved route. Keep its verified unique credential reference unchanged.
   await openAccountAdvanced(page)
@@ -388,9 +388,9 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
     await selectedAccount(page).getByRole('tab', { name: 'Settings', exact: true }).click()
     const routing = selectedAccount(page).getByRole('switch', { name: 'Enable for model routing', exact: true })
     await routing.click()
-    await expect(selectedAccount(page).getByRole('switch', { name: 'Hidden from model picker', exact: true })).not.toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'In model picker', exact: true })).not.toBeChecked()
     await routing.click()
-    await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'In model picker', exact: true })).toBeChecked()
     await expect
       .poll(async () => (await readSavedAccounts(page)).find(account => account.instanceId === 'commandcode_work'))
       .toMatchObject({ enabled: true, favoriteModelIds: [], hiddenModelIds: [] })
@@ -410,14 +410,18 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
     }
     page.on('request', recordSignOut)
     try {
-      await selectedAccount(page).getByRole('button', { name: 'Sign out', exact: true }).click()
+      // Sign out lives in the account actions menu (council round 4, D2).
+      await selectedAccount(page).getByRole('button', { name: 'Account actions', exact: true }).click()
+      await page.getByRole('menuitem', { name: 'Sign out…', exact: true }).click()
       const confirmation = page.getByRole('alertdialog')
       await expect(confirmation.getByRole('heading', { name: 'Sign out of Command Code Work?', exact: true })).toBeVisible()
       await confirmation.getByRole('button', { name: 'Cancel', exact: true }).click()
       await expect(confirmation).toBeHidden()
       expect(await readSavedAccounts(page)).toEqual(before)
       expect(signOutCalls).toHaveLength(0)
-      await expect(selectedAccount(page).getByRole('button', { name: 'Sign out', exact: true })).toBeEnabled()
+      await selectedAccount(page).getByRole('button', { name: 'Account actions', exact: true }).click()
+      await expect(page.getByRole('menuitem', { name: 'Sign out…', exact: true })).toBeEnabled()
+      await page.keyboard.press('Escape')
     } finally {
       page.off('request', recordSignOut)
     }
@@ -976,7 +980,7 @@ When('a Command Code account backed by a local fake provider is added', async ({
   const saved = await readSavedAccounts(page)
   expect(saved).toHaveLength(1)
   expect(saved[0]).toMatchObject({ enabled: true, kind: 'commandcode', instanceId: 'commandcode_work' })
-  await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
+  await expect(selectedAccount(page).getByRole('switch', { name: 'In model picker', exact: true })).toBeChecked()
 })
 
 Then('existing reference and CLI methods verify against only the loopback provider', async ({ page }: { page: Page }) => {
@@ -1076,7 +1080,7 @@ Then('failed verification reports a retry error without adding the account', asy
     await expect(page.getByRole('button', { name: /^Command Code 2: Weekly limit/ })).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(savedAccountCards(page)).toHaveCount(1)
-    await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'In model picker', exact: true })).toBeChecked()
     const before = await readSavedAccounts(page)
     await selectedAccount(page).getByRole('tab', { name: 'Settings', exact: true }).click()
     await selectedAccount(page).getByRole('button', { name: 'Reauthenticate', exact: true }).click()

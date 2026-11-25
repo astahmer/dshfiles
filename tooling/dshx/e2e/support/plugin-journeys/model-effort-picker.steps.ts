@@ -313,7 +313,7 @@ When('two Command Code accounts offer the same model in a new thread', async ({ 
     await expect(connection).toBeHidden()
     await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
     const detail = page.getByRole('region', { name: 'Selected account', exact: true })
-    await expect(detail.getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
+    await expect(detail.getByRole('switch', { name: 'In model picker', exact: true })).toBeChecked()
   }
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   const picker = page.getByRole('button', { name: /, reasoning / })

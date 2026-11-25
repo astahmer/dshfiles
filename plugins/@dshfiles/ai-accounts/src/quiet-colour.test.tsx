@@ -107,20 +107,19 @@ describe('a healthy accounts page is quiet', () => {
 
 describe('account state line', () => {
   const time = (at: number): string => `at ${at}`
-  it('names a connected account and when it was checked, beside a green dot', () => {
-    expect(AccountConnection.stateLine(AccountConnection.status(account(), usage), time)).toEqual({
-      text: `Connected · checked at ${usage.readAt}`,
-      health: 'ok',
-    })
+  // Council round 4, D2: the header keeps the dot and its word; when it was checked moves to the detail line.
+  it('names a connected account beside a green dot, and its last check separately', () => {
+    const status = AccountConnection.status(account(), usage)
+    expect(AccountConnection.stateLine(status)).toEqual({ text: 'Connected', health: 'ok' })
+    expect(AccountConnection.checkedLabel(status, time)).toBe(`Checked at ${usage.readAt}`)
   })
   it('names a blocking state with its health', () => {
-    expect(AccountConnection.stateLine(AccountConnection.status(account({ state: 'cooling' }), usage), time)).toEqual({
-      text: `Rate limited · checked at ${usage.readAt}`,
-      health: 'limited',
-    })
+    expect(AccountConnection.stateLine(AccountConnection.status(account({ state: 'cooling' }), usage))).toEqual({ text: 'Rate limited', health: 'limited' })
   })
   it('falls back to the plain state when the provider was never asked', () => {
-    expect(AccountConnection.stateLine(AccountConnection.status(account({ signedIn: false }), null), time)).toEqual({ text: 'Not signed in', health: 'off' })
+    const status = AccountConnection.status(account({ signedIn: false }), null)
+    expect(AccountConnection.stateLine(status)).toEqual({ text: 'Not signed in', health: 'off' })
+    expect(AccountConnection.checkedLabel(status, time)).toBeNull()
   })
   it('draws the header state as one health dot and muted text while healthy', () => {
     const header = renderToStaticMarkup(<DetailHeader mark={null} state={{ text: 'Connected · checked 08:30', health: 'ok' }} title={<h2>Work</h2>} />)
