@@ -262,11 +262,11 @@ describe('DestinationShell', () => {
     expect(head?.className).toContain('dshx:text-muted-foreground')
     expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-4')
     expect(head?.className).toContain('dshx:pb-1')
-    // Council round 6 B9: beside the Settings page the rail and the page's h1 name the destination, so the column draws
-    // no second "Settings" on the h1's line (it stays for assistive tech).
+    // Council round 7 B2: the column keeps its "Settings" head on every Settings page (the page's h1 names the category),
+    // so the list never jumps 36px between General and another Settings page.
     const columnTitle = screen.getByRole('heading', { level: 2, name: 'Settings' })
-    expect(columnTitle.className).toContain('dshx:sr-only')
-    expect(columnTitle.closest('header')?.className).toContain('dshx:sr-only')
+    expect(columnTitle.className).not.toContain('dshx:sr-only')
+    expect(columnTitle.closest('header')?.className).not.toContain('dshx:sr-only')
     // The column sits on the nav surface (kit A4).
     expect(screen.getByRole('tabpanel', { name: 'Settings' }).className).toContain('dshx:surface-nav')
     // The page's current category is the column's current row.
