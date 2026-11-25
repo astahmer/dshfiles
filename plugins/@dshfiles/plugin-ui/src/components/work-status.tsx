@@ -96,14 +96,14 @@ const GlyphMark = ({ status }: { readonly status: StatusGlyphState }): React.JSX
       return <Spinner />
     case 'needs-you':
       return (
-        <svg aria-hidden viewBox="0 0 16 16" className="dshx:size-3">
+        <svg aria-hidden viewBox="0 0 16 16" className="dshx:size-3.5">
           <path d="M8 1.5 14.5 8 8 14.5 1.5 8Z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
       )
     case 'failed':
       return <XIcon aria-hidden className="dshx:size-3.5" strokeWidth={3} />
     case 'ready':
-      return <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:bg-current" />
+      return <span aria-hidden className="dshx:size-2.5 dshx:rounded-full dshx:bg-current" />
     case 'idle':
       return <span aria-hidden className="dshx:size-2 dshx:rounded-full dshx:border dshx:border-current" />
     case 'done':
@@ -132,7 +132,8 @@ function useChangedWhileMounted(status: StatusGlyphState): boolean {
 }
 
 /**
- * The status mark of a work item, in a fixed 16 px box so rows align whatever the state (StatusGlyph v2): working is
+ * The status mark of a work item, in a fixed 16 px box so rows align whatever the state (StatusGlyph v2). The marks that
+ * carry a state you act on read at 14 px (needs-you, failed, working) and the ready dot at 10 px (round five K6): working is
  * an ink phase-synced spinner, needs-you the indigo diamond, failed the red cross, ready a green dot, idle a faint
  * ring, done a muted check, stale a dashed ring, stopped a muted square. A mark that changes while on screen
  * cross-fades in 120ms.
