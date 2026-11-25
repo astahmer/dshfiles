@@ -17,7 +17,7 @@
       "failureModes": [
         "A manager page that is not loaded keeps its card with a disabled Open button and names the package to add to the profile.",
         "An owner API that is absent shows which plugin the count needs instead of a number.",
-        "skills.sh search needs a Vercel OIDC login DSH cannot hold, so the hub links to the site instead of searching in place."
+        "Searching skills.sh needs a sign-in DSH cannot keep safely, so the hub links to the site instead of searching in place."
       ],
       "externalDependencies": [
         {

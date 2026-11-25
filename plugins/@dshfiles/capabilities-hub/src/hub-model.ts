@@ -57,7 +57,7 @@ const SECTIONS: readonly HubSection[] = [
     trust: 'agent-instructions',
     trustLabel: 'Agent instructions',
     trustDetail: 'A skill is text an agent follows. Read a skill from an unknown source before adding it; it can steer what the agent does.',
-    manager: { panelId: 'dshfiles-agent-toolkit', label: 'Agent toolkit', owner: '@dshfiles/agent-toolkit' },
+    manager: { panelId: 'dshfiles-agent-toolkit', label: 'Capabilities', owner: '@dshfiles/agent-toolkit' },
     agentTools: ['skill'],
   },
   {
@@ -76,7 +76,7 @@ const SECTIONS: readonly HubSection[] = [
     summary: 'Installed plugins and the marketplace that adds more.',
     trust: 'executable-code',
     trustLabel: 'Executable code',
-    trustDetail: 'A DSH plugin runs code in the Host and in this browser. Install only plugins you trust; the Plugins page owns installs and updates.',
+    trustDetail: 'A DSH plugin runs code on the computer that runs DSH and in this browser. Install only plugins you trust; the Plugins page owns installs and updates.',
     manager: { panelId: 'plugins', label: 'Plugins', owner: 'DSH core (marketplace tab from dshmarket)' },
     agentTools: [],
   },
@@ -90,7 +90,7 @@ const SKILLS_SH: SkillsShGuidance = {
   telemetryDisabled: true,
   inAppSearch: 'unavailable',
   inAppSearchReason:
-    'skills.sh search needs a Vercel OIDC login that DSH cannot hold safely yet, so search runs on skills.sh. Copy the command, check the repository, then run it in a terminal yourself.',
+    'Searching skills.sh needs a sign-in that DSH cannot keep safely yet, so search on skills.sh itself. Copy the command, check the repository, then run it in a terminal yourself.',
 }
 
 /** Where a registry skill comes from, grouped the way the hub counts them. */

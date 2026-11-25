@@ -70,7 +70,7 @@ describe('CapabilitiesHubPanel', () => {
 
     fireEvent.click(within(mcp).getByRole('button', { name: 'Open MCP servers' }))
     fireEvent.click(within(plugins).getByRole('button', { name: 'Open Plugins' }))
-    fireEvent.click(within(skills).getByRole('button', { name: 'Open Agent toolkit' }))
+    fireEvent.click(within(skills).getByRole('button', { name: 'Open Capabilities' }))
     expect(openPanel.mock.calls).toEqual([['mcp-servers'], ['plugins'], ['dshfiles-agent-toolkit']])
   })
 
@@ -89,7 +89,7 @@ describe('CapabilitiesHubPanel', () => {
       expect(chip?.getAttribute('data-variant')).toBe('muted')
     }
     // The warning sentence stays as text beside the chip.
-    expect(screen.getByText(/A DSH plugin runs code in the Host and in this browser/u)).toBeTruthy()
+    expect(screen.getByText(/A DSH plugin runs code on the computer that runs DSH and in this browser/u)).toBeTruthy()
     const skillsSh = document.querySelector('[data-skills-sh]')
     expect(skillsSh?.className).not.toMatch(/bg-muted|rounded-md|dshx:border\b/u)
   })
@@ -107,7 +107,7 @@ describe('CapabilitiesHubPanel', () => {
   it('keeps a missing manager visible with the fix instead of a dead button', () => {
     renderPanel(panelId => panelId !== 'dshfiles-agent-toolkit')
     const skills = screen.getByRole('region', { name: 'Skills' })
-    expect(within(skills).getByRole('button', { name: 'Open Agent toolkit' }).hasAttribute('disabled')).toBe(true)
+    expect(within(skills).getByRole('button', { name: 'Open Capabilities' }).hasAttribute('disabled')).toBe(true)
     expect(within(skills).getByText(/Add @dshfiles\/agent-toolkit to the profile and restart DSH/u)).toBeTruthy()
   })
 })
