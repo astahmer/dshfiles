@@ -3,13 +3,14 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
+import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
-import { ArrowLeftIcon, CopyIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, ChevronRightIcon, CopyIcon, RefreshCwIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { type JSX, memo, useCallback, useMemo, useState } from 'react'
@@ -432,18 +433,26 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
   }
 
   return (
-    <div className="dshx-root dshx:@container dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-4 dshx:overflow-hidden dshx:p-5 dshx:@max-pane-narrow:p-3">
-      <PageHeader heading={t('title')} description={t('subtitle')}>
-        {list.data === undefined ? null : <Badge variant="outline">{t('sessionsCount', { count: list.data.total })}</Badge>}
-        <Button variant="outline" size="sm" className="dshx:shrink" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-          {refresh.isPending ? <Spinner aria-hidden /> : <RefreshCwIcon aria-hidden />} <span className="dshx:@max-pane-narrow:sr-only">{t('refresh')}</span>
-        </Button>
-      </PageHeader>
-
+    // The kit Page: one h1 the phone top bar replaces, its count as plain text (never a zero), Refresh on the h1's line.
+    <Page
+      fill
+      className="dshx:overflow-hidden"
+      heading={t('title')}
+      description={t('subtitle')}
+      {...(list.data === undefined || list.data.total === 0 ? {} : { count: t('sessionsCount', { count: list.data.total }) })}
+      actions={[{ id: 'refresh', label: t('refresh'), icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() }]}
+    >
       {noSources ? (
-        <Alert>
-          <AlertDescription>{t('noSources')}</AlertDescription>
-        </Alert>
+        <div className="dshx:flex dshx:flex-col dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border">
+          <EmptyState action={{ label: t('refresh'), icon: <RefreshCwIcon aria-hidden />, onSelect: () => refresh.mutate() }}>{t('noSources')}</EmptyState>
+          <Collapsible className="dshx:w-full dshx:max-w-prose dshx:px-4 dshx:pb-4">
+            <CollapsibleTrigger className="dshx:group dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground">
+              <ChevronRightIcon aria-hidden className="dshx:size-3.5 dshx:transition-transform dshx:group-data-[state=open]:rotate-90" />
+              {t('whereWeLook')}
+            </CollapsibleTrigger>
+            <CollapsibleContent className="dshx:pt-2 dshx:text-xs dshx:text-muted-foreground">{t('whereWeLookDetail')}</CollapsibleContent>
+          </Collapsible>
+        </div>
       ) : null}
       {indexing !== undefined && !indexing.caughtUp ? (
         <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
@@ -478,6 +487,8 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
         </div>
       )}
 
+      {/* Filters over an empty list filter nothing: with no agent logs the page is its empty state alone. */}
+      {noSources ? null : (
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-compact:flex-col dshx:@max-pane-compact:items-stretch">
         <ToggleGroup
           aria-label={t('agentFilter')}
@@ -521,7 +532,9 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
           </Button>
         </form>
       </div>
+      )}
 
+      {noSources ? null : (
       <div className="dshx:grid dshx:min-h-0 dshx:flex-1 dshx:grid-cols-[minmax(18rem,2fr)_3fr] dshx:gap-4 dshx:@max-pane-compact:grid-cols-1">
         <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-col', selected !== null && 'dshx:@max-pane-compact:hidden')}>{listBody()}</div>
         {selected === null ? (
@@ -537,6 +550,7 @@ export const AgentSessionsPanel = (props: { readonly t: AgentsviewTranslate }): 
           />
         )}
       </div>
-    </div>
+      )}
+    </Page>
   )
 }

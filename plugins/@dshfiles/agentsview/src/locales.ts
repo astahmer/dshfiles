@@ -22,8 +22,10 @@ const en = {
   clearSearch: 'Back to the list',
   indexing: 'Indexing agent logs: {indexed} of {total} files',
   indexError: 'The last indexing pass failed: {error}. Press Refresh to try again.',
-  noSources:
-    'No agent CLI logs were found. Claude Code writes under ~/.claude/projects and Codex under ~/.codex (or $CLAUDE_CONFIG_DIR / $CODEX_HOME); run either CLI once, then press Refresh.',
+  noSources: 'No Claude Code or Codex threads on this machine yet.',
+  whereWeLook: 'Where we look',
+  whereWeLookDetail:
+    'Claude Code writes under ~/.claude/projects and Codex under ~/.codex (or $CLAUDE_CONFIG_DIR / $CODEX_HOME). Run either CLI once, then Refresh.',
   sourceMissing: 'not found',
   noSessions: 'No thread matches this filter.',
   sessionsCount: '{count} threads',
