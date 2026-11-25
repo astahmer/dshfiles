@@ -43,7 +43,10 @@ cards, ProjectMark on composer chips). P pages done (11 revisions `lzrzzppx` …
 a value label, teal-first series, one segmented style, 20 px lead numbers; Inbox cards with a status-tinted band, one
 attention verb each and utilities in ⋯, phone answers as 44 px rows; phone status pill clears the home indicator; Settings
 selected wash and a checked Appearance card; AI accounts rail as a selector with picker checkboxes; Backlog titles in ink
-and tinted tags; calm dark diff tints). T thread list, tabs and palette running. Follow-up: chat's "When to Collapse
+and tinted tags; calm dark diff tints). T thread list, tabs and palette done (5 revisions `xpkytmyw` … `nrpzywvt`: title and time on line 1, the verb on line 2 as
+an attention or danger-tint button, ProjectMark tiles, persistent Needs-you and Failed washes, tinted group count chips,
+selected wash on the open thread and the active rail item, one Settings navigation, inactive tabs on the panel step with
+the project tile, palette status hues kept and one prefix hint). Follow-up: chat's "When to Collapse
 Work Details" in sentence case.
 
 ## Round four
