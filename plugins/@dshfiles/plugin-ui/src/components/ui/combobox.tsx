@@ -21,7 +21,7 @@ export interface ComboboxOption {
 }
 
 const triggerClass =
-  'dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-left dshx:text-sm dshx:text-foreground dshx:outline-none dshx:transition-[color,box-shadow] dshx:focus-visible:border-ring dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50'
+  'dshx:flex dshx:h-(--dshx-control-h) dshx:w-full dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-left dshx:text-sm dshx:text-foreground dshx:outline-none dshx:transition-[color,box-shadow] dshx:focus-visible:border-ring dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50'
 
 const groupOf = (options: readonly ComboboxOption[]): readonly { readonly name: string | undefined; readonly options: readonly ComboboxOption[] }[] =>
   options.reduce<{ readonly name: string | undefined; readonly options: ComboboxOption[] }[]>((groups, option) => {

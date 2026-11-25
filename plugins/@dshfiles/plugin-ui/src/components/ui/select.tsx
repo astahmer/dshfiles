@@ -19,12 +19,13 @@ function SelectValue({ ...props }: React.ComponentProps<typeof SelectPrimitive.V
 }
 
 /**
- * The select trigger's look (council round 3 A4): the field look at 32px (28px at `size="sm"` for a dense toolbar),
+ * The select trigger's look (council round 3 A4): the field look at the one control height (`--dshx-control-h`, 32px;
+ * 44px on a coarse pointer; 28px at `size="sm"` for a dense toolbar),
  * the value in ink, the chevron in secondary ink at full strength. Exported for a trigger the kit does not render.
  */
 const selectLook = cn(
   fieldLook,
-  'dshx:flex dshx:w-fit dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-2.5 dshx:py-1.5 dshx:text-sm dshx:whitespace-nowrap dshx:transition-[color,box-shadow] dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:data-[placeholder]:text-muted-foreground dshx:data-[size=default]:h-8 dshx:data-[size=sm]:h-7 dshx:*:data-[slot=select-value]:line-clamp-1 dshx:*:data-[slot=select-value]:flex dshx:*:data-[slot=select-value]:items-center dshx:*:data-[slot=select-value]:gap-2 dshx:dark:aria-invalid:ring-destructive/40 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4 dshx:[&_svg:not([class*=text-])]:text-muted-foreground',
+  'dshx:flex dshx:w-fit dshx:items-center dshx:justify-between dshx:gap-2 dshx:px-2.5 dshx:py-1.5 dshx:text-sm dshx:whitespace-nowrap dshx:transition-[color,box-shadow] dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:data-[placeholder]:text-muted-foreground dshx:data-[size=default]:h-(--dshx-control-h) dshx:data-[size=sm]:h-7 dshx:*:data-[slot=select-value]:line-clamp-1 dshx:*:data-[slot=select-value]:flex dshx:*:data-[slot=select-value]:items-center dshx:*:data-[slot=select-value]:gap-2 dshx:dark:aria-invalid:ring-destructive/40 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4 dshx:[&_svg:not([class*=text-])]:text-muted-foreground',
 )
 
 function SelectTrigger({

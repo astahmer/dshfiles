@@ -16,7 +16,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
       className={cn(
         fieldLook,
         'dshx:group/input-group dshx:relative dshx:flex dshx:w-full dshx:items-center dshx:transition-[color,box-shadow] dshx:outline-none',
-        'dshx:h-8 dshx:min-w-0 dshx:has-[>textarea]:h-auto',
+        'dshx:h-(--dshx-control-h) dshx:min-w-0 dshx:has-[>textarea]:h-auto',
 
         // Variants based on alignment.
         'dshx:has-[>[data-align=inline-start]]:[&>input]:pl-2',

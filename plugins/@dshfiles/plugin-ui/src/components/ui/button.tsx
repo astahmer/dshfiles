@@ -7,9 +7,12 @@ import { Slot } from 'radix-ui'
  * Press feedback (DESIGN.md › Motion: controls answer a press within 80ms): every variant washes darker on `:active`,
  * and under a coarse pointer, where there is no hover to show the target first, the button also gives a 3% press.
  * Only colour, shadow and that scale transition, so nothing moves the layout.
+ *
+ * One control height and one radius (council round 5 A1): the default size is `--dshx-control-h` (32px, 44px on a
+ * coarse pointer), the height of every field and the segmented root, and every size shares the fields' 8px radius.
  */
 const buttonVariants = cva(
-  'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:gap-2 dshx:rounded-md dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:transition-[color,background-color,border-color,box-shadow,scale] dshx:duration-(--dshx-duration-hover) dshx:pointer-coarse:motion-safe:active:scale-[0.97] dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:pointer-events-none dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:aria-invalid:ring-destructive/40 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4',
+  'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:gap-2 dshx:rounded-lg dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:transition-[color,background-color,border-color,box-shadow,scale] dshx:duration-(--dshx-duration-hover) dshx:pointer-coarse:motion-safe:active:scale-[0.97] dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:pointer-events-none dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:aria-invalid:ring-destructive/40 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4',
   {
     variants: {
       variant: {
@@ -32,12 +35,12 @@ const buttonVariants = cva(
         'danger-tint': 'dshx:bg-status-failed/12 dshx:text-danger-tint-foreground dshx:hover:bg-status-failed/18 dshx:active:bg-status-failed/24',
       },
       size: {
-        default: 'dshx:h-8 dshx:px-3 dshx:py-1.5 dshx:has-[>svg]:px-2.5',
-        xs: 'dshx:h-6 dshx:gap-1 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:has-[>svg]:px-1.5 dshx:[&_svg:not([class*=size-])]:size-3',
-        sm: 'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:px-2.5 dshx:text-xs dshx:has-[>svg]:px-2 dshx:[&_svg:not([class*=size-])]:size-3.5',
-        lg: 'dshx:h-9 dshx:rounded-md dshx:px-5 dshx:has-[>svg]:px-4',
+        default: 'dshx:h-(--dshx-control-h) dshx:px-3 dshx:py-1.5 dshx:has-[>svg]:px-2.5',
+        xs: 'dshx:h-6 dshx:gap-1 dshx:px-2 dshx:text-xs dshx:has-[>svg]:px-1.5 dshx:[&_svg:not([class*=size-])]:size-3',
+        sm: 'dshx:h-7 dshx:gap-1.5 dshx:px-2.5 dshx:text-xs dshx:has-[>svg]:px-2 dshx:[&_svg:not([class*=size-])]:size-3.5',
+        lg: 'dshx:h-9 dshx:px-5 dshx:has-[>svg]:px-4',
         icon: 'dshx:size-8',
-        'icon-xs': 'dshx:size-6 dshx:rounded-md dshx:[&_svg:not([class*=size-])]:size-3',
+        'icon-xs': 'dshx:size-6 dshx:[&_svg:not([class*=size-])]:size-3',
         'icon-sm': 'dshx:size-7',
         'icon-lg': 'dshx:size-9',
       },

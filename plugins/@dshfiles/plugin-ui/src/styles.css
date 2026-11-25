@@ -114,6 +114,8 @@
   --spacing-row: var(--dshx-size-row);
   --spacing-bar: var(--dshx-size-bar);
   --spacing-touch: var(--dshx-size-touch);
+  /* The one control height (council round 5 A1): `dshx:h-control-h`, 32px, 44px on a coarse pointer. */
+  --spacing-control-h: var(--dshx-control-h);
 
   /* Elevation: s0 resting (none) · s1 composer and sticky · s2 menus and popovers · s3 modals and sheets. */
   --shadow-s0: none;
@@ -212,6 +214,11 @@
     --dshx-size-row: 32px;
     --dshx-size-bar: 36px;
     --dshx-size-touch: 44px;
+    /*
+     * The one control height (council round 5 A1): Input, InputGroup, Combobox, the default Select trigger, the segmented
+     * root and default-size Buttons, all at the 8px radius. 44px on a coarse pointer (below).
+     */
+    --dshx-control-h: 32px;
 
     /* Elevation, light: soft ambient shadows; only s2/s3 layers may add a backdrop blur. */
     --dshx-elevation-1: 0 1px 2px oklch(0.2 0.01 65 / 0.05), 0 4px 12px -6px oklch(0.2 0.01 65 / 0.1);
@@ -323,6 +330,7 @@
     :root {
       --dshx-density-text-input: 16px;
       --dshx-density-target: 44px;
+      --dshx-control-h: 44px;
     }
   }
 

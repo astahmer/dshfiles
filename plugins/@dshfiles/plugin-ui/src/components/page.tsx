@@ -123,10 +123,10 @@ const useCompact = (ref: React.RefObject<HTMLElement | null>): boolean => {
 const ActionIcon = ({ action }: { readonly action: PageAction }): React.ReactNode =>
   action.pending === true ? <Spinner aria-hidden className="dshx:size-3.5" /> : (action.icon ?? null)
 
+// Header actions take the one control height (council round 5 A1), so they line up with the page's fields and tabs.
 const ActionButton = ({ action, primary }: { readonly action: PageAction; readonly primary: boolean }): React.JSX.Element => (
   <Button
     type="button"
-    size="sm"
     variant={action.destructive === true ? 'destructive' : primary ? 'default' : 'outline'}
     disabled={action.disabled === true || action.pending === true}
     onClick={action.onSelect}
@@ -141,7 +141,7 @@ const ActionButton = ({ action, primary }: { readonly action: PageAction; readon
 const PrimaryMenu = ({ action, items }: { readonly action: PageAction; readonly items: readonly PageAction[] }): React.JSX.Element => (
   <DropdownMenu>
     <DropdownMenuTrigger asChild>
-      <Button type="button" size="sm" disabled={action.disabled === true || action.pending === true} data-page-action={action.id}>
+      <Button type="button" disabled={action.disabled === true || action.pending === true} data-page-action={action.id}>
         <ActionIcon action={action} />
         {action.label}
         <ChevronDownIcon aria-hidden className="dshx:-mr-0.5 dshx:opacity-70" />
@@ -224,7 +224,7 @@ const PageHeaderRow = (props: {
           {overflow.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" size="icon-sm" variant="ghost" aria-label={props.overflowLabel ?? 'More actions'}>
+                <Button type="button" size="icon" variant="ghost" aria-label={props.overflowLabel ?? 'More actions'}>
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>

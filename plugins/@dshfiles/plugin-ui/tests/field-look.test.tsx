@@ -22,7 +22,7 @@ describe('one field look (council round 3 A4)', () => {
     expect(fieldLook.split(' ')).toEqual(['dshx:rounded-lg', 'dshx:border', 'dshx:border-input', 'dshx:bg-background'])
   })
 
-  it('draws the select trigger at 32px in that look, with a full-strength chevron', () => {
+  it('draws the select trigger at the one control height (32px) in that look, with a full-strength chevron', () => {
     const view = render(
       <Select>
         <SelectTrigger aria-label="Theme">
@@ -31,7 +31,7 @@ describe('one field look (council round 3 A4)', () => {
       </Select>,
     )
     const trigger = view.container.querySelector('[data-slot="select-trigger"]')!
-    expect(classes(trigger)).toEqual(expect.arrayContaining([...fieldLook.split(' '), 'dshx:data-[size=default]:h-8']))
+    expect(classes(trigger)).toEqual(expect.arrayContaining([...fieldLook.split(' '), 'dshx:data-[size=default]:h-(--dshx-control-h)']))
     expect(trigger.className).not.toMatch(/dark:bg-input|dark:hover:bg-input|shadow-xs|bg-transparent|rounded-md/u)
     expect(selectLook).toContain(fieldLook)
     // The chevron is the control's glyph: muted ink at full strength (3:1), not 50% opacity.
@@ -58,7 +58,7 @@ describe('one field look (council round 3 A4)', () => {
     expect(styles).toContain("@import './field-look.css';")
     const rule = /@utility select-look \{([^}]*)\}/u.exec(looks)?.[1] ?? ''
     for (const declaration of [
-      'height: 32px;',
+      'height: var(--dshx-control-h, 32px);',
       'border: 1px solid var(--dsw-alias-border-l3);',
       'border-radius: var(--dsw-radius-md, 8px);',
       'background-color: var(--dsw-alias-bg-base);',
