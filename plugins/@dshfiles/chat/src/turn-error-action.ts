@@ -14,6 +14,37 @@ export interface TurnErrorActionOwnerProps {
   readonly message: string
 }
 
+/** Codes a provider or the Host sets when no usable key or sign-in reached the model. */
+const CREDENTIAL_CODES: ReadonlySet<string> = new Set(['AUTH', 'MISSING_CREDENTIAL', 'INVALID_CREDENTIAL'])
+/** Core's own wording for a route with no key, e.g. `llm-deepseek: no API key for provider route "…"`. */
+const NO_KEY_TEXT = /\bno API key\b|\bmissing (?:an? )?API key\b/i
+const STATUS_PREFIX = /^\s*(\d{3})\s*:/
+
+/**
+ * One reading of a terminal failure for every action in the seat, so the card, "Ask to fix" and the account action
+ * agree on what can change the outcome.
+ */
+export const TurnFailure = {
+  /** The HTTP status a provider failure starts with (`401: {…}`), when it carries one. */
+  status(message: string): number | undefined {
+    const status = STATUS_PREFIX.exec(message)?.[1]
+    return status === undefined ? undefined : Number(status)
+  },
+
+  /** No account or key can run the model: retrying or asking the same model cannot succeed. */
+  isCredential(failure: Pick<TurnErrorActionOwnerProps, 'code' | 'message'>): boolean {
+    const status = TurnFailure.status(failure.message)
+    return CREDENTIAL_CODES.has(failure.code.trim()) || status === 401 || status === 403 || NO_KEY_TEXT.test(failure.message)
+  },
+
+  /** Whether Retry is the primary: a client error other than a timeout (408) or a rate limit (429) fails again. */
+  retryLeads(failure: Pick<TurnErrorActionOwnerProps, 'code' | 'message'>): boolean {
+    if (TurnFailure.isCredential(failure)) return false
+    const status = TurnFailure.status(failure.message)
+    return status === undefined || status < 400 || status >= 500 || status === 408 || status === 429
+  },
+}
+
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     /**

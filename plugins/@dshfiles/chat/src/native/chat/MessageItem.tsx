@@ -17,6 +17,7 @@ import css from './MessageItem.module.css'
 import { formatMessageClock } from './message-chrome.ts'
 import { needsTimeDivider, previousTurnTime } from './time-divider.ts'
 import { ResumeInterrupted } from '../../resume-interrupted.tsx'
+import { TurnFailure } from '../../turn-error-action.ts'
 
 const EMPTY_TEXT_FACTS: Readonly<Partial<UserTextFacts>> = {}
 
@@ -58,8 +59,8 @@ function codedFailureMessage(code: unknown, t: ChatViewSlotProps['t']): string |
   if (code === 'ACCOUNT_SIGNED_OUT') return t('message.failure.accountSignedOut')
   if (code === 'INTERRUPTED') return t('message.failure.interrupted')
   if (code === 'ACCOUNT_SIGN_IN_REQUIRED') return t('message.failure.accountSignInRequired')
-  if (code === 'QUOTA' || code === 'ACCOUNT_QUOTA') return t('message.failure.quota')
-  return code === 'AUTH' ? t('message.failure.auth') : undefined
+  // dshfiles (round four D5): `AUTH` is a credential failure, worded by `failureSentence` with the account as the way out.
+  return code === 'QUOTA' || code === 'ACCOUNT_QUOTA' ? t('message.failure.quota') : undefined
 }
 
 /** dshfiles (unslop T8, T9): one plain sentence instead of the provider's raw payload or a library string. */
@@ -73,6 +74,7 @@ function failureMessage(
   const sentence = failureSentence(message, typeof code === 'string' ? code : undefined)
   if (sentence.kind === 'stalled') return t('message.failure.stalled', { minutes: sentence.minutes })
   if (sentence.kind === 'tooLong') return t('message.failure.tooLong')
+  if (sentence.kind === 'credential') return t('message.failure.credential')
   return sentence.kind === 'provider' ? sentence.text : t('message.failure.unknown')
 }
 
@@ -439,20 +441,26 @@ export const RetryNodeView = memo(function RetryNodeView({ node, t }: ChatNodeVi
 const useResumeAction = (props: {
   readonly turn: number
   readonly seq: number
+  /** dshfiles (round four): an outline Retry when retrying is unlikely to help (a client error). */
+  readonly secondary?: boolean
 } & Pick<ChatNodeViewProps, 'useChat' | 'useSession' | 'useAccess'>): ReactNode => {
   const latest = props.useChat(snapshot => snapshot.timeline.turnOrder.at(-1) === props.turn)
   const sessionId = props.useSession(snapshot => snapshot.sessionId)
   const running = props.useSession(snapshot => snapshot.running)
   const allowed = props.useAccess('session/prompt')
-  return latest && !running && allowed ? <ResumeInterrupted sessionId={sessionId} seq={props.seq} /> : undefined
+  return latest && !running && allowed ? <ResumeInterrupted sessionId={sessionId} seq={props.seq} secondary={props.secondary === true} /> : undefined
 }
 
 /** Terminal turn-error keyed Chat renderer. */
 export const TurnErrorNodeView = memo(function TurnErrorNodeView({
   node, t, useChat, useSession, useAccess, renderSlot,
 }: ChatNodeViewProps<'turn-error'> & PropsRenderSlots<'conversation.chat.turnErrorAction'>) {
-  const resume = useResumeAction({ turn: node.data.turn, seq: node.data.seq, useChat, useSession, useAccess })
-  const action = node.data.code === 'ACCOUNT_SIGNED_OUT' ? undefined : resume
+  const failure = { code: node.data.code ?? '', message: node.data.message }
+  const resume = useResumeAction({
+    turn: node.data.turn, seq: node.data.seq, useChat, useSession, useAccess, secondary: !TurnFailure.retryLeads(failure),
+  })
+  // dshfiles (round four D5): a credential failure fails again on Retry; the account action in the seat leads.
+  const action = node.data.code === 'ACCOUNT_SIGNED_OUT' || TurnFailure.isCredential(failure) ? undefined : resume
   const extraActions = renderSlot('conversation.chat.turnErrorAction', { seq: node.data.seq, code: node.data.code ?? '', message: node.data.message })
   return <TurnErrorItem node={node.data} t={t} action={action} extraActions={extraActions} />
 })

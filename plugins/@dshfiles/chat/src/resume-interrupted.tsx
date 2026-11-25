@@ -8,6 +8,8 @@ import { isApiOwnerMissing } from '@dshfiles/dshx/api'
 interface ResumeInterruptedProps {
   readonly sessionId: string
   readonly seq: number
+  /** An outline button: retrying a client error (4xx other than 408 or 429) is unlikely to help. */
+  readonly secondary?: boolean
 }
 
 /**
@@ -58,7 +60,7 @@ export const ResumeInterruptedAction = (
     : { idle: 'Resume', pending: 'Resuming…', failed: 'Could not resume. Try again.' }
   return (
     <span className="dshx-root dshx:flex dshx:flex-col dshx:gap-1">
-      <Button size="sm" disabled={resume.isPending} onClick={() => resume.mutate()}>
+      <Button size="sm" variant={props.secondary === true ? 'outline' : 'default'} disabled={resume.isPending} onClick={() => resume.mutate()}>
         {resume.isPending ? label.pending : label.idle}
       </Button>
       {resume.isError && (

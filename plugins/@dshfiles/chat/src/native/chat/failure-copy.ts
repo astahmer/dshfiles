@@ -5,11 +5,14 @@
  * string such as `pi-ai stream idle timeout after 300000ms`. The card shows one plain sentence and keeps the original
  * and the failure code under "Details".
  */
+import { TurnFailure } from '../../turn-error-action.ts'
 
 /** What the card shows: a keyed sentence with its parameters, or the provider's own words. */
 export type FailureSentence =
   | { readonly kind: 'stalled'; readonly minutes: number }
   | { readonly kind: 'tooLong' }
+  /** Round four D5: no account or key can run the model; the card leads with the account, not Retry. */
+  | { readonly kind: 'credential' }
   | { readonly kind: 'provider'; readonly text: string }
   | { readonly kind: 'unknown' }
 
@@ -51,6 +54,7 @@ function asSentence(text: string): string {
 export function failureSentence(message: string, code: string | undefined): FailureSentence {
   const stalled = IDLE_TIMEOUT.exec(message)
   if (stalled !== null) return { kind: 'stalled', minutes: Math.max(1, Math.round(Number(stalled[1]) / 60_000)) }
+  if (TurnFailure.isCredential({ code: code ?? '', message })) return { kind: 'credential' }
   const text = payloadMessage(message) ?? message.trim()
   if (code === 'CONTEXT_WINDOW_EXCEEDED' || CONTEXT_LENGTH.test(text)) return { kind: 'tooLong' }
   if (text === '' || BARE_PAYLOAD.test(text)) return { kind: 'unknown' }

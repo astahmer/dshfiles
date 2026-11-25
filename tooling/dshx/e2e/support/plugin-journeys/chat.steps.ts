@@ -144,9 +144,9 @@ When('the failed turn is retried inline', async ({ page }: { page: Page }) => {
 Then('the request runs again without a continue prompt', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'chat-retried-turn-adds-no-prompt', async () => {
     // The seeded thread has no model of its own, so the rerun request fails again on the default route: that second
-    // failure proves the request ran, and only the newest failed turn keeps the action.
+    // failure proves the request ran. It fails for want of a key, which Retry cannot fix, so no card offers Retry.
     await expect(page.getByText('This turn failed', { exact: true })).toHaveCount(2)
-    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0)
     await expect(page.getByText('Execution requested', { exact: true })).toHaveCount(1)
     await expect(page.getByText('Continue the interrupted task', { exact: false })).toHaveCount(0)
     await expect(page.getByText('Say hello', { exact: true })).toHaveCount(1)
