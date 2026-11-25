@@ -247,16 +247,20 @@ describe('DestinationShell', () => {
     // General's first row names its group; the others keep a heading.
     expect(within(list).getByRole('group', { name: 'General' }).querySelector('h3')).toBeNull()
     expect(within(within(list).getByRole('group', { name: 'Models & accounts' })).getByText('Models & accounts')).toBeTruthy()
-    // Round five B5: every category row has its 16px muted glyph; group heads are 13/600 secondary, 8px under the group above.
-    for (const name of ['General', 'Appearance', 'AI accounts']) {
+    // Round five B5, council round 6 B3: every category row has its 16px glyph in its group's tone; group heads are
+    // 13/600 secondary, 16px under the group above and 4px over their first row.
+    for (const [name, group] of [['General', 'general'], ['Appearance', 'general'], ['AI accounts', 'models']] as const) {
       const glyph = within(list).getByRole('button', { name }).querySelector('[data-section-icon] [data-settings-glyph]')
       expect(glyph?.getAttribute('class'), name).toContain('dshx:size-4')
+      expect(glyph?.getAttribute('class'), name).toContain('dshx:text-(--settings-tone)')
+      expect(glyph?.getAttribute('data-settings-glyph'), name).toBe(group)
     }
     const head = within(list).getByRole('group', { name: 'Models & accounts' }).querySelector('h3')
     expect(head?.className).toContain('dshx:text-sm')
     expect(head?.className).toContain('dshx:font-semibold')
     expect(head?.className).toContain('dshx:text-muted-foreground')
-    expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-2')
+    expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-4')
+    expect(head?.className).toContain('dshx:pb-1')
     // The column sits on the nav surface (kit A4).
     expect(screen.getByRole('tabpanel', { name: 'Settings' }).className).toContain('dshx:surface-nav')
     // The page's current category is the column's current row.
@@ -281,6 +285,8 @@ describe('DestinationShell', () => {
     const navigation = navigationOf({ ...settingsState, open: false, activeId: undefined })
     renderShell({ panels: settingsPanels, contributed, activePanelId: 'ai-accounts', settingsNavigation: navigation })
     expect(screen.getByRole('button', { name: 'AI accounts' }).getAttribute('aria-current')).toBe('page')
+    // Council round 6 B3: the child row starts 12px past its parent's text edge (10px inset + 16px glyph + 8px gap).
+    expect(screen.getByRole('button', { name: 'AI accounts settings' }).className).toContain('dshx:pl-11.5')
     fireEvent.click(screen.getByRole('button', { name: 'AI accounts settings' }))
     expect(navigation.select).toHaveBeenCalledWith('ai-accounts')
   })

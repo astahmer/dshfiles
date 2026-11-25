@@ -495,7 +495,8 @@ const SectionButton = (props: {
         className={cn(
           'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-          props.nested === true && 'dshx:pl-6',
+          // A child row starts 12px past its parent's text edge (council round 6 B3): 10px inset, 16px glyph, 8px gap.
+          props.nested === true && 'dshx:pl-11.5',
           props.count === 0 && 'dshx:opacity-45',
           // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
           SECTION_ROW_BADGE_ROOM,
@@ -599,8 +600,9 @@ const SettingsColumnList = (props: {
           role="group"
           aria-label={group.label}
           data-settings-group={group.id}
-          // Round five B5: group heads 13/600 in the secondary ink, 8px under the group above.
-          className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0"
+          // Group heads 13/600 in the secondary ink (round five B5), 16px under the group above and 4px over their first
+          // row (council round 6 B3).
+          className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0"
         >
           {group.named ? <h3 className={SETTINGS_GROUP_HEAD}>{group.label}</h3> : null}
           {group.rows.map(row => {
@@ -612,8 +614,8 @@ const SettingsColumnList = (props: {
               <Fragment key={row.id}>
                 <SectionButton
                   label={row.label}
-                  // Every category's 16px muted glyph (round five B5), the one its phone tile draws.
-                  icon={<SettingsEntryGlyph className="dshx:text-current" group={group.id} label={row.label} />}
+                  // Every category's 16px glyph in its group's tone (round five B5, council round 6 B3), as its phone tile.
+                  icon={<SettingsEntryGlyph group={group.id} label={row.label} />}
                   selected={here}
                   onSelect={() => open(row)}
                   count={state.searching ? row.count : undefined}
@@ -635,7 +637,7 @@ const SettingsColumnList = (props: {
         </div>
       ))}
       {rest.length === 0 ? null : (
-        <div role="group" aria-label="Pages" data-settings-group="pages" className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-0.5">
+        <div role="group" aria-label="Pages" data-settings-group="pages" className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5">
           <h3 className={SETTINGS_GROUP_HEAD}>Pages</h3>
           {props.rows(rest)}
         </div>
