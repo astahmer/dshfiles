@@ -26,8 +26,8 @@ describe('small transcript fixes (round three C15, C16, C7, F11)', () => {
 
   it('gives "Back to bottom" a 44px target on a touch screen', () => {
     const css = read('../src/native/chat/ChatView.module.css')
-    // Round five C2: the control itself is 44px on a touch screen (it was a 34px face with a 5px invisible margin).
-    const coarse = /@media \(pointer: coarse\) \{\s*\.toBottomSlot \{([^}]*)\}/.exec(css)?.[1] ?? ''
-    expect(coarse).toContain('--dsh-to-bottom-size: 44px;')
+    // Round five C2 (council round 3): a 36px circle with a 44px hit area (4px on each side) on a touch screen.
+    const coarse = /@media \(pointer: coarse\) \{\s*\.toBottom::after \{([^}]*)\}/.exec(css)?.[1] ?? ''
+    expect(coarse).toContain('inset: -4px;')
   })
 })
