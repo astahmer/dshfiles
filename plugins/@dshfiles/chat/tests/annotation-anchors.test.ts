@@ -40,7 +40,7 @@ const column = { left: 100, top: 0, right: 780, bottom: 900 }
 const bound = { top: 40, bottom: 800 }
 
 const anchor = (marker: { left: number; top: number; right: number; bottom: number } = { left: 100, top: 200, right: 700, bottom: 240 }): AnnotationAnchor => ({
-  annotation: { id: 1, text: 'Where do operations stop?', comment: '', source: 'step=s1&block=0' },
+  annotation: { id: 'draft:1', text: 'Where do operations stop?', comment: '', source: 'step=s1&block=0', sent: false },
   block: document.createElement('p'),
   bounds: { left: 100, top: 200, right: marker.right, bottom: marker.bottom },
   text: marker,

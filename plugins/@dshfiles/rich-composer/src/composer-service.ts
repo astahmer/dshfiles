@@ -8,6 +8,19 @@ import { formatFileMention } from '@deepseek-ai/dsh-file-reference/grammar'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { relativizeToCwd, workspaceTitleOf } from '@deepseek-ai/dsh-util-workspace-path'
 import type { ComposerAnnotation, ComposerService, ComposerTarget, Subscribable } from '@dshfiles/dshx/client'
+import type { DraftAnnotation } from './native/input/draft-annotations.ts'
+import type { SentAnnotation } from './native/input/sent-annotations.ts'
+
+const DRAFT_ID_PREFIX = 'draft:'
+const SENT_ID_PREFIX = 'sent:'
+
+/** Split one contract annotation id back into the store that owns it. */
+const annotationOwner = (id: string): { readonly kind: 'draft' | 'sent'; readonly id: number } | undefined => {
+  const draft = id.startsWith(DRAFT_ID_PREFIX)
+  if (!draft && !id.startsWith(SENT_ID_PREFIX)) return undefined
+  const local = Number(id.slice(draft ? DRAFT_ID_PREFIX.length : SENT_ID_PREFIX.length))
+  return Number.isInteger(local) ? { kind: draft ? 'draft' : 'sent', id: local } : undefined
+}
 
 interface ModelDirectories {
   directoryFor(sessionId: SessionId): { select(selection: { provider: string; model: string; reasoningEffort?: string }): Promise<{ readonly ok: boolean }> }
@@ -39,17 +52,43 @@ export const createComposerService = (ctx: Context): ComposerService => {
     const listeners = new Set<() => void>()
     const notify = (): void => { for (const listener of listeners) listener() }
     let boundShell: SessionInputShell | undefined
-    let unsubscribeAnnotations: (() => void) | undefined
+    let unsubscribeDraft: (() => void) | undefined
+    let unsubscribeSent: (() => void) | undefined
     let unsubscribeCurrent: (() => void) | undefined
+    let lastDraft: readonly DraftAnnotation[] | undefined
+    let lastSent: readonly SentAnnotation[] | undefined
+    let lastView: readonly ComposerAnnotation[] = []
     const bind = (): void => {
       const shell = resolve(target?.sessionId)?.shell
       if (shell === boundShell) return
-      unsubscribeAnnotations?.()
+      unsubscribeDraft?.()
+      unsubscribeSent?.()
       boundShell = shell
-      unsubscribeAnnotations = shell?.annotations.subscribe(notify)
+      unsubscribeDraft = shell?.annotations.subscribe(notify)
+      unsubscribeSent = shell?.sentAnnotations.subscribe(notify)
+    }
+    // One stable array per store state: React's external-store read cannot return a fresh array each call.
+    const read = (): readonly ComposerAnnotation[] => {
+      const shell = resolve(target?.sessionId)?.shell
+      const draft = shell?.annotations.snapshot()
+      const sent = shell?.sentAnnotations.snapshot()
+      if (draft === lastDraft && sent === lastSent) return lastView
+      lastDraft = draft
+      lastSent = sent
+      lastView = [
+        ...(sent ?? []).map(annotation => ({
+          id: `${SENT_ID_PREFIX}${annotation.id}`, text: annotation.text, comment: annotation.comment,
+          source: annotation.source, sent: true,
+        })),
+        ...(draft ?? []).map(annotation => ({
+          id: `${DRAFT_ID_PREFIX}${annotation.id}`, text: annotation.text, comment: annotation.comment,
+          source: annotation.source, sent: false,
+        })),
+      ]
+      return lastView
     }
     return {
-      get: () => resolve(target?.sessionId)?.shell.annotations.snapshot() ?? [],
+      get: read,
       subscribe: (listener) => {
         listeners.add(listener)
         if (listeners.size === 1) {
@@ -59,7 +98,8 @@ export const createComposerService = (ctx: Context): ComposerService => {
         return () => {
           listeners.delete(listener)
           if (listeners.size > 0) return
-          unsubscribeAnnotations?.()
+          unsubscribeDraft?.()
+          unsubscribeSent?.()
           unsubscribeCurrent?.()
           boundShell = undefined
         }
@@ -119,13 +159,19 @@ export const createComposerService = (ctx: Context): ComposerService => {
     setAnnotationComment: input => {
       const shell = resolve(input.sessionId)?.shell
       if (shell === undefined) return false
-      shell.annotations.setComment({ id: input.id, comment: input.comment })
+      const owner = annotationOwner(input.id)
+      if (owner === undefined) return false
+      if (owner.kind === 'sent') shell.sentAnnotations.setComment({ id: owner.id, comment: input.comment })
+      else shell.annotations.setComment({ id: owner.id, comment: input.comment })
       return true
     },
     removeAnnotation: input => {
       const shell = resolve(input.sessionId)?.shell
       if (shell === undefined) return false
-      shell.annotations.remove(input.id)
+      const owner = annotationOwner(input.id)
+      if (owner === undefined) return false
+      if (owner.kind === 'sent') shell.sentAnnotations.remove(owner.id)
+      else shell.annotations.remove(owner.id)
       return true
     },
     setModel: async input => {

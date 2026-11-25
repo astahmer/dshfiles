@@ -154,14 +154,17 @@ export type ComposerAttachment =
       readonly comment?: string
     }
 
-/** One unsent annotation on the composer's draft: a quoted passage and the comment written on it. */
+/** One annotation on the composer's review layer: a quoted passage and the comment written on it. */
 export interface ComposerAnnotation {
-  readonly id: number
+  /** Opaque identity; draft annotations and sent history have separate id spaces. */
+  readonly id: string
   readonly text: string
   /** The user's comment; empty until one is written. */
   readonly comment: string
   /** Opaque locator of the quoted passage, handed back when the user asks to see it; empty when unknown. */
   readonly source: string
+  /** Whether the message carrying it was sent; sent history persists across reloads. */
+  readonly sent: boolean
 }
 
 export interface ComposerModelSelection {
@@ -184,12 +187,12 @@ export interface ComposerService {
   /** Insert at the caret, or at the end when the composer never had focus. */
   insert(input: ComposerTarget & { readonly text: string }): boolean
   attach(input: ComposerTarget & { readonly attachment: ComposerAttachment }): boolean
-  /** The target composer's annotations, in the order they were added; empty until one exists. */
+  /** The target composer's annotations: sent history first, then the draft's, in the order they were added. */
   annotations(target?: ComposerTarget): Subscribable<readonly ComposerAnnotation[]>
-  /** Write, or clear with an empty string, the comment on one draft annotation. */
-  setAnnotationComment(input: ComposerTarget & { readonly id: number; readonly comment: string }): boolean
-  /** Remove one annotation from the draft. */
-  removeAnnotation(input: ComposerTarget & { readonly id: number }): boolean
+  /** Write, or clear with an empty string, the comment on one annotation, draft or sent. */
+  setAnnotationComment(input: ComposerTarget & { readonly id: string; readonly comment: string }): boolean
+  /** Remove one annotation, draft or sent. */
+  removeAnnotation(input: ComposerTarget & { readonly id: string }): boolean
   /** Choose the model and variant the next message uses. */
   setModel(input: ComposerTarget & { readonly selection: ComposerModelSelection }): Promise<boolean>
   focus(target?: ComposerTarget): boolean

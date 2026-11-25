@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { Context } from '@deepseek-ai/cordis'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SessionInputShell } from './native/input/facade.ts'
 import { DraftAnnotations } from './native/input/draft-annotations.ts'
 import { COMMENT_QUOTE_COMMAND, $isQuoteNode } from './native/input/editor/QuoteNode.tsx'
@@ -15,6 +16,8 @@ const cleanups: (() => void)[] = []
 afterEach(() => {
   for (const cleanup of cleanups.splice(0).reverse()) cleanup()
 })
+// Sent history is per-browser and this file shares one session id; each test starts empty.
+beforeEach(() => { localStorage.clear() })
 
 const shellSendingTo = (sink: (text: string) => Promise<SubmitOutcome>): SessionInputShell => {
   const ctx = new Context()
@@ -33,6 +36,7 @@ const shellSendingTo = (sink: (text: string) => Promise<SubmitOutcome>): Session
     toggleSource: () => undefined,
   }
   const shell = new SessionInputShell({
+    sessionId: SessionId('test-session'),
     actx: ctx,
     inputTriggers: () => triggers,
     defaultSink: text => sink(text),
@@ -125,5 +129,8 @@ describe('draft annotations', () => {
     shell.setDraft('Fix it')
     shell.submit()
     await vi.waitFor(() => expect(sent).toEqual(['Annotation 1 on your previous reply:\n> Four helpers are now running\n\nComment: phone too?\n\nFix it']))
+    // The accepted send moves it from the draft into the session's review history.
+    expect(shell.annotations.snapshot()).toEqual([])
+    expect(shell.sentAnnotations.snapshot()).toMatchObject([{ text: 'Four helpers are now running', comment: 'phone too?', source: '' }])
   })
 })

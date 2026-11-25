@@ -11056,10 +11056,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "chat#inline-annotations",
       "plugin": "chat",
       "id": "inline-annotations",
-      "title": "See draft annotations beside the passage they quote",
-      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Quote and Annotate share one selection…",
+      "title": "See annotations beside the passage they quote, sent or draft",
+      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Sending moves the annotations into the…",
       "destination": "transcript",
-      "currentSurface": "transcript: numbered markers beside annotated assistant passages, with a comments column on a wide window",
+      "currentSurface": "transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window",
       "reach": [],
       "reachNarrow": null,
       "onboarding": {

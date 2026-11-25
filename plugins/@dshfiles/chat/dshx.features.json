@@ -740,12 +740,12 @@
     },
     {
       "id": "inline-annotations",
-      "title": "See draft annotations beside the passage they quote",
-      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Quote and Annotate share one selection row on every input kind. Settings › General › Annotation marks switches between marker + popover, comments column (default), inline marker and off; Comment while annotating switches between asking at the passage (default) and attaching silently.",
+      "title": "See annotations beside the passage they quote, sent or draft",
+      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Sending moves the annotations into the session's review history: markers and comments stay on the passage, and per-browser storage brings them back after a reload. Quote and Annotate share one selection row on every input kind. Settings › General › Annotation marks switches between marker + popover, comments column (default), inline marker and off; Comment while annotating switches between asking at the passage (default) and attaching silently.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: numbered markers beside annotated assistant passages, with a comments column on a wide window",
+      "currentSurface": "transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window",
       "configuration": [
         {
           "key": "annotationMarks",
@@ -760,11 +760,11 @@
           "coveredBy": ["chat.annotation-quick-add"]
         }
       ],
-      "states": ["marker", "comment-open", "comment-empty", "column", "inline", "off"],
+      "states": ["marker", "comment-open", "comment-empty", "sent", "column", "inline", "off"],
       "failureModes": [
         "An annotation whose assistant step the transcript window has not mounted shows no marker until that step is back on screen.",
         "A window with no room beside the transcript keeps markers and their popovers instead of the comments column.",
-        "Annotations live on the draft: sending turns them into quoted text and clears their markers."
+        "Sent annotations live in this browser's storage: another browser or cleared storage starts without them, and a message trimmed out of the transcript hides its marker."
       ],
       "externalDependencies": [],
       "verification": [
@@ -778,7 +778,7 @@
           "kind": "unit-test",
           "id": "chat.annotation-marker-placement",
           "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
-          "testName": "sits in the gutter right of the transcript column"
+          "testName": "sits in the gutter just past the quoted paragraph"
         },
         {
           "kind": "unit-test",
@@ -796,6 +796,12 @@
           "kind": "not-applicable",
           "id": "chat.inline-annotations-browser",
           "reason": "Walked in a scratch DSH: select an assistant passage, press Annotate, write the comment, then read the marker and comments column at 1440x900 and the marker popover at 390x844 Chromium."
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.annotation-sent-history",
+          "file": "plugins/@dshfiles/rich-composer/src/native/input/sent-annotations.test.ts",
+          "testName": "keeps the annotation an accepted message carried, and reloads it for the same session"
         }
       ],
       "onboarding": {

@@ -2,7 +2,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { SessionFace } from '@deepseek-ai/dsh-api-session-controller/client'
-import type { SessionId } from '@deepseek-ai/dsh-session/types'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SessionInputShell } from './native/input/facade.ts'
@@ -67,6 +67,7 @@ function fixture() {
     toggleSource: () => undefined,
   }
   const shell = new SessionInputShell({
+    sessionId: SessionId('test-session'),
     actx: ctx,
     inputTriggers: () => triggers,
     defaultSink: (text, attachments, mode, signal, accept) => {
