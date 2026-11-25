@@ -6,7 +6,7 @@
 DSH Host, one list per registered project. Create a board, draw (autosaved), rename it, delete it to **Recently
 deleted** and restore it. Agents get the same verbs as tools and can draw from Mermaid.
 
-![The Whiteboards page: one project's boards with rename and delete](docs/screenshots/project-whiteboards.png)
+![The Whiteboard page: one project's boards with rename and delete](docs/screenshots/project-whiteboards.png)
 
 ## Why Excalidraw, and why owned
 
