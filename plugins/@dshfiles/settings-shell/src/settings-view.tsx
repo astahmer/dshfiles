@@ -32,6 +32,8 @@ const headerButton =
   'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-foreground dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
 const navCell =
   'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dshx-tone-2)]'
+/** The settings column (council round 4 B5): 640-680px, so values sit near their labels. */
+export const SETTINGS_COLUMN_WIDTH = 'dshx:max-w-[680px]'
 /** The active category (round five K2, A1): the quiet selected wash with its leading marker, ink text at 550. */
 const navCellActive = 'dshx:bg-selected-wash dshx:selected-marker dshx:hover:bg-selected-wash dshx:font-selected dshx:text-foreground'
 // A group label is a label, not one more row: 16 px above it (none above the first), 4 px between it and its entries.
@@ -423,18 +425,21 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     else openEntry(id)
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
+  // The header ends where the settings column does: the column alone beside the side column's list, after the page's own
+  // 208px list otherwise.
+  const headerWidth = props.columnNavigation === true ? 'dshx:max-w-[680px]' : 'dshx:max-w-[888px]'
   return (
     <PageViewMemoryProvider>
       <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
         {/* The page header (council round 3 B3, kit A5): one h1 and a line on what the page holds, with the search,
-            Modified and the configuration file on a toolbar under it. It ends where the settings column does (the 208px
-            category list plus the 760px column), so the actions line up with the rows. A narrow pane (a phone) names
+            Modified and the configuration file on a toolbar under it. It ends where the settings column does, so the
+            actions line up with the rows. A narrow pane (a phone) names
             the page in its top bar, so the header is kept for screen readers only there. */}
         <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-6 dshx:pt-5 dshx:pb-3 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-2 dshx:@max-pane-compact:pb-2">
-          <div className="dshx:max-w-[968px] dshx:@max-pane-compact:sr-only" data-settings-page-header="">
+          <div className={cn(headerWidth, 'dshx:@max-pane-compact:sr-only')} data-settings-page-header="">
             <PageHeader heading={<span id={props.titleId}>{props.renderSlot('settings.header', {})}</span>} description={t('description')} />
           </div>
-          <div className="dshx:flex dshx:max-w-[968px] dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-compact:gap-2" data-settings-toolbar="">
+          <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-compact:gap-2', headerWidth)} data-settings-toolbar="">
           <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1">
             <InputGroupAddon>
               <SearchIcon />
@@ -528,8 +533,9 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
             ref={content}
           >
-            {/* One reading width for every entry: sections, plugin pages and search results share this column. */}
-            <div className="dshx:max-w-[760px]" data-settings-column="">
+            {/* One reading width for every entry: sections, plugin pages and search results share this 680px column, so a
+                value sits near its label (council round 4 B5). */}
+            <div className={SETTINGS_COLUMN_WIDTH} data-settings-column="">
               {searching && <SearchResults {...props} onSelect={openEntry} result={result} />}
               {!searching && active !== undefined && <EntryView {...props} entry={active} jevNamespaces={jevNamespaces} key={active.id} />}
             </div>

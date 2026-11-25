@@ -92,7 +92,7 @@ export const PluginSettingsPageView = (props: {
     </div>
   )
   return (
-    <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[760px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
+    <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[680px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
       {props.heading === 'section' && <h3 className={SECTION_TITLE_CLASS}>{props.page.title}</h3>}
       {(props.heading === undefined || props.heading === 'page') && (
         <h2 className={cn(SECTION_TITLE_CLASS, props.namedByNavigation === true && 'dshx:@max-pane-compact:sr-only')}>{props.page.title}</h2>

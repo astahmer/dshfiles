@@ -38,6 +38,15 @@ describe('Settings › General controls in the kit field look (council round 3 B
     expect(general).toContain('dshx:pointer-coarse:[&_[class*=_stepper_]]:h-11!')
     expect(general).toContain('dshx:pointer-coarse:[&_[class*=_selector_]]:h-11!')
   })
+
+  it('sets the font size at the kit UnitInput text size, with no chevron trailing the field (council round 4 B5)', () => {
+    const general = read('native/general-section.tsx')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]_[class*=_value_]]:text-sm!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-sm!')
+    // The More font settings disclosure stays reachable, as text, without its chevron.
+    expect(general).toContain('dshx:[&_[class*=_expander_]>svg]:hidden!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]')
+  })
 })
 
 describe('Settings header on a phone (round five P4)', () => {

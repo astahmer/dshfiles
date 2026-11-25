@@ -68,10 +68,18 @@ describe('settings view: page header (council round 3 B3)', () => {
     const toolbar = view.host.querySelector('[data-settings-toolbar]')
     expect(toolbar?.querySelector('[role="searchbox"]')).not.toBeNull()
     expect(toolbar?.querySelector('[data-settings-modified-filter]')).not.toBeNull()
-    // The header comes first, the toolbar under it; both end where the settings column (208 + 760 px) ends.
+    // The header comes first, the toolbar under it; both end where the settings column (208 + 680 px) ends.
     if (header == null || toolbar == null) throw new Error('Settings header or toolbar missing')
     expect(header.compareDocumentPosition(toolbar)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(toolbar?.className).toContain('dshx:max-w-[968px]')
+    expect(toolbar?.className).toContain('dshx:max-w-[888px]')
+    view.unmount()
+  })
+
+  it('reads in one 680px column, the header ending with it, so values sit near their labels (council round 4 B5)', () => {
+    const view = mount({ columnNavigation: true })
+    expect(view.host.querySelector('[data-settings-column]')?.className).toBe('dshx:max-w-[680px]')
+    expect(view.host.querySelector('[data-settings-toolbar]')?.className).toContain('dshx:max-w-[680px]')
+    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-[680px]')
     view.unmount()
   })
 })
@@ -148,10 +156,11 @@ describe('settings view: one title per entry', () => {
   const entry = (view: { readonly host: HTMLElement }): HTMLElement | null => view.host.querySelector('[data-settings-entry]')
   const shown = (element: Element | null | undefined): boolean => element instanceof HTMLElement && element.style.display !== 'none'
 
-  it('titles every entry with the one 13px section heading', () => {
+  it('titles every entry with the one contextual heading, 15/20 at 600 (council round 4 B5)', () => {
     const view = mount({ activeId: 'appearance' })
     const heading = entry(view)?.querySelector('h2')
-    expect(heading?.className).toContain('dshx:text-sm')
+    expect(heading?.className).toContain('dshx:text-heading')
+    expect(heading?.className).not.toContain('dshx:text-sm')
     expect(heading?.className).not.toContain('dshx:text-title')
     view.unmount()
   })

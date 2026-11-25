@@ -131,9 +131,10 @@ describe('plugin settings page', () => {
     expect(document.activeElement).toBe(viewButton('view.form'))
   })
 
-  it('titles the page with the one 13px section heading', async () => {
+  it('titles the page with the one contextual heading, 15/20 at 600 (council round 4 B5)', async () => {
     await show({ visible: true })
-    expect(container.querySelector('h2')?.className).toContain('dshx:text-sm')
+    expect(container.querySelector('h2')?.className).toContain('dshx:text-heading')
+    expect(container.querySelector('section')?.className).toContain('dshx:max-w-[680px]')
     expect(container.querySelector('h2')?.className).not.toContain('dshx:text-title')
   })
 })
