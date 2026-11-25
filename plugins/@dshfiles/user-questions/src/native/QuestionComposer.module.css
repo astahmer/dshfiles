@@ -564,6 +564,18 @@
   flex: 1;
 }
 
+/* dshfiles (round four R12): on a touch screen the inline answer field is a 44px target, not its 24px line. */
+@media (pointer: coarse) {
+  .customRow {
+    min-height: 44px;
+  }
+
+  .customInline {
+    align-self: stretch;
+    min-height: 44px;
+  }
+}
+
 /* Optionless question: the free-form answer is the whole body, so it carries
    its own frame. The 12px side margins add to the .options 12px padding so both
    edges align with the title's 24px inset; two lines are reserved before the
@@ -657,9 +669,20 @@
 }
 
 /* The row, not the button alone, carries hover and selection, so the description reads as part of its option. */
-.optionItem:hover:has(> .optionRowInteractive),
 .optionItem:has(> .optionSelected) {
   background: var(--dsw-alias-interactive-bg-hover);
+}
+
+/* dshfiles (round four R12): hover sits behind (hover: hover), so a tap does not leave a row lit on a phone. */
+@media (hover: hover) {
+  .optionItem:hover:has(> .optionRowInteractive) {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+
+  .optionItem > .optionRow:hover {
+    border-color: transparent;
+    background: transparent;
+  }
 }
 
 .optionItem:has(> .optionSelected) {
@@ -667,7 +690,6 @@
 }
 
 .optionItem > .optionRow,
-.optionItem > .optionRow:hover,
 .optionItem > .optionSelected {
   border-color: transparent;
   background: transparent;

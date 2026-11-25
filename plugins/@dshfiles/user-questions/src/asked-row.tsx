@@ -65,7 +65,12 @@ export const AskedRow = (props: AskedRowProps) => {
     running: false,
   }
   return (
-    <div className="dshx-root" data-asked-row="" data-answerable={answerable ? '' : undefined}>
+    <div
+      // Round four R12: the row's leading disclosure is a 44px target on a touch screen, not its 16px glyph.
+      className="dshx-root dshx:pointer-coarse:[&_[aria-expanded]]:min-h-11"
+      data-asked-row=""
+      data-answerable={answerable ? '' : undefined}
+    >
       <DisclosureRow {...rowProps}>
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3 dshx:text-sm">
           {view.questions.map(item => (
