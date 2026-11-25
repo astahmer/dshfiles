@@ -64,7 +64,7 @@ export const OpenConfigAction = (props: {
       )}
       {/* No overflow clip on the split button: it would cut the kit's 44px touch hit area of both halves. */}
       {/* A narrow pane (a phone) gives it the 44px of the search and Modified beside it (council round 4 B3). */}
-      <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs dshx:@max-pane-compact:h-11">
+      <div className="dshx:inline-flex dshx:h-8 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs dshx:@max-pane-compact:h-11">
         <Tooltip>
           <TooltipTrigger asChild>
             {/* A narrow pane has no room for the label: the menu (whose first item opens the file) takes the seat. */}

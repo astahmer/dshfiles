@@ -77,11 +77,22 @@ describe('settings view: page header (council round 3 B3)', () => {
     view.unmount()
   })
 
-  it('reads in one 680px column inside the 880px lane frame, its header actions on the frame edge (round five A2)', () => {
+  it('ends the header with the 680px field column: the search grows, Modified and the file action on 32px, 8px apart (council round 6 B2)', () => {
     const view = mount({ columnNavigation: true })
     expect(view.host.querySelector('[data-settings-column]')?.className).toBe('dshx:max-w-[680px]')
-    expect(view.host.querySelector('[data-settings-toolbar]')?.className).toContain('dshx:max-w-lane')
-    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-lane')
+    const toolbar = view.host.querySelector<HTMLElement>('[data-settings-toolbar]')
+    expect(toolbar?.className).toContain('dshx:max-w-[680px]')
+    expect(toolbar?.className).not.toContain('dshx:max-w-lane')
+    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-[680px]')
+    // One 8px rhythm between the search, Modified and the action group.
+    expect(toolbar?.className).toContain('dshx:gap-2')
+    expect(toolbar?.className).not.toContain('dshx:gap-3')
+    const search = toolbar?.querySelector('[role="searchbox"]')?.closest('[data-slot="input-group"]')
+    expect(search?.className).toContain('dshx:h-8')
+    expect(search?.className).not.toMatch(/max-w-\[560px\]/u)
+    expect(view.host.querySelector('[data-settings-modified-filter]')?.className).toContain('dshx:h-8')
+    // The configuration file's split button on the same 32px as the selects.
+    expect(read('open-config-action.tsx')).toContain('dshx:inline-flex dshx:h-8 dshx:items-stretch')
     view.unmount()
   })
 })

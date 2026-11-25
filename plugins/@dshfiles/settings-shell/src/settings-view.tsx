@@ -1,7 +1,6 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { PAGE_FRAME_CLASS } from '@dshfiles/plugin-ui/components/page'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
@@ -470,9 +469,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     else openEntry(id)
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
-  // Beside the side column's list the page is on the kit's 880px lane frame (round five A2): the header and its actions end
-  // on the frame's edge, the 680px field column inside it. After the page's own 208px list the header ends with the column.
-  const headerWidth = props.columnNavigation === true ? PAGE_FRAME_CLASS.lane : 'dshx:max-w-[888px]'
+  // The header ends where the settings column does (council round 6 B2): beside the side column's list that is the 680px
+  // field column itself, so the configuration file's action sits flush with the selects; after the page's own 208px list
+  // it is that list plus the column.
+  const headerWidth = props.columnNavigation === true ? SETTINGS_COLUMN_WIDTH : 'dshx:max-w-[888px]'
   return (
     <PageViewMemoryProvider>
       <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
@@ -490,9 +490,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           <div className={cn(headerWidth, 'dshx:@max-pane-compact:sr-only')} data-settings-page-header="">
             <PageHeader heading={<span id={props.titleId}>{props.renderSlot('settings.header', {})}</span>} description={t('description')} />
           </div>
-          <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-compact:gap-2', headerWidth)} data-settings-toolbar="">
+          {/* One 8px rhythm (council round 6 B2): the search grows, then Modified and the action group, all 32px. */}
+          <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2', headerWidth)} data-settings-toolbar="">
           {/* On a phone the search, Modified and the file menu are one 44px row (council round 4 B3). */}
-          <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1 dshx:@max-pane-compact:h-11">
+          <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:@max-pane-compact:h-11">
             <InputGroupAddon>
               <SearchIcon />
             </InputGroupAddon>
@@ -543,7 +544,6 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             data-settings-modified-filter=""
             onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
             pressed={SettingsSearch.hasModifiedFilter(props.query)}
-            size="sm"
             variant="outline"
           >
             {t('search.modified')}
