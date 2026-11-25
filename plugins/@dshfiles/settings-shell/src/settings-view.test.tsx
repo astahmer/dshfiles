@@ -301,6 +301,10 @@ describe('settings view: one grouped page', () => {
     expect(general?.getAttribute('aria-label')).toBe('General')
     expect([...(general?.children ?? [])].filter(child => child.textContent === 'General' && !child.hasAttribute('data-nav-id'))).toEqual([])
     expect(view.host.querySelector('[data-settings-group="other"]')?.firstElementChild?.textContent).toBe('Other')
+    // The open category: the quiet selected wash, its leading marker and a 550 label (round five A1).
+    const open = view.host.querySelector('[data-nav-id][aria-current="page"]')
+    expect(open?.className).toContain('dshx:selected-marker')
+    expect(open?.className).toContain('dshx:font-selected')
     view.unmount()
   })
 

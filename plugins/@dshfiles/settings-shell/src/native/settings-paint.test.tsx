@@ -55,6 +55,8 @@ describe('Settings › General below 28rem and its Appearance cards (round five 
     // The light card's paper differs from the dark card's: each swatch shows its own theme.
     expect(column?.style.getPropertyValue('--settings-swatch-light')).not.toBe(column?.style.getPropertyValue('--settings-swatch-dark'))
     expect(column?.className).toContain('dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)]')
+    // The chosen card carries the selection marker beside its wash (round five A1).
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-marker!')
   })
 })
 
