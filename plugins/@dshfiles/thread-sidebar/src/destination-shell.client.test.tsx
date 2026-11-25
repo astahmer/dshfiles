@@ -134,16 +134,47 @@ describe('DestinationShell', () => {
     expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy()
   })
 
-  it('lets a page description wrap to a second line instead of cutting it at the column edge', () => {
+  it('keeps a page description to one line under its row (round five T4)', () => {
     setPhone(false)
     renderShell()
     fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
     const usage = screen.getByRole('button', { name: 'Usage' })
     const description = document.getElementById(usage.getAttribute('aria-describedby') ?? '')
     expect(description?.textContent).toBe('Cost, quota, requests and tools.')
-    // The 200px column cut every description after about 27 characters ("Cost, quota, requests and t…").
-    expect(description?.className).toContain('dshx:line-clamp-2')
-    expect(description?.className.split(' ')).not.toContain('dshx:truncate')
+    expect(description?.className).toContain('dshx:line-clamp-1')
+    expect(description?.className).not.toContain('dshx:line-clamp-2')
+  })
+
+  it('marks the active rail item and the open page with the selected wash and an accent icon (round five T3)', () => {
+    setPhone(false)
+    renderShell({ activePanelId: 'dshfiles-usage', renderPanelIcon: () => <svg data-testid="page-icon" /> })
+    fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
+    const tab = screen.getByRole('tab', { name: 'Observe' })
+    expect(tab.className).toContain('dshx:bg-selected-wash')
+    expect(tab.className).toContain('dshx:text-foreground')
+    expect(tab.className).not.toMatch(/(^| )dshx:bg-accent( |$)/u)
+    expect(tab.querySelector('[data-rail-icon]')?.className).toContain('dshx:text-control-on')
+    expect(screen.getByRole('tab', { name: 'Threads' }).querySelector('[data-rail-icon]')?.className).not.toContain('dshx:text-control-on')
+    const usage = screen.getByRole('button', { name: 'Usage' })
+    expect(usage.className).toContain('dshx:bg-selected-wash')
+    expect(usage.querySelector('[data-section-icon]')?.className).toContain('dshx:text-control-on')
+    const traces = screen.getByRole('button', { name: 'Traces' })
+    expect(traces.className).not.toContain('dshx:bg-selected-wash')
+  })
+
+  it('shows one Settings navigation: with the Settings page on stage its list drops the descriptions (round five T4)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    renderShell({ activePanelId: 'dshfiles-settings' })
+    const all = screen.getByRole('button', { name: 'All settings' })
+    expect(all.getAttribute('aria-current')).toBe('page')
+    expect(all.getAttribute('aria-describedby')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plugins' }).getAttribute('aria-describedby')).toBeNull()
+    expect(document.querySelector('[data-destination-index="settings"] header p')).toBeNull()
+    cleanup()
+    DestinationSelection.set('settings')
+    renderShell({ activePanelId: 'plugins' })
+    expect(screen.getByRole('button', { name: 'All settings' }).getAttribute('aria-describedby')).not.toBeNull()
   })
 
   it('lists the Settings pages without a layout switch: one sidebar layout (b:952m)', () => {

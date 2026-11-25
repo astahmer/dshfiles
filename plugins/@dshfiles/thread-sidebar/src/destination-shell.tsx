@@ -318,11 +318,16 @@ const RailButton = (props: {
       className={cn(
         'dshx:flex dshx:w-full dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-0 dshx:py-1.5 dshx:text-muted-foreground dshx:outline-none dshx:transition-colors',
         'dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-        props.active && 'dshx:bg-accent dshx:text-foreground',
+        // The active item at the tint rung (round five T3): the selected wash, ink label, accent icon.
+        props.active && 'dshx:bg-selected-wash dshx:text-foreground dshx:hover:bg-selected-wash',
         dropping && 'dshx:ring-2 dshx:ring-ring',
       )}
     >
-      <span className="dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center" aria-hidden="true">
+      <span
+        className={cn('dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center', props.active && 'dshx:text-control-on')}
+        aria-hidden="true"
+        data-rail-icon=""
+      >
         {props.icon}
       </span>
       {props.showLabel ? (
@@ -424,16 +429,19 @@ const SectionButton = (props: {
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
           // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
           SECTION_ROW_BADGE_ROOM,
-          props.selected && 'dshx:bg-accent',
+          // The open page at the tint rung (round five T3): the selected wash with an accent icon; the label stays ink.
+          props.selected && 'dshx:bg-selected-wash dshx:text-foreground dshx:hover:bg-selected-wash',
         )}
       >
         {props.icon === undefined || props.icon === null ? null : (
           <span
             className={cn(
-              'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground',
+              'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center',
+              props.selected ? 'dshx:text-control-on' : 'dshx:text-muted-foreground',
               SECTION_ROW_BADGE,
             )}
             aria-hidden="true"
+            data-section-icon=""
           >
             {props.icon}
           </span>
@@ -441,8 +449,8 @@ const SectionButton = (props: {
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <span className={cn('dshx:truncate dshx:text-sm', props.selected && 'dshx:font-medium')}>{props.label}</span>
           {props.description === undefined ? null : (
-            // Two lines, not one: the list column is about 200px, which cut every description mid-word.
-            <span id={descriptionId} className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">
+            // One line at most (round five T4): the row is a destination, the page itself says the rest.
+            <span id={descriptionId} className="dshx:line-clamp-1 dshx:text-xs dshx:text-muted-foreground">
               {props.description}
             </span>
           )}
@@ -506,6 +514,9 @@ const FolderIndex = (props: {
   const mapped = folder.entries.filter(entry => !other(entry) && entry.developer !== true)
   const unmapped = folder.entries.filter(entry => other(entry) && entry.developer !== true)
   const settings = folder.id === 'settings' ? props.openSettings : null
+  // Settings shows one navigation (round five T4): with its page on stage, whose own category list leads, this list
+  // drops its descriptions and reads as a plain list of the other Settings pages.
+  const settingsOnStage = folder.id === 'settings' && props.activePanelId === SETTINGS_PANEL_ID
   const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
   const missingPage = Destinations.expectedPageOf(folder.id)
   const rows = (entries: readonly ResolvedEntry[], descriptions = true): JSX.Element => (
@@ -527,7 +538,7 @@ const FolderIndex = (props: {
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <h2 className={cn('dshx:text-sm dshx:font-semibold', props.phone === true && 'dshx:sr-only')}>{folder.label}</h2>
-          <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>
+          {settingsOnStage ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>}
         </div>
         {folderUi === undefined || resolved === undefined || props.phone === true ? null : (
           <FolderMenu folder={resolved} ui={folderUi} onRename={() => setRenaming(true)} />
@@ -561,12 +572,12 @@ const FolderIndex = (props: {
             {settings === null ? null : (
               <SectionButton
                 label="All settings"
-                description="Appearance, models, agents, tools and more."
-                selected={props.activePanelId === SETTINGS_PANEL_ID}
+                description={settingsOnStage ? undefined : 'Appearance, models, agents, tools and more.'}
+                selected={settingsOnStage}
                 onSelect={settings}
               />
             )}
-            {rows(mapped)}
+            {rows(mapped, !settingsOnStage)}
             {folderUi === undefined || resolved === undefined || props.phone === true ? null : <AddPanelButton folder={resolved} ui={folderUi} />}
           </nav>
         )}
@@ -579,7 +590,7 @@ const FolderIndex = (props: {
         {developer.length === 0 ? null : (
           <section className="dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3" aria-label="Developer" data-destination-group="developer">
             <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Developer</h3>
-            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer)}</div>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer, !settingsOnStage)}</div>
           </section>
         )}
       </div>
