@@ -28,7 +28,7 @@ describe('narrow frame recovery geometry', () => {
 
   it('concedes even the collapsed rail only when it would take more than half an extreme viewport', () => {
     expect(computeColumns(80, 0, 0)).toEqual({ sidebar: 40, center: 40, rightbar: 0 })
-    expect(computeColumns(360, 0, 0)).toEqual({ sidebar: 56, center: 304, rightbar: 0 })
+    expect(computeColumns(360, 0, 0)).toEqual({ sidebar: 60, center: 300, rightbar: 0 })
     expect(computeColumns(80, 0, 0, 0)).toEqual({ sidebar: 0, center: 80, rightbar: 0 })
   })
 

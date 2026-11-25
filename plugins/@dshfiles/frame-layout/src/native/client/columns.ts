@@ -17,10 +17,10 @@ export const SIDEBAR_MAX = 420
 export const SIDEBAR_DEFAULT = 280
 /**
  * Local delta (dshfiles, round five B4): from this frame width the untouched default is wider, a 256px thread column
- * beside thread-sidebar's 56px labelled rail.
+ * beside thread-sidebar's 60px labelled rail (round five B3).
  */
 export const SIDEBAR_WIDE_VIEWPORT = 1440
-export const SIDEBAR_DEFAULT_WIDE = 312
+export const SIDEBAR_DEFAULT_WIDE = 316
 
 export class SidebarDefaultModel {
   /** The default for a frame this wide. */
@@ -30,8 +30,8 @@ export class SidebarDefaultModel {
   static readonly preference = (input: { readonly custom: boolean; readonly sidebar: number; readonly viewport: number }): number =>
     input.custom ? input.sidebar : SidebarDefaultModel.width(input.viewport)
 }
-/** Closed-sidebar rail: a 24px icon column between 16px horizontal paddings. */
-export const SIDEBAR_COLLAPSED = 56
+/** Local delta (dshfiles): the closed-sidebar rail is thread-sidebar's 60px labelled rail (round five B3). */
+export const SIDEBAR_COLLAPSED = 60
 /** Frame width below which the sidebar overlays the main content without a rail. */
 export const SIDEBAR_DRAWER_BREAKPOINT = 768
 /** Viewport width below which the sidebar auto-collapses to the rail (deepsuite

@@ -25,13 +25,13 @@ DSH's three-column AppFrame, forked so the frame's dragged panel widths and coll
   reload reopens the sidebar at its **last open width and last state** and keeps the right panel's px preference.
 - **Collapse is remembered**: closing the sidebar boots back closed, and reopening restores the last open width instead of
   the 280px contract default. A narrow frame (<1024px) keeps its own responsive auto-collapse rather than restoring a stored
-  wide-frame override. Until a width is dragged the sidebar takes the default for the frame, 312px (a 256px thread
-  column beside the 56px labelled rail) from 1440px, 280px below; that untouched width is never stored, so a stored width
+  wide-frame override. Until a width is dragged the sidebar takes the default for the frame, 316px (a 256px thread
+  column beside the 60px labelled rail) from 1440px, 280px below; that untouched width is never stored, so a stored width
   always wins. The frame stores the right panel's width; Workbench owns whether its persistent right-pane tabs are shown.
 - **Recovery reveal**: the owned `ctx.frameSidebar.show()` presentation port opens the left sidebar idempotently from live frame state. Repeated synchronous Reset layout calls cannot toggle it closed again; remembered widths and the prior wide-frame preference survive narrow expansion. The resolved sidebar track takes at most half the frame, so reopening a remembered 420px sidebar on a 360px frame leaves both left and centre at 180px instead of hiding the conversation. The right track still concedes first, and wider frames restore the saved width. This does not add a method to native `ILayout`.
 - **Storage failure degrades to upstream behavior**: a blocked or full store (private mode, quota) leaves the geometry
   in-memory, exactly as the native package.
-- **Phone navigation seat**: below 640px a left occupant that draws its own phone navigation sets `data-shell-phone-nav` on the document; the frame then drops the 56px rail track and the right track, hides the clipped sidebar column and reserves `--dsh-phone-nav-height` for the occupant's bottom bar. A pure CSS rule; without the mark the narrow frame behaves as upstream.
+- **Phone navigation seat**: below 640px a left occupant that draws its own phone navigation sets `data-shell-phone-nav` on the document; the frame then drops the 60px rail track and the right track, hides the clipped sidebar column and reserves `--dsh-phone-nav-height` for the occupant's bottom bar. A pure CSS rule; without the mark the narrow frame behaves as upstream.
 - **Zen mode**: **Zen mode** in ⌘K, or Mod+Shift+. anywhere, leaves only the thread and its composer. See
   [zen mode](#zen-mode).
 - **Left-content seat**: the public `shell.left` contract is declared/rendered by the owned thread sidebar, not by AppFrame.
