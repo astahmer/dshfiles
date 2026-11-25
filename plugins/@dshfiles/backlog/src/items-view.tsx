@@ -275,7 +275,7 @@ const Row = (props: {
               )}
             />
           )}
-          {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-warning" /> : null}
+          {item.pinned ? <PinIcon aria-label="Pinned" className="dshx:size-3 dshx:shrink-0 dshx:fill-current dshx:text-foreground" /> : null}
           <ItemGlyphs.AttentionBadge attention={item.attention} compact />
           <WorkGlyphs.ProgressBadge progress={item.children} />
           <WorkGlyphs.CriteriaBadge progress={item.criteriaProgress} />
@@ -419,7 +419,8 @@ export const ItemsView = (props: {
     clearSelection()
   }
   const filtering = props.statuses.length > 0
-  const visibleGroups = props.groupBy === 'status' && !filtering ? groups : groups.filter(group => group.items.length > 0)
+  // A zero is not drawn (DESIGN.md › Layout, counts): an empty group, status groups included, has no header.
+  const visibleGroups = groups.filter(group => group.items.length > 0)
   const entries = useMemo(
     (): Entry[] =>
       visibleGroups.flatMap(group => {

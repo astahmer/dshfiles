@@ -602,7 +602,8 @@ When('backlog item b:{int} is opened', async ({ page }: { page: Page }, id: numb
   await page.getByRole('button', { name: 'Feed', exact: true }).click()
   await feed(page)
     .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
-    .getByText(`${await backlogLabel(page, id)}`, { exact: true })
+    // The feed shows the id on hover; the row's time is its mention handle and opens it like the id did.
+    .locator('[data-backlog-mention-handle]')
     .click()
   await expect(peek(page)).toContainText(`${await backlogLabel(page, id)}`)
 })
@@ -1304,9 +1305,11 @@ When('a thread on the fake model is started', async ({ page }: { page: Page }) =
 
 When('the reference of backlog item {string} is dragged into the thread composer', async ({ page }: { page: Page }, reference: string) => {
   const label = await withBacklogRefs(page, reference)
+  // A list row prints its `b:` id; a feed row keeps it in a tooltip on its time, which is the same handle.
   const handle = page
     .locator('[data-backlog-mention-handle]')
     .filter({ hasText: new RegExp(`^${label}$`, 'u'), visible: true })
+    .or(page.getByRole('article', { name: `Item ${label}`, exact: true }).locator('[data-backlog-mention-handle]').filter({ visible: true }))
     .first()
   await handle.dragTo(threadComposer(page))
 })

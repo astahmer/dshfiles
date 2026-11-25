@@ -2,6 +2,7 @@ import { useBacklogSelection } from './use-backlog-selection.js'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { LinkIcon, MessageSquareIcon, PaperclipIcon, PinIcon, WandSparklesIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
 import { usePrependScrollAnchor } from '@dshfiles/plugin-ui/hooks/use-prepend-scroll-anchor'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -60,9 +61,17 @@ export const FeedEntryMeta = (props: {
 }): JSX.Element => (
   <span data-feed-entry-meta="" className="dshx:flex dshx:shrink-0 dshx:items-baseline dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
     <span className="dshx:@max-pane-narrow:hidden">{ItemGlyphs.actorName(props.author)} ·</span>
-    <span>{new Date(props.item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-    <span aria-hidden>·</span>
-    <BacklogMentionHandle item={props.item} />
+    {/* The id is a reference, not a label: it shows on hover, and the time stays the drag handle that mentions it. */}
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span>
+          <BacklogMentionHandle item={props.item} className="dshx:font-sans!">
+            {new Date(props.item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+          </BacklogMentionHandle>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>{BacklogReference.labelOf(props.item)}</TooltipContent>
+    </Tooltip>
   </span>
 )
 
@@ -209,7 +218,7 @@ const FeedEntry = (props: {
             onClick={() => actions.update.mutate({ id: item.id, pinned: !item.pinned })}
             className={cn(
               'dshx:rounded-md dshx:p-1 dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground',
-              item.pinned && 'dshx:text-warning',
+              item.pinned && 'dshx:text-foreground',
             )}
           >
             <PinIcon className={cn('dshx:size-3.5', item.pinned && 'dshx:fill-current')} />
@@ -331,7 +340,7 @@ export const FeedView = (props: {
       <StatusFilterBar counts={props.counts} statuses={props.statuses} toggle={props.toggleStatus} clear={props.clearStatuses} />
       {pinned.length === 0 ? null : (
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:overflow-x-auto dshx:border-b dshx:border-border dshx:px-4 dshx:py-2">
-          <PinIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:fill-current dshx:text-warning" />
+          <PinIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:fill-current dshx:text-foreground" />
           {pinned.map(item => (
             <BacklogItemMenu
               key={item.id}
@@ -370,7 +379,7 @@ export const FeedView = (props: {
         }}
         className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto"
       >
-        <div className="dshx:mx-auto dshx:flex dshx:min-h-full dshx:max-w-4xl dshx:flex-col dshx:justify-end dshx:px-3 dshx:pt-6 dshx:pb-3">
+        <div className="dshx:mx-auto dshx:flex dshx:min-h-full dshx:max-w-4xl dshx:flex-col dshx:justify-start dshx:px-3 dshx:pt-6 dshx:pb-3">
           {props.loaded && props.items.length === 0 ? (
             props.statuses.length === 0 ? (
               <EmptyState className="dshx:py-20">

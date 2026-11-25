@@ -1,7 +1,6 @@
 import { useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
 import { ArrowLeftIcon, ArrowRightIcon, Columns3Icon, LinkIcon, MessageSquareIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { RollingNumber } from '@dshfiles/plugin-ui/components/motion/text'
-import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -449,7 +448,8 @@ export const BoardView = (props: {
               <header className="dshx:flex dshx:h-8 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:px-2">
                 <ItemGlyphs.StatusIcon status={status} />
                 <h3 className="dshx:text-sm dshx:font-semibold dshx:text-foreground">{ItemGlyphs.statusLabels[status]}</h3>
-                <RollingNumber value={column.length} className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" />
+                {/* A zero is not drawn; the empty column stays a drop target. */}
+                {column.length === 0 ? null : <RollingNumber value={column.length} className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" />}
                 <Button
                   type="button"
                   variant="ghost"
@@ -476,7 +476,6 @@ export const BoardView = (props: {
                   })
                 }}
               >
-                {column.length === 0 ? <EmptyState className="dshx:py-6">Nothing here.</EmptyState> : null}
                 {column.slice(0, (pages[status] ?? 1) * COLUMN_PAGE).map(item => (
                   <BoardCard
                     key={item.id}

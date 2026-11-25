@@ -28,13 +28,14 @@ const attentionLabels = { none: 'No attention', 'needs-input': 'Needs you', bloc
 const statusTone = {
   inbox: 'dshx:text-muted-foreground',
   todo: 'dshx:text-muted-foreground',
-  doing: 'dshx:text-warning',
-  done: 'dshx:text-success',
-  dropped: 'dshx:text-destructive',
+  doing: 'dshx:text-foreground',
+  done: 'dshx:text-muted-foreground',
+  dropped: 'dshx:text-muted-foreground',
 } satisfies Record<BacklogStatus, string>
 
-/** Linear-style progress rings: dashed for untriaged, empty, half, then a green check or a red cross, since a filled
- * dot is what a project's own colour dot looks like. */
+/** Linear-style progress rings: dashed for untriaged, empty, an ink half, then a muted check, or a muted ring with one
+ * diagonal stroke for Dropped (DESIGN.md › Colour roles: the red cross is Failed's, and a page's own vocabulary takes
+ * no status hue). A filled dot is what a project's own colour dot looks like. */
 const StatusIcon = (props: { readonly status: BacklogStatus; readonly className?: string }): JSX.Element => (
   <svg aria-hidden viewBox="0 0 14 14" width="14" height="14" className={cn('dshx:size-3.5 dshx:shrink-0', statusTone[props.status], props.className)}>
     {props.status === 'inbox' ? <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="2.2 1.8" /> : null}
@@ -54,7 +55,7 @@ const StatusIcon = (props: { readonly status: BacklogStatus; readonly className?
     {props.status === 'dropped' ? (
       <>
         <circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        <path d="m4.9 4.9 4.2 4.2m0-4.2-4.2 4.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="m3.4 10.6 7.2-7.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </>
     ) : null}
   </svg>
@@ -66,10 +67,10 @@ const kindIcons = { task: SquareCheckIcon, bug: BugIcon, idea: LightbulbIcon, no
 >
 const kindTone = {
   task: 'dshx:text-muted-foreground',
-  bug: 'dshx:text-destructive',
-  idea: 'dshx:text-warning',
-  note: 'dshx:text-info',
-  question: 'dshx:text-teal',
+  bug: 'dshx:text-muted-foreground',
+  idea: 'dshx:text-muted-foreground',
+  note: 'dshx:text-muted-foreground',
+  question: 'dshx:text-muted-foreground',
 } satisfies Record<BacklogKind, string>
 
 const KindIcon = (props: { readonly kind: BacklogKind; readonly className?: string }): JSX.Element => {
@@ -174,7 +175,7 @@ const ActorAvatar = (props: { readonly actorId: string | undefined; readonly cla
         <span
           className={cn(
             'dshx:inline-flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-2xs dshx:font-semibold dshx:ring-2 dshx:ring-background',
-            agent ? 'dshx:bg-violet/20 dshx:text-violet' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-info/20 dshx:text-info',
+            agent ? 'dshx:bg-identity-2/20 dshx:text-identity-2' : system ? 'dshx:bg-muted dshx:text-muted-foreground' : 'dshx:bg-identity-1/20 dshx:text-identity-1',
             props.className,
           )}
         >

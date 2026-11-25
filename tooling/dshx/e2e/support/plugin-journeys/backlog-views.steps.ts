@@ -327,7 +327,8 @@ Then('backlog item b:{int} is referenced by {string}', async ({ page }: { page: 
     await expect(feed(page)).toContainText(title)
     await feed(page)
       .getByRole('article', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
-      .getByText(`${await backlogLabel(page, id)}`, { exact: true })
+      // The feed shows the id on hover; the row's time is its mention handle and opens it like the id did.
+      .locator('[data-backlog-mention-handle]')
       .click()
     await expect(peek(page).getByRole('list', { name: 'Referenced by' })).toContainText(title)
   })

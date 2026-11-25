@@ -412,7 +412,7 @@
         "fill textbox \"Capture\" \"Open [guide](https://example.com/guide) https://example.com\nRead [description](https://example.org/description) https://example.org\"",
         "press Enter",
         "expect link \"guide\"",
-        "click text \"b:#1\"",
+        "click article \"Item b:#1\" at 8,8",
         "expect link \"description\"",
         "click button \"example.com/guide\"",
         "expect button \"Open in browser\"",
