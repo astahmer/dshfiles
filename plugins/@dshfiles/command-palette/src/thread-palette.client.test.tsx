@@ -207,12 +207,16 @@ describe('ThreadPalette navigation', () => {
 })
 
 describe('ThreadPalette frame (council round 3 B5)', () => {
-  it('keeps a 16 px outer inset and a 16 px query line', () => {
+  it('keeps a 16 px outer inset, a 16 px query line and the kit dialog surface', () => {
     mount()
     const dialog = screen.getByRole('dialog')
     // The kit dialog's 24 px sm: padding read as a loose frame: 16 px on every side.
     expect(dialog.className).toContain('dshx:p-4!')
     expect(dialog.className).toContain('dshx:phone:p-0!')
+    // The kit's floating surface (kit A8) draws the fill, edge and shadow: the palette sets none of its own.
+    expect(dialog.className).toContain('dshx:surface-dialog')
+    expect(dialog.className).not.toContain('dshx:dark:bg-(--dshx-tone-raised)')
+    expect(dialog.className).not.toContain('dshx:shadow-s3')
     const query = screen.getByRole('combobox')
     expect(query.className).toContain('dshx:text-base')
     expect(query.className).not.toContain('dshx:text-sm')
@@ -752,8 +756,8 @@ describe('ThreadPalette goes to threads', () => {
     const search = screen.getByRole('combobox').closest('[data-slot="command-input-wrapper"]')?.parentElement
     expect(search?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:outline-none!')
     const dialog = document.querySelector('[data-slot="dialog-content"]')
-    expect(dialog?.className).toContain('dshx:shadow-s3')
-    expect(dialog?.className).toContain('dshx:dark:bg-(--dshx-tone-raised)')
+    // One floating surface: the kit dialog's (council round 3 B5, kit A8).
+    expect(dialog?.className).toContain('dshx:surface-dialog')
   })
 
   it("draws a thread's status with the list's glyph and word", async () => {

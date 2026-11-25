@@ -712,9 +712,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           // A 16px outer inset (council round 3 B5): the kit dialog's 24px read as a loose frame around the search. Important,
           // to beat the kit's own sm: padding without a viewport variant here; the full-screen phone search keeps none.
           'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-4! dshx:phone:p-0! dshx:sm:max-w-2xl',
-          // One frame (round five B6): the raised surface with a hairline and the top elevation step; in dark it sits
-          // one tone above the page (tone 2) so it does not sink into the dimmed stage.
-          'dshx:border-(color:--dshx-tone-line) dshx:shadow-s3 dshx:dark:bg-(--dshx-tone-raised)',
+          // One frame: the kit dialog's floating surface (council round 3 B5, kit A8), so in dark the palette is a raised
+          // warm card with a faint edge and one deep shadow, not the brightest box on screen.
           // A phone gets a full-screen search: the input at the top, results down to the software keyboard (the visual
           // viewport, published below), no centred card.
           'dshx:phone:top-[var(--palette-top,0px)] dshx:phone:left-0 dshx:phone:translate-x-0 dshx:phone:translate-y-0 dshx:phone:w-full dshx:phone:max-w-none! dshx:phone:h-[var(--palette-height,100dvh)] dshx:phone:max-h-none dshx:phone:flex dshx:phone:flex-col dshx:phone:rounded-none dshx:phone:border-0 dshx:phone:pt-[env(safe-area-inset-top,0px)] dshx:phone:shadow-none',
