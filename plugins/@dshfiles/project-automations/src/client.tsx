@@ -10,6 +10,8 @@ import { DestinationSections } from '@dshfiles/thread-sidebar/destinations'
 import { AutomationsPanel } from './automations-panel.js'
 
 const PANEL_ID = 'project-automations'
+/** The Schedules page (the schedule fork): a prompt sent into an existing thread at a set time. */
+const SCHEDULES_PANEL_ID = 'schedules'
 
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
   <svg aria-hidden width={props.size ?? 18} height={props.size ?? 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7">
@@ -27,7 +29,7 @@ export default defineClient({
       panelId: PANEL_ID,
       destination: 'work',
       label: 'Automations',
-      description: 'Schedules and webhooks that start threads in a project.',
+      description: 'Start a new thread on a schedule or from a webhook.',
       order: 3,
       formerLabels: ['Automations'],
     })
@@ -56,7 +58,16 @@ export default defineClient({
         { name: 'main', key: PANEL_ID },
         decorate(() => (
           <PluginQueryProvider>
-            <AutomationsPanel openThread={openThread} projects={projects} threads={threads} />
+            <AutomationsPanel
+              openThread={openThread}
+              projects={projects}
+              threads={threads}
+              openSchedules={
+                ctx.slots.entriesOfSlot('main').some(entry => entry.options.key === SCHEDULES_PANEL_ID)
+                  ? () => metadata?.plugin?.layout.openPanel(SCHEDULES_PANEL_ID)
+                  : undefined
+              }
+            />
           </PluginQueryProvider>
         )),
       ),

@@ -3,6 +3,10 @@ import { frequencyEn, frequencyJa, frequencyEs, frequencyFr, frequencyDe, freque
 
 /** English task-manager dictionary and key domain. */
 export const en = {
+  'description': 'Prompts sent to a thread at a set time.',
+  'description.otherBefore': 'To start a new thread from a schedule or a webhook, use ',
+  'description.otherLink': 'Automations',
+  'description.otherAfter': '.',
   'host.create': 'Create',
   'host.createMethod': 'Choose a creation method',
   'host.chatCreate': 'Create in a session',
@@ -46,8 +50,8 @@ export const en = {
   'host.frequency.monthly': 'Every month',
   'host.frequency.advanced': 'Custom',
 
-  'panel': 'Automation tasks',
-  'title': 'Automation tasks',
+  'panel': 'Schedules',
+  'title': 'Schedules',
   'new.action': 'New',
   'list.label': 'Task catalog',
   'list.nextPrefix': 'Next scheduled time: ',
@@ -55,14 +59,14 @@ export const en = {
   'list.error': 'Could not load tasks.',
   'list.retry': 'Retry',
   'list.empty': 'No tasks yet. Tasks created in your sessions appear here.',
-  'list.emptyActive': 'No active automation tasks',
-  'list.emptyPaused': 'No paused automation tasks',
-  'list.emptyInactive': 'No ended automation tasks',
+  'list.emptyActive': 'No active schedules',
+  'list.emptyPaused': 'No paused schedules',
+  'list.emptyInactive': 'No ended schedules',
   'list.noMatches': 'No matching tasks',
   'search.label': 'Search tasks',
-  'search.placeholder': 'Search automation tasks',
+  'search.placeholder': 'Search schedules',
   'search.clear': 'Clear search',
-  'empty.action': 'New automation task',
+  'empty.action': 'New schedule',
   'statusFilter.label': 'Task status',
   'statusFilter.all': 'All',
   'status.active': 'Enabled',
@@ -169,6 +173,10 @@ export type TaskManagerKey = keyof typeof en
 
 /** Simplified Chinese dictionary with the same keys as English. */
 export const zh: Record<TaskManagerKey, string> = {
+  'description': '在设定时间发送到会话的提示。',
+  'description.otherBefore': '如需按计划或通过 Webhook 新建会话，请使用',
+  'description.otherLink': '自动化',
+  'description.otherAfter': '。',
   'host.create': '创建',
   'host.createMethod': '选择创建方式',
   'host.chatCreate': '在会话中创建',
@@ -330,6 +338,10 @@ export const zh: Record<TaskManagerKey, string> = {
 
 /** Japanese copy, checked against the English keys. */
 export const ja = {
+  'description': '決まった時刻にスレッドへ送るプロンプト。',
+  'description.otherBefore': 'スケジュールや Webhook で新しいスレッドを始めるには、',
+  'description.otherLink': 'オートメーション',
+  'description.otherAfter': 'を使います。',
   ...frequencyJa,
   'host.create': '作成',
   'host.createMethod': '作成方法を選択',
@@ -490,6 +502,10 @@ export const ja = {
 
 /** Spanish dictionary, checked against the English keys. */
 export const es = {
+  'description': 'Indicaciones enviadas a un hilo a una hora fija.',
+  'description.otherBefore': 'Para iniciar un hilo nuevo con una programación o un webhook, usa ',
+  'description.otherLink': 'Automatizaciones',
+  'description.otherAfter': '.',
   'panel': 'Tareas de automatización',
   'title': 'Tareas de automatización',
   'new.action': 'Nuevo',
@@ -651,6 +667,10 @@ export const es = {
 
 /** French dictionary, checked against the English keys. */
 export const fr = {
+  'description': 'Des invites envoyées à un fil à une heure donnée.',
+  'description.otherBefore': 'Pour démarrer un nouveau fil selon un horaire ou un webhook, utilisez ',
+  'description.otherLink': 'Automatisations',
+  'description.otherAfter': '.',
   'panel': "Tâches d'automatisation",
   'title': "Tâches d'automatisation",
   'new.action': 'Nouveau',
@@ -812,6 +832,10 @@ export const fr = {
 
 /** German dictionary, checked against the English keys. */
 export const de = {
+  'description': 'Prompts, die zu einer festen Zeit an einen Thread gehen.',
+  'description.otherBefore': 'Um einen neuen Thread nach Zeitplan oder per Webhook zu starten, nutzen Sie ',
+  'description.otherLink': 'Automatisierungen',
+  'description.otherAfter': '.',
   'panel': 'Automatisierungsaufgaben',
   'title': 'Automatisierungsaufgaben',
   'new.action': 'Neu',
@@ -973,6 +997,10 @@ export const de = {
 
 /** Russian dictionary, checked against the English keys. */
 export const ru = {
+  'description': 'Промпты, отправляемые в ветку в заданное время.',
+  'description.otherBefore': 'Чтобы начать новую ветку по расписанию или вебхуку, используйте ',
+  'description.otherLink': 'Автоматизации',
+  'description.otherAfter': '.',
   'panel': 'Задачи автоматизации',
   'title': 'Задачи автоматизации',
   'new.action': 'Новый',
@@ -1134,6 +1162,10 @@ export const ru = {
 
 /** Portuguese dictionary, checked against the English keys. */
 export const pt = {
+  'description': 'Prompts enviados a uma conversa num horário definido.',
+  'description.otherBefore': 'Para iniciar uma conversa nova por agendamento ou webhook, use ',
+  'description.otherLink': 'Automações',
+  'description.otherAfter': '.',
   'panel': 'Tarefas de automação',
   'title': 'Tarefas de automação',
   'new.action': 'Novo',

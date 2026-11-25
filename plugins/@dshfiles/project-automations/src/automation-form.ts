@@ -44,7 +44,7 @@ export const automationFormProblem = (form: AutomationForm): string | undefined 
   if (form.timingKind !== 'every' && form.timeZone.trim() === '') return 'A time zone is required, such as Europe/Paris or UTC.'
   if (form.timingKind === 'cron' && form.cron.trim().split(/\s+/u).length !== 5)
     return 'A cron expression has five fields: minute hour day-of-month month day-of-week.'
-  if ((form.timingKind === 'daily' || form.timingKind === 'weekly') && !/^\d{2}:\d{2}$/u.test(form.time.trim())) return 'Give the time as HH:mm, such as 09:00.'
+  if ((form.timingKind === 'daily' || form.timingKind === 'weekly') && !/^\d{2}:\d{2}$/u.test(form.time.trim())) return 'Pick a time, such as 09:00.'
   if (form.timingKind === 'weekly' && form.weekdays.length === 0) return 'Pick at least one weekday.'
   if (form.timingKind === 'every' && !(Number(form.everyMinutes) >= 1)) return 'Run at most once a minute: give 1 or more minutes.'
   return undefined

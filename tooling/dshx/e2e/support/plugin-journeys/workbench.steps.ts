@@ -2349,7 +2349,7 @@ Then('the view chooser names views without their plugin and AI Accounts search s
     // Rows name the page, never its plugin (DESIGN.md); two views sharing a short name would keep their qualified names.
     expect(names.filter(name => /^(?:AI Accounts|Workbench|Plugin Manager|Schedule|Settings Shell|Rich Composer): /u.test(name))).toEqual([])
     await expect(chooser.getByRole('button', { name: 'Current conversation', exact: true })).toHaveCount(0)
-    for (const name of ['Threads', 'Navigation', 'Quota', 'Sidebar controls', 'Accounts', 'Files', 'Scratchpad', 'Plugins', 'Automation tasks'])
+    for (const name of ['Threads', 'Navigation', 'Quota', 'Sidebar controls', 'Accounts', 'Files', 'Scratchpad', 'Plugins', 'Schedules'])
       await expect(chooser.getByRole('button', { name, exact: true })).toBeVisible()
     // Native/unlabeled footer actions are present in this composition: never falsely attribute their aggregate to AI Accounts.
     await expect(chooser.getByRole('button', { name: 'Controls', exact: true })).toHaveCount(0)
@@ -2365,7 +2365,7 @@ Then('the view chooser names views without their plugin and AI Accounts search s
     await expect(tab).toHaveAttribute('aria-selected', 'true')
     await expect(tab.locator('[data-workbench-tab-id]')).toHaveAttribute('data-workbench-tab-id', PREVIEW_SOURCE_ID)
     await expect(mainSeat(page).locator(`[data-sidebar-workbench-source="${PREVIEW_SOURCE_ID}"] [data-slot="sidebar.footer.above"]`)).toBeAttached()
-    for (const name of ['Sidebar status', 'Sidebar actions', 'Current conversation', 'Threads', 'Plugins', 'Automation tasks'])
+    for (const name of ['Sidebar status', 'Sidebar actions', 'Current conversation', 'Threads', 'Plugins', 'Schedules'])
       await expect(mainPane(page).getByRole('tab', { name, exact: true })).toHaveCount(0)
   })
 })

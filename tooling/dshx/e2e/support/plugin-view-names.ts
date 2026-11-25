@@ -19,7 +19,7 @@ const reusableViewNames = new Map([
   ['Scratchpad', 'Workbench: Scratchpad'],
   ['Ticker', 'Workbench: Ticker'],
   ['Plugins', 'Plugin Manager: Plugins'],
-  ['Automation tasks', 'Schedule: Automation tasks'],
+  ['Schedules', 'Schedule: Schedules'],
 ])
 
 export const reusableViewName = (fixtureName: string): string => reusableViewNames.get(fixtureName) ?? fixtureName
@@ -50,7 +50,7 @@ export const viewNamePattern = (fixtureName: string, before = '', after = ''): R
 
 /** Core-owned navigation metadata stays original outside Workbench; the owned Navigation seat qualifies it. */
 const globalPanelName = (fixtureName: string): string =>
-  fixtureName === 'Plugins' || fixtureName === 'Automation tasks' ? fixtureName : reusableViewName(fixtureName)
+  fixtureName === 'Plugins' || fixtureName === 'Schedules' ? fixtureName : reusableViewName(fixtureName)
 
 export const globalPanelLink = (page: Page, fixtureName: string): Locator =>
   page
@@ -81,7 +81,7 @@ const railLocations = new Map<string, { readonly destination: string; readonly s
   ['Jujutsu: Revision graph', { destination: 'Land', section: 'History' }],
   ['Jujutsu: Source Control', { destination: 'Land', section: 'Source control' }],
   ['Backlog: Items', { destination: 'Work', section: 'Backlog' }],
-  ['Schedule: Automation tasks', { destination: 'Work', section: 'Schedules' }],
+  ['Schedule: Schedules', { destination: 'Work', section: 'Schedules' }],
   ['Agents: Directory', { destination: 'Agents', section: 'Directory' }],
   ['Agent Communication: Messages', { destination: 'Agents', section: 'Messages' }],
   ['Agent Toolkit: Capabilities', { destination: 'Agents', section: 'Capabilities' }],

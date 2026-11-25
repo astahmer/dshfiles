@@ -18,7 +18,7 @@ const strip = (page: Page) => page.getByRole('tablist', { name: 'Open views', ex
  */
 const THREAD_STATUS_SUFFIX = '(?:, (?:Working|Needs you|Failed|Finished, unread))?'
 const nativeTabName = (name: string): string | RegExp => {
-  if (name === 'Plugins' || name === 'Automation tasks' || name === 'Settings') return name
+  if (name === 'Plugins' || name === 'Schedules' || name === 'Settings') return name
   // viewNamePattern anchors its alternatives with a closing `$`: the optional status goes in front of it.
   return new RegExp(`${viewNamePattern(name).source.slice(0, -1)}${THREAD_STATUS_SUFFIX}$`, 'u')
 }

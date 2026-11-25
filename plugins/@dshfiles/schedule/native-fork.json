@@ -25,5 +25,11 @@
       "local": "locale"
     }
   ],
-  "delta": ["src/native/catalog-source.ts", "src/native/index.ts"]
+  "delta": [
+    "src/native/TaskManagerPage.module.css",
+    "src/native/TaskManagerPage.tsx",
+    "src/native/catalog-source.ts",
+    "src/native/index.ts",
+    "src/native/task-manager-locales.ts"
+  ]
 }
