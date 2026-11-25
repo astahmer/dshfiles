@@ -3,6 +3,7 @@
 
 import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type {
   NodeKey, RenderEntry,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -38,6 +39,7 @@ import { SinceYouLeftCard, SinceYouLeftContext, type SinceYouLeftPlacement } fro
 import { useTextInteraction } from './text-interaction.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { OlderRowsSentinel } from './older-rows-sentinel.tsx'
+import { dockJumpSeat } from './dock-jump-seat.ts'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
 import { FileOpenRequestModel, type FileOpenRequest } from '../../file-open-request.ts'
@@ -561,6 +563,22 @@ export function ChatView({
     }
   }, [recap, transcript.entries, entryTurn, jumpToTurn, dismissSince, t, railItems, unreadLanding, running])
 
+  // dshfiles (unslop r5 C1): on a phone the control takes the dock's trailing seat, looked up each time it appears.
+  const [jumpSeat, setJumpSeat] = useState<HTMLElement | null>(null)
+  useLayoutEffect(() => {
+    setJumpSeat(scroll.followingTail ? null : dockJumpSeat(frameRef.current))
+  }, [scroll.followingTail])
+  const toBottom = (
+    <button
+      type="button"
+      className={jumpSeat === null ? css.toBottom : `${css.toBottom} ${css.toBottomInDock}`}
+      aria-label={t('chat.toBottom')}
+      onClick={scroll.returnToBottom}
+    >
+      <ChevronDownIcon size={14} strokeWidth={1.5} />
+    </button>
+  )
+
   return (
     <div ref={frameRef} className={css.frame}>
       <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t}
@@ -651,18 +669,9 @@ export function ChatView({
           <div className={css.turnSpacer} data-chat-turn-spacer aria-hidden="true" />
         </div>
       </div>
-      {!scroll.followingTail && (
-        <div className={css.toBottomSlot}>
-          <button
-            type="button"
-            className={css.toBottom}
-            aria-label={t('chat.toBottom')}
-            onClick={scroll.returnToBottom}
-          >
-            <ChevronDownIcon size={14} strokeWidth={1.5} />
-          </button>
-        </div>
-      )}
+      {!scroll.followingTail && (jumpSeat !== null && jumpSeat.isConnected
+        ? createPortal(toBottom, jumpSeat)
+        : <div className={css.toBottomSlot}>{toBottom}</div>)}
       {imagePreview.status === 'open' && (
         <ImageLightbox images={imagePreview.images} initialIndex={imagePreview.initialIndex} labels={imageLightboxLabels} onClose={closeImagePreview} />
       )}

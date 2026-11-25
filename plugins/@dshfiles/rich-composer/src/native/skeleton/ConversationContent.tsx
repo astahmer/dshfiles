@@ -12,7 +12,7 @@ import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { ConversationWidthControls } from './ConversationWidthControls.tsx'
 import { confirmedRemoteWorkspaceCwd } from '../../remote-workspace-context.ts'
 import { AgentPresetVisibility } from '../../agent-preset-visibility.ts'
-import { LiveWork, LiveWorkSummary, useLiveWorkCounts } from '../../live-work.tsx'
+import { LiveWork, PhoneDockHead, useLiveWorkCounts } from '../../live-work.tsx'
 import css from './ConversationRoot.module.css'
 
 function ConversationSessionView({ renderSlot }: ConversationViewsProps) {
@@ -303,9 +303,12 @@ export function ConversationContent(props: ConversationContentProps) {
   const composerBar = (
     <div ref={stackRef} className={clsx(css.composerStack, hero && css.composerHero)} data-live-work-open={liveWorkOpen ? '' : undefined}>
       {hero && <HeroShell t={t} project={chipTitle} />}
+      {/* Unslop r5 C1 (council round 4): the phone dock's head row holds Live work and the jump control's trailing seat. */}
       {session !== undefined && (
-        <LiveWorkSummary
-          className={css.liveWork}
+        <PhoneDockHead
+          className={css.dockHead}
+          summaryClassName={css.liveWork}
+          jumpSeatClassName={css.jumpSeat}
           counts={liveWork}
           open={liveWorkOpen}
           onToggle={() => { setLiveWorkOpenFor(liveWorkOpen ? undefined : sessionId) }}

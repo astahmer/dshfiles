@@ -434,6 +434,12 @@
   }
 }
 
+/* dshfiles (unslop r5 C1, council round 4): a phone has no gutter, so the control sits in the dock's trailing seat
+   (rich-composer's PhoneDockHead), on the dock, never over prose; there it is an ordinary box in a row. */
+.toBottomInDock {
+  margin-top: 0;
+}
+
 /* A touch screen answers a 44px tap centred on the 36px circle. */
 @media (pointer: coarse) {
   .toBottom::after {

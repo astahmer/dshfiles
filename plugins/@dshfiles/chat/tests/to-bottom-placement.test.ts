@@ -1,7 +1,11 @@
+// @vitest-environment jsdom
 import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { dockJumpSeat } from '../src/native/chat/dock-jump-seat.ts'
 
-const css = readFileSync(new URL('../src/native/chat/ChatView.module.css', import.meta.url), 'utf8')
+const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/native/chat/ChatView.module.css'), 'utf8')
 const rule = (selector: RegExp): string => selector.exec(css)?.[1] ?? ''
 
 describe('the "Back to bottom" control', () => {
@@ -34,5 +38,27 @@ describe('the "Back to bottom" control', () => {
   it('floats over the transcript: no band, no hairline behind it', () => {
     expect(css).not.toMatch(/\.toBottomSlot::before/)
     expect(css).not.toContain('--dsh-to-bottom-overlap')
+  })
+
+  // Round five C1 (council round 4): a phone has no gutter, so the control moves into the dock's trailing seat (the
+  // composer publishes `[data-composer-jump-seat]`) and is never drawn over prose.
+  it('finds the dock trailing seat of its own conversation, and none elsewhere', () => {
+    const scroller = document.createElement('div')
+    scroller.setAttribute('data-conversation-scroll', '')
+    const frame = document.createElement('div')
+    const seat = document.createElement('span')
+    seat.setAttribute('data-composer-jump-seat', '')
+    scroller.append(frame, seat)
+    document.body.append(scroller)
+    expect(dockJumpSeat(frame)).toBe(seat)
+    seat.remove()
+    expect(dockJumpSeat(frame)).toBeNull()
+    expect(dockJumpSeat(null)).toBeNull()
+    scroller.remove()
+  })
+
+  it('sits in the dock seat as a plain 36px circle, without the floating slot offset', () => {
+    const docked = rule(/\n\.toBottomInDock \{([^}]*)\}/)
+    expect(docked).toMatch(/margin-top: 0/)
   })
 })

@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { act, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { LiveWork, LiveWorkSummary, useLiveWorkCounts } from './live-work.tsx'
+import { LiveWork, LiveWorkSummary, PhoneDockHead, useLiveWorkCounts } from './live-work.tsx'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 
@@ -104,7 +104,7 @@ describe('Live work on a narrow phone (unslop r5 C1)', () => {
     const phone = ':global(html[data-shell-phone-nav])'
     expect(rules.get(`${phone} .liveWork`)).toMatch(/display:\s*flex/)
     expect(rules.get(`${phone} .composerStack > ${DOCK} > *`)).toMatch(/flex-basis:\s*100%/)
-    const closed = `${phone} .composerStack:has(> .liveWork):not([data-live-work-open]) > ${DOCK}`
+    const closed = `${phone} .composerStack:has(> .dockHead > .liveWork):not([data-live-work-open]) > ${DOCK}`
     expect(rules.get(`${closed} > :global([data-dshfiles-live-preview-dock])`)).toMatch(/display:\s*none/)
     // Outside the narrow phone the summary never shows.
     expect(css).toMatch(/\n\.liveWork \{\s*display: none;\s*\}/)
@@ -112,7 +112,9 @@ describe('Live work on a narrow phone (unslop r5 C1)', () => {
 })
 
 describe('the collapsed Live work row (round five C2, council round 3)', () => {
-  it('is a flat 44px disclosure with one separator, not an outlined card', async () => {
+  // Round five C1 (council round 4): the dock's edge is the seat's 24px fade, so the row draws no hairline of its own
+  // (a rule there cut the transcript's last visible line in half).
+  it('is a flat 44px disclosure without its own rule, not an outlined card', async () => {
     const host = document.createElement('div')
     document.body.append(host)
     const root = createRoot(host)
@@ -122,11 +124,83 @@ describe('the collapsed Live work row (round five C2, council round 3)', () => {
     const row = host.querySelector<HTMLButtonElement>('[data-live-work-summary]')
     const classes = row?.className.split(/\s+/u) ?? []
     expect(classes).toContain('dshx:h-11')
-    expect(classes).toContain('dshx:border-t')
+    expect(classes).not.toContain('dshx:border-t')
     // Opaque page fill: the row sits over the transcript's scroll range, so text never shows through it.
     expect(classes).toContain('dshx:bg-background')
     for (const card of ['dshx:border', 'dshx:rounded-lg', 'dshx:bg-popover']) expect(classes).not.toContain(card)
     await act(async () => root.unmount())
     host.remove()
+  })
+})
+
+/** The body of the first rule whose selector is exactly `selector`, inside the media block that starts at `media`. */
+const ruleIn = (media: string, selector: string): string => {
+  let from = css.indexOf(media)
+  while (from >= 0) {
+    const open = css.indexOf('{', from)
+    let depth = 0
+    let end = open
+    for (let index = open; index < css.length; index += 1) {
+      if (css[index] === '{') depth += 1
+      if (css[index] === '}') depth -= 1
+      if (depth === 0) {
+        end = index
+        break
+      }
+    }
+    for (const match of css.slice(open + 1, end).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if ((match[1] ?? '').trim() === selector) return match[2] ?? ''
+    }
+    from = css.indexOf(media, end)
+  }
+  return ''
+}
+
+describe('the phone dock edge (round five C1, council round 4)', () => {
+  const PHONE = '@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px)'
+  const phone = ':global(html[data-shell-phone-nav])'
+
+  it('ends the transcript above the dock in a 24px fade, so no line of text is cut by a rule', () => {
+    const seat = ruleIn(PHONE, `${phone} .body[data-content-phase='active'] .composerSeat`)
+    expect(seat).toMatch(/padding-top:\s*24px/)
+    // Transparent at the band's top, the page base before the band ends: the band is the fade, the dock below opaque.
+    expect(seat).toMatch(/var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,/)
+    const opaqueAt = Number(/var\(--dsw-alias-bg-base\) (\d+)px\s*\)/u.exec(seat)?.[1])
+    expect(opaqueAt).toBeGreaterThan(0)
+    expect(opaqueAt).toBeLessThanOrEqual(24)
+  })
+
+  it('gives the jump control a trailing seat in the dock head, beside Live work', async () => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 27.99rem)', addEventListener: () => undefined, removeEventListener: () => undefined }))
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    await act(async () =>
+      root.render(<PhoneDockHead className="head" jumpSeatClassName="seat" counts={{ jobs: 1, subagents: 0 }} open={false} onToggle={() => undefined} label="Live work" detail="1 job" />),
+    )
+    const head = host.querySelector('[data-composer-dock-head]')
+    expect(head?.firstElementChild?.hasAttribute('data-live-work-summary')).toBe(true)
+    // The seat trails the row, so the control sits in the dock, never over the transcript's prose.
+    expect(head?.lastElementChild?.hasAttribute('data-composer-jump-seat')).toBe(true)
+    await act(async () => root.unmount())
+    host.remove()
+  })
+
+  it('renders no dock head on a wider screen, where the control keeps the gutter', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined }))
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    await act(async () =>
+      root.render(<PhoneDockHead counts={{ jobs: 1, subagents: 0 }} open={false} onToggle={() => undefined} label="Live work" detail="1 job" />),
+    )
+    expect(host.querySelector('[data-composer-dock-head]')).toBeNull()
+    await act(async () => root.unmount())
+    host.remove()
+  })
+
+  it('folds the head away while it holds neither Live work nor the control', () => {
+    const hidden = ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:not(:has([data-live-work-summary], [data-composer-jump-seat] > *))`)
+    expect(hidden).toMatch(/display:\s*none/)
   })
 })

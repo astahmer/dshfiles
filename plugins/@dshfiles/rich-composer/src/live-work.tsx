@@ -69,6 +69,9 @@ const subscribeQuery = (notify: () => void): (() => void) => {
 const readQuery = (): boolean => query()?.matches ?? false
 const readQueryOnServer = (): boolean => false
 
+/** Whether the viewport is narrow enough for the phone dock head (the Live work row and the jump seat). */
+const useNarrowDock = (): boolean => useSyncExternalStore(subscribeQuery, readQuery, readQueryOnServer)
+
 /**
  * The live work in the composer stack's dock, counted only while the viewport is narrow enough for the summary. The
  * stack is watched for the outlet arriving (child list only, so draft keystrokes cost nothing) and the outlet's subtree
@@ -77,7 +80,7 @@ const readQueryOnServer = (): boolean => false
  * @returns the counts; zero while the viewport is wider.
  */
 export function useLiveWorkCounts(stack: RefObject<HTMLElement | null>): LiveWorkCounts {
-  const narrow = useSyncExternalStore(subscribeQuery, readQuery, readQueryOnServer)
+  const narrow = useNarrowDock()
   const [counts, setCounts] = useState<LiveWorkCounts>(NONE)
   useEffect(() => {
     const root = stack.current
@@ -128,8 +131,9 @@ export function LiveWorkSummary(props: {
       type="button"
       aria-expanded={props.open}
       className={cn(
-        // Round five C2 (council round 3): a flat disclosure on the page with one separator above it, not an outlined card.
-        'dshx-root dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-t dshx:border-border dshx:bg-background dshx:px-1 dshx:text-left dshx:text-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60',
+        // Round five C2 (council round 3): a flat disclosure on the page, not an outlined card. C1 (council round 4): no
+        // rule of its own; the composer seat's 24px fade is the dock's edge.
+        'dshx-root dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:flex-none dshx:items-center dshx:gap-2 dshx:bg-background dshx:px-1 dshx:text-left dshx:text-sm dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60',
         props.className,
       )}
       data-live-work-summary=""
@@ -145,5 +149,25 @@ export function LiveWorkSummary(props: {
         {props.detail}
       </span>
     </button>
+  )
+}
+
+/**
+ * The phone dock's head row (round five C1, council round 4): the Live work disclosure, then a trailing seat that Chat's
+ * "Back to bottom" control portals into (`[data-composer-jump-seat]`, read by chat's `dockJumpSeat`), so on a phone the
+ * control sits on the dock instead of over the transcript's last lines. Rendered only below 28rem; ConversationRoot
+ * folds the row away while it holds neither.
+ */
+export function PhoneDockHead(
+  props: Parameters<typeof LiveWorkSummary>[0] & { readonly summaryClassName?: string | undefined; readonly jumpSeatClassName?: string | undefined },
+): JSX.Element | null {
+  const narrow = useNarrowDock()
+  if (!narrow) return null
+  const { className, summaryClassName, jumpSeatClassName, ...summary } = props
+  return (
+    <div className={className} data-composer-dock-head="">
+      <LiveWorkSummary {...summary} className={summaryClassName} />
+      <span className={jumpSeatClassName} data-composer-jump-seat="" />
+    </div>
   )
 }

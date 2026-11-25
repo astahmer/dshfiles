@@ -1048,6 +1048,20 @@ button.crumbEditable {
     justify-content: flex-end;
   }
 
+  /* Unslop r5 C1 (council round 4): the transcript ends above the dock in a 24px fade band the seat owns, so its last
+     visible line dissolves instead of being cut by the dock's first row; at the tail, Chat's 12px end padding keeps
+     the last line above the band. The curve eases out, opaque from 20px, so the next line's cap tops never show as
+     a row of grey dashes on the dock's edge. */
+  :global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat {
+    padding-top: 24px;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
+      color-mix(in srgb, var(--dsw-alias-bg-base) 70%, transparent) 12px,
+      var(--dsw-alias-bg-base) 20px
+    );
+  }
+
   :global(html[data-shell-phone-nav]) .composerHero {
     align-self: stretch;
     width: 100%;
@@ -1125,24 +1139,59 @@ button.crumbEditable {
   display: none;
 }
 
+/* The phone dock's head row (unslop r5 C1, council round 4, src/live-work.tsx PhoneDockHead): Live work, then the
+   trailing seat Chat's "Back to bottom" control portals into, so on a phone the control sits on the dock, never over
+   prose. Only the narrow phone renders it. */
+.dockHead {
+  display: none;
+}
+
 @media (max-width: 27.99rem) {
   /* The composer card's edges, like the dock entries under it. */
+  :global(html[data-shell-phone-nav]) .dockHead {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    margin-inline: var(--dsh-composer-side-clearance, 0px);
+  }
+
+  /* Neither Live work nor the control: the row takes no room and no stack gap. */
+  :global(html[data-shell-phone-nav]) .dockHead:not(:has([data-live-work-summary], [data-composer-jump-seat] > *)) {
+    display: none;
+  }
+
   :global(html[data-shell-phone-nav]) .liveWork {
     display: flex;
+    flex: 1 1 auto;
     width: auto;
-    margin-inline: var(--dsh-composer-side-clearance, 0px);
+  }
+
+  /* A 44px seat at the row's trailing end; empty, it takes no room. */
+  :global(html[data-shell-phone-nav]) .jumpSeat {
+    display: flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    margin-left: auto;
+  }
+
+  :global(html[data-shell-phone-nav]) .jumpSeat:empty {
+    display: none;
   }
 
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > * {
     flex-basis: 100%;
   }
 
-  :global(html[data-shell-phone-nav]) .composerStack:has(> .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
+  :global(html[data-shell-phone-nav]) .composerStack:has(> .dockHead > .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
     display: none;
   }
 
   /* A dock holding only live work leaves no empty seat (and no stack gap) while the summary is closed. */
-  :global(html[data-shell-phone-nav]) .composerStack:has(> .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']):not(:has(> :not([data-dshfiles-live-preview-dock]))) {
+  :global(html[data-shell-phone-nav]) .composerStack:has(> .dockHead > .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']):not(:has(> :not([data-dshfiles-live-preview-dock]))) {
     display: none !important;
   }
 }
