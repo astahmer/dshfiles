@@ -960,6 +960,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       case 'bookmark-delete':
         return state?.revisions.find(revision => revision.localBookmarks.includes(pendingAction.bookmark))?.commitId ?? null
       case 'workspace-forget':
+      case 'operation-undo':
         return null
       default:
         return pendingAction.commitId
@@ -2055,6 +2056,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 <TooltipContent side="bottom">
                   {selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
                 </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className={TOUCH_HIT_AREA}
+                    disabled={repoId === null || busy}
+                    onClick={() => askForConfirmation({ kind: 'operation-undo' })}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Undo
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Undo the last jujutsu operation (jj op undo)</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>

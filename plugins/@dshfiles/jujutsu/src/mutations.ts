@@ -250,6 +250,14 @@ const mutationPreview = Effect.fnUntraced(function* (input: {
         detail: 'Files:\n' + action.paths.join('\n') + '\n\nThe changes these files carry in this revision are discarded.',
       }
     }
+    case 'operation-undo': {
+      return {
+        title: 'Undo last operation',
+        summary: 'Undo the most recent jujutsu operation',
+        detail:
+          'This rewinds the repository one operation, for example a land, rebase, describe or bookmark move. Anything that operation changed moves back; later operations are left in place when jujutsu can replay them. Conflicts the undo introduces stay recorded for review.',
+      }
+    }
   }
 })
 
@@ -276,6 +284,11 @@ const make = Effect.gen(function* () {
   const reader = yield* RevisionReader
   const identity = yield* RepositoryIdentity
   const commands = yield* JujutsuCommands
+  /** The operation at the top of the repo's op log; an `operation-undo` preview is bound to it. */
+  const currentOperationId = (repo: RegisteredRepo) =>
+    repositories
+      .run(repo)(['op', 'log', '--limit', '1', '--no-graph', '--template', 'self.id()'], { outputLimit: 256 })
+      .pipe(Effect.map(result => result.stdout.trim()))
 
   const previews = yield* Cache.make({
     lookup: (previewId: string): Effect.Effect<PreparedMutation, PreviewExpired> => Effect.fail(new PreviewExpired({ previewId, reason: 'expired' })),
@@ -319,6 +332,7 @@ const make = Effect.gen(function* () {
     yield* Effect.forEach(commitIds, commitId => findRevision(revisions, commitId))
     const preview: Preview = yield* mutationPreview({ action: preparedAction, revisions, selectedPaths, workspacePath: destination?.path ?? workspaceRoot })
     const argv = yield* Effect.fromResult(JujutsuMutationModel.buildMutationArgv(preparedAction))
+    const operationId = preparedAction.kind === 'operation-undo' ? yield* currentOperationId(repo) : undefined
     if (remote && !remoteNames.includes(preparedAction.remote)) return yield* refuse('remote-gone')
     const pushBookmark = preparedAction.kind === 'push' ? preparedAction : undefined
     if (pushBookmark !== undefined && !revisions.some(row => row.localBookmarks.includes(pushBookmark.bookmark))) {
@@ -352,6 +366,7 @@ const make = Effect.gen(function* () {
       expiresAt: (yield* Clock.currentTimeMillis) + Duration.toMillis(PREVIEW_TTL),
       ...(destination !== undefined && { workspaceParentIdentity: destination.parentIdentity }),
       ...(destination === undefined && workspaceRoot !== undefined && { workspaceRoot }),
+      ...(operationId === undefined ? {} : { operationId }),
     }
     return prepared
   })
@@ -394,6 +409,13 @@ const make = Effect.gen(function* () {
     const prepared = yield* take(input.previewId, repo)
     yield* identity.verify(repo)
     const action = prepared.action
+    if (action.kind === 'operation-undo') {
+      // A land, describe or another operation since the preview makes this undo the wrong one.
+      const current = yield* currentOperationId(repo)
+      if (prepared.operationId === undefined || current !== prepared.operationId) {
+        return yield* new PreviewExpired({ previewId: input.previewId, reason: 'target-changed' })
+      }
+    }
     const workspacePath =
       action.kind === 'workspace-add'
         ? yield* Effect.gen(function* () {
