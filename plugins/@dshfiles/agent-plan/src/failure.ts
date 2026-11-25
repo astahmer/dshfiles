@@ -1,4 +1,5 @@
 /** Pure copy for "Ask to fix" on a failed turn: whether to offer it, and the text it puts in the composer. */
+import { TurnFailure } from '@dshfiles/chat/turn-error-action'
 
 export interface FailureFacts {
   readonly message: string
@@ -15,8 +16,12 @@ export const Failure = {
     return { message: owner.message.trim(), code: code === '' ? undefined : code }
   },
 
-  /** Whether the card offers the action: a stopped turn needs no fixing. */
+  /**
+   * Whether the card offers the action: a stopped turn needs no fixing, and a credential failure cannot be fixed by
+   * asking the model that has no key (the account action leads instead).
+   */
   actionable(facts: FailureFacts): boolean {
+    if (TurnFailure.isCredential({ code: facts.code ?? '', message: facts.message })) return false
     return facts.code === undefined || !STOPPED_CODES.has(facts.code)
   },
 
