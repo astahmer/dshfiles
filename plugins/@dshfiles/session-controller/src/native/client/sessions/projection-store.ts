@@ -226,6 +226,26 @@ export class ProjectionValueStore {
     }
   }
 
+  /**
+   * Discard one Host generation's watermarks, keeping the given keys' values as cached rows.
+   * A reconnect must not blank a list row (title, prompted-turn count) before the new
+   * generation answers: a kept value yields to every sequenced write, and the next
+   * baseline or list block replaces it.
+   * @param keys - projection keys whose last value stays readable.
+   */
+  demoteToCached(keys: readonly string[]): void {
+    const kept = new Set(keys)
+    for (const [key, row] of [...this.rows]) {
+      if (!kept.has(key)) {
+        this.rows.delete(key)
+        this.changed(key)
+      } else if (row.kind === 'sequenced') {
+        // Same value, no seq: no change for readers, so no notification.
+        this.rows.set(key, { kind: 'cached', value: row.value })
+      }
+    }
+  }
+
   /** Discard one Host generation's values and watermarks while preserving subscribed faces. */
   clear(): void {
     for (const key of this.rows.keys()) {

@@ -63,6 +63,9 @@ const RESIDENT_SESSION_STATE_LIMIT = 3
 /** Values a list row still reads after its Session's history state is released. */
 const LIST_ROW_STATE_KEYS = ['title', 'sessionListMetadata', 'promptedTurnCount'] as const
 
+/** Delays before re-pulling a failed list: 1 s, 2 s, 5 s, then every 10 s while the connection holds. */
+const LIST_RETRY_DELAYS_MS = [1_000, 2_000, 5_000, 10_000] as const
+
 /**
  * Session instances nobody renders that stay instantiated. The sidebar restores and revisits threads freely, and a
  * resident instance carries its whole event window; past this many, the least recently viewed unsubscribed instance
@@ -202,6 +205,9 @@ export class SessionManager {
   private readonly viewedSessions: SessionId[] = []
   /** Guards the release pass: `drop` re-enters state release, and the pass already mutates `sessions`. */
   private releasingSessions = false
+  /** Consecutive failed list pulls; picks the next retry delay. */
+  private listFailures = 0
+  private listRetry: ReturnType<typeof setTimeout> | undefined
 
 
   private listSnapshotCache: SessionListSnapshot
@@ -295,6 +301,7 @@ export class SessionManager {
    */
   async dispose(): Promise<void> {
     this.disposed = true
+    this.cancelListRetry()
     this.list = { ...this.list, state: 'idle', flight: null }
     this.notifier.markDirty()
     this.engagedSessions.clear()
@@ -550,6 +557,7 @@ export class SessionManager {
     if (this.disposed) return Promise.resolve()
     const inFlight = this.list.flight
     if (inFlight !== null) return inFlight.promise
+    this.cancelListRetry()
     const completion = Promise.withResolvers<void>()
     const flight: ListFlight = { promise: completion.promise, mutations: [] }
     const mutations = flight.mutations
@@ -624,12 +632,40 @@ export class SessionManager {
             : crashed
               ? { ...this.list, state: 'idle', flight: null }
               : { ...this.list, flight: null }
+          if (failure === null) this.listFailures = 0
+          else this.scheduleListRetry()
           this.notifier.markDirty()
         }
         completion.resolve()
       }
     })()
     return completion.promise
+  }
+
+  /**
+   * Re-pull a failed list now (the page learned the Host answers again) instead of at the next retry.
+   * @returns completion of the pull, or at once when the list is not in error.
+   */
+  retryFailedList(): Promise<void> {
+    if (this.list.state !== 'error') return Promise.resolve()
+    return this.refreshList()
+  }
+
+  private scheduleListRetry(): void {
+    if (this.disposed) return
+    this.cancelListRetry()
+    const delay = LIST_RETRY_DELAYS_MS[Math.min(this.listFailures, LIST_RETRY_DELAYS_MS.length - 1)]
+    this.listFailures += 1
+    this.listRetry = setTimeout(() => {
+      this.listRetry = undefined
+      void this.refreshList()
+    }, delay)
+  }
+
+  private cancelListRetry(): void {
+    if (this.listRetry === undefined) return
+    clearTimeout(this.listRetry)
+    this.listRetry = undefined
   }
 
   /**
@@ -1000,11 +1036,14 @@ export class SessionManager {
   /**
    * Repair one re-established Host-event generation with queryable baselines.
    * Discard old projection cuts before new queries, including cold Sessions
-   * absent from the process-local control baseline.
+   * absent from the process-local control baseline, but keep each row's list
+   * values as cached rows until the new baseline replaces them: a failed pull
+   * must not turn titled threads into untitled drafts.
    * Opened Session follow streams resume independently through API Gateway.
    */
   handleConnected(): void {
-    for (const store of this.projectionStores.values()) store.clear()
+    for (const store of this.projectionStores.values()) store.demoteToCached(LIST_ROW_STATE_KEYS)
+    this.listFailures = 0
     // Dropping the flight fences the stale pass out of every write; the pull restarts below.
     this.list = { ...this.list, flight: null }
     void this.refreshList()

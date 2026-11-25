@@ -101,6 +101,27 @@ export const inject = [
 ]
 
 /**
+ * Call back when the page's connection owner (settings-shell) clears `html[data-host-connection]`:
+ * the Host answers HTTP again. The socket can stay up through an HTTP outage (a silent tunnel), so
+ * the generation alone never says the list can be pulled again. Read through the attribute, the
+ * documented mirror, so this fork takes no kit dependency.
+ * @param reachable - called on each set-to-absent transition.
+ * @returns stops watching.
+ */
+function watchHostReachable(reachable: () => void): () => void {
+  if (typeof document === 'undefined' || typeof MutationObserver === 'undefined') return () => {}
+  const root = document.documentElement
+  let away = root.hasAttribute('data-host-connection')
+  const observer = new MutationObserver(() => {
+    const now = root.hasAttribute('data-host-connection')
+    if (away && !now) reachable()
+    away = now
+  })
+  observer.observe(root, { attributes: true, attributeFilter: ['data-host-connection'] })
+  return () => { observer.disconnect() }
+}
+
+/**
  * Install Client Session state and its reconnecting control stream.
  * @param ctx - Client Cordis context.
  */
@@ -133,6 +154,7 @@ export function apply(ctx: Context): void {
   }
   ctx.effect(() => connection.generation.subscribe(connected), 'session-controller.client.generation')
   connected()
+  ctx.effect(() => watchHostReachable(() => { sessions.handleHostReachable() }), 'session-controller.client.reachable')
   ctx.typert.contexts.registerClient('agent', {
     identity: candidate => sessions.sessionOf(candidate)?.sessionId,
     resolve: (sessionId) => {
