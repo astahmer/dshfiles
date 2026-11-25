@@ -8,7 +8,6 @@ import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { HostSnapshotsModel } from './snapshots.js'
-import { useThreadWorkStatus } from './thread-status-client.js'
 
 type HeaderLiveActivityProps = Pick<PropsRuntime<'conversation.session.header.utilities'>, 'sessionId' | 'useSessions' | 'useSessionStatus'> &
   Pick<PropsLocale<typeof THREAD_SIDEBAR_LOCALE_NAMESPACE>, 't'>
@@ -94,17 +93,10 @@ const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | n
   const turns = useLiveTurns(ids, sessionState.phase === 'ready')
   // An approval is not a tool call the live-turn fold can see: the thread's pending interaction is the signal.
   const waitingOnYou = props.useSessionStatus(statuses => statuses.get(props.sessionId)?.pendingInteraction !== undefined)
-  // The list's rolled-up status: a parent whose own turn ended is still Working while a subagent works (DESIGN.md R2).
-  const listed = useThreadWorkStatus(props.sessionId)
-  if (!running) {
-    if (listed?.status !== 'working') return null
-    return (
-      <HeaderLiveSignal
-        turn={{ startedAt: undefined, step: listed.detail ?? null }}
-        labels={{ working: props.t('threadSidebarWorking'), needsYou: props.t('threadSidebarStateNeedsYou') }}
-      />
-    )
-  }
+  // A parent whose own turn ended is still Working while a subagent works (DESIGN.md R2), but the header's subagent
+  // chip ("1 subagent", with the working glyph) already says so: the seat stays empty instead of repeating it as
+  // "Waiting on 1 subagent" (round five B4). The seat keeps its width, so nothing beside it moves.
+  if (!running) return null
   return (
     <HeaderLiveSignal
       turn={turns.get(props.sessionId)}
