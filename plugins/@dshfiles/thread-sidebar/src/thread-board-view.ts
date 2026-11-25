@@ -20,6 +20,7 @@ export interface ThreadBoardViewSettings extends ThreadViewPreferences {
 }
 
 export const DEFAULT_THREAD_BOARD_VIEW: ThreadBoardViewSettings = {
+  // Stored as the Host's default; the board draws it as the status groups (ThreadBoardViewModel.columnsOf).
   groupBy: 'status',
   statusFilters: [],
   sourceFilter: 'all',
@@ -61,6 +62,18 @@ export const storedThreadBoardView = createStoredValue({
 })
 
 export class ThreadBoardViewModel {
+  /**
+   * The board's columns are the list's status groups (Needs you · Working · Ready · Idle, Pinned first when it has
+   * rows) for the stored default and for any board view that chose the manual sections: those columns ("Active") told
+   * a thread's state in a second vocabulary. Project, date and flat groupings stay available.
+   */
+  static readonly columnsOf = (settings: ThreadBoardViewSettings): ThreadBoardViewSettings =>
+    settings.groupBy === 'status' ? { ...settings, groupBy: 'state' } : settings
+
+  /** The groupings a surface offers: the board drops the manual sections, the list keeps them. */
+  static readonly groupingsOf = (board: boolean): readonly (typeof THREAD_GROUP_BY_OPTIONS)[number][] =>
+    board ? THREAD_GROUP_BY_OPTIONS.filter(groupBy => groupBy !== 'status') : THREAD_GROUP_BY_OPTIONS
+
   static readonly update = (
     current: ThreadBoardViewSettings,
     patch: Partial<Pick<ThreadBoardViewSettings, 'groupBy' | 'statusFilters' | 'sourceFilter' | 'projectFilter' | 'collapsedGroups' | 'collapsedSections'>>,

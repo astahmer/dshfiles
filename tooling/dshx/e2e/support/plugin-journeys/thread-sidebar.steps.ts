@@ -1058,7 +1058,9 @@ When('separate remote threads are enabled and the thread board page is opened', 
 Then('the board shows only columns, grouped and filtered independently from the sidebar list', async ({ page }: { page: Page }) => {
   const board = threadBoard(page)
   await recordAssertion(page, 'thread-sidebar-board-shows-only-columns', async () => {
-    await expect(board.getByRole('region', { name: /column$/u })).toHaveCount(6)
+    // Columns are the list's status groups (Needs you · Working · Ready · Idle); the retired Active section is gone.
+    await expect(board.getByRole('region', { name: /column$/u }).first()).toBeVisible()
+    await expect(board.getByRole('region', { name: 'Active column', exact: true })).toHaveCount(0)
     // Recovery, attention, draft and remote groups belong to the sidebar list; on the board their threads sit in columns.
     await expect(board.locator('[data-remote-threads]')).toHaveCount(0)
     await expect(board.getByTestId('thread-sidebar-scroll').locator(':scope > section')).toHaveCount(0)
@@ -1066,11 +1068,11 @@ Then('the board shows only columns, grouped and filtered independently from the 
   await recordAssertion(page, 'thread-sidebar-board-keeps-independent-view-state', async () => {
     // The sidebar keeps the list; the page carries the board's own view controls.
     await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Arrange manually')
-    // The board keeps the drag-to-arrange sections as its columns; the list defaults to the status grouping.
-    await expect(board.getByRole('button', { name: 'Group: Arrange manually', exact: true })).toBeVisible()
+    // The board's columns are the status groups, whatever the list is grouped by.
+    await expect(board.getByRole('button', { name: 'Group: Status', exact: true })).toBeVisible()
   })
 
-  await selectThreadViewValue(page, 'Group: Arrange manually', 'Project', board)
+  await selectThreadViewValue(page, 'Group: Status', 'Project', board)
   await selectThreadViewValue(page, 'Filter: Any', 'Working', board)
   await selectThreadViewValue(page, 'Filter: Working', 'Subagent threads', board)
   const projectFilter = board.getByRole('combobox', { name: 'Project filter', exact: true })

@@ -2238,7 +2238,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   // Filter presets (b:xpvk): the list shows the active preset's filters, or the draft once the user changed one.
   const listThreadFilters = useMemo(() => ThreadViewPreferencesModel.currentThreadViewFilters(threadViewSettings), [threadViewSettings])
-  const threadView = isBoard ? boardViewSettings : listThreadFilters
+  const threadView = isBoard ? ThreadBoardViewModel.columnsOf(boardViewSettings) : listThreadFilters
   const activeWorkspaceFilter = isBoard ? boardViewSettings.projectFilter : preferences.workspaceFilter
   const localProjectsForRemoteThreads = useMemo(
     () =>
@@ -6407,7 +6407,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     <DropdownMenuContent align="start" className="dshx-root dshx:min-w-48">
                       <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupBy')}</DropdownMenuLabel>
                       <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
-                        {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
+                        {ThreadBoardViewModel.groupingsOf(isBoard).map(groupBy => (
                           <DropdownMenuRadioItem key={groupBy} value={groupBy}>
                             {props.tSidebar(threadGroupLabelKeys[groupBy])}
                           </DropdownMenuRadioItem>
