@@ -152,6 +152,10 @@ active item's icon seat; the label stays ink (600 when active). The `text-`/`bg-
 `[&_svg:not([class*=text-])]` icon colour inside buttons and menu rows. Direct colours exist too:
 `dshx:text-nav-threads`, `dshx:bg-nav-threads/14`. Never tint a row, panel or header with them.
 
+**Prompt fill.** The user prompt bubble takes `bg-prompt-fill` (`--dshx-prompt-fill`, a faint cool tint at hue 230:
+light `oklch(0.965 0.012 230)`, dark `oklch(0.255 0.018 230)`; council round 6 A5). In a CSS module (chat) read
+`var(--dshx-prompt-fill)`. Ink, secondary and faint text and links hold AA on it (`tests/prompt-fill.test.ts`).
+
 **Attention washes.** A row that waits on you outranks a selected one: a Needs-you row takes `bg-wash-needs-you`
 (`--dshx-wash-needs-you`, accent hue, light `oklch(0.935 0.032 h)`, dark `oklch(0.29 0.045 h)`) and a Failed row
 `bg-wash-failed` (`--dshx-wash-failed`, hue 25, light `oklch(0.94 0.031 25)`, dark `oklch(0.255 0.032 25)`). A

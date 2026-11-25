@@ -71,6 +71,12 @@ export interface Palette {
    */
   readonly fieldBorder: Oklch
   /**
+   * The user prompt bubble (council round 6 A5): a faint cool tint at hue 230, 40° from the default attention indigo,
+   * so your own words read apart from the agent's without saying attention. Ink, secondary and faint text and links hold
+   * AA on it. Fixed hue: a prompt is neither the accent nor a status.
+   */
+  readonly promptFill: Oklch
+  /**
    * The primary button's fill: in light a soft warm near-black (council round 4 A2: oklch 0.30 0.01 on the grey hue, a
    * step off the 0.22 ink so it is not a black slab); in dark a softened warm light grey (council round 3 A3: oklch 0.88
    * 0.006), so the one primary stops being the brightest thing on the screen. Its label is the page colour, AA at rest
@@ -152,6 +158,7 @@ function palette(input: PaletteInput): Palette {
     needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
     // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
     failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.94, c: 0.031, h: STATUS_HUES.danger },
+    promptFill: dark ? { l: 0.255, c: 0.018, h: 230 } : { l: 0.965, c: 0.012, h: 230 },
     fieldBorder: { l: round(clamp(base + ((dark ? 0.55 : 0.61) - base) * contrast, 0, 1), 4), c: primaryChroma, h: hue },
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
     primaryHover: dark

@@ -207,6 +207,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-wash-needs-you-band', PaletteMath.toCss(p.needsYouBandWash))
   push('--dshx-wash-failed', PaletteMath.toCss(p.failedWash))
   push('--dshx-field-border', PaletteMath.toCss(p.fieldBorder))
+  push('--dshx-prompt-fill', PaletteMath.toCss(p.promptFill))
   push('--dshx-primary-fill', PaletteMath.toCss(p.primaryFill))
   push('--dshx-primary-hover', PaletteMath.toCss(p.primaryHover))
   for (const key of ['success', 'warning', 'danger', 'info'] as const) {

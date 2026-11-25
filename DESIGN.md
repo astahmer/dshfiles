@@ -13,6 +13,7 @@ colors:
   border-strong: '#bfbdbb'
   field-border: '#88827d'
   selected-wash: '#ebe9e6'
+  prompt-fill: '#ecf5fa'
   wash-needs-you: '#e1e9ff'
   wash-failed: '#ffe4e1'
   label-faint: '#6a6967'
@@ -29,6 +30,7 @@ colors:
   field-border-dark: '#76706c'
   label-secondary-dark: '#a7a4a1'
   selected-wash-dark: '#2a2725'
+  prompt-fill-dark: '#1a252a'
   wash-needs-you-dark: '#232a42'
   wash-needs-you-band-dark: '#242b3d'
   wash-failed-dark: '#311d1b'
@@ -226,10 +228,11 @@ No slate shell: navigation surfaces keep the warm stone.
 | --------------- | ------------------------------------ | ---------------------------- | -------------------------------------------------------------- | --------- | --------- |
 | 0 bg            | page, cards in light                 | `background`, `card` (light) | `--dsw-alias-bg-base`                                          | `#fefcfa` | `#15120f` |
 | 1 panel         | sidebar, code blocks, dark cards     | `card` (dark)                | `--dsw-specific-sidebar-fill`, `--dsw-alias-bg-layer-1` (dark) | `#f4f2f0` | `#1b1815` |
-| 2 raised        | hover fill, chips, tab track, bubble | `muted`, `secondary`         | `--dsw-alias-bg-module-platform`                               | `#ebe9e7` | `#23201d` |
+| 2 raised        | hover fill, chips, tab track         | `muted`, `secondary`         | `--dsw-alias-bg-module-platform`                               | `#ebe9e7` | `#23201d` |
 | 3 selected      | selected row, active nav             | —                            | `--dsw-specific-sidebar-nav-item-active`                       | `#e4e2e0` | `#292623` |
 | 4 line          | hairline border                      | `border`                     | `--dsw-alias-border-l2`                                        | `#dedcda` | `#2f2c29` |
-| 5 border        | control border                       | `input`                      | `--dsw-alias-border-l3`                                        | `#d6d4d2` | `#393633` |
+| 5 border        | quiet control edge (buttons, tabs)   | `input`                      | `--dsw-alias-border-l3`                                        | `#d6d4d2` | `#393633` |
+| field border    | field boundary, 3:1 on every surface | `field-border`               | `--dshx-field-border`                                          | `#88827d` | `#76706c` |
 | 6 border-strong | hover border, emphasis               | —                            | `--dsw-alias-border-l4`                                        | `#bfbdbb` | `#423f3c` |
 | 7 strong        | idle glyphs, scrollbars              | —                            | (ramp)                                                         | `#9f9e9d` | `#575552` |
 | 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#6a6967` | `#94928f` |
@@ -239,6 +242,11 @@ No slate shell: navigation surfaces keep the warm stone.
 | Needs-you wash  | a row that waits on you              | `wash-needs-you`             | `--dshx-wash-needs-you` (accent hue)                           | `#e1e9ff` | `#232a42` |
 | Needs-you band  | a full-width head band (Inbox card)  | `wash-needs-you-band`        | `--dshx-wash-needs-you-band` (accent hue)                      | `#e1e9ff` | `#242b3d` |
 | Failed wash     | a row that failed                    | `wash-failed`                | `--dshx-wash-failed` (hue 25)                                  | `#ffe4e1` | `#311d1b` |
+| prompt fill     | the user prompt bubble               | `prompt-fill`                | `--dshx-prompt-fill` (hue 230)                                 | `#ecf5fa` | `#1a252a` |
+
+**Prompt fill.** Your own prompt sits on `--dshx-prompt-fill`, a faint cool tint (light `oklch(0.965 0.012 230)`, dark
+`oklch(0.255 0.018 230)`), 40° from the attention indigo so it never reads as Needs you; ink, secondary and faint text
+and links hold AA on it (`plugin-ui/tests/prompt-fill.test.ts`). Chat's bubble reads it as `var(--dshx-prompt-fill)`.
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |

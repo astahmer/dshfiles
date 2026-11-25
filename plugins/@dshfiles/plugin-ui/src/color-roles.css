@@ -52,6 +52,12 @@
    * Dividers and card hairlines stay `border-border`. Falls back to the Host control border without ui-styles.
    */
   --color-field-border: var(--dshx-field-border, var(--dsw-alias-border-l3));
+  /*
+   * The user prompt bubble (council round 6 A5): `bg-prompt-fill`, or `var(--dshx-prompt-fill)` in a CSS module (chat's
+   * MessageItem bubble). A faint cool tint at hue 230; ink, secondary and faint text and links hold AA on it
+   * (tests/prompt-fill). Falls back to the Host bubble fill without ui-styles.
+   */
+  --color-prompt-fill: var(--dshx-prompt-fill, var(--dsw-specific-bubble));
   /* Behind a kit dialog, alert dialog or sheet (round five K8): warm ink at 32% in light, black at 50% in dark. */
   --color-scrim: var(--dshx-scrim);
   --color-attention-foreground: var(--dshx-attention-foreground);
