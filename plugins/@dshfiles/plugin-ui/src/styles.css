@@ -19,6 +19,7 @@
 @import './motion-utilities.css';
 @import './field-look.css';
 @import './surfaces.css';
+@import './disclosure.css';
 
 @custom-variant dark (&:where(body[data-ds-dark-theme] *));
 /*

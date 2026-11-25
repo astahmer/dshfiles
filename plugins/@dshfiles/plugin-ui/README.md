@@ -37,7 +37,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 - Put `dshx-root` on each surface root you render. Prefix every utility (`dshx:hover:bg-accent`), write complete static class strings, merge with `cn`.
 - Animated components: `src/components/motion/` on the shared motion layer (see [Motion](#motion)).
-- Components: `src/components/ui/` (button, input, textarea, label, select, checkbox, switch, tabs, badge, card, table, dialog, alert-dialog, dropdown-menu, context-menu, popover, tooltip, command, combobox, separator, skeleton, toggle, toggle-group, collapsible, alert, kbd, spinner, empty, field, input-group, item, progress, scroll-area, page-header, search-input, status-dot, project-mark, attention-badge). Wrap tooltips in `TooltipProvider`.
+- Components: `src/components/ui/` (button, input, textarea, label, select, checkbox, switch, tabs, badge, card, table, dialog, alert-dialog, dropdown-menu, context-menu, popover, tooltip, command, combobox, separator, skeleton, toggle, toggle-group, collapsible (with `DisclosureTrigger`), alert, kbd, spinner, empty, field, input-group, item, progress, scroll-area, page-header, search-input, status-dot, project-mark, attention-badge). Wrap tooltips in `TooltipProvider`.
 - `PageHeader` (`components/ui/page-header`) is a plugin page's top row: `heading` (the `h1`) over a one-line `description`, with badges and actions as children on the right.
 - `SearchInput` (`components/ui/search-input`) is the search field: the input group with a leading search glyph. `className` sizes the group; `aria-label`, `value`, `ref` and every other prop reach the input.
 - `StatusDot` (`components/ui/status-dot`) is the round status marker: `tone` (`current`, `success`, `destructive`, `warning`, `info`, `muted`) or a computed color class, `size` `sm` (6px) or default (8px). It is `aria-hidden` unless given an `aria-label`, which makes it `role="img"`; it forwards its ref so a `TooltipTrigger asChild` can wrap it.
@@ -184,12 +184,21 @@ dshx:surface-dialog` to its own card.
 
 **One field look.** `Input`, `Textarea`, `InputGroup` (so `SearchInput`) and the `Select` trigger share `fieldLook`
 (`components/ui/input`): a 1px `border-input` border, the page fill (`bg-background`), the 8px radius, no shadow and no
-dark fill. The trigger is 32px (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;
+dark fill. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
+coarse pointer, sizes `Input`, `InputGroup`, `Combobox`, the default `Select` trigger, `select-look`, the segmented
+`TabsList` (items inset 3px) and default-size `Button`s (so `Page` header actions); every `Button` size shares the 8px
+radius. The trigger takes that height (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;
 `selectLook` (`components/ui/select`) is its whole class string. A control the kit does not draw (a Host select in a
 native settings row) takes the `dshx:select-look` utility through an arbitrary variant
 (`dshx:[&_[class*=_select]]:select-look`). A number with a unit is one `UnitInput` (`components/ui/unit-input`):
 `<UnitInput aria-label="Font size" unit="px" value={14} onChange={…} />`, the unit a muted inner suffix that a screen
 reader hears with the field, never a number glued to a second control.
+
+**One disclosure** (council round 5 A5). `DisclosureTrigger` (`components/ui/collapsible`, inside a `Collapsible`) draws
+a 16px chevron in secondary ink before its label and turns it a quarter when open (still under reduced motion);
+`DisclosureChevron` is that chevron for a trigger you draw yourself inside a `dshx:group/disclosure`. A `<details>` takes
+`className="dshx:disclosure"`: the native ▶ marker is hidden in every engine and the same chevron is drawn before the
+`summary`. `CollapsibleTrigger` stays the plain Radix trigger for `asChild` callers.
 
 **Change counts.** `DiffStat` (`components/diff-stat`) is the one reading of a diff's size:
 `<DiffStat added={48} removed={3} />` draws `+48 −3`, always both sides with additions first, sans with tabular figures
