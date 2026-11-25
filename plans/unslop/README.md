@@ -126,6 +126,16 @@ and the Settings column 680 CSS px, so desktop shots are exactly 2×. Round 5 fi
 nav and stage surface roles, the destination tone on the active tab, Settings glyphs and a phone drill-down, a 60 px rail
 with 11 px labels, the phone list's trailing column, the phone dock's chevrons and model label, Inbox verbs in the card
 head, a Usage stat card, Review's base control, Backlog alignment and Plugins row affordances.
+All four lanes done: A kit 8 revisions `wzonywpw` … `krxsuvsn` (lane 880 and wide 1200 frames, nav and stage surfaces,
+one 32/44 px control height and 8 px radius, a disclosure chevron, a locale clock formatter, ProjectMark at 18 %, light
+washes at the sRGB edge with faint text at AA); D 10 revisions `wktllsxm` … `rrzswzpz` (ModelMark and brand colours in
+the kit, SpendMap `leafMaxWidth`, Usage stats card and brand marks, AI accounts one field look and marked selection,
+Review base once and one review control, Backlog start-aligned day divider, Plugins chevrons, a visible quota meter);
+B 10 revisions `umkzmpkp` … `wvlolmyw` (approval subtitles, 60 px rail with 11 px labels, phone two-row thread rows, the
+destination glyph on the active page tab, Settings glyphs and surface roles, phone Settings drill-down, theme-card
+previews, list fade); C 12 revisions `ktsynvnn` … `zlqqrlkl` (60 px folded rail, model name and Can edit on the phone bar,
+an arrow jump control, unwrapped code with an edge fade, 24 px turn rhythm, Inbox verbs in the card head, centred New
+thread, full-width header rule, locale clock times). settings-shell needs a restart when this lands.
 
 ## Round four
 
