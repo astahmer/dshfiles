@@ -122,8 +122,7 @@
       "reachNarrow": [
         "click button \"Account menu\"",
         "click menuitem \"Settings\"",
-        "click combobox \"Sections\"",
-        "click option \"MCP endpoint\"",
+        "click button \"MCP endpoint\"",
         "expect tab \"Claude Code\""
       ],
       "surfaces": ["client", "host", "settings", "api", "tool"],

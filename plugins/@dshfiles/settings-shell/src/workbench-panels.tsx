@@ -168,6 +168,12 @@ export const createSettingsWorkbenchHub = (sources: {
             // be a second control for the same thing. Sections still get `close` through their owner.
             onClose={undefined}
             onSelect={select}
+            // A phone's Back returns this pane to its category list (round five B6).
+            onBack={() => {
+              setActiveId(undefined)
+              setField(undefined)
+              setTarget(undefined)
+            }}
             onSearch={setQuery}
           />
         )}

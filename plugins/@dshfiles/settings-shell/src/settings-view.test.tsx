@@ -368,14 +368,54 @@ describe('settings view: one grouped page', () => {
   })
 })
 
-describe('settings view: phone toolbar (council round 4 B3)', () => {
-  it('gives the search, Modified and the file menu one 44px row in a narrow pane', () => {
+describe('settings view: phone toolbar (council round 4 B3, round five B6)', () => {
+  it('gives the search and the file menu one 44px row in a narrow pane, with Modified as the search field\'s filter', () => {
     const view = mount({})
     const search = view.host.querySelector('[data-settings-toolbar] [role="searchbox"]')?.closest('[data-slot="input-group"]')
     expect(search?.className).toContain('dshx:@max-pane-compact:h-11')
-    expect(view.host.querySelector('[data-settings-modified-filter]')?.className).toContain('dshx:@max-pane-compact:h-11')
+    // The toolbar's Modified toggle leaves a narrow pane; the field's own filter button takes its place.
+    expect(view.host.querySelector('[data-settings-modified-filter]')?.className).toContain('dshx:@max-pane-compact:hidden')
+    const inline = search?.querySelector<HTMLElement>('[data-settings-modified-inline]')
+    expect(inline?.getAttribute('aria-label')).toBe('search.modified')
+    expect(inline?.getAttribute('aria-pressed')).toBe('false')
+    expect(inline?.className).toContain('dshx:@max-pane-compact:inline-flex')
     expect(read('open-config-action.tsx')).toContain('dshx:shadow-xs dshx:@max-pane-compact:h-11')
     expect(read('open-config-action.tsx')).toContain('dshx:@max-pane-compact:w-11')
+    view.unmount()
+  })
+})
+
+describe('settings view: phone drill-down (round five B6)', () => {
+  it('opens on the grouped category list in a narrow pane, with no Sections dropdown', () => {
+    const onSelect = vi.fn()
+    const view = mount({ activeId: undefined, onBack: () => {}, onSelect })
+    expect(view.host.querySelector('[role="combobox"]')).toBeNull()
+    const root = view.host.querySelector<HTMLElement>('[data-settings-root]')
+    expect(root?.className).toContain('dshx:@max-pane-compact:flex')
+    expect(root?.className).toContain('dshx:hidden')
+    // 44px rows with a 28px identity tile and a chevron; the first group is named by its first row.
+    const row = root?.querySelector<HTMLElement>('[data-settings-root-row="appearance"]')
+    expect(row?.className).toContain('dshx:h-11')
+    expect(row?.querySelector('[data-settings-tile]')?.className).toContain('dshx:size-7')
+    expect(row?.textContent).toBe('Appearance')
+    expect(root?.querySelector('[data-settings-group="general"] h3')).toBeNull()
+    // The fields wait for a pick in a narrow pane; a wide pane still shows the first category.
+    expect(view.host.querySelector('[data-settings-column]')?.className).toContain('dshx:@max-pane-compact:hidden')
+    act(() => row?.click())
+    expect(onSelect).toHaveBeenCalledWith('appearance')
+    view.unmount()
+  })
+
+  it('shows a picked category under one Back row, without the search toolbar, and Back returns to the list', () => {
+    const onBack = vi.fn()
+    const view = mount({ activeId: 'appearance', onBack })
+    expect(view.host.querySelector('[data-settings-root]')).toBeNull()
+    const back = view.host.querySelector<HTMLElement>('[data-settings-back-row]')
+    expect(back?.className).toContain('dshx:@max-pane-compact:grid')
+    expect(back?.querySelector('h2')?.textContent).toBe('Appearance')
+    expect(view.host.querySelector('[data-settings-toolbar]')?.parentElement?.className).toContain('dshx:@max-pane-compact:hidden')
+    act(() => back?.querySelector<HTMLElement>('button[aria-label="nav.back"]')?.click())
+    expect(onBack).toHaveBeenCalledOnce()
     view.unmount()
   })
 })

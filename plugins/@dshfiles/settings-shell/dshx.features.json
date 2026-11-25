@@ -8,7 +8,7 @@
       "summary": "The Settings button, its sections, the General page and the Cmd+, shortcut.",
       "details": "The sidebar Settings trigger, the page's one connection state (a Host probe on every device, published through the kit's HostConnection and drawn as one strip: a pill at the top centre on a desktop, a line under the top bar on a phone), Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "expect button \"General\""],
-      "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect combobox \"Sections\""],
+      "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect button \"Appearance\""],
       "surfaces": ["client", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
@@ -232,7 +232,6 @@
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
         "expect group \"Models & accounts\""
       ],
       "surfaces": ["client", "settings"],
@@ -455,8 +454,7 @@
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
-        "click option \"Layout\"",
+        "click button \"Layout\"",
         "expect spinbutton \"Max tabs\""
       ],
       "surfaces": ["client", "settings", "integration"],
@@ -504,8 +502,7 @@
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
-        "click option \"Layout\"",
+        "click button \"Layout\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\""
@@ -569,8 +566,7 @@
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
-        "click option \"Layout\"",
+        "click button \"Layout\"",
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\"",
@@ -703,8 +699,7 @@
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
-        "click option \"Layout\"",
+        "click button \"Layout\"",
         "click button \"Advanced: Main tabs\"",
         "click button \"Plugin details: Main tabs\"",
         "expect switch \"Plugin enabled\""

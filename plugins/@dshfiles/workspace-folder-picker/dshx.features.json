@@ -561,8 +561,7 @@
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
-        "click option \"Projects\"",
+        "click button \"Projects\"",
         "expect region \"Declared project settings\""
       ],
       "surfaces": ["client", "host", "tool"],

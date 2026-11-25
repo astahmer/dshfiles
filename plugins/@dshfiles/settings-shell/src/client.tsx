@@ -593,6 +593,8 @@ export default defineClient({
       sectionOwner,
       t: input.t,
       onSelect: (sectionId: string) => actor.send({ type: 'select', sectionId }),
+      // A phone's Back returns to the category list (round five B6): the page forgets its category.
+      onBack: () => actor.send({ type: 'back' }),
       onReveal: entry => actor.send({ type: 'reveal', sectionId: entry.sectionId, target: entry.target }),
       onSearch: (next: string) => actor.send({ type: 'search', query: next }),
       openPanel,

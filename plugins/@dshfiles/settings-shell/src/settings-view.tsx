@@ -1,11 +1,10 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
-import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpRightIcon, ChevronLeftIcon, ChevronRightIcon, ListFilterIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
@@ -19,6 +18,7 @@ import type { SettingField } from './schema-form/schema-model.js'
 import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 import { SettingsNavigationModel } from './navigation-state.js'
+import { SettingsEntryTile } from './settings-icons.js'
 
 export interface SectionRow {
   readonly id: string
@@ -80,6 +80,11 @@ export interface SettingsViewProps {
    * and the entry title the column's selected row already names.
    */
   readonly columnNavigation?: boolean
+  /**
+   * A narrow pane (a phone) drills down (round five B6): Settings opens on its grouped category list, a category shows
+   * only its fields under a Back row, and Back returns to the list by forgetting the category. Absent, Back is not drawn.
+   */
+  readonly onBack?: (() => void) | undefined
 }
 
 /** A nav entry: name, a mark for a page that opens elsewhere and, while searching, how many matches it holds. */
@@ -105,6 +110,40 @@ const NavCell = (props: {
       </span>
     )}
   </button>
+)
+
+/**
+ * The phone's Settings root (round five B6): every category in its task group, as grouped 44px rows with a 28px identity
+ * tile, the name and a chevron (an arrow for a row that opens a stage page). Drawn only in a narrow pane; the first group
+ * stands 16px under the header and, like the desktop column, is named by its first row.
+ */
+const SettingsRootList = (props: { readonly groups: readonly GroupedEntries[]; readonly onOpen: (id: string) => void }): JSX.Element => (
+  <div className="dshx:hidden dshx:flex-col dshx:gap-4 dshx:pt-1 dshx:pb-6 dshx:@max-pane-compact:flex" data-settings-root="">
+    {props.groups.map(({ group, entries }, index) => (
+      <section aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-1.5" data-settings-group={group.id} key={group.id} role="group">
+        {index === 0 ? null : <h3 className="dshx:m-0 dshx:px-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.label}</h3>}
+        <div className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-(--dsw-alias-bg-layer-1)">
+          {entries.map(entry => (
+            <button
+              className="dshx:flex dshx:h-11 dshx:w-full dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:border-none dshx:bg-transparent dshx:px-2 dshx:text-left dshx:text-sm dshx:text-foreground dshx:active:bg-accent dshx:hover:bg-[var(--dshx-tone-2)]"
+              data-settings-root-row={entry.id}
+              key={entry.id}
+              onClick={() => props.onOpen(entry.id)}
+              type="button"
+            >
+              <SettingsEntryTile group={group.id} label={entry.label} />
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{entry.label}</span>
+              {entry.opens === undefined ? (
+                <ChevronRightIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+              ) : (
+                <ArrowUpRightIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
+              )}
+            </button>
+          ))}
+        </div>
+      </section>
+    ))}
+  </div>
 )
 
 /** Matching entries grouped by their section, in section order. */
@@ -397,7 +436,11 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     entries: props.sectionEntries,
     shortcuts: props.shortcuts,
   })
-  const active = SettingsGroups.entryFor(props.groups, props.activeId) ?? props.groups[0]?.entries[0]
+  const picked = SettingsGroups.entryFor(props.groups, props.activeId)
+  const active = picked ?? props.groups[0]?.entries[0]
+  // A narrow pane drills down (round five B6): no category picked shows the grouped list, a picked one only its fields.
+  const atRoot = !searching && picked === undefined
+  const drilled = !searching && picked !== undefined && props.onBack !== undefined
   const jevNamespaces = new Set(
     props.groups.flatMap(group => group.entries.filter(entry => entry.id === JEV_ENTRY_ID).flatMap(entry => entry.pages.map(page => page.ns))),
   )
@@ -436,7 +479,13 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             Modified and the configuration file on a toolbar under it. It ends where the settings column does, so the
             actions line up with the rows. A narrow pane (a phone) names
             the page in its top bar, so the header is kept for screen readers only there. */}
-        <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-6 dshx:pt-5 dshx:pb-3 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-2 dshx:@max-pane-compact:pb-2">
+        <div
+          className={cn(
+            'dshx:flex dshx:flex-none dshx:flex-col dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-6 dshx:pt-5 dshx:pb-3 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-2 dshx:@max-pane-compact:pb-2',
+            // A phone category page shows only its fields under Back (round five B6): the search stays on the list.
+            drilled && 'dshx:@max-pane-compact:hidden',
+          )}
+        >
           <div className={cn(headerWidth, 'dshx:@max-pane-compact:sr-only')} data-settings-page-header="">
             <PageHeader heading={<span id={props.titleId}>{props.renderSlot('settings.header', {})}</span>} description={t('description')} />
           </div>
@@ -468,17 +517,28 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
               type="text"
               value={props.query}
             />
-            {props.query !== '' && (
-              <InputGroupAddon align="inline-end">
+            <InputGroupAddon align="inline-end">
+              {props.query !== '' && (
                 <InputGroupButton aria-label={t('search.clear')} onClick={() => props.onSearch('')} size="icon-xs">
                   <XIcon />
                 </InputGroupButton>
-              </InputGroupAddon>
-            )}
+              )}
+              {/* On a phone Modified is the search field's own filter (round five B6), not a toolbar button. */}
+              <InputGroupButton
+                aria-label={t('search.modified')}
+                aria-pressed={SettingsSearch.hasModifiedFilter(props.query)}
+                className="dshx:hidden dshx:aria-pressed:bg-selected-wash dshx:aria-pressed:text-foreground dshx:@max-pane-compact:inline-flex"
+                data-settings-modified-inline=""
+                onClick={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
+                size="icon-xs"
+              >
+                <ListFilterIcon />
+              </InputGroupButton>
+            </InputGroupAddon>
           </InputGroup>
           <Toggle
             aria-label={t('search.modified')}
-            className="dshx:shrink-0 dshx:@max-pane-compact:h-11 dshx:@max-pane-compact:px-3"
+            className="dshx:shrink-0 dshx:@max-pane-compact:hidden"
             data-settings-modified-filter=""
             onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
             pressed={SettingsSearch.hasModifiedFilter(props.query)}
@@ -503,17 +563,19 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           </div>
           </div>
         </div>
-        <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">
-          <Combobox
-            label={t('search.sections')}
-            value={active?.id ?? ''}
-            options={props.groups.flatMap(({ group, entries }) =>
-              entries.map(entry => ({ value: entry.id, label: entry.label, keywords: [entry.keywords], group: group.label })),
-            )}
-            onValueChange={select}
-            matchTriggerWidth
-          />
-        </div>
+        {drilled && picked !== undefined && (
+          // The phone category page's one row of chrome (round five B6): Back to the list, and the category's name.
+          <div
+            className="dshx:hidden dshx:min-w-0 dshx:shrink-0 dshx:grid-cols-[minmax(0,1fr)_minmax(0,2fr)_minmax(0,1fr)] dshx:items-center dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-1 dshx:@max-pane-compact:grid"
+            data-settings-back-row=""
+          >
+            <Button aria-label={t('nav.back')} className="dshx:h-11 dshx:justify-self-start dshx:gap-0.5 dshx:px-2 dshx:text-muted-foreground" onClick={props.onBack} variant="ghost">
+              <ChevronLeftIcon aria-hidden="true" className="dshx:size-5" />
+              {t('nav.backShort')}
+            </Button>
+            <h2 className="dshx:m-0 dshx:truncate dshx:text-center dshx:text-heading dshx:font-semibold dshx:text-foreground">{picked.label}</h2>
+          </div>
+        )}
         <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
           {props.columnNavigation === true ? null : (
           <nav
@@ -535,9 +597,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
             ref={content}
           >
+            {atRoot && <SettingsRootList groups={props.groups} onOpen={openEntry} />}
             {/* One reading width for every entry: sections, plugin pages and search results share this 680px column, so a
                 value sits near its label (council round 4 B5). */}
-            <div className={SETTINGS_COLUMN_WIDTH} data-settings-column="">
+            <div className={cn(SETTINGS_COLUMN_WIDTH, atRoot && 'dshx:@max-pane-compact:hidden')} data-settings-column="">
               {searching && <SearchResults {...props} onSelect={openEntry} result={result} />}
               {!searching && active !== undefined && <EntryView {...props} entry={active} jevNamespaces={jevNamespaces} key={active.id} />}
             </div>

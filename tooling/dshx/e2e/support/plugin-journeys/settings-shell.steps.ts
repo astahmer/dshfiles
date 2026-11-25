@@ -20,29 +20,32 @@ When('Settings is opened from the sidebar', async ({ page }: { page: Page }) => 
 
 Then('Settings remain usable at narrow and wide widths', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'settings-shell-compact-navigation', async () => {
-    const sections = page.getByRole('combobox', { name: 'Sections', exact: true })
+    // A narrow pane drills down (round five B6): the grouped category list, then one category under Back.
+    const root = page.locator('[data-settings-root]')
+    const back = page.getByRole('button', { name: 'Back to Settings', exact: true })
     const navigation = page.getByRole('navigation', { name: 'Settings', exact: true })
     for (const width of [360, 480, 768, 1024]) {
       await page.setViewportSize({ width, height: 900 })
       await expect(settingsView(page)).toBeVisible()
+      if (await back.isVisible()) await back.click()
       expect(await settingsView(page).evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true)
       expect(await searchField(page).evaluate(element => element.clientWidth)).toBeGreaterThan(60)
       await expect(page.getByRole('button', { name: 'Open configuration file', exact: true })).toBeVisible()
       if (width <= 480) {
         await expect(navigation).toBeHidden()
-        await expect(sections).toBeVisible()
-        await sections.click()
-        await page.getByRole('option', { name: 'Models', exact: true }).click()
-        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
-        await expect(sections).toHaveText('Models')
+        await expect(root).toBeVisible()
+        await root.getByRole('button', { name: 'Models', exact: true }).click()
+        await expect(back).toBeVisible()
+        await expect(page.locator('[data-settings-back-row] h2')).toHaveText('Models')
         await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeHidden()
-        await sections.click()
-        await page.getByRole('option', { name: 'General', exact: true }).click()
-        await expect(page.getByRole('listbox', { includeHidden: true })).toHaveCount(0)
+        await back.click()
+        await root.getByRole('button', { name: 'General', exact: true }).click()
         await expect(page.getByRole('switch', { name: 'Show coding view', exact: true })).toBeVisible()
+        await back.click()
+        await expect(root).toBeVisible()
       } else {
         await expect(navigation).toBeVisible()
-        await expect(sections).toBeHidden()
+        await expect(root).toBeHidden()
       }
       if (width === 360) await page.screenshot({ path: test.info().outputPath('settings-shell-compact-navigation.png') })
     }
