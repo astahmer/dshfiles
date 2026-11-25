@@ -2,7 +2,7 @@ import type { TurnLocation } from '@deepseek-ai/dsh-client-ui-conversation/clien
 import { ChatFocusModel, type ChatTurnTailExtras } from '@dshfiles/chat/chat-focus'
 import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { useSettings } from '@dshfiles/dshx/client'
-import { ChevronDownIcon, ChevronRightIcon, CircleCheckIcon, CircleXIcon, FileIcon, ListChecksIcon } from '@dshfiles/plugin-ui/icons'
+import { CircleCheckIcon, CircleXIcon, FileIcon, ListChecksIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import { turnSummarySettings } from './settings.js'
@@ -13,15 +13,22 @@ import { hasEditedFiles, hasWalkthrough, TurnWalkthroughList, TurnWalkthroughTog
 
 type OpenList = 'files' | 'commands' | 'failures'
 
+/**
+ * A part that opens its list (council round 7 C5): a link in the strip's one grammar, parts joined by "·" and no "›".
+ * It underlines on hover and stays underlined in ink while its list is open; `aria-expanded` says so to assistive tech.
+ */
 const Toggle = (props: { readonly open: boolean; readonly onToggle: () => void; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
   <button
     aria-expanded={props.open}
-    className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground dshx:pointer-coarse:min-h-11', props.className)}
+    className={cn(
+      'dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground dshx:pointer-coarse:min-h-11',
+      'dshx:underline-offset-2 dshx:hover:underline dshx:aria-expanded:text-foreground dshx:aria-expanded:underline',
+      props.className,
+    )}
     onClick={props.onToggle}
     type="button"
   >
     {props.children}
-    {props.open ? <ChevronDownIcon aria-hidden className="dshx:size-3" /> : <ChevronRightIcon aria-hidden className="dshx:size-3" />}
   </button>
 )
 
@@ -110,7 +117,7 @@ interface LinePart {
 }
 
 /**
- * The footer under a finished Turn: "Edited 3 files +42 −7 › · ran 6 commands › · 2 of 42 tests failed › · 1m 12s". The file
+ * The footer under a finished Turn: "Edited 3 files +42 −7 · ran 6 commands · 2 of 42 tests failed · 1m 12s". The file
  * and command counts open their lists (each file opens in the editor), and the one red part opens the failed commands.
  */
 export const TurnSummaryLine = (props: {
@@ -175,7 +182,7 @@ export const TurnSummaryLine = (props: {
         key: segment.key,
         chevron: true,
         node: (
-          <Toggle className="dshx:text-destructive" onToggle={toggle('failures')} open={open === 'failures'}>
+          <Toggle className="dshx:text-destructive dshx:aria-expanded:text-destructive" onToggle={toggle('failures')} open={open === 'failures'}>
             {label(segment, index)}
           </Toggle>
         ),
@@ -221,13 +228,15 @@ export const TurnSummaryLine = (props: {
       node: (
         <button
           aria-expanded={canList ? open === 'failures' : undefined}
-          className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default dshx:pointer-coarse:min-h-11"
+          className={cn(
+            'dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-destructive dshx:disabled:cursor-default dshx:pointer-coarse:min-h-11',
+            canList && 'dshx:underline-offset-2 dshx:hover:underline dshx:aria-expanded:underline',
+          )}
           disabled={!canList}
           onClick={toggle('failures')}
           type="button"
         >
           {failures} {failures === 1 ? 'command' : 'commands'} failed
-          {canList && (open === 'failures' ? <ChevronDownIcon className="dshx:size-3" /> : <ChevronRightIcon className="dshx:size-3" />)}
         </button>
       ),
     })

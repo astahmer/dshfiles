@@ -1,6 +1,6 @@
 import { DockChanges } from '@dshfiles/plugin-ui/components/motion/activity-dock'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ArrowUpRightIcon, ChevronDownIcon, ChevronRightIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpRightIcon, FileDiffIcon, FolderIcon } from '@dshfiles/plugin-ui/icons'
 import type { TurnActivitySummary } from './turn-activity.js'
 import { TurnWalkthroughModel } from './turn-walkthrough-model.js'
 
@@ -17,13 +17,13 @@ export const hasWalkthrough = (summary: TurnActivitySummary, chipLimit: number):
 export const TurnWalkthroughToggle = (props: { readonly open: boolean; readonly onToggle: () => void }): JSX.Element => (
   <button
     aria-expanded={props.open}
-    className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground dshx:pointer-coarse:min-h-11"
+    // Council round 7 C5: a link in the strip's grammar, underlined on hover and while open, no chevron.
+    className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:hover:text-foreground dshx:pointer-coarse:min-h-11 dshx:underline-offset-2 dshx:hover:underline dshx:aria-expanded:text-foreground dshx:aria-expanded:underline"
     onClick={props.onToggle}
     type="button"
   >
     <FileDiffIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
     <span>Walkthrough</span>
-    {props.open ? <ChevronDownIcon aria-hidden className="dshx:size-3" /> : <ChevronRightIcon aria-hidden className="dshx:size-3" />}
   </button>
 )
 
