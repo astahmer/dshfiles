@@ -173,7 +173,12 @@ describe('TabStrip layout', () => {
     const { unmount } = mount(undefined, undefined, idle)
     const seat = (): Element | null => document.querySelector('[data-tab-status-slot]')
     expect(seat()?.className).toContain('dshx:size-4')
-    expect(seat()?.childElementCount).toBe(0)
+    // A thread with no status and no project yet (a new thread) draws the compose glyph there, in the Threads tone
+    // (council round 6 B6), rather than an empty seat.
+    expect(seat()?.querySelector('[data-tab-status]')).toBeNull()
+    expect(seat()?.querySelector('[data-tab-compose]')?.className).toContain('dshx:nav-tone-threads')
+    // The strip is on the nav surface; only the selected tab is on the canvas.
+    expect(document.querySelector('[role="tablist"]')?.parentElement?.className).toContain('dshx:surface-nav')
     unmount()
     mount()
     expect(seat()?.className).toContain('dshx:size-4')
