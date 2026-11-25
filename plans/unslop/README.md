@@ -61,6 +61,14 @@ with a placeholder (blank Enter lines were being saved as a draft), one row grid
 filter; Review ProjectMark, sans counters, one Reviewed checkbox per file, card hugs its files; AI accounts 300 px rail,
 DeepSeek mark, provider marks on model ids, "In picker"). Follow-ups: DESIGN.md's "no underline page tabs" vs Usage;
 brand marks duplicated in model-effort-picker and ai-accounts; SpendMap needs a no-gauge option.
+A done (9 revisions `stttokqr` … `zmnllvmq`: Needs-you and Failed wash tokens; a quieter selected wash with a 2 px
+leading marker and 550 title; `StatusCount`; faint text at AA on bg, panel, raised and every wash; chart labels at
+secondary ink; one syntax pair for transcript and diff, diff body on the ramp, 12 % add/delete tints, `+`/`−` marks; core
+Plugins page on the shared inset with identity-tone tiles and one Experimental chip per group; Page tab strip no longer
+scrolls vertically). C done (6 revisions `ouqmrunl` … `wnxxurkt`: phone status pill only on Threads and Inbox; jump to
+latest on the dock edge with no faded band; one 720 px transcript column shared by code, cards, dock and composer; one
+Inbox card with a status head band, "Recommended" spelled out, a StatusCount title, phone Start triage in the top bar;
+sentence case for the collapse setting). agent-questions' Host provider changed: a restart is needed. B running.
 
 ## Round four
 
