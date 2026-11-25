@@ -11,7 +11,7 @@
     "raw-error-echo": 13,
     "status-word": 19,
     "transport-failure": 0,
-    "code-echo": 6,
+    "code-echo": 4,
     "try-again": 0,
     "ascii-ellipsis": 0
   },
@@ -19,7 +19,6 @@
     "code-echo/jj-integration": 1,
     "code-echo/model-effort-picker": 2,
     "code-echo/multi-host": 1,
-    "code-echo/rich-composer": 2,
     "conversation/agent-preset": 1,
     "conversation/backlog": 5,
     "conversation/btw": 1,

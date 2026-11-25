@@ -19,6 +19,7 @@ import { ComposerBar, type ComposerBarPlacement } from './composer-more.ts'
 import { ComposerMoreMenu } from './composer-more-menu.tsx'
 import { ModeChip } from './mode-chip.tsx'
 import { ModeChipCatalog, type ModeChipHost } from './mode-chip-model.ts'
+import { RpcFailure } from './rpc-failure.ts'
 import { threadHeaderMenuOf } from './thread-header-menu.ts'
 import { ThreadViewsModel } from './thread-views.ts'
 
@@ -111,7 +112,7 @@ export default defineClient({
         onCatalogChanged: listener => remote.$on('permission-presets/catalog-changed', listener),
         run: async (sessionId, line) => {
           const result = await remote.commands.execute(SessionId(sessionId), line, [])
-          if (!result.ok) return `${result.error.message} (${result.error.code})`
+          if (!result.ok) return RpcFailure.sentence({ subject: 'Plan mode and file access', error: result.error })
           return result.value === undefined ? `this DSH has no ${line.split(' ')[0] ?? line} command` : null
         },
       }

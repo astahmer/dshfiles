@@ -38,6 +38,7 @@ import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
+import { RpcFailure } from '../../rpc-failure.ts'
 import { SendWhenUploaded, settleHeldSend, uploadGate, type HeldDraft, type HeldSend, type UploadGate } from '../../held-send.ts'
 import { isImageMediaType, withCanonicalImageType } from '../canonical-image-type.ts'
 import { ContextMeter } from './ContextMeter.tsx'
@@ -234,7 +235,8 @@ export const InputBar = memo(function InputBar({
     }
     showToast(error.code === 'session/attachment-invalid' || error.code === 'subagent/attachment-invalid'
       ? attachmentErrorText(t, error.details.reason, imageLimits)
-      : `${error.message} (${error.code})`)
+      // dshfiles (round four D7): one sentence from the kit's error copy, never the endpoint or the code.
+      : RpcFailure.sentence({ subject: 'Your message', error, kept: t('error.promptKept') }))
   }, [promptError, showToast, t, imageLimits])
   useEffect(() => {
     if (notice?.level === 'error') showToast(notice.text)
