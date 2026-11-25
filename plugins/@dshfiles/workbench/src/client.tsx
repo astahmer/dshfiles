@@ -62,6 +62,7 @@ import { bottomPanelCommand } from './bottom-panel-shortcut.js'
 import { workbenchSettings } from './settings.js'
 import { WorkbenchView, type WorkbenchPanelDrop } from './workbench-view.js'
 import { NewViewTabs, type NewViewSelection } from './new-view.js'
+import { lastPhoneRightPanel, PhoneRightPaneModel, rememberPhoneRightPanel } from './phone-last-view.js'
 import { NewThreadSource } from './new-thread-source.js'
 import { TabRows } from './tab-row-visibility.js'
 import { MAIN_TABS_ATTRIBUTE, mainTabsHidden } from './header-seat.js'
@@ -1370,6 +1371,22 @@ export default defineClient({
           const shown = props.shown !== false
           const phone = usePhoneWidth()
           const sheetOpen = usePhoneSheetOpen()
+          const rightDockApi = useRef<DockviewApi | null>(null)
+          const rightDockUnsubscribe = useRef<(() => void) | null>(null)
+          useEffect(() => () => rightDockUnsubscribe.current?.(), [])
+          // Opening the sheet resumes the last real view instead of "Choose a view" (P15), unless a panel request
+          // already chose one (a Changes pill, a plugin's open).
+          useEffect(() => {
+            if (!phone || !sheetOpen) return
+            const api = rightDockApi.current
+            if (api === null) return
+            const target = PhoneRightPaneModel.resumePanel({
+              activeId: api.activePanel?.id,
+              lastId: lastPhoneRightPanel(),
+              available: id => api.getPanel(id) !== undefined,
+            })
+            if (target !== undefined) api.getPanel(target)?.api.setActive()
+          }, [phone, sheetOpen])
           useLayoutEffect(() => {
             if (shown) ctx.layout.openRightbar(true, false)
             else ctx.layout.closeRightbar()
@@ -1390,7 +1407,12 @@ export default defineClient({
               onOpenPanel={openIn('right')}
               onDropPanel={handleDrop('right')}
               acceptDroppedPanel={acceptsForeignPanel}
-              onApi={api => drainPendingOpen('right', api)}
+              onApi={api => {
+                drainPendingOpen('right', api)
+                rightDockApi.current = api
+                rightDockUnsubscribe.current?.()
+                rightDockUnsubscribe.current = rememberPhoneRightPanel(api)
+              }}
               headerActions={context => (
                 <>
                   <ToggleBottomPanel />
