@@ -34,6 +34,8 @@ const dayLabel = (time: number, now: number): string => {
   return new Date(time).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
+const rowTime = (time: number): string => new Date(time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+
 /** "Agent 80c6ed moved it inbox → doing · 4 updates": the actor stays separate so it can link to its thread. */
 const activityLine = (item: BacklogSummaryView): { readonly actorId: string; readonly summary: string } | null => {
   const last = item.activity.last
@@ -62,6 +64,8 @@ export const FeedEntryMeta = (props: {
   readonly item: { readonly id: number; readonly ref?: string | undefined; readonly title: string; readonly createdAt: number }
   readonly author: string | undefined
   readonly showAuthor?: boolean
+  /** The day divider already names this time: the row keeps it as a handle that shows on hover or focus (round 4, D4). */
+  readonly timeInDivider?: boolean
 }): JSX.Element => (
   <span
     data-feed-entry-meta=""
@@ -73,9 +77,15 @@ export const FeedEntryMeta = (props: {
     {/* The id is a reference, not a label: it shows on hover, and the time stays the drag handle that mentions it. */}
     <Tooltip>
       <TooltipTrigger asChild>
-        <span>
+        <span
+          data-feed-entry-time=""
+          className={cn(
+            props.timeInDivider === true &&
+              'dshx:opacity-0 dshx:transition-opacity dshx:group-hover/entry:opacity-100 dshx:focus-within:opacity-100 dshx:pointer-coarse:opacity-100',
+          )}
+        >
           <BacklogMentionHandle item={props.item} className="dshx:font-sans!">
-            {new Date(props.item.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
+            {rowTime(props.item.createdAt)}
           </BacklogMentionHandle>
         </span>
       </TooltipTrigger>
@@ -96,8 +106,9 @@ const FeedEntry = (props: {
   readonly openThread: (sessionId: string) => void
   /** False when every row in the feed has the same author: the avatar would repeat one face down the page. */
   readonly showAuthor: boolean
-  /** A tag's tone among the tags on screen (`FeedLook.tagTones`). */
+  /** A tag's fixed tone (`FeedLook.tagTone`). */
   readonly tagTone: (tag: string) => string
+  readonly timeInDivider: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -180,7 +191,7 @@ const FeedEntry = (props: {
             )}
             {inlineTag === null ? null : tagChip(inlineTag)}
           </div>
-          <FeedEntryMeta item={item} author={author} showAuthor={props.showAuthor} />
+          <FeedEntryMeta item={item} author={author} showAuthor={props.showAuthor} timeInDivider={props.timeInDivider} />
           {item.preview === '' ? null : (
             <BacklogText
               text={item.preview}
@@ -318,8 +329,16 @@ export const FeedView = (props: {
   const selection = useBacklogSelection({ items: [...pinned, ...visible], openId: props.openId, scope: JSON.stringify(props.statuses) })
   const lastId = ordered.at(-1)?.id
   const showAuthor = FeedLook.authorsDiffer([...pinned, ...ordered])
-  const tagTones = useMemo(() => FeedLook.tagTones(props.items.flatMap(item => item.tags)), [props.items])
-  const tagTone = (tag: string): string => tagTones.get(tag) ?? FeedLook.tagTone(tag)
+  /** Per day divider, the time its rows all show (when they were captured in the same minute that day). */
+  const dayRows = new Map<string, BacklogSummaryView[]>()
+  for (const item of visible) {
+    const label = dayLabel(backlogSortTime(item, props.sort), now)
+    dayRows.set(label, [...(dayRows.get(label) ?? []), item])
+  }
+  const sharedTimes = new Map<string, string | null>()
+  for (const [label, rows] of dayRows) {
+    sharedTimes.set(label, rows.every(row => dayLabel(row.createdAt, now) === label) ? FeedLook.sharedTime(rows.map(row => rowTime(row.createdAt))) : null)
+  }
 
   useLayoutEffect(() => {
     const element = scroller.current
@@ -335,12 +354,16 @@ export const FeedView = (props: {
     const label = dayLabel(itemDate, now)
     const previous = visible[index - 1]
     const separator = previous === undefined || dayLabel(backlogSortTime(previous, props.sort), now) !== label
+    const shared = sharedTimes.get(label) ?? null
     return (
       <div key={item.id}>
         {separator ? (
           <div role="separator" className="dshx:my-2 dshx:flex dshx:items-center dshx:gap-3 dshx:px-2">
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
-            <span className="dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{label}</span>
+            <span className="dshx:text-2xs dshx:font-medium dshx:text-muted-foreground dshx:tabular-nums">
+              {label}
+              {shared === null ? '' : ` · ${shared}`}
+            </span>
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
           </div>
         ) : null}
@@ -355,7 +378,8 @@ export const FeedView = (props: {
           triageOff={props.triageOff}
           openThread={props.openThread}
           showAuthor={showAuthor}
-          tagTone={tagTone}
+          tagTone={FeedLook.tagTone}
+          timeInDivider={shared !== null}
         />
       </div>
     )

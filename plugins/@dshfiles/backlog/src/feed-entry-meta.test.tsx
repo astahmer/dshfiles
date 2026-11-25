@@ -52,3 +52,22 @@ test('a feed whose rows share one author names no author on any row (council rou
   const meta = host.querySelector('[data-feed-entry-meta]')
   expect(meta?.textContent).toBe(new Date(createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))
 })
+
+test('a row whose time its day divider already names keeps the time as a hover handle (council round 4, D4)', () => {
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+  const createdAt = new Date(2026, 10, 16, 15, 21).getTime()
+  act(() =>
+    root?.render(
+      <TooltipProvider>
+        <FeedEntryMeta item={{ id: 3, ref: 'w33f', title: 'Feed item', createdAt }} author="user" showAuthor={false} timeInDivider />
+      </TooltipProvider>,
+    ),
+  )
+  const handle = host.querySelector('[data-feed-entry-time]')
+  expect(handle?.querySelector('[data-backlog-mention-handle]')).not.toBeNull()
+  expect(handle?.className).toContain('dshx:opacity-0')
+  expect(handle?.className).toContain('dshx:group-hover/entry:opacity-100')
+  expect(handle?.className).toContain('dshx:focus-within:opacity-100')
+})

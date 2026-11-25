@@ -62,7 +62,9 @@ describe('Backlog feed (council round 2, D2)', () => {
   })
 
   it('lays each row on one grid: 16 px status, title, 104 px meta, with tags 4 px under the title', () => {
-    expect(feed).toContain('dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1')
+    expect(feed).toContain(
+      'dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1',
+    )
     expect(feed).toMatch(/data-feed-entry-chips="" className="dshx:col-span-2 dshx:col-start-2/u)
   })
 
@@ -77,17 +79,20 @@ describe('Backlog feed (council round 3, D2)', () => {
   const feed = read('feed-view.tsx')
   const bare = { attention: 'none' as const, proposal: null, project: null, attachments: [], links: [], activity: { comments: 0 }, freshness: 'fresh' as const }
 
-  it('gives the tags on one screen distinct tones, never two neighbouring hues (#docs and #finance were both teal)', () => {
-    const tones = FeedLook.tagTones(['billing', 'finance', 'web-app', 'a11y', 'docs', 'billing'])
-    expect(tones.get('docs')).not.toBe(tones.get('finance'))
-    expect(new Set(tones.values()).size).toBe(5)
-    // Tones 0/5 (225°/195°) and 3/4 (305°/340°) read as one colour: no pair of them while a far tone is free.
-    const four = FeedLook.tagTones(['docs', 'finance', 'billing', 'a11y'])
-    const indices = [...four.values()].map(tone => Number(tone.at(-1)))
-    expect(indices.includes(0) && indices.includes(5)).toBe(false)
-    expect(indices.includes(3) && indices.includes(4)).toBe(false)
-    // Stable: the same set gives the same tones whatever the order of the rows.
-    expect(FeedLook.tagTones(['docs', 'finance'])).toEqual(FeedLook.tagTones(['finance', 'docs']))
+  // Council round 4, D4: one fixed hue per tag. Collisions are accepted; a tag never changes colour as others come and go.
+  it('gives each tag one fixed tone, whatever other tags are on screen', () => {
+    expect(FeedLook).not.toHaveProperty('tagTones')
+    expect(feed).not.toContain('tagTones')
+    expect(feed).toMatch(/tagTone=\{FeedLook\.tagTone\}/u)
+  })
+
+  it('names a time shared by every row of a day once, in its divider', () => {
+    expect(FeedLook.sharedTime(['07:16 PM', '07:16 PM', '07:16 PM'])).toBe('07:16 PM')
+    expect(FeedLook.sharedTime(['07:16 PM', '07:17 PM'])).toBeNull()
+    // One row has nothing to repeat: its own time stays on the row.
+    expect(FeedLook.sharedTime(['07:16 PM'])).toBeNull()
+    expect(feed).toMatch(/\{label\}\s*\{shared === null \? '' : ` · \$\{shared\}`\}/u)
+    expect(feed).toMatch(/timeInDivider=\{shared !== null\}/u)
   })
 
   it('puts one short tag inline with the title, and keeps a second line for previews or several chips', () => {

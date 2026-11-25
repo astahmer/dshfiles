@@ -1,13 +1,5 @@
 import { projectToneIndex } from '@dshfiles/plugin-ui/components/ui/project-mark'
 
-const TONE_COUNT = 6
-/** Balanced tones whose hues sit under 40° apart and read as one colour at chip size: 225°/195° and 305°/340°. */
-const NEIGHBOUR = new Map([
-  [0, 5],
-  [5, 0],
-  [3, 4],
-  [4, 3],
-])
 /** A tag this long or shorter fits beside a title without pushing it into an early ellipsis. */
 const INLINE_TAG_MAX = 16
 
@@ -30,31 +22,18 @@ export class FeedLook {
 
   /**
    * A tag's identity tone: the kit's status-safe project palette, hashed from the tag so it never changes between
-   * reloads. The class sets `color`; the chip tints its fill from it.
+   * reloads, nor as other tags come and go. Two tags may share a tone; that is accepted (council round 4, D4). The class
+   * sets `color`; the chip tints its fill from it.
    */
   static readonly tagTone = (tag: string): string => `project-tone-balanced-${String(projectToneIndex(tag))}`
 
   /**
-   * The tones of the tags on one screen. Each tag starts at its hashed tone; a tag whose tone is taken, or whose hue
-   * neighbours a taken one, moves to the next free tone that does not, so two tags never share a colour while the
-   * palette has room (#docs and #finance hashed to teal and cyan, council round 3, D2). Tags are placed in name order,
-   * so the same set always gets the same tones whatever order the rows are in.
+   * The time every row of a day shares, which its divider names once instead of each row (council round 4, D4). Null
+   * when the rows differ or there is only one row.
    */
-  static readonly tagTones = (tags: Iterable<string>): ReadonlyMap<string, string> => {
-    const used = new Set<number>()
-    const tones = new Map<string, string>()
-    for (const tag of [...new Set(tags)].sort()) {
-      const own = projectToneIndex(tag)
-      const order = Array.from({ length: TONE_COUNT }, (_, step) => (own + step) % TONE_COUNT)
-      const neighbour = (tone: number): boolean => {
-        const near = NEIGHBOUR.get(tone)
-        return near !== undefined && used.has(near)
-      }
-      const tone = order.find(candidate => !used.has(candidate) && !neighbour(candidate)) ?? order.find(candidate => !used.has(candidate)) ?? own
-      used.add(tone)
-      tones.set(tag, `project-tone-balanced-${String(tone)}`)
-    }
-    return tones
+  static readonly sharedTime = (times: readonly string[]): string | null => {
+    const [first] = times
+    return first !== undefined && times.length > 1 && times.every(time => time === first) ? first : null
   }
 
   /**
