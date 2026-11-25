@@ -76,6 +76,15 @@ export const GeneralSection = (
         // shorter cubes.
         'dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-card!',
         'dshx:@max-pane-narrow:[&_[class*=_themeCube]]:py-2! dshx:@max-pane-narrow:[&_[class*=_themeCube]]:gap-1!',
+        // The rows' selectors (core module CSS, filled and borderless) in the kit's one select look (council round 3 B3,
+        // kit A4): 32px, a 1px border, the page fill, 8px corners.
+        'dshx:[&_[class*=_selector_]]:select-look! dshx:[&_[class*=_selector_]:hover]:bg-(--dsw-alias-interactive-bg-hover)!',
+        // A touch screen keeps 44px controls: the selectors, and the stepper whose up and down buttons are 44px there.
+        'dshx:pointer-coarse:[&_[class*=_selector_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]+[class*=_unit_]]:h-11!',
+        // Font size: the core stepper and its "px" read as one field with the unit as an inner suffix, the kit's UnitInput
+        // look (council round 3 B3, kit A4), instead of a filled number pill beside a loose unit.
+        'dshx:[&_[class*=_stepper_]]:h-8! dshx:[&_[class*=_stepper_]]:min-w-14! dshx:[&_[class*=_stepper_]]:justify-start! dshx:[&_[class*=_stepper_]]:rounded-r-none! dshx:[&_[class*=_stepper_]]:border! dshx:[&_[class*=_stepper_]]:border-r-0! dshx:[&_[class*=_stepper_]]:border-(--dsw-alias-border-l3)! dshx:[&_[class*=_stepper_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]]:pl-2.5!',
+        'dshx:[&_[class*=_stepper_]+[class*=_unit_]]:-ml-2! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:inline-flex! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:h-8! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:items-center! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:rounded-r-(--dsw-radius-md)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-(--dsw-alias-border-l3)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:pr-2.5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-muted-foreground!',
         // Each card's theme swatch under its label (`themeSwatches`): cards in core order, Light, Dark, System.
         "dshx:[&_[class*=_themeCube]]:before:order-last dshx:[&_[class*=_themeCube]]:before:mt-1 dshx:[&_[class*=_themeCube]]:before:h-3 dshx:[&_[class*=_themeCube]]:before:w-10 dshx:[&_[class*=_themeCube]]:before:content-['']",
         'dshx:[&_[class*=_themeCube]:nth-child(1)]:before:[background:var(--settings-swatch-light)] dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)] dshx:[&_[class*=_themeCube]:nth-child(3)]:before:[background:var(--settings-swatch-system)]',

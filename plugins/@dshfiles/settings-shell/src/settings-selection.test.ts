@@ -25,6 +25,21 @@ describe('Settings selection at the tint rung (round five P4, K2)', () => {
   })
 })
 
+describe('Settings › General controls in the kit field look (council round 3 B3)', () => {
+  it('draws the row selectors as the kit select and the font size as one field with its unit inside', () => {
+    const general = read('native/general-section.tsx')
+    expect(general).toContain('dshx:[&_[class*=_selector_]]:select-look!')
+    // The number and its unit share one bordered box: the stepper drops its trailing edge, the unit takes it.
+    expect(general).toContain('dshx:[&_[class*=_stepper_]]:rounded-r-none!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]]:border-r-0!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:-ml-2!')
+    // 44px on a touch screen, where the stepper's own buttons are 44px.
+    expect(general).toContain('dshx:pointer-coarse:[&_[class*=_stepper_]]:h-11!')
+    expect(general).toContain('dshx:pointer-coarse:[&_[class*=_selector_]]:h-11!')
+  })
+})
+
 describe('Settings header on a phone (round five P4)', () => {
   it('folds the configuration file action into one named menu instead of a bare <> icon', () => {
     const action = read('open-config-action.tsx')
