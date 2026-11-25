@@ -1,4 +1,5 @@
 import { useResource } from '@dshfiles/dshx/client'
+import { AttentionBadge } from '@dshfiles/plugin-ui/components/ui/attention-badge'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useMemo } from 'react'
 import { ATTENTION_LIST_LIMIT, ATTENTION_READ, attentionApi } from './attention-api.js'
@@ -31,12 +32,9 @@ export const InboxGlyph = (props: { readonly size?: number; readonly navigation:
         <path d="M4 13l2.5-7h11L20 13v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z" />
         <path d="M4 13h4.5l1 2h5l1-2H20" />
       </svg>
-      {count === 0 ? null : (
-        <span className="dshx:absolute dshx:-right-2 dshx:-top-1.5 dshx:min-w-4 dshx:rounded-full dshx:bg-primary dshx:px-1 dshx:text-center dshx:text-2xs dshx:font-semibold dshx:leading-4 dshx:text-primary-foreground">
-          {count > 99 ? '99+' : count}
-          <span className="dshx:sr-only"> need you</span>
-        </span>
-      )}
+      {/* Round five C4 (council round 4): the kit's attention badge in the glyph's trailing corner, past its edge, so it
+          never covers the glyph; its ring is the rail's and the phone tab bar's surface (the sidebar fill). */}
+      <AttentionBadge count={count} label="need you" className="dshx:absolute dshx:left-full dshx:-top-1.5" />
     </span>
   )
 }

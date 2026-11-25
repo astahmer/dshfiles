@@ -16,7 +16,7 @@ Open the reusable **Activity Timeline: Activity** view from navigation or the Wo
 
 The plugin also owns the attention inbox of [the ADE plan](../../../docs/ade-ux/README.md#48-the-attention-model)
 (Phase 2a). The **Inbox** entry in the left navigation (a temporary home until the Phase 3 rail) carries the only
-badge, the Needs you count. The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
+badge, the Needs you count (the kit's `AttentionBadge`, seated past the glyph's trailing edge so it never covers it; council round 4). The page has **Needs you** (blocking and failed items) and **Other** (ready items) tabs,
 plus **Snoozed**, **Done** and **Muted** when they hold items. Each row leads with the thread or item it is about,
 then the sentence that says what it is about and its detail, then one direct action and its verbs inline: answer
 choices, **Review thread** for a finished turn, **Open thread**, **Open backlog item** for a subject another page owns,
