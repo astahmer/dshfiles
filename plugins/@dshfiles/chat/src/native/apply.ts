@@ -60,6 +60,7 @@ import { AnnotationMarksPolicy, AnnotationQuickCommentPolicy } from './annotatio
 import { AnnotationMarksRow, type AnnotationMarksRowInjected } from './settings/AnnotationMarksRow.tsx'
 import { AnnotationQuickCommentRow, type AnnotationQuickCommentRowInjected } from './settings/AnnotationQuickCommentRow.tsx'
 import { SeenAnswers, UnreadLandingPolicy } from './unread-landing.ts'
+import { SeenTurns } from './seen-turns.ts'
 import { useTurnDataValue } from './chat/use-turn-data.ts'
 import { bindDisclosure } from './chat/use-disclosure.ts'
 import { useFlowHidden, useMotionHidden } from './chat/flow-motion.ts'
@@ -153,6 +154,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
   const chatStore = createChatStore()
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
   const seenAnswers = new SeenAnswers(typeof localStorage === 'undefined' ? null : localStorage)
+  const seenTurns = new SeenTurns(typeof localStorage === 'undefined' ? null : localStorage)
   const chatSettings = ctx.configForms.get<ChatSettings>(CHAT_SETTINGS_NAMESPACE)
   const linkOpening = createSnapshotStore(chatSettings.getSnapshot().value?.linkOpening ?? DEFAULT_LINK_OPENING)
   ctx.effect(() => chatSettings.subscribe(() => {
@@ -391,6 +393,11 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           seenAnswer: {
             read: () => seenAnswers.read(sessionId),
             markSeen: (anchorKey) => { seenAnswers.markSeen(sessionId, anchorKey) },
+          },
+          seenTurns: {
+            read: () => seenTurns.read(sessionId),
+            markSeen: (turn) => { seenTurns.markSeen(sessionId, turn) },
+            reset: (turn) => { seenTurns.reset(sessionId, turn) },
           },
           forkAt: (seq) => {
             const turn = [...chat.getSnapshot().timeline.turns.values()].find(turn => turn.end?.seq === seq)

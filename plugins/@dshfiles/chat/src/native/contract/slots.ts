@@ -382,6 +382,12 @@ export interface ChatViewInjected {
     read: () => string | null
     markSeen: (anchorKey: string) => void
   }
+  /** This browser's read position in this Session: the highest Turn reached, for the rail's read boundary. */
+  seenTurns: {
+    read: () => number | null
+    markSeen: (turn: number) => void
+    reset: (turn: number | null) => void
+  }
   forkAt: (seq: number) => void
 }
 
