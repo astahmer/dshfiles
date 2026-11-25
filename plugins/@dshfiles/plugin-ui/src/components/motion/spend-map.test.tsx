@@ -52,3 +52,48 @@ describe('SpendMap › series colour (council round 4, D1)', () => {
     expect(html).not.toContain('style="color:')
   })
 })
+
+describe('SpendMap › dimension colour (council round 7, D3)', () => {
+  const withTones = (leafColor?: string): string =>
+    renderToStaticMarkup(
+      <SpendMap
+        heading="Where it went"
+        owner="All accounts"
+        total={10}
+        format={value => String(value)}
+        dimensions={dimensions(leafColor).map(dimension => ({
+          ...dimension,
+          color: dimension.id === 'model' ? 'var(--dshx-data-1)' : 'var(--dshx-data-2)',
+        }))}
+        dimensionId="model"
+        leafId="a"
+        onDimensionChange={() => undefined}
+        onLeafChange={() => undefined}
+      />,
+    )
+  const card = (html: string, id: string): string => new RegExp(`<button[^>]*data-node-anchor="dim:${id}".*?</button>`, 'su').exec(html)?.[0] ?? ''
+
+  it("draws an unselected card's top segment and dot in the dimension's colour, not grey", () => {
+    const accounts = card(withTones(), 'provider')
+    expect(accounts).toContain('aria-checked="false"')
+    expect(accounts.match(/background-color:var\(--dshx-data-2\)/gu)).toHaveLength(2)
+    expect(accounts).not.toContain('dshx:bg-muted-foreground/40')
+  })
+
+  it("draws a selected card with no leaf colour in the dimension's colour, other segments muted", () => {
+    const models = card(withTones(), 'model')
+    expect(models.match(/background-color:var\(--dshx-data-1\)/gu)).toHaveLength(2)
+    expect(models).not.toContain('dshx:bg-foreground')
+    expect(models).toContain('dshx:bg-muted-foreground/30')
+  })
+
+  it("keeps a selected leaf's series colour over the dimension's", () => {
+    const models = card(withTones('var(--dshx-data-3)'), 'model')
+    expect(models.match(/background-color:var\(--dshx-data-3\)/gu)).toHaveLength(2)
+    expect(models).not.toContain('var(--dshx-data-1)')
+  })
+
+  it('leaves an unselected card without a colour muted', () => {
+    expect(card(render(), 'provider')).toContain('dshx:bg-muted-foreground/40')
+  })
+})

@@ -36,6 +36,12 @@ export interface SpendDimension {
   readonly label: string
   readonly icon?: React.ReactNode
   readonly leaves: readonly SpendLeaf[]
+  /**
+   * A CSS colour for the dimension's card (a `var(--dshx-data-N)`): its top entry's strip segment and dot take it whether
+   * the card is selected or not, so a card reads as its own series instead of grey; a selected entry's own colour wins.
+   * Without one an unselected card stays muted (council round 7, D3).
+   */
+  readonly color?: string
 }
 
 export interface SpendMapProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
@@ -375,8 +381,8 @@ function DimensionCard({
   readonly onSelect: () => void
 }) {
   const top = dimension.leaves.find(entry => entry.id === highlightLeafId) ?? dimension.leaves[0]
-  // The highlighted entry keeps the series colour the chart gives it; ink when it has none.
-  const topColor = selected ? top?.color : undefined
+  // The highlighted entry keeps the series colour the chart gives it, else the dimension's colour; ink when neither.
+  const topColor = selected ? (top?.color ?? dimension.color) : dimension.color
   const topStyle = topColor === undefined ? undefined : { backgroundColor: topColor }
   return (
     <button
@@ -402,7 +408,7 @@ function DimensionCard({
             style={{ flexGrow: Math.max(entry.share, 0.02), ...(entry.id === top?.id && topStyle) }}
             className={cn(
               'dshx:h-full dshx:basis-0 dshx:rounded-full dshx:transition-colors dshx:duration-300',
-              entry.id === top?.id && selected ? topStyle === undefined && 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/30',
+              entry.id === top?.id && (selected || topStyle !== undefined) ? topStyle === undefined && 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/30',
             )}
           />
         ))}
@@ -414,7 +420,7 @@ function DimensionCard({
             style={topStyle}
             className={cn(
               'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
-              selected ? topStyle === undefined && 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/40',
+              topStyle !== undefined ? undefined : selected ? 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/40',
             )}
           />
           <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{top.label}</span>
