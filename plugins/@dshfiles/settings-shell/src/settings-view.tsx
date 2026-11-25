@@ -340,6 +340,12 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
 const SEARCH_FOCUS_FRAMES = 30
 
 /**
+ * A touch screen opens Settings without focusing its search (round five B7): focus there raises the software keyboard
+ * over the page the person came to read. A keyboard and mouse keep the focused field.
+ */
+const touchFirst = (): boolean => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true
+
+/**
  * Settings opens with its search field focused (DESIGN.md: a shortcut that opens a page focuses its first field).
  * `autoFocus` alone runs while the stage still hides the page's host, so the field cannot take focus and focus falls to
  * `body` (Option+Cmd+, from the composer). This retries for a few frames, and only while focus is nowhere: a control
@@ -347,6 +353,7 @@ const SEARCH_FOCUS_FRAMES = 30
  */
 const useSearchFocusOnShow = (search: RefObject<HTMLInputElement | null>): void => {
   useEffect(() => {
+    if (touchFirst()) return
     let frame = 0
     let tries = 0
     const attempt = (): void => {
@@ -427,8 +434,8 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
               ref={search}
               aria-label={t('search.placeholder')}
               autoComplete="off"
-              autoFocus
-              data-modal-autofocus=""
+              autoFocus={!touchFirst()}
+              data-modal-autofocus={touchFirst() ? undefined : ''}
               onChange={event => props.onSearch(event.currentTarget.value)}
               onKeyDown={event => {
                 // Escape clears a query first, as in VS Code.

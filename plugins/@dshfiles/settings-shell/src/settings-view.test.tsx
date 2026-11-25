@@ -98,6 +98,18 @@ describe('settings view: search focus', () => {
     view.unmount()
   })
 
+  it('leaves the search field unfocused on a touch screen, so no keyboard covers the page (round five B7)', async () => {
+    const matchMedia = vi.fn((query: string) => ({ matches: query === '(pointer: coarse)', media: query, addEventListener: () => {}, removeEventListener: () => {} }))
+    vi.stubGlobal('matchMedia', matchMedia)
+    const view = mount({})
+    await frames(3)
+    const search = view.host.querySelector('[role="searchbox"]')
+    expect(document.activeElement).not.toBe(search)
+    expect(search?.hasAttribute('data-modal-autofocus')).toBe(false)
+    view.unmount()
+    vi.unstubAllGlobals()
+  })
+
   it('leaves focus where the user put it', async () => {
     const rail = document.createElement('button')
     document.body.append(rail)

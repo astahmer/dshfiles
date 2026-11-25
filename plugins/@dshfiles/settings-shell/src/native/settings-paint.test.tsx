@@ -45,6 +45,19 @@ describe('Settings › General paints once (round three item 30)', () => {
   })
 })
 
+describe('Settings › General below 28rem and its Appearance cards (round five B7)', () => {
+  it('stacks every native row and gives each theme card its own paper, ink and accent swatch', async () => {
+    await act(async () => root.render(<GeneralSection renderSlot={() => null} />))
+    const column = container.querySelector<HTMLElement>('[data-settings-theme-swatches]')
+    expect(column?.className).toContain('dshx:@max-pane-narrow:[&_[class$=row]]:flex-col!')
+    expect(column?.className).not.toContain('flex-wrap')
+    for (const scheme of ['light', 'dark', 'system']) expect(column?.style.getPropertyValue(`--settings-swatch-${scheme}`)).toMatch(/^radial-gradient/u)
+    // The light card's paper differs from the dark card's: each swatch shows its own theme.
+    expect(column?.style.getPropertyValue('--settings-swatch-light')).not.toBe(column?.style.getPropertyValue('--settings-swatch-dark'))
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)]')
+  })
+})
+
 describe('the Language note', () => {
   it('says what a language other than English and 中文 covers', async () => {
     await act(async () => root.render(<LanguageCoverageNote locale="fr" t={t} />))

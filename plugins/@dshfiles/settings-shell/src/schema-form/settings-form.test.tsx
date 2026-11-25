@@ -78,6 +78,12 @@ describe('settings form rows', () => {
     expect(untouched?.textContent).not.toContain('source.default')
   })
 
+  it('stacks every row below 28rem: the text, then the control (round five B7)', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={form} namespace="example" t={t} />))
+    const layout = row('focusThreadInSidebar')?.querySelector('[data-setting-row-layout]')
+    expect(layout?.className).toContain('dshx:@max-pane-narrow:flex-col')
+  })
+
   it('names the source of a value that is not the default, and what a reset re-inherits', async () => {
     await act(async () => root.render(<SettingsForm fields={fields} form={form} namespace="example" t={t} />))
     const modified = row('maxTabs')

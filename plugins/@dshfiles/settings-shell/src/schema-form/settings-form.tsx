@@ -612,7 +612,11 @@ const SettingRow = (props: {
       ref={row}
     >
       {props.modified && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-3 dshx:-left-3 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
-      <div className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6">
+      {/* Below 28rem (a phone) every row stacks: its text, then its control (round five B7). */}
+      <div
+        className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6 dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:gap-2"
+        data-setting-row-layout=""
+      >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
           <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-base dshx:leading-5 dshx:text-foreground">
             {/* The config key stays one hover away (and in the JSON view); it is not a line of every row. */}

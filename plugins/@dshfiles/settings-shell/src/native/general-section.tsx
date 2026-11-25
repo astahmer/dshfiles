@@ -4,10 +4,11 @@
  */
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PaletteMath } from '@dshfiles/plugin-ui/theme/palette'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { IconSettingsOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { ShellTranslate } from './locales.js'
 import { useObservable } from './use-observable.js'
 import { DshReleaseIndicator } from '../release-notice.js'
@@ -22,6 +23,25 @@ const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly 
   return true
 }
 
+/**
+ * Each Appearance card's own colours (round five B7): paper, ink and accent dots generated from the kit's palette for
+ * that scheme, so the card shows the theme it picks rather than only its icon. System shows both papers and the accent.
+ */
+const themeSwatches = (): CSSProperties & Record<`--settings-swatch-${string}`, string> => {
+  const light = PaletteMath.standaloneColours('light')
+  const dark = PaletteMath.standaloneColours('dark')
+  const dot = (x: number, fill: string, edge: string): string =>
+    `radial-gradient(circle at ${String(x)}px 50%, ${fill} 4px, ${edge} 4.5px, ${edge} 5px, transparent 5.5px)`
+  // One mid-grey ring on every dot: a near-white or near-black dot then shows on a light and on a dark card alike.
+  const ring = light.faint
+  const strip = (paper: string, ink: string, accent: string): string => [dot(6, paper, ring), dot(20, ink, ring), dot(34, accent, accent)].join(', ')
+  return {
+    '--settings-swatch-light': strip(light.bg, light.text, light.accent),
+    '--settings-swatch-dark': strip(dark.bg, dark.text, dark.accent),
+    '--settings-swatch-system': strip(light.bg, dark.bg, light.accent),
+  }
+}
+
 /** The General section column; rows come from `settings.general.item` registrants. */
 export const GeneralSection = (
   props: Pick<PropsRenderSlots<'settings.general.item'>, 'renderSlot'> & {
@@ -34,6 +54,7 @@ export const GeneralSection = (
   },
 ): JSX.Element => {
   const column = useRef<HTMLDivElement>(null)
+  const swatches = useMemo(() => themeSwatches(), [])
   useEffect(() => {
     if (props.target === undefined || column.current === null) return
     revealSettingsEntry({ container: column.current, entryId: props.target })
@@ -45,8 +66,9 @@ export const GeneralSection = (
     <div
       className={cn(
         "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0",
-        'dshx:@max-pane-narrow:[&_[class$=row]]:flex-wrap dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
-        'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:flex-[1_1_12rem]!',
+        // Below 28rem every native row stacks, its control under its text (round five B7), like the plugin rows.
+        'dshx:@max-pane-narrow:[&_[class$=row]]:flex-col! dshx:@max-pane-narrow:[&_[class$=row]]:items-start! dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
+        'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:w-full!',
         // Round three item 30: the Language note reads as the Language row's own caption, under one divider.
         'dshx:[&_[class$=row]:has(+[data-settings-language-note])]:border-b-0! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:pb-1!',
         // Round five P4: the chosen Appearance cube (core theme row, unlayered module CSS) at the tint rung: the selected
@@ -54,8 +76,13 @@ export const GeneralSection = (
         'dshx:[&_[class*=_themeCube][aria-pressed=true]]:relative dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:border-ring! dshx:[&_[class*=_themeCube][aria-pressed=true]]:bg-selected-wash!',
         "dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:absolute dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:top-2.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:right-3.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:bottom-auto dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:left-auto dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:h-2.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:w-1.5 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:rotate-45 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:border-r-2 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:border-b-2 dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:border-ring dshx:[&_[class*=_themeCube][aria-pressed=true]]:after:content-['']",
         'dshx:@max-pane-narrow:[&_[class*=_themeCube]]:py-2! dshx:@max-pane-narrow:[&_[class*=_themeCube]]:gap-1!',
+        // Each card's theme swatch under its label (`themeSwatches`): cards in core order, Light, Dark, System.
+        "dshx:[&_[class*=_themeCube]]:before:order-last dshx:[&_[class*=_themeCube]]:before:mt-1 dshx:[&_[class*=_themeCube]]:before:h-3 dshx:[&_[class*=_themeCube]]:before:w-10 dshx:[&_[class*=_themeCube]]:before:content-['']",
+        'dshx:[&_[class*=_themeCube]:nth-child(1)]:before:[background:var(--settings-swatch-light)] dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)] dshx:[&_[class*=_themeCube]:nth-child(3)]:before:[background:var(--settings-swatch-system)]',
       )}
+      data-settings-theme-swatches=""
       ref={column}
+      style={swatches}
     >
       {props.renderSlot('settings.general.item', {})}
       {props.banner}
