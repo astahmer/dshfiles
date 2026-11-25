@@ -92,12 +92,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 680,
-  "apiToolBindings": 477,
-  "apiToolNameCount": 477,
-  "apiToolSchemas": 476,
+  "apiMethods": 691,
+  "apiToolBindings": 488,
+  "apiToolNameCount": 488,
+  "apiToolSchemas": 487,
   "definedTools": 24,
-  "tools": 500,
+  "tools": 511,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -758,7 +758,8 @@
               "commandcode",
               "github-copilot",
               "cursor",
-              "mistral"
+              "mistral",
+              "antigravity"
             ]
           },
           "requestId": {
@@ -991,7 +992,8 @@
               "commandcode",
               "github-copilot",
               "cursor",
-              "mistral"
+              "mistral",
+              "antigravity"
             ]
           },
           "requestId": {
@@ -1186,7 +1188,8 @@
                   "commandcode",
                   "github-copilot",
                   "cursor",
-                  "mistral"
+                  "mistral",
+                  "antigravity"
                 ]
               },
               "displayName": {
@@ -4791,7 +4794,7 @@
     },
     {
       "name": "dshx_comm_agents",
-      "description": "List DSH Agents for peer discovery. Related and same-workspace peers come first; includeAll lists every live Agent. Each entry includes its title/label and parent Session id when available. For your own parent or child Agents, native send_message and subagent results are the right channel; use dshx_comm_send only between other top-level threads. Peer messages remain passive and never start or resume a turn.",
+      "description": "List DSH Agents for peer discovery. Related and same-workspace peers come first; includeAll lists every live Agent. Each entry includes its title/label and parent Session id when available. For your own parent or child Agents, native send_message and subagent results are the right channel; use dshx_comm_send only between other top-level threads. A direct `request` wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -4827,7 +4830,7 @@
     },
     {
       "name": "dshx_comm_send",
-      "description": "Store untrusted peer text for another top-level thread. For your own parent or child Agents, native send_message and subagent results are the right channel. Sending never adds a Session message or starts, resumes, or redirects the recipient. intent \"request\" records the request but never starts a turn.",
+      "description": "Store untrusted peer text for another top-level thread. For your own parent or child Agents, native send_message and subagent results are the right channel. A direct `request` wakes its recipient with a pointer message (\"read your inbox\"), so an idle thread acts without a user prompt; a notice never starts or resumes a turn. Waking is bounded by a cooldown and an hourly cap, and can be turned off in Settings.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5344,7 +5347,7 @@
     },
     {
       "name": "jj_prepare_action",
-      "description": "Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore.",
+      "description": "Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore, operation-undo.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5787,6 +5790,21 @@
                   "paths"
                 ],
                 "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "operation-undo"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
               }
             ]
           }
@@ -5965,7 +5983,7 @@
     },
     {
       "name": "jj_thread_cleanup",
-      "description": "Remove idle workspaces, then abandon empty undescribed revisions nothing builds on. A thread workspace qualifies when it is of a listed kind (empty: never landed; integrated: landed, or all its work held by one other local bookmark, named in integratedInto and kept), unused longer than olderThanHours, with no live, waiting or unreadable Session and no queued integration. Secondary JJ checkouts are opt-in: a present one must be idle and clean with no unlanded work, outside the primary checkout and threads directory; a missing one is only forgotten, its path never deleted. untracked removes threads-directory entries no workspace owns. targets limits removal to matching preview rows. Working-copy files are snapshotted first; unlanded work is never forced. apply: false previews; apply: true only when the user asked to clean up.",
+      "description": "Remove idle workspaces, then abandon empty undescribed revisions nothing builds on. A thread workspace qualifies when it is of a listed kind (empty: never landed; integrated: landed, or all its work held by one other local bookmark, named in integratedInto and kept; stale: pending work the bookmark moved past and nobody changed for the stale window, only ever removed when stale is listed), unused longer than olderThanHours, with no live, waiting or unreadable Session and no queued integration. Secondary JJ checkouts are opt-in: a present one must be idle and clean with no unlanded work, outside the primary checkout and threads directory; a missing one is only forgotten, its path never deleted. untracked removes threads-directory entries no workspace owns. targets limits removal to matching preview rows. Working-copy files are snapshotted first; unlanded work is never forced except stale work the stale kind selected. apply: false previews; apply: true only when the user asked to clean up.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -5983,6 +6001,7 @@
                 "empty",
                 "integrated",
                 "merged",
+                "stale",
                 "secondary",
                 "untracked"
               ]
@@ -6005,6 +6024,7 @@
                     "empty",
                     "integrated",
                     "merged",
+                    "stale",
                     "secondary",
                     "untracked"
                   ]
@@ -6175,7 +6195,7 @@
     },
     {
       "name": "jj_thread_repositories",
-      "description": "List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.",
+      "description": "List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, whether that work is stale, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -7396,6 +7416,127 @@
       }
     },
     {
+      "name": "multi_host_link_back",
+      "description": "Link an existing host back to this machine, SSH or paired: this machine makes a pairing code and the host redeems it, so the host's agents can run threads here. This machine's linking must be on and its link URL reachable from the host. Call only when the user asked to link that host back.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "runtimeId": {
+            "type": "string"
+          },
+          "allowPlainHttp": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "runtimeId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_link_configure",
+      "description": "Turn this machine's link gateway on or off and choose where it listens: 'tailscale' (this machine's Tailscale address, the default), 'loopback' (behind tailscale serve or a reverse proxy, with advertiseUrl naming the public origin) or 'all' (every interface; plain HTTP on a LAN). advertiseUrl null clears it. Linked machines can run threads here. Call only when the user asked to change linking.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "listen": {
+            "type": "string",
+            "enum": [
+              "tailscale",
+              "loopback",
+              "all"
+            ]
+          },
+          "port": {
+            "type": "integer"
+          },
+          "advertiseUrl": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_link_offer",
+      "description": "Make a single-use pairing code (valid ten minutes) another machine redeems to link to this one, with the pairing links that carry it. Anyone holding the code can link a machine until it expires. Call only when the user asked to pair or link a machine.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "multi_host_link_pair",
+      "description": "Pair with another machine using the pairing link or URL and code it shows (Hosts → Link this machine, or multi_host_link_offer there), without SSH. The machine becomes a host here, so threads and multi_host_delegate can run on it. linkBack: true also asks it to pair with this machine, so its agents can run threads here; this machine's linking must be on. Call only when the user asked to pair or link machines.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "string"
+          },
+          "code": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "linkBack": {
+            "type": "boolean"
+          },
+          "allowPlainHttp": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "link"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_link_peers",
+      "description": "The machines linked to this one: each may run threads here until it is unlinked. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
+      "name": "multi_host_link_revoke",
+      "description": "Unlink one machine: its credential stops working and its open connections close at once. It must pair again with a new code to come back. Pass confirm: true. Call only when the user asked to unlink that machine.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "peerId": {
+            "type": "string"
+          },
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "peerId",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_link_status",
+      "description": "This machine's link gateway: whether linking is on, where it listens, the URLs another machine pairs with, how many machines are linked, and why it is not listening. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
       "name": "multi_host_list",
       "description": "List the machines (hosts) this DSH can run threads on and their DSH runtimes: connector, remote home, whether a connection is open, and the last error. Read-only.",
       "parameters": {
@@ -8023,6 +8164,26 @@
       }
     },
     {
+      "name": "multi_host_thread_archive",
+      "description": "Archive one thread on the runtime that owns it, through the same reversible Workspace API its own sidebar uses; the thread leaves the sidebar until restored. Refused while its turn runs: stop it first. Call only when the user asked to archive that thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "runtimeId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "runtimeId",
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "multi_host_thread_reply",
       "description": "Send a message to one thread running on another machine: it queues the message, or steers the running turn when steer is true. Call only when the user asked to reply on that thread.",
       "parameters": {
@@ -8083,6 +8244,26 @@
           },
           "maxMessages": {
             "type": "integer"
+          }
+        },
+        "required": [
+          "runtimeId",
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "multi_host_thread_unarchive",
+      "description": "Restore one archived thread on the runtime that owns it, through the same reversible Workspace API its own sidebar uses. Call only when the user asked to restore that thread.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "runtimeId": {
+            "type": "string"
+          },
+          "sessionId": {
+            "type": "string"
           }
         },
         "required": [
@@ -11045,8 +11226,400 @@
       }
     },
     {
+      "name": "theme_define",
+      "description": "Save a theme the user asked for (any named or described theme: Nord, Solarized, \"a cyberpunk theme with rain\") and, by default, switch to it, live with no restart. Look up the theme’s official palette first when it has one and keep its exact colours; give only the schemes it really has. An optional backdrop animates behind the conversation. Returns contrastWarnings for text under WCAG AA: tell the user. Call only when the user asked for a theme. Reversible: theme_set preset returns to a preset; theme_remove deletes it.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "theme": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "Lowercase letters, digits and hyphens; not a preset id. Saving an existing id replaces that theme.",
+                "type": "string"
+              },
+              "label": {
+                "description": "Name shown to the user, 1–60 characters.",
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "dark": {
+                "description": "Colours used while DSH is dark.",
+                "type": "object",
+                "properties": {
+                  "colours": {
+                    "description": "Every role, in a ramp from bg to text: bg, panel, raised, selected are fills; line, border, borderStrong borders; strong, faint, muted, text glyphs and text. Prefer the theme’s official palette and UI colours over invented ones.",
+                    "type": "object",
+                    "properties": {
+                      "bg": {
+                        "description": "#rrggbb: app and conversation background.",
+                        "type": "string"
+                      },
+                      "panel": {
+                        "description": "#rrggbb: sidebar, cards and code blocks.",
+                        "type": "string"
+                      },
+                      "raised": {
+                        "description": "#rrggbb: hover, bubbles and the composer.",
+                        "type": "string"
+                      },
+                      "selected": {
+                        "description": "#rrggbb: selected rows and active items.",
+                        "type": "string"
+                      },
+                      "line": {
+                        "description": "#rrggbb: hairline dividers.",
+                        "type": "string"
+                      },
+                      "border": {
+                        "description": "#rrggbb: control borders.",
+                        "type": "string"
+                      },
+                      "borderStrong": {
+                        "description": "#rrggbb: strong borders.",
+                        "type": "string"
+                      },
+                      "strong": {
+                        "description": "#rrggbb: idle glyphs and scrollbars.",
+                        "type": "string"
+                      },
+                      "faint": {
+                        "description": "#rrggbb: tertiary text and placeholders (3:1 on bg, panel and raised).",
+                        "type": "string"
+                      },
+                      "muted": {
+                        "description": "#rrggbb: secondary text (4.5:1).",
+                        "type": "string"
+                      },
+                      "text": {
+                        "description": "#rrggbb: primary text (4.5:1).",
+                        "type": "string"
+                      },
+                      "accent": {
+                        "description": "#rrggbb: links, focus, selection and the primary accent (4.5:1).",
+                        "type": "string"
+                      },
+                      "onAccent": {
+                        "description": "#rrggbb: text on a solid accent fill.",
+                        "type": "string"
+                      },
+                      "success": {
+                        "description": "#rrggbb: success text and icons.",
+                        "type": "string"
+                      },
+                      "warning": {
+                        "description": "#rrggbb: warning text and icons.",
+                        "type": "string"
+                      },
+                      "danger": {
+                        "description": "#rrggbb: error and danger text.",
+                        "type": "string"
+                      },
+                      "info": {
+                        "description": "#rrggbb: informational text.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "bg",
+                      "panel",
+                      "raised",
+                      "selected",
+                      "line",
+                      "border",
+                      "borderStrong",
+                      "strong",
+                      "faint",
+                      "muted",
+                      "text",
+                      "accent",
+                      "onAccent",
+                      "success",
+                      "warning",
+                      "danger",
+                      "info"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "syntax": {
+                    "description": "Code colours; a missing role keeps the generated one.",
+                    "type": "object",
+                    "properties": {
+                      "comment": {
+                        "description": "#rrggbb: code comments.",
+                        "type": "string"
+                      },
+                      "punctuation": {
+                        "description": "#rrggbb: code punctuation and plain identifiers.",
+                        "type": "string"
+                      },
+                      "constant": {
+                        "description": "#rrggbb: numbers and constants.",
+                        "type": "string"
+                      },
+                      "keyword": {
+                        "description": "#rrggbb: keywords.",
+                        "type": "string"
+                      },
+                      "parameter": {
+                        "description": "#rrggbb: parameters and variables.",
+                        "type": "string"
+                      },
+                      "function": {
+                        "description": "#rrggbb: functions and methods.",
+                        "type": "string"
+                      },
+                      "string": {
+                        "description": "#rrggbb: strings.",
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "backdrop": {
+                    "type": "object",
+                    "properties": {
+                      "scene": {
+                        "description": "A built-in animated scene painted at the back: honu-lagoon, koi-mosaic, halftone-dawn, halftone-dusk, plotter-tide, plotter-tide-night, dither-dunes, dither-dunes-night, paper-garden, paper-garden-kraft, night-reef, snow-pines, braille-stars, teletext-clouds, vector-range, departure-board, blueprint, deep-water, aurora, ember. Each is drawn for a light or a dark window (galleryThemes).",
+                        "type": "string"
+                      },
+                      "glass": {
+                        "description": "Frosted layer between the backdrop and the conversation column: blur 0–30 px, a #rrggbb tint, opacity 0–1.",
+                        "type": "object",
+                        "properties": {
+                          "blur": {},
+                          "tint": {
+                            "type": "string"
+                          },
+                          "opacity": {}
+                        },
+                        "required": [
+                          "blur",
+                          "tint",
+                          "opacity"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "layers": {
+                        "description": "Up to 3 full-size layers over the scene, back to front; each is CSS declarations without braces, e.g. \"background-image: radial-gradient(...); animation: snow 8s linear infinite\". Gradients and animations only: url() and @import are refused. Animate opacity or transform, not backgrounds, so nothing repaints per frame; reduced motion stops the animations. A scene, layers and glass take at most 4 slots together.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "keyframes": {
+                        "description": "The @keyframes blocks the layers use; prefix the names with the theme id.",
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "colours"
+                ],
+                "additionalProperties": false
+              },
+              "light": {
+                "description": "Colours used while DSH is light. Give only the schemes the theme really has (its official variants).",
+                "type": "object",
+                "properties": {
+                  "colours": {
+                    "description": "Every role, in a ramp from bg to text: bg, panel, raised, selected are fills; line, border, borderStrong borders; strong, faint, muted, text glyphs and text. Prefer the theme’s official palette and UI colours over invented ones.",
+                    "type": "object",
+                    "properties": {
+                      "bg": {
+                        "description": "#rrggbb: app and conversation background.",
+                        "type": "string"
+                      },
+                      "panel": {
+                        "description": "#rrggbb: sidebar, cards and code blocks.",
+                        "type": "string"
+                      },
+                      "raised": {
+                        "description": "#rrggbb: hover, bubbles and the composer.",
+                        "type": "string"
+                      },
+                      "selected": {
+                        "description": "#rrggbb: selected rows and active items.",
+                        "type": "string"
+                      },
+                      "line": {
+                        "description": "#rrggbb: hairline dividers.",
+                        "type": "string"
+                      },
+                      "border": {
+                        "description": "#rrggbb: control borders.",
+                        "type": "string"
+                      },
+                      "borderStrong": {
+                        "description": "#rrggbb: strong borders.",
+                        "type": "string"
+                      },
+                      "strong": {
+                        "description": "#rrggbb: idle glyphs and scrollbars.",
+                        "type": "string"
+                      },
+                      "faint": {
+                        "description": "#rrggbb: tertiary text and placeholders (3:1 on bg, panel and raised).",
+                        "type": "string"
+                      },
+                      "muted": {
+                        "description": "#rrggbb: secondary text (4.5:1).",
+                        "type": "string"
+                      },
+                      "text": {
+                        "description": "#rrggbb: primary text (4.5:1).",
+                        "type": "string"
+                      },
+                      "accent": {
+                        "description": "#rrggbb: links, focus, selection and the primary accent (4.5:1).",
+                        "type": "string"
+                      },
+                      "onAccent": {
+                        "description": "#rrggbb: text on a solid accent fill.",
+                        "type": "string"
+                      },
+                      "success": {
+                        "description": "#rrggbb: success text and icons.",
+                        "type": "string"
+                      },
+                      "warning": {
+                        "description": "#rrggbb: warning text and icons.",
+                        "type": "string"
+                      },
+                      "danger": {
+                        "description": "#rrggbb: error and danger text.",
+                        "type": "string"
+                      },
+                      "info": {
+                        "description": "#rrggbb: informational text.",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "bg",
+                      "panel",
+                      "raised",
+                      "selected",
+                      "line",
+                      "border",
+                      "borderStrong",
+                      "strong",
+                      "faint",
+                      "muted",
+                      "text",
+                      "accent",
+                      "onAccent",
+                      "success",
+                      "warning",
+                      "danger",
+                      "info"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "syntax": {
+                    "description": "Code colours; a missing role keeps the generated one.",
+                    "type": "object",
+                    "properties": {
+                      "comment": {
+                        "description": "#rrggbb: code comments.",
+                        "type": "string"
+                      },
+                      "punctuation": {
+                        "description": "#rrggbb: code punctuation and plain identifiers.",
+                        "type": "string"
+                      },
+                      "constant": {
+                        "description": "#rrggbb: numbers and constants.",
+                        "type": "string"
+                      },
+                      "keyword": {
+                        "description": "#rrggbb: keywords.",
+                        "type": "string"
+                      },
+                      "parameter": {
+                        "description": "#rrggbb: parameters and variables.",
+                        "type": "string"
+                      },
+                      "function": {
+                        "description": "#rrggbb: functions and methods.",
+                        "type": "string"
+                      },
+                      "string": {
+                        "description": "#rrggbb: strings.",
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "backdrop": {
+                    "type": "object",
+                    "properties": {
+                      "scene": {
+                        "description": "A built-in animated scene painted at the back: honu-lagoon, koi-mosaic, halftone-dawn, halftone-dusk, plotter-tide, plotter-tide-night, dither-dunes, dither-dunes-night, paper-garden, paper-garden-kraft, night-reef, snow-pines, braille-stars, teletext-clouds, vector-range, departure-board, blueprint, deep-water, aurora, ember. Each is drawn for a light or a dark window (galleryThemes).",
+                        "type": "string"
+                      },
+                      "glass": {
+                        "description": "Frosted layer between the backdrop and the conversation column: blur 0–30 px, a #rrggbb tint, opacity 0–1.",
+                        "type": "object",
+                        "properties": {
+                          "blur": {},
+                          "tint": {
+                            "type": "string"
+                          },
+                          "opacity": {}
+                        },
+                        "required": [
+                          "blur",
+                          "tint",
+                          "opacity"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "layers": {
+                        "description": "Up to 3 full-size layers over the scene, back to front; each is CSS declarations without braces, e.g. \"background-image: radial-gradient(...); animation: snow 8s linear infinite\". Gradients and animations only: url() and @import are refused. Animate opacity or transform, not backgrounds, so nothing repaints per frame; reduced motion stops the animations. A scene, layers and glass take at most 4 slots together.",
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "keyframes": {
+                        "description": "The @keyframes blocks the layers use; prefix the names with the theme id.",
+                        "type": "string"
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "colours"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ],
+            "additionalProperties": false
+          },
+          "apply": {
+            "description": "Switch to the theme at once (default true).",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "theme"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "theme_get",
-      "description": "The Appearance theme: colour preset, the grey hue, grey tint, accent hue and contrast in effect and their overrides, UI, code and reading font, the light/dark preference and the available presets. Read-only.",
+      "description": "The Appearance theme: preset or saved theme in use, the grey hue, grey tint, accent hue and contrast in effect and their overrides, UI, code and reading font, the light/dark preference, the presets, the saved themes and contrast warnings. Read-only.",
       "parameters": {
         "type": "object",
         "properties": {},
@@ -11054,28 +11627,57 @@
       }
     },
     {
+      "name": "theme_remove",
+      "description": "Delete a saved theme by id; if it was in use, the preset applies again. Call only when the user asked to delete that theme, with confirm: true. Irreversible except by defining it again.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Required: removing deletes the saved definition.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "theme_set",
-      "description": "Change the Appearance theme for every surface: a preset, per-value overrides or the fonts; reset: true restores the defaults. Call only when the user asked to change the theme. Reversible: theme_get shows the previous state and reset: true returns to the defaults. Light or dark is the separate Theme setting (ui-theme preference).",
+      "description": "Change the Appearance theme for every surface: a preset, a saved theme, per-value overrides or the fonts; reset: true restores the defaults. Call only when the user asked to change the theme. Reversible: theme_get shows the previous state and reset: true returns to the defaults. Light or dark is the separate Theme setting (ui-theme preference).",
       "parameters": {
         "type": "object",
         "properties": {
           "reset": {
-            "description": "true restores every default (warm stone, Geist, Geist Mono); other fields are ignored.",
+            "description": "true restores every default (warm stone, Geist, Geist Mono, no saved theme); other fields are ignored.",
             "type": "boolean",
             "enum": [
               true
             ]
           },
           "preset": {
-            "description": "Colour preset. Choosing one clears the grey hue, grey tint, accent hue and contrast overrides not given in the same call.",
+            "description": "Colour preset. Choosing one clears the saved theme in use and the grey hue, grey tint, accent hue and contrast overrides not given in the same call.",
             "type": "string",
             "enum": [
               "warm-stone",
               "neutral",
               "high-contrast",
               "slate-blue",
-              "moss"
+              "moss",
+              "dracula"
             ]
+          },
+          "customTheme": {
+            "type": "string",
+            "description": "Id of a saved theme (savedThemes in theme_get) or a built-in gallery theme (galleryThemes: honu-lagoon, koi-mosaic, night-reef, snow-pines, aurora…) to use instead of the preset; clears overrides not given in the same call. null returns to the preset. A gallery scene made for one kind of window shows only in that scheme: set ui-theme preference to match."
           },
           "greyHue": {
             "type": "number",
@@ -11116,6 +11718,18 @@
               "sans",
               "serif"
             ]
+          },
+          "readingBlur": {
+            "description": "Blur under the conversation column while a backdrop scene shows, in px, 0–24 (0: none). Cheap: a still of the scene is blurred once; the scene keeps moving on the sides.",
+            "type": "number"
+          },
+          "readingTint": {
+            "description": "Extra tint of the theme background under the conversation column, in percent, 0–100 (0: only what the theme needs for readable text). Both are kept across theme changes; reset sets them to 0.",
+            "type": "number"
+          },
+          "sceneFrameRate": {
+            "description": "Most frames per second an animated backdrop scene is drawn at, 0–120 (default 60; the display caps it; 0: a still picture). Only the focused tab moves its backdrop. Kept across theme changes; reset restores 60.",
+            "type": "number"
           }
         },
         "additionalProperties": false

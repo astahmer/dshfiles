@@ -1040,8 +1040,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#agent-directory",
       "plugin": "agent-communication",
       "id": "agent-directory",
-      "title": "Discover Agents and workspace peers",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: the direct inbox needs no registration, and a hashed workspace topic is an explicit opt-in that is pruned once no live Agent w…",
+      "title": "Discover Agents and peers",
+      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: peer mail is direct and needs no registration.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
@@ -1052,15 +1052,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#passive-messaging",
       "plugin": "agent-communication",
       "id": "passive-messaging",
-      "title": "Durable peer mail with a bounded request wake",
-      "summary": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request additionally wakes an idle recipient through a plugin-source pointer message, under a cooldown and an hourly cap, while every notice and topic message…",
+      "title": "Durable direct peer mail with a bounded request wake",
+      "summary": "Direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request wakes an idle recipient through a plugin-source pointer message under a cooldown and an hourly cap, while notices stay passive.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Agents › Messages and post a message to a topic.",
-        "doneWhen": "Your message shows in the topic's history.",
+        "firstAction": "Open Agents › Messages and send a direct message to a live Agent.",
+        "doneWhen": "Your message shows in that Agent’s conversation.",
         "open": {
           "panel": "agent-communication"
         }
@@ -1070,8 +1070,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#human-browser",
       "plugin": "agent-communication",
       "id": "human-browser",
-      "title": "Post messages from the communication browser",
-      "summary": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
+      "title": "Send direct messages from the Messages panel",
+      "summary": "A human picks a live or dormant Agent thread and sends a direct message; the panel returns a storage receipt. A request wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages › post",
       "reach": [

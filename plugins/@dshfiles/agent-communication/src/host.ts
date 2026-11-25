@@ -100,22 +100,19 @@ export default DshxPlugin.make({
       postMessage: input =>
         Effect.gen(function* () {
           const result = yield* CommunicationOperations.use(operations => operations.postMessage(input))
-          if (result.topic === null && input.agentId !== undefined)
-            yield* MailWake.use(wake =>
-              wake.deliver({
-                recipientId: input.agentId ?? '',
-                senderId: 'communication-browser',
-                senderLabel: 'the communication panel',
-                messageId: result.messageId,
-                intent: result.intent,
-              }),
-            )
+          yield* MailWake.use(wake =>
+            wake.deliver({
+              recipientId: input.agentId ?? '',
+              senderId: 'communication-browser',
+              senderLabel: 'the communication panel',
+              messageId: result.messageId,
+              intent: result.intent,
+            }),
+          )
           return result
         }),
       messageRecipients: input => CommunicationOperations.use(operations => operations.messageRecipients(input.messageId)),
       revealMessageBody: input => CommunicationOperations.use(operations => operations.revealMessageBody(input.messageId)),
-      setSubscription: input => CommunicationOperations.use(operations => operations.setSubscription(input)),
-      unsubscribe: input => CommunicationOperations.use(operations => operations.unsubscribe(input)),
       acknowledge: input => CommunicationOperations.use(operations => operations.acknowledge(input)),
     }),
   ],

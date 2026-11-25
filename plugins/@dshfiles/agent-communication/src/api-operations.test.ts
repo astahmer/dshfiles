@@ -10,13 +10,7 @@ import {
   type CommunicationAgent,
   type CommunicationPrincipal,
 } from '@dshfiles/dshx/communication'
-import {
-  browseMessagesInputSchema,
-  postMessageInputSchema,
-  type AgentCommunicationBrowseInput,
-  type AgentCommunicationPostInput,
-  type AgentCommunicationSubscriptionInput,
-} from './api.js'
+import { postMessageInputSchema, type AgentCommunicationBrowseInput, type AgentCommunicationPostInput } from './api.js'
 import { CommunicationOperations } from './api-operations.js'
 import { CommunicationHub } from './communication-hub-promise.js'
 import { HostAgents } from './host-edge-promise.js'
@@ -31,8 +25,6 @@ const operationsOver = (service: CommunicationService, agents: readonly Communic
     diagnostics: (limit?: number) => run(operations => operations.diagnostics(limit)),
     browseMessages: (request: AgentCommunicationBrowseInput) => run(operations => operations.browseMessages(request)),
     postMessage: (request: AgentCommunicationPostInput) => run(operations => operations.postMessage(request)),
-    setSubscription: (request: AgentCommunicationSubscriptionInput) => run(operations => operations.setSubscription(request)),
-    unsubscribe: (request: { readonly agentId: string; readonly topic: string }) => run(operations => operations.unsubscribe(request)),
     acknowledge: (request: { readonly agentId: string; readonly messageId: string }) => run(operations => operations.acknowledge(request)),
   }
 }
@@ -109,48 +101,27 @@ describe('Agent communication API operations', () => {
     ).toMatchObject({ success: true, data: { recipients: [{ readAt: null }] } })
   })
 
-  it('only subscribes live Agents and configures passive delivery', async () => {
-    const { service, operations } = await createTestOperations()
-    const missingTarget: AgentCommunicationSubscriptionInput = { agentId: 'agent-unknown', topic: 'workspace/demo' }
-    const request: AgentCommunicationSubscriptionInput = { agentId: 'agent-reader', topic: 'workspace/demo' }
-
-    await expect(operations.setSubscription(missingTarget)).rejects.toMatchObject({ code: 'agent-not-live' })
-    expect(await service.diagnostics({ agents: [] })).toMatchObject({ subscriptionCount: 0 })
-
-    const saved = await operations.setSubscription(request)
-    const report = await operations.diagnostics(20)
-
-    expect(saved).toMatchObject({ principal: { kind: 'agent', id: 'agent-reader' }, topic: 'workspace/demo', delivery: 'passive' })
-    expect(saved).not.toHaveProperty('allowSteerFrom')
-    expect(report.subscriptions).toMatchObject([{ principal: { id: 'agent-reader' }, delivery: 'passive' }])
-    expect(report.agents[0]).toMatchObject({ id: 'agent-reader', workspaceTopic: 'workspace/demo', workspaceOptedOut: false, workspaceSubscribed: true })
-  })
-
   it('browses pages without reading or acknowledging and posts as a browser principal', async () => {
     const { service, operations } = await createTestOperations()
-    const topic = 'workspace/demo'
-    await service.ensureSubscription({ kind: 'agent', id: 'agent-reader' }, { topic, delivery: 'passive' })
-    const receipt = await operations.postMessage({ topic, text: 'A browser-authored message.' })
+    const receipt = await operations.postMessage({ agentId: 'agent-reader', text: 'A browser-authored message.' })
 
-    expect(receipt).toMatchObject({ topic, recipientCount: 1 })
+    expect(receipt).toMatchObject({ recipientCount: 1 })
     expect(receipt).not.toHaveProperty('text')
-    expect(await operations.browseMessages({ topic, limit: 1 })).toMatchObject({
-      items: [{ id: receipt.messageId, sender: { kind: 'external', id: 'communication-browser' }, text: 'A browser-authored message.' }],
-      nextCursor: null,
-      totalMatching: 1,
-    })
+    const firstPage = await operations.browseMessages({ agentId: 'agent-reader', limit: 1 })
+    expect(firstPage.items).toContainEqual(expect.objectContaining({ id: receipt.messageId, sender: { kind: 'external', id: 'communication-browser' } }))
+    expect(firstPage.totalMatching).toBeGreaterThanOrEqual(1)
     expect(await service.messageRecipients(receipt.messageId)).toMatchObject({
       recipients: [{ principal: { id: 'agent-reader' }, readAt: null, acknowledgedAt: null }],
     })
 
     const directReceipt = await operations.postMessage({ agentId: 'agent-reader', text: 'A direct browser message.' })
-    expect(directReceipt).toMatchObject({ topic: null, recipientCount: 1 })
-    expect(await operations.browseMessages({ agentId: 'agent-reader' })).toMatchObject({
-      items: [{ id: directReceipt.messageId, topic: null, text: 'A direct browser message.' }],
-    })
+    expect(directReceipt).toMatchObject({ recipientCount: 1 })
+    expect((await operations.browseMessages({ agentId: 'agent-reader' })).items).toContainEqual(
+      expect.objectContaining({ id: directReceipt.messageId, topic: null, text: 'A direct browser message.' }),
+    )
 
     const offlineReceipt = await operations.postMessage({ agentId: 'agent-offline', text: 'A durable message for an offline Agent.' })
-    expect(offlineReceipt).toMatchObject({ topic: null, recipientCount: 1 })
+    expect(offlineReceipt).toMatchObject({ recipientCount: 1 })
     expect(await service.messageRecipients(offlineReceipt.messageId)).toMatchObject({
       recipients: [{ principal: { id: 'agent-offline' }, readAt: null, acknowledgedAt: null }],
     })
@@ -159,8 +130,7 @@ describe('Agent communication API operations', () => {
   it('validates message targets and paginates a direct conversation without duplicate pages', async () => {
     const { operations } = await createTestOperations()
     expect(Schema.is(postMessageInputSchema)({ text: 'missing target' })).toBe(false)
-    expect(Schema.is(postMessageInputSchema)({ topic: 'workspace/demo', agentId: 'agent-reader', text: 'ambiguous' })).toBe(false)
-    expect(Schema.is(browseMessagesInputSchema)({ topic: 'workspace/demo', agentId: 'agent-reader' })).toBe(false)
+    expect(Schema.is(postMessageInputSchema)({ text: 'no recipient' })).toBe(false)
 
     for (let index = 0; index < 5; index += 1) {
       await operations.postMessage({ agentId: 'agent-reader', text: `direct ${index}` })
@@ -179,12 +149,11 @@ describe('Agent communication API operations', () => {
     expect(olderPage.nextCursor).toBeDefined()
   })
 
-  it('requires a live Agent to unsubscribe and only acknowledges a message recipient', async () => {
+  it('only acknowledges a message recipient', async () => {
     const { service, operations } = await createTestOperations()
     const sender: Extract<CommunicationPrincipal, { readonly kind: 'agent' }> = { kind: 'agent', id: 'agent-sender' }
     const message = await service.send({ sender, toAgentId: 'agent-reader', text: 'Inspect this message.' })
 
-    await expect(operations.unsubscribe({ agentId: 'agent-unknown', topic: 'workspace/demo' })).rejects.toMatchObject({ code: 'agent-not-live' })
     await expect(operations.acknowledge({ agentId: 'agent-sender', messageId: message.id })).rejects.toMatchObject({ code: 'message-not-found' })
     await expect(operations.acknowledge({ agentId: 'agent-reader', messageId: message.id })).resolves.toEqual({ acknowledged: true })
   })

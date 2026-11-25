@@ -770,16 +770,15 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   )
   if (command === 'comm' && !help) {
     const [action, first, ...extra] = platformArgs
-    const actions = ['agents', 'topics', 'report', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack', 'mcp']
+    const actions = ['agents', 'report', 'send', 'inbox', 'ack', 'mcp']
     if (!actions.includes(action ?? '')) throw new CliUsageError(`comm requires ${actions.join(', ')}.`)
-    if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && first === undefined) throw new CliUsageError(`comm ${action} requires an id.`)
-    if (['publish', 'send'].includes(action ?? '') && (first === undefined || extra.join(' ').trim().length === 0)) {
+    if (action === 'ack' && first === undefined) throw new CliUsageError('comm ack requires an id.')
+    if (action === 'send' && (first === undefined || extra.join(' ').trim().length === 0)) {
       throw new CliUsageError(`comm ${action} requires a target and message text.`)
     }
-    if (['agents', 'topics', 'report', 'inbox', 'mcp'].includes(action ?? '') && first !== undefined)
+    if (['agents', 'report', 'inbox', 'mcp'].includes(action ?? '') && first !== undefined)
       throw new CliUsageError(`comm ${action} accepts no positional arguments.`)
-    if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && extra.length > 0)
-      throw new CliUsageError(`comm ${action} accepts one positional argument.`)
+    if (action === 'ack' && extra.length > 0) throw new CliUsageError('comm ack accepts one positional argument.')
     if (action === 'mcp' && (json || delivery !== undefined || priority !== undefined || topic !== undefined || limit !== undefined)) {
       throw new CliUsageError('comm mcp does not accept --json or inbox/message options.')
     }

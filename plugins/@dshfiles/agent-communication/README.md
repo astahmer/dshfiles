@@ -2,9 +2,9 @@
 
 ![Post messages from the communication browser](docs/screenshots/human-browser.png)
 
-This owned DSH bundle provides durable direct Agent inboxes and opt-in topic channels. A direct message is stored first; a `notice` stays passive and is read at the recipient's next natural execution, while a `request` wakes an idle recipient with a pointer message ("read your inbox") so the work is not stranded. The wake never carries peer text, and it is bounded by a per-recipient cooldown, a pair cooldown that damps reply loops, and an hourly cap; Settings can turn it off. Topic messages stay passive. Completed turns stay completed.
+This owned DSH bundle provides durable direct Agent inboxes. A direct message is stored first; a `notice` stays passive and is read at the recipient's next natural execution, while a `request` wakes an idle recipient with a pointer message ("read your inbox") so the work is not stranded. The wake never carries peer text, and it is bounded by a per-recipient cooldown, a pair cooldown that damps reply loops, and an hourly cap; Settings can turn it off. Completed turns stay completed.
 
-Agents in the same resolved working directory are grouped in the directory, but nothing subscribes them anywhere automatically: the direct inbox needs no registration, and a workspace `workspace/<hash>` topic is an explicit opt-in (the panel's Rejoin, or the CLI/MCP subscribe). That used to register every Agent at startup and `agent/created`, which left thousands of subscriptions for broadcasts nobody read; the generated channels are now pruned once no live Agent works there for 24 hours. A full topic reports `topic-full`.
+Agents in the same resolved working directory are grouped in the directory; nothing subscribes them anywhere automatically. An older version kept a hashed workspace topic per folder and subscribed every Agent at startup, which left thousands of subscriptions for broadcasts nobody read; that path is gone, together with its panel controls and CLI/MCP commands.
 
 Every Agent also has a private `inbox` for direct messages, and it needs no subscription row: a direct message carries its recipient, and inbox reads filter on the recipient. An Agent execution reads new, not-yet-shown messages with `dshx_comm_inbox`; `includeSeen: true` also returns older unacknowledged messages. Reading records `readAt` separately from acknowledgement, and only `dshx_comm_ack` removes a message from both views. Peer text is returned as quoted JSON and remains untrusted.
 
@@ -20,15 +20,15 @@ The Agent tools are `dshx_comm_agents`, `dshx_comm_send`, `dshx_comm_inbox` and 
 
 Task boards remain separate from this live directory. When Agent Teams is composed, its existing `team_task_list` tool is scoped to Team members and reads the shared Team board; it does not make generic runtime-owned subagents' task state visible. `idle` and absence from the live registry do not establish completion.
 
-The communication browser provides channel and direct-conversation navigation, bounded search and pagination, message context, recipient read/acknowledgement status, Agent runtime status, and a secondary diagnostics/activity view. A human can post to a channel or direct inbox; the receipt reports how many current recipients matched. Posting does not create or resume Agent work. An idle Agent is not assumed to be finished, and an Agent absent from the live registry is not assumed to be complete.
+The Messages panel lists direct conversations only, with bounded search and pagination, message context, recipient read/acknowledgement status, Agent runtime status, and a secondary diagnostics/activity view. A human sends a direct message to one Agent thread; the receipt reports how many recipients matched. A notice does not create or resume Agent work; a request wakes an idle recipient through the pointer wake. An idle Agent is not assumed to be finished, and an Agent absent from the live registry is not assumed to be complete.
 
-Idle status or absence from the live registry alone never proves a Session is stale. The bridge-owning Host prunes generated `workspace/<24-hex>` channels, together with their subscriptions, messages and acknowledgements, once no live Agent works at that workspace and the topic has been idle for 24 hours; it runs at startup (clearing the subscriptions older versions created for every Agent) and hourly. Other topic names and direct inboxes are outside this rule. Message and activity retention is also bounded to 30 days and 5,000 entries. Diagnostics compare active Agents' workspace topics with their stored subscriptions, so a missing subscription is visible instead of silently counted as a valid channel member.
+Idle status or absence from the live registry alone never proves a Session is stale. The bridge-owning Host still runs one startup and hourly pass that removes any generated `workspace/<24-hex>` topic left by older versions once no live Agent works there for 24 hours. Message and activity retention is bounded to 30 days and 5,000 entries.
 
 The CLI and MCP stdio adapter use the same typed Host service:
 
 ```sh
 dshx comm report --limit 20 --json
-dshx comm topics --json
+dshx comm agents --json
 dshx comm mcp --principal editor
 ```
 

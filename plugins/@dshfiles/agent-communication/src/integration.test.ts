@@ -206,8 +206,8 @@ describe('Agent communication integration', () => {
         ),
     }
 
-    const notice = await operations.postMessage({ topic: 'workspace/demo', text: 'FYI.' })
-    const request = await operations.postMessage({ topic: 'workspace/demo', text: 'Please review.', intent: 'request' })
+    const notice = await operations.postMessage({ agentId: recipient.id, text: 'FYI.' })
+    const request = await operations.postMessage({ agentId: recipient.id, text: 'Please review.', intent: 'request' })
     const direct = await service.send({ sender: { kind: 'agent', id: sender.id }, toAgentId: recipient.id, text: 'Please run the checks.', intent: 'request' })
 
     expect(notice.intent).toBe('notice')

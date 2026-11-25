@@ -42,9 +42,6 @@ const connectClient = (runtime: CommunicationCliRuntime, principalId: string): P
 const agentRows = (items: readonly CommunicationAgent[]): string =>
   items.length === 0 ? 'No live DSH Agents.' : items.map(item => `${JSON.stringify(item.id)}\t${item.status ?? 'unknown'}`).join('\n')
 
-const topicRows = (items: readonly { readonly topic: string; readonly subscribers: number }[]): string =>
-  items.length === 0 ? 'No subscribed topics.' : items.map(item => `${item.topic}\t${item.subscribers} subscriber(s)`).join('\n')
-
 const inboxRows = (items: Awaited<ReturnType<CommunicationClient['inbox']>>['items']): string =>
   items.length === 0
     ? 'No unacknowledged messages.'
@@ -121,40 +118,9 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
       emitResult(args, runtime.io, { items }, agentRows(items))
       return 0
     }
-    if (action === 'topics') {
-      const items = await client.listTopics()
-      emitResult(args, runtime.io, { items }, topicRows(items))
-      return 0
-    }
     if (action === 'report') {
       const report = await client.diagnostics({ limit: args.limit ?? 20 })
       emitResult(args, runtime.io, report, reportRows(report))
-      return 0
-    }
-    if (action === 'subscribe') {
-      if (args.delivery !== undefined)
-        throw new CommunicationError('delivery-retired', 'Communication subscriptions are passive; remove the --delivery option.')
-      const subscription = await client.subscribe({ topic: first ?? '' })
-      emitResult(args, runtime.io, subscription, `Subscribed ${subscription.principal.id} to ${subscription.topic}; messages stay passive.`)
-      return 0
-    }
-    if (action === 'unsubscribe') {
-      const result = await client.unsubscribe(first ?? '')
-      emitResult(args, runtime.io, { topic: first, ...result }, result.removed ? `Unsubscribed from ${first}.` : `No subscription existed for ${first}.`)
-      return 0
-    }
-    if (action === 'publish') {
-      const message = await client.publish({
-        topic: first ?? '',
-        text: remaining.join(' '),
-        priority: args.priority ?? 'normal',
-      })
-      emitResult(
-        args,
-        runtime.io,
-        { id: message.id, topic: message.topic, matchedSubscribers: message.recipients.length },
-        `Published ${message.id} to ${message.topic}; ${message.recipients.length} subscriber(s) matched.`,
-      )
       return 0
     }
     if (action === 'send') {
@@ -173,8 +139,7 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
     }
     if (action === 'inbox') {
       const limit = args.limit ?? 20
-      const inboxInput = args.topic === undefined ? { limit } : { topic: args.topic, limit }
-      const result = await client.inbox(inboxInput)
+      const result = await client.inbox({ limit })
       emitResult(args, runtime.io, result, inboxRows(result.items))
       return 0
     }
