@@ -33,6 +33,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 4 (round-3 shots) | 8 | 8 | 8.5 | one system now; phone transcript clip, two Settings layouts, rail surface, muddy tones remain |
 | 5 (round-4 shots) | 8 | 8.5 | 8.5 | no redesign needed; page frames, control heights, phone density, colour in persistent chrome |
 | 6 (round-5 shots) | 8 | 8.5 | 8.5 | colour and type at the bar; craft and alignment (phone Inbox head, Settings header edge, indigo selection) |
+| 7 (round-6 shots) | 8.5 | 8.5 | 8.5 | indigo still on on-states and the theme card; one header frame; phone fold; one identity mark per page |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -152,6 +153,11 @@ one desktop live-work dock, a Wrap cue on overflowing code, a truly centred New 
 prompt tint, the status strip on nav); D 14 revisions `tskxtrqm` … `vtvwwvyk` (Usage in one card rhythm, Review's file
 header and Mark reviewed edge, Backlog solid open ring, time gutter, accent tab bar, Plugins title and lane). The lead fixed
 one lint finding in a new test, the Settings font size field border, and the diff collapsed-lines bar inset.
+
+Round 7 findings, merged in `.cache/unslop-audit/r5/council/round-7-fixes.md`: ink for every non-attention on-state
+(checkboxes, switches, the chosen card, underline tabs); a destination glyph in its tone before each page title; one 880
+header frame (Settings rows widen to it, Inbox actually renders at it); the Settings nav header on every page; the phone
+Inbox, thread list and transcript fit their folds; short code wraps on narrow panes; filter triggers in the field look.
 
 ## Round four
 
