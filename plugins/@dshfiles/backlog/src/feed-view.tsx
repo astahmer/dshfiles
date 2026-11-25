@@ -59,23 +59,18 @@ const Chip = (props: { readonly children: ReactNode; readonly className?: string
 )
 
 /**
- * Who captured the item, when and its `b:` id: trailing muted meta, so the row leads with the item itself. The author
- * is left out when every row has the same one: "You" down the whole page says nothing (council round 2, D2).
+ * When the item was captured, and its `b:` id: an 11 px tabular run label in the row's leading gutter, so a run of
+ * same-minute rows reads as one labelled run instead of a time on one row and none on the next (council round 6, D3).
  */
-export const FeedEntryMeta = (props: {
+export const FeedEntryTime = (props: {
   readonly item: { readonly id: number; readonly ref?: string | undefined; readonly title: string; readonly createdAt: number }
-  readonly author: string | undefined
-  readonly showAuthor?: boolean
   /** The row above shows the same time: this row keeps it as a handle that shows on hover or focus (round 5, D4). */
   readonly timeShownAbove?: boolean
 }): JSX.Element => (
   <span
-    data-feed-entry-meta=""
-    className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-baseline dshx:justify-end dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums"
+    data-feed-entry-gutter=""
+    className="dshx:flex dshx:min-w-0 dshx:items-center dshx:text-2xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums"
   >
-    {props.showAuthor === false ? null : (
-      <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{ItemGlyphs.actorName(props.author)} ·</span>
-    )}
     {/* The id is a reference, not a label: it shows on hover, and the time stays the drag handle that mentions it. */}
     <Tooltip>
       <TooltipTrigger asChild>
@@ -93,6 +88,16 @@ export const FeedEntryMeta = (props: {
       </TooltipTrigger>
       <TooltipContent>{BacklogReference.labelOf(props.item)}</TooltipContent>
     </Tooltip>
+  </span>
+)
+
+/**
+ * Who captured the item: trailing muted meta, so the row leads with the item itself. Left out when every row has the
+ * same author: "You" down the whole page says nothing (council round 2, D2).
+ */
+export const FeedEntryAuthor = (props: { readonly author: string | undefined }): JSX.Element => (
+  <span data-feed-entry-meta="" className="dshx:min-w-0 dshx:shrink-0 dshx:truncate dshx:text-2xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
+    {ItemGlyphs.actorName(props.author)}
   </span>
 )
 
@@ -160,8 +165,12 @@ const FeedEntry = (props: {
           </span>
         ) : null}
         {props.showAuthor ? <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" /> : null}
-        {/* One grid for every row (council round 2, D2): 16 px status seat, title, 104 px meta; the rest sits under the title. */}
-        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1">
+        {/*
+         * One grid for every row (council round 2, D2): a 52 px time gutter (council round 6, D3), 16 px status seat,
+         * title, then the author when rows differ; the rest sits under the title.
+         */}
+        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[52px_16px_minmax(0,1fr)_auto] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1">
+          <FeedEntryTime item={item} timeShownAbove={props.timeShownAbove} />
           <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:w-4 dshx:justify-center">
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
@@ -194,14 +203,14 @@ const FeedEntry = (props: {
             )}
             {inlineTag === null ? null : tagChip(inlineTag)}
           </div>
-          <FeedEntryMeta item={item} author={author} showAuthor={props.showAuthor} timeShownAbove={props.timeShownAbove} />
+          {props.showAuthor ? <FeedEntryAuthor author={author} /> : null}
           {item.preview === '' ? null : (
             <BacklogText
               text={item.preview}
-              className="dshx:col-span-2 dshx:col-start-2 dshx:line-clamp-2 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div>div]:text-sm! dshx:[&>div>div]:leading-relaxed! dshx:[&>div>div]:text-muted-foreground! dshx:[&>div_p]:my-0"
+              className="dshx:col-span-2 dshx:col-start-3 dshx:line-clamp-2 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div>div]:text-sm! dshx:[&>div>div]:leading-relaxed! dshx:[&>div>div]:text-muted-foreground! dshx:[&>div_p]:my-0"
             />
           )}
-          <div data-feed-entry-chips="" className="dshx:col-span-2 dshx:col-start-2 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:empty:hidden">
+          <div data-feed-entry-chips="" className="dshx:col-span-2 dshx:col-start-3 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:empty:hidden">
             <ItemGlyphs.AttentionBadge attention={item.attention} />
             {item.proposal === null ? null : (
               <Chip className="dshx:border-violet/40 dshx:text-violet">
@@ -235,7 +244,7 @@ const FeedEntry = (props: {
             {item.freshness === 'fresh' ? null : <Chip className={cn(item.freshness === 'stale' && 'dshx:text-warning')}>{item.freshness}</Chip>}
           </div>
           {activity === null ? null : (
-            <p className="dshx:col-span-2 dshx:col-start-2 dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
+            <p className="dshx:col-span-2 dshx:col-start-3 dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
               <span aria-hidden className="dshx:h-px dshx:w-3 dshx:shrink-0 dshx:bg-border" />
               <span className="dshx:min-w-0 dshx:truncate">
                 <ActorThreadLink actorId={activity.actorId} openThread={props.openThread} /> <span>{activity.summary}</span>
