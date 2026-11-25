@@ -2885,7 +2885,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "antigravity-accounts",
       "title": "Use a Google AI plan through the Antigravity CLI",
-      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with DSH's system prompt, none of Antigravity's built-in tools,…",
+      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with a neutral system prompt, none of Antigravity's built-in to…",
       "destination": "settings",
       "currentSurface": "dialog: Add AI account › Antigravity",
       "reach": [
@@ -28803,7 +28803,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "workbench",
       "id": "main-tab-parity",
       "title": "Keep preview pin unread and close semantics in Dockview tabs",
-      "summary": "Dockview tabs consume main-tabs' existing semantics provider and profile close-button setting: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears. Selecting a tab also scrolls it fully into view once its title and the…",
+      "summary": "Dockview tabs keep Main Tabs' preview, pin, unread, close and thread-open behavior. Dockview handles normal tab scrolling. Workbench reveals selected tabs after window resize or layout restore, once the strip settles, without re-revealing when a title mounts or changes.",
       "destination": "none",
       "currentSurface": "workbench: tab semantics",
       "reach": [

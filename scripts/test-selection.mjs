@@ -214,6 +214,13 @@ const run = ({ args, cwd = repositoryRoot }) => {
   if (result.status !== 0) process.exit(result.status ?? 1)
 }
 
+const vitestFlags = (scriptArgs = '') => {
+  const flags = scriptArgs.split(' ').filter(Boolean)
+  // Treat --passWithNoTests as a default, not an override of the package's option.
+  if (!flags.some(flag => /^--(?:no-)?(?:passWithNoTests|pass-with-no-tests)(?:=|$)/.test(flag))) flags.push('--passWithNoTests')
+  return flags
+}
+
 const main = () => {
   const { values, positionals } = parseArgs({
     options: {
@@ -303,8 +310,7 @@ const main = () => {
       continue
     }
     const commandMatch = /^vitest run(?: (.*))?$/.exec(packageInfo.test)
-    const commandFlags = commandMatch === null ? [] : (commandMatch[1] ?? '').split(' ').filter(Boolean)
-    run({ args: ['exec', 'vitest', 'run', ...tests, ...commandFlags, '--passWithNoTests'], cwd: join(repositoryRoot, packageInfo.directory) })
+    run({ args: ['exec', 'vitest', 'run', ...tests, ...vitestFlags(commandMatch?.[1])], cwd: join(repositoryRoot, packageInfo.directory) })
   }
   for (const packageInfo of selection.filter(packageInfo => packageInfo.mode === 'related')) {
     const match = /^vitest run(?: (.*))?$/.exec(packageInfo.test)
@@ -312,11 +318,10 @@ const main = () => {
       run({ args: ['exec', 'turbo', 'run', 'test', `--filter=${packageInfo.name}`] })
       continue
     }
-    const flags = (match[1] ?? '').split(' ').filter(Boolean)
     const args = values.since
       ? ['run', `--changed=${values.since}`]
       : ['related', '--run', ...packageInfo.files.map(path => relative(packageInfo.directory, path))]
-    run({ args: ['exec', 'vitest', ...args, ...flags, '--passWithNoTests'], cwd: join(repositoryRoot, packageInfo.directory) })
+    run({ args: ['exec', 'vitest', ...args, ...vitestFlags(match[1])], cwd: join(repositoryRoot, packageInfo.directory) })
   }
 }
 

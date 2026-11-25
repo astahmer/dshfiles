@@ -510,7 +510,7 @@
     {
       "id": "main-tab-parity",
       "title": "Keep preview pin unread and close semantics in Dockview tabs",
-      "summary": "Dockview tabs consume main-tabs' existing semantics provider and profile close-button setting: preview, keep, pin, unread, local close and explicit thread-open continue working after the old strip disappears. Selecting a tab also scrolls it fully into view once its title and the strip header actions have laid out, without moving a strip the user scrolled by hand.",
+      "summary": "Dockview tabs keep Main Tabs' preview, pin, unread, close and thread-open behavior. Dockview handles normal tab scrolling. Workbench reveals selected tabs after window resize or layout restore, once the strip settles, without re-revealing when a title mounts or changes.",
       "reach": [
         "seed tool-call-thread",
         "expect button \"New tab\"",
@@ -573,13 +573,25 @@
           "kind": "unit-test",
           "id": "workbench.active-tab-visible",
           "file": "plugins/@dshfiles/workbench/src/tab-reveal.test.ts",
-          "testName": "re-reveals the selected tab when its strip resizes, and stops after disposal"
+          "testName": "re-reveals every group on window resize, and stops after disposal"
         },
         {
           "kind": "unit-test",
-          "id": "workbench.active-tab-user-scroll",
+          "id": "workbench.active-tab-layout-restore",
           "file": "plugins/@dshfiles/workbench/src/tab-reveal.test.ts",
-          "testName": "leaves a strip alone once the user scrolls it away from the selection"
+          "testName": "reveals the selected tab after restoring a layout"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.active-tab-reveal-settle",
+          "file": "plugins/@dshfiles/workbench/src/tab-reveal.test.ts",
+          "testName": "waits for the last mounting part instead of correcting each one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "workbench.active-tab-native-scroll",
+          "file": "plugins/@dshfiles/workbench/src/workbench-tab.test.tsx",
+          "testName": "leaves strip scrolling to Dockview when the tab mounts and its title changes"
         }
       ],
       "telemetry": [
