@@ -729,8 +729,7 @@ export default defineClient({
     ]
     const defaultsFor = (command: TabCommand): ShortcutCommand['defaults'] => {
       if (command.defaults !== undefined) return command.defaults
-      const webOnly: ShortcutCommand['defaults'] =
-        command.web === undefined ? {} : { 'web:macos': command.web, 'web:windows': command.web }
+      const webOnly: ShortcutCommand['defaults'] = command.web === undefined ? {} : { 'web:macos': command.web, 'web:windows': command.web }
       if (command.desktop === undefined) return webOnly
       const defaults: ShortcutCommand['defaults'] = {
         'desktop:macos': command.desktop,

@@ -117,5 +117,4 @@ export const ScreenWakeLock = createScreenWakeLock({
 })
 
 /** React binding for the thread menu's row. */
-export const useScreenWakeLock = (): boolean =>
-  useSyncExternalStore(ScreenWakeLock.subscribe, ScreenWakeLock.get, ScreenWakeLock.get)
+export const useScreenWakeLock = (): boolean => useSyncExternalStore(ScreenWakeLock.subscribe, ScreenWakeLock.get, ScreenWakeLock.get)

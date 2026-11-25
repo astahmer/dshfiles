@@ -1051,12 +1051,7 @@ html[data-phone-stack-motion='pop']::view-transition-new(root) {
  */
 @media (max-width: 639.98px) {
   html[data-shell-phone-nav]
-    :is(
-      [data-slot='key-hint'],
-      [data-slot='dropdown-menu-shortcut'],
-      [data-slot='context-menu-shortcut'],
-      [data-slot='command-shortcut']
-    ) {
+    :is([data-slot='key-hint'], [data-slot='dropdown-menu-shortcut'], [data-slot='context-menu-shortcut'], [data-slot='command-shortcut']) {
     display: none;
   }
 }

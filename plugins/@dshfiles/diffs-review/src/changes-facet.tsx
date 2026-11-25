@@ -656,7 +656,10 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                 <span aria-hidden="true">{showNoise ? '▾' : '▸'}</span>
               </button>
               {showNoise ? (
-                <ul aria-label="Generated and lock files" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border">
+                <ul
+                  aria-label="Generated and lock files"
+                  className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border"
+                >
                   {noiseFiles.map(file => changeRow(file))}
                 </ul>
               ) : null}
