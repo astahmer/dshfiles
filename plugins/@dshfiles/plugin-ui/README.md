@@ -250,6 +250,23 @@ While it is set, every `LiveElapsed` stops at its last value, the `StatusGlyph` 
 working shimmer stand still, and a verb that archives, lands or cleans up is not offered (DESIGN.md Connection).
 `LiveElapsed` is a silent `role="timer"`.
 
+## Errors
+
+```tsx
+import { errorSentence } from '@dshfiles/plugin-ui/lib/error-copy'
+import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
+
+if (query.isError) return <LoadError subject="Inbox" error={query.error} onRetry={() => void query.refetch()} />
+toast.error(errorSentence({ subject: 'Message', error, kept: 'Your message is kept; send it again once DSH is back.' }).sentence)
+```
+
+`errorSentence({ subject, error, kept? })` returns `{ kind, sentence, detail, retry }` for the five classes in
+DESIGN.md (Error copy): `unreachable`, `request`, `missing`, `credential`, `refused`. It reads the fields dshx's
+`ApiError` carries (`kind`, `status`, `endpoint`, `remoteCode`), never an endpoint in the text, and keeps the raw
+text, code and endpoint in `detail`. `retry` says whether Retry leads (`primary`), follows (`secondary`) or is not
+offered (`none`). `LoadError` draws the sentence, Retry and a Details disclosure; pass `sentence` and `actions` for a
+case it cannot know (a destination whose plugin did not load: Reload and Open Plugins).
+
 ## Table (TanStack Table v9)
 
 ```tsx

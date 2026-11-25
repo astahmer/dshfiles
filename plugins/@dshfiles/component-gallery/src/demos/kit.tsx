@@ -13,6 +13,7 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
+import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
 import { workStatusValues, workStatusLabels } from '@dshfiles/plugin-ui/components/work-status'
 import { PlusIcon, RefreshCwIcon, TrashIcon } from '@dshfiles/plugin-ui/icons'
 import type { GalleryDemo } from './types.js'
@@ -251,6 +252,23 @@ export const kitDemos: readonly GalleryDemo[] = [
             <TooltipContent>Tooltips instead of native title</TooltipContent>
           </Tooltip>
         </div>
+      </div>
+    ),
+  },
+  {
+    id: 'kit-load-error',
+    title: 'LoadError',
+    description: 'A page or section that did not load: one sentence from errorSentence, Retry, and the cause under Details.',
+    source: "import { LoadError } from '@dshfiles/plugin-ui/components/load-error'",
+    static: true,
+    render: () => (
+      <div className="dshx:flex dshx:flex-col dshx:gap-2">
+        <LoadError
+          subject="Inbox"
+          error={Object.assign(new Error('Internal Server Error'), { kind: 'transport', status: 500, endpoint: 'dshx-inbox/list' })}
+          onRetry={() => undefined}
+        />
+        <LoadError subject="Inbox" error={new TypeError('Failed to fetch')} onRetry={() => undefined} />
       </div>
     ),
   },

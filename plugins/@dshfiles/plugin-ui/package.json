@@ -41,6 +41,10 @@
       "types": "./src/lib/phone-shell.ts",
       "default": "./src/lib/phone-shell.ts"
     },
+    "./lib/error-copy": {
+      "types": "./src/lib/error-copy.ts",
+      "default": "./src/lib/error-copy.ts"
+    },
     "./lib/host-connection": {
       "types": "./src/lib/host-connection.ts",
       "default": "./src/lib/host-connection.ts"
