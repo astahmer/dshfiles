@@ -79,10 +79,11 @@ describe('a healthy accounts page is quiet', () => {
     expect(markup).not.toMatch(/text-(success|health-ok)/u)
     expect(markup).not.toMatch(/(bg|border|ring|border-l)-info/u)
   })
-  it('marks the selected account with the selected-row fill, not a side border', () => {
+  it('marks the selected account with the accent selected wash, not a side border (round five K2)', () => {
     const markup = row(account(), 'codex_work')
     expect(markup).toContain('aria-current="true"')
-    expect(markup).toContain('dshx:bg-accent')
+    expect(markup).toContain('dshx:bg-selected-wash')
+    expect(markup).not.toContain('dshx:bg-accent')
     expect(markup).not.toContain('border-l-')
     expect(markup).not.toMatch(/(bg|border|ring)-info/u)
   })

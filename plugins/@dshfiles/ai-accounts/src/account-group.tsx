@@ -51,7 +51,7 @@ export const AccountGroup = (props: {
                 !selected && 'dshx:hover:border-muted-foreground/40',
               )}
             >
-              <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-3', selected && 'dshx:bg-accent')}>
+              <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-3', selected && 'dshx:bg-selected-wash dshx:text-foreground')}>
                 <button
                   aria-current={selected ? 'true' : undefined}
                   aria-label={`Select ${profile.displayName}`}
