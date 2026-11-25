@@ -90,28 +90,47 @@ describe('the hover actions of a thread row', () => {
 describe('a row that needs you', () => {
   const asking = { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: Which layout should the release notes use?' }) }
 
-  it('gives the question the second line and Answer its own seat at the first line\'s trailing edge', async () => {
+  it('keeps the title and time on line 1 and puts Answer at line 2\'s trailing edge on its attention tint', async () => {
     const row = await renderRow(asking)
-    const verb = row.querySelector('[data-testid="thread-row-verb"]')
-    expect(verb?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('head')
-    // Its touch area paints above the row after it, which covered the part below the row.
+    const verb = row.querySelector<HTMLElement>('[data-testid="thread-row-verb"]')
+    expect(verb?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('meta')
+    expect(verb?.getAttribute('data-variant')).toBe('attention')
+    // 24px drawn; the kit gives it a 44px hit area on touch, painted above the row after it.
+    expect(verb?.className).toContain('dshx:h-6')
     expect(verb?.className).toContain('dshx:z-10')
-    // The verb takes the time's seat; the title gives way before it, on the first line only.
-    expect(row.querySelector('[data-thread-time]')).toBeNull()
-    expect(row.querySelector('[data-thread-head]')?.className).toContain('dshx:pr-17.5')
-    expect(row.querySelector('[data-thread-main-action]')?.className).not.toMatch(/dshx:pr-(20|30)\b/u)
-    // The question takes the whole second line: no seat is reserved there, and the project name gives way.
-    expect(row.querySelector('[data-thread-where]')?.className).not.toMatch(/dshx:pr-(20|36)/u)
+    // Line 1 is the title at full width and the time: no verb seat there any more.
+    expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m')
+    expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
+    // Line 2 keeps the verb's width at its end; the question takes the rest.
+    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-17.5')
     expect(row.querySelector('[data-testid="thread-row-status-detail"]')?.className).toContain('dshx:flex-1')
     expect(row.querySelector('[data-testid="thread-row-project"]')).toBeNull()
   })
 
+  it('lets a Needs-you title wrap to two lines at 13/18, weight 550', async () => {
+    const row = await renderRow(asking)
+    const title = row.querySelector<HTMLElement>('[data-thread-title]')
+    expect(title?.className).toContain('dshx:line-clamp-2')
+    expect(title?.className).not.toContain('dshx:truncate')
+    expect(title?.className).toContain('dshx:text-sm/[18px]')
+    expect(title?.className).toContain('dshx:font-[550]')
+    const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(idle.querySelector<HTMLElement>('[data-thread-title]')?.className).toContain('dshx:truncate')
+  })
+
+  it('gives a failed row\'s verb the danger tint', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
+    expect(row.querySelector('[data-testid="thread-row-verb"]')?.getAttribute('data-variant')).toBe('danger-tint')
+  })
+
   it('keeps the question readable beside a subagent counter', async () => {
-    // With three children the second line reserved 144 px for the verb and the counter, and the question read "A…".
+    // The verb and the counter share line 2's end; the question keeps the rest of the line.
     const children = ['c1', 'c2', 'c3'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
     const row = await renderRow({ ...asking, childThreads: children })
-    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-16')
-    expect(row.querySelector('[data-thread-where]')?.className).not.toContain('dshx:pr-36')
+    const end = row.querySelector('[data-thread-row-end]')
+    expect(end?.querySelector('[data-testid="thread-row-verb"]')).not.toBeNull()
+    expect(end?.querySelector('[data-thread-children-toggle]')).not.toBeNull()
+    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-34')
   })
 
   it('keeps the verb beside the title on a row with no second line', async () => {
@@ -125,6 +144,53 @@ describe('a row that needs you', () => {
   })
 })
 
+describe('colour in a row', () => {
+  const wash = (row: HTMLElement): HTMLElement | null => row.querySelector<HTMLElement>('[data-row-wash]')
+
+  it('holds a soft indigo wash on a Needs-you row and a softer red one on a Failed row', async () => {
+    const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    expect(wash(asking)?.getAttribute('data-row-wash')).toBe('needs-you')
+    expect(wash(asking)?.className).toContain('dshx:bg-status-needs-you/6')
+    cleanup()
+    const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
+    expect(wash(failed)?.getAttribute('data-row-wash')).toBe('failed')
+    expect(wash(failed)?.className).toContain('dshx:bg-status-failed/5')
+    cleanup()
+    const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(wash(idle)).toBeNull()
+  })
+
+  it('paints the selected row with the selected wash, not the grey hover fill', async () => {
+    const row = await renderRow({ selected: true })
+    const fill = row.querySelector<HTMLElement>('article > div')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:bg-selected-wash')
+    expect(fill?.className).not.toContain('dshx:group-data-[selected=true]/row:bg-accent')
+  })
+})
+
+describe('the project on line 2', () => {
+  it('is a 16px ProjectMark tile in the seat under the status glyph, with the name in muted text', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    const mark = row.querySelector<HTMLElement>('[data-thread-where] [data-slot="project-mark"]')
+    expect(mark?.getAttribute('data-size')).toBe('dense')
+    expect(mark?.textContent).toBe('SA')
+    const name = row.querySelector<HTMLElement>('[data-testid="thread-row-project"]')
+    expect(name?.textContent).toBe('sample')
+    expect(name?.className).not.toMatch(/project-tone-/u)
+  })
+
+  it('uses the colour picked for the project', async () => {
+    const row = await renderRow({ projectChipTone: 4, workStatus: rowStatus({ status: 'idle' }) })
+    expect(row.querySelector('[data-slot="project-mark"]')?.className).toContain('project-tone-balanced-4')
+  })
+
+  it('drops the truncated name when line 2 carries a reason, and names the tile instead', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
+    expect(row.querySelector('[data-testid="thread-row-project"]')).toBeNull()
+    expect(row.querySelector('[data-slot="project-mark"]')?.getAttribute('aria-label')).toBe('sample')
+  })
+})
+
 describe('a thread that runs a background job', () => {
   it('says so with a muted job chip and stays Idle, never Working', async () => {
     const row = await renderRow({ runningJobs: 1, workStatus: rowStatus({ status: 'idle' }) })
@@ -132,6 +198,17 @@ describe('a thread that runs a background job', () => {
     expect(chip?.textContent).toMatch(/threadSidebarRunningJobs/u)
     expect(chip?.className).toContain('dshx:text-muted-foreground')
     expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('idle')
+  })
+
+  it('drops the job chip when line 2 already says it waits on its subagents', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const row = await renderRow({ runningJobs: 1, childThreads: [child], workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) })
+    const detail = row.querySelector('[data-testid="thread-row-status-detail"]')
+    expect(detail?.textContent).toBe('Waiting on 1 subagent')
+    // No project name follows a reason any more, so the reason takes the line instead of 60% of it.
+    expect(detail?.className).toContain('dshx:flex-1')
+    expect(detail?.className).not.toContain('dshx:max-w-[60%]')
+    expect(row.querySelector('[data-thread-jobs]')).toBeNull()
   })
 
   it('shows no chip without a running job', async () => {

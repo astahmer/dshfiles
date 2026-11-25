@@ -21,7 +21,14 @@ interface ThreadGroupHeaderProps {
   readonly icon?: ReactNode
   /** Local checkouts this row stands for; above one, the row names the repository rather than a path. */
   readonly checkoutCount?: number
+  /**
+   * The Needs you group's split (round five T2): its count chips take their status hue, indigo for the threads that need
+   * you and red for the failed ones, while the label stays muted. The spoken name keeps the plain total.
+   */
+  readonly statusCounts?: { readonly needsYou: number; readonly failed: number }
 }
+
+const COUNT_CHIP = 'dshx:inline-flex dshx:h-4 dshx:min-w-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:px-1 dshx:font-medium dshx:tabular-nums'
 
 export const ThreadGroupHeader = ({
   label,
@@ -35,7 +42,9 @@ export const ThreadGroupHeader = ({
   action,
   icon,
   checkoutCount,
+  statusCounts,
 }: ThreadGroupHeaderProps) => {
+  const tinted = statusCounts !== undefined && statusCounts.needsYou + statusCounts.failed > 0
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
   return (
     <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5')}>
@@ -54,7 +63,23 @@ export const ThreadGroupHeader = ({
             {checkoutCount} checkouts
           </span>
         )}
-        <span className="dshx:shrink-0 dshx:font-normal dshx:tabular-nums dshx:text-(--dsw-alias-label-tertiary)">({count})</span>
+        {tinted ? (
+          <>
+            <span className="dshx:sr-only">({count})</span>
+            {statusCounts.needsYou === 0 ? null : (
+              <span aria-hidden="true" data-group-count="needs-you" className={cn(COUNT_CHIP, 'dshx:bg-attention-tint dshx:text-attention-foreground')}>
+                {statusCounts.needsYou}
+              </span>
+            )}
+            {statusCounts.failed === 0 ? null : (
+              <span aria-hidden="true" data-group-count="failed" className={cn(COUNT_CHIP, 'dshx:bg-danger-tint dshx:text-danger-tint-foreground')}>
+                {statusCounts.failed}
+              </span>
+            )}
+          </>
+        ) : (
+          <span className="dshx:shrink-0 dshx:font-normal dshx:tabular-nums dshx:text-(--dsw-alias-label-tertiary)">({count})</span>
+        )}
         <span className="dshx:flex-1" aria-hidden="true" />
         <span className="dshx:inline-flex dshx:shrink-0 dshx:opacity-60 dshx:group-hover/header:opacity-100" aria-hidden="true">
           {collapsed ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />}

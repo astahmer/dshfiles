@@ -13,6 +13,7 @@ const mount = (
     action?: ReactNode
     icon?: ReactNode
     checkoutCount?: number
+    statusCounts?: { readonly needsYou: number; readonly failed: number }
   } = {},
 ) => {
   const onToggle = vi.fn()
@@ -30,9 +31,10 @@ const mount = (
   const withAction = options.action === undefined ? props : { ...props, action: options.action }
   const withIcon = options.icon === undefined ? withAction : { ...withAction, icon: options.icon }
   const withCheckouts = options.checkoutCount === undefined ? withIcon : { ...withIcon, checkoutCount: options.checkoutCount }
+  const withCounts = options.statusCounts === undefined ? withCheckouts : { ...withCheckouts, statusCounts: options.statusCounts }
   const view = render(
     <TooltipProvider>
-      <ThreadGroupHeader {...withCheckouts} />
+      <ThreadGroupHeader {...withCounts} />
     </TooltipProvider>,
   )
   return { ...view, onToggle, startProjectSession }
@@ -108,6 +110,25 @@ describe('ThreadGroupHeader', () => {
     const toggle = screen.getByRole('button', { name: /^R repo \(12\)$/u })
     expect(mark).not.toBeNull()
     expect(toggle.contains(mark)).toBe(true)
+  })
+
+  it('tints the Needs you count chips in their status hue and keeps the label and the spoken count unchanged', () => {
+    const header = mount({ label: 'Needs you', statusCounts: { needsYou: 2, failed: 1 } })
+    const toggle = screen.getByRole('button', { name: 'Needs you (12)' })
+    const chips = Array.from(header.container.querySelectorAll<HTMLElement>('[data-group-count]'))
+    expect(chips.map(chip => [chip.dataset.groupCount, chip.textContent])).toEqual([
+      ['needs-you', '2'],
+      ['failed', '1'],
+    ])
+    expect(chips[0]?.className).toContain('dshx:bg-attention-tint')
+    expect(chips[0]?.className).toContain('dshx:text-attention-foreground')
+    expect(chips[1]?.className).toContain('dshx:bg-danger-tint')
+    expect(chips[1]?.className).toContain('dshx:text-danger-tint-foreground')
+    expect(screen.getByText('Needs you').className).toContain('dshx:truncate')
+    expect(toggle.className).toContain('dshx:text-muted-foreground')
+    cleanup()
+    const plain = mount({ label: 'Working' })
+    expect(plain.container.querySelector('[data-group-count]')).toBeNull()
   })
 
   it('names how many local checkouts a repository row stands for', () => {

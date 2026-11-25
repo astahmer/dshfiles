@@ -56,6 +56,7 @@ import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
@@ -163,6 +164,7 @@ import {
   type AttentionColor,
   type AttentionColorKey,
   type AttentionColors,
+  type ProjectColorPalette,
   type SidebarPreferences,
   type SidebarSection,
   type ThreadRowAction,
@@ -179,7 +181,6 @@ import { useStageCovered } from './stage-cover.js'
 import { THREAD_SIDEBAR_LOCALE_NAMESPACE } from './locales.js'
 import { ThreadReferencesItems } from './thread-references-menu.js'
 import { ContinueInProjectItems } from './continue-in-menu.js'
-import { projectTextTone } from './project-tone.js'
 import { useSavedProjectChip } from './project-colors.js'
 import { PaletteProjectColorsModel } from './palette-project-colors.js'
 import { RowArrivalTintModel } from './row-arrival-tint.js'
@@ -637,8 +638,8 @@ export interface ThreadRowProps {
   readonly workspaceTitle: string | undefined
   /** The project folder behind the workspace id, for a thread whose Session summary carries no cwd. */
   readonly workspacePath: string | undefined
-  /** Saved project colour overrides (primitives so memoized rows keep prop equality). */
-  readonly projectChipClassName: string | undefined
+  /** Saved project colour overrides: a palette tone or a custom colour (primitives so memoized rows keep prop equality). */
+  readonly projectChipTone: number | undefined
   readonly projectChipColor: string | undefined
   /**
    * Set when the thread runs in its own jj workspace rather than in the project checkout (b:212a): the row shows a quiet
@@ -1372,15 +1373,34 @@ const ThreadRowMenu = {
  * neutral monogram, from the Host's cached project-icon resolver. A thread outside any project keeps an empty box of the
  * same size so every title starts on one line. Never a status colour: the status glyph beside it is the only signal.
  */
-/** The project's 14px mark on a row's second line (b:212a): where the thread runs, beside the project name. */
-const RowProjectMark = memo((props: { readonly path: string | undefined; readonly label: string | undefined }): JSX.Element =>
-  props.path === undefined ? (
-    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark="none" />
-  ) : (
-    <span aria-hidden="true" className="dshx:inline-flex dshx:size-3.5 dshx:shrink-0" data-thread-project-mark={props.label ?? ''}>
-      <ProjectIcon path={props.path} label={props.label} className="dshx:size-3.5" />
-    </span>
-  ),
+/**
+ * The project's identity tile on a row's second line (b:212a, round five T1): the kit's 16px `ProjectMark`, in the
+ * colour picked for the project or its name's tone, so the colour sits on the tile and the name stays muted. With the
+ * project colour preference off the tile takes the line's muted ink. It names the project itself when the name beside
+ * it gave way to a reason.
+ */
+const RowProjectMark = memo(
+  (props: {
+    readonly name: string | undefined
+    readonly tone: number | undefined
+    readonly color: string | undefined
+    readonly palette: ProjectColorPalette
+    readonly coloured: boolean
+    readonly labelled: boolean
+  }): JSX.Element =>
+    props.name === undefined ? (
+      <span aria-hidden="true" className="dshx:inline-flex dshx:size-4 dshx:shrink-0" data-thread-project-mark="none" />
+    ) : (
+      <ProjectMark
+        name={props.name}
+        size="dense"
+        tone={props.tone}
+        color={props.coloured ? props.color : 'currentColor'}
+        palette={props.palette}
+        decorative={!props.labelled}
+        data-thread-project-mark={props.name}
+      />
+    ),
 )
 
 /**
@@ -1471,7 +1491,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const leadSeat = workStatus !== undefined || rowStyle.statusDot
   const inlineVerb = workStatus?.verb
   const showAgent = workStatus !== undefined && props.agent !== undefined
-  const jobCount = props.runningJobs ?? 0
+  // "Waiting on 1 subagent" already says what keeps the thread busy; a job chip beside it read as a second count of it.
+  const waitingOnSubagents = workStatus?.status === 'working' && !session.running && props.childThreads.length > 0
+  const jobCount = waitingOnSubagents ? 0 : (props.runningJobs ?? 0)
   // Why it needs you leads the second line, so the title keeps the first line to itself.
   const statusDetail =
     workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
@@ -1484,6 +1506,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const live = session.running && (workStatus === undefined || workStatus.status === 'working')
   const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? (workStatus === undefined ? t('threadSidebarWorking') : undefined)) : undefined
   const liveStartedAt = live ? props.liveTurn?.startedAt : undefined
+  // The project name only when line 2 has nothing else to say: beside a reason or a step it was cut to "b…" (T1).
+  const showProjectName = showProject && liveStep === undefined && statusDetail === undefined
   const metaLine =
     liveStep !== undefined ||
     (showMark && props.workspacePath !== undefined) ||
@@ -1497,10 +1521,32 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     jobCount > 0 ||
     statusDetail !== undefined
   const headLine = rowStyle.title || rowStyle.time || rowStyle.statusDot || props.integrationQueuedAt !== undefined || (props.subscriberCount ?? 0) > 0
-  // The inline verb has its own seat at the first line's trailing edge, where the time sits: on the second line it
-  // shared the end with the subagent counter and cut the question it answers to "A…" (C14). The question now has the
-  // second line to itself.
-  const verbSeat = inlineVerb === undefined ? undefined : 'head'
+  // Line 1 is the title at full width and the time; the verb takes line 2's trailing edge (round five T1), beside the
+  // subagent counter when there is one, at its own reserved width so the question keeps the rest of the line (C14).
+  // A row with no second line keeps the verb at the first line's end.
+  const verbSeat = inlineVerb === undefined ? undefined : metaLine ? 'meta' : 'head'
+  // The tint rung (round five K3): Needs-you verbs on the attention tint, a failed row's on the danger tint; a Ready
+  // row's Land stays an outline, so the ink primary is left to the page.
+  const verbVariant = workStatus?.status === 'needs-you' ? 'attention' : workStatus?.status === 'failed' ? 'danger-tint' : 'outline'
+  // A Needs-you title may take two lines (13/18, 550): it is the row you act on, so it reads whole.
+  const wrapTitle = workStatus?.status === 'needs-you'
+  // Colour in the list (round five T2): Needs you and Failed hold a soft wash of their hue after the arrival tint fades.
+  const rowWash = workStatus?.status === 'needs-you' || workStatus?.status === 'failed' ? workStatus.status : undefined
+  const verbButton =
+    inlineVerb === undefined || workStatus === undefined ? null : (
+      <Button
+        type="button"
+        size="xs"
+        variant={verbVariant}
+        // Above the neighbouring rows, so its 44 px touch area is not covered by the row painted after it.
+        className="dshx:z-10 dshx:h-6 dshx:px-2"
+        data-testid="thread-row-verb"
+        data-verb={inlineVerb}
+        onClick={() => props.actions.actOnStatus(session.id, workStatus)}
+      >
+        {t(inlineVerbLabelKeys[inlineVerb])}
+      </Button>
+    )
   const openAside = useAsideOpen()
   /**
    * One hover action's button, or null when the row's own state rules it out: the recovery pair only on a thread that
@@ -1673,9 +1719,12 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         )}
         <div
           className={cn(
-            'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-accent dshx:pointer-coarse:touch-pan-y',
+            'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:bg-selected-wash dshx:group-data-[selected=true]/row:text-foreground dshx:pointer-coarse:touch-pan-y',
             swipe.offset === 0 ? 'dshx:transition-transform dshx:duration-150' : 'dshx:bg-(--dsw-specific-sidebar-fill)',
+            swipe.offset === 0 && rowWash === 'needs-you' && 'dshx:bg-status-needs-you/6',
+            swipe.offset === 0 && rowWash === 'failed' && 'dshx:bg-status-failed/5',
           )}
+          data-row-wash={rowWash}
           style={swipe.offset === 0 ? undefined : { transform: `translateX(${String(swipe.offset)}px)` }}
         >
           {arrival.tint === undefined ? null : <RowArrivalTintModel.Tint key={arrival.tint.key} tint={arrival.tint} onEnd={arrival.end} />}
@@ -1716,9 +1765,11 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               {headLine ? (
                 <span
                   className={cn(
-                    'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2',
-                    // The verb's seat is on this line only, so the second line keeps its full width for the question; on
-                    // touch the verb also sits left of the row menu button.
+                    'dshx:flex dshx:min-w-0 dshx:gap-2',
+                    // A two-line title keeps the glyph and the time on its first line.
+                    wrapTitle ? 'dshx:items-start' : 'dshx:items-center',
+                    // A row without a second line keeps the verb on this one; on touch the verb also sits left of the
+                    // row menu button.
                     verbSeat === 'head' && 'dshx:pr-17.5 dshx:pointer-coarse:pr-19',
                     // Wherever the strip can show (it hides on a coarse pointer, where the row menu button keeps its own corner).
                     verbSeat !== 'head' &&
@@ -1748,16 +1799,22 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     // The glyph has its own 16px seat (b:212a), where the project mark used to carry it as a corner badge:
                     // the mark moved to line 2, so line 1 keeps main's widths and the mute marker its place by the strip.
                     return status === null ? null : (
-                      <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" data-thread-lead="">
+                      <span
+                        className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', wrapTitle && 'dshx:mt-px')}
+                        data-thread-lead=""
+                      >
                         {status}
                       </span>
                     )
                   })()}
                   {props.mute === undefined ? null : <MutedMarker mute={props.mute} t={t} />}
                   <span
+                    data-thread-title=""
                     className={cn(
-                      'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
-                      compact ? 'dshx:text-sm' : 'dshx:text-base',
+                      'dshx:min-w-0 dshx:flex-1 dshx:text-foreground',
+                      wrapTitle
+                        ? 'dshx:line-clamp-2 dshx:text-sm/[18px] dshx:font-[550] dshx:break-words'
+                        : cn('dshx:truncate', compact ? 'dshx:text-sm' : 'dshx:text-base'),
                       // Dark cockpit: in the status list only Ready rows are bold and Done rows are muted.
                       (workStatus === undefined ? unread : workStatus.status === 'ready') && 'dshx:font-semibold',
                       workStatus?.status === 'done' && 'dshx:text-muted-foreground',
@@ -1800,6 +1857,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
+                        wrapTitle && 'dshx:mt-px',
                         stripSeats > 0 &&
                           'dshx:not-pointer-coarse:group-hover/row:hidden dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:hidden',
                       )}
@@ -1814,8 +1872,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    // Room for what sits at the end of this line: the subagent counter.
-                    childCount > 0 && 'dshx:pr-16',
+                    // Room for what sits at the end of this line: the verb, the subagent counter, or both.
+                    verbSeat === 'meta' ? (childCount > 0 ? 'dshx:pr-34' : 'dshx:pr-17.5') : childCount > 0 && 'dshx:pr-16',
                   )}
                   data-thread-where=""
                 >
@@ -1823,7 +1881,16 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       so the project name lines up with the title. Its 8px gap matches line 1's. */}
                   {leadSeat || showMark ? (
                     <span className="dshx:mr-0.5 dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center">
-                      {showMark ? <RowProjectMark path={props.workspacePath} label={props.workspaceTitle} /> : null}
+                      {showMark ? (
+                        <RowProjectMark
+                          name={props.workspaceTitle}
+                          tone={props.projectChipTone}
+                          color={props.projectChipColor}
+                          palette={rowStyle.projectPalette}
+                          coloured={rowStyle.projectColor}
+                          labelled={!showProjectName}
+                        />
+                      ) : null}
                     </span>
                   ) : null}
                   {liveStep === undefined ? null : (
@@ -1838,9 +1905,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {liveStep !== undefined || statusDetail === undefined ? null : (
                     <span
                       className={cn(
-                        'dshx:min-w-0 dshx:shrink dshx:truncate',
-                        // A reason the row's verb answers has the line to itself; otherwise the project name follows it.
-                        inlineVerb === undefined ? 'dshx:max-w-[60%]' : 'dshx:flex-1',
+                        // The reason takes the line: the project name no longer follows it (the tile names the project).
+                        'dshx:min-w-0 dshx:flex-1 dshx:truncate',
                         (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
                       )}
                       data-testid="thread-row-status-detail"
@@ -1848,20 +1914,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       {statusDetail}
                     </span>
                   )}
-                  {showProject && liveStep === undefined && !(inlineVerb !== undefined && statusDetail !== undefined) ? (
-                    <span
-                      className={cn(
-                        // The first text to give way on a short row: it truncates, then hides, before the mark does.
-                        'dshx:min-w-0 dshx:shrink dshx:truncate dshx:@max-[11rem]/row:hidden',
-                        rowStyle.projectColor &&
-                          props.workspaceTitle !== undefined &&
-                          props.projectChipColor === undefined &&
-                          // A colour chosen at import wins; without one the name keeps its palette tint.
-                          (props.projectChipClassName ?? projectTextTone(props.workspaceTitle, props.rowStyle.projectPalette)),
-                      )}
-                      data-testid="thread-row-project"
-                      style={rowStyle.projectColor && props.projectChipColor !== undefined ? { color: props.projectChipColor } : undefined}
-                    >
+                  {showProjectName ? (
+                    // Muted: the tile carries the project's colour (round five T1). The first text to give way on a
+                    // short row: it truncates, then hides, before the mark does.
+                    <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:@max-[11rem]/row:hidden" data-testid="thread-row-project">
                       {props.workspaceTitle ?? t('threadSidebarUnassigned')}
                     </span>
                   ) : null}
@@ -1896,11 +1952,25 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               ) : null}
             </button>
           )}
-          {childCount > 0 ? (
+          {childCount > 0 || (verbSeat === 'meta' && !props.renaming) ? (
+            // Line 2's trailing edge: the verb, then the subagent counter. The 24px verb centres on line 2 (6px under a
+            // comfortable row, 2px under a compact one); touch moves it left of the row menu button's column.
+            <div
+              data-thread-row-end=""
+              data-verb-seat={verbSeat === 'meta' ? 'meta' : undefined}
+              className={cn(
+                'dshx:absolute dshx:right-1.5 dshx:flex dshx:items-center dshx:gap-1',
+                verbSeat !== 'meta' || props.renaming
+                  ? 'dshx:bottom-1'
+                  : cn(compact ? 'dshx:bottom-0.5 dshx:pointer-coarse:bottom-2' : 'dshx:bottom-1.5', 'dshx:pointer-coarse:right-10'),
+              )}
+            >
+              {verbSeat === 'meta' && !props.renaming ? verbButton : null}
+              {childCount > 0 ? (
             <button
               type="button"
               data-thread-children-toggle=""
-              className="dshx:absolute dshx:right-1.5 dshx:bottom-1 dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              className="dshx:flex dshx:h-5 dshx:items-center dshx:gap-1 dshx:rounded-full dshx:px-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
               aria-expanded={props.childrenOpen}
               aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
               onClick={() => props.actions.toggleChildren(session.id, props.childrenOpen)}
@@ -1931,6 +2001,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
               )}
             </button>
+              ) : null}
+            </div>
           ) : null}
           {props.renaming || (verbSeat !== 'head' && !nearViewport) ? null : (
             // The first line's corner: the hover actions in the time slot. A verb on a one-line row shares it, and the
@@ -1944,20 +2016,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 verbSeat === 'head' && 'dshx:pointer-coarse:right-10',
               )}
             >
-              {verbSeat !== 'head' || inlineVerb === undefined || workStatus === undefined ? null : (
-                <Button
-                  type="button"
-                  size="xs"
-                  variant={workStatus.status === 'ready' ? 'outline' : 'default'}
-                  // Above the neighbouring rows, so its 44 px touch area is not covered by the row painted after it.
-                  className="dshx:z-10 dshx:h-6 dshx:px-2"
-                  data-testid="thread-row-verb"
-                  data-verb={inlineVerb}
-                  onClick={() => props.actions.actOnStatus(session.id, workStatus)}
-                >
-                  {t(inlineVerbLabelKeys[inlineVerb])}
-                </Button>
-              )}
+              {verbSeat === 'head' ? verbButton : null}
               {nearViewport ? (
                 <div
                   data-testid="thread-row-actions"
@@ -5921,7 +5980,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     // The open thread stays mounted wherever it moved, so arrow-key switching can put focus back on it.
     pinnedThreadIds: [activeRowDrag?.sessionId, selectedSession?.id],
     revealThreadId,
-    estimateSize: rowStyle.density === 'compact' ? 34 : 50,
+    // A row and its 6px gap (round five T1).
+    estimateSize: rowStyle.density === 'compact' ? 40 : 56,
     enabled: !isBoard,
   }
   const savedProjectChipOf = useSavedProjectChip()
@@ -5972,7 +6032,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         workspaceId={workspaceId}
         workspaceTitle={workspaceId === undefined ? undefined : workspaceTitleById.get(workspaceId)}
         workspacePath={workspacePath}
-        projectChipClassName={savedProjectChip?.className}
+        projectChipTone={savedProjectChip?.tone}
         projectChipColor={savedProjectChip?.color}
         ownWorkspaceName={ownWorkspace?.name}
         ownWorkspacePath={ownWorkspace?.path}
@@ -7432,10 +7492,24 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       ? ThreadStatusModel.isCollapsed(group.key, collapsedGroups)
                       : collapsedGroups.includes(group.key))
                   const resumableSessions = statusGroupResumableSessions.get(group.key) ?? []
+                  // The Needs you group's count chips take their status hue (round five T2): needs you, then failed.
+                  const statusCounts =
+                    group.key === `${STATUS_GROUP_KEY_PREFIX}needs-you`
+                      ? group.threads.reduce(
+                          (counts, thread) => {
+                            const status = thread.kind === 'local' ? threadStatusById.get(thread.session.id)?.status : undefined
+                            if (status === 'failed') return { ...counts, failed: counts.failed + 1 }
+                            return status === 'needs-you' ? { ...counts, needsYou: counts.needsYou + 1 } : counts
+                          },
+                          { needsYou: 0, failed: 0 },
+                        )
+                      : undefined
                   return (
                     <section
                       className={cn(
+                        // Groups stand 20px apart in the list: the last row's 6px gap and this 14px.
                         'dshx:mt-1 dshx:rounded-md',
+                        !isBoard && 'dshx:not-first:mt-3.5',
                         isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
                       )}
                       key={group.key}
@@ -7453,6 +7527,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                                 })()
                           }
                           checkoutCount={group.checkoutCount}
+                          {...(statusCounts === undefined ? {} : { statusCounts })}
                           label={groupLabel}
                           count={group.threads.length}
                           collapsed={groupCollapsed}
