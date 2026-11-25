@@ -3,7 +3,20 @@ import { FinishedTurnAttention } from './inbox-provider.js'
 import { EMPTY_PENDING_APPROVALS, PendingApprovalsModel, type PendingApprovalsState } from './pending-approvals.js'
 import type { SessionEvent } from './session-events.js'
 
-const at = (sessionId: string, type: string, data: unknown, seq = 1): SessionEvent => ({
+/** The event fields this fold reads, across tool/call, approval/asked, approval/decided and turn/end. */
+interface FoldedEventData {
+  readonly turn?: number
+  readonly step?: number
+  readonly callId?: string
+  readonly name?: string
+  readonly arguments?: string
+  readonly id?: string
+  readonly toolName?: string
+  readonly reason?: string
+  readonly outcome?: string
+}
+
+const at = (sessionId: string, type: string, data: FoldedEventData, seq = 1): SessionEvent => ({
   sessionId,
   origin: undefined,
   parentSessionId: undefined,

@@ -10,7 +10,6 @@ const RUNNING_PREFIX = 'Running '
 const NAMELESS_STEP = 'Running a command'
 
 const reasonField = Schema.Struct({ reason: Schema.String })
-const isText = Schema.is(Schema.String)
 
 const clip = (text: string): string => {
   const line = text.replace(/\s+/g, ' ').trim().replace(/…$/u, '')
@@ -26,16 +25,22 @@ const clip = (text: string): string => {
  * approval itself is decided on its card, where the whole command shows. A plan review, or an approval with neither,
  * has no detail and the row says Needs you.
  */
-const subjectOf = (input: { readonly kind: string | undefined; readonly step: string | null | undefined; readonly reason?: unknown }): string | undefined => {
+const subjectOf = (input: { readonly kind: string | undefined; readonly step: string | null | undefined; readonly reason?: string | undefined }): string | undefined => {
   if (input.kind !== 'approval') return undefined
   const step = input.step ?? ''
   if (step.startsWith(RUNNING_PREFIX) && step !== NAMELESS_STEP) return clip(step.slice(RUNNING_PREFIX.length))
-  if (isText(input.reason) && input.reason.trim() !== '') return clip(input.reason)
+  if (input.reason !== undefined && input.reason.trim() !== '') return clip(input.reason)
   return undefined
 }
 
+/** A Session's pending interaction as the status snapshot carries it; the approval domain adds `reason`. */
+interface PendingInteractionView {
+  readonly kind: string
+  readonly key: string
+}
+
 /** The pending interaction's own reason, when its domain carries one (the approval request's). */
-const reasonOf = (interaction: unknown): unknown => (Schema.is(reasonField)(interaction) ? interaction.reason : undefined)
+const reasonOf = (interaction: PendingInteractionView | undefined): string | undefined => (Schema.is(reasonField)(interaction) ? interaction.reason : undefined)
 
 export class ApprovalDetail {
   static readonly subjectOf = subjectOf
@@ -46,7 +51,7 @@ export class ApprovalDetail {
    * @returns the detail line, or undefined when nothing names what waits.
    */
   static of(
-    input: { readonly kind: string | undefined; readonly step: string | null | undefined; readonly reason?: unknown },
+    input: { readonly kind: string | undefined; readonly step: string | null | undefined; readonly reason?: string | undefined },
     format: (subject: string) => string = subject => `Approve: ${subject}`,
   ): string | undefined {
     const subject = subjectOf(input)

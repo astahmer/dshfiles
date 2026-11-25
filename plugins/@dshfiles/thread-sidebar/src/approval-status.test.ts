@@ -1,6 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { describe, expect, it } from 'vitest'
-import { selectApprovalNeededRows } from './attention-rows.js'
+import { ApprovalRows } from './approval-rows.js'
 import { ApprovalDetail } from './approval-detail.js'
 import { ThreadStatusModel } from './thread-status.js'
 import { WorkingThreadsProjection } from './working-threads.js'
@@ -11,7 +11,7 @@ describe('a thread waiting on an approval', () => {
   const selected = { id: SessionId('selected'), blank: false, running: true, updatedAt: 10 }
 
   it('is Needs you on the open thread too, and no Working count includes it', () => {
-    const rows = selectApprovalNeededRows({
+    const rows = ApprovalRows.select({
       sessions: [selected],
       pendingInteractionKindFor: () => 'approval',
       mutedSessionIds: new Set<string>(),

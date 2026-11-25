@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { DraftsSection } from './drafts-section.js'
 import { threadSidebarDictionaries } from './locales.js'
+import type { ThreadSidebarTranslate } from './thread-view-manager.js'
 
 // The test primitives stub has no relative-time formatter.
 vi.mock('./relative-age.js', () => ({ formatAge: () => '1m' }))
@@ -11,7 +12,7 @@ vi.mock('./relative-age.js', () => ({ formatAge: () => '1m' }))
 const english: Readonly<Record<string, string>> = threadSidebarDictionaries.en
 
 /** The native `t`: a missing key reads back as itself, which is how `plural` probes variants. */
-const translate = (key: string, params?: Readonly<Record<string, unknown>>): string =>
+const translate: ThreadSidebarTranslate = (key, params) =>
   (english[key] ?? key).replace(/\{(\w+)\}/g, (_match, name: string) => String(params?.[name] ?? ''))
 
 const drafts = Array.from({ length: 6 }, (_, index) => ({

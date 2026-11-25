@@ -170,7 +170,8 @@ import {
 } from './organization.js'
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
-import { selectApprovalNeededRows, selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
+import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
+import { ApprovalRows } from './approval-rows.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
 import { useSidebarState } from './sidebar-state.js'
@@ -3270,35 +3271,35 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         }
       }
       for (const path of plan.workspacePaths) await jjThreads.discard({ path, force: false }).catch(() => undefined)
-      let undoInFlight = false
-      setNotice({
-        tone: 'success',
-        message: plural(props.tSidebar, 'threadSidebarDraftsCleaned', archivedIds.length),
-        ...(archivedIds.length === 0
-          ? {}
-          : {
-              actionLabel: props.tSidebar('threadSidebarUndo'),
-              durationMs: preferences.archiveUndoDurationSeconds * 1_000,
-              onAction: () => {
-                if (undoInFlight) return
-                undoInFlight = true
-                void (async () => {
-                  let undoFailed = false
-                  for (const archivedId of archivedIds) {
-                    try {
-                      await props.unarchiveSession(archivedId)
-                    } catch {
-                      undoFailed = true
-                    }
-                  }
-                  setNotice({
-                    tone: undoFailed ? 'danger' : 'success',
-                    message: props.tSidebar(undoFailed ? 'threadSidebarActionFailure' : 'threadSidebarUndone'),
-                  })
-                })()
-              },
-            }),
-      })
+      const cleaned = { tone: 'success' as const, message: plural(props.tSidebar, 'threadSidebarDraftsCleaned', archivedIds.length) }
+      if (archivedIds.length === 0) {
+        setNotice(cleaned)
+      } else {
+        let undoInFlight = false
+        setNotice({
+          ...cleaned,
+          actionLabel: props.tSidebar('threadSidebarUndo'),
+          durationMs: preferences.archiveUndoDurationSeconds * 1_000,
+          onAction: () => {
+            if (undoInFlight) return
+            undoInFlight = true
+            void (async () => {
+              let undoFailed = false
+              for (const archivedId of archivedIds) {
+                try {
+                  await props.unarchiveSession(archivedId)
+                } catch {
+                  undoFailed = true
+                }
+              }
+              setNotice({
+                tone: undoFailed ? 'danger' : 'success',
+                message: props.tSidebar(undoFailed ? 'threadSidebarActionFailure' : 'threadSidebarUndone'),
+              })
+            })()
+          },
+        })
+      }
       setDraftsOpen(false)
       void refetchJjRepositories()
     } catch {
@@ -3892,7 +3893,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // The open thread included: an approval it waits on is Needs you on every surface (unslop round four, D3).
   const approvalNeededRows = useMemo(
     () =>
-      selectApprovalNeededRows({
+      ApprovalRows.select({
         sessions: attentionSessions,
         pendingInteractionKindFor: sessionId => sessionStatus.get(sessionId)?.pendingInteraction?.kind,
         mutedSessionIds,

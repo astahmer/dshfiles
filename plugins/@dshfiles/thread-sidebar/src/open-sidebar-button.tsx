@@ -7,10 +7,10 @@ import { PanelLeftOpenIcon } from '@dshfiles/plugin-ui/icons'
  * browser's own), with Ctrl for Cmd off a Mac.
  */
 const sidebarChord = (): string => {
-  if (typeof document === 'undefined') return 'Meta+Alt+B'
-  const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/u.test(navigator.userAgent)
+  const mac = /Mac|iPhone|iPad/u.test(globalThis.navigator?.userAgent ?? '')
   const primary = mac ? 'Meta' : 'Control'
-  return document.documentElement.dataset.platform === undefined ? `${primary}+Alt+B` : `${primary}+B`
+  // The desktop app marks <html data-platform>; a browser leaves it unset.
+  return globalThis.document?.documentElement.dataset.platform === undefined ? `${primary}+Alt+B` : `${primary}+B`
 }
 
 /**
