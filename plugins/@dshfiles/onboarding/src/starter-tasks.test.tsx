@@ -15,10 +15,17 @@ describe('StarterTaskCards', () => {
     expect(insert).toHaveBeenCalledExactlyOnceWith('Find one small bug or rough edge in sample and propose a fix before changing anything.')
   })
 
-  it('stays quiet once a thread has a message or when no project is on screen', () => {
-    const { container, rerender } = render(<StarterTaskCards beforeFirstThread={false} insert={() => undefined} project="sample" />)
-    expect(container.childElementCount).toBe(0)
-    rerender(<StarterTaskCards beforeFirstThread insert={() => undefined} project={null} />)
+  it('keeps the three chips once a thread has a message, without the first-task sentence (round five B8)', () => {
+    const insert = vi.fn()
+    render(<StarterTaskCards beforeFirstThread={false} insert={insert} project="sample" />)
+    expect(screen.queryByText(/Pick a first task/u)).toBeNull()
+    expect(screen.getAllByRole('button').map(button => button.textContent)).toEqual(['Explain the project', 'Find a rough edge', 'Add a missing test'])
+    fireEvent.click(screen.getByRole('button', { name: 'Explain the project' }))
+    expect(insert).toHaveBeenCalledExactlyOnceWith('Explain how sample is organised and where I should start reading.')
+  })
+
+  it('stays quiet when no project is on screen', () => {
+    const { container } = render(<StarterTaskCards beforeFirstThread insert={() => undefined} project={null} />)
     expect(container.childElementCount).toBe(0)
   })
 })

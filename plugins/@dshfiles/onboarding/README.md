@@ -54,9 +54,9 @@ blocks the app, makes no model request, and changes the profile only when you co
       itself again on a later load while setup is missing); only Done and Don't show again are kept per browser.
       **Show the setup wizard** (⌘K) or **Start setup** on the page replays it on any profile.
 
-3. **First tasks** — until the first thread has a message, the new-thread screen says one sentence and offers three
-   first tasks for the project on screen (**Explain the project**, **Find a rough edge**, **Add a missing test**) in
-   rich-composer's suggestion row. A task puts its prompt in the composer and never sends it; nothing shows without a
+3. **First tasks** — the new-thread screen offers three tasks for the project on screen (**Explain the project**,
+   **Find a rough edge**, **Add a missing test**) as outline chips in rich-composer's suggestion row, beside Resume and
+   Inbox; until the first thread has a message one sentence above them explains them. A task puts its prompt in the composer and never sends it; nothing shows without a
    project on screen. The wizard's First task step offers the same prompts for "this project".
 
 ## Pack changes
@@ -216,7 +216,7 @@ All apply live; none needs a restart.
 | Key            | Default | Effect                                                                                                 |
 | -------------- | ------- | ------------------------------------------------------------------------------------------------------ |
 | `wizard`       | `true`  | Show the setup wizard while no thread is open. The palette command still replays it when off.          |
-| `starterTasks` | `true`  | Offer three first tasks for the project on the new-thread screen until the first thread has a message. |
+| `starterTasks` | `true`  | Offer three tasks for the project on the new-thread screen (with an explaining line until the first thread has a message). |
 | `checklist`    | `true`  | Show the checklist; off skips every Host check, the GitHub one included.                               |
 | `githubCheck`  | `true`  | Run `gh auth status --hostname github.com` on the Host (5 s timeout, cached 60 s); off reports `off`.  |
 | `packs`        | `true`  | Show the packs section.                                                                                |

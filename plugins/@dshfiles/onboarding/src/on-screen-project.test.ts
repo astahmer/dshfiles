@@ -20,6 +20,19 @@ describe('the project on screen', () => {
     expect(OnScreenProjects.of({ sessions: sessions('session-other'), workspaces })).toEqual({ projectId: 'workspace-welii', title: 'welii' })
   })
 
+  it("is the project of the Session a surface names, when the Workbench stage retains none as the main view (round five B8)", () => {
+    expect(OnScreenProjects.of({ sessions: sessions(null), workspaces })).toBeNull()
+    expect(OnScreenProjects.of({ sessions: sessions(null), workspaces, sessionId: 'session-other' })).toEqual({ projectId: 'workspace-welii', title: 'welii' })
+    // A draft no workspace lists yet reads as the project of its folder.
+    const draft = { ids: ['session-draft'], byId: { 'session-draft': { retainedBy: {}, cwd: '/dev/welii' } } }
+    expect(OnScreenProjects.of({ sessions: draft, workspaces, sessionId: 'session-draft' })).toEqual({ projectId: 'workspace-welii', title: 'welii' })
+    // The named Session wins over the main view's.
+    expect(OnScreenProjects.of({ sessions: sessions('session-main'), workspaces, sessionId: 'session-other' })).toEqual({
+      projectId: 'workspace-welii',
+      title: 'welii',
+    })
+  })
+
   it('reads a thread workspace as the project it was cut from', () => {
     expect(OnScreenProjects.of({ sessions: sessions('session-isolated'), workspaces })).toEqual({ projectId: 'workspace-dshfiles', title: 'dshfiles' })
   })

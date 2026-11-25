@@ -19818,7 +19818,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "onboarding",
       "id": "starter-tasks",
       "title": "First tasks for your project on the new-thread screen",
-      "summary": "A new project offers three first tasks that put a prompt in the composer without sending it.",
+      "summary": "The new-thread screen offers three tasks for the project that put a prompt in the composer without sending it.",
       "destination": "composer",
       "currentSurface": "new-thread screen: suggestion cards",
       "reach": [

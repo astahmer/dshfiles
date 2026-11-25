@@ -12,7 +12,7 @@ export const onboardingSettings = defineSettings({
     starterTasks: Schema.boolean()
       .default(true)
       .description(
-        'Suggest three first tasks on the new-thread screen until your first thread has a message.',
+        'Suggest three tasks for the project on the new-thread screen, with a line that explains them until your first thread has a message.',
       ),
     checklist: Schema.boolean()
       .default(true)

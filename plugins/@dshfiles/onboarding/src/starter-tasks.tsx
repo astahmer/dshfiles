@@ -41,8 +41,10 @@ const CARD =
   'dshx-root dshx:inline-flex dshx:h-9 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-12 dshx:pointer-coarse:text-base dshx:[&_svg]:size-4 dshx:[&_svg]:flex-none'
 
 /**
- * The new-thread hero's first tasks (calm-onboarding C2): one sentence and three cards for the project on screen, only
- * until the first thread has a message. A card puts its prompt in the composer and never sends it.
+ * The new-thread hero's suggested tasks (calm-onboarding C2, round five B8): three outline chips for the project on
+ * screen, beside Resume and Inbox. Until the first thread has a message one sentence explains them; after that the
+ * chips stay on their own, so a new thread always offers a start. A chip puts its prompt in the composer and never sends
+ * it.
  */
 export const StarterTaskCards = (props: {
   readonly project: string | null
@@ -50,12 +52,14 @@ export const StarterTaskCards = (props: {
   readonly insert: (text: string) => void
 }): ReactNode => {
   const project = props.project
-  if (project === null || !props.beforeFirstThread) return null
+  if (project === null) return null
   return (
     <>
-      <p className="dshx-root dshx:w-full dshx:text-center dshx:text-sm dshx:text-muted-foreground" data-starter-tasks="">
-        Pick a first task for {project}; it goes into the composer and nothing is sent.
-      </p>
+      {props.beforeFirstThread ? (
+        <p className="dshx-root dshx:w-full dshx:text-center dshx:text-sm dshx:text-muted-foreground" data-starter-tasks="">
+          Pick a first task for {project}; it goes into the composer and nothing is sent.
+        </p>
+      ) : null}
       {StarterTasks.list({ project }).map(task => {
         const Icon = ICONS[task.id]
         return (

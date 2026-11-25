@@ -308,8 +308,8 @@
     {
       "id": "starter-tasks",
       "title": "First tasks for your project on the new-thread screen",
-      "summary": "A new project offers three first tasks that put a prompt in the composer without sending it.",
-      "details": "Until the first thread has a message, the new-thread screen says one sentence and offers three first tasks for the project on screen (explain it, find a rough edge, add a missing test) beside the other suggestion cards. A task puts its prompt in the composer and never sends it. Nothing shows without a project on screen or after a thread has a message.",
+      "summary": "The new-thread screen offers three tasks for the project that put a prompt in the composer without sending it.",
+      "details": "The new-thread screen offers three tasks for the project on screen (explain it, find a rough edge, add a missing test) as outline chips beside the other suggestion cards; until the first thread has a message one sentence above them explains them. A task puts its prompt in the composer and never sends it. Nothing shows without a project on screen.",
       "reach": ["expect button \"Explain the project\""],
       "surfaces": ["client"],
       "surface": "composerContribution",
@@ -340,7 +340,7 @@
           "kind": "unit-test",
           "id": "onboarding.starter-tasks-quiet",
           "file": "plugins/@dshfiles/onboarding/src/starter-tasks.test.tsx",
-          "testName": "stays quiet once a thread has a message or when no project is on screen"
+          "testName": "keeps the three chips once a thread has a message, without the first-task sentence (round five B8)"
         },
         {
           "kind": "not-applicable",

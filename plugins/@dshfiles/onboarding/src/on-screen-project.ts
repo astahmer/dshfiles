@@ -3,6 +3,8 @@ import { EntityLabels, type ThreadDirectories } from '@dshfiles/plugin-ui/hooks/
 interface SessionRow {
   readonly parentId?: string | undefined
   readonly retainedBy: { readonly mainView?: number | undefined }
+  /** The Session's folder: a New-thread draft is in no workspace's list yet, but its folder names its project. */
+  readonly cwd?: string | undefined
 }
 
 interface WorkspaceRow {
@@ -30,10 +32,15 @@ const of = (input: {
   readonly workspaces: readonly WorkspaceRow[]
   /** The VCS providers' thread folders, so a thread in a custom threads directory reads as its project. */
   readonly threadDirectories?: ThreadDirectories | undefined
+  /**
+   * The Session a surface is about, when it knows it (the New-thread hero's blank Session). The Workbench stage does
+   * not retain its Session as the main view, so the hero names its own.
+   */
+  readonly sessionId?: string | undefined
 }): OnScreenProject | null => {
   const workspaceBySession = new Map(input.workspaces.flatMap(workspace => workspace.sessionIds.map(id => [id, workspace] as const)))
   const visited = new Set<string>()
-  let cursor = input.sessions.ids.find(id => (input.sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
+  let cursor = input.sessionId ?? input.sessions.ids.find(id => (input.sessions.byId[id]?.retainedBy.mainView ?? 0) > 0)
   while (cursor !== undefined && !visited.has(cursor)) {
     visited.add(cursor)
     const workspace = workspaceBySession.get(cursor)
@@ -44,7 +51,12 @@ const of = (input: {
     }
     cursor = input.sessions.byId[cursor]?.parentId
   }
-  return null
+  // A named Session no workspace lists yet (the hero's blank draft) reads as the project its folder belongs to.
+  const cwd = input.sessionId === undefined ? undefined : input.sessions.byId[input.sessionId]?.cwd
+  if (cwd === undefined || cwd === '') return null
+  const repository = trimSeparators(EntityLabels.repositoryPath(cwd, input.threadDirectories))
+  const project = EntityLabels.projectsOf(input.workspaces, input.threadDirectories).find(candidate => trimSeparators(candidate.path) === repository)
+  return project === undefined ? null : { projectId: project.workspaceId, title: project.title }
 }
 
 export class OnScreenProjects {
