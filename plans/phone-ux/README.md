@@ -57,6 +57,9 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
 13. **P2 (attempt)** — chat flow items skip style/layout/paint off screen on phones (`content-visibility: auto`, remembered
     intrinsic size), the transcript render being the remaining open cost. Unverified until a landed build can be
     measured.
+14. **P17 (partial)** — the JJ graph draws eight placeholder rows while its first revision page loads instead of
+    collapsing to a spinner; older-page/search keep the spinner. Typecheck + build clean. Gestures and `jj op undo`
+    remain, the gesture half blocked on P12.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
