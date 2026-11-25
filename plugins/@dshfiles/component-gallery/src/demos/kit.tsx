@@ -55,6 +55,11 @@ const roleSwatches = {
     ['status-done', 'dshx:bg-status-done'],
     ['control-on', 'dshx:bg-control-on'],
   ],
+  'Tint rung': [
+    ['selected-wash', 'dshx:bg-selected-wash'],
+    ['attention-tint', 'dshx:bg-attention-tint'],
+    ['danger-tint', 'dshx:bg-danger-tint'],
+  ],
   Identity: [
     ['identity-1', 'dshx:bg-identity-1'],
     ['identity-2', 'dshx:bg-identity-2'],

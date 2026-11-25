@@ -46,6 +46,11 @@ export interface Palette {
   readonly warning: Trio
   readonly danger: Trio
   readonly info: Trio
+  /**
+   * The accent at the tint rung for a selection (round five K2): the selected list row, the active rail item and
+   * settings category, a pressed toggle, the palette's highlighted row. Opaque, on the accent hue; text on it stays ink.
+   */
+  readonly selectedWash: Oklch
 }
 
 export const NEUTRAL_STEP_NAMES = ['bg', 'panel', 'raised', 'selected', 'line', 'border', 'border-strong', 'strong', 'faint', 'muted', 'text'] as const
@@ -105,6 +110,7 @@ function palette(input: PaletteInput): Palette {
     warning: trio(dark ? status(STATUS_HUES.warning) : { l: 0.48, c: 0.12, h: STATUS_HUES.warning }),
     danger: trio(status(STATUS_HUES.danger)),
     info: trio(accentFg),
+    selectedWash: dark ? { l: 0.29, c: 0.055, h: accentHue } : { l: 0.95, c: 0.03, h: accentHue },
   }
 }
 

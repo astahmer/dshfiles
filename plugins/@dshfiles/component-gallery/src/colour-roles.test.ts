@@ -14,7 +14,7 @@ describe('colour roles demo', () => {
   })
 
   it('draws a literal swatch for every role, identity and data token, and each health', () => {
-    const roles = ['status-needs-you', 'status-failed', 'status-ready', 'status-working', 'status-idle', 'status-done', 'control-on']
+    const roles = ['status-needs-you', 'status-failed', 'status-ready', 'status-working', 'status-idle', 'status-done', 'control-on', 'selected-wash', 'attention-tint', 'danger-tint']
     for (let n = 1; n <= 8; n += 1) roles.push(`identity-${n}`)
     for (let n = 1; n <= 6; n += 1) roles.push(`data-${n}`)
     for (const role of roles) expect(source, role).toContain(`'dshx:bg-${role}'`)

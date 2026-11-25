@@ -27,6 +27,12 @@
    * AA on its own tint at rest, hover and press over every surface (tests/button-tint.test.tsx). `attention-tint` and
    * `danger-tint` are the rest tint for a chip or a band that is not a button.
    */
+  /*
+   * A selection at the tint rung (round five K2): a soft accent wash, generated per accent hue in theme.generated.css.
+   * The selected row, the active rail item and settings category, a pressed toggle, the palette's highlighted row.
+   * Text on it stays ink (`text-foreground`).
+   */
+  --color-selected-wash: var(--dshx-selected-wash);
   --color-attention-foreground: var(--dshx-attention-foreground);
   --color-danger-tint-foreground: var(--dshx-danger-tint-foreground);
   --color-attention-tint: color-mix(in oklab, var(--dsw-alias-state-business-primary) 12%, transparent);

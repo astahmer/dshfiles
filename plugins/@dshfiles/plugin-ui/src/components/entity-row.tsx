@@ -83,7 +83,7 @@ export const EntityRow = React.forwardRef<HTMLDivElement, EntityRowProps>(functi
       className={cn(
         'dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-md dshx:transition-colors',
         onSelect !== undefined && 'dshx:hover:bg-accent/60',
-        selected && 'dshx:bg-accent',
+        selected && 'dshx:bg-selected-wash',
         className,
       )}
       {...props}

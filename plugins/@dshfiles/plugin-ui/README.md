@@ -130,6 +130,12 @@ text is the status colour pulled 30% toward the ink, so it holds AA on its own t
 that is not a button uses the same pair: `bg-attention-tint text-attention-foreground`, `bg-danger-tint
 text-danger-tint-foreground`. Neither is a page primary: that stays the one ink button.
 
+**Selection: the selected wash.** A selection is the accent at the tint rung: `bg-selected-wash` (`--dshx-selected-wash`,
+generated per accent hue: light `oklch(0.95 0.03 h)`, dark `oklch(0.29 0.055 h)`) with ink text (`text-foreground`).
+The kit uses it for the selected `EntityRow`, the highlighted `CommandItem` and a pressed `Toggle`/`ToggleGroupItem`;
+use it for an active rail item, settings category or list row too. Hover stays the ink wash (`bg-accent`). The page's
+segmented `TabsList` keeps its paper pill.
+
 ## Shared components
 
 Audit of UI rebuilt across owned plugins (native forks excluded), October 2026. Add a component here only when three or
