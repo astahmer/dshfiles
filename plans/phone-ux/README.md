@@ -45,6 +45,9 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
 10. **P27** — on a coarse pointer the thread row menu offers Keep screen on / Allow screen to sleep: one page-level
     Screen Wake Lock, re-requested when the page becomes visible while wanted, off when the platform refuses. 4 tests;
     the real-phone check (does the screen stay on) is still the owner's.
+11. **P20 (partial)** — a coarse pointer gets a key row above the terminal (Esc, Tab, Ctrl+C, arrows) that sends the
+    bytes through xterm and keeps focus; hidden on pointer devices, disabled while not writable. 2 tests. Still open:
+    follow tail / jump to latest / search / copy for logs.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
