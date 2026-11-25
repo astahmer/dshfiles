@@ -70,7 +70,7 @@ export const OpenConfigAction = (props: {
             {/* A narrow pane has no room for the label: the menu (whose first item opens the file) takes the seat. */}
             <button
               className={cn(
-                'dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:rounded-l-md dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60',
+                'dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:rounded-l-md dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-sm dshx:leading-none dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60',
                 path !== null && 'dshx:@max-pane-compact:hidden',
               )}
               disabled={state.opening || busy}

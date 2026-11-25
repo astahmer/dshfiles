@@ -21,6 +21,7 @@ const mount = (overrides: Partial<SettingsViewProps>, section: ReactNode = null)
   const sectionOwners: unknown[] = []
   const renderSlot: ShellRenderSlot = (name, owner) => {
     if (name === 'settings.section') sectionOwners.push(owner)
+    if (name === 'settings.header') return 'Settings'
     return name === 'settings.section' ? section : null
   }
   const onReveal = vi.fn()
@@ -70,20 +71,24 @@ describe('settings view: page header (council round 3 B3)', () => {
     const toolbar = view.host.querySelector('[data-settings-toolbar]')
     expect(toolbar?.querySelector('[role="searchbox"]')).not.toBeNull()
     expect(toolbar?.querySelector('[data-settings-modified-filter]')).not.toBeNull()
-    // The header comes first, the toolbar under it; both end where the settings column (208 + 680 px) ends.
+    // The header comes first, the toolbar under it; both end where the settings column (208 + the 880 lane) ends.
     if (header == null || toolbar == null) throw new Error('Settings header or toolbar missing')
     expect(header.compareDocumentPosition(toolbar)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(toolbar?.className).toContain('dshx:max-w-[888px]')
+    expect(toolbar?.className).toContain('dshx:max-w-[1088px]')
+    expect(toolbar?.className).toContain('dshx:@min-pane-wide:max-w-[1168px]')
     view.unmount()
   })
 
-  it('ends the header with the 680px field column: the search grows, Modified and the file action on 32px, 8px apart (council round 6 B2)', () => {
+  it('puts the header, the toolbar and the field column on the 880 lane (council round 7 B1)', () => {
     const view = mount({ columnNavigation: true })
-    expect(view.host.querySelector('[data-settings-column]')?.className).toBe('dshx:max-w-[680px]')
+    const column = view.host.querySelector('[data-settings-column]')?.className
+    expect(column).toContain('dshx:max-w-lane')
+    expect(column).toContain('dshx:@min-pane-wide:max-w-lane-wide')
+    expect(column).not.toContain('680px')
     const toolbar = view.host.querySelector<HTMLElement>('[data-settings-toolbar]')
-    expect(toolbar?.className).toContain('dshx:max-w-[680px]')
-    expect(toolbar?.className).not.toContain('dshx:max-w-lane')
-    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-[680px]')
+    expect(toolbar?.className).toContain('dshx:max-w-lane')
+    expect(toolbar?.className).not.toContain('680px')
+    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-lane')
     // One 8px rhythm between the search, Modified and the action group.
     expect(toolbar?.className).toContain('dshx:gap-2')
     expect(toolbar?.className).not.toContain('dshx:gap-3')
@@ -93,6 +98,45 @@ describe('settings view: page header (council round 3 B3)', () => {
     expect(view.host.querySelector('[data-settings-modified-filter]')?.className).toContain('dshx:h-8')
     // The configuration file's split button on the same 32px as the selects.
     expect(read('open-config-action.tsx')).toContain('dshx:inline-flex dshx:h-8 dshx:items-stretch')
+    view.unmount()
+  })
+
+  it('labels every toolbar button 13/500 on 32px: Modified and Open configuration file read alike (council round 7 B7)', () => {
+    const view = mount({ columnNavigation: true })
+    const modified = view.host.querySelector('[data-settings-modified-filter]')?.className
+    expect(modified).toContain('dshx:h-8')
+    expect(modified).toContain('dshx:text-sm')
+    expect(modified).toContain('dshx:font-medium')
+    // The file action's label was 12px beside Modified's 13px, so Modified read heavier and sat a pixel high.
+    expect(read('open-config-action.tsx')).toContain('dshx:px-2.5 dshx:text-sm dshx:leading-none dshx:font-medium')
+    expect(read('open-config-action.tsx')).not.toContain('dshx:px-2.5 dshx:text-xs dshx:font-medium')
+    view.unmount()
+  })
+})
+
+describe('settings view: the page title names the category (council round 7 B2)', () => {
+  it('titles the page with the open category, not "Settings", beside the side column', () => {
+    const view = mount({ columnNavigation: true, activeId: 'general' })
+    expect(view.host.querySelector('[data-settings-page-header] h1')?.textContent).toBe('General')
+    view.unmount()
+    const appearance = mount({ columnNavigation: true, activeId: 'appearance' })
+    expect(appearance.host.querySelector('[data-settings-page-header] h1')?.textContent).toBe('Appearance')
+    // The section is still Settings for assistive technology.
+    expect(appearance.host.querySelector('[data-settings-view]')?.getAttribute('aria-label')).toBe('title')
+    appearance.unmount()
+  })
+
+  it('titles the search results "Settings": they span every category', () => {
+    const view = mount({ columnNavigation: true, activeId: 'general', query: 'dark' })
+    expect(view.host.querySelector('[data-settings-page-header] h1')?.textContent).toBe('Settings')
+    view.unmount()
+  })
+
+  it('keeps "Settings" for the phone category list, which shows no category', () => {
+    const view = mount({ activeId: undefined, onBack: () => {} })
+    const heading = view.host.querySelector('[data-settings-page-header] h1')
+    expect(heading?.querySelector('.dshx\\:\\@max-pane-compact\\:hidden')?.textContent).toBe('General')
+    expect(heading?.querySelector('.dshx\\:\\@max-pane-compact\\:inline')?.textContent).toBe('Settings')
     view.unmount()
   })
 })
@@ -267,7 +311,8 @@ describe('settings view: one title per entry', () => {
     }
     mount({ groups, activeId: page.pageId, renderPluginPage }).unmount()
     mount({ groups, activeId: page.pageId, renderPluginPage, columnNavigation: true }).unmount()
-    expect(headings).toEqual(['page', 'named'])
+    // The page h1 names the entry in either layout (council round 7 B2).
+    expect(headings).toEqual(['named', 'named'])
   })
 })
 
@@ -275,8 +320,8 @@ describe('settings view: narrow panes', () => {
   it('leaves the entry title to the Sections select when the navigation collapses into it', () => {
     const view = mount({ activeId: 'appearance' })
     const header = view.host.querySelector('[data-settings-entry] header')
-    // The select right above already reads "Appearance": the heading stays for assistive technology only.
-    expect(header?.className).toContain('dshx:@max-pane-compact:sr-only')
+    // The page h1 already reads "Appearance": the heading stays for assistive technology only.
+    expect(header?.className).toBe('dshx:sr-only')
     expect(header?.querySelector('h2')?.textContent).toBe('Appearance')
     view.unmount()
   })
@@ -456,7 +501,7 @@ describe('settings view: one Settings navigation (council round 4 B1)', () => {
   it('keeps its own list without a column (a docked pane, no thread sidebar)', () => {
     const view = mount({ activeId: 'general' })
     expect(view.host.querySelector('nav[aria-label="title"]')).not.toBeNull()
-    expect(view.host.querySelector('[data-settings-entry="general"] header')?.className).toBe('dshx:@max-pane-compact:sr-only')
+    expect(view.host.querySelector('[data-settings-entry="general"] header')?.className).toBe('dshx:sr-only')
     view.unmount()
   })
 })

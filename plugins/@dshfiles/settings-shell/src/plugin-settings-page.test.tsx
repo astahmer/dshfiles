@@ -134,7 +134,9 @@ describe('plugin settings page', () => {
   it('titles the page with the one contextual heading, 15/20 at 600 (council round 4 B5)', async () => {
     await show({ visible: true })
     expect(container.querySelector('h2')?.className).toContain('dshx:text-heading')
-    expect(container.querySelector('section')?.className).toContain('dshx:max-w-[680px]')
+    // The 880 lane, as the Settings column (council round 7 B1).
+    expect(container.querySelector('section')?.className).toContain('dshx:max-w-lane')
+    expect(container.querySelector('section')?.className).not.toContain('680px')
   })
 
   it('keeps its title for screen readers only beside the side column row that names it (council round 4 B1)', async () => {

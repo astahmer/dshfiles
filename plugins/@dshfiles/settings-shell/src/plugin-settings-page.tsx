@@ -1,4 +1,5 @@
 import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { PAGE_FRAME_CLASS } from '@dshfiles/plugin-ui/components/page'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
@@ -95,7 +96,8 @@ export const PluginSettingsPageView = (props: {
     </div>
   )
   return (
-    <section aria-label={props.page.title} className="dshx-root dshx:flex dshx:max-w-[680px] dshx:flex-col dshx:gap-1" data-settings-page={props.page.ns}>
+    // The 880 lane of every Settings column (council round 7 B1).
+    <section aria-label={props.page.title} className={cn('dshx-root dshx:flex dshx:flex-col dshx:gap-1', PAGE_FRAME_CLASS.lane)} data-settings-page={props.page.ns}>
       {props.heading === 'section' && <h3 className={SECTION_TITLE_CLASS}>{props.page.title}</h3>}
       {(props.heading === undefined || props.heading === 'page' || props.heading === 'named') && (
         <h2

@@ -612,9 +612,11 @@ const SettingRow = (props: {
       ref={row}
     >
       {props.modified && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-3 dshx:-left-3 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
-      {/* Below 28rem (a phone) every row stacks: its text, then its control (round five B7). */}
+      {/* The label takes the rest of the lane and the control a 280px seat, right-aligned, so every control ends on the
+          header's action edge (council round 7 B1). Below 28rem (a phone) every row stacks: its text, then its control
+          (round five B7). */}
       <div
-        className="dshx:flex dshx:items-start dshx:justify-between dshx:gap-6 dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:gap-2"
+        className="dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(280px,max-content)] dshx:items-start dshx:gap-6 dshx:@max-pane-narrow:grid-cols-1 dshx:@max-pane-narrow:gap-2"
         data-setting-row-layout=""
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
@@ -646,7 +648,7 @@ const SettingRow = (props: {
             )}
           </span>
           {field.description !== '' && (
-            <span className="dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">
+            <span className="dshx:max-w-[60ch] dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
@@ -661,7 +663,7 @@ const SettingRow = (props: {
             </span>
           )}
         </div>
-        {!block && <div className="dshx:shrink-0">{control}</div>}
+        {!block && <div className="dshx:min-w-0 dshx:justify-self-end dshx:@max-pane-narrow:justify-self-start">{control}</div>}
       </div>
       {block && control}
       {props.refused && (

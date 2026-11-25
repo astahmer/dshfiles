@@ -81,7 +81,21 @@ describe('settings form rows', () => {
   it('stacks every row below 28rem: the text, then the control (round five B7)', async () => {
     await act(async () => root.render(<SettingsForm fields={fields} form={form} namespace="example" t={t} />))
     const layout = row('focusThreadInSidebar')?.querySelector('[data-setting-row-layout]')
-    expect(layout?.className).toContain('dshx:@max-pane-narrow:flex-col')
+    expect(layout?.className).toContain('dshx:@max-pane-narrow:grid-cols-1')
+    expect(layout?.lastElementChild?.className).toContain('dshx:@max-pane-narrow:justify-self-start')
+  })
+
+  it('splits a row into the label (1fr) and a 280px control seat ending on the lane edge (council round 7 B1)', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={form} namespace="example" t={t} />))
+    const layout = row('focusThreadInSidebar')?.querySelector('[data-setting-row-layout]')
+    expect(layout?.className).toContain('dshx:grid')
+    expect(layout?.className).toContain('dshx:grid-cols-[minmax(0,1fr)_minmax(280px,max-content)]')
+    expect(layout?.className).not.toContain('dshx:justify-between')
+    // The control sits right-aligned in its seat, so every control ends where the header's actions do.
+    expect(layout?.lastElementChild?.className).toContain('dshx:justify-self-end')
+    // The helper copy stays under the label, at 60 characters at most.
+    const description = [...(layout?.firstElementChild?.querySelectorAll('span') ?? [])].find(span => span.className.includes('dshx:text-xs'))
+    expect(description?.className).toContain('dshx:max-w-[60ch]')
   })
 
   it('names the source of a value that is not the default, and what a reset re-inherits', async () => {

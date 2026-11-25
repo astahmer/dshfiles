@@ -1,5 +1,6 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
+import { PAGE_FRAME_CLASS } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
@@ -32,8 +33,13 @@ const headerButton =
   'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-foreground dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
 const navCell =
   'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dshx-tone-2)]'
-/** The settings column (council round 4 B5): 640-680px, so values sit near their labels. */
-export const SETTINGS_COLUMN_WIDTH = 'dshx:max-w-[680px]'
+/**
+ * The settings column on the kit's 880 lane, as every list and form page (council round 7 B1): each row splits into its
+ * label and a 280px control seat, so values keep to the trailing edge the header's actions end on.
+ */
+export const SETTINGS_COLUMN_WIDTH = PAGE_FRAME_CLASS.lane
+/** Without the side column the page draws its own 208px list before the column: the header spans both. */
+const OWN_LIST_HEADER_WIDTH = 'dshx:max-w-[1088px] dshx:@min-pane-wide:max-w-[1168px]'
 /** The active category (round five K2, A1): the quiet selected wash with its leading marker, ink text at 550. */
 const navCellActive = 'dshx:bg-selected-wash dshx:selected-marker dshx:hover:bg-selected-wash dshx:font-selected dshx:text-foreground'
 // A group label is a label, not one more row: 16 px above it (none above the first), 4 px between it and its entries.
@@ -338,15 +344,14 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
   const section = useSingleTitle(entry.sectionLabel ?? entry.label)
   const pages = entry.pages.map(page => <Fragment key={page.pageId}>{props.renderPluginPage(page, headingOf(page))}</Fragment>)
   function headingOf(page: PluginSettingsPage): PluginPageHeading {
-    if (!ownHeading) return props.columnNavigation === true ? 'named' : 'page'
+    if (!ownHeading) return 'named'
     return sameTitle(page.title, entry.label) ? 'none' : 'section'
   }
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
       {ownHeading && (
-        // In a narrow pane the Sections select right above names the entry, and beside the column its selected row does,
-        // so the title is not printed a second time.
-        <header className={props.columnNavigation === true ? 'dshx:sr-only' : 'dshx:@max-pane-compact:sr-only'}>
+        // The page's h1 names the entry (council round 7 B2), and a phone's Back row does: the title is not printed twice.
+        <header className="dshx:sr-only">
           <h2 className={SECTION_TITLE_CLASS}>{entry.label}</h2>
         </header>
       )}
@@ -472,7 +477,23 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   // The header ends where the settings column does (council round 6 B2): beside the side column's list that is the 680px
   // field column itself, so the configuration file's action sits flush with the selects; after the page's own 208px list
   // it is that list plus the column.
-  const headerWidth = props.columnNavigation === true ? SETTINGS_COLUMN_WIDTH : 'dshx:max-w-[888px]'
+  const headerWidth = props.columnNavigation === true ? SETTINGS_COLUMN_WIDTH : OWN_LIST_HEADER_WIDTH
+  // Each category page titles itself (council round 7 B2): the side column's head names Settings, the h1 the category,
+  // so no page reads "Settings Settings". Search results span every category and keep "Settings"; so does a phone's
+  // category list, which a wide pane shows as its first category.
+  const settingsTitle = props.renderSlot('settings.header', {})
+  const category = searching ? undefined : active?.label
+  const title =
+    category === undefined ? (
+      settingsTitle
+    ) : atRoot && props.onBack !== undefined ? (
+      <>
+        <span className="dshx:@max-pane-compact:hidden">{category}</span>
+        <span className="dshx:hidden dshx:@max-pane-compact:inline">{settingsTitle}</span>
+      </>
+    ) : (
+      category
+    )
   return (
     <PageViewMemoryProvider>
       <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
@@ -488,7 +509,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         >
           <div className={cn(headerWidth, 'dshx:@max-pane-compact:sr-only')} data-settings-page-header="">
-            <PageHeader heading={<span id={props.titleId}>{props.renderSlot('settings.header', {})}</span>} description={t('description')} />
+            <PageHeader heading={<span id={props.titleId}>{title}</span>} description={t('description')} />
           </div>
           {/* One 8px rhythm (council round 6 B2): the search grows, then Modified and the action group, all 32px. */}
           <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2', headerWidth)} data-settings-toolbar="">
@@ -625,8 +646,9 @@ export const SettingsTab = (props: SettingsViewProps & { readonly host: HTMLElem
   const titleId = useId()
   return createPortal(
     // The page sits on the stage surface, the column beside it on nav (round five B5, kit A4), in both schemes.
+    // Named Settings, whichever category its h1 shows.
     <section
-      aria-labelledby={titleId}
+      aria-label={props.t('title')}
       className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:surface-stage"
       data-settings-view="tab"
       onClick={stopPropagation}
