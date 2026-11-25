@@ -11,6 +11,7 @@ colors:
   border-hairline: '#dedcda'
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
+  selected-wash: '#e6eeff'
   label-faint: '#737170'
   label-secondary: '#646362'
   signal-indigo: '#3b5bd4'
@@ -23,6 +24,7 @@ colors:
   surface-raised-dark: '#23201d'
   border-hairline-dark: '#2f2c29'
   label-secondary-dark: '#a7a4a1'
+  selected-wash-dark: '#212947'
   signal-indigo-dark: '#839ffc'
   danger-red-dark: '#fa8880'
   success-green-dark: '#65c67d'
@@ -88,9 +90,9 @@ motion:
 spacing:
   row-y: '8px'
   row-x: '12px'
-  stack: '12px'
-  section: '16px'
-  page: '20px'
+  stack: '16px'
+  section: '20px'
+  page: '24px'
   page-narrow: '12px'
 components:
   button-primary:
@@ -126,7 +128,12 @@ components:
     textColor: '{colors.ink}'
     padding: '8px 12px'
   entity-row-selected:
-    backgroundColor: '{colors.surface-selected}'
+    backgroundColor: '{colors.selected-wash}'
+  button-attention:
+    textColor: '{colors.signal-indigo}'
+    rounded: '{rounded.md}'
+    height: '24px'
+    padding: '0 8px'
   chip-muted:
     backgroundColor: '{colors.surface-raised}'
     textColor: '{colors.label-secondary}'
@@ -184,6 +191,11 @@ follows every preset; never assume warm stone or indigo in a rule. Every preset 
 Each step has one job. Plugins reach them through the semantic Tailwind tokens; `--dshx-tone-<step>` (and
 `--dshx-tone-<name>`) exist for the rare raw CSS rule.
 
+**Surface steps.** The surfaces stay warm and step clearly apart, mostly in dark (round five): dark bg, panel, raised
+and selected sit at oklch L 0.185, 0.21, 0.245 and 0.27, with the ink softened to 0.93; light panel and raised sit at
+0.962 and 0.935 under the 0.992 page. Faint text reads at AA where it is read: on the page in light, on raised in dark.
+No slate shell: navigation surfaces keep the warm stone.
+
 | Step            | Job                                  | Tailwind token               | Host variable                                                  | Light     | Dark      |
 | --------------- | ------------------------------------ | ---------------------------- | -------------------------------------------------------------- | --------- | --------- |
 | 0 bg            | page, cards in light                 | `background`, `card` (light) | `--dsw-alias-bg-base`                                          | `#fefcfa` | `#15120f` |
@@ -197,6 +209,7 @@ Each step has one job. Plugins reach them through the semantic Tailwind tokens; 
 | 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#737170` | `#8e8b89` |
 | 9 muted         | secondary text (AA)                  | `muted-foreground`           | `--dsw-alias-label-secondary`                                  | `#646362` | `#a7a4a1` |
 | 10 text         | primary text, primary fill (AA)      | `foreground`, `primary`      | `--dsw-alias-label-primary`                                    | `#1b1a19` | `#eae7e4` |
+| selected wash   | selection at the tint rung           | `selected-wash`              | `--dshx-selected-wash` (accent hue)                            | `#e6eeff` | `#212947` |
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |
@@ -231,14 +244,25 @@ work on any surface.
    (`--dshx-project-*`), providers and model families their brand mark, agents their avatar or a hashed
    `identity-1..8` tone. Identity colour always sits beside the name, and a list colours one identity dimension:
    the one that differs between its rows. Identity never uses `info`, `success`, `warning`, `destructive` or
-   `chart-1..5`.
+   `chart-1..5`. A project shows as one `ProjectMark` (`components/ui/project-mark`): a 20px tile (16px dense), 4px
+   radius, its tone at 14% behind two letters in that tone, with the project name beside it in muted text. The six
+   project tones (hues 225, 110, 55, 305, 340, 195) keep 25° or more from every status hue.
 6. **Accent indigo means interaction.** Focus ring, links, text selection, the active tab bar, and the on state of
    switches, checkboxes and radios. Never a button fill, never decoration. The primary button is ink.
 7. **Strength ladder: mark, text, tint, fill.** A mark is a glyph, dot or logo up to 16px (20px in a header). Text
    in a colour must hold AA. A tint is the colour at 12–16% alpha behind text in that colour. Fill is reserved for
    the destructive button, the on state of a control, a provider tile up to 44px, and chart marks. A row carries at
    most one status colour and one identity colour.
-8. **Data.** Categorical series use `data-1..6` in order. A status hue appears in a chart only when the series is
+   **Tint rung.** Colour sits at the tint rung on things you act on or must tell apart, never on page backgrounds,
+   headers or body text. A row-level verb that answers what waits on you (Review, Answer, Rate…) is `Button`
+   `variant="attention"`: Needs-you text on a 12% tint of it, no border; a failed row's verb is `variant="danger-tint"`.
+   Their text is the status colour pulled 30% toward the ink so it holds AA on its own tint. A chip or band reuses
+   the pair (`bg-attention-tint text-attention-foreground`). A selection (the selected row, the active rail item and
+   settings category, a pressed toggle, the palette's highlighted row) is `bg-selected-wash`, a soft accent wash
+   generated per accent hue, with ink text. Hover stays the ink wash.
+8. **Data.** Categorical series use `data-1..6` in order: six identity hues at a chart step (teal, violet, copper,
+   magenta, olive, cyan). The data ramp never starts with the accent, and ChartFrame maps the chart library's
+   palette onto it. A status hue appears in a chart only when the series is
    that status (failed requests are `destructive`). Quota is ink while healthy, amber at 15% or less, red when
    spent. Diff lines keep the success and danger tints.
 
@@ -318,7 +342,7 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 **Page anatomy** (`Page` from `@dshfiles/plugin-ui/components/page`):
 
 ```
-┌ Page (its own @container; padding 20px, 12px below 28rem) ───────────────────────────┐
+┌ Page (its own @container; padding 24px, 12px below 28rem) ───────────────────────────┐
 │ h1 Heading  12  [meta chip] [meta chip]          [Secondary] [Secondary] [⋯] [Primary] │
 │ One-line description, muted, ≤ 72ch                                                    │
 │ [ Tab · Tab · Tab ]   ← optional, one segmented style                                  │
@@ -328,7 +352,9 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 
 - At most one primary action. Secondary actions are outline buttons while the page is at least 42rem wide and fold
   into the `⋯` overflow menu below that; the primary never folds.
-- Pages fill their pane (no centred max-width column). Body stacks use 12px gaps; sections 16px.
+- Pages fill their pane (no centred max-width column). Spacing scale: page padding 24px, 20px between the header and
+  the body, body sections stacked 16px apart; narrow panes and phones keep 12px. Rows stay 32px, so density stays
+  compact.
 - Size by container, never by viewport: the page root is `@container`; children query `@max-pane-narrow` (< 28rem,
   phones and 360–480px panes) and `@max-pane-compact` (< 42rem, split layouts). Collapse order: labels become icons,
   secondary chips hide or wrap, primary text truncates, and only then does a row wrap.
@@ -360,7 +386,8 @@ Tailwind's own step names resolve to these levels in the kit `@theme` (`shadow-x
 
 Dark adds a 1px inner top highlight (`inset 0 1px 0`) to every level so raised layers read against near-black. Only
 s2/s3 may add a backdrop blur. Declare depth once — a bordered card has no shadow. Stacking bands: Host modals 1000,
-kit dialogs/sheets 1050, floating layers (select, popover, menu, tooltip) 1100.
+kit dialogs/sheets 1050, floating layers (select, popover, menu, tooltip) 1100. A kit dialog, alert dialog or sheet
+dims the page with `bg-scrim`: the warm ink at 32% in light, black at 50% in dark.
 
 ## Motion
 
@@ -410,7 +437,8 @@ Heights: 24 compact · 28 default control · 32 list row · 36 composer bar · 4
 
 **Primary button — black.** `Button` `variant="default"` is the Host brand fill (`#0f1115` light, `#f9fafb` dark),
 which most pages already used (MCP Add server, Memory, Backlog New, Hosts). One per page. Header secondary actions are
-`outline` `sm`; row verbs are `outline` or `ghost` `sm`; destructive verbs `destructive` and always behind a
+`outline` `sm`; row verbs are `outline` or `ghost` `sm`, and a row verb that answers what waits on you is
+`attention` (`danger-tint` on a failed row; see the tint rung); destructive verbs `destructive` and always behind a
 confirmation when they lose work.
 
 **Tabs — one style.** The segmented `TabsList` (muted track, paper active pill) for page views, rendered by `Page`
@@ -431,6 +459,9 @@ item — thread, subagent, job, check, workspace, host. Plugins map onto them an
 | Ready     | finished, not yet seen or landed     | green dot                 | **bold**  |
 | Idle      | seen, nothing pending                | faint ring                | normal    |
 | Done      | landed or closed; workspace released | muted check               | muted     |
+
+Every glyph sits in a 16px seat, so a row never shifts when its state changes. Needs you, Failed and Working draw at
+14px and the Ready dot at 10px.
 
 Two glyph-only states draw but never group or sort: **stale** (dashed faint ring: a reading or workspace that may be
 out of date) and **stopped** (muted square: cancelled or parked by the user).
@@ -454,6 +485,7 @@ Inbox item only opens it, and its verb is Review.
 meta chips · trailing inline verb`, with an optional muted description line and full-width children (an output pane).
 The middle is one button when the row selects; leading and trailing stay separate controls. Lists are one bordered
 card with hairline dividers. In narrow panes meta wraps under the title and trailing verbs drop to their own line.
+A selected row takes `bg-selected-wash` with ink text.
 
 **Live work row** (a subagent, a background job). One row in the EntityRow shape: `status glyph · name · muted
 current step · elapsed · Open`. While the work runs it lives in the dock above the composer, where it expands to its
@@ -467,7 +499,9 @@ no route or account id. One thing is never a card and a row on the same screen.
 **Focus ring.** One ring for kit and native controls: `outline: 2px solid` in the accent (`ring`), 1px offset
 (-2px inside a clipping list or a tab strip), on `:focus-visible` only, no halo and no transition. It holds 3:1 on
 bg, panel and raised in both schemes. `ring-ring/50` and box-shadow rings are retired; the kit sheet draws the ring
-for every control.
+for every control. **Compound fields.** An input group or a command input is one box with one ring: the wrapper that
+carries the border draws it while its field has focus (`:has(field:focus-visible)`), and the field draws none. A
+command input on the top edge of a clipping palette draws its ring 2px inside, so it is never cut.
 
 **Focus never falls to `body`.** An action that removes the focused element moves focus to its next sibling, or the
 previous one at the end. A surface that closes returns focus to what opened it. A shortcut that opens a page

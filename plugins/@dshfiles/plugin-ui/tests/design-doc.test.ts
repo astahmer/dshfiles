@@ -29,4 +29,20 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     ])
       expect(design).toContain(text)
   })
+
+  it('records the round-five tint rung, project mark, data ramp, surface steps, spacing and compound focus rules', () => {
+    for (const text of [
+      '**Tint rung.**',
+      '`variant="attention"`',
+      '`bg-selected-wash`',
+      '`ProjectMark`',
+      'The data ramp never starts with the accent',
+      '**Surface steps.**',
+      "  stack: '16px'\n  section: '20px'\n  page: '24px'",
+      'padding 24px, 12px below 28rem',
+      '**Compound fields.**',
+      '`bg-scrim`',
+    ])
+      expect(design, text).toContain(text)
+  })
 })
