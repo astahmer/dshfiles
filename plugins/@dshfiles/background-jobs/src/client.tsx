@@ -112,7 +112,8 @@ export default defineClient({
       // an entry that renders nothing, the way thread-sidebar replaces `subagent-catalog`, unless the user turns
       // Settings › Background jobs › headerJobChip on.
       const headerChip = observeSettings(ctx, backgroundJobsSettings)
-      ctx.effect(() => {
+      // Through `inject`: the entry waits for the header's slot, so a composition without it does not stop this setup.
+      ctx.slots.inject('conversation.session.header.actions', () => {
         let withdraw: (() => void) | undefined
         const sync = (): void => {
           if (headerChip.getSnapshot()?.headerJobChip === true) {
@@ -131,7 +132,7 @@ export default defineClient({
           stop()
           withdraw?.()
         }
-      }, 'background-jobs: header job chip')
+      })
       const rows = [
         { id: 'processes', label: 'Observe › Processes', aliases: ['Processes', 'Jobs', 'Background jobs'], tab: PROCESSES_JOBS_TAB },
         { id: 'processes-dev-servers', label: 'Observe › Processes › Dev servers', aliases: ['Dev servers', 'Preview servers', 'Ports'], tab: 'dev-servers' },

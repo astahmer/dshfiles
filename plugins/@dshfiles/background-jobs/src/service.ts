@@ -221,14 +221,16 @@ export class JobsBoard extends Context.Service<
           if (filter.sessionId !== undefined && row.owner !== filter.sessionId) return false
           return needle === null || matchesSearch(row, needle)
         })
-        const categoryCounts = emptyCounts()
-        for (const row of base) categoryCounts[row.category] += 1
-        const scopedByCategory = categories === null ? base : base.filter(row => categories.has(row.category))
-        const inScope = scopedByCategory.filter(row => {
+        const inStatusScope = (row: JobRow): boolean => {
           if (filter.scope === 'running') return isLiveStatus(row.status)
           if (filter.scope === 'finished') return isTerminalStatus(row.status)
           return true
-        })
+        }
+        // A category chip counts what it would show: the rows of the selected Working/Done/All scope.
+        const categoryCounts = emptyCounts()
+        for (const row of base) if (inStatusScope(row)) categoryCounts[row.category] += 1
+        const scopedByCategory = categories === null ? base : base.filter(row => categories.has(row.category))
+        const inScope = scopedByCategory.filter(inStatusScope)
         const ranked = inScope
           .map((row): RankedRow => ({ row, rank: isLiveStatus(row.status) ? 0 : 1 }))
           .sort((left, right) =>

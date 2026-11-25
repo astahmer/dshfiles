@@ -247,6 +247,21 @@ describe('background jobs board', () => {
       }),
     )
 
+    // DESIGN.md › Layout, counts: a filter's count is what it would show, here within the Working/Done/All scope.
+    it.effect('counts each category within the selected scope', () =>
+      Effect.gen(function* () {
+        const fixture = yield* makeBoard({ jobs: [historyJob({ id: 'bash-curl', label: 'curl -s http://localhost:3000' })] })
+        const all = yield* fixture.board.board({ scope: 'all' })
+        const category = all.rows[0]?.category
+        if (category === undefined) throw new Error('the job was not listed')
+        expect(all.categoryCounts[category]).toBe(1)
+        const running = yield* fixture.board.board({ scope: 'running' })
+        expect(running.rows).toHaveLength(0)
+        expect(running.categoryCounts[category]).toBe(0)
+        expect((yield* fixture.board.board({ scope: 'finished' })).categoryCounts[category]).toBe(1)
+      }),
+    )
+
     it.effect('searches labels, ids and status detail', () =>
       Effect.gen(function* () {
         const fixture = yield* makeBoard({

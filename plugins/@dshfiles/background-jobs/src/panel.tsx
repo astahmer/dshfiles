@@ -380,16 +380,10 @@ export function BackgroundJobsPanel(props: BackgroundJobsPanelProps): JSX.Elemen
       description={props.description ?? t('subtitle')}
       {...(props.tabs === undefined ? {} : { tabs: props.tabs })}
       meta={
-        // One fact in the header: what runs now. Finished jobs are the list below.
-        value === undefined ? null : (
+        // One fact in the header: what runs now. Finished jobs are the list below; with nothing running there is no chip.
+        value === undefined || value.runningCount === 0 ? null : (
           <Badge variant="muted">
-            {value.runningCount === 0 ? (
-              t('nothingRunning')
-            ) : (
-              <>
-                <RollingNumber value={value.runningCount} /> {t('running')}
-              </>
-            )}
+            <RollingNumber value={value.runningCount} /> {t('running')}
           </Badge>
         )
       }
