@@ -6,7 +6,7 @@
       "id": "settings-shell-port",
       "title": "Settings shell",
       "summary": "The Settings button, its sections, the General page and the Cmd+, shortcut.",
-      "details": "The sidebar Settings trigger, connection recovery pill, Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
+      "details": "The sidebar Settings trigger, the page's one connection state (a Host probe on every device, published through the kit's HostConnection and drawn as one strip: a pill at the top centre on a desktop, a line under the top bar on a phone), Desktop update indicator, section navigation, General section, onboarding coordinator and Mod+, shortcut of the native Settings shell, served by this bundle with the native row switched off.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "expect button \"General\""],
       "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect combobox \"Sections\""],
       "surfaces": ["client", "settings", "integration"],
@@ -37,6 +37,12 @@
           "kind": "gherkin",
           "id": "settings-shell.compact-navigation",
           "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.connection-strip",
+          "file": "plugins/@dshfiles/settings-shell/src/native/connection-strip.test.ts",
+          "testName": "finds a dead tunnel on a desktop too: reconnecting after one miss, offline after two, then Connected for 2 s"
         },
         {
           "kind": "unit-test",

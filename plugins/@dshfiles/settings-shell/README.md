@@ -251,19 +251,26 @@ window.dispatchEvent(
 `dispatchEvent` returns false when the shell took the request, the contract of `dshfiles:open-file`. Settings sections receive `close`, as natively, and `target` when opened at one of their
 search entries.
 
-### Connection banner (phone)
+### Connection strip
 
 The socket alone misses a tunnel that silently drops packets (Tailscale switched off on the phone): the page keeps
 showing stored threads as if it were live. The shell probes the Host with a HEAD of `/manifest.webmanifest` when the
-page becomes visible, on `online`, and every 20 s while a phone page is visible; a first miss is confirmed 5 s later.
-Two misses, or a disconnected socket, show one slim line under the phone top bar, "Not connected to `<host>`" with
-Retry. A probe that reaches the Host again after an outage reconnects the stale socket. Desktop keeps the sidebar
-connection pill and probes only on resume and `online`.
+page becomes visible, on `online`, at once when the socket state changes, and every 20 s while the page is visible,
+on every device; a first miss is confirmed 5 s later. It is the one publisher of the page's connection state
+(`@dshfiles/plugin-ui/lib/host-connection`, mirrored as `html[data-host-connection]`): while it is not online every
+`LiveElapsed` stops, spinners stand still and kit queries refetch on the return.
+
+One strip draws it, a pill at the top centre of the window on a desktop and a full-width line under the top bar on a
+phone: "Reconnecting to DSH…" after a first miss or while the socket reopens, "Not connected to DSH. What you see
+may be out of date." with Retry after two misses or a closed socket, then "Connected" for 2 s. A screen reader hears
+each change once through one polite node. A probe that reaches the Host again after an outage reconnects the stale
+socket. Nothing is drawn while online, and the native sidebar-foot connection pill is not ported.
 
 ## Port
 
 This bundle is a **port** of `@deepseek-ai/dsh-client-ui-settings-general` **0.2.2-rc.2** (MIT, © DeepSeek), the
-native Settings shell: the sidebar trigger row with its connection-recovery pill and Desktop update indicator, the
+native Settings shell: the sidebar trigger row with its Desktop update indicator (its connection pill became the
+connection strip above), the
 settings surface and its section navigation, the General section (Coding view switch, current version), the
 `settings.*` child slots every settings page registers into, the onboarding coordinator, the `settings.open`
 shortcut (Desktop `Mod+,`, Web `Mod+Alt+,`), and the Host-release reload prompt on the frame's `shell.overlay`

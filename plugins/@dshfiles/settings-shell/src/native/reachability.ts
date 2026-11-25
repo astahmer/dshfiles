@@ -1,8 +1,8 @@
 /**
  * Whether this page can reach its Host. The connection's own state only changes when the socket closes or the browser
  * reports offline; a tunnel that silently drops packets (Tailscale switched off on a phone) leaves it "connected" for
- * minutes while the page shows stale data. A cheap HTTP probe on resume, on `online` and on a slow interval closes that
- * gap.
+ * minutes while the page shows stale data. A cheap HTTP probe on resume, on `online`, on each socket change and on a
+ * slow interval closes that gap, on every device.
  */
 
 import type { ConnectionState } from '@deepseek-ai/dsh-client-connection/client'
@@ -33,11 +33,14 @@ export class ReachabilityModel {
     return { state: { probe: misses >= FAILED_PROBES_FOR_OFFLINE ? 'unreachable' : state.probe, misses, probing: false }, recovered: false }
   }
 
-  /** What the page shows: the probe outranks a socket that has not noticed the outage yet. */
+  /**
+   * What the page shows: the probe outranks a socket that has not noticed the outage yet. One miss is "reconnecting"
+   * while the confirming probe runs; the second makes it offline.
+   */
   static readonly view = (input: { readonly state: ReachabilityState; readonly connection: ConnectionState | undefined }): ReachabilityView => {
     if (input.state.probe === 'unreachable') return input.state.probing ? 'checking' : 'offline'
     if (input.connection === 'disconnected') return 'offline'
-    if (input.connection === 'connecting') return 'checking'
+    if (input.connection === 'connecting' || input.state.misses > 0) return 'checking'
     return 'online'
   }
 }

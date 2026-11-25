@@ -1,17 +1,15 @@
 /**
  * Ported from @deepseek-ai/dsh-client-ui-settings-general@0.2.2-rc.2 (MIT): `SettingsRoot.js`. The sidebar-foot
- * trigger row (connection recovery, Desktop update) plus the settings surface and the onboarding coordinator, which
- * mounts exactly one ordered `settings.onboarding` step while the main view shows no thread.
+ * trigger row (Desktop update) plus the settings surface and the onboarding coordinator, which mounts exactly one
+ * ordered `settings.onboarding` step while the main view shows no thread. The native row's connection pill is gone:
+ * the connection strip (connection-banner.tsx) is the one drawing of the connection, on every layout.
  */
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
-import type { ConnectionState } from '@deepseek-ai/dsh-client-connection/client'
 import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/client'
 import type { SettingsLauncherOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
-import { ConnectionIndicator, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { connectionIndicatorMachine, connectionIndicatorState } from './connection-indicator-machine.js'
 import { DesktopUpdateIndicator, type DesktopUpdateSource } from './desktop-update.js'
 import type { ShellTranslate } from './locales.js'
 import type { ShellRenderSlot } from './slots.js'
@@ -24,8 +22,6 @@ export interface OnboardingStep {
 
 /** Everything the root reads besides its slot props; built once per registration. */
 export interface ShellRootDeps {
-  readonly connectionState: ObservableSnapshot<ConnectionState | undefined>
-  readonly reconnect: () => void
   readonly desktopUpdate: DesktopUpdateSource
   readonly shortcuts: ObservableSnapshot<readonly ShortcutCatalogEntry[]>
   readonly onboardingSteps: ObservableSnapshot<readonly OnboardingStep[]>
@@ -48,13 +44,10 @@ export const ShellRoot = (props: {
   const { deps, t, renderSlot, wide } = props
   const open = useObservable(deps.settingsOpen)
   const shortcut = useObservable(deps.shortcuts).find(row => row.id === 'settings.open')
-  const desktopUpdate = useObservable(deps.desktopUpdate.store)
-  const connectionState = useObservable(deps.connectionState)
   const onboardingSteps = useObservable(deps.onboardingSteps)
   const onboardingActive = useObservable(deps.onboardingActive)
   const [requestedOnboarding, setRequestedOnboarding] = useState<string | undefined>()
   const [completedOnboarding, setCompletedOnboarding] = useState<ReadonlySet<string>>(() => new Set())
-  const [connection, sendConnection] = useMachine(connectionIndicatorMachine, { input: { connectionState } })
 
   const pendingStep = onboardingActive ? onboardingSteps.find(step => !completedOnboarding.has(step.id)) : undefined
   const onboardingStep = requestedOnboarding === undefined ? pendingStep : onboardingSteps.find(step => step.id === requestedOnboarding)
@@ -70,17 +63,11 @@ export const ShellRoot = (props: {
     if (appeared && open) deps.closeSettings()
   }, [onboardingStep, open, deps])
 
-  useEffect(() => {
-    sendConnection({ type: 'connection.changed', state: connectionState })
-  }, [connectionState, sendConnection])
-
   const completeOnboardingStep = useCallback((id: string) => {
     setRequestedOnboarding(undefined)
     setCompletedOnboarding(previous => (previous.has(id) ? previous : new Set([...previous, id])))
   }, [])
 
-  const connectionIndicator = connectionIndicatorState(connection)
-  const installing = desktopUpdate.presentation?.phase === 'installing'
   const launcherProps: SettingsLauncherOwnerProps = {
     wide,
     settingsOpen: open,
@@ -123,16 +110,7 @@ export const ShellRoot = (props: {
             </Tooltip>
           ),
         })}
-        <ConnectionIndicator
-          connectingLabel={t('connection.connecting')}
-          disconnectedLabel={t('connection.error')}
-          onReconnect={deps.reconnect}
-          reconnectActionLabel={t('connection.reconnect')}
-          recoveredLabel={t('connection.connected')}
-          restartActionLabel={t('connection.restart')}
-          state={wide && !installing ? connectionIndicator : undefined}
-        />
-        <DesktopUpdateIndicator hidden={connectionIndicator !== undefined && !installing} source={deps.desktopUpdate} t={t} wide={wide} />
+        <DesktopUpdateIndicator hidden={false} source={deps.desktopUpdate} t={t} wide={wide} />
       </div>
       {/* The surface decides what shows: the side panel keeps its page mounted while the dialog is closed. */}
       {props.surface}

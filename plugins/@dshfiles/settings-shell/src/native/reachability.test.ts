@@ -5,9 +5,9 @@ import { ReachabilityModel } from './reachability.js'
 const fail = (state = ReachabilityModel.initial) => ReachabilityModel.settled(ReachabilityModel.started(state), false).state
 
 describe('ReachabilityModel', () => {
-  it('reports offline after two failed probes even while the socket still says connected', () => {
+  it('reports reconnecting after one failed probe and offline after two, even while the socket still says connected', () => {
     const once = fail()
-    expect(ReachabilityModel.view({ state: once, connection: 'connected' })).toBe('online')
+    expect(ReachabilityModel.view({ state: once, connection: 'connected' })).toBe('checking')
     const twice = fail(once)
     expect(ReachabilityModel.view({ state: twice, connection: 'connected' })).toBe('offline')
   })
