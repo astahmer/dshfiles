@@ -14,6 +14,15 @@
  */
 @layer base {
   body {
+    /*
+     * Surface roles (council round 5 A4; DESIGN.md › Elevation & Depth). Every navigation column (the thread list,
+     * the Settings categories, a master list beside a detail) sits on `nav`, the panel step (#F4F2F0 light, #1B1815
+     * dark); every page sits on `stage`, the canvas (#FEFCFA / #15120F). They follow the active theme's steps; the
+     * Host fallbacks hold without ui-styles. `surface-nav` / `surface-stage` also set `--dshx-surface`, the fill a
+     * fade, a badge ring or a sticky header blends into.
+     */
+    --dshx-surface-nav: var(--dshx-tone-panel, var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1)));
+    --dshx-surface-stage: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
     --dshx-dialog-fill: var(--dsw-alias-bg-base);
     --dshx-dialog-border: var(--dsw-alias-border-l2);
     --dshx-elevation-dialog: var(--dshx-elevation-3);
@@ -31,6 +40,16 @@
     --dshx-kbd-fill: oklch(1 0 0 / 0.08);
     --dshx-kbd-border: oklch(1 0 0 / 0.12);
   }
+}
+
+@utility surface-nav {
+  --dshx-surface: var(--dshx-surface-nav);
+  background-color: var(--dshx-surface);
+}
+
+@utility surface-stage {
+  --dshx-surface: var(--dshx-surface-stage);
+  background-color: var(--dshx-surface);
 }
 
 @utility surface-dialog {

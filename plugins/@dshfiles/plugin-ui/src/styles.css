@@ -75,6 +75,9 @@
   --color-ring: var(--dsw-alias-state-business-primary);
   /* Tertiary ink (palette step 8, AA on bg, panel, raised and every row wash): a page count, a placeholder. */
   --color-faint-foreground: var(--dsw-alias-label-tertiary);
+  /* Surface roles (council round 5 A4, surfaces.css): `bg-surface-nav` for navigation columns, `bg-surface-stage` for pages. */
+  --color-surface-nav: var(--dshx-surface-nav);
+  --color-surface-stage: var(--dshx-surface-stage);
   --color-info: var(--dsw-alias-state-business-primary);
   --color-success: var(--dsw-alias-state-success-primary);
   --color-warning: var(--dsw-alias-state-warn-primary);

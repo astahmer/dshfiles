@@ -468,6 +468,14 @@ shadow. Four elevation levels, and only the composer floats at rest:
 | s2    | `shadow-s2`        | Menus, popovers, selects, floating Dockview groups |
 | s3    | `shadow-s3`        | Dialogs and phone bottom sheets                    |
 
+**Two surface roles** (`surfaces.css`). Every navigation column — the thread list, the Settings categories, a master
+list beside its detail — sits on `nav`, the panel step (`#F4F2F0` light, `#1B1815` dark); every page sits on
+`stage`, the canvas (`#FEFCFA` / `#15120F`). Write `dshx:surface-nav` / `dshx:surface-stage` (they also set
+`--dshx-surface`, the fill a fade, a badge ring or a sticky header blends into) or `dshx:bg-surface-nav` /
+`dshx:bg-surface-stage`; CSS modules read `var(--dshx-surface-nav)` / `var(--dshx-surface-stage)`. The roles follow the
+active theme's panel and bg steps, so a destination never picks its own grey: the same two roles in both schemes,
+on every destination.
+
 Tailwind's own step names resolve to these levels in the kit `@theme` (`shadow-xs` none, `sm` s1, `md`/`lg` s2,
 `xl`/`2xl` s3), so a shadcn default draws a level, but new code writes the s-step.
 
