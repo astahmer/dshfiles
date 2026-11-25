@@ -144,23 +144,30 @@ describe('DestinationShell', () => {
     expect(document.querySelectorAll('[data-destination-index="observe"] header p')).toHaveLength(1)
   })
 
-  it('marks the active rail item and the open page with the selected wash and an accent icon (round five T3)', () => {
+  it('lights the current place once: a toned tile on the rail item, the wash and marker on the open page (council round 3 B2)', () => {
     setPhone(false)
     renderShell({ activePanelId: 'dshfiles-usage', renderPanelIcon: () => <svg data-testid="page-icon" /> })
     fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
     const tab = screen.getByRole('tab', { name: 'Observe' })
-    expect(tab.className).toContain('dshx:bg-selected-wash')
-    // The quieter selection (round five A1): the wash plus its leading marker, the label at 550.
-    expect(tab.className).toContain('dshx:selected-marker')
-    expect(within(tab).getByText('Observe').className).toContain('dshx:font-selected')
+    // The rail item: its identity tone's 14% tile behind the glyph and an ink label at 600, no wash and no marker.
+    expect(tab.className).toContain('dshx:nav-tone-observe')
+    expect(tab.className).not.toContain('dshx:bg-selected-wash')
+    expect(tab.className).not.toContain('dshx:selected-marker')
+    expect(within(tab).getByText('Observe').className).toContain('dshx:font-semibold')
     expect(tab.className).toContain('dshx:text-foreground')
     expect(tab.className).not.toMatch(/(^| )dshx:bg-accent( |$)/u)
-    expect(tab.querySelector('[data-rail-icon]')?.className).toContain('dshx:text-control-on')
-    expect(screen.getByRole('tab', { name: 'Threads' }).querySelector('[data-rail-icon]')?.className).not.toContain('dshx:text-control-on')
+    expect(tab.querySelector('[data-rail-icon]')?.className).toContain('dshx:bg-nav-tile')
+    // Every destination glyph draws in its own tone; only the active one gets the tile.
+    const threads = screen.getByRole('tab', { name: 'Threads' })
+    expect(threads.className).toContain('dshx:nav-tone-threads')
+    expect(threads.querySelector('[data-rail-icon]')?.className).toContain('dshx:text-nav-tone')
+    expect(threads.querySelector('[data-rail-icon]')?.className).not.toContain('dshx:bg-nav-tile')
+    // The open page: the neutral wash and the marker, which carries the accent; its icon in ink.
     const usage = screen.getByRole('button', { name: 'Usage' })
     expect(usage.className).toContain('dshx:bg-selected-wash')
     expect(usage.className).toContain('dshx:selected-marker')
-    expect(usage.querySelector('[data-section-icon]')?.className).toContain('dshx:text-control-on')
+    expect(usage.querySelector('[data-section-icon]')?.className).toContain('dshx:text-foreground')
+    expect(usage.querySelector('[data-section-icon]')?.className).not.toContain('dshx:text-control-on')
     const traces = screen.getByRole('button', { name: 'Traces' })
     expect(traces.className).not.toContain('dshx:bg-selected-wash')
   })
@@ -188,7 +195,7 @@ describe('DestinationShell', () => {
     // Folded by the stage, the rail keeps its Settings item active.
     const settings = screen.getByRole('tab', { name: 'Settings' })
     expect(settings.getAttribute('aria-selected')).toBe('true')
-    expect(settings.className).toContain('dshx:selected-marker')
+    expect(settings.querySelector('[data-rail-icon]')?.className).toContain('dshx:bg-nav-tile')
     expect(document.querySelector('[data-stage-folded]')).not.toBeNull()
     // The page leaves the stage: the column this folded opens again.
     draw({ collapsed: true, activePanelId: null })

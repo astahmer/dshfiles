@@ -315,6 +315,18 @@ const soleEntry = (folder: RailFolder): string | undefined =>
 
 const isDestinationId = (id: string): id is DestinationId => DESTINATION_IDS.some(candidate => candidate === id)
 
+/** Each destination's identity tone (council round 3 A7): its glyph on the rail and the phone tab bar. */
+const NAV_TONE = {
+  threads: 'dshx:nav-tone-threads',
+  inbox: 'dshx:nav-tone-inbox',
+  land: 'dshx:nav-tone-land',
+  work: 'dshx:nav-tone-work',
+  agents: 'dshx:nav-tone-agents',
+  observe: 'dshx:nav-tone-observe',
+  knowledge: 'dshx:nav-tone-knowledge',
+  settings: 'dshx:nav-tone-settings',
+} as const satisfies Record<DestinationId, string>
+
 const RailButton = (props: {
   readonly folder: RailFolder
   readonly active: boolean
@@ -350,22 +362,27 @@ const RailButton = (props: {
         props.onDropView(viewId)
       }}
       className={cn(
-        'dshx:flex dshx:w-full dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-0 dshx:py-1.5 dshx:text-muted-foreground dshx:outline-none dshx:transition-colors',
+        'dshx:flex dshx:w-full dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-0 dshx:py-1 dshx:text-muted-foreground dshx:outline-none dshx:transition-colors',
         'dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-        // The active item (round five T3, A1): the quiet selected wash with its leading marker, ink label, accent icon.
-        props.active && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
+        // Navigation identity (council round 3 B2, A7): each destination's glyph in its own tone. The active item is its
+        // tone's 14% tile behind the glyph and an ink label at 600, no wash: the leaf row in the list carries the marker.
+        isDestinationId(props.folder.id) ? NAV_TONE[props.folder.id] : undefined,
+        props.active && 'dshx:text-foreground',
         dropping && 'dshx:ring-2 dshx:ring-ring',
       )}
     >
       <span
-        className={cn('dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center', props.active && 'dshx:text-control-on')}
+        className={cn(
+          'dshx:inline-flex dshx:h-6 dshx:w-8 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-nav-tone',
+          props.active && 'dshx:bg-nav-tile',
+        )}
         aria-hidden="true"
         data-rail-icon=""
       >
         {props.icon}
       </span>
       {props.showLabel ? (
-        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-tight', props.active && 'dshx:font-selected')}>
+        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-tight', props.active && 'dshx:font-semibold')}>
           {props.folder.label}
         </span>
       ) : null}
@@ -465,7 +482,8 @@ const SectionButton = (props: {
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
           // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
           SECTION_ROW_BADGE_ROOM,
-          // The open page (round five T3, A1): the quiet selected wash and its leading marker, an accent icon, ink label.
+          // The open page (round five T3, A1; council round 3 B2): the neutral selected wash and its leading marker, which
+          // carries the accent, with an ink icon and label: the current place is lit once, here.
           props.selected && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
         )}
       >
@@ -473,7 +491,7 @@ const SectionButton = (props: {
           <span
             className={cn(
               'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center',
-              props.selected ? 'dshx:text-control-on' : 'dshx:text-muted-foreground',
+              props.selected ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
               SECTION_ROW_BADGE,
             )}
             aria-hidden="true"
