@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 const client = readFileSync(new URL('client.tsx', import.meta.url), 'utf8')
 const header = readFileSync(new URL('thread-group-header.tsx', import.meta.url), 'utf8')
 const rows = readFileSync(new URL('virtual-thread-rows.tsx', import.meta.url), 'utf8')
+const shell = readFileSync(new URL('destination-shell.tsx', import.meta.url), 'utf8')
 
 describe('phone thread list density (round five B1)', () => {
   it('stands groups 4px apart on touch (the last row gap alone, council round 6 B8), none above the first, 20px with a mouse', () => {
@@ -35,6 +36,14 @@ describe('phone thread list density (round five B1)', () => {
   })
 
   it('ends the list in 12px of padding under a 24px fade, so the status bar never cuts the last row hard (round five C5)', () => {
-    expect(client).toContain("'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]'")
+    expect(client).toContain("'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]")
+  })
+
+  it('fits the first Ready row, title and project, above the tab bar at 390x664 (council round 7 B4)', () => {
+    // A 14px fade on touch, not 24px: the last line above the tab bar reads instead of fading out.
+    expect(client).toContain('dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]')
+    // 8px reclaimed above the first group: 4px over the search, 4px from the project row's touch height.
+    expect(shell).toContain("'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-1 dshx:text-foreground'")
+    expect(client).toContain('triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:text-base dshx:font-medium dshx:hover:bg-accent dshx:pointer-coarse:h-7"')
   })
 })

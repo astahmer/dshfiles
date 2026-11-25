@@ -6606,7 +6606,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 searchAbove={0}
                 searchLabel={props.tSidebar('threadSidebarProjectSearch')}
                 searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
-                triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:text-base dshx:font-medium dshx:hover:bg-accent"
+                // 28px on touch, its 44px hit area from the kit (council round 7 B4), like the group heads under it.
+                triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:text-base dshx:font-medium dshx:hover:bg-accent dshx:pointer-coarse:h-7"
                 triggerContent={
                   <>
                     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
@@ -7171,8 +7172,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // A floor of about two rows: in a short docked column (free docking with the bottom pane open) the section
           // scrolls past its controls instead of squeezing the list to a sliver no row fits in. The list ends in 12px of
           // padding under a 24px fade (round five C5), so a row scrolled to the status bar thins out instead of being cut.
+          // A phone fades only 14px (council round 7 B4): the line above the tab bar reads instead of fading out.
           className={cn(
-            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]',
+            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)] dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]',
             isBoard && 'dshx:p-4 dshx:[mask-image:none]',
           )}
           onKeyDown={event => {
