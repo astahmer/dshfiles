@@ -45,13 +45,28 @@ describe('Settings › General paints once (round three item 30)', () => {
   })
 })
 
+/** The SVG document a card's preview variable carries. */
+const previewSvg = (value: string | undefined): string => decodeURIComponent(/^url\("data:image\/svg\+xml,(.*)"\)$/u.exec(value ?? '')?.[1] ?? '')
+
 describe('Settings › General below 28rem and its Appearance cards (round five B7)', () => {
-  it('stacks every native row and gives each theme card its own paper, ink and accent swatch', async () => {
+  it('stacks every native row and gives each theme card a 96×56 preview drawn in that theme', async () => {
     await act(async () => root.render(<GeneralSection renderSlot={() => null} />))
     const column = container.querySelector<HTMLElement>('[data-settings-theme-swatches]')
     expect(column?.className).toContain('dshx:@max-pane-narrow:[&_[class$=row]]:flex-col!')
     expect(column?.className).not.toContain('flex-wrap')
-    for (const scheme of ['light', 'dark', 'system']) expect(column?.style.getPropertyValue(`--settings-swatch-${scheme}`)).toMatch(/^radial-gradient/u)
+    for (const scheme of ['light', 'dark', 'system']) {
+      const svg = previewSvg(column?.style.getPropertyValue(`--settings-swatch-${scheme}`))
+      // The theme's page, its sidebar strip, two text lines and one indigo diamond.
+      expect(svg).toContain('viewBox="0 0 96 56"')
+      expect(svg).toContain('data-part="sidebar"')
+      expect(svg.match(/data-part="line"/gu)?.length).toBeGreaterThanOrEqual(2)
+      expect(svg).toContain('<polygon data-part="diamond"')
+    }
+    // The card's icon gives way to the preview, which is 96×56 and leads the card.
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]>svg]:hidden!')
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:h-14')
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:w-24')
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:order-first')
     // The light card's paper differs from the dark card's: each swatch shows its own theme.
     expect(column?.style.getPropertyValue('--settings-swatch-light')).not.toBe(column?.style.getPropertyValue('--settings-swatch-dark'))
     expect(column?.className).toContain('dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)]')

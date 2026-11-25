@@ -23,24 +23,47 @@ const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly 
   return true
 }
 
+type SchemeColours = ReturnType<typeof PaletteMath.standaloneColours>
+
+/** One scheme's miniature window: the page, its sidebar strip, two text lines and one indigo (Needs-you) diamond. */
+const previewParts = (colours: SchemeColours): string =>
+  [
+    `<rect width="96" height="56" fill="${colours.bg}"/>`,
+    `<rect data-part="sidebar" width="24" height="56" fill="${colours.panel}"/>`,
+    `<rect x="24" width="1" height="56" fill="${colours.line}"/>`,
+    `<rect data-part="line" x="34" y="15" width="46" height="4" rx="2" fill="${colours.text}"/>`,
+    `<rect data-part="line" x="34" y="25" width="32" height="4" rx="2" fill="${colours.muted}"/>`,
+    `<polygon data-part="diamond" points="38,35 42,39 38,43 34,39" fill="${colours.accent}"/>`,
+    `<rect data-part="line" x="46" y="37" width="22" height="4" rx="2" fill="${colours.muted}"/>`,
+  ].join('')
+
 /**
- * Each Appearance card's own colours (round five B7): paper, ink and accent dots generated from the kit's palette for
- * that scheme, so the card shows the theme it picks rather than only its icon. System shows both papers and the accent.
+ * Each Appearance card's preview (round five B7): a 96×56 miniature drawn in that theme's own palette, so the card
+ * shows the theme it picks rather than an icon. System shows the light window with its trailing half in dark.
  */
-const themeSwatches = (): CSSProperties & Record<`--settings-swatch-${string}`, string> => {
+const themePreview = (scheme: 'light' | 'dark' | 'system'): string => {
   const light = PaletteMath.standaloneColours('light')
   const dark = PaletteMath.standaloneColours('dark')
-  const dot = (x: number, fill: string, edge: string): string =>
-    `radial-gradient(circle at ${String(x)}px 50%, ${fill} 4px, ${edge} 4.5px, ${edge} 5px, transparent 5.5px)`
-  // One mid-grey ring on every dot: a near-white or near-black dot then shows on a light and on a dark card alike.
-  const ring = light.faint
-  const strip = (paper: string, ink: string, accent: string): string => [dot(6, paper, ring), dot(20, ink, ring), dot(34, accent, accent)].join(', ')
-  return {
-    '--settings-swatch-light': strip(light.bg, light.text, light.accent),
-    '--settings-swatch-dark': strip(dark.bg, dark.text, dark.accent),
-    '--settings-swatch-system': strip(light.bg, dark.bg, light.accent),
-  }
+  const body =
+    scheme === 'system'
+      ? `${previewParts(light)}<g clip-path="url(#half)">${previewParts(dark)}</g>`
+      : previewParts(scheme === 'light' ? light : dark)
+  // One mid-grey edge on every preview, so a near-white or near-black window shows on a light and on a dark card alike.
+  const svg = [
+    '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="56" viewBox="0 0 96 56">',
+    '<defs><clipPath id="frame"><rect width="96" height="56" rx="6"/></clipPath><clipPath id="half"><rect x="48" width="48" height="56"/></clipPath></defs>',
+    `<g clip-path="url(#frame)">${body}</g>`,
+    `<rect x="0.5" y="0.5" width="95" height="55" rx="5.5" fill="none" stroke="${light.faint}"/>`,
+    '</svg>',
+  ].join('')
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`
 }
+
+const themeSwatches = (): CSSProperties & Record<`--settings-swatch-${string}`, string> => ({
+  '--settings-swatch-light': themePreview('light'),
+  '--settings-swatch-dark': themePreview('dark'),
+  '--settings-swatch-system': themePreview('system'),
+})
 
 /** The General section column; rows come from `settings.general.item` registrants. */
 export const GeneralSection = (
@@ -90,8 +113,9 @@ export const GeneralSection = (
         // menu. It stays, as a quiet text button named by its own label, after the field.
         'dshx:[&_[class*=_expander_]]:ml-1! dshx:[&_[class*=_expander_]]:h-8! dshx:[&_[class*=_expander_]]:w-auto! dshx:[&_[class*=_expander_]]:rounded-md! dshx:[&_[class*=_expander_]]:px-2! dshx:[&_[class*=_expander_]]:text-sm! dshx:[&_[class*=_expander_]]:text-muted-foreground! dshx:[&_[class*=_expander_]>svg]:hidden! dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]',
         'dshx:[&_[class*=_stepper_]+[class*=_unit_]]:-ml-2! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:inline-flex! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:h-8! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:items-center! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:rounded-r-(--dsw-radius-md)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-(--dsw-alias-border-l3)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:pr-2.5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-muted-foreground!',
-        // Each card's theme swatch under its label (`themeSwatches`): cards in core order, Light, Dark, System.
-        "dshx:[&_[class*=_themeCube]]:before:order-last dshx:[&_[class*=_themeCube]]:before:mt-1 dshx:[&_[class*=_themeCube]]:before:h-3 dshx:[&_[class*=_themeCube]]:before:w-10 dshx:[&_[class*=_themeCube]]:before:content-['']",
+        // Each card leads with its theme's 96×56 preview (`themeSwatches`, round five B7) in place of core's icon, label
+        // under it; cards in core order, Light, Dark, System. Tighter padding keeps the card about as tall as before.
+        "dshx:[&_[class*=_themeCube]>svg]:hidden! dshx:[&_[class*=_themeCube]]:py-3! dshx:[&_[class*=_themeCube]]:gap-2! dshx:[&_[class*=_themeCube]]:before:order-first dshx:[&_[class*=_themeCube]]:before:h-14 dshx:[&_[class*=_themeCube]]:before:w-24 dshx:[&_[class*=_themeCube]]:before:shrink-0 dshx:[&_[class*=_themeCube]]:before:content-['']",
         'dshx:[&_[class*=_themeCube]:nth-child(1)]:before:[background:var(--settings-swatch-light)] dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)] dshx:[&_[class*=_themeCube]:nth-child(3)]:before:[background:var(--settings-swatch-system)]',
       )}
       data-settings-theme-swatches=""
