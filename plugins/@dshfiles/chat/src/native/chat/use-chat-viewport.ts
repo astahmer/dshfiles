@@ -842,7 +842,9 @@ export class ChatViewport {
    */
   landAtUnread(row: HTMLElement, label: string): ViewportLanding | null {
     this.clearUnread()
-    row.dataset.chatUnreadLabel = label
+    // dshfiles (unslop r5 C3, council round 5): an answer that opens its Turn (only "Worked for" above it) needs no
+    // divider: the whole Turn is new. The label marks an answer after output of its Turn the reader may have seen.
+    if (!this.opensTurn(row)) row.dataset.chatUnreadLabel = label
     const turn = Number(row.dataset.chatTurn)
     // dshfiles (unslop r5 C3): a 24px inset showed the bottom half of the Turn's "Worked for" row (12px above the
     // answer) cut by the scrollport's top edge. That row now lands whole, 12px below the edge; with no such row
@@ -888,6 +890,22 @@ export class ChatViewport {
     }
     if (!(previous instanceof HTMLElement) || previous.dataset.chatFlowKind !== 'turn-process') return 0
     return Math.max(0, row.getBoundingClientRect().top - previous.getBoundingClientRect().top)
+  }
+
+  /**
+   * Whether an answer is the first output its Turn shows: the visible flow items above it, past its "Worked for" row, start
+   * with the Turn's prompt (a user message or a trigger).
+   * @param row - the final answer row.
+   * @returns true when nothing of the Turn's own output precedes the answer.
+   */
+  private opensTurn(row: HTMLElement): boolean {
+    let previous = row.closest<HTMLElement>('[data-chat-flow-kind]')?.previousElementSibling ?? null
+    while (previous instanceof HTMLElement) {
+      const kind = previous.dataset.chatFlowKind
+      if (!previous.hidden && previous.getBoundingClientRect().height > 0 && kind !== 'turn-process') return kind === 'user' || kind === 'turn-trigger'
+      previous = previous.previousElementSibling
+    }
+    return false
   }
 
   /** Remove the unread divider, once the reader's own input starts newer content. */

@@ -171,6 +171,35 @@ describe('ChatViewport unread landing geometry (round five C3)', () => {
     expect(landing(true).scrollTop).toBe(964 - 12)
   })
 
+  // Round five C3 (council round 5): a "New" divider between "Worked for" and the answer marked nothing the reader had
+  // not already seen arrive; the whole Turn is new. Only an answer after earlier output of its Turn gets the label.
+  it('draws no "New" label when the answer opens its Turn (only "Worked for" above it)', () => {
+    landing(true)
+    expect(document.querySelectorAll('[data-chat-unread-label]')).toHaveLength(0)
+  })
+
+  it('labels an answer that follows earlier output of its own Turn', () => {
+    const answer = row({ key: 'answer', turn: 2, answer: true })
+    const prompt = flowItem('user')
+    const step = flowItem('assistant-step')
+    const answerItem = flowItem('assistant-step', answer)
+    const list = document.createElement('div')
+    const column = document.createElement('div')
+    column.append(prompt, step, answerItem)
+    list.append(column)
+    document.body.append(list)
+    const scroller = document.body
+    place(prompt, scroller, 800, 100)
+    place(step, scroller, 912, 40)
+    place(answerItem, scroller, 964, 400)
+    place(answer, scroller, 964, 400)
+    const viewport = new ChatViewport()
+    viewport.attach(list, column)
+    viewport.updateTurns([{ turn: 2, anchorKey: 'turn-2', prompt: '', response: '' }])
+    viewport.landAtUnread(answer, 'New')
+    expect(answer.dataset.chatUnreadLabel).toBe('New')
+  })
+
   it('lands an answer with no row directly above it 12px below the top edge', () => {
     // The prompt above ends 100px before the answer: nothing of it shows within the 12px inset.
     expect(landing(false).scrollTop).toBe(1000 - 12)

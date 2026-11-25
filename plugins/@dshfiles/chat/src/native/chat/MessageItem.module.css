@@ -7,6 +7,23 @@
   gap: 6px;
 }
 
+/* dshfiles (unslop r5 C3, council round 5): on a hover device a prompt's actions row (its clock, copy, ⋯) shows on hover,
+   so where "Worked for" follows the prompt it overlays the space under the bubble instead of holding 34px of the flow
+   open; ChatView.module.css then puts "Worked for" 24px under the bubble. The row stays at the trailing edge, clear of
+   "Worked for" at the start edge. */
+@media (hover: hover) {
+  :global([data-chat-flow-kind='user']):has(+ :global([data-chat-flow-kind='turn-process'])) .userRow {
+    position: relative;
+  }
+
+  :global([data-chat-flow-kind='user']):has(+ :global([data-chat-flow-kind='turn-process'])) .userRow > :global([data-clock]) {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 1;
+  }
+}
+
 .userStack {
   display: flex;
   flex-direction: column;

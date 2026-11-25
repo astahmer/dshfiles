@@ -109,6 +109,15 @@
   --dsh-chat-flow-gap: 28px;
 }
 
+/* dshfiles (unslop r5 C3, council round 5): where a prompt's actions show only on hover, they overlay the space under
+   its bubble (MessageItem.module.css) and "Worked for" sits 24px under the bubble; it was 50px, the hidden row's 34px
+   plus the 16px gap. */
+@media (hover: hover) {
+  .flowItem[data-chat-flow-kind="user"] + .flowItem[data-chat-flow-kind="turn-process"] {
+    --dsh-chat-flow-gap: 24px;
+  }
+}
+
 /* dshfiles (visual refresh T2.2): consecutive tool rows read as one list of 24px lines, 2px apart. */
 .flowItem[data-chat-flow-kind="tool-call"] + .flowItem[data-chat-flow-kind="tool-call"] {
   --dsh-chat-flow-gap: 2px;
@@ -120,19 +129,19 @@
   min-width: 0;
 }
 
-/* Where an unread thread opened: above its final answer, drawn like the Since you left divider (a muted label between
-   hairlines). With the recap card in the row, that card's divider is the only one. */
+/* Where an unread thread opened: above its final answer, when output of its Turn came before it (use-chat-viewport.ts
+   opensTurn; an answer that opens its Turn needs no marker). dshfiles (unslop r5 C3, council round 5): an 11px label in
+   the accent, on the text's start edge, with no rules: the centred divider read as a section break inside one Turn. With
+   the recap card in the row, that card's divider is the only one. */
 .flowItem[data-chat-unread-label]::before {
   content: attr(data-chat-unread-label);
   display: block;
-  margin-bottom: 8px;
-  color: var(--dsw-alias-label-secondary);
-  font: var(--dsw-font-xxs-12);
+  margin-bottom: 4px;
+  color: var(--dshx-tone-info, var(--dsw-alias-brand-primary));
+  font-size: 11px;
   font-weight: 600;
-  text-align: center;
-  background:
-    linear-gradient(var(--dsw-alias-border-l2), var(--dsw-alias-border-l2)) left center / calc(50% - 3em) 1px no-repeat,
-    linear-gradient(var(--dsw-alias-border-l2), var(--dsw-alias-border-l2)) right center / calc(50% - 3em) 1px no-repeat;
+  line-height: 16px;
+  letter-spacing: 0.02em;
 }
 
 .flowItem[data-chat-unread-label]:has(> [data-since-you-left])::before {
