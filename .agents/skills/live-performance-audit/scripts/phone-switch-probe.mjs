@@ -87,9 +87,12 @@ await context.addInitScript(() => {
         if ((result.titleMs !== null && result.msgMs !== null) || now > 30000) return
       } else {
         const rows = [...document.querySelectorAll('button[data-thread-main-action][data-thread-id]')]
+        // Drawer mode keeps the stage named in the top bar while the list slides over it: the drawer being open is
+        // the "list is on screen" signal there, where the stack has no stage.
+        const drawerOpen = document.querySelector('[data-phone-drawer="open"]') !== null
         if (
           result.listMs === null &&
-          (stage === null || stage === undefined) &&
+          (stage === null || stage === undefined || drawerOpen) &&
           header !== null &&
           rows.some(row => row.getBoundingClientRect().height > 0 && row.checkVisibility({ visibilityProperty: true }))
         )
@@ -152,14 +155,20 @@ const loadStart = Date.now()
 await page.goto(url)
 await page.locator('header[data-phone-top-bar]').waitFor({ timeout: 120_000 })
 const rowsLocator = page.locator('button[data-thread-main-action][data-thread-id]')
+// The list is a full-screen stack page (Back button) or the owner's thread drawer (Show threads).
+const listButton = page.locator('[data-phone-sidebar]')
+const backButton = page.locator('[data-phone-back]')
+const openList = async () => {
+  if (await listButton.isVisible().catch(() => false)) await listButton.tap()
+  else if (await backButton.isVisible().catch(() => false)) await backButton.tap()
+}
 if (
   !(await rowsLocator
     .first()
     .isVisible()
     .catch(() => false))
 ) {
-  const back = page.locator('[data-phone-back]')
-  if (await back.isVisible().catch(() => false)) await back.tap()
+  await openList()
 }
 await rowsLocator.first().waitFor({ timeout: 120_000 })
 const loadMs = Date.now() - loadStart
@@ -202,7 +211,12 @@ const summarize = async (longBefore, extra) => {
   }
 }
 for (const pick of picks) {
-  const expectedTitle = await page.locator(`button[data-thread-main-action][data-thread-id="${pick.id}"]`).evaluate(row => {
+  // Back/openList leaves the list open, but its slide needs a frame before the row is tappable again.
+  const row = page.locator(`button[data-thread-main-action][data-thread-id="${pick.id}"]`)
+  // The list is virtualized: a row from an earlier snapshot may sit outside the mounted window.
+  await row.scrollIntoViewIfNeeded().catch(() => undefined)
+  await row.waitFor({ state: 'visible', timeout: 30_000 })
+  const expectedTitle = await row.evaluate(row => {
     const titleNode = [...row.querySelectorAll('span')].find(span => span.className.includes('dshx:flex-1') && span.className.includes('dshx:truncate')) ?? row
     return (titleNode.textContent ?? '').replace(/\s+/g, ' ').trim()
   })
@@ -210,7 +224,7 @@ for (const pick of picks) {
   let longBefore = await page.evaluate(() => window.__longTasks.length)
   await page.evaluate(expected => window.__watch('open', expected), expectedTitle)
   if (profileDir !== undefined) await cdp.send('Profiler.start')
-  await page.locator(`button[data-thread-main-action][data-thread-id="${pick.id}"]`).tap({ position: { x: 30, y: 12 } })
+  await row.tap({ position: { x: 30, y: 12 } })
   await page.waitForFunction(() => window.__result.titleMs !== null && window.__result.msgMs !== null, null, { timeout: 35_000, polling: 100 }).catch(() => {})
   await page.waitForTimeout(3000)
   if (profileDir !== undefined) profiles.push({ kind: 'open', profile: (await cdp.send('Profiler.stop')).profile })
@@ -220,7 +234,8 @@ for (const pick of picks) {
   longBefore = await page.evaluate(() => window.__longTasks.length)
   await page.evaluate(() => window.__watch('back', ''))
   if (profileDir !== undefined) await cdp.send('Profiler.start')
-  await page.locator('[data-phone-back]').tap()
+  await openList()
+  await rowsLocator.first().waitFor({ state: 'visible', timeout: 30_000 })
   await page.waitForFunction(() => window.__result.listMs !== null, null, { timeout: 35_000, polling: 100 }).catch(() => {})
   await page.waitForTimeout(2000)
   if (profileDir !== undefined) profiles.push({ kind: 'back', profile: (await cdp.send('Profiler.stop')).profile })
