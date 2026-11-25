@@ -36,7 +36,7 @@ const copy: ThreadPaletteCopy = {
   unassigned: 'Unassigned',
   working: 'Working',
   idle: 'Idle',
-  prefixHint: 'Type ? for prefixes',
+  prefixHint: 'Prefixes',
   viewAll: 'Everything',
   viewCommands: 'Commands',
   viewContent: 'Thread content',
@@ -488,9 +488,9 @@ describe('Threads tab project scope', () => {
     expect(result.textContent).not.toContain('/dev/dshfiles')
   })
 
-  it('paints each project mark in the colour the thread list gives that project, never a status hue', async () => {
+  it('draws each project as the thread list\'s ProjectMark tile, in the colour the list gives that project', async () => {
     const colorOf = vi.fn((thread: { readonly project: string }) =>
-      thread.project === 'dshfiles' ? { className: 'project-tone-balanced-3' } : { color: '#ffd400' },
+      thread.project === 'dshfiles' ? { className: 'project-tone-balanced-3', tone: 3 } : { color: '#ffd400' },
     )
     render(
       <ThreadPalette
@@ -511,17 +511,41 @@ describe('Threads tab project scope', () => {
     )
     const markOf = async (name: RegExp) => (await screen.findByRole('option', { name })).querySelector<HTMLElement>('[data-palette-project-mark]')
     const tone = await markOf(/Here work/)
+    expect(tone?.getAttribute('data-slot')).toBe('project-mark')
     expect(tone?.className).toContain('project-tone-balanced-3')
-    expect(tone?.className).not.toMatch(/chart-/u)
+    // The sidebar's letters: first letters of two words, else the first two letters.
+    expect(tone?.textContent).toBe('DS')
     const custom = await markOf(/Elsewhere work/)
-    // A picked colour stays readable: the mark clamps its lightness instead of painting the raw pick as text.
+    // A picked colour stays readable: the tile clamps its lightness per scheme instead of painting the raw pick.
     expect(custom?.style.getPropertyValue('--chip')).toBe('#ffd400')
     expect(custom?.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
-    expect(custom?.className).toContain('dshx:text-(--chip-light)')
-    expect(custom?.className).not.toMatch(/chart-/u)
+    expect(custom?.style.color).toBe('var(--chip-clamped)')
+    expect(custom?.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
     const loose = await markOf(/Loose work/)
     expect(loose?.className).toContain('dshx:bg-muted')
     expect(colorOf).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'session-loose' }))
+  })
+
+  it('uses two-word letters the way the sidebar does (billing-api is BA, not BI)', async () => {
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[{ ...here, project: 'billing-api' }]}
+        projectColorOf={() => ({ tone: 0 })}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn()}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    const mark = (await screen.findByRole('option', { name: /Here work/ })).querySelector<HTMLElement>('[data-palette-project-mark]')
+    expect(mark?.textContent).toBe('BA')
   })
 
   it('keeps project marks neutral when nothing provides project colours', async () => {
@@ -542,8 +566,9 @@ describe('Threads tab project scope', () => {
       />,
     )
     const mark = (await screen.findByRole('option', { name: /Here work/ })).querySelector<HTMLElement>('[data-palette-project-mark]')
-    expect(mark?.className).toContain('dshx:bg-muted')
-    expect(mark?.className).not.toMatch(/chart-/u)
+    expect(mark?.getAttribute('data-slot')).toBe('project-mark')
+    expect(mark?.className).not.toMatch(/project-tone-/u)
+    expect(mark?.style.color).toBe('currentcolor')
   })
 
   it('lists only the current project on Threads and every project on Everything', async () => {
@@ -685,6 +710,16 @@ describe('ThreadPalette goes to threads', () => {
     expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('needs-you')
     expect(row.textContent).toContain('Needs you')
     expect(row.textContent).not.toContain('Working')
+    // The row's muted-icon rule must not grey the glyph: Needs you keeps its indigo, Failed its red.
+    expect(row.querySelector('[data-slot="status-glyph"]')?.className).toContain('dshx:[&_svg]:text-current!')
+  })
+
+  it('replaces the clipped prefix legend with one "? Prefixes" hint that opens the prefix list', async () => {
+    render(palette())
+    const hint = await screen.findByRole('button', { name: /Prefixes/u })
+    expect(hint.querySelector('[data-slot="kbd"]')?.textContent).toBe('?')
+    fireEvent.click(hint)
+    expect(screen.getByRole<HTMLInputElement>('combobox').value).toBe('?')
   })
 })
 
@@ -711,7 +746,7 @@ describe('ThreadPalette on a phone (unslop phone 27)', () => {
     expect(dialog.style.getPropertyValue('--palette-height')).toBe('420px')
     // The ↑ ↓ / Enter / Esc legend is marked for the kit's touch rule, which hides it on a coarse pointer.
     expect(screen.getByText('Navigate').closest('[data-key-legend]')).not.toBeNull()
-    // The prefix hint wraps under the tabs on a phone instead of truncating to "Type ? f…".
-    expect(screen.getByText('Type ? for prefixes').className).toContain('dshx:phone:basis-full')
+    // The prefix hint is for a keyboard: a phone keeps that row for a notice or Ask DSH's status only.
+    expect(screen.getByRole('button', { name: /Prefixes/u }).className).toContain('dshx:phone:hidden')
   })
 })

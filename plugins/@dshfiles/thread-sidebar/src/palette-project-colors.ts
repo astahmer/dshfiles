@@ -1,4 +1,5 @@
 import type { PaletteProjectColorSource } from '@dshfiles/command-palette/palette-contract'
+import { projectToneIndex } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import type { ProjectColorPalette } from './organization.js'
 import type { ProjectChip } from './project-colors.js'
 import { projectTextTone } from './project-tone.js'
@@ -12,8 +13,12 @@ const sourceOf = (input: {
   readonly savedChipOf: (path: string) => ProjectChip | undefined
   readonly palette: ProjectColorPalette
 }): PaletteProjectColorSource => ({
-  colorOf: ({ path, title }) =>
-    (path === undefined ? undefined : input.savedChipOf(path)) ?? (title.length === 0 ? undefined : { className: projectTextTone(title, input.palette) }),
+  colorOf: ({ path, title }) => {
+    const saved = path === undefined ? undefined : input.savedChipOf(path)
+    // A picked tone is one of the balanced palette's, as on the row; the palette draws the same ProjectMark tile.
+    if (saved !== undefined) return saved.tone === undefined ? saved : { ...saved, palette: 'balanced' }
+    return title.length === 0 ? undefined : { className: projectTextTone(title, input.palette), tone: projectToneIndex(title), palette: input.palette }
+  },
 })
 
 export class PaletteProjectColorsModel {

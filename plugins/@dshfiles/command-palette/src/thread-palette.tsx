@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { ProjectMark, type ProjectMarkProps } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -152,24 +153,22 @@ const withoutRepeatedTitle = (snippet: string, title: string): string => {
 
 const neutralMark = 'dshx:bg-muted dshx:text-muted-foreground'
 
-/** A picked colour paints text only through a lightness clamp, so a pale or dark pick still reads in both schemes. */
-const customMarkText = 'dshx:text-(--chip-light) dshx:dark:text-(--chip-dark)'
+type ProjectMarkPaint = Pick<ProjectMarkProps, 'tone' | 'color' | 'palette' | 'className' | 'style'>
 
-/** How a thread row draws its project mark. */
-type ProjectMark = { readonly className: string; readonly style?: CSSProperties }
-
-/** The project mark of a thread row: its project's identity colour as text on a 16% tint of it, else neutral. */
-const projectMark = (color: PaletteProjectColor | undefined): ProjectMark => {
-  if (color === undefined || (color.className === undefined && color.color === undefined)) return { className: neutralMark }
-  const tint = 'color-mix(in srgb, currentColor 16%, transparent)'
-  if (color.color === undefined) return { className: color.className ?? '', style: { backgroundColor: tint } }
-  const style: CSSProperties = { backgroundColor: tint }
-  Object.assign(style, {
+/**
+ * The project tile of a thread row (round five T6): the thread list's `ProjectMark`, in the tone or colour the list gives
+ * the project. A custom pick rides as --chip and is clamped per scheme (L <= 0.52 in light, L >= 0.78 in dark), so a
+ * pale or dark pick still reads. Without a colour source the tile stays neutral ink.
+ */
+const projectMarkPaint = (color: PaletteProjectColor | undefined): ProjectMarkPaint => {
+  if (color === undefined || (color.tone === undefined && color.color === undefined)) return { color: 'currentColor', className: neutralMark }
+  if (color.color === undefined) return { tone: color.tone, palette: color.palette }
+  const style: CSSProperties & Readonly<Record<'--chip' | '--chip-light' | '--chip-dark', string>> = {
     '--chip': color.color,
     '--chip-light': 'oklch(from var(--chip) min(l, 0.52) c h)',
     '--chip-dark': 'oklch(from var(--chip) max(l, 0.78) c h)',
-  })
-  return { className: customMarkText, style }
+  }
+  return { color: 'var(--chip-clamped)', className: 'dshx:[--chip-clamped:var(--chip-light)] dshx:dark:[--chip-clamped:var(--chip-dark)]', style }
 }
 
 const projectLabel = (project: string): string => project.split(/[\\/]/u).filter(Boolean).at(-1) ?? project
@@ -619,7 +618,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const placeholder = viewCopy[view].placeholder
   const escapeLabel = escapeLabelFor({ ask, subview, hasQuery: query.length > 0, copy: props.copy })
   const showAskEntry = !ask && !subview && query.length === 0
-  const askStatus = ask ? (askPending ? props.copy.askPending : props.copy.askHint) : props.copy.prefixHint
+  const askStatus = ask ? (askPending ? props.copy.askPending : props.copy.askHint) : null
 
   const destinationItem = (destination: PaletteActionOption): JSX.Element => {
     const row: PaletteRow = { kind: 'destination', destination }
@@ -653,21 +652,21 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           {threadRows.map(thread => {
             const row: PaletteRow = { kind: 'thread', thread }
             const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
-            const mark = thread.project.length > 0 ? projectMark(props.projectColorOf?.(thread)) : { className: neutralMark }
             // The list's status, rolled up: a thread that waits for an answer is Needs you here too, not Working.
             const listed = props.threadStatusOf?.(thread)
             return (
               <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                <span
-                  className={cn(
-                    'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
-                    mark.className,
+                <span className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true">
+                  {thread.project.length > 0 ? (
+                    <ProjectMark name={project} data-palette-project-mark="" {...projectMarkPaint(props.projectColorOf?.(thread))} />
+                  ) : (
+                    <span
+                      className={cn('dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded-sm', neutralMark)}
+                      data-palette-project-mark=""
+                    >
+                      <MessageSquareIcon className="dshx:size-3.5" />
+                    </span>
                   )}
-                  style={mark.style}
-                  data-palette-project-mark=""
-                  aria-hidden="true"
-                >
-                  {thread.project.length > 0 ? project.slice(0, 2).toLocaleUpperCase() : <MessageSquareIcon className="dshx:size-3.5" />}
                 </span>
                 <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                   <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
@@ -684,7 +683,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                     {listed === undefined ? null : (
                       <>
                         <span aria-hidden="true">·</span>
-                        <StatusGlyph status={listed.status} decorative />
+                        {/* The row's own rule greys every icon without a text colour; the glyph keeps its status hue. */}
+                        <StatusGlyph status={listed.status} decorative className="dshx:[&_svg]:text-current!" />
                         <span className="dshx:shrink-0" data-palette-thread-status="">
                           {listed.label}
                         </span>
@@ -798,15 +798,24 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               </Tabs>
             )}
             {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
-            <span
-              className={cn(
-                'dshx:truncate dshx:phone:basis-full dshx:phone:whitespace-normal',
-                // The prefix legend is for a keyboard: the phone keeps the row for a notice or Ask DSH's status only.
-                notice === null && !ask && !actionSnapshot.matches('failed') && 'dshx:phone:hidden',
-              )}
-            >
-              {notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}
-            </span>
+            {notice === null && !ask && !actionSnapshot.matches('failed') ? (
+              // One "? Prefixes" hint instead of a legend the row clipped (round five T6): it opens the prefix list. It is
+              // for a keyboard: the phone keeps this row for a notice or Ask DSH's status only.
+              <button
+                type="button"
+                data-palette-prefix-hint=""
+                onMouseDown={event => event.preventDefault()}
+                onClick={() => sendNavigation({ type: 'query.change', query: '?' })}
+                className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:hover:text-foreground dshx:phone:hidden"
+              >
+                <Kbd>?</Kbd>
+                <span>{props.copy.prefixHint}</span>
+              </button>
+            ) : (
+              <span className="dshx:truncate dshx:phone:basis-full dshx:phone:whitespace-normal">
+                {notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}
+              </span>
+            )}
           </div>
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1 dshx:phone:max-h-none dshx:phone:min-h-0 dshx:phone:flex-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">

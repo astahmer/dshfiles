@@ -74,6 +74,10 @@ export interface CommandPaletteService {
 export interface PaletteProjectColor {
   readonly className?: string
   readonly color?: string
+  /** The palette tone (0-5) the kit `ProjectMark` paints; a custom `color` wins over it. */
+  readonly tone?: number
+  /** The thread list's project palette, so the tile matches the list's. */
+  readonly palette?: 'balanced' | 'cool'
 }
 
 /** Paints a thread row's project mark, so a project wears the same colour in the palette as in the thread list. */
