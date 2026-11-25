@@ -58,7 +58,6 @@ describe('native question inbox provider', () => {
       dedupeKey: 'session-root:call-1',
       subject: { kind: 'session', id: 'session-root' },
       reason: 'Asks: Deploy the release now?',
-      detail: 'Choose an answer here, or open the thread to write your own.',
       severity: 'blocking',
       verbs: ['Answer', 'Open', 'Done', 'Snooze', 'MuteSource'],
       choices: [
@@ -80,13 +79,14 @@ describe('native question inbox provider', () => {
     const [held] = NativeQuestionAttention.draftsOf([projected(open, true, true)])
     expect(held).toMatchObject({
       dedupeKey: 'session-root:call-2',
-      detail: 'Choose an answer here, or open the thread to write your own.',
       verbs: ['Answer', 'Open', 'Done', 'Snooze', 'MuteSource'],
       choices: [
         { id: '0', label: 'Deploy', recommended: true },
         { id: '1', label: 'Wait' },
       ],
     })
+    // The Inbox card offers its own "Write your own…" beside the answers, so the item carries no hint sentence.
+    expect(held).not.toHaveProperty('detail')
     // A form of a thread that stopped is not answerable from anywhere, held or not.
     expect(NativeQuestionAttention.draftsOf([projected(open, false, true)])[0]).not.toHaveProperty('choices')
   })

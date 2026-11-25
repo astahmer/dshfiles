@@ -54,12 +54,14 @@ const draftOf = (item: NativeQuestionInboxItem): AttentionDraft | undefined => {
   if (first === undefined) return undefined
   const more = item.questions.length > 1 ? ` (+${String(item.questions.length - 1)} more)` : ''
   const answerable = answerableQuestion(item)
-  const detail = answerable === undefined ? inThreadDetail(item) : 'Choose an answer here, or open the thread to write your own.'
+  // An answerable form needs no hint: the Inbox card draws its answers and a "Write your own…" control beside them.
+  const hint = answerable === undefined ? inThreadDetail(item) : undefined
+  const detail = [first.detail, hint].filter(part => part !== undefined).join('\n\n')
   return {
     dedupeKey: `${item.sessionId}:${item.callId}`,
     subject: { kind: 'session', id: item.sessionId },
     reason: clamp(`Asks: ${first.question}${more}`, 500),
-    detail: clamp(first.detail === undefined ? detail : `${first.detail}\n\n${detail}`, 2000),
+    ...(detail !== '' && { detail: clamp(detail, 2000) }),
     severity: 'blocking',
     verbs: answerable === undefined ? ['Open', 'Done', 'Snooze', 'MuteSource'] : ['Answer', 'Open', 'Done', 'Snooze', 'MuteSource'],
     ...(answerable !== undefined && {
