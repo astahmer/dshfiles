@@ -7,7 +7,6 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService, type CommunicationAgent, type CommunicationService } from '@dshfiles/dshx/communication'
 import { Effect, Layer } from 'effect'
-import { initializeCommunicationAgent } from './agent-lifecycle.js'
 import { CommunicationOperations } from './api-operations.js'
 import { CommunicationHub } from './communication-hub-promise.js'
 import { HostAgents } from './host-edge-promise.js'
@@ -57,9 +56,9 @@ const registryFor = (agents: readonly TestAgent[], ownership: Readonly<Record<st
 })
 
 const register = async (service: CommunicationService, agent: TestAgent): Promise<void> => {
-  await Effect.runPromise(
-    initializeCommunicationAgent({ agentId: agent.id, workspaceCwd: agent.session.header.cwd }).pipe(Effect.provide(CommunicationHub.fromService(service))),
-  )
+  const topic = LiveAgentDirectoryModel.communicationWorkspaceTopic(agent.session.header.cwd)
+  if (topic === undefined) return
+  await service.ensureSubscription({ kind: 'agent', id: agent.id }, { topic, delivery: 'passive' })
 }
 
 afterEach(async () => {

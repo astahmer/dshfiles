@@ -3,8 +3,8 @@
   "features": [
     {
       "id": "agent-directory",
-      "title": "Discover Agents and workspace channels",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first, and keep same-directory Agents on one hashed workspace topic.",
+      "title": "Discover Agents and workspace peers",
+      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: the direct inbox needs no registration, and a hashed workspace topic is an explicit opt-in that is pruned once no live Agent works there for a day.",
       "surfaces": ["tool", "host", "client"],
       "surface": "destinationSection",
       "destination": "agents",
@@ -14,6 +14,7 @@
       "failureModes": [
         "A missing workspace cwd cannot derive a workspace topic.",
         "A workspace topic hashes cwd and is not a DSH Workspace registry id or a JJ workspace/revision id.",
+        "No Agent is auto-subscribed to a workspace topic; a subscription is an explicit opt-in and the generated channels of older versions are pruned at startup.",
         "The listing carries title, status, parent Session id and relation only; it contains no task text, transcript content or path.",
         "For an Agent's own parent or children, native send_message and subagent results are the channel; the peer tools serve separate top-level threads.",
         "Task-board access remains available only through existing Agent Teams tools to Team members; arbitrary non-Team child task state is not exposed.",
@@ -30,7 +31,7 @@
           "kind": "unit-test",
           "id": "agent-communication.lifecycle-workspace-subscribers",
           "file": "plugins/@dshfiles/agent-communication/src/agent-lifecycle.test.ts",
-          "testName": "subscribes every Agent in a shared working directory exactly once"
+          "testName": "prunes a generated workspace topic once no live Agent remains and it has been idle past the window"
         },
         {
           "kind": "unit-test",

@@ -2754,6 +2754,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/tool-search/tool-visibility",
+      "kind": "module",
+      "title": "@dshfiles/tool-search/tool-visibility",
+      "summary": "One plugin's claim that some of its tools must be declared to every Session instead of hidden behind `tool_search`. Keep the set small and the tools cheap: the declared list is sent with every request, so a large schema costs cached tokens on each turn.",
+      "publicSymbol": "ToolVisibilityDeclaration, ToolSearchVisibility, declareVisibleTools, makeToolSearchVisibility",
+      "importFrom": "@dshfiles/tool-search/tool-visibility",
+      "owner": "@dshfiles/tool-search",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/tool-search/src/tool-visibility.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "tweetContextBacklogApi",
       "importFrom": "@dshfiles/tweet-context/backlog-api",
       "owner": "@dshfiles/tweet-context",
