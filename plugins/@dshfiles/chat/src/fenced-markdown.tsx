@@ -3,7 +3,7 @@
  * is not an assistant answer (reasoning, compaction summaries, question text) and should not grow inline-reference
  * links, yet should show a ```` ```mermaid ```` fence the way the answer does.
  */
-import { CodeBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CodeBlock, FenceCodeBlock, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useRegistry } from '@dshfiles/dshx/client'
 import { memo, type ComponentProps, type ReactNode } from 'react'
 import { CodeFenceSeat } from './code-fence-seat.js'
@@ -16,7 +16,7 @@ const renderMarkdownText = MarkdownText.type
 /** `MarkdownText` with fences a code-fence renderer claims handed to that renderer; the same props. */
 export const FencedMarkdown = memo(function FencedMarkdown(props: ComponentProps<typeof MarkdownText>): ReactNode {
   const renderers = useRegistry(CodeFences)
-  const prose = MarkdownProse.useState(CodeBlock)
+  const prose = MarkdownProse.useState(CodeBlock, FenceCodeBlock)
   return (
     <CodeFenceSeat renderers={renderers} labels={props.labels.code}>
       {MarkdownProse.transform(renderMarkdownText(props), prose, 'fenced')}

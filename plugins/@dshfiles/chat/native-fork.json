@@ -1,5 +1,5 @@
 {
-  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change.",
+  "$comment": "Provenance of this native fork; scripts/native-fork-diff.mjs reads it. Update it with every upstream bump or delta change. ChatView's plain fence seat hands its CodeBlock card to Chat's CodeFold (no-wrap with a sideways scroll by default, the wrap toggle, the fold; round five C2), instead of upstream's FenceCodeBlock preset.",
   "upstream": {
     "repository": "https://github.com/deepseek-ai/deepseek-harness.git",
     "package": "@deepseek-ai/dsh-client-ui-chat",

@@ -10,7 +10,7 @@ import type {
 import type { InboxState } from '@deepseek-ai/dsh-agent/types'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  Button, classifyLinkPath, FenceCodeBlock, MarkdownDelegateProvider, Modal,
+  Button, classifyLinkPath, CodeBlock, MarkdownDelegateProvider, Modal,
   type MarkdownDelegateFenceInfo, type MarkdownMenuTarget,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ImageLightbox, type ImageLightboxLabels, type LightboxImage } from '@dshfiles/plugin-ui/components/image-lightbox'
@@ -40,6 +40,7 @@ import { useTextInteraction } from './text-interaction.ts'
 import { useChatScroll } from './use-chat-scroll.ts'
 import { OlderRowsSentinel } from './older-rows-sentinel.tsx'
 import { dockJumpSeat } from './dock-jump-seat.ts'
+import { CodeFold } from '../../code-fold.tsx'
 import { openMarkdownExternalLink, openMarkdownFileLink } from './markdown-image-links.ts'
 import { ImagePreviewRequestModel, type ImagePreview } from '../../image-preview-request.ts'
 import { FileOpenRequestModel, type FileOpenRequest } from '../../file-open-request.ts'
@@ -142,10 +143,25 @@ export function ChatView({
   const codeLabels = useMemo(() => markdownLabels(t).code, [t])
   // Every fence in the flow dispatches by language; the content is the plain
   // code block, so a language without a layer renders as code without diff rows.
+  // dshfiles (unslop r5 C2, council round 5): the plain card goes through Chat's CodeFold (no-wrap with a sideways
+  // scroll by default, the wrap toggle, the fold); a bare FenceCodeBlock kept the native wrapped default.
   const renderCode = useCallback((fence: MarkdownDelegateFenceInfo) => renderSlot('conversation.chat.markdown.fence', fence, {
     entryKey: fence.lang,
     children: (
-      <FenceCodeBlock lang={fence.lang} code={fence.code} streaming={fence.streaming} labels={codeLabels} diff={false} />
+      <CodeFold
+        block={
+          <CodeBlock
+            // FenceCodeBlock's convention: the native card trims one trailing newline for display.
+            code={`${fence.code}\n`}
+            lang={fence.lang}
+            streaming={fence.streaming}
+            diff={false}
+            copyLabel={codeLabels.copyLabel}
+            copiedLabel={codeLabels.copiedLabel}
+            toolbarLabels={codeLabels.toolbarLabels}
+          />
+        }
+      />
     ),
   }), [renderSlot, codeLabels])
   const [imagePreview, setImagePreview] = useState<ImagePreview<LightboxImage>>(() =>

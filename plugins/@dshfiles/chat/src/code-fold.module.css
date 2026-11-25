@@ -42,6 +42,20 @@
   mask-image: linear-gradient(to bottom, black calc(100% - 40px), transparent);
 }
 
+/* Round five C2 (council round 5): unwrapped code keeps its lines and scrolls sideways; its last 16px fade, so a line
+   that runs past the card's edge reads as one that scrolls instead of one cut off. The card's own fill behind the
+   `pre` is the same colour, so the fade never shows through to the page. */
+.fold :global(.md-code-block[data-code-wrap='false']) pre {
+  mask-image: linear-gradient(to right, black calc(100% - 16px), transparent);
+}
+
+.fold[data-code-fold='closed'] :global(.md-code-block[data-code-wrap='false']) pre {
+  mask-image:
+    linear-gradient(to bottom, black calc(100% - 40px), transparent),
+    linear-gradient(to right, black calc(100% - 16px), transparent);
+  mask-composite: intersect;
+}
+
 .toggle {
   display: block;
   margin: 4px 0 0;
@@ -70,6 +84,16 @@
   .wrap,
   .toggle {
     position: relative;
+  }
+
+  /* Round five C2 (council round 5): a touch screen scrolls the card with a swipe and its edge fade says there is more,
+     so it draws no scrollbar under the last line. */
+  .fold :global(.md-code-block[data-code-wrap='false']) pre {
+    scrollbar-width: none;
+  }
+
+  .fold :global(.md-code-block[data-code-wrap='false']) pre::-webkit-scrollbar {
+    display: none;
   }
 
   /* A 44pt tap target: vertical only beside copy, so the two buttons never share a point. */
