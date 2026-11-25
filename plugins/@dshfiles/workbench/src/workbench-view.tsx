@@ -38,6 +38,7 @@ import { TabStripEdges } from './tab-strip-edges.js'
 import { HiddenTabRowRestore, TabRowVoidMenu, type TabRowMenuTarget } from './tab-row-controls.js'
 import { PanelChromeContext, type PanelChrome } from './header-seat.js'
 import { usePhoneWidth } from './phone-sheet.js'
+import { StripOverhang } from './strip-overhang.js'
 
 /** Variables live in the injected dockview sheet (`dockview-theme.css`), mapped to the Host `--dsw-*` tokens. */
 const workbenchTheme: DockviewTheme = { name: 'dshfiles', className: 'dshfiles-workbench-theme' }
@@ -562,6 +563,26 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
       unsubscribe()
     }
   }, [api, registry, region, open])
+
+  // One chrome (council round 3 B1): the main region's top-left tab row starts after a folded sidebar's header row,
+  // which overhangs the stage's corner (strip-overhang.ts); floating windows keep their own rows.
+  useEffect(() => {
+    if (api === null || region !== 'main') return
+    const release = StripOverhang.mount()
+    const mark = (): void =>
+      StripOverhang.markRows(
+        api.groups
+          .filter(group => group.api.location.type === 'grid')
+          .map(group => group.element.querySelector(':scope > .dv-tabs-and-actions-container'))
+          .filter(row => row instanceof HTMLElement),
+      )
+    mark()
+    const layout = api.onDidLayoutChange(mark)
+    return () => {
+      layout.dispose()
+      release()
+    }
+  }, [api, region])
 
   const Tab = useMemo(() => createWorkbenchTab(registry), [registry])
   // Dockview retains header components; refs keep callbacks and menu contents current.

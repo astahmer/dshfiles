@@ -7,7 +7,7 @@ import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
@@ -95,6 +95,22 @@ const DROP_CARET =
 const STRIP_BUTTON =
   'dshx:flex dshx:size-7 dshx:flex-none dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-(--dsw-radius-sm) dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring'
 
+/**
+ * `<html data-main-tabs>` while any strip is mounted. Counted: a slot that re-registers mounts its new strip before the
+ * old one unmounts, and the old strip's cleanup must not clear the mark the new one set.
+ */
+let mountedStrips = 0
+export class StripPresence {
+  static readonly mount = (): (() => void) => {
+    mountedStrips += 1
+    document.documentElement.setAttribute('data-main-tabs', '')
+    return () => {
+      mountedStrips = Math.max(0, mountedStrips - 1)
+      if (mountedStrips === 0) document.documentElement.removeAttribute('data-main-tabs')
+    }
+  }
+}
+
 export const TabStrip = (props: TabStripProps): ReactElement => {
   const { tabs, send, t } = props
   const closeButtonPosition = props.closeButtonPosition ?? DEFAULT_CLOSE_BUTTON_POSITION
@@ -109,6 +125,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
   const tabsRef = useRef(tabs)
   tabsRef.current = tabs
   const activeId = tabs.find(tab => tab.active)?.id
+  // One chrome (round five B1): a folded sidebar draws its open header row over the start of this strip
+  // (thread-sidebar's sidebar-fold.ts) only while a strip is mounted to make room for it.
+  useLayoutEffect(() => StripPresence.mount(), [])
   const renameTab = async (tab: TabView, title: string): Promise<void> => {
     if (tab.kind !== 'thread') return
     try {
@@ -231,7 +250,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
     <div
       className="dshx-root dshx:flex dshx:h-[38px] dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:bg-background dshx:pt-2.5 dshx:pr-1.5 dshx:text-[length:var(--dsh-content-font-size-secondary,13px)]"
       data-window-drag=""
-      style={{ paddingInlineStart: 'calc(var(--dsh-frame-leading-clearance, 0px) + 10px)' }}
+      style={{ paddingInlineStart: 'calc(var(--dsh-frame-leading-clearance, 0px) + var(--dshfiles-sidebar-overhang, 0px) + 10px)' }}
     >
       <div
         ref={scroller}

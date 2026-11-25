@@ -838,17 +838,16 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     }
   }
   chooseRef.current = choose
-  // Folded by the stage, the rail keeps its item active (round five B1); like any collapsed rail it is icons with
-  // tooltips, since the collapsed column is too narrow for "Knowledge".
-  const railOpen = !props.collapsed || stageFolded
+  // One chrome (round five B1): folding the column never changes the rail. It keeps its labels, its order and its
+  // active item; only the list beside it hides (sidebar-fold.ts).
   const railButton = (candidate: RailFolder): JSX.Element => {
-    const active = railOpen && candidate.id === folder.id
+    const active = candidate.id === folder.id
     const button = (
       <RailButton
         key={candidate.id}
         folder={candidate}
         active={active}
-        showLabel={!props.collapsed}
+        showLabel
         controls={props.collapsed ? undefined : listId}
         icon={folderIcon(props, candidate, active)}
         onSelect={() => choose(candidate)}
@@ -888,13 +887,14 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         aria-label="Destinations"
         className={cn(
           'dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pb-2 dshx:[scrollbar-width:none]',
-          // 2px gutters and unpadded buttons: "Knowledge", the longest destination, fits whole at the label size without
-          // widening the rail (productivity pass Q5, T5.3).
-          props.collapsed ? 'dshx:w-full dshx:px-2' : 'dshx:w-16 dshx:px-0.5',
+          // One width open and folded: the frame's folded track (56px) holds the rail whole (round five B1). Unpadded
+          // buttons: "Knowledge", the longest destination, fits whole at the label size (productivity pass Q5, T5.3).
+          'dshx:w-14 dshx:px-0',
         )}
         data-stage-folded={stageFolded ? '' : undefined}
       >
-        {/* Expanded, New thread sits in the header row; collapsed, the rail keeps it reachable. */}
+        {/* New thread sits in the header row, which a folded column keeps over the stage; where it cannot (no tab strip,
+            zen mode) the rail keeps it reachable (client.css). */}
         {props.collapsed && props.showNewThread ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -902,6 +902,7 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
                 variant="ghost"
                 size="icon"
                 aria-label={props.labels.newThread}
+                data-sidebar-folded-new-thread=""
                 className="dshx:mb-1 dshx:w-full dshx:shrink-0"
                 onClick={props.startSession}
               >

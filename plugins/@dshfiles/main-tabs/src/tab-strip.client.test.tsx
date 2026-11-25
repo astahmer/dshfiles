@@ -146,6 +146,27 @@ const openAsideFromMenu = async (): Promise<void> => {
 }
 
 describe('TabStrip layout', () => {
+  it('makes room for a folded sidebar header drawn over its start, and says it is mounted (round five B1)', () => {
+    // thread-sidebar draws the folded column's open header row over the start of this strip: the strip pads by the
+    // overhang it publishes, after any frame leading clearance, and marks <html> so the row is drawn only over a strip.
+    const { unmount } = mount()
+    const strip = screen.getByRole('tablist').parentElement
+    expect(strip?.style.paddingInlineStart).toBe('calc(var(--dsh-frame-leading-clearance, 0px) + var(--dshfiles-sidebar-overhang, 0px) + 10px)')
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(true)
+    unmount()
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(false)
+  })
+
+  it('keeps the mounted mark while a re-registered strip replaces the old one', () => {
+    // The new strip mounts before the old one unmounts: the old cleanup must not clear the new strip's mark.
+    const old = mount()
+    const next = mount()
+    old.unmount()
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(true)
+    next.unmount()
+    expect(document.documentElement.hasAttribute('data-main-tabs')).toBe(false)
+  })
+
   it('keeps a 16 px status seat on a thread tab whether or not it has a status, so the title never moves', () => {
     // The glyph mounted only with a status, and the title moved 24 px each time a thread started or stopped (F13).
     const idle = tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status: null } : tab))

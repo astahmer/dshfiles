@@ -268,6 +268,28 @@ describe('DestinationShell', () => {
     expect(screen.queryByRole('group', { name: 'Layout' })).toBeNull()
   })
 
+  it('folded, keeps the rail it has open: its labels, order, width and active item (round five B1)', () => {
+    setPhone(false)
+    DestinationSelection.set('observe')
+    const rail = (): { readonly labels: string; readonly width: string; readonly active: string | null } => {
+      const nav = document.querySelector('nav[aria-label="Destinations"]')
+      const items = [...(nav?.querySelectorAll('[role="tab"]') ?? [])]
+      return {
+        labels: items.map(item => item.textContent).join('|'),
+        width: nav?.className ?? '',
+        active: items.find(item => item.getAttribute('aria-selected') === 'true')?.getAttribute('data-destination') ?? null,
+      }
+    }
+    renderShell({ collapsed: false, activePanelId: 'dshfiles-usage' })
+    const open = rail()
+    expect(open.labels).toContain('Knowledge')
+    expect(open.active).toBe('observe')
+    cleanup()
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-usage' })
+    expect(rail()).toEqual(open)
+    expect(screen.queryByText('Thread list')).toBeNull()
+  })
+
   it('collapsed, keeps only the rail and expands on a destination', () => {
     setPhone(false)
     const shell = renderShell({ collapsed: true })

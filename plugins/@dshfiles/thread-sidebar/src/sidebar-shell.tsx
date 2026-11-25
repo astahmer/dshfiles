@@ -97,6 +97,7 @@ import { threadSidebarNavigationApi, type NavigationRecord } from './navigation-
 import { decodeClientRevisions } from './client-revisions.js'
 import { SidebarCustomizationFallback, SidebarCustomizationSeat } from './sidebar-customization.js'
 import { LayoutMerge, SidebarDockHost } from './sidebar-dock-host.js'
+import { SidebarFold } from './sidebar-fold.js'
 import { SidebarCatalog } from './sidebar-catalog.js'
 import { useSidebarFolders } from './sidebar-folders.js'
 import { threadSidebarTreeApi } from './sidebar-tree-api.js'
@@ -492,6 +493,32 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const footerItemRefs = useRef(new Map<string, HTMLDivElement>())
   const headerRegionId = `thread-sidebar-header-${useId()}`
   const wide = !props.collapsed
+  // One chrome (round five B1): folded beside the stage on a desktop, the column keeps the header row it has open
+  // (wordmark, Back, Forward, New thread, ⌘K) at its open width, drawn over the top of the stage; main-tabs pads its
+  // strip by the overhang. Only the list below it folds away, and the rail stays as it is open.
+  const folded = SidebarFold.overhangs({ collapsed: props.collapsed, phone: phoneLayout, width: props.width })
+  const openWidth = useRef(SidebarFold.OPEN_FALLBACK)
+  if (!props.collapsed && props.width > SidebarFold.TRACK_MAX) openWidth.current = props.width
+  const overhangWidth = openWidth.current
+  const [overhangAt, setOverhangAt] = useState<{ readonly left: number; readonly top: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!folded) return
+    const root = document.documentElement
+    const place = (): void => {
+      const rect = shellRef.current?.getBoundingClientRect()
+      if (rect === undefined) return
+      setOverhangAt(current => (current?.left === rect.left && current.top === rect.top ? current : { left: rect.left, top: rect.top }))
+    }
+    place()
+    root.setAttribute(SidebarFold.ROOT_ATTRIBUTE, '')
+    root.style.setProperty(SidebarFold.OVERHANG_VARIABLE, `${String(SidebarFold.overhang(overhangWidth, props.width))}px`)
+    window.addEventListener('resize', place)
+    return () => {
+      window.removeEventListener('resize', place)
+      root.removeAttribute(SidebarFold.ROOT_ATTRIBUTE)
+      root.style.removeProperty(SidebarFold.OVERHANG_VARIABLE)
+    }
+  }, [folded, overhangWidth, props.width])
   const mac = KeyboardShortcutModel.isMacPlatform(navigator.platform)
 
   // Rebuilds happen in another window, so check on return to this one and now and then while it stays visible.
@@ -1142,6 +1169,178 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     return chord === null ? label : `${label} (${KeyboardShortcutModel.formatChord(chord, mac).join('')})`
   }
 
+  /** The header row: the mark (it folds and unfolds the column), and open, the wordmark and Back, Forward, New thread, ⌘K. */
+  const brandContent = (open: boolean): JSX.Element => (
+    <>
+      <Button
+        variant="ghost"
+        size={open ? 'icon-sm' : 'icon'}
+        aria-label={text(props.t, props.collapsed ? 'threadSidebarExpand' : 'threadSidebarCollapse')}
+        onClick={props.toggleSidebar}
+      >
+        {preferences.hideBrandLogo ? (
+          <PanelLeftIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" />
+        ) : (
+          (props.renderSlot('sidebar.brand.mark', { size: 20 }) ?? <span aria-hidden="true">◈</span>)
+        )}
+      </Button>
+      {open && !preferences.hideBrandLogo ? (
+        // The wordmark never truncates (T1.2): it is drawn at a 20px height (the native SVG is 24px) so it fits whole
+        // beside Back, Forward, New thread and the palette at the default 280px; below 20rem only the history chevron
+        // folds away (right-click or hold Back/Forward opens the same menu).
+        <span
+          data-sidebar-wordmark=""
+          className="dshx:flex dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap dshx:text-sm dshx:font-semibold dshx:[&_svg]:h-5 dshx:[&_svg]:w-auto"
+        >
+          {props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}
+        </span>
+      ) : null}
+      {open ? (
+        <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-px dshx:overflow-hidden">
+          <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
+            <PopoverAnchor asChild>
+              <div ref={historyGroupRef} className="dshx:flex dshx:items-center">
+                {([-1, 1] as const).map(direction => {
+                  const label = text(props.t, direction === -1 ? 'threadSidebarBack' : 'threadSidebarForward')
+                  return (
+                    <Button
+                      key={direction}
+                      variant="ghost"
+                      size="icon-xs"
+                      className="dshx:text-muted-foreground"
+                      aria-label={label}
+                      title={`${withChordHint(label, direction === -1 ? preferences.backChord : preferences.forwardChord)}\n${text(props.t, 'threadSidebarHistoryHint')}`}
+                      disabled={!ThreadNavigationHistoryModel.canStep(history, direction)}
+                      onPointerDown={event => {
+                        if (event.button !== 0) return
+                        window.clearTimeout(historyHold.current.timer)
+                        historyHold.current = {
+                          opened: false,
+                          timer: window.setTimeout(() => {
+                            historyHold.current.opened = true
+                            setHistoryOpen(true)
+                          }, HISTORY_HOLD_MS),
+                        }
+                      }}
+                      onPointerUp={() => window.clearTimeout(historyHold.current.timer)}
+                      onPointerLeave={() => window.clearTimeout(historyHold.current.timer)}
+                      onContextMenu={event => {
+                        event.preventDefault()
+                        setHistoryOpen(true)
+                      }}
+                      onClick={() => {
+                        if (historyHold.current.opened) {
+                          historyHold.current.opened = false
+                          return
+                        }
+                        stepNavigation(direction)
+                      }}
+                    >
+                      {direction === -1 ? (
+                        <ArrowLeftIcon className="dshx:size-3.5" aria-hidden="true" />
+                      ) : (
+                        <ArrowRightIcon className="dshx:size-3.5" aria-hidden="true" />
+                      )}
+                    </Button>
+                  )
+                })}
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  className="dshx:w-4 dshx:text-muted-foreground dshx:@max-[20rem]/brand:hidden"
+                  aria-label={text(props.t, 'threadSidebarHistory')}
+                  aria-expanded={historyOpen}
+                  title={text(props.t, 'threadSidebarHistory')}
+                  disabled={history.entries.length < 2}
+                  onClick={() => setHistoryOpen(open => !open)}
+                >
+                  <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
+                </Button>
+              </div>
+            </PopoverAnchor>
+            <PopoverContent
+              align="start"
+              sideOffset={6}
+              className="dshx-root dshx:flex dshx:max-h-[min(420px,calc(100vh-96px))] dshx:w-64 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
+              aria-label={text(props.t, 'threadSidebarHistory')}
+              onInteractOutside={event => {
+                if (event.target instanceof Node && historyGroupRef.current?.contains(event.target) === true) event.preventDefault()
+              }}
+            >
+              {history.entries
+                .map((entry, index) => ({ entry, index }))
+                .reverse()
+                .map(({ entry, index }) => {
+                  const current = index === history.index
+                  const label =
+                    entry.kind === 'thread'
+                      ? (threadTitle.current(entry.id) ?? text(props.t, 'threadSidebarHistoryThread'))
+                      : (panels.find(panel => panel.id === entry.id)?.label ?? entry.id)
+                  return (
+                    <Button
+                      key={`${String(index)}:${entry.kind}:${entry.id}`}
+                      variant="ghost"
+                      size="sm"
+                      className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-normal', current && 'dshx:bg-accent dshx:font-medium')}
+                      aria-current={current ? 'page' : undefined}
+                      onClick={() => {
+                        setHistoryOpen(false)
+                        goToHistoryEntry(index)
+                      }}
+                    >
+                      <span
+                        className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        {entry.kind === 'thread' ? (
+                          <MessageSquareIcon className="dshx:size-3.5" />
+                        ) : (
+                          props.renderSlot('sidebar.panellist', { size: 14, active: false }, { only: entry.id })
+                        )}
+                      </span>
+                      <span className="dshx:truncate">{label}</span>
+                    </Button>
+                  )
+                })}
+            </PopoverContent>
+          </Popover>
+          {preferences.hiddenHeaderIds.includes('new-thread') ? null : (
+            <Button
+              variant="ghost"
+              size="icon-xs"
+              className="dshx:text-muted-foreground"
+              aria-label={text(props.t, 'threadSidebarNewThread')}
+              title={text(props.t, 'threadSidebarNewThread')}
+              onClick={() => startSession()}
+            >
+              <SquarePenIcon className="dshx:size-4" aria-hidden="true" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            className="dshx:text-muted-foreground"
+            aria-label={text(props.t, 'threadSidebarCommandPalette')}
+            title={
+              paletteHint === null
+                ? text(props.t, 'threadSidebarCommandPalette')
+                : `${text(props.t, 'threadSidebarCommandPalette')} (${KeyboardShortcutModel.formatChord(paletteHint, mac).join('')})`
+            }
+            onClick={() => openPalette('all')}
+          >
+            <CommandIcon className="dshx:size-4" aria-hidden="true" />
+          </Button>
+          <SidebarCustomizationFallback
+            contentOverridden
+            label={text(props.t, 'threadSidebarSettings')}
+            expanded={customizeOpen}
+            onClick={() => setCustomizeOpen(value => !value)}
+          />
+        </div>
+      ) : null}
+    </>
+  )
+
   return (
     <TooltipProvider>
       <div
@@ -1159,175 +1358,27 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             'dshx:@container/brand dshx:flex dshx:h-12 dshx:w-full dshx:shrink-0 dshx:items-center dshx:gap-1',
             props.collapsed ? 'dshx:justify-center' : 'dshx:px-1.5',
           )}
+          // Folded, the open row drawn over the stage replaces this one wherever main-tabs makes room for it (client.css).
+          data-sidebar-brand-fallback={folded ? '' : undefined}
         >
-          <Button
-            variant="ghost"
-            size={props.collapsed ? 'icon' : 'icon-sm'}
-            aria-label={text(props.t, props.collapsed ? 'threadSidebarExpand' : 'threadSidebarCollapse')}
-            onClick={props.toggleSidebar}
-          >
-            {preferences.hideBrandLogo ? (
-              <PanelLeftIcon className="dshx:size-4 dshx:text-muted-foreground" aria-hidden="true" />
-            ) : (
-              (props.renderSlot('sidebar.brand.mark', { size: 20 }) ?? <span aria-hidden="true">◈</span>)
-            )}
-          </Button>
-          {wide && !preferences.hideBrandLogo ? (
-            // The wordmark never truncates (T1.2): it is drawn at a 20px height (the native SVG is 24px) so it fits whole
-            // beside Back, Forward, New thread and the palette at the default 280px; below 20rem only the history chevron
-            // folds away (right-click or hold Back/Forward opens the same menu).
-            <span
-              data-sidebar-wordmark=""
-              className="dshx:flex dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap dshx:text-sm dshx:font-semibold dshx:[&_svg]:h-5 dshx:[&_svg]:w-auto"
-            >
-              {props.renderSlot('sidebar.brand.name', {}) ?? 'DSH'}
-            </span>
-          ) : null}
-          {wide ? (
-            <div className="dshx:ml-auto dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-px dshx:overflow-hidden">
-              <Popover open={historyOpen} onOpenChange={setHistoryOpen}>
-                <PopoverAnchor asChild>
-                  <div ref={historyGroupRef} className="dshx:flex dshx:items-center">
-                    {([-1, 1] as const).map(direction => {
-                      const label = text(props.t, direction === -1 ? 'threadSidebarBack' : 'threadSidebarForward')
-                      return (
-                        <Button
-                          key={direction}
-                          variant="ghost"
-                          size="icon-xs"
-                          className="dshx:text-muted-foreground"
-                          aria-label={label}
-                          title={`${withChordHint(label, direction === -1 ? preferences.backChord : preferences.forwardChord)}\n${text(props.t, 'threadSidebarHistoryHint')}`}
-                          disabled={!ThreadNavigationHistoryModel.canStep(history, direction)}
-                          onPointerDown={event => {
-                            if (event.button !== 0) return
-                            window.clearTimeout(historyHold.current.timer)
-                            historyHold.current = {
-                              opened: false,
-                              timer: window.setTimeout(() => {
-                                historyHold.current.opened = true
-                                setHistoryOpen(true)
-                              }, HISTORY_HOLD_MS),
-                            }
-                          }}
-                          onPointerUp={() => window.clearTimeout(historyHold.current.timer)}
-                          onPointerLeave={() => window.clearTimeout(historyHold.current.timer)}
-                          onContextMenu={event => {
-                            event.preventDefault()
-                            setHistoryOpen(true)
-                          }}
-                          onClick={() => {
-                            if (historyHold.current.opened) {
-                              historyHold.current.opened = false
-                              return
-                            }
-                            stepNavigation(direction)
-                          }}
-                        >
-                          {direction === -1 ? (
-                            <ArrowLeftIcon className="dshx:size-3.5" aria-hidden="true" />
-                          ) : (
-                            <ArrowRightIcon className="dshx:size-3.5" aria-hidden="true" />
-                          )}
-                        </Button>
-                      )
-                    })}
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className="dshx:w-4 dshx:text-muted-foreground dshx:@max-[20rem]/brand:hidden"
-                      aria-label={text(props.t, 'threadSidebarHistory')}
-                      aria-expanded={historyOpen}
-                      title={text(props.t, 'threadSidebarHistory')}
-                      disabled={history.entries.length < 2}
-                      onClick={() => setHistoryOpen(open => !open)}
-                    >
-                      <ChevronDownIcon className="dshx:size-3" aria-hidden="true" />
-                    </Button>
-                  </div>
-                </PopoverAnchor>
-                <PopoverContent
-                  align="start"
-                  sideOffset={6}
-                  className="dshx-root dshx:flex dshx:max-h-[min(420px,calc(100vh-96px))] dshx:w-64 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:p-1"
-                  aria-label={text(props.t, 'threadSidebarHistory')}
-                  onInteractOutside={event => {
-                    if (event.target instanceof Node && historyGroupRef.current?.contains(event.target) === true) event.preventDefault()
-                  }}
-                >
-                  {history.entries
-                    .map((entry, index) => ({ entry, index }))
-                    .reverse()
-                    .map(({ entry, index }) => {
-                      const current = index === history.index
-                      const label =
-                        entry.kind === 'thread'
-                          ? (threadTitle.current(entry.id) ?? text(props.t, 'threadSidebarHistoryThread'))
-                          : (panels.find(panel => panel.id === entry.id)?.label ?? entry.id)
-                      return (
-                        <Button
-                          key={`${String(index)}:${entry.kind}:${entry.id}`}
-                          variant="ghost"
-                          size="sm"
-                          className={cn('dshx:w-full dshx:justify-start dshx:gap-2 dshx:font-normal', current && 'dshx:bg-accent dshx:font-medium')}
-                          aria-current={current ? 'page' : undefined}
-                          onClick={() => {
-                            setHistoryOpen(false)
-                            goToHistoryEntry(index)
-                          }}
-                        >
-                          <span
-                            className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
-                            aria-hidden="true"
-                          >
-                            {entry.kind === 'thread' ? (
-                              <MessageSquareIcon className="dshx:size-3.5" />
-                            ) : (
-                              props.renderSlot('sidebar.panellist', { size: 14, active: false }, { only: entry.id })
-                            )}
-                          </span>
-                          <span className="dshx:truncate">{label}</span>
-                        </Button>
-                      )
-                    })}
-                </PopoverContent>
-              </Popover>
-              {preferences.hiddenHeaderIds.includes('new-thread') ? null : (
-                <Button
-                  variant="ghost"
-                  size="icon-xs"
-                  className="dshx:text-muted-foreground"
-                  aria-label={text(props.t, 'threadSidebarNewThread')}
-                  title={text(props.t, 'threadSidebarNewThread')}
-                  onClick={() => startSession()}
-                >
-                  <SquarePenIcon className="dshx:size-4" aria-hidden="true" />
-                </Button>
-              )}
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                className="dshx:text-muted-foreground"
-                aria-label={text(props.t, 'threadSidebarCommandPalette')}
-                title={
-                  paletteHint === null
-                    ? text(props.t, 'threadSidebarCommandPalette')
-                    : `${text(props.t, 'threadSidebarCommandPalette')} (${KeyboardShortcutModel.formatChord(paletteHint, mac).join('')})`
-                }
-                onClick={() => openPalette('all')}
-              >
-                <CommandIcon className="dshx:size-4" aria-hidden="true" />
-              </Button>
-              <SidebarCustomizationFallback
-                contentOverridden
-                label={text(props.t, 'threadSidebarSettings')}
-                expanded={customizeOpen}
-                onClick={() => setCustomizeOpen(value => !value)}
-              />
-            </div>
-          ) : null}
+          {brandContent(wide)}
           {props.collapsed ? props.renderSlot('sidebar.toggle.badge', {}) : null}
         </div>
+        {folded && overhangAt !== null
+          ? createPortal(
+              <div
+                data-sidebar-brand-overhang=""
+                // The strip's height and top inset (main-tabs): the row's controls sit on the tabs' centre line, where
+                // the open column's 48px row centres them.
+                className="dshx-root dshx:@container/brand dshx:fixed dshx:z-[16] dshx:flex dshx:h-[38px] dshx:items-center dshx:gap-1 dshx:border-r-[0.5px] dshx:border-(--dsw-alias-border-l3) dshx:bg-(--dsw-specific-sidebar-fill) dshx:px-1.5 dshx:pt-2.5 dshx:text-foreground"
+                style={{ left: overhangAt.left, top: overhangAt.top, width: overhangWidth }}
+              >
+                {brandContent(true)}
+                {props.renderSlot('sidebar.toggle.badge', {})}
+              </div>,
+              document.body,
+            )
+          : null}
 
         {/* One sidebar layout (b:952m): the rail and its list render here, and live in the Workbench's Sidebar pane once
             it lends its element; collapsed, on a phone and without the Workbench they stay inline (the rail). */}

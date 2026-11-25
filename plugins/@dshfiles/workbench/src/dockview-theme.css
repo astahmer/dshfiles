@@ -62,6 +62,12 @@
   box-shadow: inset 0 -1px 0 var(--dshx-tone-line, var(--dsw-alias-border-l2));
 }
 
+/* One chrome (council round 3 B1, strip-overhang.ts): the main region's top-left tab row starts after a folded
+ * sidebar's header row, which overhangs the stage's corner; the overhang is 0 while the column is open. */
+.dshfiles-workbench-theme .dv-tabs-and-actions-container[data-workbench-top-start] {
+  padding-inline-start: var(--dshfiles-sidebar-overhang, 0px);
+}
+
 .dshfiles-workbench-theme .dv-groupview > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab:hover {
   background-color: var(--dsh-main-tab-bg-hover);
 }

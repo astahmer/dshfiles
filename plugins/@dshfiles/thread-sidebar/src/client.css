@@ -4,6 +4,29 @@
   outline-offset: 3px;
 }
 
+/* One chrome (round five B1, sidebar-fold.ts): a folded column draws its open header row over the stage's top edge.
+   Only a main tab strip makes room for it: main-tabs' (data-main-tabs) or the Workbench main region's tab rows
+   (data-workbench-main-strip, unless they are hidden). Without one, or in zen mode, the row stays in the rail as the
+   mark alone. */
+html[data-sidebar-folded]:is([data-main-tabs], [data-workbench-main-strip]:not([data-workbench-main-tabs='hidden'])):not([data-dshfiles-zen]) {
+  --dshfiles-sidebar-overhang: var(--dshfiles-sidebar-folded-overhang, 0px);
+}
+
+html:not([data-main-tabs]):not([data-workbench-main-strip]) [data-sidebar-brand-overhang],
+html[data-workbench-main-tabs='hidden']:not([data-main-tabs]) [data-sidebar-brand-overhang],
+html[data-dshfiles-zen] [data-sidebar-brand-overhang] {
+  display: none;
+}
+
+html:is([data-main-tabs], [data-workbench-main-strip]:not([data-workbench-main-tabs='hidden'])):not([data-dshfiles-zen]) [data-sidebar-brand-fallback] {
+  visibility: hidden;
+}
+
+/* The header row carries New thread, so the rail keeps the order it has open. */
+html:is([data-main-tabs], [data-workbench-main-strip]:not([data-workbench-main-tabs='hidden'])):not([data-dshfiles-zen]) [data-sidebar-folded-new-thread] {
+  display: none;
+}
+
 .dshfiles-thread-mention-hint {
   position: fixed;
   z-index: 90;
