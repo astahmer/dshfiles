@@ -104,6 +104,8 @@ export const DiffToolCard = (props: DiffToolCardProps): ReactNode => {
   return (
     <ToolCard
       {...cardLabel(applied.title)}
+      // Round five C1: a succeeded edit shows the kit's copper pencil instead of a check.
+      kind="edit"
       meta={<DiffStat added={totals.added} removed={totals.removed} />}
       onToggle={disclosure.toggle}
       open={disclosure.expanded}
