@@ -217,6 +217,7 @@ const make = Effect.gen(function* () {
             integratedInto: bookmarks,
             rebasedAt: thread.rebasedAt,
             sessionIds: thread.sessionIds,
+            stale: thread.stale === true,
             mergedPullRequests: [...new Set(thread.sessionIds.flatMap(sessionId => mergedPullRequests.get(sessionId) ?? []))],
             integrationQueued: (yield* requests.get(thread.path)) !== undefined,
             usedAt: [changedAt.get(thread.name), thread.rebasedAt, createdAt === undefined ? undefined : Date.parse(createdAt)],
@@ -348,16 +349,23 @@ const make = Effect.gen(function* () {
       // A dev server left running from the folder would keep its port and files after the folder is gone.
       const plannedWorkspaces = yield* stopProcesses(plannedByName)
       const threadWorkspaces = plannedWorkspaces.filter(workspace => workspace.kind !== 'secondary')
+      // Stale work is the one opt-in that abandons unlanded revisions: it was selected by kind, and every row passed the
+      // same stale test Land shows. Everything else keeps the no-force guard.
+      const staleWorkspaces = threadWorkspaces.filter(workspace => workspace.kind === 'stale')
+      const landedWorkspaces = threadWorkspaces.filter(workspace => workspace.kind !== 'stale')
       const secondaryWorkspaces = plannedWorkspaces.filter(workspace => workspace.kind === 'secondary')
+      const staleOutcome =
+        staleWorkspaces.length === 0 ? { results: [] } : yield* threads.discardMany({ repoRoot, names: staleWorkspaces.map(workspace => workspace.name), force: true })
       const threadOutcome =
-        threadWorkspaces.length === 0
+        landedWorkspaces.length === 0
           ? { results: [] }
           : yield* threads.discardMany({
               repoRoot,
-              names: threadWorkspaces.map(workspace => workspace.name),
+              names: landedWorkspaces.map(workspace => workspace.name),
               force: false,
-              acceptBookmarkedWork: threadWorkspaces.some(workspace => workspace.integratedInto !== undefined),
+              acceptBookmarkedWork: landedWorkspaces.some(workspace => workspace.integratedInto !== undefined),
             })
+      const threadResults = [...staleOutcome.results, ...threadOutcome.results]
       const secondaryOutcome =
         secondaryWorkspaces.length === 0
           ? { results: [] }
@@ -366,7 +374,7 @@ const make = Effect.gen(function* () {
               workspaces: secondaryWorkspaces.map(workspace => ({ name: workspace.name, path: workspace.path, missing: workspace.missing })),
             })
       const resultByName = new Map<string, { readonly status: string; readonly error: string | null }>()
-      for (const result of threadOutcome.results) resultByName.set(result.name, { status: result.status, error: result.error })
+      for (const result of threadResults) resultByName.set(result.name, { status: result.status, error: result.error })
       for (const result of secondaryOutcome.results) resultByName.set(result.name, { status: result.status, error: result.message })
       // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each removed workspace reports its progress item in order.
       for (const workspace of plannedWorkspaces) {

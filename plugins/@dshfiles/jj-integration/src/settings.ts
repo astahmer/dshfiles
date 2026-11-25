@@ -92,6 +92,9 @@ export const jjIntegrationSettings = defineSettings({
         Schema.union([
           Schema.const('empty').description('Empty: workspaces that never landed anything.'),
           Schema.const('integrated').description('Integrated: workspaces whose work all landed.'),
+          Schema.const('stale').description(
+            'Stale: workspaces Land calls Stale — pending work the bookmark moved past and nobody changed for the stale window. Opt-in: it abandons those unlanded revisions.',
+          ),
           Schema.const('untracked').description('Untracked: threads-directory folders and files no jj workspace owns.'),
         ]),
       )
@@ -122,7 +125,7 @@ export const jjIntegrationSettings = defineSettings({
     }).description(
       [
         'Remove idle thread workspaces automatically, through the same cleanup job as the manual button.',
-        'Protection tiers, strongest first: revisions that are not on the bookmark and not held by another bookmark; a thread that is running, asks a question or cannot be read; an integration queued for the workspace; a secondary checkout with uncommitted or unverifiable state; and any workspace used more recently than the age above.',
+        'Protection tiers, strongest first: revisions that are not on the bookmark and not held by another bookmark (unless the stale kind is selected and Land calls that work Stale); a thread that is running, asks a question or cannot be read; an integration queued for the workspace; a secondary checkout with uncommitted or unverifiable state; and any workspace used more recently than the age above.',
         'Merged pull requests are a manual choice only: they need the pull-request links read, which an automatic run never does.',
       ].join(' '),
     ),

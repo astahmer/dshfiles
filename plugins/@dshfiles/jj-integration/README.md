@@ -420,9 +420,14 @@ The Jujutsu panel's repository menu (⋮) offers **Clean up thread workspaces…
 Pick how long a workspace must have been unused (1h, 6h or 24h) and which kinds
 to remove: **Empty** (never landed anything) and/or **Already integrated**
 (landed, nothing left above the bookmark, or all of its work is already on
-another bookmark). The dialog previews the list before
+another bookmark). **Stale work** is a separate opt-in group: pending work Land
+calls Stale, i.e. the bookmark moved past it and nobody changed it for
+`staleAfterDays` (7). Selecting it abandons those unlanded revisions, so it is
+never selected by default and the preview names each row before anything is
+removed. The dialog previews the list before
 anything is removed. One confirmation then discards every match exactly as the
-row's own Remove does (never forced) and abandons the empty, undescribed
+row's own Remove does: never forced, except the Stale rows you selected, whose
+unlanded revisions are abandoned. It also abandons the empty, undescribed
 revisions nothing builds on: no working copy, bookmark, tag or revision with
 content or a description descends from them, so no live workspace is rewritten.
 
@@ -509,12 +514,14 @@ the found, stopped, killed and failed counts.
 
 The Host also runs that same job on its own (setting `autoCleanup`, on by
 default): every `intervalMinutes` (60) it cleans the repositories used recently
-of the selected `kinds` (`empty` and `integrated`; `untracked` is opt-in) unused
-for `olderThanHours` (24). The first run waits five minutes after the Host
+of the selected `kinds` (`empty` and `integrated`; `untracked` and `stale` are
+opt-in) unused for `olderThanHours` (24). The first run waits five minutes after
+the Host
 starts, a run is skipped while any cleanup job is queued or running, and
 disposing the plugin cancels the next run. It uses the same qualifiers as the
-button, so a workspace with unlanded revisions, a working, waiting or unreadable
-Session, or a queued integration is always kept. Each run lands in the cleanup
+button, so a workspace with recent unlanded revisions, a working, waiting or
+unreadable Session, or a queued integration is always kept. Each run lands in
+the cleanup
 trail (`jj_thread_cleanup_jobs` marks it `automatic`) and in the activity
 timeline as `workspace.cleaned` — routine when nothing was removed, with the
 skip counts (`Skipped 41: 29 activity-unknown, 12 has-work.`) as its detail — or

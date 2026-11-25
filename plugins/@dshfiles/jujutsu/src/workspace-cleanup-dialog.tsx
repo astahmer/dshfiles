@@ -27,9 +27,10 @@ const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: s
   { kind: 'merged', label: 'Merged pull request' },
   { kind: 'untracked', label: 'Untracked folders' },
   { kind: 'secondary', label: 'Other JJ workspaces' },
+  { kind: 'stale', label: 'Stale work' },
 ]
 
-const KIND_TAG = { empty: 'WS', integrated: 'WS', merged: 'PR', secondary: 'JJ', untracked: 'DIR' } as const satisfies Record<CleanupKindView, string>
+const KIND_TAG = { empty: 'WS', integrated: 'WS', merged: 'PR', secondary: 'JJ', stale: 'WS', untracked: 'DIR' } as const satisfies Record<CleanupKindView, string>
 
 const AGE_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
@@ -69,7 +70,7 @@ const cleanupRows = (result: CleanupResult): CleanupRow[] => [
 ]
 
 /** A thread's own workspace: removable once idle, and named by its thread rather than its folder (b:212a). */
-const isThreadWorkspaceKind = (kind: CleanupKindView): boolean => kind === 'empty' || kind === 'integrated' || kind === 'merged'
+const isThreadWorkspaceKind = (kind: CleanupKindView): boolean => kind === 'empty' || kind === 'integrated' || kind === 'merged' || kind === 'stale'
 
 const projectNameOf = (repoRoot: string): string => repoRoot.replace(/\/+$/u, '').split('/').at(-1) ?? repoRoot
 
@@ -97,9 +98,12 @@ export const WorkspaceCleanupDialog = (props: {
   const api = useApi(jjIntegrationApi)
   const queryClient = useQueryClient()
   const [olderThanHours, setOlderThanHours] = useState(6)
+  // Stale work is the one kind that abandons unlanded revisions: it is off until the user asks for it, and the request
+  // only names it then, so a Host that predates the kind still answers the preview.
+  const [includeStale, setIncludeStale] = useState(false)
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set())
   const [expanded, setExpanded] = useState<ReadonlySet<CleanupKindView>>(() => new Set())
-  const kinds = KIND_CHOICES.map(choice => choice.kind)
+  const kinds = KIND_CHOICES.filter(choice => choice.kind !== 'stale' || includeStale).map(choice => choice.kind)
   const request = { path: props.path, olderThanHours, kinds }
   const preview = useQuery({
     queryKey: ['jujutsu', 'workspace-cleanup-preview', props.path, olderThanHours, kinds],
@@ -173,7 +177,8 @@ export const WorkspaceCleanupDialog = (props: {
         <DialogHeader className="dshx:px-5 dshx:pb-4 dshx:pt-5">
           <DialogTitle>Clean up workspaces</DialogTitle>
           <DialogDescription className="dshx:sr-only">
-            Select idle workspaces and untracked folders to remove. Unlanded work, uncommitted changes, and active threads are always kept.
+            Select idle workspaces and untracked folders to remove. Active threads and uncommitted changes are always kept; unlanded
+            work is kept unless you select its Stale work group.
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-5 dshx:pb-4 dshx:text-xs">
@@ -200,6 +205,17 @@ export const WorkspaceCleanupDialog = (props: {
             {preview.isFetching ? <Spinner className="dshx:size-3" /> : <RefreshCwIcon aria-hidden="true" className="dshx:size-3" />}
             Rescan
           </Button>
+          <label className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
+            <Checkbox
+              aria-label="Include stale work"
+              checked={includeStale}
+              onCheckedChange={value => {
+                setIncludeStale(value === true)
+                setSelected(new Set())
+              }}
+            />
+            Stale work
+          </label>
         </div>
         {previewLoadingLabel === undefined ? null : (
           <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-5 dshx:pt-3 dshx:text-xs dshx:text-muted-foreground" role="status">
@@ -294,8 +310,8 @@ export const WorkspaceCleanupDialog = (props: {
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-5 dshx:py-4">
           <span className="dshx:text-xs dshx:text-muted-foreground">
             {selectedRows.some(row => row.missing)
-              ? 'Missing checkouts are only forgotten; their paths are never removed. Unlanded work is always protected.'
-              : 'Unlanded work is always protected'}
+              ? 'Missing checkouts are only forgotten; their paths are never removed. Stale work is abandoned only when selected.'
+              : 'Unlanded work is abandoned only when its Stale work group is selected'}
           </span>
           <DialogFooter className="dshx:gap-2">
             <Button onClick={() => props.onOpenChange(false)} size="sm" type="button" variant="ghost">

@@ -3,10 +3,11 @@ import type { ThreadSessionActivity } from './thread-rebase-eligibility.js'
 /**
  * `empty` never landed anything; `integrated` landed at least once and has nothing left above the bookmark, or every
  * revision it holds is already on another bookmark; `merged` is the same with a merged pull request recorded for one of
- * its threads; `secondary` is another checkout of the repository; `untracked` is a threads-directory entry no jj
- * workspace owns.
+ * its threads; `stale` holds pending work the bookmark moved past and nobody changed for the stale window, which only
+ * an explicit stale cleanup may abandon; `secondary` is another checkout of the repository; `untracked` is a
+ * threads-directory entry no jj workspace owns.
  */
-export type CleanupKind = 'empty' | 'integrated' | 'merged' | 'secondary' | 'untracked'
+export type CleanupKind = 'empty' | 'integrated' | 'merged' | 'stale' | 'secondary' | 'untracked'
 type WorkspaceKind = Exclude<CleanupKind, 'untracked'>
 
 export type CleanupSkipReason =
@@ -29,6 +30,8 @@ export interface CleanupThread {
   readonly integrationQueued: boolean
   /** Merged pull requests recorded for this workspace's threads, as `owner/repo#123`: why a landed workspace is merged. */
   readonly mergedPullRequests?: readonly string[]
+  /** The Land view calls this pending work stale: the bookmark moved past it and nobody changed it for the window. */
+  readonly stale?: boolean
   readonly secondary?: boolean
   readonly missing?: boolean
   readonly workingCopyState?: 'clean' | 'dirty' | 'unknown' | 'missing'
@@ -44,8 +47,8 @@ const lastUsedAt = (thread: CleanupThread): number => Math.max(0, ...thread.used
 
 /**
  * Which idle thread workspaces a cleanup may remove. A workspace with unlanded work is never a candidate unless another
- * bookmark already holds all of it, and a live Session that works, asks or cannot be read keeps its workspace; archived
- * Sessions no longer count.
+ * bookmark already holds all of it, or the run explicitly selected the `stale` kind and the work is stale; a live
+ * Session that works, asks or cannot be read keeps its workspace. Archived Sessions no longer count.
  */
 const decide = (input: {
   readonly thread: CleanupThread
@@ -62,7 +65,8 @@ const decide = (input: {
   if (thread.secondary === true && thread.workingCopyState !== 'clean' && thread.workingCopyState !== 'missing') return skip('workspace-state-unknown')
   if (thread.secondary === true && usedAt === 0) return skip('workspace-state-unknown')
   const onAnotherBookmark = (thread.integratedInto?.length ?? 0) > 0
-  if (thread.unlandedCount > 0 && !onAnotherBookmark) return skip('has-work')
+  const staleWork = onAnotherBookmark ? false : thread.stale === true && input.kinds.includes('stale')
+  if (thread.unlandedCount > 0 && !onAnotherBookmark && !staleWork) return skip('has-work')
   if (thread.integrationQueued) return skip('queued')
   const liveSessions = thread.sessionIds.filter(sessionId => !input.archived.has(sessionId))
   for (const sessionId of liveSessions) {
@@ -72,6 +76,7 @@ const decide = (input: {
   }
   let kind: WorkspaceKind = 'integrated'
   if (thread.secondary === true) kind = 'secondary'
+  else if (thread.unlandedCount > 0 && !onAnotherBookmark) kind = 'stale'
   else if (thread.rebasedAt === undefined && !onAnotherBookmark) kind = 'empty'
   else if ((thread.mergedPullRequests?.length ?? 0) > 0) kind = 'merged'
   if (!input.kinds.includes(kind)) return skip('kind-excluded')
