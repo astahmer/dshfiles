@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { BoxIcon, FolderIcon, KeyRoundIcon, TargetIcon } from '@dshfiles/plugin-ui/icons'
 import { useState, type ReactNode } from 'react'
 import type { ChartQuery, ChartView } from './api.js'
+import { DATA_SERIES } from './data-series.js'
 import { UsageFormattingModel } from './format.js'
 
 type SpendMetric = 'cost' | 'tokens' | 'requests'
@@ -30,7 +31,8 @@ const formatterFor = (metric: SpendMetric): ((value: number) => string) =>
 
 /**
  * One SpendMap dimension per breakdown the Host returns: its largest entries by the chosen measure, the rest folded
- * into one entry. Only the grouped dimension has per-bucket series, so only its entries get a sparkline.
+ * into one entry. Only the grouped dimension has per-bucket series, so only its entries get a sparkline and the colour
+ * the chart above gives the same key (its index in `view.keys` on the data ramp), so one model keeps one colour.
  */
 export const spendDimensions = (input: {
   readonly view: ChartView
@@ -49,6 +51,10 @@ export const spendDimensions = (input: {
     }
     return starts.map(start => byStart.get(start) ?? 0)
   }
+  const colorOf = (key: string): string | undefined => {
+    const index = input.view.keys.indexOf(key)
+    return index < 0 ? undefined : DATA_SERIES[index % DATA_SERIES.length]
+  }
   return DIMENSIONS.flatMap(dimension => {
     const rows: readonly BreakdownRow[] | undefined = input.view.breakdown[dimension.id]
     if (rows === undefined) return []
@@ -59,6 +65,7 @@ export const spendDimensions = (input: {
     const rest = sorted.slice(LEAF_LIMIT)
     const leaves: SpendLeaf[] = shown.map(row => {
       const amount = amountOf(row, input.metric)
+      const color = dimension.id === input.groupBy ? colorOf(row.key) : undefined
       return {
         id: row.key,
         label: dimension.id === 'purpose' ? (purposeLabels.get(row.key) ?? row.key) : row.key,
@@ -66,6 +73,7 @@ export const spendDimensions = (input: {
         share: shareOf(amount),
         ...(input.metric === 'cost' && (row.unpriced ?? 0) > 0 && { flag: { label: 'Unpriced', tone: 'warning' as const } }),
         ...(dimension.id === input.groupBy && { series: seriesOf(row.key) }),
+        ...(color !== undefined && { color }),
       }
     })
     if (rest.length > 0) {
@@ -109,6 +117,7 @@ export const UsageSpendMap = (props: {
     <SpendMap
       data-usage-spend-map
       className={PLAIN_TOTAL}
+      inset="flush"
       detailPeriod="this range"
       dimensionId={dimension?.id ?? props.groupBy}
       dimensions={dimensions}

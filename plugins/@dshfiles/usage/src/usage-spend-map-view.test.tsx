@@ -63,3 +63,23 @@ describe('Usage › Where it went (council round 2, D1)', () => {
     expect(classes).toContain('dshx:[&_[data-node-anchor=root]>div>div]:static')
   })
 })
+
+describe('Usage › Where it went (council round 3, D1)', () => {
+  const twoModels: ChartView = {
+    ...view,
+    keys: ['m0', 'm1'],
+    breakdown: { ...view.breakdown, model: [row('m1', 6, 6), row('m0', 3, 3)] },
+  }
+  const html = renderToStaticMarkup(
+    <UsageSpendMap view={twoModels} metric="cost" range={{ from: 0, to: 86_400_000 }} groupBy="model" onGroupBy={() => undefined} onShowRequests={() => undefined} />,
+  )
+
+  it('draws each ribbon in the colour the chart gives the same key: series order, not rank', () => {
+    expect(html).toContain('data-spend-link="leaf:model:m0" style="color:var(--dshx-data-1)"')
+    expect(html).toContain('data-spend-link="leaf:model:m1" style="color:var(--dshx-data-2)"')
+  })
+
+  it('draws the map on the card, without an inner frame', () => {
+    expect(html).toContain('data-spend-map-inset="flush"')
+  })
+})
