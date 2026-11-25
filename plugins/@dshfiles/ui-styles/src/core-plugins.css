@@ -9,12 +9,13 @@
 /*
  * The page frame takes the shared page inset (24px, 12px narrow). The list and its header stop at one 920px lane on the
  * page's left edge instead of a centred 960px column (council round 3, D4), so the switches line up under the header's
- * actions; the sticky header bar keeps its full width for its background and compact rule. Icon seats are 40px.
+ * actions; the sticky header bar keeps its full width for its background and compact rule. Icon seats are 32px with
+ * 18px glyphs (council round 4, D5).
  */
 section[data-plugin-panel][data-plugin-panel] {
   --plugin-page-inset: 24px;
   --plugin-page-top-inset: 24px;
-  --card-icon-size: 40px;
+  --card-icon-size: 32px;
   --card-head-gap: 12px;
   --dshx-plugin-tone: var(--dshx-identity-7);
   align-items: stretch;
@@ -83,8 +84,35 @@ section[data-plugin-panel] [class*='_cardIcon'] {
 }
 
 section[data-plugin-panel] [class*='_cardIcon'] > * {
+  /* The artwork draws its glyph at about 0.6 of its box (36px drew ~20px): a 30px box draws the ~18px glyph. */
+  width: 30px;
+  height: 30px;
   filter: drop-shadow(var(--dshx-plugin-tile-shift) 0 0 var(--dshx-plugin-tone));
   transform: translateX(calc(-1 * var(--dshx-plugin-tile-shift)));
+}
+
+/*
+ * Rows (council round 4, D5). A description wraps to two lines before it clamps, instead of the module's one-line clamp
+ * that cut "an…" and "agent.…" mid-thought; a row with no description keeps a one-line row's height (title 20 + gap 4
+ * + an 18px line), its title centred, so rows are even.
+ */
+section[data-plugin-panel] [class*='_cardDesc'] {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  text-wrap: pretty;
+}
+
+section[data-plugin-panel] [class*='_cardMain'] {
+  min-height: 42px;
+  justify-content: center;
+}
+
+/* Section titles (Built-in plugin settings, Experimental plugins, Installed plugins): 14/20 at 650. */
+section[data-plugin-panel] [class*='_sectionTitle'],
+section[data-plugin-panel] [class*='_groupTitle'] {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 650;
 }
 
 section[data-plugin-panel] li[data-plugin-package$='a'], section[data-plugin-panel] li[data-plugin-item$='a'] { --dshx-plugin-tone: var(--dshx-identity-2); }

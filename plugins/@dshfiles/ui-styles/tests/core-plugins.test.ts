@@ -122,9 +122,9 @@ describe('core Plugins page (round five A7)', () => {
     expect(once?.[1]).toMatch(/display:\s*none;/u)
   })
 
-  it('seats icons at 40px, puts the switch in a fixed column and parts rows with a quiet rule (council round 3, D4)', () => {
+  it('seats icons at 32px, puts the switch in a fixed column and parts rows with a quiet rule (council round 3, D4; round 4, D5)', () => {
     const frame = ruleFor('[data-plugin-panel][data-plugin-panel] {')
-    expect(frame).toMatch(/--card-icon-size:\s*40px;/u)
+    expect(frame).toMatch(/--card-icon-size:\s*32px;/u)
     const end = ruleFor("[class*='_cardEnd']")
     expect(end).toMatch(/min-width:\s*44px;/u)
     expect(end).toMatch(/justify-content:\s*flex-end;/u)
@@ -133,5 +133,41 @@ describe('core Plugins page (round five A7)', () => {
     const rule = ruleFor("[class*='_cards'] > li + li::before")
     expect(rule).toMatch(/border-top:\s*1px solid var\(--dsw-alias-border-l3\);/u)
     expect(rule).toMatch(/pointer-events:\s*none;/u)
+  })
+})
+
+describe('core Plugins rows and section titles (council round 4, D5)', () => {
+  it('still renders the hooks these rules key on', () => {
+    for (const name of ['cardDesc', 'cardMain', 'sectionTitle', 'groupTitle'])
+      expect(new RegExp(`"${name}":\\s*\`[A-Za-z0-9]+_[A-Za-z0-9]+_${name}\``, 'u').test(page), name).toBe(true)
+    // The module clamps a description to one line, which cut "an…" and "agent.…" mid-thought.
+    expect(/_cardDesc\{[^}]*-webkit-line-clamp:1;/u.test(page), 'one-line clamp').toBe(true)
+  })
+
+  it('wraps a description to two lines before it clamps', () => {
+    const desc = ruleFor("[class*='_cardDesc']")
+    expect(desc).toMatch(/-webkit-line-clamp:\s*2;/u)
+    expect(desc).toMatch(/line-clamp:\s*2;/u)
+  })
+
+  it('gives a row without a description the height of a one-line row, so rows are even', () => {
+    // Title 20 + gap 4 + one 18px description line.
+    expect(ruleFor("[class*='_cardMain']")).toMatch(/min-height:\s*42px;/u)
+    expect(ruleFor("[class*='_cardMain']")).toMatch(/justify-content:\s*center;/u)
+  })
+
+  it('draws ~18px glyphs in the 32px tiles: the artwork box is 30px, its glyph about 0.6 of it', () => {
+    const art = ruleFor("[class*='_cardIcon'] > *")
+    expect(art).toMatch(/width:\s*30px;/u)
+    expect(art).toMatch(/height:\s*30px;/u)
+  })
+
+  it('sets section titles 14/20 at 650', () => {
+    for (const hook of ['_sectionTitle', '_groupTitle']) {
+      const title = rules.find(([selector]) => selector.includes(`[class*='${hook}']`))?.[1] ?? ''
+      expect(title, hook).toMatch(/font-size:\s*14px;/u)
+      expect(title, hook).toMatch(/line-height:\s*20px;/u)
+      expect(title, hook).toMatch(/font-weight:\s*650;/u)
+    }
   })
 })
