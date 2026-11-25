@@ -3766,7 +3766,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 133 catalog feature(s)",
+        "Used by 134 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
