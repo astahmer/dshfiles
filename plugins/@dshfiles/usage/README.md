@@ -8,7 +8,7 @@
 ![Jev API usage card](docs/screenshots/usage-jev-card.png)
 ![Thread Cost facet with the family cost of its subagents](docs/screenshots/usage-thread-family-cost.png)
 
-**Observe › Usage** is the one usage page (docs/ade-ux §6): four tabs, **Cost** (charts),
+**Observe › Usage** is the one usage page (docs/ade-ux §6): four tabs, **Overview** (cost, tokens and requests),
 **Quota**, **Requests** (the request log) and **Tools** (tool and Jev activity), built from
 DSH session logs and bounded Host-side call observations. Observation only.
 

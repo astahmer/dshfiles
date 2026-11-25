@@ -28795,7 +28795,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "usage",
       "id": "usage-charts",
       "title": "Usage charts",
-      "summary": "The Cost tab charts cost, tokens and requests over time, against the previous period.",
+      "summary": "The Overview tab charts cost, tokens and requests over time, against the previous period.",
       "destination": "observe",
       "currentSurface": "left-nav: Usage › Charts",
       "reach": [
@@ -28828,10 +28828,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Cost\"",
+          "text": "click tab \"Overview\"",
           "action": "click",
           "by": "tab",
-          "name": "Cost",
+          "name": "Overview",
           "value": null
         },
         {
@@ -28907,10 +28907,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click tab \"Cost\"",
+          "text": "click tab \"Overview\"",
           "action": "click",
           "by": "tab",
-          "name": "Cost",
+          "name": "Overview",
           "value": null
         },
         {

@@ -71,3 +71,11 @@ describe('Usage › Cost numbers', () => {
     expect(markup).not.toContain('title=')
   })
 })
+
+describe('Usage › Overview numbers (council round 3, D1)', () => {
+  const markup = renderToStaticMarkup(<CostSummary days={7} pricingNote="List-price estimate." summary={summary()} />)
+  it('groups the three lead numbers in ~200 px columns instead of spreading them across the page', () => {
+    const grid = /<div class="([^"]*)"><div class="[^"]*"><span[^>]*>Cost \(estimate\)/u.exec(markup)
+    expect(grid?.[1]).toContain('dshx:@min-[42rem]:grid-cols-[repeat(3,200px)]')
+  })
+})

@@ -46,3 +46,20 @@ describe('Usage controls', () => {
     expect(read('charts.tsx')).toMatch(/view\.summary\.cost > 0 \? \(\s*<UsageSpendMap/u)
   })
 })
+
+describe('Usage page sections and chart toolbar (council round 3, D1)', () => {
+  it('names the first section Overview: it shows cost, tokens and requests', () => {
+    const panel = read('panel.tsx')
+    const tabs = panel.slice(panel.indexOf('const USAGE_TAB_ITEMS'), panel.indexOf('const withFallback'))
+    const labels = [...tabs.matchAll(/\{ value: '(\w+)', label: '([^']+)' \}/gu)].map(match => `${match[1]}:${match[2]}`)
+    expect(labels).toEqual(['charts:Overview', 'quota:Quota', 'log:Requests', 'activity:Tools'])
+  })
+
+  it('keeps the measure and the grouping together on the chart toolbar, at most 16 px apart', () => {
+    const charts = read('charts.tsx')
+    const toolbar = /<div className="([^"]*)" role="toolbar" aria-label="Chart options">/u.exec(charts)
+    expect(toolbar?.[1]).toBeDefined()
+    expect(toolbar?.[1]).not.toContain('justify-between')
+    expect(toolbar?.[1]).toMatch(/dshx:gap-(?:1|2|3|4)\b/u)
+  })
+})

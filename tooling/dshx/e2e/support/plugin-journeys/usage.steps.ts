@@ -91,7 +91,7 @@ When('recorded session logs and a price catalog are seeded', async ({ page }: { 
 When('the Usage analytics panel is opened on the range since {string}', async ({ page }: { page: Page }, from: string) => {
   await openGlobalPanel(page, 'Usage')
   await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
-  // Cost is the first tab (Phase 5: Cost · Quota · Requests · Tools); the log is Requests.
+  // Overview is the first tab (Overview · Quota · Requests · Tools); the log is Requests.
   await page.getByRole('tab', { name: 'Requests', exact: true }).click()
   await page.getByRole('radio', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)
@@ -162,7 +162,7 @@ Then('a failed request opens the thread that made it', async ({ page }: { page: 
 })
 
 When('the Charts tab is opened', async ({ page }: { page: Page }) => {
-  await page.getByRole('tab', { name: 'Cost', exact: true }).click()
+  await page.getByRole('tab', { name: 'Overview', exact: true }).click()
   try {
     await expect(page.getByText('Cost over time', { exact: true })).toBeVisible()
   } catch (error) {

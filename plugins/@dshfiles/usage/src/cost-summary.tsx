@@ -46,7 +46,7 @@ const Change = (props: { readonly current: number; readonly previous: number }):
 }
 
 /**
- * The Cost tab's numbers: cost, requests and cache hit lead; the other five open on "More numbers". The estimate's
+ * The Overview tab's numbers: cost, requests and cache hit lead; the other five open on "More numbers". The estimate's
  * caveat (list price, catalog age) is a tooltip on the cost label.
  */
 export const CostSummary = (props: { readonly summary: Summary; readonly days: number; readonly pricingNote: string }): JSX.Element => {
@@ -59,7 +59,8 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
     UsageFormattingModel.changeRatio(current, previous) === null ? undefined : <Change current={current} previous={previous} />
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-2">
-      <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2">
+      {/* Grouped in ~200 px columns: three numbers spread across a 1500 px page read as three unrelated facts. */}
+      <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@min-[42rem]:grid-cols-[repeat(3,200px)] dshx:@min-[42rem]:gap-x-4">
         <LeadTile
           label={
             <>
@@ -87,7 +88,10 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
         />
       </div>
       {open ? (
-        <div className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@min-[48rem]:grid-cols-3 dshx:@min-[80rem]:grid-cols-5" id={moreId}>
+        <div
+          className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@min-[42rem]:grid-cols-[repeat(3,200px)] dshx:@min-[42rem]:gap-x-4 dshx:@min-[72rem]:grid-cols-[repeat(5,200px)]"
+          id={moreId}
+        >
           <Tile
             label="Per day"
             value={UsageFormattingModel.formatCost(summary.cost / props.days)}

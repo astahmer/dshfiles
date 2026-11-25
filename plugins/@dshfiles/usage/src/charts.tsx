@@ -339,7 +339,7 @@ export const UsageCharts = (props: {
         description={trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
       >
         {/* The page's one metric switch: "Where it went" and the daily calendar follow it (council round 2, D1). */}
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3" role="toolbar" aria-label="Chart options">
           <SlidingSegments aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
           <Select value={props.groupBy} onValueChange={value => props.onGroupBy(GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model')}>
             <SelectTrigger size="sm" aria-label="Group by" className="dshx:justify-start dshx:gap-1.5">

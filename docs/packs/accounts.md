@@ -56,7 +56,7 @@ From the onboarding feature catalog: 46 features, the 33 curated ones first.
 26. **Add a Jev key from the Backlog setting** (`secret-catalog`, settings) — Add a Jev key from the Backlog setting, stored as a secret.
 27. **Set up a Jev key from chat** (`secret-catalog`, transcript) — When Jev has no key, the latest turn offers a short form to add one.
 28. **Request log** (`usage`, observe) — The Requests tab lists every model request with its tokens, cost, time and status.
-29. **Usage charts** (`usage`, observe) — The Cost tab charts cost, tokens and requests over time, against the previous period.
+29. **Usage charts** (`usage`, observe) — The Overview tab charts cost, tokens and requests over time, against the previous period.
 30. **Jev API usage card** (`usage`, observe) — See how many Jev calls Backlog and Memory made and what they cost this month.
 31. **Tool and skill analytics** (`usage`, observe) — The Tools tab charts how often each tool and skill runs and how long it takes.
 32. **Quota in the Usage page** (`usage`, observe) — The Quota tab of Usage shows each account's limits, their history and a forecast.

@@ -47,7 +47,7 @@ const BUCKET_LABELS = { hour: 'Hourly', day: 'Daily' } satisfies Record<(typeof 
 
 /** The page's sections: underline tabs, so the range control below is the page's one segmented track. */
 const USAGE_TAB_ITEMS: readonly { readonly value: Preferences['tab']; readonly label: string }[] = [
-  { value: 'charts', label: 'Cost' },
+  { value: 'charts', label: 'Overview' },
   { value: 'quota', label: 'Quota' },
   { value: 'log', label: 'Requests' },
   { value: 'activity', label: 'Tools' },
@@ -58,7 +58,7 @@ const withFallback = <ValueSchema extends SchemaTypes.Top>(schema: ValueSchema, 
   schema.pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(fallback))))
 
 const preferencesSchema = Schema.Struct({
-  // Stored names predate the tab labels: charts is Cost, log is Requests, activity is Tools.
+  // Stored names predate the tab labels: charts is Overview, log is Requests, activity is Tools.
   tab: withFallback(Schema.Literals(['log', 'charts', 'quota', 'activity']), 'charts'),
   preset: withFallback(Schema.Literals(PRESETS), '7d'),
   customFrom: withFallback(Schema.String, ''),
