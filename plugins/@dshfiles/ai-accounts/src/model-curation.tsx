@@ -131,7 +131,7 @@ export const ModelCuration = (props: {
           <thead className="dshx:border-b dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
             <tr>
               <th className="dshx:px-3 dshx:py-2 dshx:font-normal">Model</th>
-              <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
+              <th className="dshx:w-36 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">In picker</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>
               <th className="dshx:w-10">
@@ -194,8 +194,9 @@ export const ModelCuration = (props: {
                         ...model.efforts.map(effort => ({ value: effort.id, label: effort.name })),
                       ]}
                       onValueChange={value => setEffort(model, value)}
-                      // The table's one field look, the same as the mode and search fields above it (council round 5, D2).
-                      triggerClassName="dshx:w-40 dshx:max-w-full dshx:disabled:[&>svg]:hidden"
+                      // The table's one field look, the same as the mode and search fields above it (council round 5, D2),
+                      // sized to its value so the width goes to model names (council round 7, D2).
+                      triggerClassName="dshx:w-fit dshx:min-w-24 dshx:max-w-full dshx:px-2 dshx:disabled:[&>svg]:hidden"
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">

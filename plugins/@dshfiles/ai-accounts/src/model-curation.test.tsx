@@ -90,6 +90,17 @@ describe('reference Models table', () => {
     expect(container.textContent).not.toContain('Default model')
   })
 
+  it('sizes each effort select to its value in a 144 px column, leaving the width to model names (council round 7, D2)', async () => {
+    await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
+    const effortHead = [...container.querySelectorAll('th')].find(element => element.textContent === 'Reasoning effort')
+    expect(effortHead?.className).toContain('dshx:w-36')
+    const trigger = container.querySelector('[aria-label="Default reasoning effort for Model 0"]')
+    const classes = (trigger?.getAttribute('class') ?? '').split(' ')
+    for (const look of ['dshx:w-fit', 'dshx:min-w-24', 'dshx:max-w-full', 'dshx:px-2']) expect(classes).toContain(look)
+    expect(classes).not.toContain('dshx:w-full')
+    expect(classes).not.toContain('dshx:w-40')
+  })
+
   it('edits the rendered inherited value without accidentally deleting a paused favorite', async () => {
     const saved = {
       ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
