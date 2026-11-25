@@ -1,3 +1,4 @@
+import { OpenSidebarButton } from './open-sidebar-button.js'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-client-resources/client'
@@ -898,6 +899,13 @@ export default defineClient({
       )
     }
 
+    // Below 1024 px the frame hides the sidebar as a drawer; this is the visible way to open it (A-F4).
+    ctx.slots.inject('shell.leading', () =>
+      ctx.slots.register(
+        { name: 'shell.leading' },
+        decorate(() => <OpenSidebarButton label={translate('threadSidebarOpenSidebar')} onOpen={() => ctx.layout.toggleSidebar()} />),
+      ),
+    )
     ctx.slots.inject('conversation.input.overlay', () =>
       ctx.slots.register(
         {
