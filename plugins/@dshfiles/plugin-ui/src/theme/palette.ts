@@ -19,7 +19,7 @@ export interface PaletteInput {
   readonly hue: number
   /** Chroma of dark-scheme fills and borders; text gets 5/7 of it and light mode half of both (D1). */
   readonly chroma: number
-  /** Hue of the accent (focus, selection, Needs you). */
+  /** Hue of the accent (focus, the active tab bar, Needs you). */
   readonly accentHue: number
   /** 1 is the standard spread; above 1 pushes borders and text away from the background (high contrast). */
   readonly contrast: number
@@ -161,7 +161,7 @@ function palette(input: PaletteInput): Palette {
     warning: trio(dark ? status(STATUS_HUES.warning) : { l: 0.48, c: 0.12, h: STATUS_HUES.warning }),
     danger: trio(status(STATUS_HUES.danger)),
     info: trio(accentFg),
-    // Neutral (council round 3 A1): the marker or the card's edge carries the accent, not the fill.
+    // Neutral (council round 3 A1): the fill carries no hue; the row marker is ink (council round 6 A1).
     selectedWash: dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 },
     // Light washes sit on the sRGB edge (council round 5 A8): at L 0.94 a 0.035 blue clipped to 0.029, so each light
     // wash takes the lowest L where faint text still holds AA and the most chroma that L renders unclipped.

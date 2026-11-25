@@ -135,4 +135,25 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('920px lane')
     expect(design).not.toMatch(/button-(primary|outline):\n(?:    .*\n)*?    height: '28px'/u)
   })
+
+  it('records the sixth council pass: ink selection marker, field boundary, 960 lane, dark layering, prompt fill (council round 6 A8)', () => {
+    for (const text of [
+      'a 2px ink bar,\n   `--dsw-alias-label-primary`',
+      '**Field boundary contrast.**',
+      '`--dshx-field-border`',
+      "  field-border: '#88827d'",
+      "  field-border-dark: '#76706c'",
+      '960px once the pane is 1280px or wider',
+      'the cap is the content box',
+      '**dark layering**',
+      "  surface-nav-dark: '#1e1b19'",
+      '**Prompt fill.**',
+      "  prompt-fill: '#ecf5fa'",
+      "  prompt-fill-dark: '#1a252a'",
+      '`--dshx-ready-mark`',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: the selection marker no longer carries the accent.
+    expect(design).not.toContain('a 2px accent bar inset on its leading edge')
+  })
 })

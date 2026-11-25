@@ -252,7 +252,7 @@ and links hold AA on it (`plugin-ui/tests/prompt-fill.test.ts`). Chat's bubble r
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |
-| Accent indigo (focus, selection, Needs you, links) | `info`, `ring` | `--dsw-alias-state-business-primary`, `--dsw-alias-link` | `#3b5bd4` | `#839ffc` |
+| Accent indigo (focus, tab bar, Needs you, links)   | `info`, `ring` | `--dsw-alias-state-business-primary`, `--dsw-alias-link` | `#3b5bd4` | `#839ffc` |
 | Danger (hue 25)                                    | `destructive`  | `--dsw-alias-state-error-primary`                        | `#a83634` | `#fa8880` |
 | Success (hue 150)                                  | `success`      | `--dsw-alias-state-success-primary`                      | `#00792f` | `#65c67d` |
 | Warning (hue 80)                                   | `warning`      | `--dsw-alias-state-warn-primary`                         | `#805400` | `#dca331` |
