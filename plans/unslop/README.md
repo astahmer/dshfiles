@@ -68,7 +68,13 @@ Plugins page on the shared inset with identity-tone tiles and one Experimental c
 scrolls vertically). C done (6 revisions `ouqmrunl` … `wnxxurkt`: phone status pill only on Threads and Inbox; jump to
 latest on the dock edge with no faded band; one 720 px transcript column shared by code, cards, dock and composer; one
 Inbox card with a status head band, "Recommended" spelled out, a StatusCount title, phone Start triage in the top bar;
-sentence case for the collapse setting). agent-questions' Host provider changed: a restart is needed. B running.
+sentence case for the collapse setting). agent-questions' Host provider changed: a restart is needed. B done (14
+revisions `tqyxlvut` … `yvmluxrx`: the destination column folds to the rail while Settings or a one-page destination
+is on stage, and the Settings page lists the destination's other pages; Needs-you and Failed rows on the wash tokens,
+the selected row on the quieter wash plus marker, Failed titles wrap, whole-unit times, a real chevron, StatusCount
+group chips; the subagent wait shown once in the header; the active tab label in ink at 500 in main-tabs and Workbench;
+palette with one keycap, relative times and one frame; Settings theme swatches and stacked narrow rows; new-thread
+starter chips kept after the first thread; dshx seed and e2e helpers reopen the folded Settings list).
 
 ## Round four
 
