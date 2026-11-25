@@ -71,7 +71,14 @@ describe('Usage › Where it went (council round 3, D1)', () => {
     breakdown: { ...view.breakdown, model: [row('m1', 6, 6), row('m0', 3, 3)] },
   }
   const html = renderToStaticMarkup(
-    <UsageSpendMap view={twoModels} metric="cost" range={{ from: 0, to: 86_400_000 }} groupBy="model" onGroupBy={() => undefined} onShowRequests={() => undefined} />,
+    <UsageSpendMap
+      view={twoModels}
+      metric="cost"
+      range={{ from: 0, to: 86_400_000 }}
+      groupBy="model"
+      onGroupBy={() => undefined}
+      onShowRequests={() => undefined}
+    />,
   )
 
   it('draws each ribbon in the colour the chart gives the same key: series order, not rank', () => {
@@ -81,5 +88,43 @@ describe('Usage › Where it went (council round 3, D1)', () => {
 
   it('draws the map on the card, without an inner frame', () => {
     expect(html).toContain('data-spend-map-inset="flush"')
+  })
+})
+
+describe('Usage › Where it went (council round 5, D1)', () => {
+  const branded: ChartView = {
+    ...view,
+    keys: ['gpt-6-luna'],
+    breakdown: { ...view.breakdown, model: [row('gpt-6-luna', 9, 9)], provider: [row('dshx_fake_codex', 9, 9)] },
+  }
+  const html = renderToStaticMarkup(
+    <UsageSpendMap
+      view={branded}
+      metric="cost"
+      range={{ from: 0, to: 86_400_000 }}
+      groupBy="model"
+      onGroupBy={() => undefined}
+      onShowRequests={() => undefined}
+    />,
+  )
+  it("seats the model's brand mark in the end node instead of its first letter", () => {
+    const seat = /data-node-anchor="leaf:model:gpt-6-luna"[^>]*><span[^>]*>(.*?)<\/span><span/u.exec(html)
+    expect(seat?.[1]).toContain('data-model-mark="openai"')
+  })
+  it('keeps the letter for an entry no brand names', () => {
+    const plain = renderToStaticMarkup(
+      <UsageSpendMap
+        view={view}
+        metric="cost"
+        range={{ from: 0, to: 86_400_000 }}
+        groupBy="model"
+        onGroupBy={() => undefined}
+        onShowRequests={() => undefined}
+      />,
+    )
+    expect(/data-node-anchor="leaf:model:m1"[^>]*><span[^>]*>(.*?)<\/span>/u.exec(plain)?.[1]).toBe('m')
+  })
+  it('caps the end nodes at 280 px through the kit prop, not a class override', () => {
+    expect(html).toMatch(/<div role="radiogroup" aria-label="Models"[^>]*style="max-width:280px"/u)
   })
 })

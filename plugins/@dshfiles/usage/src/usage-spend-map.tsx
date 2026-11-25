@@ -1,3 +1,4 @@
+import { ModelMark, modelFamily } from '@dshfiles/plugin-ui/components/model-mark'
 import { SpendMap, type SpendDimension, type SpendLeaf } from '@dshfiles/plugin-ui/components/motion/spend-map'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { BoxIcon, FolderIcon, KeyRoundIcon, TargetIcon } from '@dshfiles/plugin-ui/icons'
@@ -10,6 +11,8 @@ type SpendMetric = 'cost' | 'tokens' | 'requests'
 type BreakdownRow = ChartView['breakdown']['model'][number]
 
 const LEAF_LIMIT = 6
+/** End nodes stop at 280 px: one model no longer runs a 1000 px node across the card (council round 5, D1). */
+const LEAF_MAX_WIDTH = 280
 const REST_ID = 'other:rest'
 
 const DIMENSIONS = [
@@ -66,8 +69,11 @@ export const spendDimensions = (input: {
     const leaves: SpendLeaf[] = shown.map(row => {
       const amount = amountOf(row, input.metric)
       const color = dimension.id === input.groupBy ? colorOf(row.key) : undefined
+      // A model or an account named after a provider shows that provider's mark in its seat instead of a letter.
+      const branded = (dimension.id === 'model' || dimension.id === 'provider') && modelFamily(row.key) !== undefined
       return {
         id: row.key,
+        ...(branded && { icon: <ModelMark modelId={row.key} /> }),
         label: dimension.id === 'purpose' ? (purposeLabels.get(row.key) ?? row.key) : row.key,
         amount,
         share: shareOf(amount),
@@ -118,6 +124,7 @@ export const UsageSpendMap = (props: {
       data-usage-spend-map
       className={PLAIN_TOTAL}
       inset="flush"
+      leafMaxWidth={LEAF_MAX_WIDTH}
       detailPeriod="this range"
       dimensionId={dimension?.id ?? props.groupBy}
       dimensions={dimensions}
