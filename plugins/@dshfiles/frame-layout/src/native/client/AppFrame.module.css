@@ -546,6 +546,12 @@
   box-shadow: var(--dshx-elevation-2, 0 8px 24px rgb(0 0 0 / 0.18));
 }
 
+/* The sheet the phone top bar's status button opens (round five C2): the same rows, inside the kit's sheet. */
+.statusSheetList {
+  display: grid;
+  gap: 6px;
+}
+
 .statusSheetRow {
   display: flex;
   align-items: center;
@@ -651,6 +657,12 @@
        reads as scrolled out of view, not as covered by the pill. */
     border-top: 1px solid var(--dsw-alias-border-l2, transparent);
     background: transparent;
+  }
+
+  /* Round five C2: no permanent band above the tab bar. Status opens from the top bar's button (PhoneStatus); the row
+     returns ('compact') only while an item marks data-status-actionable, and the auto grid row collapses meanwhile. */
+  :global([data-shell-phone-nav]) .statusStrip[data-status-strip='button'] {
+    display: none;
   }
 
   /* While the software keyboard is up the composer sits on it; the pill would only push it up (T3.5). */

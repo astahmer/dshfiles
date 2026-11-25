@@ -2,8 +2,10 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import { Command, defineClient } from '@dshfiles/dshx/client'
 import { apply, inject } from './native/client/index.js'
 import { SettingsStatusStrip } from './native/client/StatusStrip.tsx'
+import { PhoneStatusButton } from './phone-status-button.tsx'
 import { STATUS_BAR_SECTION_ID } from './status-bar.ts'
 import { StatusBarSettings } from './status-bar-settings.tsx'
+import { PhoneStatus } from './status-strip.ts'
 import { ZenMode } from './zen-mode.ts'
 // Type-only: puts the `shell.dock` seat declaration in this program.
 import type {} from './regions.js'
@@ -22,6 +24,8 @@ export default defineClient({
     )
     const plugin = metadata?.plugin
     if (plugin === undefined) return
+    // Round five C2: the phone top bars (Threads, Inbox) place this button; status no longer takes a band above the tab bar.
+    plugin.provide(PhoneStatus, { Button: PhoneStatusButton })
     plugin.add(Command, {
       id: '@dshfiles/frame-layout.zen-mode',
       title: 'Zen mode',

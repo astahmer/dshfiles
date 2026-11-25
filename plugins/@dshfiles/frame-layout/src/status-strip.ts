@@ -8,8 +8,8 @@
  * the layout owner nothing renders the registry, so an item simply does not show.
  */
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { defineRegistry } from '@dshfiles/dshx/client'
-import type { ReactElement } from 'react'
+import { defineContract, defineRegistry } from '@dshfiles/dshx/client'
+import type { ComponentType, ReactElement } from 'react'
 
 /** What the frame hands every item. */
 export interface StatusItemProps {
@@ -46,6 +46,19 @@ export interface StatusItem {
 
 /** Plugins contribute with `api.add(StatusItems, { id, side, label, component: api.bind(View) })`. */
 export const StatusItems = defineRegistry<StatusItem>('@dshfiles/frame-layout.status-item')
+
+export interface PhoneStatusService {
+  /**
+   * The phone top bar's status control (round five C2): a 44 px icon button that opens the status items as a sheet.
+   * The owner of a screen's top bar (thread-sidebar on Threads, activity-timeline on Inbox) renders it in the bar's
+   * trailing group. It renders nothing outside a phone-width frame or while no item is visible. An item that needs the
+   * user marks `data-status-actionable` on what it renders; the frame then also draws its bottom row.
+   */
+  readonly Button: ComponentType
+}
+
+/** Provided by frame-layout; `useContract(PhoneStatus)` is not active without it, and the bar shows no status control. */
+export const PhoneStatus = defineContract<PhoneStatusService>('@dshfiles/frame-layout.phone-status', { owner: '@dshfiles/frame-layout' })
 
 /** One item per id (the first registered wins), each side sorted by order, then registration order. */
 const arrange = (items: readonly StatusItem[]): { readonly global: readonly StatusItem[]; readonly thread: readonly StatusItem[] } => {

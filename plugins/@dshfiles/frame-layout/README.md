@@ -122,6 +122,17 @@ names its first two items in their own words ("1 working · Quota CC1 56%", neve
 item's rendered text) and opens the items as a list above it; it hides while the software keyboard is up. The pill
 belongs to the overview screens: with the thread sidebar's phone navigation it shows only while the Threads or Inbox
 tab is current, so an open thread, Land, More and the pages opened from More (Settings, Backlog…) get its row back.
+With the phone shell's navigation (round five C2) even that row is gone unless an item needs the user: status opens
+from a 44 px top-bar button, and the pill row returns only while an item marks `data-status-actionable` on what it
+renders (a quota running out, a lost connection). The owner of a screen's top bar places the button through the
+`PhoneStatus` contract on the same module:
+
+```tsx
+import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
+const status = useContract(PhoneStatus) // inactive without frame-layout
+return status.status === 'active' ? <status.value.Button /> : null // the button is null off the phone, or with no item
+```
+
 frame-layout owns this registry because it depends on no plugin, so any provider
 (ai-accounts, thread-sidebar, hmr-gate) can depend on it without closing a cycle.
 
