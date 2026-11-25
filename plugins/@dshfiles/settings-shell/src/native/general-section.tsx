@@ -135,15 +135,21 @@ export const GeneralSection = (
  * General's group headings (council round 6 B5): the transcript rows chat registers (View mode, When to collapse work
  * details, Replies after collapse, order 12) sit under one "Transcript" heading, after core's Font size (11); the rows
  * after them (Show coding view at 15 onwards) start a "Behavior" group, so the transcript group ends where its rows do.
+ * "Basics" (council round 7 B2) heads core's Permission (-20), Language (0), Appearance (10) and Font size (11), so every
+ * General row sits in a named group.
  */
 export const GENERAL_HEADINGS = [
-  { id: 'dshfiles-general-transcript-heading', key: 'general.transcriptHeading', order: 11.5 },
-  { id: 'dshfiles-general-behavior-heading', key: 'general.behaviorHeading', order: 13 },
+  { id: 'dshfiles-general-basics-heading', key: 'general.basicsHeading', order: -30, first: true },
+  { id: 'dshfiles-general-transcript-heading', key: 'general.transcriptHeading', order: 11.5, first: false },
+  { id: 'dshfiles-general-behavior-heading', key: 'general.behaviorHeading', order: 13, first: false },
 ] as const
 
-/** One General group heading: 15/20 ink, 24px above it, no divider of its own (the row above keeps its own). */
-export const GeneralGroupHeading = (props: { readonly label: string }): JSX.Element => (
-  <h3 className={cn(SECTION_TITLE_CLASS, 'dshx:pt-6 dshx:pb-1')} data-settings-general-heading="">
+/**
+ * One General group heading: 15/20 ink, 24px above it, no divider of its own (the row above keeps its own). The `first`
+ * heading opens the page and starts at its top.
+ */
+export const GeneralGroupHeading = (props: { readonly label: string; readonly first?: boolean }): JSX.Element => (
+  <h3 className={cn(SECTION_TITLE_CLASS, props.first === true ? 'dshx:pb-1' : 'dshx:pt-6 dshx:pb-1')} data-settings-general-heading="">
     {props.label}
   </h3>
 )

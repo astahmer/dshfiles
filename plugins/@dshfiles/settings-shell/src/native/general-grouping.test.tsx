@@ -24,7 +24,8 @@ afterEach(async () => {
   vi.unstubAllGlobals()
 })
 
-/** The General rows' slot orders in this composition: core's Appearance 10 and Font size 11, chat's transcript rows 12. */
+/** The General rows' slot orders in this composition: core's Permission -20, Language 0, Appearance 10 and Font size 11, chat's transcript rows 12. */
+const PERMISSION = -20
 const FONT_SIZE = 11
 const TRANSCRIPT_ROWS = 12
 const SHOW_CODING_VIEW = 15
@@ -42,6 +43,19 @@ describe('Settings › General groups its transcript rows (council round 6 B5)',
     expect(shellMessages.zh['general.transcriptHeading']).not.toBe('')
     // Each heading is registered as a General row of its own.
     expect(client()).toMatch(/for \(const heading of GENERAL_HEADINGS\)/u)
+  })
+
+  it('opens General with a "Basics" heading above Permission, Language, Appearance and Font size (council round 7 B2)', async () => {
+    const basics = GENERAL_HEADINGS.find(heading => heading.key === 'general.basicsHeading')
+    expect(basics?.order).toBeLessThan(PERMISSION)
+    expect(shellMessages.en['general.basicsHeading']).toBe('Basics')
+    expect(shellMessages.zh['general.basicsHeading']).not.toBe('')
+    // The first heading on the page starts at the top: no 24px gap above it.
+    await act(async () => root.render(<GeneralGroupHeading first label="Basics" />))
+    const heading = container.querySelector('h3')
+    expect(heading?.className).toContain('dshx:text-heading')
+    expect(heading?.className).not.toContain('dshx:pt-6')
+    expect(GENERAL_HEADINGS.filter(heading => 'first' in heading && heading.first === true).map(heading => heading.key)).toEqual(['general.basicsHeading'])
   })
 
   it('draws the heading at the contextual heading size, set apart from the row above it', async () => {

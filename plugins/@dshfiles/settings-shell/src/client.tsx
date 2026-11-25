@@ -1019,7 +1019,7 @@ export default defineClient({
       ctx.slots.inject('settings.general.item', () =>
         ctx.slots.register(
           { name: 'settings.general.item', id: heading.id, order: heading.order, locale: SHELL_LOCALE_NAMESPACE },
-          (props: { readonly t: ShellTranslate }) => <GeneralGroupHeading label={props.t(heading.key)} />,
+          (props: { readonly t: ShellTranslate }) => <GeneralGroupHeading first={heading.first} label={props.t(heading.key)} />,
         ),
       )
     }
