@@ -114,7 +114,7 @@ From the onboarding feature catalog: 208 features, the 100 curated ones first.
 64. **See what this setup can do and what it still needs on one page** (`onboarding`, knowledge) — A setup checklist shows what this setup can do and what it still needs, with a fix for each missing step.
 65. **Enable or disable a plugin pack after an exact preview** (`onboarding`, knowledge) — Turn a plugin pack on or off after a preview of exactly what changes.
 66. **Get set up in three steps: account, project, first task** (`onboarding`, threads) — Three steps get you set up: add an account, add a project, start a first task.
-67. **First tasks for your project on the new-thread screen** (`onboarding`, composer) — A new project offers three first tasks that put a prompt in the composer without sending it.
+67. **First tasks for your project on the new-thread screen** (`onboarding`, composer) — The new-thread screen offers three tasks for the project that put a prompt in the composer without sending it.
 68. **Show me where a feature lives, one step at a time** (`onboarding`, knowledge) — Show me where highlights each control on the way to a feature, one step at a time.
 69. **See what changed in your plugins since your last visit** (`onboarding`, knowledge) — What's new lists the latest changes to your plugins, newest first.
 70. **Get features suggested from what you already do** (`onboarding`, knowledge) — Off by default: suggests features you have not tried, based on what you did in the last 30 days.
