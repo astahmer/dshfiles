@@ -54,11 +54,12 @@ export interface ContextMeterProps {
   useProjection: UseProjection
   /** The owning bar's locale seat, passed down as a plain prop. */
   t: ComposerBarProps['t']
-  /** dshfiles (b:ysaj): `conversation.composer.context` readings (compaction), as rows under the breakdown. */
-  detail?: ReactNode
+  /** dshfiles (b:ysaj): `conversation.composer.context` readings (compaction), as rows under the breakdown. A
+   * function so the slot's providers run only while the panel is open. */
+  renderDetail?: () => ReactNode
 }
 
-export function ContextMeter({ useProjection, t, detail }: ContextMeterProps) {
+export function ContextMeter({ useProjection, t, renderDetail }: ContextMeterProps) {
   const pressure = useProjection('contextPressure')
   const breakdown = useProjection('contextBreakdown')
   const [open, setOpen] = useState(false)
@@ -173,7 +174,7 @@ export function ContextMeter({ useProjection, t, detail }: ContextMeterProps) {
               ))}
             </dl>
           )}
-          {detail == null ? null : <div className={css.detail} data-context-detail="">{detail}</div>}
+          {renderDetail == null ? null : <div className={css.detail} data-context-detail="">{renderDetail()}</div>}
         </div>,
         document.body,
       )}
