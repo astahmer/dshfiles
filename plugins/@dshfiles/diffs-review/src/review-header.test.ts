@@ -40,16 +40,48 @@ describe('the Review page controls (council round 2, D3)', () => {
     expect(base).not.toContain('font-mono')
   })
 
-  it('gives each file one reviewed control: a checkbox labelled "Reviewed"', () => {
-    expect(panel).not.toContain('Mark reviewed')
+  it('gives each file one reviewed control: a checkbox that reads "Mark reviewed" (council round 5, D3)', () => {
     expect(panel).not.toContain('for batch review')
     expect(panel).toMatch(/<Checkbox\s+aria-label=\{`Reviewed: \$\{path\}`\}/u)
-    expect(panel).toMatch(/<span[^>]*>Reviewed<\/span>/u)
+    expect(panel).toMatch(/<span[^>]*>Mark reviewed<\/span>/u)
     expect(panel).toContain('All files reviewed')
   })
 
   it('lets the diff card hug its files and marks the chosen project with its ProjectMark', () => {
     expect(panel).not.toContain('dshx:min-h-64 dshx:flex-1')
     expect(panel).toMatch(/<ProjectMark name=\{pickerProjectName\} size="dense" \/>/u)
+  })
+})
+
+describe('the Review page controls (council round 5, D3)', () => {
+  const panel = readFileSync(fileURLToPath(new URL('panel.tsx', import.meta.url)), 'utf8')
+  const base = panel.slice(panel.indexOf('data-review-base'), panel.indexOf('/>', panel.indexOf('aria-label="Base branch or bookmark"')))
+
+  it('names the base once, in the branch control: "Base: main" in value ink, no "since" chip beside the title', () => {
+    expect(panel).not.toContain('ReviewHeader.rangeLabel(result.range)')
+    expect(panel).not.toMatch(/<Page[^>]*\smeta=/u)
+    expect(base).toMatch(/<span[^>]*>\s*Base:\s*<\/span>/u)
+    expect(base).toContain("placeholder={base ?? 'default'}")
+    expect(base).toContain('dshx:placeholder:text-foreground')
+    expect(base).not.toContain('Base branch (')
+  })
+
+  it('keeps every control on the kit control height: no per-control height, no small picker button', () => {
+    expect(base).not.toContain('dshx:h-8')
+    const picker = panel.slice(
+      panel.indexOf('aria-label="Choose project or workspace"'),
+      panel.indexOf('>', panel.indexOf('variant="outline"', panel.indexOf('aria-label="Choose project or workspace"'))),
+    )
+    expect(picker).not.toContain('size="sm"')
+  })
+
+  it('shows no review counter or bar for a single file: its header control is the whole review state', () => {
+    const toolbar = panel.slice(panel.indexOf('data-review-toolbar'), panel.indexOf('result.truncated'))
+    expect(toolbar).toMatch(/result\.fileCount > 1 \? \(\s*<>\s*<Stat label=\{`\$\{totalReviewed\}\/\$\{result\.fileCount\} reviewed`\} \/>/u)
+  })
+
+  it('folds Refresh into the overflow menu', () => {
+    const refresh = panel.slice(panel.indexOf("id: 'refresh'"), panel.indexOf('}', panel.indexOf("id: 'refresh'")))
+    expect(refresh).toContain("placement: 'overflow'")
   })
 })

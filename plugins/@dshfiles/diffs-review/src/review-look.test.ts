@@ -33,9 +33,9 @@ describe('Review header and file toolbar (council round 4, D3)', () => {
   })
 
   it('reads the file count on the left of the file toolbar and the review progress on its right', () => {
-    const toolbar = /<div className="([^"]*)" data-review-toolbar>([\s\S]*?)\n {8}<\/div>\n/u.exec(panel)
+    const toolbar = /<div className="([^"]*)" data-review-toolbar>/u.exec(panel)
     expect(toolbar?.[1]).toContain('dshx:justify-between')
-    const body = toolbar?.[2] ?? ''
+    const body = panel.slice(panel.indexOf('data-review-toolbar'), panel.indexOf('result.truncated'))
     expect(body.indexOf('<DiffStat')).toBeLessThan(body.indexOf('reviewed`}'))
     expect(body).toContain('All files reviewed')
   })

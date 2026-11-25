@@ -1,6 +1,6 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useApi } from '@dshfiles/dshx/client'
-import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { EmptyState, PAGE_FRAME_CLASS, Page } from '@dshfiles/plugin-ui/components/page'
 import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -254,7 +254,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
           toggleReviewed(path, event.shiftKey)
         }}
       />
-      <span aria-hidden>Reviewed</span>
+      <span aria-hidden>Mark reviewed</span>
     </label>
   )
 
@@ -294,17 +294,11 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
   return (
     <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
       <Page
-        width="full"
+        width="wide"
         heading="Review"
         description="Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers."
-        meta={
-          result?.status === 'ok' ? (
-            <Badge variant="secondary" className="dshx:text-2xs">
-              {ReviewHeader.rangeLabel(result.range)}
-            </Badge>
-          ) : undefined
-        }
-        // Summarize is an outline action beside Refresh: the page has no filled primary (council round 4, D3).
+        // The base is named once, in the branch control ("Base: main"), not again in a chip beside the title (round 5, D3).
+        // Summarize is an outline action and Refresh sits in the overflow: the page has no filled primary (council round 4/5, D3).
         actions={[
           ...(reviewSessionId === undefined
             ? []
@@ -316,7 +310,14 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
                   onSelect: () => void props.openInThread(String(reviewSessionId), { scope: 'target' }),
                 },
               ]),
-          { id: 'refresh', label: 'Refresh', icon: <RefreshCw aria-hidden />, onSelect: () => void query.refetch(), pending: query.isFetching },
+          {
+            id: 'refresh',
+            label: 'Refresh',
+            icon: <RefreshCw aria-hidden />,
+            onSelect: () => void query.refetch(),
+            pending: query.isFetching,
+            placement: 'overflow',
+          },
           ...(canSummarize
             ? [
                 {
@@ -336,7 +337,6 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
             aria-label="Choose project or workspace"
             className="dshx:min-w-48 dshx:max-w-full dshx:shrink dshx:justify-between dshx:font-normal"
             onClick={() => setPickerOpen(true)}
-            size="sm"
             type="button"
             variant="outline"
           >
@@ -360,13 +360,22 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
               showNativePicker={false}
             />
           ) : null}
-          <Input
-            aria-label="Base branch or bookmark"
-            placeholder={baseRef === '' && base !== undefined ? `Base branch (${base})` : 'Base branch (default)'}
-            value={baseRef}
-            onChange={event => setBaseRef(event.target.value)}
-            className="dshx:h-8 dshx:w-48 dshx:max-w-full dshx:tabular-nums"
-          />
+          {/* The effective base reads as the field's value ("Base: main", ink); typing a bookmark overrides it. */}
+          <div className="dshx:relative dshx:w-48 dshx:max-w-full" data-review-base>
+            <span
+              aria-hidden
+              className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:-translate-y-1/2 dshx:text-sm dshx:text-muted-foreground"
+            >
+              Base:
+            </span>
+            <Input
+              aria-label="Base branch or bookmark"
+              placeholder={base ?? 'default'}
+              value={baseRef}
+              onChange={event => setBaseRef(event.target.value)}
+              className={cn('dshx:w-full dshx:pl-12 dshx:tabular-nums', base !== undefined && 'dshx:placeholder:text-foreground')}
+            />
+          </div>
         </div>
         {/* The file toolbar over the diff card: what changed on the left, review progress on the right (round 4, D3). */}
         {result?.status === 'ok' && ReviewHeader.showStats(result.fileCount) ? (
@@ -388,8 +397,13 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
                   All files reviewed
                 </label>
               ) : null}
-              <Stat label={`${totalReviewed}/${result.fileCount} reviewed`} />
-              <Progress value={progress} className={ReviewLook.PROGRESS} />
+              {/* One file: its header's Mark reviewed control is the whole review state (council round 5, D3). */}
+              {result.fileCount > 1 ? (
+                <>
+                  <Stat label={`${totalReviewed}/${result.fileCount} reviewed`} />
+                  <Progress value={progress} className={ReviewLook.PROGRESS} />
+                </>
+              ) : null}
             </span>
           </div>
         ) : null}
@@ -413,45 +427,48 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         ) : null}
       </Page>
 
-      {scopes.length > 0 && packageJson.files.length > 0 ? (
-        <div className="dshx:mx-6 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
-          <PackageJsonTables headerActions={reviewControls} view={packageJson} />
-        </div>
-      ) : null}
-      {scopes.length > 0 && images.length > 0 ? (
-        <div className="dshx:mx-6 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
-          <ChangedImages images={images} renderActions={reviewControls} />
-        </div>
-      ) : null}
-      {scopes.length > 0 && textFiles.length > 0 ? (
-        <div
-          data-testid="diffs-review-diffs"
-          className={cn(
-            SURFACE,
-            // The card ends at its last file instead of stretching to the pane foot (council round 2, D3).
-            'dshx:mx-6 dshx:mb-6 dshx:flex dshx:flex-col dshx:overflow-hidden dshx:@max-pane-narrow:mx-3 dshx:@max-pane-narrow:mb-3',
-          )}
-        >
-          <PatchView
-            files={textFiles}
-            className={cn('dshx:flex-1', ReviewLook.DARK_DIFF_TINTS)}
-            empty={<p className={cn(HINT, 'dshx:p-3')}>No diff hunks to display.</p>}
-            renderHeaderPrefix={file => {
-              const scope = scopeByPath.get(file.name)
-              if (scope === undefined) return null
-              return (
-                <span className="dshx:mr-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                  <Badge variant="secondary" className="dshx:text-2xs">
-                    {scope.label}
-                  </Badge>
-                  <span className={cn(HINT, 'dshx:truncate')}>{ReviewHeader.scopeNote(aiSummaries?.[scope.key] ?? scope.summary)}</span>
-                </span>
-              )
-            }}
-            renderHeaderMetadata={file => reviewControls(file.name)}
-          />
-        </div>
-      ) : null}
+      {/* The cards sit outside Page, so they take its wide frame: the same start inset and 1200 px cap (round 5, D3). */}
+      <div className={cn(PAGE_FRAME_CLASS.wide, 'dshx:px-6 dshx:@max-pane-narrow:px-3')} data-review-cards>
+        {scopes.length > 0 && packageJson.files.length > 0 ? (
+          <div className="dshx:mb-3">
+            <PackageJsonTables headerActions={reviewControls} view={packageJson} />
+          </div>
+        ) : null}
+        {scopes.length > 0 && images.length > 0 ? (
+          <div className="dshx:mb-3">
+            <ChangedImages images={images} renderActions={reviewControls} />
+          </div>
+        ) : null}
+        {scopes.length > 0 && textFiles.length > 0 ? (
+          <div
+            data-testid="diffs-review-diffs"
+            className={cn(
+              SURFACE,
+              // The card ends at its last file instead of stretching to the pane foot (council round 2, D3).
+              'dshx:mb-6 dshx:flex dshx:flex-col dshx:overflow-hidden dshx:@max-pane-narrow:mb-3',
+            )}
+          >
+            <PatchView
+              files={textFiles}
+              className={cn('dshx:flex-1', ReviewLook.DARK_DIFF_TINTS)}
+              empty={<p className={cn(HINT, 'dshx:p-3')}>No diff hunks to display.</p>}
+              renderHeaderPrefix={file => {
+                const scope = scopeByPath.get(file.name)
+                if (scope === undefined) return null
+                return (
+                  <span className="dshx:mr-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+                    <Badge variant="secondary" className="dshx:text-2xs">
+                      {scope.label}
+                    </Badge>
+                    <span className={cn(HINT, 'dshx:truncate')}>{ReviewHeader.scopeNote(aiSummaries?.[scope.key] ?? scope.summary)}</span>
+                  </span>
+                )
+              }}
+              renderHeaderMetadata={file => reviewControls(file.name)}
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   )
 }
