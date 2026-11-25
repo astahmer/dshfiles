@@ -39,6 +39,13 @@ describe('Settings › General controls in the kit field look (council round 3 B
     expect(general).toContain('dshx:pointer-coarse:[&_[class*=_selector_]]:h-11!')
   })
 
+  it('edges the font size field like every kit field, at 3:1 (council round 6 A2)', () => {
+    const general = read('native/general-section.tsx')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]]:border-field-border!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-field-border!')
+    expect(general).not.toContain('border-(--dsw-alias-border-l3)!')
+  })
+
   it('sets the font size at the kit UnitInput text size, with no chevron trailing the field (council round 4 B5)', () => {
     const general = read('native/general-section.tsx')
     expect(general).toContain('dshx:[&_[class*=_stepper_]_[class*=_value_]]:text-sm!')
