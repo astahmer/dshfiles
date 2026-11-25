@@ -514,14 +514,21 @@
 
 /* The mark step (unslop r5 C3): a phone's bar shows the model as its brand mark in a 24px chip instead of "gpt-…". The
    model picker is its own plugin; this reads the markers its trigger already carries (`data-model-trigger`, the mark's
-   `svg[data-brand]`, `data-model-picker-text`), and a model without a mark keeps its truncating name. */
+   `svg[data-brand]`, `data-model-picker-text`), and a model without a mark keeps its truncating name. Round five C1
+   (council round 5): the mark alone read as an unnamed glyph, so the short name stays beside it, truncated at 96px; a
+   bar it would wrap (`data-model-mark-tight`, control-row-layout.ts) keeps the mark alone. */
 .row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) {
   min-width: 0;
   gap: 0;
   padding-inline: 4px;
 }
 
-.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) :is(:global([data-model-picker-text]), :global([data-model-picker-provider])),
+.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) :global([data-model-picker-text]) {
+  max-width: 96px;
+}
+
+.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) :global([data-model-picker-provider]),
+.row[data-model-mark-tight] :global([data-model-trigger]:has(svg[data-brand])) :global([data-model-picker-text]),
 .row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) > svg:last-child {
   display: none;
 }

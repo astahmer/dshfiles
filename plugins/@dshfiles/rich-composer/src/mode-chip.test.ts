@@ -110,9 +110,11 @@ describe('the mode chip in a narrow bar (unslop phone 6)', () => {
     expect(label).toContain('dshx:in-data-model-icon:hidden')
   })
 
-  // Unslop r5 C3: a phone's bar shows the mode as its icon (the mark step), next to the model's brand mark.
-  it('drops "Can edit" to its icon at the mark step of a phone bar', () => {
-    expect(classesOf('data-composer-mode-label=""')).toContain('dshx:in-data-model-mark:hidden')
+  // Round five C1 (council round 5): a phone's bar keeps "Can edit" while it fits; only a tight bar drops it to its icon.
+  it('keeps "Can edit" at the mark step of a phone bar and drops it only when that bar is tight', () => {
+    const label = classesOf('data-composer-mode-label=""')
+    expect(label).not.toContain('dshx:in-data-model-mark:hidden')
+    expect(label).toContain('dshx:in-data-model-mark-tight:hidden')
   })
 
   it('stops the chip from shrinking in the compact step, so the model name truncates first', () => {

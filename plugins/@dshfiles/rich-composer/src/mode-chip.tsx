@@ -120,9 +120,9 @@ export const ModeChip = (props: ModeChipProps & { readonly host: ModeChipHost; r
           >
             {planOn || current === undefined ? <ListChecksIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" /> : accessIcon(current)}
             {/* Collapse order (DESIGN.md, unslop phone 6): the model name truncates before this label goes, because it says
-                whether the agent may edit; the icon step of a very narrow pane and a phone's bar (the mark step, unslop r5
-                C3) drop it, and the accessible name stays. */}
-            <span className="dshx:min-w-0 dshx:truncate dshx:in-data-model-icon:hidden dshx:in-data-model-mark:hidden" data-composer-mode-label="">
+                whether the agent may edit; the icon step of a very narrow pane and a phone bar too tight for it (the mark
+                step's data-model-mark-tight, round five C1) drop it, and the accessible name stays. */}
+            <span className="dshx:min-w-0 dshx:truncate dshx:in-data-model-icon:hidden dshx:in-data-model-mark-tight:hidden" data-composer-mode-label="">
               {label}
             </span>
             <ChevronDownIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:opacity-60 dshx:in-data-model-compact:hidden" />

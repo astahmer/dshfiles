@@ -246,6 +246,37 @@ describe("a phone's bar (unslop r5 C3)", () => {
     stop()
   })
 
+  // Round five C1 (council round 5): the mark alone read as an unnamed glyph; the bar names the model beside its mark and
+  // keeps "Can edit" while they fit, and drops both words (data-model-mark-tight) only when the line would wrap.
+  it('keeps the words beside the mark while the bar fits, and marks a bar that would wrap as tight', () => {
+    const fits = rowOf({ available: 292, expanded: [44, 105, 32, 95], compact: [44, 90, 32, 96], icon: [44, 30, 32, 32] })
+    const stopFits = observeControlRow(fits, { markStep: () => true })
+    expect(fits.hasAttribute('data-model-mark')).toBe(true)
+    expect(fits.hasAttribute('data-model-mark-tight')).toBe(false)
+    stopFits()
+    const tight = rowOf({
+      available: 200,
+      expanded: [44, 105, 32, 95],
+      compact: [44, 90, 32, 96],
+      icon: [44, 30, 32, 32],
+      wraps: row => !row.hasAttribute('data-model-mark-tight'),
+    })
+    const stopTight = observeControlRow(tight, { markStep: () => true })
+    expect(tight.hasAttribute('data-model-mark')).toBe(true)
+    expect(tight.hasAttribute('data-model-mark-tight')).toBe(true)
+    stopTight()
+  })
+
+  it('names the model beside its mark, truncated at 96px, and hides the name only on a tight bar', async () => {
+    const { readFileSync } = await import('node:fs')
+    const { dirname, resolve } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
+    expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]:has\(svg\[data-brand\]\)\) :global\(\[data-model-picker-text\]\) \{[^}]*max-width: 96px;/)
+    expect(css).toContain('.row[data-model-mark-tight] :global([data-model-trigger]:has(svg[data-brand])) :global([data-model-picker-text])')
+    expect(css).not.toContain('.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) :is(:global([data-model-picker-text])')
+  })
+
   it('leaves a wider bar to the content-sized steps', () => {
     const row = rowOf({ available: 600, expanded: [28, 90, 28, 140, 32], compact: [28, 28, 28, 90, 32], icon: [28, 28, 28, 28, 32] })
     const stop = observeControlRow(row, { markStep: () => false })
@@ -261,7 +292,7 @@ describe("a phone's bar (unslop r5 C3)", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
     const trigger = ".row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand]))"
     expect(css).toMatch(new RegExp(`${trigger.replace(/[[\]().:]/g, '\\$&')} \\{[^}]*padding-inline: 4px`))
-    expect(css).toContain(`${trigger} :is(:global([data-model-picker-text]), :global([data-model-picker-provider]))`)
+    expect(css).toContain(`${trigger} :global([data-model-picker-provider])`)
     expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]\) :global\(svg\[data-brand\]\) \{\s*width: 16px;\s*height: 16px;/)
     // Zero-width plugin anchors each cost a gap, so the mark step drops them like the icon step: + · mode · ⋯ · model.
     expect(css).toMatch(/\.row:is\(\[data-model-icon\], \[data-model-mark\]\) \.standardControls \{\s*column-gap: 0;/)

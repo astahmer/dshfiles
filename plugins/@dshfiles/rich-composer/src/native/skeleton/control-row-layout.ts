@@ -40,8 +40,9 @@ const wraps = (row: HTMLElement): boolean => {
  * @param row - Composer control row with its leading and trailing groups.
  * @param options.iconStep - whether the row may take the second, icon-only step (default yes).
  * @param options.markStep - whether the bar is a phone's (unslop r5 C3): then it always takes the compact step and the
- *   mark step (`data-model-mark`), where the model chip is its brand mark and the mode chip its icon, so the bar never
- *   truncates the model to "gpt-…"; the icon step stays for a model without a mark. Default no.
+ *   mark step (`data-model-mark`), where the model chip is its brand mark with the name beside it (truncated at 96px)
+ *   and the mode chip keeps its words; a bar those words would wrap (`data-model-mark-tight`, round five C1) shows the
+ *   mark and the mode icon alone. The icon step stays for a model without a mark. Default no.
  * @returns Disconnect the layout observers and font listener.
  */
 export function observeControlRow(
@@ -75,9 +76,13 @@ export function observeControlRow(
     row.removeAttribute('data-model-compact')
     row.removeAttribute('data-model-icon')
     row.removeAttribute('data-model-mark')
+    row.removeAttribute('data-model-mark-tight')
     if (options.markStep?.() === true) {
       row.setAttribute('data-model-compact', '')
       row.setAttribute('data-model-mark', '')
+      // Round five C1 (council round 5): the mark names its model (up to 96px) and the mode chip keeps "Can edit" while
+      // the line holds them; a bar they would wrap drops both words to their icons.
+      row.toggleAttribute('data-model-mark-tight', wraps(row) || overflows())
       measured = rowWidth()
       return
     }
