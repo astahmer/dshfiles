@@ -1,8 +1,9 @@
-import { getFiletypeFromFileName, parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
+import { getFiletypeFromFileName, parsePatchFiles, registerCustomTheme, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, Virtualizer } from '@pierre/diffs/react'
 import { useEffect, useMemo, useRef, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
 import { cn } from './lib/utils.js'
-import { bundledLanguages } from './shiki-slim.js'
+import { bundledLanguages, createCssVariablesTheme } from './shiki-slim.js'
+import { DiffLook } from './theme/diff-look.js'
 
 export { parseDiffFromFile, parsePatchFiles, type FileDiffMetadata } from '@pierre/diffs'
 
@@ -71,13 +72,36 @@ const isDarkTheme = (): boolean => document.body.hasAttribute('data-ds-dark-them
 const useDshDarkTheme = (): boolean => useSyncExternalStore(subscribeToDarkTheme, isDarkTheme, () => false)
 
 // The library renders inside shadow roots, so only inherited custom properties reach it.
-// SAFETY: CSSProperties has no index for custom properties; every key here is a --diffs-* variable.
 const DIFF_FONT_STYLE = {
   '--diffs-font-family': 'var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace)',
   '--diffs-header-font-family': 'inherit',
   '--diffs-font-size': '12px',
   '--diffs-line-height': '18px',
-} as CSSProperties
+} as const
+
+/**
+ * One syntax pair for the transcript and the diff (round five A4): the diff highlights with Shiki's `css-variables`
+ * theme, whose token colours are the `--shiki-token-*` values the theme block fits for both schemes, the same ones the
+ * transcript's code blocks read. Registered once with the diff library's theme resolver.
+ */
+const THEME = 'dshx-syntax'
+registerCustomTheme(THEME, () => Promise.resolve(createCssVariablesTheme({ name: THEME, variablePrefix: '--shiki-' })))
+
+/** Diff options and inherited style shared by every `PatchView`. */
+export class PatchLook {
+  static readonly THEME = THEME
+
+  /** Explicit `+`/`−` gutter marks (`classic`), so a changed line reads without its colour. */
+  static options(dark: boolean): Pick<DiffOptions, 'diffIndicators' | 'theme' | 'themeType'> {
+    return { themeType: dark ? 'dark' : 'light', theme: { dark: THEME, light: THEME }, diffIndicators: 'classic' }
+  }
+
+  /** Font, ramp body, 12% line tints and the shared syntax pair, as custom properties the shadow roots inherit. */
+  static style(dark: boolean): CSSProperties {
+    // SAFETY: CSSProperties has no index for custom properties; every key here is a --diffs-* or --shiki-* variable.
+    return { ...DIFF_FONT_STYLE, ...DiffLook.style(dark ? 'dark' : 'light') } as CSSProperties
+  }
+}
 
 /**
  * Virtualized, syntax-highlighted view of a git patch (`jj diff --git`, `git diff`) or pre-parsed files.
@@ -101,8 +125,7 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
   const diffOptions = (file: FileDiffMetadata): DiffOptions => {
     const base: DiffOptions = {
       diffStyle: layout,
-      themeType: dark ? 'dark' : 'light',
-      theme: { dark: 'pierre-dark', light: 'pierre-light' },
+      ...PatchLook.options(dark),
       stickyHeader: true,
       hunkSeparators: 'line-info',
       overflow: 'scroll',
@@ -123,7 +146,7 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
   if (files.length === 0) return <>{props.empty ?? null}</>
 
   return (
-    <div className={cn('dshx:min-h-0 dshx:overflow-hidden', props.className)} ref={root} style={DIFF_FONT_STYLE}>
+    <div className={cn('dshx:min-h-0 dshx:overflow-hidden', props.className)} ref={root} style={PatchLook.style(dark)}>
       <Virtualizer className="dshx:size-full dshx:overflow-auto dshx:overscroll-contain">
         {files.map(file => (
           <div data-diff-path={file.name} key={`${file.prevName ?? ''}\u0000${file.name}`}>

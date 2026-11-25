@@ -41,7 +41,7 @@ describe('theme block', () => {
   it('keeps Shiki token colours readable on the code block', () => {
     for (const scheme of ['light', 'dark'] as const) {
       const code = PaletteMath.palette({ ...WARM_STONE, scheme }).neutral[1]!
-      for (const hue of [20, 245, 55, 300, 210]) expect(PaletteMath.contrastRatio(ThemeCss.syntaxColor(hue, scheme), code)).toBeGreaterThanOrEqual(4.5)
+      for (const hue of Object.values(ThemeCss.SYNTAX_HUES)) expect(PaletteMath.contrastRatio(ThemeCss.syntaxColor(hue, scheme), code)).toBeGreaterThanOrEqual(4.5)
     }
   })
 })
