@@ -11,7 +11,7 @@ export interface ProjectColorEntry {
 }
 
 const PROJECT_TONE_COUNT = 6
-const PROJECT_TONE_NAMES = ['sky', 'green', 'amber', 'violet', 'rose', 'indigo'] as const
+const PROJECT_TONE_NAMES = ['azure', 'olive', 'copper', 'violet', 'magenta', 'teal'] as const
 const PROJECT_COLOR_PATTERN = /^#[0-9a-f]{6}$/iu
 
 export type ProjectToneName = (typeof PROJECT_TONE_NAMES)[number]
