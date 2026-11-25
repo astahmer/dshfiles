@@ -323,7 +323,9 @@ export class Recall extends Context.Service<
         if (key.kind === 'digest') {
           yield* recordRead(thread === undefined ? 0 : 1, ids)
           if (!thread) return `No digest for ${id}. It may still be running, trivial, or past retention; memory_search finds its messages.`
-          return `${ids[0]} digest (${day(thread.updatedAt)}, ${basename(thread.project)}, ${thread.source === 'model' ? 'written by a model' : 'from the thread record'}). ${MemoryGuidance.untrusted}\n${thread.digest}`
+          // The full Session id: a short t:<id> opens nothing in the window, and a chat link needs the real one.
+          const link = `Session ${thread.id}; cite it in chat as [${thread.title.replace(/[[\]]/gu, '')}](thread:${thread.id}).`
+          return `${ids[0]} digest (${day(thread.updatedAt)}, ${basename(thread.project)}, ${thread.source === 'model' ? 'written by a model' : 'from the thread record'}). ${MemoryGuidance.untrusted}\n${link}\n${thread.digest}`
         }
         if (sessionId === undefined) return `Unknown thread ${id}.`
         const match = /^(\d+)\s*-\s*(\d+)$/.exec(key.range.trim()) ?? /^(\d+)$/.exec(key.range.trim())
@@ -610,7 +612,11 @@ export class Recall extends Context.Service<
       })
 
       /** One thread's message count and timestamps from its Session log, for the panel's digest detail. */
-      const threadDetail = Effect.fn('memory thread detail')(function* (sessionId: string) {
+      const threadDetail = Effect.fn('memory thread detail')(function* (reference: string) {
+        // The t:<id> memory prints resolves to its Session; a full session-<uuid> passes through.
+        const key = memoryReferenceKey({ id: reference })
+        const stored = key === null || key.kind === 'note' ? undefined : yield* repo.thread(key.threadKey).pipe(Effect.orElseSucceed(() => undefined))
+        const sessionId = stored?.id ?? reference.trim().replace(/^`|`$/gu, '')
         const log = yield* sessions.read(sessionId)
         const now = yield* Clock.currentTimeMillis
         const own = log.events.slice(log.inheritedEventCount)

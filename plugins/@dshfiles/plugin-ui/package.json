@@ -21,6 +21,10 @@
       "types": "./src/lib/utils.ts",
       "default": "./src/lib/utils.ts"
     },
+    "./lib/manual-model-choice": {
+      "types": "./src/lib/manual-model-choice.ts",
+      "default": "./src/lib/manual-model-choice.ts"
+    },
     "./lib/stack-frames": {
       "types": "./src/lib/stack-frames.ts",
       "default": "./src/lib/stack-frames.ts"

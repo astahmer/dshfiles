@@ -57,6 +57,7 @@ const CLIENT_BROKER_PATH = fileURLToPath(new URL('../../client/broker.js', impor
 const CLIENT_APP_SERVICES_PATH = fileURLToPath(new URL('../../client/app-services.js', import.meta.url))
 const CLIENT_APP_CONTRACTS_PATH = fileURLToPath(new URL('../../client/app-contracts.js', import.meta.url))
 const CLIENT_LINKS_PATH = fileURLToPath(new URL('../../client/links.js', import.meta.url))
+const CLIENT_TOOLS_PATH = fileURLToPath(new URL('../../client/client-tools.js', import.meta.url))
 const CLIENT_COMMAND_CHORDS_PATH = fileURLToPath(new URL('../../client/command-chords.js', import.meta.url))
 const CLIENT_COMMAND_KEYS_PATH = fileURLToPath(new URL('../../client/command-keys.js', import.meta.url))
 const CLIENT_REGISTRIES_PATH = fileURLToPath(new URL('../../client/registries.js', import.meta.url))
@@ -93,6 +94,7 @@ const CLIENT_RUNTIME_ENTRIES = [
   CLIENT_APP_SERVICES_PATH,
   CLIENT_APP_CONTRACTS_PATH,
   CLIENT_LINKS_PATH,
+  CLIENT_TOOLS_PATH,
   CLIENT_COMMAND_CHORDS_PATH,
   CLIENT_REGISTRIES_PATH,
   CLIENT_STORE_PATH,
@@ -282,6 +284,11 @@ function clientEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, op
           'export const createSource = PluginContextModel.signal',
           `export { Command, Composer, Dialogs, SessionScreen, Toasts } from ${JSON.stringify(CLIENT_APP_SERVICES_PATH)}`,
           `export { LinkHandler, MarkdownLinks } from ${JSON.stringify(CLIENT_LINKS_PATH)}`,
+          `import { ClientToolsModel } from ${JSON.stringify(CLIENT_TOOLS_PATH)}`,
+          `export { ClientTools } from ${JSON.stringify(CLIENT_TOOLS_PATH)}`,
+          'export const defineClientTool = ClientToolsModel.define',
+          'export const describeClientTool = ClientToolsModel.describe',
+          'export const runClientTool = ClientToolsModel.run',
           `export { Browser, Changes, Files } from ${JSON.stringify(CLIENT_APP_CONTRACTS_PATH)}`,
           `export { ComposerAction, ComposerPill, ComposerTool, ComposerTools, FileViewer, HeaderAction, MenuItem, Overlay, Panel, PluginDetailBadge, PluginDetailSection, SessionRowAccessory, SettingsSection } from ${JSON.stringify(CLIENT_REGISTRIES_PATH)}`,
           `export { CommandChords } from ${JSON.stringify(CLIENT_COMMAND_CHORDS_PATH)}`,

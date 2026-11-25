@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import test from 'node:test'
-import { BEGIN, derive, END, OVERRIDES, SEED, withDerived } from './standard-preset.mjs'
+import { ADDITIONS, BEGIN, derive, END, OVERRIDES, SEED, withDerived } from './standard-preset.mjs'
 
 test('the seed preset-standard row is the one the pinned core derives', () => {
   const seed = readFileSync(SEED, 'utf8')
@@ -28,4 +28,12 @@ test('every override applies to the derived row', () => {
   const body = block.slice(block.indexOf('- id: preset-standard'))
   assert.doesNotMatch(body, /customSkillDirs/)
   assert.doesNotMatch(body, /list-agents|modelSelectionSettings/)
+})
+
+test('every addition sits right after its anchor, terminal tools included', () => {
+  const body = derive().slice(derive().indexOf('- id: preset-standard'))
+  for (const addition of ADDITIONS) assert.match(body, new RegExp(`- id: ${addition.after}\\n[\\s\\S]*?\\n      - id: ${addition.id}\\n`), addition.id)
+  // The panel's guidance tells the model to use terminal_open; without this row the tool does not exist.
+  assert.match(body, /- id: tool-terminal\n\s+name: '@deepseek-ai\/dsh-tool-terminal'/)
+  assert.match(body, /preferredShells: !!js "process\.platform === 'win32'/)
 })

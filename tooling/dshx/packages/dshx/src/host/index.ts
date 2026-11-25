@@ -26,6 +26,9 @@ export type { PluginStorage, StorageListAllInput } from './plugin-storage.js'
 export { generate } from './generate.js'
 export type { GenerateInput, GenerateModel, GenerateResult } from './generate.js'
 export type { ToolEdit } from './tool-edits.js'
+import { ToolEditsModel } from './tool-edits.js'
+/** Put one agent in Code Mode (DSH's PTC executor in its own scope); resolves to the disposer. */
+export const mountCodeMode = ToolEditsModel.mountCodeMode
 export type { HostHooks, ShellEnvHook } from './hooks.js'
 export type { HostRegistrations, ModelDiscoveryContribution, ProviderContribution } from './registrations.js'
 export type { HostDefinition, HostToolContribution, PromptContextContribution, PromptContribution, PromptSectionContribution } from './types.js'

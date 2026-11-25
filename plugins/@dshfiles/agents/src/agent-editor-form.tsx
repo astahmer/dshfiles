@@ -1,4 +1,5 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { RouteDisplay, RouteLabel } from './route-display.js'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
@@ -131,7 +132,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
     { value: '', label: 'Harness default', description: 'follows the thread default' },
     ...props.catalog.map(option => ({
       value: option.key,
-      label: option.modelName,
+      label: RouteDisplay.modelName(option),
       description: option.providerName,
       keywords: [option.provider, option.model, option.providerName],
       group: option.providerName,
@@ -306,6 +307,19 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
               searchPlaceholder="Search models or providers…"
               emptyLabel="No model matches."
               triggerClassName="dshx:h-9"
+              trigger={routeOption === undefined ? undefined : <RouteLabel option={routeOption} showAccount />}
+              contentClassName="dshx:min-w-96"
+              renderOption={option => {
+                const route = props.catalog.find(candidate => candidate.key === option.value)
+                return route === undefined ? (
+                  <>
+                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{option.label}</span>
+                    {option.description === undefined ? null : <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{option.description}</span>}
+                  </>
+                ) : (
+                  <RouteLabel option={route} showAccount />
+                )
+              }}
               onValueChange={value => {
                 const option = props.catalog.find(candidate => candidate.key === value)
                 if (option === undefined) {

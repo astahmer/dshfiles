@@ -1,7 +1,7 @@
 import { CircleHelpIcon } from '@dshfiles/plugin-ui/icons'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BRAND_MARKS, type BrandKey } from './brand-marks.js'
+import { BrandMark } from './brand-mark.js'
 import { EFFORT_BAR_COUNT, EFFORT_BAR_HEIGHTS, type EffortGlyph } from './effort-levels.js'
 
 const TONE_FILL = {
@@ -10,29 +10,7 @@ const TONE_FILL = {
   warning: 'dshx:bg-warning',
 } as const
 
-/** The model family's mark: vendored brand artwork, or its initial when the family is unknown. */
-export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey | undefined; readonly name: string; readonly className?: string }) => {
-  if (brand === undefined)
-    return (
-      <span
-        aria-hidden="true"
-        className={cn(
-          'dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground',
-          className,
-        )}
-      >
-        {name.slice(0, 1)}
-      </span>
-    )
-  const mark = BRAND_MARKS[brand]
-  return (
-    <svg aria-hidden="true" className={cn('dshx:size-[18px] dshx:shrink-0', className)} data-brand={brand} style={{ color: mark.color }} viewBox="0 0 24 24">
-      {mark.paths.map((path, index) => (
-        <path d={path.d} fill={path.fill ?? 'currentColor'} fillRule="evenodd" key={index} />
-      ))}
-    </svg>
-  )
-}
+export { BrandMark }
 
 /** The service name a route is offered through, shown after the model name. */
 export const ProviderLabel = ({ label, className }: { readonly label: string; readonly className?: string }) => (

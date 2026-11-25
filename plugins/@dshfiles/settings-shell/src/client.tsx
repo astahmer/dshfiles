@@ -12,6 +12,7 @@ import { createSnapshotStore, type ObservableSnapshot, type SnapshotSelectorHook
 import type { ShortcutCommandId } from '@deepseek-ai/dsh-client-shortcuts/client'
 import { resolveSlotLabel, type PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
+  ClientTools,
   createApiClient,
   defineClient,
   provideSettingsPageRenderer,
@@ -25,6 +26,7 @@ import {
 } from '@dshfiles/dshx/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteActions, type PaletteAction } from '@dshfiles/command-palette/palette-contract'
+import { workbenchTabs } from '@dshfiles/workbench/tabs'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -61,6 +63,7 @@ import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
+import { SettingsClientTools } from './settings-client-tools.js'
 import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
@@ -728,6 +731,27 @@ export default defineClient({
       return () => window.removeEventListener(OPEN_SETTINGS_EVENT, onOpenSettings)
     }, 'settings-shell: open-settings requests')
 
+    // The same open path as `dshfiles:open-settings`, offered to Agents as client tools; a bridge plugin carries the calls.
+    ctx.effect(() => {
+      const plugin = metadata?.plugin
+      if (plugin === undefined) return () => {}
+      const releases = SettingsClientTools.create({
+        destinations: () =>
+          groups.getSnapshot().flatMap(({ group, entries }) => entries.map(entry => ({ id: entry.id, label: entry.label, group: group.label }))),
+        open: openRequest,
+        // The tab strip main-tabs publishes through the workbench channel (no dependency on main-tabs itself).
+        openInNewTab: () => {
+          const tabs = workbenchTabs()
+          if (!tabs.getSnapshot().enabled) return false
+          tabs.actions.open({ kind: 'panel', panelId: SETTINGS_PANEL_ID }, true, 'Settings')
+          return true
+        },
+      }).map(tool => plugin.add(ClientTools, tool))
+      // Plugin pages come from the settings mirror, which otherwise loads on the first Settings open.
+      void describe.ensure()
+      return () => releases.forEach(release => release())
+    }, 'settings-shell: client tools for Agents')
+
     const addPaletteAction = (action: PaletteAction): (() => void) => metadata?.plugin?.add(PaletteActions, action) ?? (() => {})
     ctx.effect(() => {
       let registered: Array<() => void> = []
@@ -808,7 +832,7 @@ export default defineClient({
     const probeNow = (): void => {
       if (reachability.getSnapshot().probing) return
       reachability.set(ReachabilityModel.started(reachability.getSnapshot()))
-      void probeHost().then((reachable) => {
+      void probeHost().then(reachable => {
         const next = ReachabilityModel.settled(reachability.getSnapshot(), reachable)
         reachability.set(next.state)
         if (next.recovered) connection.reconnect()

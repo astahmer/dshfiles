@@ -425,7 +425,9 @@ ${output.text}`,
     }),
     threads: MemoryContract.method({
       input: Schema.Struct({
-        project: Schema.String.check(Schema.isMaxLength(4_096)),
+        project: Schema.String.check(Schema.isMaxLength(4_096)).annotate({
+          description: 'Absolute project folder path, e.g. /Users/me/code/app (not "all"; memory_search with project "all" spans projects).',
+        }),
         includeUndigested: Schema.optional(Schema.Boolean).annotate({ description: 'Also list Sessions memory has not digested yet; default false.' }),
       }),
       output: Schema.Array(panelThreadSchema),
@@ -434,7 +436,11 @@ ${output.text}`,
       tool: { name: 'memory_threads', readOnly: true, render: compactJson },
     }),
     threadDetail: MemoryContract.method({
-      input: Schema.Struct({ id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)) }),
+      input: Schema.Struct({
+        id: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(200)).annotate({
+          description: 'Thread reference t:<id> from memory, or a full session-<uuid>.',
+        }),
+      }),
       output: Schema.Struct({ messages: integer, createdAt: Schema.Number, updatedAt: Schema.Number }),
       description: "One thread digest's message count and timestamps, read from its Session log. Read-only.",
       tool: { name: 'memory_thread_detail', readOnly: true, render: compactJson },

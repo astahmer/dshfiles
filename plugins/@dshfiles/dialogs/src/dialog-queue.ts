@@ -70,12 +70,13 @@ export const createDialogQueue = (): DialogQueue => {
     alert: input => enqueue<void>((id, settle) => ({ id, kind: 'alert', input, settle })),
     prompt: input => enqueue<string | undefined>((id, settle) => ({ id, kind: 'prompt', input, settle })),
     select: <Value extends string>(input: SelectInput<Value>) =>
-      enqueue<Value | undefined>((id, settle) => ({
-        id,
-        kind: 'select',
-        input,
-        settle: answer => settle(input.options.find(option => option.value === answer)?.value),
-      })),
+      enqueue<Value | undefined>((id, settle) => {
+        const answer = (value: string | undefined): void => settle(input.options.find(option => option.value === value)?.value)
+        // Aborting settles the request wherever it is, open or still waiting, so the dialog closes.
+        if (input.signal?.aborted === true) queueMicrotask(() => answer(undefined))
+        else input.signal?.addEventListener('abort', () => answer(undefined), { once: true })
+        return { id, kind: 'select', input, settle: answer }
+      }),
   }
 
   const dispose = (): void => {

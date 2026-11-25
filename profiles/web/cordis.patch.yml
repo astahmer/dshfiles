@@ -142,6 +142,7 @@
 #   tool-subagent-fork: the same owned fork for subagent_fork
 #   tool-ask-user: owned fork that tells the model the form renders markdown and html previews (b:6); timed mode lets a question stay answerable while the agent works (timeout -1 blocks)
 #   skill-filesystem: stock points customSkillDirs at @deepseek-ai/dsh-agent-preset resolved from the patch file; from a profile patch that package does not resolve and the expression would break the whole preset, so this row keeps the default skill directories
+#   user-terminals: persistent terminals in the side panel: terminal_open/send/read let the agent run a command the user watches (the panel guidance already names them), and user_terminal_list/read read terminals the user opened (issue #270)
 - id: preset-standard
   name: '@deepseek-ai/dsh-agent-preset'
   config:
@@ -223,6 +224,21 @@
               thresholdChars: 8192
               headChars: 4096
               tailChars: 1024
+      - id: user-terminals
+        name: cordis:group
+        group: true
+        isolate:
+          terminals: true
+        config:
+          - id: terminal-registry
+            name: '@deepseek-ai/dsh-terminal'
+          - id: terminal-panel
+            name: '@deepseek-ai/dsh-terminal-panel'
+            config:
+              readUserTerminals: true
+              preferredShells: !!js "process.platform === 'win32' ? ['pwsh', 'powershell'] : []"
+          - id: tool-terminal
+            name: '@deepseek-ai/dsh-tool-terminal'
       - id: delegation
         name: cordis:group
         group: true

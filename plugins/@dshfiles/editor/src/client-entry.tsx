@@ -1,11 +1,12 @@
 import type {} from '@deepseek-ai/dsh-api-gateway/client'
+import { EditorClientTools } from './editor-client-tools.js'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
 import type { UseSidebarRightTabInfo } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
-import { Command, defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
+import { ClientTools, Command, defineClient, FileViewer, Files, type FilesService, SessionScreen, SettingsSection, type SettingsSectionItem } from '@dshfiles/dshx/client'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
@@ -256,6 +257,10 @@ export default defineClient({
         window.removeEventListener(GO_TO_LINE_EVENT, onGoToLine)
       }
     }, 'dshfiles-editor: open-file and go-to-line requests')
+
+    // The same store and open path, offered to Agents as client tools; a bridge plugin carries the calls.
+    if (plugin !== undefined)
+      for (const tool of EditorClientTools.create({ currentSession, state: store.getSnapshot, open: openFile })) plugin.add(ClientTools, tool)
 
     ctx.effect(() => {
       const fileIndex = createWorkspaceFileIndex<SessionId>({

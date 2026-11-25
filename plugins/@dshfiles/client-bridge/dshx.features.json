@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "agent-client-tools",
+      "title": "Agents act in your DSH window",
+      "summary": "client_tools_list shows the open DSH browser windows and the client tools other plugins declare in them; client_tool_call runs one (open a file at a line in the editor, a panel, Settings, a tab, a palette command), or a chain of up to 20 with steps in one round trip stopping at the first failure, in the window showing the Agent's thread or the one it names, and returns the results. A PTC-mode (Code Mode) agent calls both from a run_code program. The window shows one notice per call for the changes it made.",
+      "reach": [
+        "seed jev-setup-chat-thread",
+        "fill textbox \"Message or run a task*\" \"[[call client_tool_call {\\\"tool\\\":\\\"settings_open\\\",\\\"input\\\":{\\\"section\\\":\\\"General\\\"}}]]\"",
+        "press Enter",
+        "expect text \"Agent: Open Settings\""
+      ],
+      "surfaces": ["tool", "host", "client", "api", "settings"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools: client_tools_list, client_tool_call",
+      "configuration": [
+        {
+          "key": "enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; off refuses every client_tool_call with a message naming this setting.",
+          "choices": ["true", "false"],
+          "coveredBy": ["client-bridge.call-refusals"]
+        },
+        {
+          "key": "notify",
+          "defaultValue": "true",
+          "constraints": "Boolean; a notice names each page-changing action an Agent ran. Read-only tools never notify.",
+          "choices": ["true", "false"],
+          "coveredBy": ["client-bridge.runner-runs-and-notifies", "client-bridge.runner-read-no-notice"]
+        }
+      ],
+      "states": ["no-window", "idle", "invoking", "answered", "failed", "timed-out", "disabled"],
+      "failureModes": [
+        "No DSH window is open: the call is refused with the step to open one.",
+        "The named window closed or never answers: window-closed at once on leave, timeout after timeoutMs otherwise.",
+        "No window offers the tool: the refusal lists the tools the window does offer.",
+        "Invalid input: the window replies with the schema validation error and runs nothing.",
+        "Switched off in Settings: every call is refused with the setting to turn on.",
+        "A chain stops at the first failing step: the Agent is told which step failed, why, and what already ran in the window; the later steps do not run.",
+        "A model reads \"open X\" as \"read X\": the two Host tools name what the window can do and when to act there instead of reading."
+      ],
+      "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "Ask an agent to open Settings at the Plugin Market for you.",
+        "doneWhen": "Settings opens at Plugin Market in your window and a notice names the agent's action.",
+        "open": {
+          "settings": {
+            "entryId": "dshfiles-client-bridge",
+            "fieldPath": ["enabled"]
+          }
+        }
+      },
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "client-bridge.agent-opens-settings",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "client-bridge.refuses-unknown-tool",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "client-bridge.code-mode-chain",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-routes-and-traces",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "sends the call to the window showing the thread and returns its result, under one client-tool invoke span"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-window-error",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "reports the window’s error to the Agent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-refusals",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "refuses while switched off, without a window, from a page, or for a tool no window offers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-timeout",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "gives up after the timeout when the window never answers"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-window-leaves",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "fails the pending call at once when its window leaves"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.windows-ranking",
+          "file": "plugins/@dshfiles/client-bridge/src/windows.test.ts",
+          "testName": "prefers the window showing the caller’s thread, then focus, then recency"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.runner-runs-and-notifies",
+          "file": "plugins/@dshfiles/client-bridge/src/invoke-runner.test.ts",
+          "testName": "runs the tool, replies with its result, tells the user, and continues the Host trace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.runner-read-no-notice",
+          "file": "plugins/@dshfiles/client-bridge/src/invoke-runner.test.ts",
+          "testName": "says when the tool is gone and never notifies for a read"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-chain",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "runs a chain in one window in one round trip and returns each step’s result"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.call-chain-failure",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "names the failed step of a chain and what already ran before it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.runner-chain",
+          "file": "plugins/@dshfiles/client-bridge/src/invoke-runner.test.ts",
+          "testName": "runs a chain in order, one span per step, and stops at the first failure with one notice for what ran"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.descriptions-name-declared-tools",
+          "file": "plugins/@dshfiles/client-bridge/src/api.test.ts",
+          "testName": "name only client tools an owned plugin still declares"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.descriptions-open-in-window",
+          "file": "plugins/@dshfiles/client-bridge/src/api.test.ts",
+          "testName": "tell the model to act in the window when asked to open something, in both Host tools"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "client-tool invoke",
+          "file": "plugins/@dshfiles/client-bridge/src/client-tool-call.test.ts",
+          "testName": "sends the call to the window showing the thread and returns its result, under one client-tool invoke span"
+        }
+      ]
+    },
+    {
+      "id": "window-presence",
+      "title": "Window presence",
+      "summary": "Each DSH browser window (one id per tab, kept across a reload) announces its focus, the thread it shows and its client tools, re-announces after a Host restart and every 30 s, and leaves when the page closes; the Host forgets a silent window after 90 s.",
+      "surfaces": ["client", "host", "api"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "none (feeds client_tools_list)",
+      "configuration": [],
+      "states": ["announced", "stale", "left"],
+      "failureModes": ["A window that closes without pagehide stays listed until the 90 s TTL drops it."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.windows-ttl",
+          "file": "plugins/@dshfiles/client-bridge/src/windows.test.ts",
+          "testName": "forgets a window it has not heard from within the TTL"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.windows-focus-time",
+          "file": "plugins/@dshfiles/client-bridge/src/windows.test.ts",
+          "testName": "keeps the last focus time while a window stays in the background"
+        },
+        {
+          "kind": "unit-test",
+          "id": "client-bridge.window-id-reload",
+          "file": "plugins/@dshfiles/client-bridge/src/window-state.test.ts",
+          "testName": "keeps the id across a reload and gets a new one for any other navigation, a duplicated tab included"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "client-bridge.presence-browser",
+          "reason": "Presence has no screen of its own; the agent-opens-settings journey lists this window through client_tools_list, which only works once the window announced itself."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    }
+  ]
+}

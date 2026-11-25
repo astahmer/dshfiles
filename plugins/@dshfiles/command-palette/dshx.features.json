@@ -515,6 +515,59 @@
           "reason": "Client-only: the palette renders registry rows and starts no Host work."
         }
       ]
+    },
+    {
+      "id": "palette-client-tools",
+      "title": "Palette commands as client tools",
+      "summary": "Every command palette row is offered to Agents through the client bridge: palette_commands lists the commands available where the user is (the same context the palette computes: thread on screen, project, theme), and palette_run runs one by id, with confirm: true, exactly as picking it does.",
+      "surfaces": ["client"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "client tools: palette_commands, palette_run (through client_tool_call)",
+      "configuration": [],
+      "states": ["listed", "ran", "unavailable", "unknown"],
+      "failureModes": [
+        "An unknown id or a command not available where the user is (a thread action with no thread on screen) is refused with the step to list the commands again.",
+        "Without confirm: true, nothing runs."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "command-palette.agent-runs-palette-command",
+          "featureFile": "tooling/dshx/e2e/features/client-bridge.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.client-tools-list",
+          "file": "plugins/@dshfiles/command-palette/src/palette-client-tools.test.ts",
+          "testName": "lists the commands available where the user is, with their labels and keys"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.client-tools-run",
+          "file": "plugins/@dshfiles/command-palette/src/palette-client-tools.test.ts",
+          "testName": "runs a command with the thread on screen, only with confirm"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.client-tools-refusals",
+          "file": "plugins/@dshfiles/command-palette/src/palette-client-tools.test.ts",
+          "testName": "refuses an unknown command or one not available here, saying what to do"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.action-context",
+          "file": "plugins/@dshfiles/command-palette/src/palette-context.test.ts",
+          "testName": "names the thread on screen, its parent’s project, and its pinned and archived state"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-side tools: the client bridge records each call (execute_tool, client-tool invoke, client-tool execute and step spans)."
+        }
+      ]
     }
   ],
   "kind": "bundle"

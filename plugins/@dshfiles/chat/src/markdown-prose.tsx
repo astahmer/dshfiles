@@ -22,6 +22,8 @@
 import { cloneElement, createElement, Fragment, isValidElement, useMemo, type JSXElementConstructor, type ReactElement, type ReactNode } from 'react'
 import { InfoIcon, LightbulbIcon, MessageSquareWarningIcon, OctagonAlertIcon, TriangleAlertIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { CodeFold, type FoldableCodeBlockProps } from './code-fold.js'
+import { parseFileReference } from './file-reference-parts.ts'
+export type { FileReferenceParts } from './file-reference-parts.ts'
 
 /** Which Chat surface rendered the Markdown: an assistant answer, or other transcript Markdown (reasoning, summaries). */
 export type MarkdownSurface = 'answer' | 'fenced'
@@ -51,19 +53,6 @@ export interface MarkdownProseState {
 
 const createState = (codeBlock: JSXElementConstructor<never>): MarkdownProseState => ({ codeBlock, cache: new WeakMap(), collisions: '' })
 
-/** A file reference as written: a path with an optional `:24`, `:24:3`, `#L24` or `#L24-L30` line suffix. */
-const FILE_REFERENCE = /^(.*?)(?::(\d+)(?:[:-]\d+)?|#L(\d+)(?:-L?\d+)?)?$/
-
-export interface FileReferenceParts {
-  readonly path: string
-  readonly line: string | undefined
-}
-
-const parseFileReference = (value: string): FileReferenceParts => {
-  const match = FILE_REFERENCE.exec(value.trim())
-  const path = match?.[1] ?? value
-  return { path: path === '' ? value : path, line: match?.[2] ?? match?.[3] }
-}
 
 const segments = (path: string): readonly string[] => path.split(/[\\/]/).filter(segment => segment !== '')
 

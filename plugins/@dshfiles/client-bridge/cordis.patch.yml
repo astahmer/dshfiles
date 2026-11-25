@@ -1,0 +1,5 @@
+# Agent → browser bridge: the Host half serves client_tools_list / client_tool_call and keeps the open windows; the
+# Client half announces this window and runs the client tools other plugins declare (see README.md).
+- insert:
+    - id: dshfiles-client-bridge
+      name: '@dshfiles/client-bridge'

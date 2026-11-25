@@ -1,8 +1,11 @@
 import type { Agent } from '@deepseek-ai/dsh-agent'
+// Type-only: ctx.agentPresets (the composed preset of an agent) and its `agent-preset/selected` event.
+import type {} from '@deepseek-ai/dsh-agent-preset-registry'
 import { createUserMessage, type ToolSchema, type UserMessage } from '@deepseek-ai/dsh-llm'
 import { projectToolSchema, type ToolExecutor } from '@deepseek-ai/dsh-tools'
 import { ToolExecutionPipeline, executeToolBatch } from '@deepseek-ai/dsh-tools/pipeline'
 import { DshxPlugin, HostContext, HostEvents, Tool } from '@dshfiles/dshx/effect'
+import { mountCodeMode } from '@dshfiles/dshx/host'
 import { Context, Effect, Exit, Layer, Ref, Schema, Scope } from 'effect'
 import { serializedSchemaBytes } from './schema-measurement.js'
 import { ToolSearchModel } from './search.js'
@@ -50,10 +53,19 @@ const nativeCoreTools = [
   'working_directory',
   'compaction_threshold',
 ]
+/**
+ * Owned tools an agent needs without a search: the client bridge's two tools act in the user's window, and are the
+ * only way a Code Mode program reaches it (a nested `tool_search` is refused there).
+ */
+const ownedCoreTools = ['client_tools_list', 'client_tool_call']
+const defaultAlwaysVisible = [...nativeCoreTools, ...ownedCoreTools]
+/** Agent presets whose own PTC executor (Code Mode, `run_code`) this plugin leaves in place. */
+const defaultCodeModePresets = ['ptc']
 const modeSchema = Schema.Literals(['cache-safe', 'progressive'])
 const defaultConfig = {
   mode: 'cache-safe' as const,
-  alwaysVisible: nativeCoreTools,
+  alwaysVisible: defaultAlwaysVisible,
+  codeModePresets: defaultCodeModePresets,
   maxResults: 5,
   maxQueryChars: 512,
   reportSchemaMetrics: false,
@@ -61,7 +73,8 @@ const defaultConfig = {
 }
 const configSchema = Schema.Struct({
   mode: modeSchema.pipe(Schema.withDecodingDefaultKey(Effect.succeed('cache-safe' as const))),
-  alwaysVisible: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(nativeCoreTools))),
+  alwaysVisible: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaultAlwaysVisible))),
+  codeModePresets: Schema.Array(Schema.String).pipe(Schema.withDecodingDefaultKey(Effect.succeed(defaultCodeModePresets))),
   maxResults: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(100)).pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(5)),
   ),
@@ -126,6 +139,12 @@ interface AgentState {
   catalogChanged: boolean
   deniedNames: readonly string[]
   liftRestriction: (() => void) | undefined
+  /**
+   * The agent runs a Code Mode preset (`codeModePresets`): its preset's PTC executor stays selected, so this plugin
+   * neither replaces the executor nor adds `tool_search` (a nested search is refused); it only keeps deferred globals
+   * out of the program SDK, which then holds the always-visible and preset tools.
+   */
+  readonly codeMode: boolean
 }
 
 /** Per-agent progressive tool discovery: each agent sees only its disclosed tools plus `tool_search`. */
@@ -135,6 +154,8 @@ class ToolSearch extends Context.Service<
     readonly install: (agent: Agent) => Effect.Effect<void, ToolSearchFailure>
     readonly uninstall: (agent: Agent) => Effect.Effect<void>
     readonly globalsChanged: Effect.Effect<void>
+    /** A blank session switched preset: attach its agent again for the composition it now runs. */
+    readonly presetSelected: (sessionId: string) => Effect.Effect<void, ToolSearchFailure>
   }
 >()('@dshfiles/tool-search/ToolSearch') {
   static readonly layer = (config: ToolSearchConfig) =>
@@ -165,6 +186,15 @@ class ToolSearch extends Context.Service<
           return globalCatalog
         }
         const isAlwaysVisible = (name: string) => alwaysVisible.some(pattern => pattern.test(name))
+
+        /**
+         * The preset an agent is composed from now: the registry's mounted composition (a blank session may switch
+         * preset after creation), else the session's creation header.
+         */
+        const presetOf = (agent: Agent): string | undefined => {
+          const header: { readonly agentPreset?: string } | undefined = agent.session.header
+          return ctx.get('agentPresets')?.composedPreset(agent.ctx) ?? header?.agentPreset
+        }
 
         const reportGlobalSchemas = Effect.gen(function* () {
           if (!config.reportSchemaMetrics) return
@@ -384,6 +414,22 @@ class ToolSearch extends Context.Service<
             )
           })
 
+        /**
+         * Code Mode: deny the deferred globals so the program SDK stays small, and mount DSH's PTC executor in the agent's
+         * own scope. The preset's executor alone is not enough: an agent scope that held this plugin's cache-safe
+         * executor (a blank session that switched to PTC) keeps an unavailable selection once that executor is released.
+         * Without the executor package the preset's own executor still serves an agent that was never attached otherwise.
+         */
+        const attachCodeMode = (state: AgentState) =>
+          Effect.gen(function* () {
+            yield* refreshRestriction(state)
+            const mounted = yield* Effect.tryPromise(() => mountCodeMode(ctx, state.agent)).pipe(
+              Effect.tapError(cause => Effect.logWarning(`tool-search: Code Mode for ${state.agent.id} keeps the preset executor: ${detailOf(cause)}`)),
+              Effect.option,
+            )
+            if (mounted._tag === 'Some') yield* Effect.addFinalizer(() => ownedSync(mounted.value))
+          })
+
         const uninstall = (agent: Agent) =>
           Effect.suspend(() => {
             const state = states.get(agent)
@@ -419,6 +465,7 @@ class ToolSearch extends Context.Service<
             catalogChanged: false,
             deniedNames: [],
             liftRestriction: undefined,
+            codeMode: config.codeModePresets.includes(presetOf(agent) ?? ''),
           }
           state.announced = reachableCatalog(state)
           states.set(agent, state)
@@ -426,11 +473,13 @@ class ToolSearch extends Context.Service<
             scope,
             ownedSync(() => state.liftRestriction?.()),
           )
-          const attachMode =
-            config.mode === 'cache-safe'
+          const attachMode = state.codeMode
+            ? attachCodeMode(state)
+            : config.mode === 'cache-safe'
               ? attachCacheSafe(state)
               : owned(Tool.register(searchTool(state), { tools: agent.ctx.tools })).pipe(Effect.andThen(refreshRestriction(state)))
-          const attach = config.announceToolChanges ? attachMode.pipe(Effect.andThen(announceToolChanges(state))) : attachMode
+          // A Code Mode program cannot search, so a notice about tools it cannot reach would only mislead it.
+          const attach = config.announceToolChanges && !state.codeMode ? attachMode.pipe(Effect.andThen(announceToolChanges(state))) : attachMode
           yield* attach.pipe(
             Scope.provide(scope),
             Effect.provideService(HostContext, hostContext),
@@ -446,12 +495,21 @@ class ToolSearch extends Context.Service<
           for (const state of states.values()) {
             refreshCatalog(state)
             state.catalogChanged = true
-            if (config.mode === 'progressive') yield* refreshRestriction(state)
+            if (config.mode === 'progressive' || state.codeMode) yield* refreshRestriction(state)
           }
         })
 
+        const presetSelected = (sessionId: string) =>
+          Effect.suspend(() => {
+            const agent = [...states.keys()].find(candidate => candidate.session.id === sessionId)
+            if (agent === undefined) return Effect.void
+            const codeMode = config.codeModePresets.includes(presetOf(agent) ?? '')
+            if (states.get(agent)?.codeMode === codeMode) return Effect.void
+            return uninstall(agent).pipe(Effect.andThen(install(agent)))
+          })
+
         yield* reportGlobalSchemas
-        return ToolSearch.of({ install, uninstall, globalsChanged })
+        return ToolSearch.of({ install, uninstall, globalsChanged, presetSelected })
       }),
     )
 }
@@ -465,6 +523,7 @@ const attachAgents = Layer.effectDiscard(
     yield* HostEvents.on('agent/created', event => logged(search.install(event.agent)))
     yield* HostEvents.on('agent/disposed', event => search.uninstall(event.agent))
     yield* HostEvents.on('tools/change', () => search.globalsChanged)
+    yield* HostEvents.on('agent-preset/selected', sessionId => logged(search.presetSelected(sessionId)))
     for (const agent of ctx.agents.list()) yield* search.install(agent)
   }),
 )

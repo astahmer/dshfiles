@@ -97,4 +97,5 @@ test('typed handles and peers are normalized the way a handle is stored', () => 
   assert.equal(AgentEditor.routeLabel(null, [luna]), 'Harness default')
   assert.equal(AgentEditor.routeLabel({ provider: 'codex', model: 'gpt-6-luna', reasoningEffort: 'high' }, [luna]), 'GPT-6 Luna · high')
   assert.equal(AgentEditor.routeLabel({ provider: 'gone', model: 'raw-model' }, [luna]), 'raw-model')
+  assert.equal(AgentEditor.routeLabel({ provider: 'codex', model: 'gpt-6-luna' }, [{ ...luna, modelName: 'codex/GPT-6 Luna' }]), 'GPT-6 Luna')
 })

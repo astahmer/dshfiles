@@ -1,5 +1,6 @@
 import { memo, useCallback, useMemo } from 'react'
 import type { InjectFace, PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
+import type { MarkdownFileMentions } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ChatFileMentions, ChatNodeViewProps, PresentationInjected, TurnTailOwnerProps } from '../contract/slots.ts'
 import { AssistantMarkdown } from './AssistantMarkdown.tsx'
 import { MarkdownProse } from '../../markdown-prose.tsx'
@@ -11,6 +12,8 @@ export interface AssistantNodeInjected extends PresentationInjected {
   resolveFilePath: (path: string) => string
   /** Resolve closing-Turn mentions with the supplied ordinary file gesture callback. */
   fileMentions: (owner: TurnTailOwnerProps, getFileTriggerProps: NonNullable<Parameters<ChatFileMentions['forClosing']>[2]>) => ReturnType<ChatFileMentions['forClosing']>
+  /** dshfiles: links any inline-code file reference (`name.ts:24`, `dir/name.ts`) to the file, found at click time. */
+  fileReferences: (openFile: (path: string, line: number | undefined) => void) => MarkdownFileMentions
 }
 
 type AssistantNodeViewProps = ChatNodeViewProps<'assistant-step'> & InjectFace<AssistantNodeInjected>
@@ -19,7 +22,7 @@ type AssistantNodeViewProps = ChatNodeViewProps<'assistant-step'> & InjectFace<A
 /** Streaming, settled, and interrupted Assistant states share one keyed renderer instance. */
 export const AssistantNodeView = memo(function AssistantNodeView({
   node, groupPart, useDisclosure, useGroupAction, useTurnData, turnProcess, openFile, loadImage, fileMentions,
-  usePresentation, renderSlot, t, sessionId, useContextMenu, resolveFilePath,
+  usePresentation, renderSlot, t, sessionId, useContextMenu, resolveFilePath, fileReferences,
 }: AssistantNodeViewProps) {
   const { getTriggerProps } = useContextMenu()
   const getFileTriggerProps = useCallback((path: string) => getTriggerProps(() => ({
@@ -37,20 +40,24 @@ export const AssistantNodeView = memo(function AssistantNodeView({
   }, [data.finalNode, openFile, tail, turn])
   // dshfiles (productivity pass T1.3): a mention written with a line (`name.ts:24`, `name.ts#L24`) resolves through
   // its path and opens at that line, so it becomes a file chip like the bare path does.
+  // dshfiles: then any other file reference in any reply (a file the Agent only read), found when clicked.
+  const references = useMemo(
+    () => fileReferences((path, line) => { void (line === undefined ? openFile(path) : openFile(path, { line })) }),
+    [fileReferences, openFile],
+  )
   const mentions = useMemo(() => {
     const native = owner === undefined ? undefined : fileMentions(owner, getFileTriggerProps)
-    if (native === undefined) return undefined
     return {
       resolve: (value: string) => {
-        const direct = native.resolve(value)
+        const direct = native?.resolve(value)
         if (direct !== undefined) return direct
         const { path, line } = MarkdownProse.parseFileReference(value)
-        if (line === undefined || path === value) return undefined
-        const target = native.resolve(path)
-        return target === undefined ? undefined : { ...target, open: () => { openFile(path, { line: Number(line) }) } }
+        const target = line === undefined || path === value ? undefined : native?.resolve(path)
+        if (target !== undefined) return { ...target, open: () => { openFile(path, { line: Number(line) }) } }
+        return references.resolve(value)
       },
     }
-  }, [fileMentions, getFileTriggerProps, openFile, owner])
+  }, [fileMentions, getFileTriggerProps, openFile, owner, references])
   const keepReplies = usePresentation(policy => policy.foldedReplies === 'all')
   // A kept reply row stays visible while the folded Turn hides its inline reasoning.
   const reasoningHidden = turnProcess !== undefined

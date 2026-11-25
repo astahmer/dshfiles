@@ -21,8 +21,10 @@ The rules that keep the list honest:
   requires ("call only when the user asked"), and destructive work (stopping a
   running thread) is never implied by a milder request.
 - A capability that only exists as browser presentation state (a tab layout, a
-  lightbox, a draft composer) is not agent-actionable; it is listed under
-  _Presentation-only_ rather than proposed as a tool.
+  lightbox, a draft composer) has no Host tool; it is listed under
+  _Presentation-only_. When a user may ask an Agent to do it for them (open
+  Settings at a section, open a tab), its owner declares a **client tool**
+  instead (see [Client tools](#client-tools-agent--browser-window)).
 
 ## Combined revision review
 
@@ -50,6 +52,23 @@ native `ui-theme` setting (`settings_set`). The historical survey counts below a
 ## Onboarding (DSH 0.2.1-rc.2)
 
 `@dshfiles/onboarding` binds every user-facing capability of Getting started to its Host API. `onboarding_overview` (read-only) returns the checklist, packs and feature rows the page shows, and with `preview: { pack, action }` the exact pack change the dialog previews. `onboarding_pack_apply` (write, run only when the user asked) applies one pack change and requires `confirm: true`; a call without it changes nothing, and the other action reverses it. `onboarding_reach` (read-only) returns the steps **Show me where** walks. `onboarding_whats_new` (read-only) returns What's new. `onboarding_suggestions` (read-only) returns the usage suggestions the page shows and refuses, reading nothing, while the `suggestions` setting is off (the default); dismissing a suggestion is per-browser presentation and has no tool. `onboarding_try_it` (write, run only when the user asked) starts the same demo thread **Try it** starts, through thread-sidebar's Thread actions create path; it requires `confirm: true`, refuses while the `tryIt` setting is off (the default), and returns the thread id so the user can open, stop or archive it (the tokens spent are not reversible). Opening a page, replaying the wizard and walking a feature are presentation and have no tool: the Agent gives the user the steps and the user walks them. See the [plugin README](../plugins/@dshfiles/onboarding/README.md#agent-tools). The historical survey counts below are not recalculated by this scoped addition.
+
+## Client tools (agent → browser window)
+
+Host tools cannot reach browser-only actions, so the owning plugin declares them as client tools: `defineClientTool` (dshx, WebMCP shape: name, title, description, input schema, `readOnly`, `execute`) added to the page-wide `ClientTools` registry. `@dshfiles/client-bridge` carries Agent calls: `client_tools_list` (read-only) lists the open windows (focus, thread on screen, tools with their input schema) and `client_tool_call` runs one tool in the window showing the Agent's thread, or the `clientId` it names, and returns the result. The bridge declares no action itself.
+
+| Owner           | Client tools                                                    |
+| --------------- | --------------------------------------------------------------- |
+| settings-shell  | `settings_sections` (read-only), `settings_open`                |
+| main-tabs       | `tabs_list` (read-only), `tabs_open`, `tabs_focus`              |
+| command-palette | `palette_commands` (read-only), `palette_run` (`confirm: true`) |
+| editor          | `editor_files` (read-only), `editor_open_file`                  |
+| workbench       | `workbench_panels` (read-only), `workbench_open_panel`          |
+| chat            | `browser_open`                                                  |
+| thread-sidebar  | `thread_open_aside`                                             |
+| sidebar-right   | `sidepanel_tabs` (read-only), `sidepanel_open`                  |
+
+The same rules as Host tools apply: writes say they run only when the user asked; the window shows a notice for each write (`notify` setting); every call is one `client-tool invoke` Host span continued by the page's `client-tool execute` span, under the automatic `execute_tool client_tool_call` span, and the transcript keeps its input and result. `enabled` (default on) in Settings › Client bridge refuses every call. To chain page actions, `client_tool_call` takes `steps` (up to 20 calls in order in one round trip, stopping at the first failure); for loops and conditions, a thread on the **PTC mode** preset calls both bridge tools from one `run_code` program, which `@dshfiles/tool-search` allows through `codeModePresets` with the bridge tools in its default `alwaysVisible`. See the [plugin README](../plugins/@dshfiles/client-bridge/README.md#chaining-actions).
 
 ## Coverage summary
 

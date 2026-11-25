@@ -6,7 +6,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { defineClient, Command, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { ClientTools, defineClient, Command, useRegistry, useSettings } from '@dshfiles/dshx/client'
+import { WorkbenchClientTools } from './workbench-client-tools.js'
 import type { RightPanelMode } from '@dshfiles/frame-layout/regions'
 // Type-only: the frame's right-column seat and the `shell.dock` slot it declares.
 import type {} from '@dshfiles/frame-layout/regions'
@@ -628,6 +629,13 @@ export default defineClient({
       }
       adoptPanel({ region, api, panelId })
     }
+
+    // The registry and this open path, offered to Agents as client tools; a bridge plugin carries the calls.
+    for (const tool of WorkbenchClientTools.create({
+      panels: registry.list,
+      open: (panelId, region) => (region === undefined ? registry.open(panelId) : openInRegion(region, panelId)),
+    }))
+      metadata?.plugin?.add(ClientTools, tool)
 
     ctx.effect(
       () =>

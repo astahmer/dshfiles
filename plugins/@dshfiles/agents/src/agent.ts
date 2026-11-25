@@ -114,8 +114,8 @@ export interface AgentMention {
   readonly text: string
 }
 
-/** A leading `@handle`, so only an addressed message dispatches; a mention mid-sentence stays a mention. */
-const LEADING_MENTION = /^\s*@([a-z][a-z0-9-]{0,31})(?=\s|$)/u
+/** A leading `@{handle}` (the sent spelling) or `@handle`, so only an addressed message dispatches; a mention mid-sentence stays a mention. */
+const LEADING_MENTION = /^\s*@(?:\{([a-z][a-z0-9-]{0,31})\}|([a-z][a-z0-9-]{0,31}))(?=\s|$)/u
 
 const clip = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, Math.max(0, max - 1)).trimEnd()}…`)
 
@@ -139,9 +139,34 @@ export class Agents {
   static parseMention(text: string): AgentMention | null {
     const match = LEADING_MENTION.exec(text)
     if (match === null) return null
-    const handle = match[1]
+    const handle = match[1] ?? match[2]
     if (handle === undefined) return null
     return { handle, text: text.slice(match[0].length).trim() }
+  }
+
+  /**
+   * Every agent a message names, in order of appearance: a leading `@handle` or `@{handle}`, and any `@{handle}` after it.
+   * The braced spelling is what the `@` menu inserts, so it is the only one that counts mid-message; a plain `@word`
+   * there stays a word.
+   */
+  static mentionedHandles(text: string): readonly string[] {
+    const found: string[] = []
+    const leading = Agents.parseMention(text)
+    if (leading !== null) found.push(leading.handle)
+    for (const match of text.matchAll(/(?<![\w@/])@\{([a-z][a-z0-9-]{0,31})\}/gu)) {
+      const handle = match[1]
+      if (handle !== undefined && !found.includes(handle)) found.push(handle)
+    }
+    return found
+  }
+
+  /** The first mentioned agent that is enabled and pins a route: the one whose model a message asks for. */
+  static firstRouted<T extends { readonly handle: string; readonly enabled: boolean; readonly route: unknown }>(text: string, agents: readonly T[]): T | undefined {
+    for (const handle of Agents.mentionedHandles(text)) {
+      const agent = agents.find(candidate => candidate.handle === handle && candidate.enabled && candidate.route !== null)
+      if (agent !== undefined) return agent
+    }
+    return undefined
   }
 
   /** The `@handle` a message addresses, for the `@` menu to mark a row as already used. */

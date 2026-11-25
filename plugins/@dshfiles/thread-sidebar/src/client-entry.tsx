@@ -20,7 +20,7 @@ import { resolveSlotLabel, type PropsRenderSlots, type PropsRuntime, type Transl
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
-import { Changes, Command, createApiClient, defineClient, hasHostCommandRegistry, runHostCommand, useSettings } from '@dshfiles/dshx/client'
+import { Changes, ClientTools, Command, createApiClient, defineClient, hasHostCommandRegistry, runHostCommand, useSettings } from '@dshfiles/dshx/client'
 import { HeroSuggestionCards, type HeroSuggestionActions } from './hero-suggestions.js'
 import { DESTINATION_GO_KEYS, GO_DESTINATION_EVENT, SHOW_DESTINATION_EVENT } from './destination-shell.js'
 import { StatusItems, type StatusItemProps } from '@dshfiles/frame-layout/status-strip'
@@ -56,6 +56,7 @@ import { subagentChatAddress } from './subagent-provenance/resource.js'
 import { ThreadAsideConversation } from './thread-aside-panel.js'
 import { THREAD_ASIDE_CONVERSATION_SLOT, THREAD_ASIDE_ID, THREAD_ASIDE_KIND, threadAsideAddress, threadAsideSessionId } from './thread-aside.js'
 import { OPEN_THREAD_ASIDE_EVENT, readThreadAsideRequest } from './thread-aside-request.js'
+import { ThreadAsideClientTools } from './thread-aside-client-tools.js'
 import { openThreadInMain, requestThreadMainTab } from './main-tab-request.js'
 import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -710,6 +711,19 @@ export default defineClient({
       window.addEventListener(OPEN_THREAD_ASIDE_EVENT, onOpenThreadAside)
       return () => window.removeEventListener(OPEN_THREAD_ASIDE_EVENT, onOpenThreadAside)
     }, 'thread-sidebar: open an aside for another plugin')
+
+    // The same aside opener, offered to Agents as a client tool; a bridge plugin carries the calls.
+    for (const tool of ThreadAsideClientTools.create({
+      listed: () => ctx.sessions.list.getSnapshot().ids,
+      title: sessionId => {
+        const list = ctx.sessions.list.getSnapshot()
+        const listed = list.ids.find(id => id === sessionId)
+        return listed === undefined ? undefined : list.byId[listed]?.displayTitle
+      },
+      onScreen: () => ctx.sidebarRight.mounted.getSnapshot(),
+      openAside,
+    }))
+      plugin?.add(ClientTools, tool)
     /** The thread the main column shows, skipping blank drafts; undefined on a panel or the New thread screen. */
     const mainViewThread = (): SessionId | undefined => {
       const sessions = ctx.sessions.list.getSnapshot()

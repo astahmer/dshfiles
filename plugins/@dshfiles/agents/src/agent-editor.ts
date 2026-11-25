@@ -171,7 +171,7 @@ export class AgentEditor {
   static routeLabel(route: AgentRoute | null, options: readonly AgentModelOption[]): string {
     if (route === null) return 'Harness default'
     const option = options.find(candidate => candidate.key === routeKey(route))
-    const model = option === undefined ? route.model : option.modelName
+    const model = option === undefined ? route.model : option.modelName.startsWith(`${option.provider}/`) ? option.modelName.slice(option.provider.length + 1) : option.modelName
     return route.reasoningEffort === undefined ? model : `${model} · ${route.reasoningEffort}`
   }
 
