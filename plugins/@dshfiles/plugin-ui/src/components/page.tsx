@@ -5,6 +5,7 @@ import { Button } from './ui/button.js'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu.js'
 import { Spinner } from './ui/spinner.js'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.js'
+import { StatusCount, type WorkStatus } from './work-status.js'
 import { useSlidingIndicator } from '../motion/react.js'
 
 /** One header action. The page shows at most one `primaryAction`; everything else is an overflow-capable action. */
@@ -38,13 +39,29 @@ export interface PageTabs {
   readonly value: string
   readonly onValueChange: (value: string) => void
   readonly items: readonly PageTab[]
+  /**
+   * `underline` for page sections; `segmented` only for up to four view modes of one list (council round 3 A5). Past
+   * four items the tabs are always underline. Default: segmented up to four items, underline beyond.
+   */
+  readonly variant?: 'underline' | 'segmented'
 }
+
+/** How wide a page runs (council round 3 A5): 1080px, a 920px list lane, or the whole pane (a diff, a chart, a table). */
+export type PageWidth = 'page' | 'lane' | 'full'
+
+/** The statuses a page title counts, attention first: one `StatusCount` per status present. */
+export type PageStatusCounts = Partial<Readonly<Record<WorkStatus, number>>>
+
+const STATUS_COUNT_ORDER: readonly WorkStatus[] = ['needs-you', 'failed', 'working', 'ready', 'idle', 'done']
+const SEGMENTED_MAX = 4
 
 export interface PageProps extends Omit<React.ComponentPropsWithoutRef<'div'>, 'title'> {
   readonly heading: React.ReactNode
   readonly description?: React.ReactNode
-  /** A count shown after the title, muted (e.g. how many items the page lists). */
+  /** A count shown after the title in tertiary ink (e.g. how many items the page lists). */
   readonly count?: number | string
+  /** Instead of `count`: one `StatusCount` per status present (`{ 'needs-you': 2, failed: 1 }`); zeros draw nothing. */
+  readonly statusCounts?: PageStatusCounts
   /** Muted chips after the title: counters, a status badge. Keep it to two or three. */
   readonly meta?: React.ReactNode
   readonly primaryAction?: PageAction
@@ -59,8 +76,12 @@ export interface PageProps extends Omit<React.ComponentPropsWithoutRef<'div'>, '
    * its children own their scroll. Exclusive with `scroll`.
    */
   readonly fill?: boolean
+  /** `page` (1080px, the default), `lane` (920px, a list page) or `full` (a diff, chart or table; `fill` defaults to it). */
+  readonly width?: PageWidth
   readonly bodyClassName?: string
 }
+
+const WIDTH_CLASS = { page: 'dshx:max-w-page', lane: 'dshx:max-w-lane', full: '' } as const satisfies Record<PageWidth, string>
 
 /** Width of the `pane-compact` container tier (42rem): below it, inline header actions fold into the overflow menu. */
 const COMPACT_WIDTH_PX = 672
@@ -121,11 +142,39 @@ const PrimaryMenu = ({ action, items }: { readonly action: PageAction; readonly 
   </DropdownMenu>
 )
 
+/**
+ * What a page title counts (council round 3 A5): one `StatusCount` per status present, attention first, or else a plain
+ * count in tertiary ink. Shared by `Page` and the standalone `PageHeader`.
+ */
+export const PageTitleCount = (props: {
+  readonly count?: number | string | undefined
+  readonly statusCounts?: PageStatusCounts | undefined
+}): React.ReactNode => {
+  const statusCounts = STATUS_COUNT_ORDER.flatMap(status => {
+    const count = props.statusCounts?.[status] ?? 0
+    return count > 0 ? [[status, count] as const] : []
+  })
+  if (statusCounts.length > 0)
+    return (
+      <span data-slot="page-status-counts" className="dshx:flex dshx:items-center dshx:gap-1.5">
+        {statusCounts.map(([status, count]) => (
+          <StatusCount key={status} status={status} count={count} />
+        ))}
+      </span>
+    )
+  return props.count === undefined ? null : (
+    <span data-slot="page-count" className="dshx:text-sm dshx:text-faint-foreground dshx:tabular-nums">
+      {props.count}
+    </span>
+  )
+}
+
 /** The page header: `h1` title, count and meta chips, one-line description; one primary action and an overflow. */
 const PageHeaderRow = (props: {
   readonly heading: React.ReactNode
   readonly description?: React.ReactNode | undefined
   readonly count?: number | string | undefined
+  readonly statusCounts?: PageStatusCounts | undefined
   readonly meta?: React.ReactNode | undefined
   readonly primaryAction?: PageAction | undefined
   readonly actions?: readonly PageAction[] | undefined
@@ -139,12 +188,8 @@ const PageHeaderRow = (props: {
     <header data-slot="page-header" className="dshx:flex dshx:min-w-0 dshx:items-start dshx:justify-between dshx:gap-3">
       <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
         <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1">
-          <h1 className="dshx:min-w-0 dshx:text-xl dshx:font-semibold dshx:tracking-[-0.01em] dshx:break-words">{props.heading}</h1>
-          {props.count === undefined ? null : (
-            <span data-slot="page-count" className="dshx:text-sm dshx:text-muted-foreground dshx:tabular-nums">
-              {props.count}
-            </span>
-          )}
+          <h1 className="dshx:min-w-0 dshx:text-title dshx:font-title dshx:break-words">{props.heading}</h1>
+          <PageTitleCount count={props.count} statusCounts={props.statusCounts} />
           {props.meta === undefined || props.meta === null ? null : (
             <div data-slot="page-meta" className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1.5">
               {props.meta}
@@ -211,6 +256,8 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
     tabs,
     scroll = false,
     fill = false,
+    width,
+    statusCounts,
     bodyClassName,
     className,
     children,
@@ -250,10 +297,13 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
       {...props}
     >
       <div
+        data-slot="page-container"
         className={cn(
           // Spacing scale (round five K9): page padding 24, 20 between the header and the sections, a 16px body stack;
-          // narrow panes and phones keep 12.
+          // narrow panes and phones keep 12. Width (council round 3 A5): header and body share one capped,
+          // start-aligned container, so the header actions sit on the content's trailing edge, not the window's.
           'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-5 dshx:p-6 dshx:@max-pane-narrow:gap-3 dshx:@max-pane-narrow:p-3',
+          WIDTH_CLASS[width ?? (fill ? 'full' : 'page')],
           fill && 'dshx:min-h-0 dshx:flex-1',
         )}
       >
@@ -261,6 +311,7 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
           heading={heading}
           description={description}
           count={count}
+          statusCounts={statusCounts}
           meta={meta}
           actions={actions}
           compact={compact}
@@ -296,6 +347,36 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
  * list: the list's grey track paints under it and the (positioned) triggers over it.
  */
 function PageTabList({ tabs }: { readonly tabs: PageTabs }) {
+  const segmented = tabs.items.length <= SEGMENTED_MAX && tabs.variant !== 'underline'
+  return segmented ? <SegmentedTabList tabs={tabs} /> : <UnderlineTabList tabs={tabs} />
+}
+
+const TabCount = ({ count }: { readonly count: number | undefined }): React.ReactNode =>
+  count === undefined ? null : <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{count}</span>
+
+/**
+ * Page sections as underline tabs (council round 3 A5): ink labels on a hairline, the active one in ink with a 2px
+ * accent bar on the hairline (the accent marks the current place, as the selection marker does).
+ */
+function UnderlineTabList({ tabs }: { readonly tabs: PageTabs }) {
+  return (
+    <TabsList variant="line" aria-label={tabs.label} className="dshx:h-9 dshx:w-full dshx:min-w-max dshx:justify-start dshx:gap-5 dshx:border-b dshx:border-border dshx:p-0">
+      {tabs.items.map(tab => (
+        <TabsTrigger
+          key={tab.value}
+          value={tab.value}
+          className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:border-0 dshx:px-0 dshx:after:bg-info dshx:data-[state=active]:text-foreground dshx:group-data-[orientation=horizontal]/tabs:after:bottom-[-1px]"
+        >
+          {tab.label}
+          <TabCount count={tab.count} />
+        </TabsTrigger>
+      ))}
+    </TabsList>
+  )
+}
+
+/** Up to four view modes of one list as the segmented control. */
+function SegmentedTabList({ tabs }: { readonly tabs: PageTabs }) {
   const { ref, indicatorRef } = useSlidingIndicator<HTMLDivElement, HTMLSpanElement>(tabs.value)
   return (
     <div ref={ref} className="dshx:relative dshx:w-fit">
@@ -313,7 +394,7 @@ function PageTabList({ tabs }: { readonly tabs: PageTabs }) {
             className="dshx:flex-none dshx:data-[state=active]:bg-transparent! dshx:data-[state=active]:shadow-none! dshx:dark:data-[state=active]:border-transparent!"
           >
             {tab.label}
-            {tab.count === undefined ? null : <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{tab.count}</span>}
+            <TabCount count={tab.count} />
           </TabsTrigger>
         ))}
       </TabsList>

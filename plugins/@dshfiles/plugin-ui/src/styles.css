@@ -70,6 +70,8 @@
   --color-border: var(--dsw-alias-border-l2);
   --color-input: var(--dsw-alias-border-l3);
   --color-ring: var(--dsw-alias-state-business-primary);
+  /* Tertiary ink (palette step 8, AA on bg, panel, raised and every row wash): a page count, a placeholder. */
+  --color-faint-foreground: var(--dsw-alias-label-tertiary);
   --color-info: var(--dsw-alias-state-business-primary);
   --color-success: var(--dsw-alias-state-success-primary);
   --color-warning: var(--dsw-alias-state-warn-primary);
@@ -129,10 +131,13 @@
   --ease-enter: var(--dshx-motion-ease-enter);
   --ease-exit: var(--dshx-motion-ease-exit);
 
-  /* Headings (weight 600, tight tracking): 20/28 section title, 26/32 page or hero title. */
-  --text-title: 1.25rem;
-  --text-title--line-height: 1.4;
+  /*
+   * Headings, tight tracking: the page `h1` 22/28 at 650 (council round 3 A5: `text-title font-title`), 26/32 hero title.
+   */
+  --text-title: 1.375rem;
+  --text-title--line-height: 1.75rem;
   --text-title--letter-spacing: -0.01em;
+  --font-weight-title: 650;
   --text-display: 1.625rem;
   --text-display--line-height: 1.2308;
   --text-display--letter-spacing: -0.02em;
@@ -146,6 +151,12 @@
 @theme {
   --container-pane-narrow: 28rem;
   --container-pane-compact: 42rem;
+  /*
+   * Page widths (council round 3 A5): `max-w-page` caps a page (header and body) at 1080px, `max-w-lane` a list page or
+   * a list lane at 920px. Full bleed is for a diff, a chart or a table only.
+   */
+  --container-page: 67.5rem;
+  --container-lane: 57.5rem;
 }
 
 @layer base {
