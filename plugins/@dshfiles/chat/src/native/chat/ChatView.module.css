@@ -399,8 +399,32 @@
   /* Clears the sticky composer stack (docks + input card + stats): the live
      height rides --dsh-composer-height (ConversationRoot's seat observer) so
      the control follows a growing textarea; the fallback covers the first
-     paint before the observer fires. */
-  bottom: calc(var(--dsh-composer-height, 152px) + 16px);
+     paint before the observer fires. dshfiles (unslop r5 C2): 12px above the dock. */
+  bottom: calc(var(--dsh-composer-height, 152px) + 12px);
+}
+
+/* dshfiles (unslop r5 C2): where the pane leaves no gutter beside the text column (a phone, a narrow pane), the control
+   would float over the last lines of prose. It gets its own band instead: from the dock's top edge up to 12px above the
+   control, in the page colour, so the transcript fades out under it. The band's height is zero whenever the gutter
+   holds the control: `--dsh-to-bottom-overlap` is how far the control (34px + 12px clear) reaches into the column,
+   measured against this frame's width (100cqw); the column is never wider than the frame minus its 32px sides. */
+.toBottomSlot::before {
+  --dsh-to-bottom-overlap: calc(
+    34px + 12px + var(--dsh-composer-side-clearance, 16px) + 16px -
+      (100cqw - min(var(--dsh-chat-content-width, 100cqw), 100cqw - 2 * (var(--dsh-composer-side-clearance, 16px) + 16px))) / 2
+  );
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: -12px;
+  left: 0;
+  height: clamp(0px, var(--dsh-to-bottom-overlap) * 100, 58px);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
+    var(--dsw-alias-bg-base) 12px
+  );
+  pointer-events: none;
 }
 
 .toBottom {
