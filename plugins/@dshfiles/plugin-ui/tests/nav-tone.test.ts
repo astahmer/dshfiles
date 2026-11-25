@@ -7,22 +7,38 @@ import { PaletteMath, WARM_STONE, type Oklch, type Scheme } from '../src/theme/p
 const roles = readFileSync(join(process.cwd(), 'src/color-roles.css'), 'utf8')
 const schemes: readonly Scheme[] = ['light', 'dark']
 
-/** The rail's destinations in order (thread-sidebar `DESTINATION_IDS`) and the identity tone each draws in. */
-const NAV_TONES = { threads: 7, inbox: 2, land: 1, work: 3, agents: 4, observe: 6, knowledge: 8 } as const
+/** The rail's destinations in order (thread-sidebar `DESTINATION_IDS`). */
+const DESTINATIONS = ['threads', 'inbox', 'land', 'work', 'agents', 'observe', 'knowledge'] as const
+/** Status hues no nav tone may sit within 25° of: danger, warning, success, the accent. */
+const STATUS_HUES = { red: 25, amber: 80, green: 150, indigo: 270 } as const
 
 const body = (selector: string): string => {
   const start = roles.indexOf(`${selector} {`)
   return start < 0 ? '' : roles.slice(start, roles.indexOf('}', start))
 }
-const identity = (scheme: Scheme, n: number): Oklch => {
-  const block = scheme === 'light' ? body('  :root') : body('  body[data-ds-dark-theme]')
-  const match = new RegExp(`--dshx-identity-${n}: oklch\\(([\\d.]+) ([\\d.]+) ([\\d.]+)\\)`, 'u').exec(block)
+const navTone = (scheme: Scheme, destination: string): Oklch => {
+  const block = scheme === 'light' ? body('  body') : body('  body[data-ds-dark-theme]')
+  const match = new RegExp(`--dshx-nav-tone-${destination}: oklch\\(([\\d.]+) ([\\d.]+) ([\\d.]+)\\);`, 'u').exec(block)
   return { l: Number(match?.[1]), c: Number(match?.[2]), h: Number(match?.[3]) }
 }
 const lab = ({ l, c, h }: Oklch) => [l, c * Math.cos((h * Math.PI) / 180), c * Math.sin((h * Math.PI) / 180)] as const
 const deltaE = (a: Oklch, b: Oklch): number => {
   const [x, y] = [lab(a), lab(b)]
   return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2])
+}
+const hueDistance = (a: number, b: number): number => {
+  const d = Math.abs(a - b) % 360
+  return Math.min(d, 360 - d)
+}
+/** Inside sRGB: the hex round trip keeps its chroma and lightness. */
+const inGamut = (tone: Oklch): boolean => {
+  const back = PaletteMath.hexToOklch(PaletteMath.toHex(tone))
+  return Math.abs(back.c - tone.c) < 0.004 && Math.abs(back.l - tone.l) < 0.006
+}
+const gamutMaxChroma = (l: number, h: number): number => {
+  let c = 0
+  while (c < 0.4 && inGamut({ l, c: c + 0.002, h })) c += 0.002
+  return c
 }
 /** `color-mix(in oklab, tone 14%, transparent)` painted over a surface: the browser composites the alpha in sRGB. */
 const tile = (tone: Oklch, under: Oklch, alpha = 0.14): Oklch => {
@@ -32,28 +48,48 @@ const tile = (tone: Oklch, under: Oklch, alpha = 0.14): Oklch => {
   return PaletteMath.hexToOklch(`#${mixed.map(value => value.toString(16).padStart(2, '0')).join('')}`)
 }
 
-describe('navigation identity tones (council round 3 A7)', () => {
-  it('maps every rail destination onto an identity tone, Settings neutral, on body so dark follows', () => {
-    const tones = body('  body')
-    for (const [destination, n] of Object.entries(NAV_TONES)) expect(tones, destination).toContain(`--dshx-nav-tone-${destination}: var(--dshx-identity-${n});`)
-    expect(tones).toContain('--dshx-nav-tone-settings: var(--dsw-alias-label-secondary);')
-    expect(new Set(Object.values(NAV_TONES)).size).toBe(Object.keys(NAV_TONES).length)
-  })
-
-  it('never borrows the green identity tone, the accent or a status colour', () => {
-    expect(Object.values(NAV_TONES)).not.toContain(5)
+describe('navigation identity tones (council round 4 A1)', () => {
+  it('gives every rail destination its own tone on body so dark follows, Settings neutral', () => {
+    for (const scheme of schemes) for (const destination of DESTINATIONS) expect(navTone(scheme, destination).h, `${scheme} ${destination}`).not.toBeNaN()
+    expect(body('  body')).toContain('--dshx-nav-tone-settings: var(--dsw-alias-label-secondary);')
     expect(roles).not.toMatch(/--dshx-nav-tone-[\w-]+: var\(--dsw-alias-state-/u)
+    // The same hue in both schemes, so a destination keeps its colour when the scheme flips.
+    for (const destination of DESTINATIONS) expect(navTone('dark', destination).h).toBe(navTone('light', destination).h)
   })
 
-  it.each(schemes)('keeps every nav tone apart from the accent and the status colours (%s)', scheme => {
+  it.each(schemes)('keeps every tone in its lightness band, in gamut and never muddy (%s)', scheme => {
+    for (const destination of DESTINATIONS) {
+      const tone = navTone(scheme, destination)
+      const [low, high] = scheme === 'light' ? [0.52, 0.56] : [0.76, 0.8]
+      expect(tone.l, destination).toBeGreaterThanOrEqual(low)
+      expect(tone.l, destination).toBeLessThanOrEqual(high)
+      expect(inGamut(tone), `${destination} in sRGB`).toBe(true)
+      // The chroma floor is 0.12; where sRGB ends below it (teal and cyan at light L 0.56 stop near 0.11) the tone sits
+      // at the gamut edge, which is as vivid as that hue gets.
+      expect(tone.c, `${destination} chroma`).toBeGreaterThanOrEqual(Math.min(0.12, gamutMaxChroma(tone.l, tone.h) - 0.008))
+    }
+  })
+
+  it('keeps every hue 25° from the status hues, Threads at most 235 and 30° from Land', () => {
+    for (const destination of DESTINATIONS)
+      for (const [status, hue] of Object.entries(STATUS_HUES))
+        expect(hueDistance(navTone('light', destination).h, hue), `${destination} vs ${status}`).toBeGreaterThanOrEqual(25)
+    expect(navTone('light', 'threads').h).toBeLessThanOrEqual(235)
+    expect(hueDistance(navTone('light', 'threads').h, navTone('light', 'land').h)).toBeGreaterThanOrEqual(30)
+  })
+
+  it.each(schemes)('spreads the seven tones apart and away from the accent and status colours (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     const status = { accent: p.accent.fg, success: p.success.fg, warning: p.warning.fg, danger: p.danger.fg }
-    for (const [destination, n] of Object.entries(NAV_TONES))
-      for (const [name, colour] of Object.entries(status)) expect(deltaE(identity(scheme, n), colour), `${destination} vs ${name}`).toBeGreaterThanOrEqual(0.045)
+    const tones = DESTINATIONS.map(destination => navTone(scheme, destination))
+    // The round-four ramp's closest pair (olive and brown) was ΔE 0.050; the re-pick keeps every pair at 0.06 or more.
+    for (const [i, a] of tones.entries()) for (const b of tones.slice(i + 1)) expect(deltaE(a, b), `${a.h} vs ${b.h}`).toBeGreaterThanOrEqual(0.06)
+    for (const [i, tone] of tones.entries())
+      for (const [name, colour] of Object.entries(status)) expect(deltaE(tone, colour), `${DESTINATIONS[i]} vs ${name}`).toBeGreaterThanOrEqual(0.06)
   })
 
   it('exposes each tone as a colour and as utilities for a tinted glyph and a 14% active tile', () => {
-    for (const destination of [...Object.keys(NAV_TONES), 'settings']) {
+    for (const destination of [...DESTINATIONS, 'settings']) {
       expect(roles).toContain(`--color-nav-${destination}: var(--dshx-nav-tone-${destination});`)
       expect(roles).toMatch(new RegExp(`@utility nav-tone-${destination} \\{\\s*--dshx-nav-tone: var\\(--dshx-nav-tone-${destination}\\);\\s*\\}`, 'u'))
     }
@@ -63,8 +99,8 @@ describe('navigation identity tones (council round 3 A7)', () => {
 
   it.each(schemes)('draws each glyph at 3:1 on the page, the rail panel and its own active tile (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    for (const [destination, n] of Object.entries(NAV_TONES)) {
-      const tone = identity(scheme, n)
+    for (const destination of DESTINATIONS) {
+      const tone = navTone(scheme, destination)
       for (const step of [0, 1, 2]) {
         const surface = p.neutral[step]!
         expect(PaletteMath.contrastRatio(tone, surface), `${destination} on step ${step}`).toBeGreaterThanOrEqual(3)

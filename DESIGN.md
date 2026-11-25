@@ -318,8 +318,13 @@ work on any surface.
 11. **Navigation identity.** Each rail destination draws its glyph in its own identity tone, glyph only, and the
     active one adds a 14% tile of that tone behind the glyph with its ink label at 600; the label never takes the
     tone. `nav-tone-<id>` on the item, `text-nav-tone` on its icon and `bg-nav-tile` on the active seat
-    (`plugin-ui/src/color-roles.css`): Threads identity-7, Inbox 2, Land 1, Work 3, Agents 4, Observe 6, Knowledge 8,
-    Settings neutral. Identity-5 is left out: it sits beside the success green. The phone tab bar uses the same tones.
+    (`plugin-ui/src/color-roles.css`). The rail has its own seven tones, not the identity ramp: Threads cyan-blue 220,
+    Land teal 177, Work orange 52, Observe lime 118, Inbox violet 297, Knowledge magenta 324, Agents rose 351;
+    Settings neutral. **Nav tone constraints** (`tests/nav-tone.test.ts`): one hue per destination in both schemes;
+    light L 0.52–0.56 at chroma 0.14, dark L 0.78 at 0.13; a chroma floor of 0.12, or the sRGB edge where a hue ends
+    lower (teal and cyan in light, about 0.105), so no tone reads muddy; every hue 25° or more from the status hues
+    (25, 80, 150, 270); Threads at hue 235 or less and 30° or more from Land; every pair ΔE 0.06 or more; the glyph
+    3:1 on bg, panel, raised and its own 14% tile, the ink label AA on that tile. The phone tab bar uses the same tones.
 
 Use semantic tokens only, never raw hex in plugin code. The exceptions are brand artwork
 (`ai-accounts/src/account-labels.ts`, `model-effort-picker/src/brand-marks.ts`) and a project colour the user
