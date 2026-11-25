@@ -303,6 +303,13 @@ describe('workbench semantic tab chrome', () => {
     expect(screen.getByText('Thread A').className).not.toContain('dshx:text-muted-foreground')
   })
 
+  it('draws the title of the tab on screen in ink at 500, even while it is a preview (round five B5)', () => {
+    fixture()
+    const title = screen.getByText('Thread A')
+    expect(title.className).toContain('dshx:in-[.dv-active-tab]:text-foreground')
+    expect(title.className).toContain('dshx:in-[.dv-active-tab]:font-medium')
+  })
+
   it('keeps a preview on double click and delegates close exactly once without archiving', () => {
     const tab = fixture()
     fireEvent.doubleClick(tab.trigger())

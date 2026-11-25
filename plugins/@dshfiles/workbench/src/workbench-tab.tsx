@@ -152,8 +152,16 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                 }}
               />
             ) : (
-              // A preview tab is muted, not italic; a long title ends in an ellipsis instead of taking the strip.
-              <span className={cn('dshx:max-w-56 dshx:truncate dshx:text-xs', tab?.preview && 'dshx:text-muted-foreground')}>{title}</span>
+              // A preview tab is muted, not italic; a long title ends in an ellipsis instead of taking the strip. The tab on
+              // screen (dockview's active tab) is ink at 500 even while it is a preview (round five B5).
+              <span
+                className={cn(
+                  'dshx:max-w-56 dshx:truncate dshx:text-xs dshx:in-[.dv-active-tab]:font-medium dshx:in-[.dv-active-tab]:text-foreground',
+                  tab?.preview && 'dshx:text-muted-foreground',
+                )}
+              >
+                {title}
+              </span>
             )}
             {notice && (
               <span role="status" className="dshx:sr-only">
