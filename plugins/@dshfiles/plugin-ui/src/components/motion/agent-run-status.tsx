@@ -2,7 +2,7 @@ import * as React from 'react'
 import { animate, motionSafe, springs, durations, easings } from '../../motion/index.js'
 import { useEnter, usePrefersReducedMotion } from '../../motion/react.js'
 import { cn } from '../../lib/utils.js'
-import { ArrowUpRightIcon, AsteriskIcon, CheckIcon, CircleXIcon, PauseIcon, PlayIcon, SquareIcon, type LucideIcon } from '../../icons.js'
+import { ArrowUpRightIcon, AsteriskIcon, CheckIcon, ChevronUpIcon, CircleXIcon, PauseIcon, PlayIcon, SquareIcon, type LucideIcon } from '../../icons.js'
 import { Button } from '../ui/button.js'
 import { ShimmerText, RollingNumber } from './text.js'
 import { ElapsedClock, formatDuration } from './elapsed-clock.js'
@@ -41,6 +41,8 @@ export interface AgentRunStatusProps extends Omit<React.HTMLAttributes<HTMLEleme
   readonly onStop?: () => void
   readonly onOpen?: () => void
   readonly openLabel?: string
+  /** Collapses the card to its caller's summary row; the chevron in the header renders only when passed. */
+  readonly onCollapse?: () => void
 }
 
 /** Every visible string, so a localized surface does not ship the English defaults. */
@@ -56,6 +58,7 @@ export interface AgentRunStatusLabels {
   readonly resume: string
   readonly stop: string
   readonly elapsed: string
+  readonly collapse: string
 }
 
 const defaultLabels: AgentRunStatusLabels = {
@@ -70,13 +73,15 @@ const defaultLabels: AgentRunStatusLabels = {
   resume: 'Resume',
   stop: 'Stop',
   elapsed: 'Elapsed',
+  collapse: 'Collapse',
 }
 
 /**
  * Compact live status card for one agent run: a spinning ring around the agent glyph, the current step shimmering,
  * a live clock, "Step n of N" with a segmented progress rail when the total is known, and the actions the caller
- * really has — Pause, Stop and Open run each render only when their handler is passed. Step changes blur in,
- * segments fill on a spring, and the ring settles into a check (or cross) when the run ends.
+ * really has — Pause, Stop and Open run each render only when their handler is passed, and a caller that folds the
+ * card to a summary row passes `onCollapse` for the header chevron. Step changes blur in, segments fill on a spring,
+ * and the ring settles into a check (or cross) when the run ends.
  */
 export function AgentRunStatus({
   heading,
@@ -93,6 +98,7 @@ export function AgentRunStatus({
   onStop,
   onOpen,
   openLabel = 'Open run',
+  onCollapse,
   className,
   ...props
 }: AgentRunStatusProps) {
@@ -131,6 +137,17 @@ export function AgentRunStatus({
           aria-label={labels.elapsed}
           className="dshx:shrink-0 dshx:font-mono dshx:text-sm dshx:text-muted-foreground"
         />
+        {onCollapse === undefined ? null : (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={labels.collapse}
+            className="dshx:-mr-1.5 dshx:shrink-0 dshx:pointer-coarse:size-11"
+            onClick={onCollapse}
+          >
+            <ChevronUpIcon aria-hidden />
+          </Button>
+        )}
       </header>
 
       <div className="dshx:flex dshx:flex-col dshx:gap-2">

@@ -55,6 +55,7 @@ export const SubagentRunCard = (props: {
   readonly labels: Partial<AgentRunStatusLabels>
   readonly onStop: () => void
   readonly onOpen: () => void
+  readonly onCollapse: () => void
 }): JSX.Element => (
   <AgentRunStatus
     className="dshx:my-1 dshx:shadow-none"
@@ -67,6 +68,7 @@ export const SubagentRunCard = (props: {
     labels={props.labels}
     onStop={props.onStop}
     onOpen={props.onOpen}
+    onCollapse={props.onCollapse}
     openLabel={props.openLabel}
   />
 )

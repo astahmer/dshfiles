@@ -4253,7 +4253,7 @@
     {
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
-      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer fold into one \"N subagents working\" row, closed by default like the background-jobs dock; opening it lists them, and the choice holds while children start and finish. With subagentRunCards on (the default) a working child whose open turn, route and tool are known becomes a compact run card: current tool, route, elapsed time, step count, Stop behind a confirmation and Open thread. A child with any of those parts missing keeps its one-line row, and the setting's off state is that row.",
+      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer fold into one \"N subagents working\" row, closed by default like the background-jobs dock; opening it lists them, and the choice holds while children start and finish. With subagentRunCards on (the default) a working child whose open turn, route and tool are known becomes a compact run card: current tool, route, elapsed time, step count, Stop behind a confirmation and Open thread. A chevron in the card header folds that child alone back to its one-line row, which keeps the live clock and expands it again; every row keeps its height, so the dock scrolls instead of squashing cards. A child with any of those parts missing keeps its one-line row, and the setting's off state is that row.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
@@ -4286,7 +4286,8 @@
         "stopping",
         "progress-unavailable",
         "run-card",
-        "run-card-row-fallback"
+        "run-card-row-fallback",
+        "run-card-collapsed"
       ],
       "failureModes": [
         "A child that cannot be opened keeps its row and thread link, and says live progress is unavailable.",
@@ -4352,6 +4353,18 @@
           "id": "thread-sidebar.subagent-run-card-actions",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
           "testName": "stops the child through its interrupt after a confirmation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-run-card-collapse",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "collapses one run card to its one-line row and back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-dock-rows-keep-height",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "keeps every row a non-shrinking flex item so a tall dock scrolls instead of squashing cards"
         },
         {
           "kind": "unit-test",
