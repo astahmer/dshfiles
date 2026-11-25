@@ -244,3 +244,10 @@ test('DESIGN.md states the duration grammar the ratchet enforces', async () => {
   assert.ok(design.includes('`formatElapsed(ms)`') && design.includes('`formatDurationMs(ms)`'))
   assert.ok(design.replace(/\s+/g, ' ').includes('a duration formatted outside the kit'), 'the check:design-tokens paragraph names the rule')
 })
+
+test('faint-focus-ring: the retired ring-ring/50 halo, under any variant (round four D15)', () => {
+  assert.deepEqual(
+    ruleHits('faint-focus-ring', "cn('dshx:focus-visible:ring-ring/50 dshx:ring-ring/50 dshx:focus-visible:ring-[3px] dshx:ring-ring dshx:focus-visible:ring-destructive/20')"),
+    ['dshx:focus-visible:ring-ring/50', 'dshx:ring-ring/50'],
+  )
+})

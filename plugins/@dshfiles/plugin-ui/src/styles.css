@@ -696,6 +696,42 @@
 }
 
 /*
+ * One focus ring (DESIGN.md Focus ring, round four D15): a 2px solid accent outline 1px outside the control, on
+ * :focus-visible only, for every control inside a kit root or a kit portal and every kit control slot. Unlayered, so it
+ * beats each component's `focus-visible:ring-[3px] ring-ring/50` halo (cleared here through Tailwind's ring variables)
+ * and its `outline-none` without editing them. An invalid field keeps its destructive ring; menu and listbox rows keep
+ * their highlight, and a popover or dialog panel that takes focus itself draws nothing.
+ */
+:where(
+    .dshx-root,
+    .dshx-root *,
+    [data-slot$='-content'],
+    [data-slot$='-content'] *,
+    [data-slot='button'],
+    [data-slot='input'],
+    [data-slot='textarea'],
+    [data-slot='checkbox'],
+    [data-slot='switch'],
+    [data-slot='toggle'],
+    [data-slot='toggle-group-item'],
+    [data-slot='radio-group-item'],
+    [data-slot$='-trigger']
+  ):focus-visible:not([aria-invalid='true']):not([role^='menuitem'], [role='option'], [data-slot$='-content']) {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+  --tw-ring-shadow: 0 0 transparent;
+  --tw-ring-offset-shadow: 0 0 transparent;
+}
+
+/*
+ * Inside a clipping list (`data-focus-inset` on the list or the row) or a tab strip (a dock strip clips) the ring draws
+ * inward. Same selector weight as the ring rule above, so this later rule wins.
+ */
+:where([data-focus-inset], [data-focus-inset] *, [role='tablist'], [role='tablist'] *, [role='tab']):focus-visible:not([aria-invalid='true']):not([role^='menuitem'], [role='option'], [data-slot$='-content']) {
+  outline-offset: -2px;
+}
+
+/*
  * Motion (visual refresh T5.1, DESIGN.md Motion). Every kit layer that animates takes the P0 tokens instead of
  * tw-animate's 150ms `ease`: menus, popovers, selects, tooltips and hover cards enter in 160ms, dialogs in 220ms,
  * sheets in 280ms, all on the enter curve; every exit is 100ms on the exit curve. Unlayered, so it beats the

@@ -139,6 +139,7 @@ class into its variants and utility:
 | `local-duration-formatter` | a `formatElapsed`, `formatDuration` or `formatClock` defined outside `plugin-ui/src/lib` (an alias, a one-line wrapper that calls `formatElapsed`/`formatDurationMs`, and a `Date` clock-time formatter are not counted), and a `padStart(2, '0')` on a line that prints a unit right after an interpolation (`${s}s`, `${m}m`, `${h} h`) |
 | `unguarded-loop-animation` | `animate-spin`/`animate-pulse` when no class in the same list has a `motion-reduce:`/`motion-safe:` variant |
 | `outline-without-focus`    | `outline-none` on a button, link, summary, `*Trigger` or widget-role element with no `focus-visible:`/`focus-within:` class in the same list |
+| `faint-focus-ring`         | `ring-ring/50` under any variant: the retired 3px halo. The kit sheet draws the one focus ring ([DESIGN.md › Focus ring](../DESIGN.md)); a clipping list takes `data-focus-inset`. Baselined at 80 on 2026-11-25 (plugin-ui 41, backlog 10, thread-sidebar 9, ai-accounts 6, jujutsu 5, rich-composer 3, secret-catalog 2, mcp-servers 2, tool-meta 1, editor 1) |
 
 The last two read a whole class list: a string literal, template holes
 included, joined with its neighbours when only `,` or `+` separates them, as

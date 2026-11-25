@@ -19,6 +19,7 @@
 //                             `padStart(2, '0')` on a line that prints a time unit (`}s`, `}m`, `}h`)
 //   unguarded-loop-animation  spin or pulse with no `motion-reduce:`/`motion-safe:` class in the same list
 //   outline-without-focus     a control's `outline-none` with no `focus-visible:` replacement in the same list
+//   faint-focus-ring          `ring-ring/50`, the retired 3px halo; the kit sheet draws the one focus ring
 //
 // It fails only when a rule's count for one plugin rises above `scripts/design-token-check.baseline.json`, so the
 // burn-down can land plugin by plugin while new code stays on the tokens.
@@ -182,6 +183,13 @@ export const designTokenRules: readonly DesignTokenRule[] = [
           token.utility,
         ),
       ),
+  },
+  {
+    // DESIGN.md › Focus ring: one 2px solid accent outline, drawn by the kit sheet for every control; the 50% halo
+    // measured 2.0–2.7:1 (round four, A-F5).
+    id: 'faint-focus-ring',
+    use: 'nothing: the kit sheet draws the focus ring (add data-focus-inset to a clipping list)',
+    matches: (line, file) => classes(line, file, token => token.utility === 'ring-ring/50'),
   },
   {
     // DESIGN.md: labels are sentence case; ALL-CAPS labels are banned. A keyboard key cap is drawn by Kbd.
