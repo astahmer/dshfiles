@@ -123,6 +123,13 @@ server, Memory, Backlog New, Hosts). Blue (`info`, `--dsw-alias-state-business-p
 reserved for focus rings, selection and the Needs-you glyph. One primary per page; everything else is `outline`
 (header) or `ghost`/`outline` `sm` (rows). The legacy `components/ui/page-header` stays for unmigrated pages only.
 
+**Row attention verbs: the tint rung.** A row-level verb that answers what waits on you (Review, Answer, Rate…) is
+`variant="attention"`: Needs-you text (`text-attention-foreground`) on a 12% tint of it (18% hover, 24% pressed), no
+border. A failed row's recovery verb is `variant="danger-tint"` (`text-danger-tint-foreground` on the danger tint). The
+text is the status colour pulled 30% toward the ink, so it holds AA on its own tint over every surface. A chip or a band
+that is not a button uses the same pair: `bg-attention-tint text-attention-foreground`, `bg-danger-tint
+text-danger-tint-foreground`. Neither is a page primary: that stays the one ink button.
+
 ## Shared components
 
 Audit of UI rebuilt across owned plugins (native forks excluded), October 2026. Add a component here only when three or

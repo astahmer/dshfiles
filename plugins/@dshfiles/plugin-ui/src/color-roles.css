@@ -21,6 +21,16 @@
   --color-status-idle: var(--dsw-alias-label-tertiary);
   --color-status-done: var(--dsw-alias-label-secondary);
   --color-control-on: var(--dsw-alias-state-business-primary);
+  /*
+   * The tint rung on things you act on (round five K3): a row-level attention verb (Review, Answer, Rate…) is Needs-you
+   * text on a 12% tint of it, a failed row's verb the danger pair. The text is pulled 30% toward the ink so it holds
+   * AA on its own tint at rest, hover and press over every surface (tests/button-tint.test.tsx). `attention-tint` and
+   * `danger-tint` are the rest tint for a chip or a band that is not a button.
+   */
+  --color-attention-foreground: var(--dshx-attention-foreground);
+  --color-danger-tint-foreground: var(--dshx-danger-tint-foreground);
+  --color-attention-tint: color-mix(in oklab, var(--dsw-alias-state-business-primary) 12%, transparent);
+  --color-danger-tint: color-mix(in oklab, var(--dsw-alias-state-error-primary) 12%, transparent);
   /* A destructive button's fill: white text holds 4.5:1 on it in both schemes (the dark danger text tone does not). */
   --color-destructive-solid: var(--dshx-destructive-solid);
   --color-health-ok: var(--dsw-alias-state-success-primary);
@@ -60,6 +70,8 @@
   /* On body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing). */
   body {
     --dshx-destructive-solid: var(--dsw-alias-state-error-primary);
+    --dshx-attention-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary));
+    --dshx-danger-tint-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
   }
   body[data-ds-dark-theme] {
     --dshx-identity-1: oklch(0.78 0.09 195);

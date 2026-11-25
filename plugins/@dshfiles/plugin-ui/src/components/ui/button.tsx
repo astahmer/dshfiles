@@ -22,6 +22,14 @@ const buttonVariants = cva(
         ghost:
           'dshx:hover:bg-accent dshx:hover:text-accent-foreground dshx:dark:hover:bg-accent/50 dshx:active:bg-(--dsw-alias-interactive-bg-active) dshx:dark:active:bg-(--dsw-alias-interactive-bg-active)',
         link: 'dshx:text-primary dshx:underline-offset-4 dshx:hover:underline',
+        /*
+         * Row-level attention verbs (Review, Answer, Rate…): Needs-you text on its own 12% tint, no border, 18% on hover
+         * and 24% pressed. The ink fill stays for the one page primary (DESIGN.md › Components).
+         */
+        attention:
+          'dshx:bg-status-needs-you/12 dshx:text-attention-foreground dshx:hover:bg-status-needs-you/18 dshx:active:bg-status-needs-you/24',
+        /** The same tint rung in the danger pair, for a failed row's recovery verb (Retry, Open). */
+        'danger-tint': 'dshx:bg-status-failed/12 dshx:text-danger-tint-foreground dshx:hover:bg-status-failed/18 dshx:active:bg-status-failed/24',
       },
       size: {
         default: 'dshx:h-8 dshx:px-3 dshx:py-1.5 dshx:has-[>svg]:px-2.5',
