@@ -116,3 +116,15 @@ describe('the desktop live work dock (round six C2)', () => {
     expect(rule(`${DESK}:last-child`)).toMatch(/margin-bottom: calc\(8px - var\(--dsh-composer-stack-gap\)\);/)
   })
 })
+
+describe('the new-thread hero centre (round six C5)', () => {
+  it('centres the heading and composer on the whole pane, not on the pane under the blank header', () => {
+    // At 1440x900 the pair sat 366px under the tab strip and 329px over the status bar: it was centred in the scroll
+    // body, under the blank 36px header row, so the pane read bottom-heavy. Half the header's height goes back. The rule
+    // keys on the main body: under Workbench the content is not inside the `.root` that holds the header.
+    const rule = blocks().find(block => block.selector === ".body:not(.embeddedBody)[data-content-phase='hero'] .composerHero")
+    expect(rule?.context).toBe('@media (min-height: 800px) and (min-width: 640px)')
+    expect(rule?.body).toMatch(/padding-bottom: 36px;/)
+    expect(css).not.toContain('.root:has(.headerBlank)')
+  })
+})

@@ -979,6 +979,14 @@ button.crumbEditable {
   .composerHero:has(> .heroSuggestions :global([data-hero-card^='starter-'])):has(> .heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-']))) {
     padding-top: 88px;
   }
+
+  /* Round six C5: the main hero always sits under the blank header (36px, no rule), which reads as part of the pane, but
+     the pair was centred in the scroll body under it: 366px below the tab strip and 329px above the status bar at
+     1440x900. A 36px foot gives half of it back. Keyed on the main body, not `.root`: under Workbench the content is
+     not inside the root that holds the header. An embedded body has no such header. */
+  .body:not(.embeddedBody)[data-content-phase='hero'] .composerHero {
+    padding-bottom: 36px;
+  }
 }
 
 .heroWorkspaceRow {
