@@ -27,6 +27,17 @@
   border-bottom: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
 }
 
+/* dshfiles (unslop r5 B8): under Workbench's reserved host corner the reserving wrapper (src/conversation-header.tsx)
+   draws the header's rule across the whole pane, so it no longer stops 32px short of the right edge; only a header that
+   has a rule hands it over (the blank New thread header has none). */
+:global([data-conversation-header-reserved]):has(.header:not(.headerBlank)) {
+  border-bottom: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
+}
+
+:global([data-conversation-header-reserved]) .header {
+  border-bottom: none;
+}
+
 /* Seated in a Workbench group's tab row (T1.4): the tabs' row is the header
    row, so the header draws no band, rule or minimum height of its own. */
 :global([data-conversation-header-seated]) .header {
@@ -404,6 +415,10 @@ button.crumbEditable {
    title, so the conversation header gives up its row; its view switch and
    actions live in the `⋯` sheet below, portalled into that top bar. */
 @media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) :global([data-conversation-header-reserved]):has(.header) {
+    border-bottom: none;
+  }
+
   :global(html[data-shell-phone-nav]) .header {
     display: none;
   }
