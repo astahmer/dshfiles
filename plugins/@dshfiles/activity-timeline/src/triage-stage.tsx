@@ -9,8 +9,8 @@ import type { AttentionItem } from './attention-api.js'
 import type { InboxTranslate } from './inbox-locales.js'
 import type { TriageAction } from './inbox-keys.js'
 
-/** Phone verb chips: 48pt in the thumb zone (T6.1), drawn as pills; a pointer keeps the compact buttons. */
-export const INBOX_CHIP = 'dshx:pointer-coarse:h-12 dshx:pointer-coarse:rounded-full dshx:pointer-coarse:px-4 dshx:pointer-coarse:text-sm'
+/** Phone verb chips: 44pt rows in the thumb zone (T6.1) with the 8px control radius (round five P2); a pointer keeps the compact buttons. */
+export const INBOX_CHIP = 'dshx:pointer-coarse:h-11 dshx:pointer-coarse:rounded-lg dshx:pointer-coarse:px-4 dshx:pointer-coarse:text-sm'
 
 export interface TriageBarProps {
   readonly t: InboxTranslate

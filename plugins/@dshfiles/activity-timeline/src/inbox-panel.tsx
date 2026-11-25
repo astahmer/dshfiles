@@ -20,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
@@ -32,7 +33,7 @@ import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BellIcon, ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -63,6 +64,14 @@ import { InboxSwipe, InboxView, type SnoozeChoice } from './inbox-view.js'
 import { ThreadReferences } from './thread-reference.js'
 
 const PROVIDER_VERBS: readonly AttentionProviderVerb[] = ['Approve', 'Land', 'Retry', 'Resume']
+
+/** A prompt-library reply a stopped thread's card offers in its menu. */
+interface InboxQuickReply {
+  readonly id: string
+  readonly label: string
+  readonly disabled: boolean
+  readonly onSelect: () => void
+}
 
 export interface Navigation {
   readonly sessions: ISessions
@@ -171,8 +180,8 @@ const InboxRow = (props: {
   readonly onFocusRow?: () => void
   /** The choice keys (1–9) shown on the answer buttons while this row is highlighted. */
   readonly showChoiceKeys?: boolean
-  /** Quick-reply chips for a stopped thread (prompt library), sent to that thread; never on an item that asks a question. */
-  readonly quickReplies?: (sessionId: string) => React.ReactNode
+  /** Quick replies for a stopped thread (prompt library), sent to that thread; never on an item that asks a question. */
+  readonly quickReplies?: (sessionId: string) => readonly InboxQuickReply[]
   /** Bumped by Triage's Enter on a Land item: open the Land confirmation, never Land itself. */
   readonly landSignal?: number
   /** Triage shows the item only: its bar is the one action row, so the card draws none of its own. */
@@ -202,6 +211,11 @@ const InboxRow = (props: {
   const statusLabel = statusLabelOf(status, t)
   const title = InboxView.subjectTitleOf(item, props.sessionLabel)
   const text = InboxView.textOf(item)
+  const clamped = InboxView.clampsText(item, props.view)
+  const doneable = open && item.verbs.includes('Done')
+  const snoozable = open && props.view !== 'snoozed' && item.verbs.includes('Snooze')
+  const mutable = open && item.verbs.includes('MuteSource')
+  const quickReplies = InboxView.offersQuickReplies(item, props.view) ? (props.quickReplies?.(item.subject.id) ?? []) : []
   const opener = item.subject.kind === 'session' ? undefined : props.openers.get(item.subject.kind)
   const openable = item.subject.kind === 'session' || opener !== undefined
   const openLabel = openLabelOf(item, opener, t)
@@ -225,6 +239,7 @@ const InboxRow = (props: {
         'dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
         phone && 'dshx:relative dshx:bg-card dshx:py-1',
         phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
+        InboxView.headerBand(status),
       )}
       data-attention-item={item.id}
       data-severity={item.severity}
@@ -256,8 +271,8 @@ const InboxRow = (props: {
       }
       description={
         <>
-          <span className={cn('dshx:line-clamp-2 dshx:break-words', InboxView.TEXT_MEASURE)}>{text.reason}</span>
-          {text.detail === null ? null : <span className={cn('dshx:line-clamp-2 dshx:break-words', InboxView.TEXT_MEASURE)}>{text.detail}</span>}
+          <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{text.reason}</span>
+          {text.detail === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{text.detail}</span>}
         </>
       }
     >
@@ -268,8 +283,9 @@ const InboxRow = (props: {
                 <Button
                   key={choice.id}
                   size="sm"
-                  variant={choice.recommended === true ? 'default' : 'outline'}
-                  className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
+                  variant={choice.recommended === true ? 'attention' : 'outline'}
+                  // On a phone each option is a full-width 44 px row: an answer reads in full and is easy to hit.
+                  className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP, 'dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start')}
                   disabled={props.busy}
                   onClick={() => props.onAct(item, 'Answer', choice.id)}
                 >
@@ -279,7 +295,6 @@ const InboxRow = (props: {
                 </Button>
               ))
             : null}
-          {InboxView.offersQuickReplies(item, props.view) ? props.quickReplies?.(item.subject.id) : null}
           {open
             ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).map(verb =>
                 verb === 'Land' ? (
@@ -315,36 +330,12 @@ const InboxRow = (props: {
           {openable ? (
             <Button
               size="sm"
-              variant={open && !item.verbs.includes('Answer') ? 'default' : 'ghost'}
+              variant={open && !item.verbs.includes('Answer') ? InboxView.attentionVariant(status) : 'ghost'}
               className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP)}
               onClick={() => props.onOpen(item)}
             >
               <span className="dshx:truncate">{openLabel}</span>
             </Button>
-          ) : null}
-          {open && item.verbs.includes('Done') ? (
-            <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy} onClick={() => props.onDone(item)}>
-              {t('done')}
-            </Button>
-          ) : null}
-          {open && props.view !== 'snoozed' && item.verbs.includes('Snooze') ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className={cn('dshx:shrink', INBOX_CHIP)} disabled={props.busy}>
-                  <ClockIcon aria-hidden />
-                  {t('snooze')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start">
-                <DropdownMenuItem keys="H" onSelect={() => props.onSnooze(item, 'hour')}>
-                  {t('snoozeHour')}
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => props.onSnooze(item, 'four-hours')}>{t('snoozeFourHours')}</DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => props.onSnooze(item, 'tomorrow')}>{t('snoozeDay')}</DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => props.onSnooze(item, 'change')}>{t('snoozeChange')}</DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           ) : null}
           {undo === 'reopen' || undo === 'unsnooze' ? (
             <Button size="sm" variant="outline" className="dshx:shrink dshx:pointer-coarse:min-h-11" disabled={props.busy} onClick={() => props.onReopen(item)}>
@@ -362,15 +353,52 @@ const InboxRow = (props: {
               {t('unmuteSource')}
             </Button>
           ) : null}
-          {open && item.verbs.includes('MuteSource') ? (
+          {/* Utility verbs live in the card's menu (round five P2): the row shows the one verb it asks for. */}
+          {doneable || snoozable || quickReplies.length > 0 || mutable ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className="dshx:pointer-coarse:size-11" aria-label={t('more')}>
+                <Button size="sm" variant="ghost" className="dshx:pointer-coarse:size-11" aria-label={t('more')} disabled={props.busy}>
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => props.onMute(item.source, true)}>{t('muteSource')}</DropdownMenuItem>
+              <DropdownMenuContent align="start" className="dshx-root">
+                {doneable ? (
+                  <DropdownMenuItem keys="E" onSelect={() => props.onDone(item)}>
+                    <CheckIcon aria-hidden />
+                    {t('done')}
+                  </DropdownMenuItem>
+                ) : null}
+                {snoozable ? (
+                  <>
+                    <DropdownMenuLabel className="dshx:flex dshx:items-center dshx:gap-2">
+                      <ClockIcon aria-hidden className="dshx:size-3.5" />
+                      {t('snooze')}
+                    </DropdownMenuLabel>
+                    <DropdownMenuItem keys="H" onSelect={() => props.onSnooze(item, 'hour')}>
+                      {t('snoozeHour')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => props.onSnooze(item, 'four-hours')}>{t('snoozeFourHours')}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => props.onSnooze(item, 'tomorrow')}>{t('snoozeDay')}</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => props.onSnooze(item, 'change')}>{t('snoozeChange')}</DropdownMenuItem>
+                  </>
+                ) : null}
+                {quickReplies.length === 0 ? null : (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel>{t('quickReplies')}</DropdownMenuLabel>
+                    {quickReplies.map(reply => (
+                      <DropdownMenuItem key={reply.id} disabled={reply.disabled} onSelect={reply.onSelect}>
+                        <span className="dshx:truncate">{reply.label}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </>
+                )}
+                {mutable ? (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => props.onMute(item.source, true)}>{t('muteSource')}</DropdownMenuItem>
+                  </>
+                ) : null}
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}
@@ -1102,22 +1130,13 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const quickReplies =
     replies.length === 0
       ? undefined
-      : (sessionId: string) => (
-          <span role="group" aria-label={t('quickReplies')} className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5" data-quick-replies="">
-            {replies.map(reply => (
-              <Button
-                key={reply.id}
-                size="sm"
-                variant="outline"
-                className="dshx:max-w-48 dshx:shrink dshx:rounded-full"
-                disabled={quickReply.isPending}
-                onClick={() => quickReply.mutate({ sessionId, text: reply.text })}
-              >
-                <span className="dshx:truncate">{reply.label}</span>
-              </Button>
-            ))}
-          </span>
-        )
+      : (sessionId: string): readonly InboxQuickReply[] =>
+          replies.map(reply => ({
+            id: reply.id,
+            label: reply.label,
+            disabled: quickReply.isPending,
+            onSelect: () => quickReply.mutate({ sessionId, text: reply.text }),
+          }))
   const peekSessionId = peeking && cursorItem?.subject.kind === 'session' ? cursorItem.subject.id : undefined
   const reply = useLastReply(peeking ? retain : undefined, peekSessionId)
   const triageReply = useLastReply(triaging ? retain : undefined, triageItem?.subject.kind === 'session' ? triageItem.subject.id : undefined)
@@ -1144,9 +1163,9 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false)
   InboxPush.useNotificationOpen()
   const alertSettingsAction = { id: 'alerts', label: t('alertSettings'), icon: <BellIcon aria-hidden />, onSelect: () => setAlertSettingsOpen(true) }
-  // On a phone, Triage (one card at a time, 1 of N, verbs in the thumb zone) is the way through the Inbox: it is the
-  // page's visible button rather than an entry in its overflow menu, unless Resume all needs that seat.
-  const triageOnTop = coarsePointer() && resumeAllAction === null && triageable
+  // Triage (one card at a time, 1 of N; on a phone its verbs sit in the thumb zone) is the way through the Inbox: it is
+  // the page's one ink button, unless Resume all needs that seat (round five P2: no ink button in a card).
+  const triageOnTop = resumeAllAction === null && triageable
   const tabs: readonly { readonly view: AttentionView; readonly label: string; readonly count: number }[] = [
     { view: 'needs-you', label: t('needsYou'), count: counts?.needsYou ?? 0 },
     { view: 'other', label: t('other'), count: counts?.other ?? 0 },
@@ -1231,7 +1250,8 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     <Page
       scroll
       heading={t('title')}
-      description={t('subtitle')}
+      // On a phone the top bar names the page; without the sentence, Start triage leads the first row.
+      description={<span className="dshx:in-data-shell-phone-nav:hidden">{t('subtitle')}</span>}
       {...(resumeAllAction !== null ? { primaryAction: resumeAllAction } : triageOnTop ? { primaryAction: triageAction } : {})}
       actions={InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available(), triageable }).map(action =>
         action.id === 'triage' ? triageAction : { ...alertSettingsAction, placement: action.placement },

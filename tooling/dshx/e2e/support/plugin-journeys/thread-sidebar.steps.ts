@@ -2359,7 +2359,9 @@ When('a thread marked unread is marked done in the Inbox beside the thread list'
       .click()
     if ((await item.count()) > 0) break
   }
-  await item.first().getByRole('button', { name: 'Done', exact: true }).click()
+  // Done is in the card's menu; the card shows only the verb it asks for.
+  await item.first().getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: /^Done/u }).click()
   await page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: 'Threads', exact: true }).click()
 })
 

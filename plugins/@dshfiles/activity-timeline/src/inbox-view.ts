@@ -55,6 +55,28 @@ const statusOf = (item: AttentionItem, view: AttentionView): WorkStatus => {
   return item.severity === 'ready' && FINISHED_WORK.has(item.subject.kind) ? 'ready' : 'idle'
 }
 
+/**
+ * The tint rung on the verb a card asks for (round five P2): Needs you indigo, Failed red, anything else a plain
+ * outline. The page's one ink button is Start triage.
+ */
+const attentionVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'outline' =>
+  status === 'needs-you' ? 'attention' : status === 'failed' ? 'danger-tint' : 'outline'
+
+/**
+ * A soft band in the status tint behind the head of a waiting card (glyph, title, age and its text), so Needs you and
+ * Failed read at a glance; the verbs below stay on the card's own surface. Ink and muted text hold AA on it.
+ */
+const headerBand = (status: WorkStatus): string =>
+  status === 'needs-you'
+    ? 'dshx:overflow-hidden dshx:[&>div:first-child]:bg-status-needs-you/6'
+    : status === 'failed'
+      ? 'dshx:overflow-hidden dshx:[&>div:first-child]:bg-status-failed/6'
+      : ''
+
+/** A question the card can answer shows in full; any other text clamps to two lines. */
+const clampsText = (item: Pick<AttentionItem, 'verbs' | 'choices'>, view: AttentionView): boolean =>
+  view === 'closed' || view === 'muted' || !item.verbs.includes('Answer') || item.choices.length === 0
+
 const relativeAge = (at: number, now: number): string => {
   const seconds = Math.max(0, Math.round((now - at) / 1000))
   if (seconds < 60) return 'just now'
@@ -176,6 +198,9 @@ export class InboxView {
   static readonly snoozeTarget = snoozeTarget
   static readonly severityGlyph = severityGlyph
   static readonly statusOf = statusOf
+  static readonly attentionVariant = attentionVariant
+  static readonly headerBand = headerBand
+  static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge
   static readonly undoOf = undoOf
   static readonly resumableIds = resumableIds
