@@ -38,8 +38,10 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
    viewport. Keep it open as a regression check rather than a fix.
 7. **P4 (partial)** — the kit gained `useCloseWatcher` (tested) and the composer picker plus the context meter adopt it, so
    the system back gesture closes them instead of leaving the thread. Still open: every other popover and sheet.
-8. **P32 (partial)** — the open phone drawer traps Tab through the kit dialog focus hook and returns focus on close;
-   21 drawer journey tests pass. Still open: `inert` on the stage, reduced motion everywhere, large-text check.
+8. **P32 (partial)** — the open phone drawer traps Tab through the kit dialog focus hook, returns focus on close, and now
+   marks the app root `inert` so the stage cannot be browsed behind the scrim (22 drawer tests pass). Reduced motion is
+   already covered by the kit's global rule. Still open: large-text check (real phone), and the same inert treatment for
+   the workbench sheet (it lives inside the app root).
 9. **P15 (partial)** — the phone thread-panel sheet resumes the last real view instead of opening on the chooser, with
    the selection logic covered by 3 tests. Still open: unmounting hidden dock views.
 10. **P27** — on a coarse pointer the thread row menu offers Keep screen on / Allow screen to sleep: one page-level
