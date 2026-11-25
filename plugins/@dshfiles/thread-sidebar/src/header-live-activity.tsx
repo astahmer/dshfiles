@@ -43,8 +43,11 @@ export const HeaderLiveSignal = (props: {
       )}
       data-testid="thread-header-live-activity"
       data-needs-you={needsYou ? '' : undefined}
-      role="status"
     >
+      {/* A screen reader hears the status word when it changes, once: never the step or the clock beside it (D14). */}
+      <span className="dshx:sr-only" aria-live="polite" data-header-status-announcer="">
+        {needsYou ? props.labels.needsYou : props.labels.working}
+      </span>
       <StatusGlyph label={needsYou ? props.labels.needsYou : props.labels.working} status={needsYou ? 'needs-you' : 'working'} />
       {needsYou ? (
         // No shimmer: nothing progresses until the user answers. The clock says how long it has waited.

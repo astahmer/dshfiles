@@ -5413,7 +5413,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const listVerb = (apply: (sessionIds: readonly string[]) => () => void): false | undefined => {
     const sessionIds = listTargets()
     if (sessionIds.length === 0) return false
+    const list = scrollAreaRef.current
+    const before =
+      list === null
+        ? undefined
+        : { orderedIds: ThreadListNavigationModel.visibleRows(list).map(row => row.id), focusedId: ThreadListNavigationModel.focusedRowId(list) }
     listUndo.current = apply(sessionIds)
+    // Done or Snooze moves the focused row away: focus the next row, never the page body (D15).
+    if (list !== null && before !== undefined) ThreadListNavigationModel.keepFocusInList(list, before)
     return undefined
   }
   const moveListFocus = (direction: 1 | -1, extend: boolean): false | undefined => {
