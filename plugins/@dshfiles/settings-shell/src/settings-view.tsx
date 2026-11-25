@@ -30,7 +30,8 @@ const headerButton =
   'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-md dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-foreground dshx:hover:bg-[var(--dsw-alias-interactive-bg-hover)] dshx:[&_svg]:size-3.5'
 const navCell =
   'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dshx-tone-2)]'
-const navCellActive = 'dshx:bg-[var(--dsw-specific-sidebar-nav-item-active)] dshx:font-medium'
+/** The active category at the tint rung (round five K2): the accent selected wash, ink text. */
+const navCellActive = 'dshx:bg-selected-wash dshx:hover:bg-selected-wash dshx:font-medium dshx:text-foreground'
 // A group label is a label, not one more row: 16 px above it (none above the first), 4 px between it and its entries.
 const navGroupBlock = 'dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0'
 const navGroup = 'dshx:px-3 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground'

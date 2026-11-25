@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, ClipboardCopyIcon, CodeIcon, FolderOpenIcon, LoaderIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronDownIcon, ClipboardCopyIcon, CodeIcon, EllipsisIcon, FolderOpenIcon, LoaderIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import type { ShellTranslate } from './native/locales.js'
 import { useObservable } from './native/use-observable.js'
@@ -65,14 +66,17 @@ export const OpenConfigAction = (props: {
       <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs">
         <Tooltip>
           <TooltipTrigger asChild>
+            {/* A narrow pane has no room for the label: the menu (whose first item opens the file) takes the seat. */}
             <button
-              className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:rounded-l-md dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60"
+              className={cn(
+                'dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:rounded-l-md dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60',
+                path !== null && 'dshx:@max-pane-compact:hidden',
+              )}
               disabled={state.opening || busy}
               onClick={() => send({ type: 'primary' })}
               type="button"
             >
-              <CodeIcon aria-hidden="true" className="dshx:hidden dshx:size-3.5 dshx:@max-pane-compact:block" />
-              <span className="dshx:@max-pane-compact:sr-only">{t('openDocument')}</span>
+              {t('openDocument')}
             </button>
           </TooltipTrigger>
           {path !== null && <TooltipContent>{pathEnd(path)}</TooltipContent>}
@@ -82,13 +86,19 @@ export const OpenConfigAction = (props: {
             <DropdownMenuTrigger asChild>
               <button
                 aria-label={t('config.more')}
-                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-r-md dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
+                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-r-md dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:@max-pane-compact:w-7 dshx:@max-pane-compact:rounded-md dshx:@max-pane-compact:border-l-0"
                 type="button"
               >
-                <ChevronDownIcon className="dshx:size-3.5" />
+                <ChevronDownIcon className="dshx:size-3.5 dshx:@max-pane-compact:hidden" />
+                <EllipsisIcon className="dshx:hidden dshx:size-3.5 dshx:@max-pane-compact:block" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="dshx:min-w-56">
+              <DropdownMenuItem onSelect={() => send({ type: 'primary' })}>
+                <CodeIcon />
+                {t('openDocument')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
               {onDisk && (
                 <>
                   <DropdownMenuLabel className="dshx:text-xs dshx:text-muted-foreground">{t('config.openWith')}</DropdownMenuLabel>
