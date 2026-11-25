@@ -218,8 +218,18 @@ describe('ThreadPalette frame (council round 3 B5)', () => {
     expect(dialog.className).not.toContain('dshx:dark:bg-(--dshx-tone-raised)')
     expect(dialog.className).not.toContain('dshx:shadow-s3')
     const query = screen.getByRole('combobox')
-    expect(query.className).toContain('dshx:text-base')
+    // A 48px search lane with a 16px query (council round 4 B7).
+    expect(query.className).toContain('dshx:text-query')
+    expect(query.className).toContain('dshx:h-12')
     expect(query.className).not.toContain('dshx:text-sm')
+    const lane = query.closest('[data-slot="command-input-wrapper"]')?.parentElement
+    expect(lane?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:h-12!')
+    // One rule between the search and filters and the results: under the filters, none under the search.
+    expect(lane?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:border-b-0!')
+    const filters = screen.getByRole('tablist').closest('.dshx\\:border-b')
+    expect(filters?.className).toContain('dshx:[&_[role=tab]]:text-sm')
+    // Two-line result rows at 56px.
+    for (const option of screen.queryAllByRole('option')) expect(option.className).toContain('dshx:min-h-14')
   })
 })
 

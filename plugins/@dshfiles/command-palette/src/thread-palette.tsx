@@ -608,7 +608,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     )
   }
 
-  const itemClass = 'dshx:group/item dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
+  // Two-line rows at 56px (council round 4 A5/B7): the title, then its meta line, with room above and below.
+  const itemClass = 'dshx:group/item dshx:min-h-14 dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
   const viewCopy = {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
@@ -736,13 +737,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           loop
           className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1"
         >
-          {/* The dialog is the field's one frame: no second ring around the search row inside it (round five B6). */}
-          <div className="dshx:relative dshx:[&_[data-slot=command-input-wrapper]]:outline-none!">
+          {/* The dialog is the field's one frame: no second ring around the search row inside it (round five B6). A 48px
+              search lane with no rule of its own: the one rule sits under the filters, above the results (council round 4
+              B7). */}
+          <div className="dshx:relative dshx:[&_[data-slot=command-input-wrapper]]:h-12! dshx:[&_[data-slot=command-input-wrapper]]:border-b-0! dshx:[&_[data-slot=command-input-wrapper]]:outline-none!">
             <CommandInput
               autoFocus
               aria-label={props.copy.searchLabel}
-              // The query reads at 16px (council round 3 B5), the size of what you type, above 14px results.
-              className={cn('dshx:h-11 dshx:text-base dshx:text-ellipsis dshx:phone:pr-20', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16 dshx:phone:pr-20')}
+              // The query reads at the kit's 16px query step (council round 3 B5, round 4 B7), the size of what you type,
+              // above 14px results.
+              className={cn('dshx:h-12 dshx:text-query dshx:text-ellipsis dshx:phone:pr-20', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16 dshx:phone:pr-20')}
               value={query}
               onValueChange={next => {
                 sendNavigation({ type: 'query.change', query: next })
@@ -769,14 +773,15 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             <Button
               type="button"
               variant="ghost"
-              className="dshx:absolute dshx:right-1 dshx:top-0 dshx:hidden dshx:h-11 dshx:min-w-11 dshx:px-3 dshx:phone:inline-flex"
+              className="dshx:absolute dshx:right-1 dshx:top-0.5 dshx:hidden dshx:h-11 dshx:min-w-11 dshx:px-3 dshx:phone:inline-flex"
               data-palette-cancel=""
               onClick={() => props.onClose()}
             >
               {props.copy.cancel}
             </Button>
           </div>
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground dshx:phone:flex-wrap">
+          {/* The filters at 13px, and under them the palette's one rule before the results (council round 4 B7). */}
+          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:pt-0.5 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground dshx:phone:flex-wrap dshx:[&_[role=tab]]:text-sm">
             {ask || subview ? (
               <Button
                 type="button"
