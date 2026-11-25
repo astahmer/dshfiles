@@ -11,6 +11,7 @@ colors:
   border-hairline: '#dedcda'
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
+  field-border: '#88827d'
   selected-wash: '#ebe9e6'
   wash-needs-you: '#e1e9ff'
   wash-failed: '#ffe4e1'
@@ -25,6 +26,7 @@ colors:
   surface-panel-dark: '#1b1815'
   surface-raised-dark: '#23201d'
   border-hairline-dark: '#2f2c29'
+  field-border-dark: '#76706c'
   label-secondary-dark: '#a7a4a1'
   selected-wash-dark: '#2a2725'
   wash-needs-you-dark: '#232a42'
@@ -573,8 +575,10 @@ up to four view modes of one list; past four items the tabs are always underline
 Finished / All) is a `ToggleGroup`.
 
 **Fields — one look.** `Input`, `Textarea`, `InputGroup` and the `Select` trigger share `fieldLook`
-(`@dshfiles/plugin-ui/components/ui/input`): a 1px control border, the page fill, the 8px radius, no shadow and no dark
-fill; the select trigger is 32px with its chevron in secondary ink at full strength. A Host select the kit does not draw
+(`@dshfiles/plugin-ui/components/ui/input`): a 1px field boundary, the page fill, the 8px radius, no shadow and no dark
+fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#88827d`, dark
+`#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); the combobox
+trigger, checkbox and radio edges use it too. Dividers and card hairlines stay `border-border`, subtle. The select trigger is 32px with its chevron in secondary ink at full strength. A Host select the kit does not draw
 takes the `select-look` utility. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
 reader hears), never a number glued to a second control.
 

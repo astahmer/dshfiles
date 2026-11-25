@@ -8,18 +8,23 @@ import { InputGroup } from '../src/components/ui/input-group.js'
 import { Select, SelectTrigger, SelectValue, selectLook } from '../src/components/ui/select.js'
 import { Textarea } from '../src/components/ui/textarea.js'
 import { UnitInput } from '../src/components/ui/unit-input.js'
+import { Checkbox } from '../src/components/ui/checkbox.js'
+import { RadioGroup, RadioGroupItem } from '../src/components/ui/radio-group.js'
 import { PaletteMath, WARM_STONE, type Scheme } from '../src/theme/palette.ts'
+import { ThemeCss } from '../src/theme/theme-css.ts'
 
 afterEach(cleanup)
 
 const looks = readFileSync(join(process.cwd(), 'src/field-look.css'), 'utf8')
 const styles = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8')
+const roles = readFileSync(join(process.cwd(), 'src/color-roles.css'), 'utf8')
+const combobox = readFileSync(join(process.cwd(), 'src/components/ui/combobox.tsx'), 'utf8')
 const classes = (element: Element | null): readonly string[] => element?.className.split(/\s+/u) ?? []
 const schemes: readonly Scheme[] = ['light', 'dark']
 
 describe('one field look (council round 3 A4)', () => {
   it('is a 1px control border, the page fill and the 8px radius, with no shadow and no dark fill', () => {
-    expect(fieldLook.split(' ')).toEqual(['dshx:rounded-lg', 'dshx:border', 'dshx:border-input', 'dshx:bg-background'])
+    expect(fieldLook.split(' ')).toEqual(['dshx:rounded-lg', 'dshx:border', 'dshx:border-field-border', 'dshx:bg-background'])
   })
 
   it('draws the select trigger at the one control height (32px) in that look, with a full-strength chevron', () => {
@@ -59,7 +64,7 @@ describe('one field look (council round 3 A4)', () => {
     const rule = /@utility select-look \{([^}]*)\}/u.exec(looks)?.[1] ?? ''
     for (const declaration of [
       'height: var(--dshx-control-h, 32px);',
-      'border: 1px solid var(--dsw-alias-border-l3);',
+      'border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));',
       'border-radius: var(--dsw-radius-md, 8px);',
       'background-color: var(--dsw-alias-bg-base);',
       'box-shadow: none;',
@@ -71,6 +76,49 @@ describe('one field look (council round 3 A4)', () => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     expect(PaletteMath.contrastRatio(p.neutral[9]!, p.neutral[0]!)).toBeGreaterThanOrEqual(4.5)
     expect(PaletteMath.contrastRatio(p.neutral[10]!, p.neutral[0]!)).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+describe('field boundary (council round 6 A2, WCAG 1.4.11)', () => {
+  it('is its own generated token, emitted in both theme blocks and exposed as the field-border colour', () => {
+    for (const scheme of schemes) expect(ThemeCss.blockDeclarations(WARM_STONE, scheme).join('\n')).toMatch(/--dshx-field-border: oklch\(/u)
+    expect(roles).toContain('--color-field-border: var(--dshx-field-border, var(--dsw-alias-border-l3));')
+    // Dividers and card hairlines stay subtle: the border role is untouched.
+    expect(styles).toContain('--color-border: var(--dsw-alias-border-l2);')
+  })
+
+  it.each(schemes)('holds 3:1 against every surface a field sits on (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const dark = scheme === 'dark'
+    const surfaces = {
+      bg: p.neutral[0]!,
+      panel: p.neutral[1]!,
+      raised: p.neutral[2]!,
+      // The dialog fill (surfaces.css: the page in light, 0.27 in dark) and the nav column (council round 6 A4: the
+      // panel in light, 0.225 in dark).
+      dialog: dark ? { l: 0.27, c: 0.006, h: 60 } : p.neutral[0]!,
+      nav: dark ? { l: 0.225, c: 0.006, h: 60 } : p.neutral[1]!,
+    }
+    for (const [name, surface] of Object.entries(surfaces)) expect(PaletteMath.contrastRatio(p.fieldBorder, surface), name).toBeGreaterThanOrEqual(3)
+    // The old control border (step 5) did not: this is the regression the token fixes.
+    expect(PaletteMath.contrastRatio(p.neutral[5]!, p.neutral[0]!)).toBeLessThan(3)
+  })
+
+  it('edges the checkbox, the radio and the combobox trigger with it too', () => {
+    const view = render(
+      <>
+        <Checkbox aria-label="Agree" />
+        <RadioGroup aria-label="Mode">
+          <RadioGroupItem value="a" aria-label="A" />
+        </RadioGroup>
+      </>,
+    )
+    for (const slot of ['checkbox', 'radio-group-item']) {
+      const element = view.container.querySelector(`[data-slot="${slot}"]`)!
+      expect(classes(element), slot).toContain('dshx:border-field-border')
+      expect(classes(element), slot).not.toContain('dshx:border-input')
+    }
+    expect(combobox).toMatch(/const triggerClass =\s*'[^']*dshx:border-field-border/u)
   })
 })
 

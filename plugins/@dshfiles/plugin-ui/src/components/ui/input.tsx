@@ -2,12 +2,13 @@ import * as React from 'react'
 import { cn } from '../../lib/utils.js'
 
 /**
- * One field look (council round 3 A4): the 1px control border, the page fill and the 8px radius, no shadow and no dark
+ * One field look (council round 3 A4): the 1px field boundary (`border-field-border`, 3:1 on every surface, council
+ * round 6 A2), the page fill and the 8px radius, no shadow and no dark
  * fill, shared by Input, Textarea, InputGroup and the Select trigger so a form reads as one set of controls. Single-line
  * fields take the one control height, `--dshx-control-h` (council round 5 A1: 32px, 44px on a coarse pointer). A control
  * the kit does not draw (a Host select) takes the `dshx:select-look` utility instead (field-look.css).
  */
-export const fieldLook = 'dshx:rounded-lg dshx:border dshx:border-input dshx:bg-background'
+export const fieldLook = 'dshx:rounded-lg dshx:border dshx:border-field-border dshx:bg-background'
 
 const Input = React.forwardRef<HTMLInputElement, React.ComponentPropsWithoutRef<'input'>>(function Input({ className, type, ...props }, ref) {
   return (

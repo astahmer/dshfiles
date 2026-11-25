@@ -46,6 +46,12 @@
   --color-wash-needs-you: var(--dshx-wash-needs-you);
   --color-wash-needs-you-band: var(--dshx-wash-needs-you-band);
   --color-wash-failed: var(--dshx-wash-failed);
+  /*
+   * A field's boundary (council round 6 A2): `border-field-border` on an input, select trigger, textarea, input group,
+   * combobox trigger, checkbox and radio, 3:1 against every surface a field sits on (WCAG 1.4.11; tests/field-look).
+   * Dividers and card hairlines stay `border-border`. Falls back to the Host control border without ui-styles.
+   */
+  --color-field-border: var(--dshx-field-border, var(--dsw-alias-border-l3));
   /* Behind a kit dialog, alert dialog or sheet (round five K8): warm ink at 32% in light, black at 50% in dark. */
   --color-scrim: var(--dshx-scrim);
   --color-attention-foreground: var(--dshx-attention-foreground);

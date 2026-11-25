@@ -12,7 +12,7 @@ function RadioGroupItem({ className, ...props }: React.ComponentProps<typeof Rad
     <RadioGroupPrimitive.Item
       data-slot="radio-group-item"
       className={cn(
-        'dshx:aspect-square dshx:size-4 dshx:shrink-0 dshx:rounded-full dshx:border dshx:border-input dshx:text-control-on dshx:shadow-xs dshx:transition-[color,border-color,box-shadow] dshx:duration-(--dshx-duration-fade) dshx:data-[state=checked]:border-control-on dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:bg-input/30 dshx:dark:aria-invalid:ring-destructive/40',
+        'dshx:aspect-square dshx:size-4 dshx:shrink-0 dshx:rounded-full dshx:border dshx:border-field-border dshx:text-control-on dshx:shadow-xs dshx:transition-[color,border-color,box-shadow] dshx:duration-(--dshx-duration-fade) dshx:data-[state=checked]:border-control-on dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:bg-input/30 dshx:dark:aria-invalid:ring-destructive/40',
         className,
       )}
       {...props}

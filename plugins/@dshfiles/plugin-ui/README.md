@@ -184,8 +184,11 @@ fill with a transparent edge, so the keycap keeps one box. A palette the kit doe
 dshx:surface-dialog` to its own card.
 
 **One field look.** `Input`, `Textarea`, `InputGroup` (so `SearchInput`) and the `Select` trigger share `fieldLook`
-(`components/ui/input`): a 1px `border-input` border, the page fill (`bg-background`), the 8px radius, no shadow and no
-dark fill. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
+(`components/ui/input`): a 1px `border-field-border` boundary (`--dshx-field-border`, light `#88827d`, dark `#76706c`:
+3:1 on bg, panel, raised, the nav column and the dark dialog fill, WCAG 1.4.11; council round 6 A2), the page fill
+(`bg-background`), the 8px radius, no shadow and no dark fill. The `Combobox` trigger, `Checkbox` and `RadioGroupItem`
+edges and `select-look` use the same boundary; a field-like control a plugin draws itself takes
+`dshx:border-field-border` too. Dividers and card hairlines stay `border-border`. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
 coarse pointer, sizes `Input`, `InputGroup`, `Combobox`, the default `Select` trigger, `select-look`, the segmented
 `TabsList` (items inset 3px) and default-size `Button`s (so `Page` header actions); every `Button` size shares the 8px
 radius. The trigger takes that height (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;
