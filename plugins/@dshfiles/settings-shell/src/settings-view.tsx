@@ -567,7 +567,8 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           </InputGroup>
           <Toggle
             aria-label={t('search.modified')}
-            className="dshx:shrink-0 dshx:@max-pane-compact:hidden"
+            // A 13px line box like the file action's: the kit's 18.85px one set the label 0.92px high (council round 7 B7).
+            className="dshx:shrink-0 dshx:leading-none dshx:@max-pane-compact:hidden"
             data-settings-modified-filter=""
             onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
             pressed={SettingsSearch.hasModifiedFilter(props.query)}

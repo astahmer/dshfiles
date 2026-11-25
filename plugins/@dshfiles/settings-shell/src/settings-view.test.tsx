@@ -107,6 +107,8 @@ describe('settings view: page header (council round 3 B3)', () => {
     expect(modified).toContain('dshx:h-8')
     expect(modified).toContain('dshx:text-sm')
     expect(modified).toContain('dshx:font-medium')
+    // One 13px line box, as the file action's: the toggle's 18.85px one set its label 0.92px high (measured in Chromium).
+    expect(modified).toContain('dshx:leading-none')
     // The file action's label was 12px beside Modified's 13px, so Modified read heavier and sat a pixel high.
     expect(read('open-config-action.tsx')).toContain('dshx:px-2.5 dshx:text-sm dshx:leading-none dshx:font-medium')
     expect(read('open-config-action.tsx')).not.toContain('dshx:px-2.5 dshx:text-xs dshx:font-medium')
