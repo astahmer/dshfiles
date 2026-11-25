@@ -226,3 +226,21 @@ describe('core Plugins page title and descriptions (council round 6, D4)', () =>
     expect(ruleFor("[class*='_cardDesc']")).toMatch(/max-width:\s*70ch;/u)
   })
 })
+
+describe('core Plugins header (council round 7, D5)', () => {
+  it('still renders the toolbar, its Refresh button and the title hooks', () => {
+    expect(page.includes('"data-plugin-toolbar"') || page.includes('data-plugin-toolbar'), 'toolbar').toBe(true)
+    expect(new RegExp('"addButton":\\s*`[A-Za-z0-9]+_[A-Za-z0-9]+_addButton`', 'u').test(page), 'addButton').toBe(true)
+    // The module draws both header buttons 32px tall; Refresh's outline is a 0.5px hairline drawn inside a 0.5px
+    // transparent border, so it reads about 31px and fainter than the filled Add plugin beside it.
+    expect(/_addButton,\.[A-Za-z0-9]+_[A-Za-z0-9]+_addPrimary,\.[A-Za-z0-9]+_[A-Za-z0-9]+_addMore\{[^}]*height:32px/u.test(page), 'module height').toBe(true)
+  })
+
+  it('draws Refresh with a full 1px edge at its 32px box, like the kit outline button beside Add plugin', () => {
+    const refresh = ruleFor("[data-plugin-toolbar] [class*='_addButton'][aria-busy]")
+    expect(refresh).toMatch(/height:\s*32px;/u)
+    expect(refresh).toMatch(/border:\s*1px solid var\(--dsw-alias-border-l2\);/u)
+    expect(refresh).toMatch(/box-shadow:\s*none;/u)
+  })
+
+})

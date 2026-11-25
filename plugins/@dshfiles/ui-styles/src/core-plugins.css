@@ -71,6 +71,17 @@ section[data-plugin-panel] [class*='_pageTitle'] {
 }
 
 /*
+ * Refresh (the outline header button, the one with `aria-busy`) keeps the module's 32px box but draws a full 1px edge
+ * at it, the kit outline button's, instead of a 0.5px hairline inside a 0.5px transparent border that read about 31px
+ * beside the filled Add plugin (council round 7, D5).
+ */
+section[data-plugin-panel] [data-plugin-toolbar] [class*='_addButton'][aria-busy] {
+  height: 32px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  box-shadow: none;
+}
+
+/*
  * The switch sits in a fixed column, so descriptions end at one edge. A row with no switch opens a page (a settings
  * item): the column holds a 14px chevron in secondary ink, centred on the switch's axis (the 36px Host switch sits flush
  * right, so its axis is 18px in), and the Host's card-link hover fills the whole row (council round 5, D5).
