@@ -337,6 +337,14 @@ describe('DestinationShell', () => {
     expect(screen.queryByRole('button', { name: 'Waiting threads' })).toBeNull()
   })
 
+  it("on a phone, ends the full-screen list above the frame's status pill row while the frame draws it", () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const list = document.querySelector<HTMLElement>('[data-phone-list]')
+    expect(list?.className).toContain('dshx:[html:not([data-phone-keyboard]):has([data-status-strip=compact])_&]:[--phone-list-status-room:44px]')
+    expect(list?.style.bottom).toContain('var(--phone-list-status-room, 0px)')
+  })
+
   it('replaces the rail with a bottom tab bar on a phone', () => {
     setPhone(true)
     const shell = renderShell({ collapsed: true })

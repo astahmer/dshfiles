@@ -1530,8 +1530,13 @@ const PhoneNavigation = (
         <div
           data-phone-list=""
           onClick={closeAfterPick}
-          className="dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-2 dshx:text-foreground"
-          style={{ top: PHONE_TOP_HEIGHT, bottom: PHONE_NAV_HEIGHT }}
+          className={cn(
+            'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-2 dshx:text-foreground',
+            // The frame's status pill row (44px, just above the tab bar) stays visible under a full-screen list: the list
+            // ends above it whenever the frame draws it (round five, lane C asked), and covers it while the keyboard is up.
+            'dshx:[html:not([data-phone-keyboard]):has([data-status-strip=compact])_&]:[--phone-list-status-room:44px]',
+          )}
+          style={{ top: PHONE_TOP_HEIGHT, bottom: `calc(${PHONE_NAV_HEIGHT} + var(--phone-list-status-room, 0px))` }}
         >
           {listContent}
         </div>
