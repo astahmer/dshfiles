@@ -62,6 +62,11 @@ export interface SpendMapProps extends Omit<React.HTMLAttributes<HTMLElement>, '
   readonly footer?: React.ReactNode
   /** `framed` (default) sets the map in an inner bordered box; `flush` draws it straight on the card. */
   readonly inset?: 'framed' | 'flush'
+  /**
+   * Caps the end-node column, in px, so a single entry does not stretch across a wide card. Without it the column takes
+   * the rest of the row.
+   */
+  readonly leafMaxWidth?: number
 }
 
 const noLeaves: readonly SpendLeaf[] = []
@@ -94,6 +99,7 @@ export function SpendMap({
   detailPeriod = 'month to date',
   footer,
   inset = 'framed',
+  leafMaxWidth,
   className,
   ...props
 }: SpendMapProps) {
@@ -244,6 +250,7 @@ export function SpendMap({
             role="radiogroup"
             aria-label={dimension?.label ?? 'Entries'}
             className="dshx:relative dshx:flex dshx:min-w-[8.5rem] dshx:flex-1 dshx:flex-col dshx:gap-1.5"
+            style={leafMaxWidth === undefined ? undefined : { maxWidth: leafMaxWidth }}
           >
             {leaves.map(entry => (
               <LeafCard

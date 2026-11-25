@@ -13,7 +13,7 @@ const dimensions: readonly SpendDimension[] = [
   },
 ]
 
-const render = (props: { readonly inset?: 'framed' | 'flush' } = {}): string =>
+const render = (props: { readonly inset?: 'framed' | 'flush'; readonly leafMaxWidth?: number } = {}): string =>
   renderToStaticMarkup(
     <SpendMap
       heading="Where it went"
@@ -44,5 +44,11 @@ describe('SpendMap', () => {
     expect(render()).toContain(frame)
     expect(render({ inset: 'flush' })).not.toContain(frame)
     expect(render({ inset: 'flush' })).toContain('data-spend-map-inset="flush"')
+  })
+
+  it('caps the end-node column at leafMaxWidth, and leaves it to fill the row without one (council round 5 D1)', () => {
+    const column = (html: string): string | undefined => /<div role="radiogroup" aria-label="Models"([^>]*)>/u.exec(html)?.[1]
+    expect(column(render({ leafMaxWidth: 280 }))).toContain('style="max-width:280px"')
+    expect(column(render())).not.toContain('max-width')
   })
 })
