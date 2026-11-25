@@ -1,6 +1,11 @@
 /** Changed-files card: filled header, file rows with line counts, and a bottom fold control. */
 .card { --changes-fill: var(--dsw-alias-card-fill); --changes-hover: var(--dsw-alias-card-fill-hover); display: flex; flex-direction: column; min-width: 0; margin-top: 4px; overflow: hidden; border: 0.5px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-lg); background: var(--dsw-alias-bg-layer-1); color: var(--dsw-alias-label-primary); }
 .card[data-single='true'] { border-color: var(--dsw-alias-border-l1); }
+/* dshfiles (unslop r5 C2, council round 4): where the turn summary's chips name every edited file with its change
+   count, this card said the same a second time; it steps aside and the chips open the same review. */
+:global([data-turn-tail]):has(:global([data-dshfiles-turn-file-chips='all'])) .card {
+  display: none;
+}
 .header { display: flex; align-items: center; gap: 10px; box-sizing: border-box; width: 100%; min-width: 0; height: 60px; margin: 0; padding: 8px 10px; border: 0; background: var(--changes-fill); color: inherit; font: inherit; text-align: left; }
 button.header { cursor: pointer; transition: background-color 120ms ease; }
 button.header:focus-visible { background: var(--changes-hover); }

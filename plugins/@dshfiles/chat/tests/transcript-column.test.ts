@@ -6,7 +6,7 @@ const css = readFileSync(new URL('../src/native/chat/ChatView.module.css', impor
 describe('one transcript column (round five C3)', () => {
   it('insets the transcript by the composer side clearance, so a narrow pane puts prose and the composer card on one edge', () => {
     const scroll = /\n\.scroll \{([^}]*)\}/.exec(css)?.[1] ?? ''
-    expect(scroll).toMatch(/padding: 16px var\(--dsh-composer-side-clearance\) 12px;/)
+    expect(scroll).toMatch(/padding: 16px var\(--dsh-composer-side-clearance\) 24px;/)
     expect(scroll).not.toContain('var(--dsh-composer-side-clearance) + 16px')
   })
 })
@@ -22,8 +22,9 @@ describe('the end of the transcript (round five C3)', () => {
     expect(hover).toMatch(/\[data-actions-reveal='hover'\]:hover \.actions,\s*\[data-actions-reveal='hover'\]:focus-within \.actions,/u)
   })
 
-  it('ends the scroll range 12px below the last row, not 16px', () => {
+  // Round five C2 (council round 4): 24px between a finished turn's last line and the dock's live rows.
+  it('ends the scroll range 24px below the last row', () => {
     const scroll = /\n\.scroll \{([^}]*)\}/.exec(css)?.[1] ?? ''
-    expect(scroll).toMatch(/padding: 16px var\(--dsh-composer-side-clearance\) 12px;/)
+    expect(scroll).toMatch(/padding: 16px var\(--dsh-composer-side-clearance\) 24px;/)
   })
 })

@@ -42,6 +42,7 @@
     "src/native/chat/ChatNodeSeat.tsx",
     "src/native/chat/ChatView.module.css",
     "src/native/chat/ChatView.tsx",
+    "src/native/chat/TurnTailNodeView.module.css",
     "src/native/chat/CompactionItem.tsx",
     "src/native/chat/MessageItem.module.css",
     "src/native/chat/MessageItem.tsx",

@@ -8,7 +8,7 @@ A footer under each finished turn that says what the agent did with tools:
 
 > `pricing.ts +40 −3` `cart.ts +2 −4` · ran 6 commands › **2 of 42 tests failed ›** read 4 files · 2 searches
 
-- **Changed-file chips** (visual refresh T2.3) name each file the turn actually wrote (a rejected edit is not counted)
+- **Changed-file chips** (visual refresh T2.3; council round 4: the chip row says `data-dshfiles-turn-file-chips="all"` when it names every file, and the line marks itself `data-chat-tail-line` so Chat lays a reply's hover actions on its trailing end) name each file the turn actually wrote (a rejected edit is not counted)
   with its lines added and removed; a chip opens that turn's review in the Changes facet (the file in the editor until
   the Host has addressed the turn's changes). Four chips show, the rest fold into `+N more`, which opens the
   walkthrough. With the walkthrough setting off, the footer falls back to the `Edited 3 files +42 −7 ›` count, whose

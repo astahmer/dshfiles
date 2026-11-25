@@ -10,3 +10,20 @@
   margin-top: 4px;
   margin-left: -6px;
 }
+
+/* dshfiles (unslop r5 C2, council round 4): on a pointer device a reply's actions show only on hover, yet their row
+   reserved 48px under the turn's last line, a dead band above the dock. When the tail ends in a one-line row that
+   leaves its trailing end free (`data-chat-tail-line`, the turn summary), the actions ride that end instead; touch
+   keeps them in their own visible row. */
+@media (hover: hover) {
+  .root[data-actions-reveal='hover']:has(> :global([data-slot]) > :global([data-chat-tail-line]):last-child) {
+    position: relative;
+  }
+
+  .root[data-actions-reveal='hover']:has(> :global([data-slot]) > :global([data-chat-tail-line]):last-child) > .actions {
+    position: absolute;
+    right: 0;
+    bottom: -4px;
+    margin: 0;
+  }
+}

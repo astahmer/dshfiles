@@ -249,7 +249,7 @@ export const TurnSummaryLine = (props: {
     })
   const separators = TurnActivity.separators(parts.map(part => part.chevron))
   return (
-    <div className="dshx-root dshx:flex dshx:w-fit dshx:max-w-[var(--dsh-chat-prose-measure,100%)] dshx:flex-col dshx:gap-1 dshx:text-sm dshx:text-muted-foreground" data-dshfiles-turn-summary="">
+    <div className="dshx-root dshx:flex dshx:w-fit dshx:max-w-[var(--dsh-chat-prose-measure,100%)] dshx:flex-col dshx:gap-1 dshx:text-sm dshx:text-muted-foreground" data-dshfiles-turn-summary="" data-chat-tail-line="">
       {/* The icon sits on the first line's text baseline (a zero-width space gives it one), so it stays beside "Ran N
           commands" when a 44px touch target sets that line, and wrapped lines keep their indent under the words. */}
       <div className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-1.5">

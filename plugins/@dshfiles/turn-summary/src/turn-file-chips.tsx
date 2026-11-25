@@ -22,7 +22,7 @@ export const TurnFileChips = (props: {
   const shown = props.files.slice(0, MAX_FILE_CHIPS)
   const hidden = props.files.length - shown.length
   return (
-    <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1" data-dshfiles-turn-file-chips="">
+    <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-1" data-dshfiles-turn-file-chips={hidden > 0 ? 'some' : 'all'}>
       {shown.map(file => (
         <button
           aria-label={`${props.opensChanges ? 'Review' : 'Open'} ${file.path}${props.opensChanges ? ' in Changes' : ''}, ${String(file.added)} added, ${String(file.removed)} removed`}

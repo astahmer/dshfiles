@@ -37,10 +37,18 @@
   }
 }
 
-/* dshfiles (unslop, phone #20): on a touch screen the row that opens a turn's work was 24px tall. */
+/* dshfiles (unslop, phone #20): on a touch screen the row that opens a turn's work was a 24px target. Round five C2
+   (council round 4): it draws at 24px, so "Worked for" sits 12px above "New", and its tap area reaches 10px past each
+   edge (44px) without taking room. */
 @media (pointer: coarse) {
   .root:not(:disabled) {
-    min-height: 44px;
+    position: relative;
+  }
+
+  .root:not(:disabled)::after {
+    content: '';
+    position: absolute;
+    inset: -10px 0;
   }
 }
 
