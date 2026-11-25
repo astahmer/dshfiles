@@ -87,6 +87,7 @@
     "src/native/skeleton/annotations-pill-done.test.tsx",
     "src/native/skeleton/dock-geometry.test.ts",
     "src/native/skeleton/input-bar-overlay.test.ts",
-    "src/native/skeleton/touch-targets.test.ts"
+    "src/native/skeleton/touch-targets.test.ts",
+    "src/native/skeleton/hero-project-mark.test.tsx"
   ]
 }

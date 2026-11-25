@@ -37,6 +37,37 @@
   color: var(--dsw-alias-label-primary);
 }
 
+/* Unslop r5 C5 (council round 4): the project in the headline carries its identity tile (the kit ProjectMark's look:
+   the project tone at 14% behind its letters pulled a quarter toward the ink, AA as in plugin-ui
+   tests/project-mark.test.tsx), sized with the headline (a 26px line gets a 29px tile with 13px letters) and kept on the
+   name's line. Its letters are drawn from `data-letters`, so the heading's text stays the sentence. */
+.project {
+  white-space: nowrap;
+}
+
+.projectMark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 2.2em;
+  min-width: 2.2em;
+  margin-right: 0.5em;
+  padding: 0 0.4em;
+  border-radius: var(--dsw-radius-sm);
+  background: color-mix(in oklab, currentColor 14%, transparent);
+  font-size: 0.5em;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0;
+  vertical-align: 0.5em;
+}
+
+.projectMark::after {
+  content: attr(data-letters);
+  color: color-mix(in oklab, currentColor 75%, var(--dsw-alias-label-primary));
+}
+
 /* Phone and narrow panes: the 20/28 heading step, left-aligned above the composer as in the phone mockup. */
 @container (max-width: 560px) {
   .headline {
