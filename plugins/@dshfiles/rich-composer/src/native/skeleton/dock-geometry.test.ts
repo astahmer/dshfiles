@@ -128,3 +128,17 @@ describe('the new-thread hero centre (round six C5)', () => {
     expect(css).not.toContain('.root:has(.headerBlank)')
   })
 })
+
+describe('the phone transcript fade above the dock (council round 7 C3)', () => {
+  it('fades over 36px (1.5 lines), opaque exactly where the dock surface starts, so no line shows as a sliced strip', () => {
+    const rule = blocks().find(
+      block =>
+        block.selector === ":global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat" &&
+        block.context.startsWith('@media (max-width: 639.98px)'),
+    )
+    expect(rule?.body).toMatch(/padding-top: 36px;/)
+    // The last stop is the seat's padding edge: the band never ends early (it was opaque from 20px of a 24px pad).
+    expect(rule?.body).toMatch(/var\(--dsw-alias-bg-base\) 36px\s*\)/)
+    expect(rule?.body).not.toMatch(/var\(--dsw-alias-bg-base\) 20px/)
+  })
+})

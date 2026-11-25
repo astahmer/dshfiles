@@ -160,14 +160,14 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
   const PHONE = '@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px)'
   const phone = ':global(html[data-shell-phone-nav])'
 
-  it('ends the transcript above the dock in a 24px fade, so no line of text is cut by a rule', () => {
+  it('ends the transcript above the dock in a 36px fade (council round 7 C3), so no line of text is cut by a rule', () => {
     const seat = ruleIn(PHONE, `${phone} .body[data-content-phase='active'] .composerSeat`)
-    expect(seat).toMatch(/padding-top:\s*24px/)
+    expect(seat).toMatch(/padding-top:\s*36px/)
     // Transparent at the band's top, the page base before the band ends: the band is the fade, the dock below opaque.
     expect(seat).toMatch(/var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,/)
     const opaqueAt = Number(/var\(--dsw-alias-bg-base\) (\d+)px\s*\)/u.exec(seat)?.[1])
     expect(opaqueAt).toBeGreaterThan(0)
-    expect(opaqueAt).toBeLessThanOrEqual(24)
+    expect(opaqueAt).toBeLessThanOrEqual(36)
   })
 
   it('gives the jump control a trailing seat in the dock head, beside Live work', async () => {
