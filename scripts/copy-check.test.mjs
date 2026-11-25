@@ -257,6 +257,27 @@ test('raw-error-echo: a message that ends by echoing an error, not a labelled va
   )
 })
 
+test('transport-failure and code-echo: a transport message or an error code printed to the user (round four D7)', () => {
+  const source = [
+    'const a = `transport failure for /api/${endpoint}: HTTP 500`',
+    "const b = 'Transport failure. Retry.'",
+    'const c = `${error.message} (${error.code})`',
+    'const d = `Could not send (${failure.errorCode}).`',
+    'const e = `Inbox did not load (HTTP ${status}). Retry; if it repeats, check the DSH terminal.`',
+    "const f = 'Could not reach DSH.'",
+    'const g = `${count} threads (${label})`',
+  ].join('\n')
+  const findings = findingsInStrings({ file: 'plugins/@dshfiles/demo/src/a.tsx', prefix, strings: extractStrings(source) })
+  assert.deepEqual(
+    findings.filter(finding => finding.term === 'transport-failure').map(finding => finding.line),
+    [1, 2],
+  )
+  assert.deepEqual(
+    findings.filter(finding => finding.term === 'code-echo').map(finding => finding.line),
+    [3, 4],
+  )
+})
+
 test('status-word: a non-canonical state word as a whole label, not inside a sentence or as an enum value', () => {
   assert.deepEqual(ruleHits('status-word', ['Running', 'In progress', 'Needs attention', 'Running tests', 'running', '3 completed', 'Working', 'Done']), [
     'Running',

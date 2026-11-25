@@ -308,6 +308,15 @@ export const copyRules: readonly CopyRule[] = [
     test: text =>
       /^(?:Running|Completed|In progress|Finished|Succeeded|Inactive|Input needed|Needs attention)$/i.test(text.trim()) && /^[A-Z]/.test(text.trim()),
   },
+  // DSH Connection's own message (`transport failure for /api/…: HTTP 500`) is a cause for Details, never copy.
+  { id: 'transport-failure', use: 'errorSentence from @dshfiles/plugin-ui/lib/error-copy; the raw text under Details', scope: 'any', test: text => /\btransport failure\b/i.test(text) },
+  // `${error.message} (${error.code})`: a code the user cannot act on. The code goes under Details.
+  {
+    id: 'code-echo',
+    use: 'errorSentence from @dshfiles/plugin-ui/lib/error-copy; the code under Details',
+    scope: 'any',
+    test: (_text, raw) => /\(\$\{[^}]*code\}\)[.!]?$/i.test(raw.trim()),
+  },
   // The retry verb is Retry; "try again" inside a sentence ("Check the path, then try again.") is fine.
   { id: 'try-again', use: 'Retry', scope: 'label', test: text => /^Try again[.!]?$/i.test(text.trim()) },
   // Three dots after a word, at a word end (`Loading...`, `Search... `); a range (`main...HEAD`) or spread is code.

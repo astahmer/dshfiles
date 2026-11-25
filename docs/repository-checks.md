@@ -166,6 +166,13 @@ each plugin's `locale/en.json`, and the catalog's `title`, `summary`,
 | `host-process`                                             | a capital "Host" inside a sentence (the server process); lower-case host is a machine           |
 | `package-name`                                             | `@dshfiles/…` or `@deepseek-ai/…` in a sentence                                                |
 | `raw-error-echo`                                           | a message ending in `: {message}` or `: ${error…}` with no next step                           |
+| `transport-failure`                                        | the text "transport failure" (DSH Connection's own message) in copy; use `errorSentence`       |
+| `code-echo`                                                | a template ending in `(${…code})`, as in `` `${error.message} (${error.code})` ``; the code goes under Details |
 | `status-word`                                              | Running, Completed, In progress, Finished, Succeeded, Inactive, Input needed or Needs attention as a whole label |
 | `try-again`                                                | "Try again" as a whole label (use Retry)                                                       |
 | `ascii-ellipsis`                                           | three dots after a word instead of …                                                           |
+
+`transport-failure` and `code-echo` came with round four of the unslop plan
+(2026-11-25), baselined at 0 and 6 (jj-integration 1, model-effort-picker 2,
+multi-host 1, rich-composer 2); `errorSentence` in
+`@dshfiles/plugin-ui/lib/error-copy` is the replacement.

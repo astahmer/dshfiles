@@ -9,11 +9,17 @@
     "host-process": 9,
     "package-name": 2,
     "raw-error-echo": 13,
-    "status-word": 21,
+    "status-word": 19,
+    "transport-failure": 0,
+    "code-echo": 6,
     "try-again": 0,
     "ascii-ellipsis": 0
   },
   "counts": {
+    "code-echo/jj-integration": 1,
+    "code-echo/model-effort-picker": 2,
+    "code-echo/multi-host": 1,
+    "code-echo/rich-composer": 2,
     "conversation/agent-preset": 1,
     "conversation/backlog": 5,
     "conversation/btw": 1,
@@ -81,7 +87,7 @@
     "status-word/backlog": 1,
     "status-word/cordis-cards": 1,
     "status-word/mcp-servers": 1,
-    "status-word/plugin-ui": 16,
+    "status-word/plugin-ui": 14,
     "status-word/resource-packs": 1
   }
 }
