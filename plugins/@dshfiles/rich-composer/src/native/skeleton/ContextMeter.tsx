@@ -10,6 +10,7 @@ import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/clie
 // Type-only: the `contextPressure` / `contextBreakdown` projection key merges.
 import type {} from '@deepseek-ai/dsh-token-meter/client'
 import { Tooltip, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
+import { useCloseWatcher } from '@dshfiles/plugin-ui/hooks/close-watcher'
 import type { ComposerBarProps } from '../contract/slots.ts'
 import { contextOccupancy } from '../context-occupancy.ts'
 import { CONTEXT_METER_VISIBLE_FROM, contextTone } from '../../context-tone.ts'
@@ -67,6 +68,8 @@ export function ContextMeter({ useProjection, t, detail }: ContextMeterProps) {
   const available = context !== null
   const anchorName = `--dsh-context-${useId().replaceAll(':', '')}`
   useDismissOnOutsidePointer(rootRef, open && available, setOpen, panelRef)
+  // The back gesture closes the panel with Escape instead of leaving the thread.
+  useCloseWatcher(open && available, () => setOpen(false))
 
   // A model switch can temporarily remove capacity while this component stays
   // mounted. Close the now-unavailable panel instead of preserving stale UI.

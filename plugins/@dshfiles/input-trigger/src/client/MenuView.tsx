@@ -13,6 +13,7 @@
  * header pinned above the scrolling list.
  */
 import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { useCloseWatcher } from '@dshfiles/plugin-ui/hooks/close-watcher'
 import { MenuSurface } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
@@ -154,6 +155,7 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
   useLayoutEffect(() => {
     updateOverflowHint()
   }, [state, maxHeight, updateOverflowHint])
+  useCloseWatcher(state.open, onDismiss)
   const highlight = state.open ? state.highlight : null
   // Escape closes the picker wherever focus sits: the + button owns focus after
   // a tap, so the controller's composer keydown never sees the key there.
