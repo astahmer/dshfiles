@@ -416,7 +416,7 @@ export const Composer = (props: {
   const voiceAvailable = speech.data?.available === true
   const inputClass = cn(
     'dshx:w-full dshx:overflow-y-auto dshx:whitespace-pre-wrap dshx:break-words dshx:rounded-md dshx:bg-transparent dshx:leading-relaxed dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground',
-    chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm',
+    chat ? 'dshx:min-h-11 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm',
   )
   const voiceTitle = (() => {
     if (transcribing) return 'Transcribing…'
@@ -463,7 +463,7 @@ export const Composer = (props: {
       <BacklogImageEditor
         ref={input}
         ariaLabel="Capture"
-        className={cn(inputClass, chat ? 'dshx:min-h-20 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm')}
+        className={cn(inputClass, chat ? 'dshx:min-h-11 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm')}
         value={text}
         files={attachments.files}
         placeholder={props.placeholder}

@@ -22,6 +22,7 @@ import { BacklogText } from './item-text.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentionHandle } from './backlog-mention-handle.js'
+import { FeedLook } from './feed-look.js'
 
 const DAY_MS = 86_400_000
 /** Like a chat history: the newest page is mounted first, older entries appear as the scroller reaches its top. */
@@ -85,6 +86,8 @@ const FeedEntry = (props: {
   readonly projectPaths: readonly string[]
   readonly triageOff: boolean
   readonly openThread: (sessionId: string) => void
+  /** False when every row in the feed has the same author: the avatar would repeat one face down the page. */
+  readonly showAuthor: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -127,7 +130,7 @@ const FeedEntry = (props: {
             ✓
           </span>
         ) : null}
-        <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" />
+        {props.showAuthor ? <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" /> : null}
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
             <span onClick={event => event.stopPropagation()}>
@@ -149,9 +152,10 @@ const FeedEntry = (props: {
               <BacklogText
                 text={imageTitleFallback(item.title)}
                 className={cn(
-                  'dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:truncate dshx:text-sm dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:text-sm! dshx:[&>div]:leading-tight! dshx:[&>div]:font-medium! dshx:[&>div]:text-foreground! dshx:[&>div>p]:my-0 dshx:[&>div>p]:truncate',
+                  // The native compact Markdown root (`> div > div`) sets 13 px tertiary text of its own: the title restyles it.
+                  'dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:truncate dshx:text-base dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:font-medium! dshx:[&>div>div]:text-base! dshx:[&>div>div]:leading-5! dshx:[&>div>div]:text-foreground! dshx:[&>div_p]:my-0 dshx:[&>div_p]:truncate',
                   closed &&
-                    'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40 dshx:[&>div]:text-muted-foreground! dshx:[&>div]:line-through',
+                    'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40 dshx:[&>div>div]:text-muted-foreground! dshx:[&>div]:line-through',
                 )}
               />
             )}
@@ -160,7 +164,7 @@ const FeedEntry = (props: {
           {item.preview === '' ? null : (
             <BacklogText
               text={item.preview}
-              className="dshx:line-clamp-2 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div]:text-sm! dshx:[&>div]:leading-relaxed! dshx:[&>div]:text-muted-foreground! dshx:[&>div>p]:my-0"
+              className="dshx:line-clamp-2 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div>div]:text-sm! dshx:[&>div>div]:leading-relaxed! dshx:[&>div>div]:text-muted-foreground! dshx:[&>div_p]:my-0"
             />
           )}
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
@@ -176,7 +180,9 @@ const FeedEntry = (props: {
               </Chip>
             )}
             {item.tags.map(tag => (
-              <Chip key={tag}>#{tag}</Chip>
+              <span key={tag} className={cn(FeedLook.TAG_CHIP, FeedLook.tagTone(tag))}>
+                <span className="dshx-project-mark-letters">#{tag}</span>
+              </span>
             ))}
             {item.attachments.length === 0 ? null : (
               <Chip>
@@ -296,6 +302,7 @@ export const FeedView = (props: {
   const pinned = props.items.filter(item => item.pinned)
   const selection = useBacklogSelection({ items: [...pinned, ...visible], openId: props.openId, scope: JSON.stringify(props.statuses) })
   const lastId = ordered.at(-1)?.id
+  const showAuthor = FeedLook.authorsDiffer([...pinned, ...ordered])
 
   useLayoutEffect(() => {
     const element = scroller.current
@@ -330,6 +337,7 @@ export const FeedView = (props: {
           projectPaths={props.projectPaths}
           triageOff={props.triageOff}
           openThread={props.openThread}
+          showAuthor={showAuthor}
         />
       </div>
     )
@@ -379,7 +387,7 @@ export const FeedView = (props: {
         }}
         className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto"
       >
-        <div className="dshx:mx-auto dshx:flex dshx:min-h-full dshx:max-w-4xl dshx:flex-col dshx:justify-start dshx:px-3 dshx:pt-6 dshx:pb-3">
+        <div className="dshx:mx-auto dshx:flex dshx:min-h-full dshx:max-w-4xl dshx:flex-col dshx:justify-start dshx:px-3 dshx:pt-3 dshx:pb-3">
           {props.loaded && props.items.length === 0 ? (
             props.statuses.length === 0 ? (
               <EmptyState className="dshx:py-20">

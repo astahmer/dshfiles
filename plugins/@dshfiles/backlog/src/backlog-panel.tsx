@@ -258,6 +258,8 @@ export const BacklogPanel = (props: {
   const searchInput = useRef<HTMLInputElement>(null)
   const debounced = useDebouncedValue({ value: query, delayMs: 120 })
   const showsResults = SearchScopes.showsResults({ query: debounced, submitted: search.submitted })
+  /** The feed with no item open draws only its rows: the card hugs them (round five P6). */
+  const hugsContent = view === 'feed' && !showsResults && openId === null
   const agentItemsScope: AgentItemsScope = showsResults ? 'search' : view
   const hideAgentItems = stored.hideAgentItems[agentItemsScope]
 
@@ -655,7 +657,14 @@ export const BacklogPanel = (props: {
             </Button>
           </p>
         ) : null}
-        <div data-backlog-content-region className="dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:overflow-clip dshx:rounded-lg dshx:border dshx:border-border dshx:@max-pane-compact:flex-col">
+        <div
+          data-backlog-content-region
+          className={cn(
+            'dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:overflow-clip dshx:rounded-lg dshx:border dshx:border-border dshx:@max-pane-compact:flex-col',
+            // The feed card ends at its last row with the capture box under it, instead of an empty card to the page foot.
+            hugsContent && 'dshx:flex-initial',
+          )}
+        >
           {showsResults ? (
             <>
               <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
