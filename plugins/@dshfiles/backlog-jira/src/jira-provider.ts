@@ -55,6 +55,7 @@ const descriptor: ProviderDescriptor = {
     extraFields: ['due', 'criteria', 'summary'],
   },
   connectionOptions: [{ key: 'email', label: 'Account email', placeholder: 'you@example.com' }],
+  baseUrl: { label: 'Site URL', placeholder: 'https://your-site.atlassian.net', required: true },
   bindingOptions: [
     { key: 'jql', label: 'Extra JQL', placeholder: 'labels = backlog' },
     { key: 'issueType', label: 'Issue type for new items', placeholder: DEFAULT_ISSUE_TYPE },

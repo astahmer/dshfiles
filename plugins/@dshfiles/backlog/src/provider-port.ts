@@ -55,6 +55,12 @@ const bindingOptionsSchema = Schema.Record(optionKey, shortText(200))
 /** One provider-specific setting a binding form offers as a text field. */
 const bindingOptionSchema = Schema.Struct({ key: optionKey, label: shortText(60), placeholder: shortText(120) })
 
+/**
+ * How a connection form asks for the base URL: what the field is called (`Instance URL`), the example it shows and
+ * whether a connection needs one. A self-hosted or per-site provider has no public default, so it says `required`.
+ */
+const baseUrlFieldSchema = Schema.Struct({ label: shortText(40), placeholder: shortText(120), required: Schema.Boolean })
+
 const descriptorSchema = Schema.Struct({
   kind: kindSlug,
   label: shortText(60),
@@ -73,6 +79,8 @@ const descriptorSchema = Schema.Struct({
   bindingOptions: Schema.optionalKey(Schema.Array(bindingOptionSchema).check(Schema.isMaxLength(12))),
   /** Settings a connection of this kind needs beyond its key and base URL: the account email Jira signs in with. Never a secret. */
   connectionOptions: Schema.optionalKey(Schema.Array(bindingOptionSchema).check(Schema.isMaxLength(6))),
+  /** How the connection form asks for the base URL. Absent: an optional `API base URL` that empty leaves at the public API. */
+  baseUrl: Schema.optionalKey(baseUrlFieldSchema),
 })
 
 /** An account as the provider receives it: the credential stays a `secret:ALIAS` reference the provider resolves. */
@@ -353,6 +361,11 @@ export class BacklogProviders {
   /** A status every backlog status reads as itself: what a provider with typed states answers. */
   static exactStatus(status: (typeof statuses)[number], label: string = status): RemoteStatus {
     return { category: status, label, equivalents: [status] }
+  }
+
+  /** The base URL field a connection form shows: the descriptor's own, else an optional field that empty leaves at the public API. */
+  static baseUrlField(descriptor: Pick<ProviderDescriptor, 'baseUrl'>): typeof baseUrlFieldSchema.Type {
+    return descriptor.baseUrl ?? { label: 'API base URL', placeholder: 'Leave empty for the public API', required: false }
   }
 
   /** Whether `reference` matches one of a descriptor's patterns. */

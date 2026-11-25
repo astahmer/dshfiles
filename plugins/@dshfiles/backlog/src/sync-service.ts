@@ -677,7 +677,12 @@ export class BacklogSync extends Context.Service<
         readonly connection: Omit<SyncConnection, 'identity'>
         readonly previousInstanceId?: string | undefined
       }) {
-        yield* registry.get(input.connection.kind)
+        const provider = yield* registry.get(input.connection.kind)
+        const urlField = provider.descriptor.baseUrl
+        if (urlField?.required === true && input.connection.baseUrl.trim() === '')
+          return yield* new SyncConfigInvalid({
+            detail: `${provider.descriptor.label} needs its ${urlField.label}, such as ${urlField.placeholder}. Set it and save again.`,
+          })
         const current = yield* snapshot
         const previousId = input.previousInstanceId ?? input.connection.instanceId
         const previous = current.connections.find(connection => connection.instanceId === previousId)

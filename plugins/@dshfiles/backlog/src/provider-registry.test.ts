@@ -111,6 +111,27 @@ describe('the provider registry', () => {
     }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/notion', client: trashingClient(calls) }] })))
   })
 
+  it.effect('refuses to save a connection without the base URL its provider requires, naming the field', () => {
+    const descriptor: ProviderDescriptor = {
+      ...trashingDescriptor,
+      kind: 'gitea-like',
+      label: 'Gitea',
+      baseUrl: { label: 'Instance URL', placeholder: 'https://gitea.example.com', required: true },
+    }
+    const client: ExternalProviderClient = { ...notionClient([]), describe: () => Effect.succeed({ providers: [descriptor] }) }
+    expect(BacklogProviders.baseUrlField(descriptor).label).toBe('Instance URL')
+    expect(BacklogProviders.baseUrlField(trashingDescriptor)).toEqual({ label: 'API base URL', placeholder: 'Leave empty for the public API', required: false })
+    return Effect.gen(function* () {
+      const sync = yield* BacklogSync
+      const connection = { instanceId: 'gitea', kind: 'gitea-like', label: 'Gitea', credential: '', baseUrl: ' ' }
+      const refused = yield* Effect.flip(sync.saveConnection({ connection }))
+      expect(refused).toMatchObject({ _tag: 'SyncConfigInvalid' })
+      expect(refused.message).toContain('Gitea needs its Instance URL, such as https://gitea.example.com')
+      const saved = yield* sync.saveConnection({ connection: { ...connection, baseUrl: 'https://gitea.example.com' } })
+      expect(saved.connection.baseUrl).toBe('https://gitea.example.com')
+    }).pipe(Effect.provide(syncTestLayer({ client: fakeLinear().client, external: [{ owner: '@acme/gitea', client }] })))
+  })
+
   it.effect('hands a connection its provider settings on test, on save and on every call it scopes', () => {
     const seen: string[] = []
     const descriptor: ProviderDescriptor = {

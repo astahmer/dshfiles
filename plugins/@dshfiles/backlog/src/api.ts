@@ -516,9 +516,10 @@ const connectionInputSchema = Schema.Struct({
   credential: Schema.String.check(Schema.isMaxLength(400))
     .pipe(Schema.optional)
     .annotate({ description: 'secret:ALIAS reference to the key; empty uses the provider’s Host environment variable (or the gh CLI for GitHub).' }),
-  baseUrl: Schema.String.check(Schema.isMaxLength(500))
-    .pipe(Schema.optional)
-    .annotate({ description: 'API base URL for a self-hosted instance; empty uses the provider’s default. Jira needs https://<site>.atlassian.net.' }),
+  baseUrl: Schema.String.check(Schema.isMaxLength(500)).pipe(Schema.optional).annotate({
+    description:
+      'Base URL of the instance or site. Empty uses the provider’s public API; a provider without one requires it: Gitea or Forgejo needs the instance (https://gitea.example.com), Jira the site (https://<site>.atlassian.net).',
+  }),
   options: BacklogProviders.bindingOptionsSchema.pipe(Schema.optional).annotate({
     description: 'Provider settings its descriptor lists in connectionOptions, e.g. { email } for Jira. Never a key.',
   }),

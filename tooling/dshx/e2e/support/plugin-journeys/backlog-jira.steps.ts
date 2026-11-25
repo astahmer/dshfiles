@@ -91,7 +91,7 @@ When('a Jira connection to the fake Jira is tested and saved with its account em
   const section = remoteSync(page)
   await section.getByRole('button', { name: 'Add Jira connection', exact: true }).click()
   const form = section.getByRole('form', { name: 'New Jira connection' })
-  await form.getByRole('textbox', { name: 'API base URL', exact: true }).fill(jiraOf(page).baseUrl)
+  await form.getByRole('textbox', { name: 'Site URL', exact: true }).fill(jiraOf(page).baseUrl)
   await form.getByRole('textbox', { name: 'Account email', exact: true }).fill(jiraOf(page).fake.email)
   await form.getByRole('button', { name: 'Test connection', exact: true }).click()
   await expect(form.getByRole('status')).toContainText('Ada Lovelace')
@@ -125,7 +125,9 @@ When('the fake Jira issue {string} is imported', async ({ page }: { page: Page }
 
 Then('the backlog shows the imported Jira issue {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'backlog-jira-imported', async () => {
-    await page.getByRole('button', { name: 'Backlog views', exact: true }).click()
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'Backlog settings' })).toHaveCount(0)
+    await page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name: 'Feed', exact: true }).click()
     await expect(feedItem(page, title)).toBeVisible()
     expect(jiraOf(page).fake.requests.some(request => request.path === '/issue/ENG-1')).toBe(true)
   })
