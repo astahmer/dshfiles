@@ -63,6 +63,7 @@
         "A folder outside a jj or git repository offers no bookmark or isolation.",
         "A thread workspace with revisions to rebase is never removed by the sweep.",
         "A destination that names no revision or several (unknown name, ambiguous prefix, conflicted bookmark) is refused before jj creates anything, with the bar's recovery text, and retrying creates nothing.",
+        "A conflicted bookmark's refusal offers Choose <bookmark>\u2019s revision\u2026: a dialog lists the revisions it points at with nothing preselected, and the bookmark moves only when the user confirms one; the Host checks again that the bookmark is still conflicted and holds that revision, then the refused move runs again. A failed `jj bookmark set` keeps the dialog open with jj's words. The agent gets the same read and write through jj_bookmark_conflict and jj_resolve_bookmark_conflict (confirm: true, only when the user chose).",
         "A failed `jj workspace add` removes what it registered, and a spare that cannot be claimed is replaced, so neither leaves a second workspace.",
         "Starting from a remote bookmark (main@origin) fetches only that bookmark first, with a 45 s timeout; offline or refused, the thread starts from the last fetched position and the Host logs a warning. A spare kept for that base never stands in for the fetch.",
         "Enable is offered only while the Jujutsu bundle is loaded and jj is installed; nothing is initialized without the click, and a broken .jj is refused rather than repaired."
@@ -98,6 +99,11 @@
         {
           "kind": "gherkin",
           "id": "jj-integration.ambiguous-destination-browser-journey",
+          "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "jj-integration.resolve-conflicted-bookmark-browser-journey",
           "featureFile": "tooling/dshx/e2e/features/jj-integration.feature"
         },
         {
@@ -163,6 +169,36 @@
         },
         {
           "kind": "unit-test",
+          "id": "jj-integration.bookmark-conflict",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "lists the revisions a conflicted bookmark holds, and none for a resolved one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.resolve-bookmark-conflict",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "points a conflicted bookmark at the chosen revision, then a thread starts from it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.resolve-bookmark-conflict-refused",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "refuses a revision the conflicted bookmark does not hold, and leaves it conflicted"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.resolve-bookmark-conflict-resolved",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "refuses to move a bookmark that is not conflicted"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.resolve-bookmark-conflict-undo",
+          "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
+          "testName": "restores the conflict with jj undo, the documented way back"
+        },
+        {
+          "kind": "unit-test",
           "id": "jj-integration.secondary-workspace-identity",
           "file": "plugins/@dshfiles/jj-integration/src/threads.integration.test.ts",
           "testName": "identifies non-thread secondary workspaces by their owning JJ checkout"
@@ -172,6 +208,10 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         },
         {
           "kind": "custom",

@@ -197,6 +197,12 @@ so the agent can follow the same asynchronous pass the user watches.
 Settings › Projects › **Main branch** pairs `jj_project_bookmark` (read-only:
 the branch and the layer that chose it) with `jj_set_project_bookmark` (write;
 `bookmark: null` reverses it to Automatic).
+A conflicted bookmark's refusal pairs `jj_bookmark_conflict` (read-only: the
+revisions it points at) with `jj_resolve_bookmark_conflict` (write; full commit
+id, `confirm: true` with no default). Picking which revision a shared bookmark
+keeps is the user's call, so the tool says to run only when the user chose one,
+never on the agent's own judgment. No tool re-creates the conflict: `jj undo`
+in the project is the way back, and the integration test covers it.
 
 Productivity pass Q3 adds three, bound to the same methods the UI calls: `dsh_update_check` (read-only; Settings ›
 About › Update DSH's Check: fetch, What's new, what it would rebuild and whether a restart follows, plus the update

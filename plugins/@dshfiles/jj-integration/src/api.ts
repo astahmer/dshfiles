@@ -29,6 +29,10 @@ import {
   projectBookmarkOutputSchema,
   projectsOutputSchema,
   setProjectBookmarkInputSchema,
+  bookmarkConflictInputSchema,
+  bookmarkConflictOutputSchema,
+  resolveBookmarkConflictInputSchema,
+  resolveBookmarkConflictOutputSchema,
   provisionInputSchema,
   provisionOutputSchema,
   queuedAtOutputSchema,
@@ -320,6 +324,30 @@ export const jjIntegrationApi = defineApi({
       description:
         'Choose the main branch of the project holding a path, as Settings › Projects does: new thread workspaces start from it, Land advances it, and source control and Changes compare against it. `bookmark: null` removes the choice so dsh.project.json, origin’s default branch or the global setting decide again (reverse it the same way). Returns the new resolution. Call only when the user asked to change that project’s main branch.',
       tool: { name: 'jj_set_project_bookmark', render: output => renderProjectBookmark(output) },
+    }),
+    bookmarkConflict: method({
+      input: bookmarkConflictInputSchema,
+      output: bookmarkConflictOutputSchema,
+      description:
+        'The revisions a bookmark of the project holding a path points at while it is conflicted (default: the project’s main branch), each with its full commit id and first description line; empty targets when it points at one revision. A conflicted main branch is why a thread workspace was refused. Read-only.',
+      tool: {
+        name: 'jj_bookmark_conflict',
+        readOnly: true,
+        render: output =>
+          output.targets.length === 0
+            ? `${output.bookmark} is not conflicted.`
+            : [
+                `${output.bookmark} is conflicted:`,
+                ...output.targets.map(target => `${target.commitId.slice(0, 12)} · ${target.summary || '(no description)'}`),
+              ].join('\n'),
+      },
+    }),
+    resolveBookmarkConflict: method({
+      input: resolveBookmarkConflictInputSchema,
+      output: resolveBookmarkConflictOutputSchema,
+      description:
+        'Point a conflicted bookmark of the project holding a path at one of the revisions it holds (a full commit id from jj_bookmark_conflict), as the refused thread workspace’s Choose revision dialog does; the other revisions stay in the repository but leave the bookmark. Refuses a bookmark that is no longer conflicted and any revision it does not hold. Requires confirm: true. Call only when the user chose which revision to keep; never pick one yourself. The way back to the conflicted bookmark is `jj undo` in the project; `jj bookmark set <name> -r <commit>` keeps another of its revisions instead.',
+      tool: { name: 'jj_resolve_bookmark_conflict', render: output => `${output.bookmark} now points at ${output.commitId.slice(0, 12)}.` },
     }),
     repositories: method({
       input: Schema.Struct({

@@ -8,6 +8,8 @@
 
 ![Start a thread workspace from a remote bookmark](docs/screenshots/thread-destination-remote.png)
 
+![Choose a conflicted bookmark's revision](docs/screenshots/thread-destination-conflict.png)
+
 ![Integrate from the end of a turn](docs/screenshots/turn-end-integrate.png)
 
 ![Choose a project's main branch](docs/screenshots/project-main-branch.png)
@@ -54,6 +56,15 @@ A blank thread shows a destination bar above its composer:
   The bookmark must name one revision: an unknown name, an ambiguous prefix or a
   conflicted bookmark is refused before anything is created, so a retry cannot
   leave a second workspace.
+- **Choose <bookmark>'s revision…**: shown beside a conflicted bookmark's
+  refusal. It lists the revisions the bookmark points at, with nothing
+  preselected; **Point <bookmark> at <revision>** runs
+  `jj bookmark set <bookmark> -r <revision>` only after that click, then the
+  refused move runs again. The Host first checks that the bookmark is still
+  conflicted and still holds that revision. The other revisions stay in the
+  repository; `jj undo` in the project brings the conflict back. The agent has
+  the same pair: `jj_bookmark_conflict` (read-only) and
+  `jj_resolve_bookmark_conflict` (`confirm: true`, only when the user chose).
 
 A Session's directory is fixed once created, so each change opens a blank
 thread at the new destination. Leaving an unused thread workspace keeps it as

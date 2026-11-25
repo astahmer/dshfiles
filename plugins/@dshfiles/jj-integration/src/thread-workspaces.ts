@@ -147,6 +147,14 @@ const make = Effect.gen(function* () {
       (target: string) => target,
       (backend, target) => backend.bookmarks(target),
     ),
+    bookmarkConflict: on(
+      (input: Parameters<ThreadWorkspacesBackend['bookmarkConflict']>[0]) => input.repoRoot,
+      (backend, input) => backend.bookmarkConflict(input),
+    ),
+    resolveBookmarkConflict: on(
+      (input: Parameters<ThreadWorkspacesBackend['resolveBookmarkConflict']>[0]) => input.repoRoot,
+      (backend, input) => backend.resolveBookmarkConflict(input),
+    ),
     remoteBookmarks: on(
       (target: string) => target,
       (backend, target) => backend.remoteBookmarks(target),

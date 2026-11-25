@@ -329,6 +329,15 @@ const conflictedBookmark = (name: string, targets: readonly { readonly commitId:
     ].join(' '),
   })
 
+const bookmarkNoLongerConflicted = (name: string) =>
+  new DestinationRejected({
+    detail: `The bookmark "${name}" is no longer conflicted, so it was left where it is. Retry creating the workspace.`,
+  })
+const notABookmarkTarget = (name: string, targets: readonly string[]) =>
+  new DestinationRejected({
+    detail: `That revision is not one the bookmark "${name}" points at, so it was left where it is. Choose one of ${targets.join(', ')}.`,
+  })
+
 /** jj's own words for a name or prefix with several targets, and for text that names nothing. */
 const AMBIGUOUS_REVISION = /is ambiguous|is conflicted|is divergent/iu
 const CONFLICTED_BOOKMARK = /Name [`']([^`']+)[`'] is conflicted/u
@@ -938,21 +947,64 @@ const make = Effect.gen(function* () {
    * is what jj then gets, so what was checked is what is used. Reads through `run`, not `jj`, to tell a destination
    * that names nothing or several revisions from jj itself failing.
    */
+  /** Every revision a local bookmark points at, with full commit ids: one when it is resolved, several when conflicted. */
+  const bookmarkTargets = Effect.fnUntraced(function* (repoRoot: string, name: string) {
+    const targets = yield* run(
+      ['--ignore-working-copy', 'log', '--no-graph', '-r', bookmarkRevset(name), '-T', 'commit_id ++ " " ++ description.first_line() ++ "\\n"'],
+      repoRoot,
+    )
+    if (targets.exitCode !== 0) return []
+    return lines(targets.stdout).flatMap(line => {
+      const [commitId = '', ...summary] = line.split(' ')
+      return isCommitId(commitId) ? [{ commitId, summary: summary.join(' ').slice(0, 80) }] : []
+    })
+  })
+
+  const bookmarkConflict = Effect.fn('thread workspaces bookmark conflict')(function* (input: { readonly repoRoot: string; readonly bookmark: string }) {
+    const targets = yield* bookmarkTargets(input.repoRoot, input.bookmark)
+    return { bookmark: input.bookmark, targets: targets.length > 1 ? targets : [] }
+  })
+
+  /**
+   * Point a conflicted bookmark at one of the revisions it holds. The choice is checked again under the repository
+   * lock: a bookmark resolved meanwhile, or a revision it no longer holds, is refused instead of moved.
+   */
+  const resolveBookmarkConflict = Effect.fn('thread workspaces resolve bookmark conflict')(function* (input: {
+    readonly repoRoot: string
+    readonly bookmark: string
+    readonly commitId: string
+  }) {
+    return yield* locks.withRepo(input.repoRoot)(
+      Effect.gen(function* () {
+        const targets = yield* bookmarkTargets(input.repoRoot, input.bookmark)
+        if (targets.length < 2) return yield* bookmarkNoLongerConflicted(input.bookmark)
+        if (!targets.some(target => target.commitId === input.commitId))
+          return yield* notABookmarkTarget(
+            input.bookmark,
+            targets.map(target => target.commitId.slice(0, 12)),
+          )
+        const moved = yield* run(['bookmark', 'set', input.bookmark, '-r', input.commitId], input.repoRoot)
+        if (moved.exitCode !== 0)
+          return yield* jjFailed(
+            `Could not point "${input.bookmark}" at ${input.commitId.slice(0, 12)}: ${moved.stderr.trim().slice(0, 400)} Run \`jj bookmark set ${input.bookmark} -r ${input.commitId.slice(0, 12)}\` in the project to see the full error.`,
+          )
+        return { bookmark: input.bookmark, commitId: input.commitId }
+      }),
+    )
+  })
+
   const resolveDestination = Effect.fnUntraced(function* (repoRoot: string, target: string, revset: string = target) {
     if (revset.startsWith('-')) return yield* unknownDestination(target)
     const output = yield* run(['--ignore-working-copy', 'log', '--no-graph', '-n', '2', '-r', revset, '-T', 'commit_id ++ "\\n"'], repoRoot)
     if (output.exitCode !== 0) {
       const conflicted = CONFLICTED_BOOKMARK.exec(output.stderr)?.[1]
       if (conflicted !== undefined) {
-        const targets = yield* run(
-          ['--ignore-working-copy', 'log', '--no-graph', '-r', bookmarkRevset(conflicted), '-T', 'commit_id ++ " " ++ description.first_line() ++ "\\n"'],
-          repoRoot,
-        )
-        const candidates = lines(targets.stdout).flatMap(line => {
-          const [commitId = '', ...summary] = line.split(' ')
-          return isCommitId(commitId) ? [{ commitId: commitId.slice(0, 12), summary: summary.join(' ').slice(0, 80) }] : []
-        })
-        if (targets.exitCode === 0 && candidates.length > 1) return yield* conflictedBookmark(conflicted, candidates)
+        const candidates = yield* bookmarkTargets(repoRoot, conflicted)
+        if (candidates.length > 1)
+          return yield* conflictedBookmark(
+            conflicted,
+            candidates.map(candidate => ({ ...candidate, commitId: candidate.commitId.slice(0, 12) })),
+          )
       }
       if (AMBIGUOUS_REVISION.test(output.stderr)) return yield* ambiguousDestination(target)
       if (UNKNOWN_REVISION.test(output.stderr)) return yield* unknownDestination(target)
@@ -1983,6 +2035,8 @@ const make = Effect.gen(function* () {
     untrackedEntries,
     removeUntrackedEntry,
     bookmarks,
+    bookmarkConflict,
+    resolveBookmarkConflict,
     remoteBookmarks,
     workingCopyCommitId,
     snapshotFiles,

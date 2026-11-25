@@ -1,5 +1,5 @@
 import { Context, Duration, Effect, FileSystem, Layer, Option, Path, type PlatformError } from 'effect'
-import { GitFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
+import { DestinationRejected, GitFailed, NotARepository, NotAThread, UnsafePath, WorkspaceFilesFailed, type ThreadWorkspaceError } from './errors.js'
 import { Git, redactGitStderr, type GitCommandFailed, type GitRunFailed } from '@dshfiles/git-cli'
 import { ProjectBookmarks } from './project-bookmarks.js'
 import { RemoteBaseModel, type RemoteBase } from './remote-base.js'
@@ -847,6 +847,17 @@ const make = Effect.gen(function* () {
     return { current: nearest.includes(preferred) ? preferred : (nearest[0] ?? null), names: [...new Set(listed)] }
   })
 
+  /** A git branch names one commit, so it is never conflicted. */
+  const bookmarkConflict = (input: { readonly repoRoot: string; readonly bookmark: string }) =>
+    Effect.succeed({ bookmark: input.bookmark, targets: [] as const })
+
+  const resolveBookmarkConflict = (input: { readonly repoRoot: string; readonly bookmark: string; readonly commitId: string }) =>
+    Effect.fail(
+      new DestinationRejected({
+        detail: `The branch "${input.bookmark}" is not conflicted: git branches name one commit, so it was left where it is. Retry creating the workspace.`,
+      }),
+    )
+
   /** Fetched remote branches as `remote/name`, the project's main branch first, for a thread to start from. */
   const remoteBookmarks = Effect.fn('git thread workspaces remote bookmarks')(function* (target: string) {
     const [listed, remotes, preferred] = yield* Effect.all(
@@ -967,6 +978,8 @@ const make = Effect.gen(function* () {
     untrackedEntries,
     removeUntrackedEntry,
     bookmarks,
+    bookmarkConflict,
+    resolveBookmarkConflict,
     remoteBookmarks,
     workingCopyCommitId,
     snapshotFiles,
