@@ -727,12 +727,12 @@ When('a provider request fails because its credential is missing', async ({ page
   await composer.fill('Verify inline recovery for missing provider credentials.')
   await page.getByRole('button', { name: 'Send message', exact: true }).click({ timeout: 10_000 })
   await expect(page.getByText('This turn failed', { exact: false })).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByRole('button', { name: 'Add or fix credentials', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Connect an account', exact: true })).toBeVisible()
 })
 
 Then('the inline credential action opens AI Accounts', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'ai-accounts-credential-recovery-action', async () => {
-    await page.getByRole('button', { name: 'Add or fix credentials', exact: true }).click()
+    await page.getByRole('button', { name: 'Connect an account', exact: true }).click()
     await expect(page.getByRole('complementary', { name: 'Provider accounts' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Add account', exact: true }).first()).toBeVisible()
   })

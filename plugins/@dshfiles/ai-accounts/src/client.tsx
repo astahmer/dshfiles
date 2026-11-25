@@ -33,9 +33,9 @@ import { IdleCacheWarningDockEntry } from './idle-cache-warning.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { TurnCostEstimate } from './turn-cost-estimate.js'
-import { CredentialRecoveryMessage } from './credential-recovery-message.js'
+import { CredentialRecoveryAction, CredentialRecoveryTail } from './credential-recovery-message.js'
 // Type-only: the owned Chat fork's seat beside Resume on a failed turn.
-import type {} from '@dshfiles/chat/turn-error-action'
+import type { TurnErrorActionOwnerProps } from '@dshfiles/chat/turn-error-action'
 import type { TurnUsageCostOwnerProps } from '@dshfiles/chat/turn-usage-cost'
 import type { SessionUsageCostOwnerProps } from '@dshfiles/chat/session-usage-cost'
 import { QuotaAutoResumeToggle } from './quota-auto-resume-toggle.js'
@@ -236,13 +236,11 @@ export default defineClientPlugin({
         <TurnCostEstimate {...props} />
       </PluginQueryProvider>
     )
-    const CredentialRecoveryMessageView = (props: { readonly turn: TurnLocation }): JSX.Element | null => (
-      <CredentialRecoveryMessage
-        turn={props.turn}
-        onOpenAccounts={openAccounts}
-        hint={translate('credentialRecoveryHint')}
-        actionLabel={translate('credentialRecoveryAction')}
-      />
+    const CredentialRecoveryActionView = (props: TurnErrorActionOwnerProps): JSX.Element | null => (
+      <CredentialRecoveryAction code={props.code} message={props.message} seq={props.seq} onOpenAccounts={openAccounts} actionLabel={translate('credentialRecoveryAction')} />
+    )
+    const CredentialRecoveryTailView = (props: { readonly turn: TurnLocation }): JSX.Element | null => (
+      <CredentialRecoveryTail turn={props.turn} onOpenAccounts={openAccounts} actionLabel={translate('credentialRecoveryAction')} />
     )
     const QuotaRetryMessageView = (props: { readonly turn: TurnLocation; readonly sessionId: string }): JSX.Element => (
       <PluginQueryProvider>
@@ -305,7 +303,7 @@ export default defineClientPlugin({
     api.ui.register({ name: 'conversation.chat.turnUsageCost', id: 'ai-accounts-turn-cost', order: 0 }, TurnCostEstimateView)
     api.ui.register(
       { name: 'conversation.chat.turnTail', id: 'ai-accounts-credential-recovery', order: 10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
-      CredentialRecoveryMessageView,
+      CredentialRecoveryTailView,
     )
     api.ui.register(
       {
@@ -320,6 +318,11 @@ export default defineClientPlugin({
     api.ui.register(
       { name: 'conversation.chat.turnTail', id: 'ai-accounts-stalled-stream', order: 30, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
       StalledStreamMessageView,
+    )
+    // First in the failed turn's action row: for a credential failure the card offers no Retry, so this leads.
+    api.ui.register(
+      { name: 'conversation.chat.turnErrorAction', id: 'ai-accounts-credential-recovery-card', order: -10, locale: AI_ACCOUNTS_LOCALE_NAMESPACE },
+      CredentialRecoveryActionView,
     )
     // Beside Resume on the failed turn itself, so the per-thread choice lives
     // where the user decides to resume. Declared by the owned Chat fork.
