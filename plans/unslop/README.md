@@ -27,7 +27,14 @@ counts 2 threads needing you while the Inbox counts 3.
 
 | Council round | Claude Opus | GPT Sol | Mistral Large | Notes |
 | --- | --- | --- | --- | --- |
-| 1 (round-0 shots) | running | running | running | GLM non-blocking |
+| 1 (round-0 shots) | 6.5 | 6.5 | 7.5 | GLM 6.5 (non-blocking): coloured pixels cover 0.03–0.5 % of 12 of 14 screens |
+
+Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
+buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
+rose/amber/green that read as Failed or Warning; the Usage chart is one flat accent slab; sidebar titles cut to about 12
+characters; Settings has three navigation columns; phone dock fragments, double focus ring, status pill over content.
+Lanes: K kit and tokens (running), C transcript and composer (running), P pages (running), T thread list, tabs and
+palette (after K).
 
 ## Round four
 
