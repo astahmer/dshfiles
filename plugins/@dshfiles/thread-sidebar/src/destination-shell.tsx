@@ -1,4 +1,6 @@
 import { WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
+import { useContract } from '@dshfiles/dshx/client'
+import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
 import { usePhoneHistoryLayer } from '@dshfiles/workbench/phone-history'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
@@ -1208,6 +1210,9 @@ const PhoneNavigation = (
   const others = props.railFolders.filter(candidate => !TABBED_DESTINATIONS.some(tabbed => tabbed === candidate.id))
   // New thread sits in the Threads list header (E8); ⌘⇧O and `c` keep starting one on a keyboard.
   const showNew = listOpen && !moreOpen && props.destination.id === 'threads'
+  // The status control (council round 3 B6, frame-layout C2): a 44px button in the Threads bar opens the status sheet,
+  // instead of a permanent band above the tab bar. Without frame-layout the bar shows none.
+  const phoneStatus = useContract(PhoneStatus)
   const stack = {
     listOpen,
     moreOpen,
@@ -1528,6 +1533,7 @@ const PhoneNavigation = (
           >
             {stageBar.title}
           </h1>
+          {showNew && !drawer && phoneStatus.status === 'active' ? <phoneStatus.value.Button /> : null}
           {showNew && !drawer ? (
             <button
               type="button"

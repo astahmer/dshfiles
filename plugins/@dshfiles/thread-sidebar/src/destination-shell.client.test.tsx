@@ -6,6 +6,14 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { DestinationSelection, DestinationShell, type DestinationShellProps } from './destination-shell.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 
+/** frame-layout's phone status button (council round 3 B6): absent unless a test provides it. */
+type PhoneStatusStub = { Button: (() => JSX.Element) | undefined }
+const phoneStatus: PhoneStatusStub = { Button: undefined }
+vi.mock('@dshfiles/dshx/client', async importOriginal => ({
+  ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
+  useContract: () => (phoneStatus.Button === undefined ? { status: 'inactive' } : { status: 'active', value: { Button: phoneStatus.Button } }),
+}))
+
 const panels = [
   { id: 'dshfiles-thread-board', label: 'Thread Sidebar: Board', order: 2 },
   { id: 'dshfiles-usage', label: 'Usage: Analytics', order: 4 },
@@ -278,7 +286,8 @@ describe('DestinationShell', () => {
   it('folded, keeps the rail it has open: its labels, order, width and active item (round five B1)', () => {
     setPhone(false)
     DestinationSelection.set('observe')
-    const rail = (): { readonly labels: string; readonly width: string; readonly active: string | null } => {
+    type RailSnapshot = { readonly labels: string; readonly width: string; readonly active: string | null }
+    const rail = (): RailSnapshot => {
       const nav = document.querySelector('nav[aria-label="Destinations"]')
       const items = [...(nav?.querySelectorAll('[role="tab"]') ?? [])]
       return {
@@ -412,6 +421,25 @@ describe('DestinationShell', () => {
     // Another destination's page reached through More keeps More lit too.
     renderShell({ collapsed: true, activePanelId: 'dshfiles-usage' })
     expect(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'More' }).getAttribute('aria-current')).toBe('page')
+  })
+
+  it('on a phone, puts the status button in the Threads bar before New thread, and none without frame-layout (council round 3 B6)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    expect(document.querySelector('[data-phone-status-probe]')).toBeNull()
+    cleanup()
+    phoneStatus.Button = () => <button type="button" aria-label="Status" data-phone-status-probe="" />
+    try {
+      renderShell({ collapsed: false })
+      const bar = document.querySelector<HTMLElement>('[data-phone-top-bar]')
+      const status = bar?.querySelector('[data-phone-status-probe]')
+      const add = bar?.querySelector('[data-phone-new]')
+      expect(status).not.toBeNull()
+      if (status == null || add == null) throw new Error('Phone status button or + button missing')
+      expect(status.compareDocumentPosition(add)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    } finally {
+      phoneStatus.Button = undefined
+    }
   })
 
   it('keeps the phone shell on a phone turned sideways (844x390, coarse pointer)', () => {
