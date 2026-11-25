@@ -219,6 +219,8 @@ export const Composer = (props: {
   )
   const [projectPickerOpen, setProjectPickerOpen] = useState(false)
   const [referenceMode, setReferenceMode] = useState<ReferenceMode | null>(null)
+  /** Focus is in the box or in a menu, dialog or list it opened; set on focus, cleared when focus leaves for elsewhere. */
+  const [engaged, setEngaged] = useState(props.autoFocus === true)
   const ownRef = useRef<BacklogImageEditorHandle | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const input = props.inputRef ?? ownRef
@@ -378,6 +380,13 @@ export const Composer = (props: {
       template,
     }
     setText('')
+    // The editor's own Enter handling runs after this one and can leave blank lines behind: clear them once it has.
+    requestAnimationFrame(() => {
+      if (input.current !== null && input.current.getText().trim() === '' && input.current.getText() !== '') {
+        input.current.replaceText('')
+        setText('')
+      }
+    })
     setTemplate('')
     attachments.clear()
     setKind(null)
@@ -424,6 +433,26 @@ export const Composer = (props: {
     return voiceAvailable ? speechReason : 'Voice input is not available'
   })()
   const effectiveKind = kind ?? preview?.kind ?? 'task'
+  /**
+   * The feed's capture box at rest is one 44 px line with its placeholder; its toolbar row appears once it is used
+   * (focused, typed in, holding a file or an error) and leaves when it is empty and focus has gone elsewhere.
+   */
+  const idle =
+    chat &&
+    !engaged &&
+    text.trim() === '' &&
+    attachments.files.length === 0 &&
+    failed === null &&
+    voice.phase === 'idle' &&
+    referenceMode === null &&
+    !projectPickerOpen
+
+  // Blank lines are not a capture: once focus has left, a box holding only them goes back to its one empty line.
+  useEffect(() => {
+    if (engaged || text === '' || text.trim() !== '') return
+    input.current?.replaceText('')
+    setText('')
+  }, [engaged, text, input, setText])
 
   return (
     <form
@@ -431,13 +460,25 @@ export const Composer = (props: {
         event.preventDefault()
         submit()
       }}
+      onFocus={() => setEngaged(true)}
+      onBlur={event => {
+        const next = event.relatedTarget
+        // A menu, picker or dialog the box opened takes focus without ending the capture.
+        if (
+          next instanceof Element &&
+          (event.currentTarget.contains(next) || next.closest('[data-radix-popper-content-wrapper], [role="dialog"], [role="menu"], [role="listbox"]') !== null)
+        )
+          return
+        setEngaged(false)
+      }}
       {...drop.dragProps}
       data-composer-card
+      data-idle={idle || undefined}
       className={cn(
         'dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:transition-[border-color,box-shadow] dshx:focus-within:border-input dshx:focus-within:shadow-sm',
         failed === null ? 'dshx:border-border' : 'dshx:border-destructive/60',
         drop.dragging && 'dshx:border-primary/60 dshx:ring-2 dshx:ring-primary/15',
-        chat ? 'dshx:px-3 dshx:pt-2.5 dshx:pb-2' : 'dshx:px-2.5 dshx:py-1.5',
+        chat ? (idle ? 'dshx:h-11 dshx:justify-center dshx:px-3 dshx:py-0' : 'dshx:px-3 dshx:pt-2.5 dshx:pb-2') : 'dshx:px-2.5 dshx:py-1.5',
       )}
     >
       <MentionMenu suggestions={suggestions} highlight={highlight} label="Suggestions" onPick={pick} onHover={setHighlight} />
@@ -463,7 +504,11 @@ export const Composer = (props: {
       <BacklogImageEditor
         ref={input}
         ariaLabel="Capture"
-        className={cn(inputClass, chat ? 'dshx:min-h-11 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm')}
+        className={cn(
+          inputClass,
+          chat ? 'dshx:min-h-11 dshx:max-h-72 dshx:text-sm' : 'dshx:min-h-16 dshx:max-h-48 dshx:text-sm',
+          idle && 'dshx:min-h-0 dshx:overflow-hidden dshx:whitespace-nowrap',
+        )}
         value={text}
         files={attachments.files}
         placeholder={props.placeholder}
@@ -527,7 +572,10 @@ export const Composer = (props: {
         </p>
       ) : null}
 
-      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:border-t dshx:border-border/60 dshx:pt-1.5">
+      <div
+        data-capture-toolbar=""
+        className={cn('dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:border-t dshx:border-border/60 dshx:pt-1.5', idle && 'dshx:hidden')}
+      >
         <DropdownMenu>
           <DropdownMenuTrigger aria-label="Add a file or a reference" className={iconButtonClass}>
             <PlusIcon className="dshx:size-4" />
@@ -697,7 +745,6 @@ export const Composer = (props: {
           </button>
         </span>
       </div>
-
 
       <ReferenceDialog
         mode={referenceMode}

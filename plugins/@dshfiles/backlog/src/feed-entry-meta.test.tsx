@@ -36,3 +36,19 @@ test('a feed row names author and time in one trailing muted line; the id waits 
   expect(meta?.className).toContain('dshx:text-muted-foreground')
   expect(meta?.className).toContain('dshx:shrink-0')
 })
+
+test('a feed whose rows share one author names no author on any row (council round 2, D2)', () => {
+  host = document.createElement('div')
+  document.body.append(host)
+  root = createRoot(host)
+  const createdAt = new Date(2026, 10, 16, 15, 21).getTime()
+  act(() =>
+    root?.render(
+      <TooltipProvider>
+        <FeedEntryMeta item={{ id: 3, ref: 'w33f', title: 'Feed item', createdAt }} author="user" showAuthor={false} />
+      </TooltipProvider>,
+    ),
+  )
+  const meta = host.querySelector('[data-feed-entry-meta]')
+  expect(meta?.textContent).toBe(new Date(createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))
+})

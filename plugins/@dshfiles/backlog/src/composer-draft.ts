@@ -8,12 +8,13 @@ const drafts = createStoredValue({ key: 'dshfiles.backlog.draft.v1', schema: dra
 
 export const useComposerDraft = (draftKey: string) => {
   const storedDrafts = drafts.useValue()
-  const [text, setTextState] = useState(() => storedDrafts[draftKey] ?? '')
+  // Blank lines left by a send are not a draft: the box reopens empty, with its placeholder.
+  const [text, setTextState] = useState(() => ((storedDrafts[draftKey] ?? '').trim() === '' ? '' : (storedDrafts[draftKey] ?? '')))
   const setText = useCallback(
     (value: string): void => {
       setTextState(value)
       const next = { ...drafts.get() }
-      if (value === '') delete next[draftKey]
+      if (value.trim() === '') delete next[draftKey]
       else next[draftKey] = value
       drafts.set(next)
     },

@@ -2226,7 +2226,7 @@ Then('the conversation and saved Backlog tab restore without losing their plugin
     await dockTab(mainDock(page), 'Backlog').click()
     const capture = mainSeat(page).getByRole('textbox', { name: 'Capture', exact: true })
     await expect(capture).toBeVisible()
-    await expect(capture).toHaveAttribute('placeholder', 'Capture a thought, a task, a bug… like sending a message')
+    await expect(capture).toHaveAttribute('placeholder', 'Capture a task, bug or idea…')
     await expect(mainSeat(page).getByRole('navigation', { name: 'Backlog views', exact: true })).toBeVisible()
     await expect(page.locator('[data-slot-error]')).toHaveCount(0)
     await page.screenshot({ path: test.info().outputPath('saved-backlog-owner-context.png'), animations: 'disabled' })

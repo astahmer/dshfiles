@@ -660,13 +660,20 @@ Then('its activity records the move {string} by the user', async ({ page }: { pa
   await finishJourneyAssertions(page)
 })
 
+/** The Feed's status filter is the first group of the toolbar's Filter menu (council round 2, D2). */
+const pickFeedStatus = async (page: Page, label: string): Promise<void> => {
+  await page.getByRole('button', { name: 'Filter', exact: true }).click()
+  await page.getByRole('menuitemcheckbox', { name: new RegExp(`^${label} \\d+$`) }).click()
+  await page.keyboard.press('Escape')
+}
+
 When('the feed is filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
   await showFeed(page)
-  await statusChip(page, label).click()
+  await pickFeedStatus(page, label)
 })
 
 When('the feed is also filtered by the {string} status', async ({ page }: { page: Page }, label: string) => {
-  await statusChip(page, label).click()
+  await pickFeedStatus(page, label)
 })
 
 When('the feed is shown', async ({ page }: { page: Page }) => {

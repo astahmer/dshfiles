@@ -19,10 +19,11 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
 import type { BacklogSort } from './backlog-sort.js'
-import { BacklogItems, type BacklogKind } from './item.js'
+import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
 import { ItemGlyphs } from './item-glyphs.js'
 import { views } from './panel-preferences.js'
 import { ProjectFilterPicker } from './project-picker.js'
+import { visibleStatuses } from './status-filter-bar.js'
 import type { BacklogSettings } from './settings.js'
 import type { BacklogView } from './view-selection.js'
 
@@ -67,7 +68,12 @@ export const BacklogViewSwitch = (props: { readonly view: View; readonly onSelec
       {views.map((entry, index) => (
         <Tooltip key={entry}>
           <TooltipTrigger asChild>
-            <button type="button" aria-current={props.view === entry ? 'page' : undefined} onClick={() => props.onSelect(entry)} className={tabClass(props.view === entry)}>
+            <button
+              type="button"
+              aria-current={props.view === entry ? 'page' : undefined}
+              onClick={() => props.onSelect(entry)}
+              className={tabClass(props.view === entry)}
+            >
               {viewLabels[entry]}
               {props.modifierHeld ? (
                 <kbd aria-hidden className="dshx:font-mono dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
@@ -103,14 +109,24 @@ export const BacklogViewSwitch = (props: { readonly view: View; readonly onSelec
   </>
 )
 
-/** Kind and dormancy filters; the count of active ones is muted, never a signal colour. */
+/** A view's status filter, shown as the Filter menu's first group where the view has no status row of its own. */
+export interface StatusFilter {
+  readonly counts: Record<BacklogStatus, number>
+  readonly statuses: readonly BacklogStatus[]
+  readonly toggle: (status: BacklogStatus) => void
+  readonly clear: () => void
+}
+
+/** Status (where given), kind and dormancy filters; the count of active ones is muted, never a signal colour. */
 export const FilterMenu = (props: {
   readonly kinds: readonly BacklogKind[]
   readonly setKinds: (kinds: BacklogKind[]) => void
   readonly showDormant: boolean
   readonly setShowDormant: (value: boolean) => void
+  readonly status?: StatusFilter | undefined
 }): JSX.Element => {
-  const active = props.kinds.length + Number(props.showDormant)
+  const status = props.status
+  const active = props.kinds.length + Number(props.showDormant) + (status?.statuses.length ?? 0)
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -121,6 +137,36 @@ export const FilterMenu = (props: {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-56">
+        {status === undefined ? null : (
+          <>
+            <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Status</DropdownMenuLabel>
+            <DropdownMenuCheckboxItem
+              checked={status.statuses.length === 0}
+              onSelect={event => event.preventDefault()}
+              onCheckedChange={() => status.clear()}
+              className="dshx:gap-2 dshx:text-sm"
+            >
+              All
+              <span className="dshx:ml-auto dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
+                {Object.values(status.counts).reduce((sum, count) => sum + count, 0)}
+              </span>
+            </DropdownMenuCheckboxItem>
+            {visibleStatuses(status.counts, status.statuses).map(value => (
+              <DropdownMenuCheckboxItem
+                key={value}
+                checked={status.statuses.includes(value)}
+                onSelect={event => event.preventDefault()}
+                onCheckedChange={() => status.toggle(value)}
+                className="dshx:gap-2 dshx:text-sm"
+              >
+                <ItemGlyphs.StatusIcon status={value} />
+                {ItemGlyphs.statusLabels[value]}
+                <span className="dshx:ml-auto dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">{status.counts[value]}</span>
+              </DropdownMenuCheckboxItem>
+            ))}
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuLabel className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground">Kind</DropdownMenuLabel>
         {BacklogItems.kinds.map(kind => (
           <DropdownMenuCheckboxItem
@@ -161,7 +207,10 @@ const ProjectFilter = (props: {
       selection={props.projects}
       projects={props.projectPaths}
       onPick={props.onPick}
-      triggerClassName={cn('dshx:h-7 dshx:max-w-48 dshx:px-2 dshx:text-xs', props.projects.length === 0 ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}
+      triggerClassName={cn(
+        'dshx:h-7 dshx:max-w-48 dshx:px-2 dshx:text-xs',
+        props.projects.length === 0 ? 'dshx:text-muted-foreground' : 'dshx:text-foreground',
+      )}
       trigger={
         <>
           {singleProject !== null ? <ItemGlyphs.ProjectDot project={singleProject} /> : <FolderIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />}
@@ -196,7 +245,9 @@ const SavedViews = (props: {
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="dshx-root dshx:w-72 dshx:p-1">
-        {props.views.length === 0 ? <p className="dshx:px-2 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No saved views yet. Search, then save it here.</p> : null}
+        {props.views.length === 0 ? (
+          <p className="dshx:px-2 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">No saved views yet. Search, then save it here.</p>
+        ) : null}
         <ul className="dshx:flex dshx:flex-col">
           {props.views.map(saved => (
             <li key={saved.name} className="dshx:group/view dshx:flex dshx:items-center dshx:rounded-md dshx:hover:bg-accent">
@@ -274,9 +325,17 @@ export const ViewMenu = (props: {
 }): JSX.Element => (
   <Popover>
     <PopoverTrigger asChild>
-      <Button type="button" variant="ghost" size="sm" aria-label="Backlog view options" className={cn('dshx:max-w-56', props.projects.length === 0 ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}>
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-label="Backlog view options"
+        className={cn('dshx:max-w-56', props.projects.length === 0 ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}
+      >
         View
-        {props.projects.length === 0 ? null : <span className="dshx:min-w-0 dshx:truncate dshx:font-normal dshx:text-muted-foreground">· {projectLabel(props.projects)}</span>}
+        {props.projects.length === 0 ? null : (
+          <span className="dshx:min-w-0 dshx:truncate dshx:font-normal dshx:text-muted-foreground">· {projectLabel(props.projects)}</span>
+        )}
         <ChevronDownIcon aria-hidden className="dshx:opacity-50" />
       </Button>
     </PopoverTrigger>
@@ -296,7 +355,9 @@ export const ViewMenu = (props: {
             >
               Hide agent items
               <span aria-hidden className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground">
-                {props.agentItems.hidden && props.agentItems.hiddenCount > 0 ? <span className="dshx:text-2xs dshx:tabular-nums">{props.agentItems.hiddenCount}</span> : null}
+                {props.agentItems.hidden && props.agentItems.hiddenCount > 0 ? (
+                  <span className="dshx:text-2xs dshx:tabular-nums">{props.agentItems.hiddenCount}</span>
+                ) : null}
                 {props.agentItems.hidden ? <CheckIcon aria-hidden className="dshx:size-3.5 dshx:text-foreground" /> : null}
               </span>
             </Toggle>

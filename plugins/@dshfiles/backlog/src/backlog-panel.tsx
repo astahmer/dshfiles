@@ -607,7 +607,11 @@ export const BacklogPanel = (props: {
                     }}
                     className="dshx:w-44 dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-xs dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground"
                   />
-                  {query === '' ? <Kbd className="dshx:@max-pane-narrow:hidden">/</Kbd> : search.submitted ? null : <Kbd className="dshx:@max-pane-narrow:hidden">↵</Kbd>}
+                  {query === '' ? (
+                    <Kbd className="dshx:@max-pane-narrow:hidden">/</Kbd>
+                  ) : search.submitted ? null : (
+                    <Kbd className="dshx:@max-pane-narrow:hidden">↵</Kbd>
+                  )}
                 </label>
               </TooltipTrigger>
               <TooltipContent>Filters this view; press Enter for all results</TooltipContent>
@@ -646,209 +650,223 @@ export const BacklogPanel = (props: {
               }}
             />
             {view === 'shipped' && !showsResults ? null : (
-              <FilterMenu kinds={kinds} setKinds={setKinds} showDormant={stored.showDormant} setShowDormant={value => setPreference({ showDormant: value })} />
+              <FilterMenu
+                kinds={kinds}
+                setKinds={setKinds}
+                showDormant={stored.showDormant}
+                setShowDormant={value => setPreference({ showDormant: value })}
+                // The Feed has no status row of its own: its status filter is the first group of this menu (council round 2, D2).
+                status={
+                  view === 'feed' && !showsResults
+                    ? {
+                        counts: statusTotals,
+                        statuses: stored.statuses,
+                        toggle: status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) }),
+                        clear: () => setPreference({ statuses: [] }),
+                      }
+                    : undefined
+                }
+              />
             )}
           </div>
-        {list.isError ? (
-          <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">
-            <span className="dshx:min-w-0">{errorMessage(list.error, 'The backlog is unavailable.')}</span>
-            <Button size="xs" variant="outline" onClick={() => void list.refetch()}>
-              Retry
-            </Button>
-          </p>
-        ) : null}
-        <div
-          data-backlog-content-region
-          className={cn(
-            'dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:overflow-clip dshx:rounded-lg dshx:border dshx:border-border dshx:@max-pane-compact:flex-col',
-            // The feed card ends at its last row with the capture box under it, instead of an empty card to the page foot.
-            hugsContent && 'dshx:flex-initial',
-          )}
-        >
-          {showsResults ? (
-            <>
-              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-                <SearchResults
-                  items={all}
-                  total={list.data?.total ?? 0}
-                  counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
-                  statuses={stored.statuses}
-                  toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                  clearStatuses={() => setPreference({ statuses: [] })}
-                  query={debounced}
-                  triageOff={triageOff}
-                  openId={openId}
-                  cursorId={cursorId}
-                  select={select}
-                  hover={setCursorId}
-                  loaded={list.isSuccess}
-                  startThread={openStartThread}
-                  projectPaths={projectPaths}
+          {list.isError ? (
+            <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-4 dshx:py-2 dshx:text-xs dshx:text-destructive">
+              <span className="dshx:min-w-0">{errorMessage(list.error, 'The backlog is unavailable.')}</span>
+              <Button size="xs" variant="outline" onClick={() => void list.refetch()}>
+                Retry
+              </Button>
+            </p>
+          ) : null}
+          <div
+            data-backlog-content-region
+            className={cn(
+              'dshx:relative dshx:flex dshx:min-h-0 dshx:flex-1 dshx:overflow-clip dshx:rounded-lg dshx:border dshx:border-border dshx:@max-pane-compact:flex-col',
+              // The feed card ends at its last row with the capture box under it, instead of an empty card to the page foot.
+              hugsContent && 'dshx:flex-initial',
+            )}
+          >
+            {showsResults ? (
+              <>
+                <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                  <SearchResults
+                    items={all}
+                    total={list.data?.total ?? 0}
+                    counts={searchStatusCounts.data ?? FeedStatus.counts(all)}
+                    statuses={stored.statuses}
+                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                    clearStatuses={() => setPreference({ statuses: [] })}
+                    query={debounced}
+                    triageOff={triageOff}
+                    openId={openId}
+                    cursorId={cursorId}
+                    select={select}
+                    hover={setCursorId}
+                    loaded={list.isSuccess}
+                    startThread={openStartThread}
+                    projectPaths={projectPaths}
+                  />
+                </div>
+                {inspector}
+              </>
+            ) : view === 'inbox' ? (
+              <InboxView
+                triageOff={triageOff}
+                items={inboxItems}
+                cursorId={cursorId}
+                threads={inboxThreads}
+                openId={openId}
+                select={select}
+                openThread={props.openThread}
+                threadTitle={sessionId => threads.find(thread => thread.id === sessionId)?.title}
+                openInbox={props.openInbox}
+                acknowledgeThread={thread =>
+                  void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
+                }
+                inspector={inspector}
+                loaded={inbox.isSuccess}
+                sort={stored.sort.inbox}
+                startThread={openStartThread}
+                projectPaths={projectPaths}
+              />
+            ) : (
+              <>
+                <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
+                  {view === 'feed' && (
+                    <FeedView
+                      cursorId={cursorId}
+                      triageOff={triageOff}
+                      items={filteredItems}
+                      sort={stored.sort.feed}
+                      statuses={stored.statuses}
+                      clearStatuses={() => setPreference({ statuses: [] })}
+                      openId={openId}
+                      select={select}
+                      loaded={list.isSuccess}
+                      now={now}
+                      projectPaths={projectPaths}
+                      startThread={openStartThread}
+                      openThread={props.openThread}
+                    />
+                  )}
+                  {view === 'ready' && (
+                    <ItemsView
+                      ready
+                      items={readyItems}
+                      sort="priority"
+                      counts={readyTotals}
+                      statuses={stored.statuses}
+                      toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                      clearStatuses={() => setPreference({ statuses: [] })}
+                      openId={openId}
+                      cursorId={cursorId}
+                      select={select}
+                      hover={setCursorId}
+                      groupBy="priority"
+                      triageOff={triageOff}
+                      setGroupBy={() => undefined}
+                      collapsed={collapsed}
+                      setCollapsed={next => withViewTransition(() => setCollapsed(next))}
+                      captureInto={startCapture}
+                      projectPaths={projectPaths}
+                      startThread={openStartThread}
+                    />
+                  )}
+                  {view === 'items' && (
+                    <ItemsView
+                      items={filteredItems}
+                      sort={stored.sort.items}
+                      counts={statusTotals}
+                      statuses={stored.statuses}
+                      toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
+                      clearStatuses={() => setPreference({ statuses: [] })}
+                      openId={openId}
+                      cursorId={cursorId}
+                      select={select}
+                      hover={setCursorId}
+                      groupBy={stored.groupBy}
+                      triageOff={triageOff}
+                      setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
+                      collapsed={collapsed}
+                      setCollapsed={next => withViewTransition(() => setCollapsed(next))}
+                      captureInto={startCapture}
+                      projectPaths={projectPaths}
+                      startThread={openStartThread}
+                    />
+                  )}
+                  {view === 'board' && (
+                    <BoardView
+                      panelId={props.panelId}
+                      triageOff={triageOff}
+                      items={items}
+                      openId={openId}
+                      cursorId={cursorId}
+                      open={select}
+                      captureInto={startCapture}
+                      projectPaths={projectPaths}
+                      startThread={openStartThread}
+                    />
+                  )}
+                  {view === 'shipped' && (
+                    <ShippedView
+                      period={stored.shippedPeriod}
+                      setPeriod={shippedPeriod => setPreference({ shippedPeriod })}
+                      projects={projectFilters}
+                      openId={openId}
+                      cursorId={cursorId}
+                      select={select}
+                      hover={setCursorId}
+                      openSettings={() => setSettingsOpen(true)}
+                    />
+                  )}
+                  {view === 'projects' && (
+                    <ProjectsView
+                      query={debounced}
+                      hideAgentItems={hideAgentItems}
+                      matchingProjects={
+                        debounced === ''
+                          ? projectFilters.length === 0
+                            ? null
+                            : new Set(projectFilters.map(project => project ?? ''))
+                          : SearchScopes.matchingProjects(items)
+                      }
+                      triageOff={triageOff}
+                      selectedProject={selectedProject}
+                      setSelectedProject={setSelectedProject}
+                      select={select}
+                      now={now}
+                      startThread={openStartThread}
+                      projectPaths={projectPaths}
+                    />
+                  )}
+                </div>
+                {inspector}
+              </>
+            )}
+          </div>
+          {captureVisible({ view, requested: captureRequested }) ? (
+            <div className="dshx:shrink-0">
+              <div>
+                <Composer
+                  key={draftKey}
+                  variant="chat"
+                  draftKey={draftKey}
+                  placeholder="Capture a task, bug or idea…"
+                  tags={tags}
+                  threads={threads}
+                  projects={projectPaths}
+                  projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
+                  reuseProject={settings.value?.reuseCaptureProject ?? true}
+                  templates={(settings.value?.templates ?? []).map(entry => entry.name)}
+                  status={captureStatus}
+                  onClearStatus={() => setCaptureStatus(null)}
+                  inputRef={captureComposer}
+                  onNavigateUp={navigateToNearestItem}
+                  {...(view === 'feed' ? {} : { onDismiss: () => setCaptureRequested(false) })}
+                  {...(captureRequest === undefined ? {} : { captureRequest })}
                 />
               </div>
-              {inspector}
-            </>
-          ) : view === 'inbox' ? (
-            <InboxView
-              triageOff={triageOff}
-              items={inboxItems}
-              cursorId={cursorId}
-              threads={inboxThreads}
-              openId={openId}
-              select={select}
-              openThread={props.openThread}
-              threadTitle={sessionId => threads.find(thread => thread.id === sessionId)?.title}
-              openInbox={props.openInbox}
-              acknowledgeThread={thread =>
-                void attentionApi.safe.acknowledge({ sessionId: thread.sessionId, version: thread.version }).then(() => attention.refetch())
-              }
-              inspector={inspector}
-              loaded={inbox.isSuccess}
-              sort={stored.sort.inbox}
-              startThread={openStartThread}
-              projectPaths={projectPaths}
-            />
-          ) : (
-            <>
-              <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', expanded && openId !== null && 'dshx:hidden')}>
-                {view === 'feed' && (
-                  <FeedView
-                    cursorId={cursorId}
-                    triageOff={triageOff}
-                    items={filteredItems}
-                    sort={stored.sort.feed}
-                    counts={statusTotals}
-                    statuses={stored.statuses}
-                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                    clearStatuses={() => setPreference({ statuses: [] })}
-                    openId={openId}
-                    select={select}
-                    loaded={list.isSuccess}
-                    now={now}
-                    projectPaths={projectPaths}
-                    startThread={openStartThread}
-                    openThread={props.openThread}
-                  />
-                )}
-                {view === 'ready' && (
-                  <ItemsView
-                    ready
-                    items={readyItems}
-                    sort="priority"
-                    counts={readyTotals}
-                    statuses={stored.statuses}
-                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                    clearStatuses={() => setPreference({ statuses: [] })}
-                    openId={openId}
-                    cursorId={cursorId}
-                    select={select}
-                    hover={setCursorId}
-                    groupBy="priority"
-                    triageOff={triageOff}
-                    setGroupBy={() => undefined}
-                    collapsed={collapsed}
-                    setCollapsed={next => withViewTransition(() => setCollapsed(next))}
-                    captureInto={startCapture}
-                    projectPaths={projectPaths}
-                    startThread={openStartThread}
-                  />
-                )}
-                {view === 'items' && (
-                  <ItemsView
-                    items={filteredItems}
-                    sort={stored.sort.items}
-                    counts={statusTotals}
-                    statuses={stored.statuses}
-                    toggleStatus={status => setPreference({ statuses: FeedStatus.toggle(stored.statuses, status) })}
-                    clearStatuses={() => setPreference({ statuses: [] })}
-                    openId={openId}
-                    cursorId={cursorId}
-                    select={select}
-                    hover={setCursorId}
-                    groupBy={stored.groupBy}
-                    triageOff={triageOff}
-                    setGroupBy={groupBy => withViewTransition(() => setPreference({ groupBy }))}
-                    collapsed={collapsed}
-                    setCollapsed={next => withViewTransition(() => setCollapsed(next))}
-                    captureInto={startCapture}
-                    projectPaths={projectPaths}
-                    startThread={openStartThread}
-                  />
-                )}
-                {view === 'board' && (
-                  <BoardView
-                    panelId={props.panelId}
-                    triageOff={triageOff}
-                    items={items}
-                    openId={openId}
-                    cursorId={cursorId}
-                    open={select}
-                    captureInto={startCapture}
-                    projectPaths={projectPaths}
-                    startThread={openStartThread}
-                  />
-                )}
-                {view === 'shipped' && (
-                  <ShippedView
-                    period={stored.shippedPeriod}
-                    setPeriod={shippedPeriod => setPreference({ shippedPeriod })}
-                    projects={projectFilters}
-                    openId={openId}
-                    cursorId={cursorId}
-                    select={select}
-                    hover={setCursorId}
-                    openSettings={() => setSettingsOpen(true)}
-                  />
-                )}
-                {view === 'projects' && (
-                  <ProjectsView
-                    query={debounced}
-                    hideAgentItems={hideAgentItems}
-                    matchingProjects={
-                      debounced === ''
-                        ? projectFilters.length === 0
-                          ? null
-                          : new Set(projectFilters.map(project => project ?? ''))
-                        : SearchScopes.matchingProjects(items)
-                    }
-                    triageOff={triageOff}
-                    selectedProject={selectedProject}
-                    setSelectedProject={setSelectedProject}
-                    select={select}
-                    now={now}
-                    startThread={openStartThread}
-                    projectPaths={projectPaths}
-                  />
-                )}
-              </div>
-              {inspector}
-            </>
-          )}
-        </div>
-        {captureVisible({ view, requested: captureRequested }) ? (
-          <div className="dshx:shrink-0">
-            <div className="dshx:mx-auto dshx:max-w-4xl">
-              <Composer
-                key={draftKey}
-                variant="chat"
-                draftKey={draftKey}
-                placeholder="Capture a thought, a task, a bug… like sending a message"
-                tags={tags}
-                threads={threads}
-                projects={projectPaths}
-                projectFilter={projectFilters.length === 0 ? null : projectFilters.length === 1 ? (projectFilters[0] ?? null) : null}
-                reuseProject={settings.value?.reuseCaptureProject ?? true}
-                templates={(settings.value?.templates ?? []).map(entry => entry.name)}
-                status={captureStatus}
-                onClearStatus={() => setCaptureStatus(null)}
-                inputRef={captureComposer}
-                onNavigateUp={navigateToNearestItem}
-                {...(view === 'feed' ? {} : { onDismiss: () => setCaptureRequested(false) })}
-                {...(captureRequest === undefined ? {} : { captureRequest })}
-              />
             </div>
-          </div>
-        ) : null}
+          ) : null}
         </Page>
         <BacklogSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen}>
           <BacklogSettingsPanel />

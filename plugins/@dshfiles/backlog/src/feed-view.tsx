@@ -17,7 +17,6 @@ import { ItemGlyphs } from './item-glyphs.js'
 import { ItemPickers } from './item-pickers.js'
 import { BacklogItemMenu } from './item-actions-menu.js'
 import type { StartThreadItem } from './start-thread.js'
-import { StatusFilterBar } from './status-filter-bar.js'
 import { BacklogText } from './item-text.js'
 import { useBacklogActions } from './use-backlog-actions.js'
 import { BacklogReference } from './backlog-reference.js'
@@ -55,13 +54,22 @@ const Chip = (props: { readonly children: ReactNode; readonly className?: string
   </span>
 )
 
-/** Who captured the item, when and its `b:` id: trailing muted meta, so the row leads with the item itself. */
+/**
+ * Who captured the item, when and its `b:` id: trailing muted meta, so the row leads with the item itself. The author
+ * is left out when every row has the same one: "You" down the whole page says nothing (council round 2, D2).
+ */
 export const FeedEntryMeta = (props: {
   readonly item: { readonly id: number; readonly ref?: string | undefined; readonly title: string; readonly createdAt: number }
   readonly author: string | undefined
+  readonly showAuthor?: boolean
 }): JSX.Element => (
-  <span data-feed-entry-meta="" className="dshx:flex dshx:shrink-0 dshx:items-baseline dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
-    <span className="dshx:@max-pane-narrow:hidden">{ItemGlyphs.actorName(props.author)} ·</span>
+  <span
+    data-feed-entry-meta=""
+    className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-baseline dshx:justify-end dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums"
+  >
+    {props.showAuthor === false ? null : (
+      <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:hidden">{ItemGlyphs.actorName(props.author)} ·</span>
+    )}
     {/* The id is a reference, not a label: it shows on hover, and the time stays the drag handle that mentions it. */}
     <Tooltip>
       <TooltipTrigger asChild>
@@ -117,7 +125,7 @@ const FeedEntry = (props: {
         }}
         onDoubleClick={rename.renameOnDoubleClick}
         className={cn(
-          'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-3 dshx:py-2.5 dshx:transition-colors dshx:duration-100 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+          'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-2 dshx:py-2.5 dshx:transition-colors dshx:duration-100 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
           props.selection.selected.has(item.id) || props.open ? 'dshx:bg-accent/70' : props.cursor ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
         )}
       >
@@ -131,15 +139,16 @@ const FeedEntry = (props: {
           </span>
         ) : null}
         {props.showAuthor ? <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" /> : null}
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
+        {/* One grid for every row (council round 2, D2): 16 px status seat, title, 104 px meta; the rest sits under the title. */}
+        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1">
+          <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:w-4 dshx:justify-center">
+            <ItemPickers.Status
+              itemLabel={BacklogReference.labelOf(item)}
+              status={item.status}
+              onPick={status => actions.update.mutate({ id: item.id, status })}
+            />
+          </span>
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-            <span onClick={event => event.stopPropagation()}>
-              <ItemPickers.Status
-                itemLabel={BacklogReference.labelOf(item)}
-                status={item.status}
-                onPick={status => actions.update.mutate({ id: item.id, status })}
-              />
-            </span>
             {item.kind === 'task' ? null : <ItemGlyphs.KindIcon kind={item.kind} />}
             {rename.renaming ? (
               <BacklogInlineTitle
@@ -159,15 +168,15 @@ const FeedEntry = (props: {
                 )}
               />
             )}
-            <FeedEntryMeta item={item} author={author} />
           </div>
+          <FeedEntryMeta item={item} author={author} showAuthor={props.showAuthor} />
           {item.preview === '' ? null : (
             <BacklogText
               text={item.preview}
-              className="dshx:line-clamp-2 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div>div]:text-sm! dshx:[&>div>div]:leading-relaxed! dshx:[&>div>div]:text-muted-foreground! dshx:[&>div_p]:my-0"
+              className="dshx:col-span-2 dshx:col-start-2 dshx:line-clamp-2 dshx:text-sm dshx:leading-relaxed dshx:text-muted-foreground dshx:[&>div]:line-clamp-2 dshx:[&>div>div]:text-sm! dshx:[&>div>div]:leading-relaxed! dshx:[&>div>div]:text-muted-foreground! dshx:[&>div_p]:my-0"
             />
           )}
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5">
+          <div data-feed-entry-chips="" className="dshx:col-span-2 dshx:col-start-2 dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5 dshx:empty:hidden">
             <ItemGlyphs.AttentionBadge attention={item.attention} />
             {item.proposal === null ? null : (
               <Chip className="dshx:border-violet/40 dshx:text-violet">
@@ -205,7 +214,7 @@ const FeedEntry = (props: {
             {item.freshness === 'fresh' ? null : <Chip className={cn(item.freshness === 'stale' && 'dshx:text-warning')}>{item.freshness}</Chip>}
           </div>
           {activity === null ? null : (
-            <p className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
+            <p className="dshx:col-span-2 dshx:col-start-2 dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
               <span aria-hidden className="dshx:h-px dshx:w-3 dshx:shrink-0 dshx:bg-border" />
               <span className="dshx:min-w-0 dshx:truncate">
                 <ActorThreadLink actorId={activity.actorId} openThread={props.openThread} /> <span>{activity.summary}</span>
@@ -258,9 +267,8 @@ const selectionLabel = (statuses: readonly BacklogStatus[]): string => {
 export const FeedView = (props: {
   readonly items: readonly BacklogSummaryView[]
   readonly sort: BacklogSort
-  readonly counts: Record<BacklogStatus, number>
+  /** The status filter, picked in the toolbar's Filter menu; the feed only says when it hides everything. */
   readonly statuses: readonly BacklogStatus[]
-  readonly toggleStatus: (status: BacklogStatus) => void
   readonly clearStatuses: () => void
   readonly openId: number | null
   readonly cursorId: number | null
@@ -321,7 +329,7 @@ export const FeedView = (props: {
     return (
       <div key={item.id}>
         {separator ? (
-          <div role="separator" className="dshx:my-3 dshx:flex dshx:items-center dshx:gap-3 dshx:px-3">
+          <div role="separator" className="dshx:my-2 dshx:flex dshx:items-center dshx:gap-3 dshx:px-2">
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
             <span className="dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{label}</span>
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
@@ -345,7 +353,6 @@ export const FeedView = (props: {
 
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
-      <StatusFilterBar counts={props.counts} statuses={props.statuses} toggle={props.toggleStatus} clear={props.clearStatuses} />
       {pinned.length === 0 ? null : (
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:overflow-x-auto dshx:border-b dshx:border-border dshx:px-4 dshx:py-2">
           <PinIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:fill-current dshx:text-foreground" />
@@ -387,7 +394,8 @@ export const FeedView = (props: {
         }}
         className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto"
       >
-        <div className="dshx:mx-auto dshx:flex dshx:min-h-full dshx:max-w-4xl dshx:flex-col dshx:justify-start dshx:px-3 dshx:pt-3 dshx:pb-3">
+        {/* Rows sit at the card's 12 px padding (4 px gutter + 8 px row inset), on the page header's edge. */}
+        <div className="dshx:flex dshx:min-h-full dshx:flex-col dshx:justify-start dshx:p-1">
           {props.loaded && props.items.length === 0 ? (
             props.statuses.length === 0 ? (
               <EmptyState className="dshx:py-20">
