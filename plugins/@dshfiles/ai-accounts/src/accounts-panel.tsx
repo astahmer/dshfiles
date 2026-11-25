@@ -80,7 +80,7 @@ export const AccountsPanel = (props: {
         count={accountsPageCount({ accounts: state.file.accounts, native: nativeProviders.data })}
         primaryAction={{ id: 'add-account', label: 'Add account', icon: <PlusIcon aria-hidden />, onSelect: addAccount }}
       >
-        <div className="dshx:mx-auto dshx:grid dshx:w-full dshx:max-w-[1680px] dshx:grid-cols-[minmax(300px,36%)_minmax(0,1fr)] dshx:items-start dshx:gap-6 dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-narrow:gap-4">
+        <div className="dshx:mx-auto dshx:grid dshx:w-full dshx:max-w-[1680px] dshx:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] dshx:items-start dshx:gap-6 dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-narrow:gap-4">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
             <AccountsToolbar file={state.file} onSearchChange={setSearch} search={search} state={state} />
             <AccountRail

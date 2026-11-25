@@ -1,10 +1,10 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
-import { BoxIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type NativeProviders } from './api.js'
+import { NativeProviderMark } from './model-mark.js'
 
 export type NativeProviderRow = NativeProviders['providers'][number]
 export const nativeProviderStatus = (provider: NativeProviderRow, liveReload: boolean): string => {
@@ -54,7 +54,7 @@ export const NativeProvidersList = (props: {
                 onClick={() => props.onSelect?.(provider.entryId)}
                 type="button"
               >
-                <BoxIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />
+                <NativeProviderMark label={provider.label} />
                 <span className="dshx:min-w-0">
                   <strong className="dshx:block dshx:truncate dshx:text-sm dshx:font-semibold">{provider.label}</strong>
                   <span className="dshx:mt-1 dshx:block dshx:text-2xs dshx:text-muted-foreground">Built-in provider</span>

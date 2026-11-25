@@ -1,6 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { BoxIcon, LayersIcon, Settings2Icon, BarChart3Icon } from '@dshfiles/plugin-ui/icons'
+import { LayersIcon, Settings2Icon, BarChart3Icon } from '@dshfiles/plugin-ui/icons'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { aiAccountsApi } from './api.js'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { nativeProviderStatus } from './native-providers-list.js'
+import { NativeProviderMark } from './model-mark.js'
 import type { AccountSection } from './account-connection-status.js'
 import { AccountUsageSlot } from './account-usage-view.js'
 import { UsageMovedNotice, useUsageRedirect } from './usage-redirect.js'
@@ -44,7 +45,7 @@ export const NativeProviderDetail = (props: {
     <section aria-label="Selected built-in provider" className={DETAIL_PANE_CLASS}>
       <DetailHeader
         detail="Built-in provider"
-        mark={<BoxIcon aria-hidden className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground" />}
+        mark={<NativeProviderMark label={provider.label} />}
         state={{ text: nativeProviderStatus(provider, query.data?.liveReload ?? false), tone: 'muted' }}
         title={<h2 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold">{provider.label}</h2>}
       >

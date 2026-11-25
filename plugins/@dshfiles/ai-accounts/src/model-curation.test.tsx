@@ -72,7 +72,7 @@ describe('reference Models table', () => {
     expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual([
       'Model',
       'Reasoning effort',
-      'Show in picker',
+      'In picker',
       'Source',
       'Actions',
     ])

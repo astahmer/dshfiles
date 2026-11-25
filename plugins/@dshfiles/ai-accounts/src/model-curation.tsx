@@ -12,6 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ActionHint } from './panel-primitives.js'
+import { ModelMark } from './model-mark.js'
 import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
@@ -127,7 +128,7 @@ export const ModelCuration = (props: {
             <tr>
               <th className="dshx:px-3 dshx:py-2 dshx:font-normal">Model</th>
               <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
-              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show in picker</th>
+              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">In picker</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>
               <th className="dshx:w-10">
                 <span className="dshx:sr-only">Actions</span>
@@ -168,6 +169,7 @@ export const ModelCuration = (props: {
                       >
                         <StarIcon className={cn(favorite && 'dshx:fill-current')} />
                       </Button>
+                      <ModelMark modelId={model.id} />
                       <ActionHint label={model.id}>
                         <strong tabIndex={0} className="dshx:min-w-0 dshx:truncate dshx:font-medium">
                           {model.name}
@@ -201,8 +203,8 @@ export const ModelCuration = (props: {
                   <td className="dshx:px-3 dshx:py-2">
                     <span
                       className={cn(
-                        'dshx:rounded-full dshx:px-2 dshx:py-1 dshx:text-xs',
-                        overridden ? 'dshx:bg-accent dshx:text-accent-foreground' : 'dshx:bg-muted dshx:text-muted-foreground',
+                        'dshx:text-xs',
+                        overridden ? 'dshx:rounded-full dshx:bg-accent dshx:px-2 dshx:py-1 dshx:text-accent-foreground' : 'dshx:text-muted-foreground',
                       )}
                     >
                       {overridden ? 'Overridden' : 'Inherited'}

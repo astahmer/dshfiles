@@ -35,7 +35,7 @@ export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; re
     aria-hidden
     className={cn(
       'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-foreground dshx:text-background dshx:shadow-sm',
-      props.large ? 'dshx:size-16' : 'dshx:size-11',
+      props.large ? 'dshx:size-16' : 'dshx:size-8',
       props.kind === 'opencode-go' && 'dshx:bg-violet dshx:text-primary-foreground',
     )}
     style={
@@ -44,7 +44,7 @@ export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; re
         : undefined
     }
   >
-    <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : 'dshx:size-7'} />
+    <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : 'dshx:size-5'} />
   </span>
 )
 
