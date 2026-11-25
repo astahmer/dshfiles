@@ -301,6 +301,8 @@ export const jjRevisionEffectSchema = Schema.Struct({
   commitId: Schema.String,
   description: Schema.String,
   conflict: Schema.Boolean,
+  /** Author time, epoch ms: when the work was written, not when it was last rebased. Absent on older Hosts. */
+  at: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
 })
 
 export const jjThreadEffectSchema = Schema.Struct({
@@ -314,6 +316,11 @@ export const jjThreadEffectSchema = Schema.Struct({
   missing: Schema.Boolean,
   behind: Schema.Boolean,
   behindCount: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
+  /**
+   * Described, conflict-free pending work the bookmark moved past and nobody changed for the Host's stale window: the
+   * row still lands one workspace at a time but leaves Ready and the inbox.
+   */
+  stale: Schema.optional(Schema.Boolean),
   rebasedAt: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),
   rebasedTipChangeId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))),
   integrationQueuedAt: Schema.optional(Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0))),

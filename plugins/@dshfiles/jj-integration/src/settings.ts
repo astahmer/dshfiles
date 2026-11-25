@@ -38,6 +38,12 @@ export const jjIntegrationSettings = defineSettings({
       .description(
         'Fallback main branch: the exact local bookmark new threads start from and Land advances, for a project that sets none of its own, declares none in dsh.project.json, and whose origin names no default branch.',
       ),
+    staleAfterDays: Schema.natural()
+      .max(365)
+      .default(7)
+      .description(
+        'Pending thread work the bookmark moved past and nobody changed for this many days is Stale: listed on its own tab, left out of Ready to land and the inbox, and still landable one workspace at a time. 0 never marks work stale.',
+      ),
     repositoryBookmarks: Schema.array(
       Schema.object({
         repository: Schema.string().description('Absolute repository root.'),

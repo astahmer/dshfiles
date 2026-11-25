@@ -328,7 +328,7 @@ export const jjIntegrationApi = defineApi({
       }),
       output: jjRepositoriesEffectSchema,
       description:
-        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
+        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, whether that work is stale, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
       tool: {
         name: 'jj_thread_repositories',
         readOnly: true,
@@ -342,6 +342,7 @@ export const jjIntegrationApi = defineApi({
                     thread.finished ? 'finished' : undefined,
                     thread.missing ? 'missing workspace' : undefined,
                     thread.canRebase === true ? 'can rebase' : thread.canRebase === false ? 'blocked' : 'activity unknown',
+                    thread.stale === true ? 'stale' : undefined,
                     (thread.unlandedSummary?.total ?? thread.unlanded.length) === 0
                       ? 'no pending revisions'
                       : `${String(thread.unlandedSummary?.total ?? thread.unlanded.length)} pending`,

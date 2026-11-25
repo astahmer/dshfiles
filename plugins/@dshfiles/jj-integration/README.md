@@ -200,17 +200,20 @@ integration control center: each ready workspace row has a bookmark combobox
 Integrate action. The banner's **Integrate all (n)** action uses the configured
 bookmark. The page also has a tab per integration state with live counts, a
 separate lifecycle filter, and compact rows grouped into
-**Conflicts**, **Ready to integrate**, **Blocked**, **Integrating** and
+**Conflicts**, **Ready to integrate**, **Stale**, **Blocked**, **Integrating** and
 **No changes or already integrated**. Empty groups are not rendered at all; their
 counts stay in the filter bar.
 
 Integration state and lifecycle are deliberately separate. Integration state is
 `ready` (described, conflict-free pending revisions and no writing session),
-`blocked` (pending revisions plus one specific unmet prerequisite), `conflicts`,
-`integrating`, `integrated`, `no changes` or `unverified` (the workspace
-directory is gone, or the Host could not verify its sessions). Lifecycle is
-active, waiting for input, idle, finished or missing, and the **Lifecycle**
-filter narrows rows by it without changing the integration classification.
+`stale` (the bookmark moved past that work and no revision was authored for
+`staleAfterDays`, so it is listed on its own tab and left out of Ready and the
+inbox, while its row still lands one workspace at a time), `blocked` (pending
+revisions plus one specific unmet prerequisite), `conflicts`, `integrating`,
+`integrated`, `no changes` or `unverified` (the workspace directory is gone, or
+the Host could not verify its sessions). Lifecycle is active, waiting for input,
+idle, finished or missing, and the **Lifecycle** filter narrows rows by it
+without changing the integration classification.
 
 A workspace that merely sits behind the bookmark has no work to offer: it is
 **No changes** with an advisory "base is N behind main" note, never a blocker.
@@ -723,6 +726,7 @@ the subagent is idle), or any rebase that keeps the revisions' ancestry — the 
 | `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                                                                                     |
 | `bookmark`                            | `main`    | Fallback main branch for a project without its own; see [Main branch per project](#main-branch-per-project).                                                                      |
 | `repositoryBookmarks`                 | empty     | `{ repository, bookmark }` per project, set in Settings › Projects; wins over `dsh.project.json` and origin's default branch.                                                     |
+| `staleAfterDays`                      | `7`       | Pending work the bookmark moved past and nobody changed for this many days is Stale: out of Ready and the inbox, still landable one row at a time. `0` disables.                  |
 | `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                                                                  |
 | `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                                                                  |
 | `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                                                       |

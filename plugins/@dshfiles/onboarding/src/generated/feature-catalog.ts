@@ -14097,7 +14097,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "thread-workspaces-panel",
       "title": "Thread integration control center",
-      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, blocked, conflicts, integrating, integrated, no change…",
+      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, stale, blocked, conflicts, integrating, integrated, no…",
       "destination": "land",
       "currentSurface": "left-nav: Land",
       "reach": [

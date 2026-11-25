@@ -569,6 +569,8 @@ describe.skipIf(!jjAvailable)('thread workspaces against real jj', () => {
     const status = await focusedThreads.status(repo, target.name)
 
     expect(status).toMatchObject({ name: target.name, path: target.path, unlanded: [{ description: 'feat: target only' }] })
+    // The author time travels with each revision, so Land can tell abandoned work from work touched today.
+    expect(status.unlanded[0]?.at).toBeGreaterThan(Date.now() - 86_400_000)
     expect(status).toEqual((await threads.list(repo)).find(thread => thread.name === target.name))
     // The bookmark's target and one `jj log` carrying both the unlanded and behind revsets, all inside the workspace.
     expect(invocations).toHaveLength(2)
