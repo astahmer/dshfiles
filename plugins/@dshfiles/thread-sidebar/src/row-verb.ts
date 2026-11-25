@@ -1,5 +1,5 @@
 /**
- * What a thread row's inline verb does, decided apart from the list so each rule has a test. Answer and Approve open
+ * What a thread row's inline verb does, decided apart from the list so each rule has a test. Answer, Approve and Review open
  * the thread, where the question or approval card is answered in place; Retry and Resume on an inbox item run that
  * item's provider verb through the inbox, exactly as the Inbox page does; a Resume the sidebar itself classified
  * (interrupted turn) resumes it here.
@@ -21,7 +21,8 @@ const actionOf = (
   context: { readonly recovering: boolean; readonly landConfirm: boolean },
 ): RowVerbAction => {
   const verb = status.verb
-  if (verb === undefined || verb === 'Answer' || verb === 'Approve') return { kind: 'open' }
+  // Review (a failed turn) opens the thread, where the failure and its recovery show.
+  if (verb === undefined || verb === 'Answer' || verb === 'Approve' || verb === 'Review') return { kind: 'open' }
   if (verb === 'Land') return context.landConfirm ? { kind: 'confirm-land' } : { kind: 'open' }
   if (status.itemId === undefined) return verb === 'Resume' && context.recovering ? { kind: 'resume' } : { kind: 'open' }
   return { kind: 'act', itemId: status.itemId, verb }

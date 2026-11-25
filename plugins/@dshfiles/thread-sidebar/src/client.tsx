@@ -38,7 +38,7 @@ import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useInboxThreadSignals } from './inbox-signals.js'
-import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type InlineVerb, type ThreadStatus, type ThreadStatusCopy, type ThreadStatusGroup } from './thread-status.js'
+import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type RowInlineVerb, type ThreadStatus, type ThreadStatusCopy, type ThreadStatusGroup } from './thread-status.js'
 import { RowVerb } from './row-verb.js'
 import { plural, useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
 import { useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
@@ -727,7 +727,9 @@ const inlineVerbLabelKeys = {
   Retry: 'threadSidebarVerbRetry',
   Resume: 'threadSidebarVerbResume',
   Land: 'threadSidebarVerbLand',
-} as const satisfies Record<InlineVerb, Parameters<ThreadSidebarTranslate>[0]>
+  // The approval verb already reads Review in every locale.
+  Review: 'threadSidebarVerbApprove',
+} as const satisfies Record<RowInlineVerb, Parameters<ThreadSidebarTranslate>[0]>
 
 const NO_CHILDREN: readonly SessionSummary[] = []
 
@@ -833,6 +835,8 @@ const ChildThreadList = (props: {
     [...props.childThreads, ...props.finishedChildThreads].map(child => child.id),
   )
   const lineClass = cn(
+    // Touch: the time stands in the parent rows' time column, clear of their menu button's (council round 4 B4).
+    'dshx:pointer-coarse:pr-11',
     'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:outline-none dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
     compact ? 'dshx:h-6 dshx:text-xs' : 'dshx:h-7 dshx:text-sm',
   )
@@ -1760,8 +1764,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
                 'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
-                // Phone rows are 60pt two-line targets (T1.3), whatever the density preference.
-                'dshx:pointer-coarse:min-h-15 dshx:pointer-coarse:justify-center',
+                // Phone rows are 56pt two-line targets (T1.3; council round 4 B4: 60pt kept the first Ready row under the
+                // tab bar at 390x844), whatever the density preference.
+                'dshx:pointer-coarse:min-h-14 dshx:pointer-coarse:justify-center',
                 // Touch: the row's actions menu button takes the top-right corner's column.
                 'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
@@ -1979,7 +1984,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 'dshx:absolute dshx:right-1.5 dshx:flex dshx:items-center dshx:gap-1',
                 verbSeat !== 'meta' || props.renaming
                   ? 'dshx:bottom-1'
-                  : cn(compact ? 'dshx:bottom-0.5 dshx:pointer-coarse:bottom-2' : 'dshx:bottom-1.5', 'dshx:pointer-coarse:right-10'),
+                  : // Touch: the verb ends where the time above it does, left of the row menu's column (council round 4 B4).
+                    cn(compact ? 'dshx:bottom-0.5 dshx:pointer-coarse:bottom-2' : 'dshx:bottom-1.5', 'dshx:pointer-coarse:right-11'),
               )}
             >
               {verbSeat === 'meta' && !props.renaming ? verbButton : null}
@@ -2033,7 +2039,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               className={cn(
                 'dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:items-center',
                 // Touch: the row's actions menu button takes the top-right corner, so the verb moves left of it.
-                verbSeat === 'head' && 'dshx:pointer-coarse:right-10',
+                verbSeat === 'head' && 'dshx:pointer-coarse:right-11',
               )}
             >
               {verbSeat === 'head' ? verbButton : null}
@@ -7528,9 +7534,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   return (
                     <section
                       className={cn(
-                        // Groups stand 20px apart in the list: the last row's 6px gap and this 14px.
+                        // Groups stand 20px apart in the list: the last row's 6px gap and this 14px; 12px on a phone, so
+                        // more of the list shows above the tab bar (council round 4 B4).
                         'dshx:mt-1 dshx:rounded-md',
-                        !isBoard && 'dshx:not-first:mt-3.5',
+                        !isBoard && 'dshx:not-pointer-coarse:not-first:mt-3.5 dshx:pointer-coarse:not-first:mt-1.5',
                         isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
                       )}
                       key={group.key}

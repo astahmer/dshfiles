@@ -27,6 +27,8 @@ export const DONE_GROUP_OPEN_KEY = `${DONE_GROUP_KEY}:open`
 /** Provider verbs a row may offer inline; the first one an item names wins. */
 export const INLINE_VERBS = ['Answer', 'Approve', 'Retry', 'Resume', 'Land'] as const
 export type InlineVerb = (typeof INLINE_VERBS)[number]
+/** A row's verb: a provider's, or Review, which a failed turn without one offers and which opens it (council round 4 B4). */
+export type RowInlineVerb = InlineVerb | 'Review'
 
 /** The inbox source of this sidebar's own items: a finished turn the user has not opened yet. */
 export const FINISHED_TURN_SOURCE = 'thread-sidebar.finished-turn'
@@ -104,7 +106,7 @@ export interface ThreadStatus {
   /** Short detail beside the title: why it needs you, or what the subagents are doing. */
   readonly detail: string | undefined
   /** The one inline verb the row offers, when it needs you. */
-  readonly verb: InlineVerb | undefined
+  readonly verb: RowInlineVerb | undefined
   /** The inbox item the verb acts on, when the verb came from the inbox. */
   readonly itemId: string | undefined
   /** When the thread entered its current state, as far as the inputs tell: the within-group sort key. */
@@ -148,7 +150,8 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
     return {
       status: 'failed',
       detail: ownFailure ?? (fromInbox ? inbox.reason : undefined),
-      verb: (fromInbox ? inbox.verb : undefined) ?? (failedLabel === undefined ? undefined : LABEL_VERB[failedLabel]),
+      // A failed row always offers a verb, like a Needs-you row (council round 4 B4): its provider's, else Review.
+      verb: (fromInbox ? inbox.verb : undefined) ?? (failedLabel === undefined ? undefined : LABEL_VERB[failedLabel]) ?? 'Review',
       itemId: fromInbox ? inbox.itemId : undefined,
       since: fromInbox ? inbox.openedAt : input.activityAt,
     }
@@ -156,7 +159,7 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
   if (input.running) return { status: 'working', detail: undefined, verb: undefined, itemId: undefined, since: input.activityAt }
   // Reading a failed thread resolves its inbox item; the failure itself stays until a later turn finishes without failing.
   if (input.failedTurn !== undefined) {
-    return { status: 'failed', detail: FAILED_TURN_DETAIL[input.failedTurn.reason], verb: undefined, itemId: undefined, since: input.failedTurn.at }
+    return { status: 'failed', detail: FAILED_TURN_DETAIL[input.failedTurn.reason], verb: 'Review', itemId: undefined, since: input.failedTurn.at }
   }
   // A stopped finish leaves only its own finished-turn signals (an older Host still publishes that item as ready); another
   // provider's ready item, such as work to land, still counts.

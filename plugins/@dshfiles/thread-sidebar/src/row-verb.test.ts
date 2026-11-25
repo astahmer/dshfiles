@@ -17,6 +17,10 @@ describe("a thread row's inline verb", () => {
     expect(RowVerb.actionOf({ verb: 'Resume', itemId: 'i' }, { recovering: false, landConfirm: true })).toEqual({ kind: 'act', itemId: 'i', verb: 'Resume' })
   })
 
+  it('Review, on a failed turn, opens the thread (council round 4 B4)', () => {
+    expect(RowVerb.actionOf({ verb: 'Review', itemId: 'i' }, { recovering: false, landConfirm: true })).toEqual({ kind: 'open' })
+  })
+
   it('Answer and Approve open the thread; an interrupted turn resumes here', () => {
     expect(RowVerb.actionOf({ verb: 'Answer', itemId: 'i' }, { recovering: false, landConfirm: true })).toEqual({ kind: 'open' })
     expect(RowVerb.actionOf({ verb: 'Approve', itemId: undefined }, { recovering: false, landConfirm: true })).toEqual({ kind: 'open' })

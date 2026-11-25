@@ -121,6 +121,15 @@ describe('thread status', () => {
     expect(ThreadStatusModel.statusOf(input({ failedTurn, archived: true })).status).toBe('done')
   })
 
+  it('offers Review on a failed row whose provider names no verb, like a Needs-you row (council round 4 B4)', () => {
+    const failedTurn = { at: NOW, reason: 'error' } as const
+    expect(ThreadStatusModel.statusOf(input({ failedTurn })).verb).toBe('Review')
+    const inbox = { itemId: 'i8', severity: 'failed', reason: 'failed', verb: undefined, openedAt: NOW, source: FINISHED_TURN_SOURCE } as const
+    expect(ThreadStatusModel.statusOf(input({ inbox, failedTurn })).verb).toBe('Review')
+    // A provider's own verb still wins.
+    expect(ThreadStatusModel.statusOf(input({ inbox: { ...inbox, verb: 'Retry' } })).verb).toBe('Retry')
+  })
+
   it('says why a failed turn failed instead of repeating the thread title', () => {
     const inbox = {
       itemId: 'i9',
