@@ -698,8 +698,10 @@ button.crumbEditable {
    by a 1px divider, 8px above the composer. The rows stay their owners'; the stack takes away their card frames. The
    phone shell keeps its chips and its Live work fold (below). */
 :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
-  width: calc(100% - var(--dsh-composer-side-clearance, 0px) * 2);
-  max-width: var(--dsh-composer-card-max-width);
+  /* Council round 7 C6: the composer card draws its hairline as a 1px ring outside its box, so the dock's border box is
+     1px wider on each side to take the composer's exact edges (it sat 1px inside them). */
+  width: calc(100% - var(--dsh-composer-side-clearance, 0px) * 2 + 2px);
+  max-width: calc(var(--dsh-composer-card-max-width) + 2px);
   margin-inline: auto;
   background: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
   border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
@@ -740,6 +742,13 @@ button.crumbEditable {
   border: 0;
   border-radius: 0;
   background: transparent;
+}
+
+/* Council round 7 C6: a subagent row leads with its disclosure chevron, so its status glyph sits 28px into the row (8px
+   inset, 14px chevron, 6px gap). A job row in a dock that also holds subagents reserves the same leading seat (its 10px
+   inset plus 18px), so every status glyph in the dock sits on one column. Alone, a job row keeps its glyph at the edge. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock='subagents'])) > :global([data-dshfiles-live-preview-dock='jobs']) :global([data-slot='composer-row-icon']) {
+  margin-inline-start: 18px;
 }
 
 /* 32px collapsed rows, the subagent row's height; a touch screen keeps the owners' 44pt targets. */

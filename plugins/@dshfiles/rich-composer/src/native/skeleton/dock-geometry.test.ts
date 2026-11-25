@@ -90,8 +90,10 @@ describe('the desktop live work dock (round six C2)', () => {
     const surface = rule(DESK)
     expect(surface).toMatch(/background: var\(--dshx-tone-panel, var\(--dsw-alias-bg-layer-1\)\);/)
     expect(surface).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
-    expect(surface).toMatch(/width: calc\(100% - var\(--dsh-composer-side-clearance, 0px\) \* 2\);/)
-    expect(surface).toMatch(/max-width: var\(--dsh-composer-card-max-width\);/)
+    // Council round 7 C6: the composer draws its hairline as a 1px ring outside its box, so the dock's border box is 1px
+    // wider on each side to share the composer's exact edges (it sat 1px inside them).
+    expect(surface).toMatch(/width: calc\(100% - var\(--dsh-composer-side-clearance, 0px\) \* 2 \+ 2px\);/)
+    expect(surface).toMatch(/max-width: calc\(var\(--dsh-composer-card-max-width\) \+ 2px\);/)
   })
 
   it('joins a jobs dock and a subagents dock that follow each other under one 1px divider', () => {
@@ -140,5 +142,17 @@ describe('the phone transcript fade above the dock (council round 7 C3)', () => 
     // The last stop is the seat's padding edge: the band never ends early (it was opaque from 20px of a 24px pad).
     expect(rule?.body).toMatch(/var\(--dsw-alias-bg-base\) 36px\s*\)/)
     expect(rule?.body).not.toMatch(/var\(--dsw-alias-bg-base\) 20px/)
+  })
+})
+
+describe('the desktop live work dock seats (council round 7 C6)', () => {
+  it('reserves a job row the subagent row\'s leading seat when the dock holds subagents: both glyphs 28px into the row', () => {
+    const rule = blocks().find(
+      block =>
+        block.selector ===
+        `:global(html:not([data-shell-phone-nav])) .composerStack > ${DOCK}:has(> :global([data-dshfiles-live-preview-dock='subagents'])) > :global([data-dshfiles-live-preview-dock='jobs']) :global([data-slot='composer-row-icon'])`,
+    )
+    // The subagent row: 8px inset + 14px chevron + 6px gap; the job row: 10px inset + 18px (measured 568.5 vs 562.5 at 24px).
+    expect(rule?.body).toMatch(/margin-inline-start: 18px;/)
   })
 })
