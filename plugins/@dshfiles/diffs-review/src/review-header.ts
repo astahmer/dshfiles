@@ -13,4 +13,7 @@ export class ReviewHeader {
 
   /** "+0 −0" and an empty bar say nothing: the stats line shows once a file changed. */
   static readonly showStats = (fileCount: number): boolean => fileCount > 0
+
+  /** A one-sentence scope note is a label beside the scope badge, so it loses its full stop; a longer summary keeps it. */
+  static readonly scopeNote = (text: string): string => (/[.!?]\s/u.test(text) ? text : text.replace(/\.$/u, ''))
 }

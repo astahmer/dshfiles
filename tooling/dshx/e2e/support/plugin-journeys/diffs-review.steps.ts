@@ -112,15 +112,16 @@ Then('the changed image shows in the review as its current version', async ({ pa
 })
 
 When('all changed files are selected for batch review', async ({ page }: { page: Page }) => {
-  await page.getByRole('checkbox', { name: 'Select all files in this review', exact: true }).check()
-  await expect(page.getByText('2 selected', { exact: true })).toBeVisible()
+  // Each file has one Reviewed box; the review-wide box marks every file across scopes at once.
+  await expect(page.getByRole('checkbox', { name: /^Reviewed: / })).toHaveCount(2)
+  await expect(page.getByText('0/2 reviewed', { exact: true })).toBeVisible()
 })
 
 Then('marking selected files reviewed updates progress across scopes', async ({ page }: { page: Page }) => {
-  await page.getByRole('button', { name: 'Mark selected reviewed', exact: true }).click()
+  await page.getByRole('checkbox', { name: 'All files reviewed', exact: true }).click()
   await recordAssertion(page, 'diffs-review-batch-marks-cross-scope-selection', async () => {
     await expect(page.getByText('2/2 reviewed', { exact: true })).toBeVisible({ timeout: 15_000 })
-    await expect(page.getByText('2 selected', { exact: true })).toHaveCount(0)
+    await expect(page.getByRole('checkbox', { name: /^Reviewed: / }).first()).toBeChecked()
   })
   await finishJourneyAssertions(page)
 })

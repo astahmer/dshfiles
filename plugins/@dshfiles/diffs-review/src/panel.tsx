@@ -3,13 +3,14 @@ import { useApi } from '@dshfiles/dshx/client'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { ReviewLook } from './review-look.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
-import { ArrowLeft, Check, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
-import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
+import { ArrowLeft, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
@@ -44,10 +45,11 @@ const noBody = (): undefined => undefined
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 const SURFACE = 'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card'
 
+/** A counter in the UI sans with tabular figures: these are numbers to compare, not text to copy verbatim. */
 const Stat = (props: { readonly label: string; readonly tone?: 'add' | 'del' }): ReactNode => (
   <span
     className={cn(
-      'dshx:font-mono dshx:text-xs',
+      'dshx:text-xs dshx:tabular-nums',
       props.tone === 'add' ? 'dshx:text-success' : props.tone === 'del' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
     )}
   >
@@ -121,6 +123,8 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
     })),
   ]
   const selectedProject = pickerProjects.find(project => project.canonicalPath === reviewPath)
+  // The project a thread workspace belongs to ("sample · thread-e4fde2" → "sample"): its ProjectMark leads the picker.
+  const pickerProjectName = selectedProject === undefined ? undefined : selectedProject.title.split(' · ')[0]?.trim() || selectedProject.title
   const pickerLabel =
     selectedProject === undefined
       ? reviewPath === ''
@@ -209,23 +213,24 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
     return result
   }, [scopes])
   const allPaths = useMemo(() => reviewFiles.map(file => file.name), [reviewFiles])
-  const [selection, setSelection] = useState<ListSelection<string>>(() => ListSelectionModel.empty())
+  /** The file whose Reviewed box was toggled last: a Shift-click carries the same mark over every file between. */
+  const [anchorPath, setAnchorPath] = useState<string | null>(null)
   useEffect(() => {
-    setSelection(ListSelectionModel.empty())
+    setAnchorPath(null)
   }, [reviewPath, head])
-  useEffect(() => {
-    setSelection(current => {
-      const next = ListSelectionModel.prune({ state: current, visibleIds: allPaths })
-      return next.ids.length === current.ids.length && next.anchorId === current.anchorId ? current : next
-    })
-  }, [allPaths])
-  const selectedPaths = useMemo(() => new Set(selection.ids), [selection.ids])
 
   const totalReviewed =
     result?.status === 'ok' ? result.scopes.reduce((total, item) => total + item.filePaths.filter(path => reviewedPaths.has(path)).length, 0) : 0
   const progress = result !== undefined && result.status === 'ok' && result.fileCount > 0 ? Math.round((totalReviewed / result.fileCount) * 100) : 0
 
-  const markReviewed = (path: string): void => marks.set([path], !reviewedPaths.has(path))
+  const allReviewed = allPaths.length > 0 && allPaths.every(path => reviewedPaths.has(path))
+  const someReviewed = allPaths.some(path => reviewedPaths.has(path))
+  const toggleReviewed = (path: string, extend: boolean): void => {
+    const from = extend && anchorPath !== null ? allPaths.indexOf(anchorPath) : -1
+    const to = allPaths.indexOf(path)
+    marks.set(from < 0 || to < 0 ? [path] : allPaths.slice(Math.min(from, to), Math.max(from, to) + 1), !reviewedPaths.has(path))
+    setAnchorPath(path)
+  }
   const packageJson = usePackageJsonTables(result?.status === 'ok' ? result.patch : '', reviewFiles)
   const images = useMemo(
     () =>
@@ -243,36 +248,20 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
     const imagePaths = new Set(images.map(image => image.path))
     return packageJson.textFiles.filter(file => !imagePaths.has(file.name))
   }, [images, packageJson.textFiles])
-  const reviewControls = (path: string): ReactNode => {
-    const isReviewed = reviewedPaths.has(path)
-    return (
-      <span className="dshx:flex dshx:items-center dshx:gap-1">
-        <input
-          type="checkbox"
-          aria-label={`Select ${path} for batch review`}
-          checked={selectedPaths.has(path)}
-          onChange={event => {
-            const click = event.nativeEvent instanceof MouseEvent ? event.nativeEvent : undefined
-            if (click?.shiftKey) {
-              setSelection(current => ListSelectionModel.extend({ state: current, orderedIds: allPaths, id: path }))
-              return
-            }
-            setSelection(current => ListSelectionModel.toggle({ state: current, id: path }))
-          }}
-          className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
-        />
-        <Button variant={isReviewed ? 'secondary' : 'ghost'} size="sm" className="dshx:gap-1 dshx:text-2xs" onClick={() => markReviewed(path)}>
-          <Check aria-hidden className="dshx:size-3" />
-          {isReviewed ? 'Reviewed' : 'Mark reviewed'}
-        </Button>
-      </span>
-    )
-  }
-  const applyReviewed = (nextReviewed: boolean): void => {
-    if (selection.ids.length === 0) return
-    marks.set(selection.ids, nextReviewed)
-    setSelection(ListSelectionModel.empty())
-  }
+  /** One reviewed control per file (council round 2, D3): a checkbox labelled Reviewed; Shift-click marks a range. */
+  const reviewControls = (path: string): ReactNode => (
+    <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground dshx:has-data-[state=checked]:text-foreground">
+      <Checkbox
+        aria-label={`Reviewed: ${path}`}
+        checked={reviewedPaths.has(path)}
+        onClick={event => {
+          event.preventDefault()
+          toggleReviewed(path, event.shiftKey)
+        }}
+      />
+      <span aria-hidden>Reviewed</span>
+    </label>
+  )
 
   const failure = (message: string, retry: () => void): ReactNode => (
     <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
@@ -354,7 +343,8 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
             type="button"
             variant="outline"
           >
-            <span className="dshx:min-w-0 dshx:truncate">{pickerLabel}</span>
+            {pickerProjectName === undefined ? null : <ProjectMark name={pickerProjectName} size="dense" />}
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{pickerLabel}</span>
             <ChevronDown aria-hidden className="dshx:size-4 dshx:shrink-0" />
           </Button>
           {pickerOpen ? (
@@ -378,7 +368,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
             placeholder={baseRef === '' && base !== undefined ? `Base branch (${base})` : 'Base branch (default)'}
             value={baseRef}
             onChange={event => setBaseRef(event.target.value)}
-            className="dshx:w-48 dshx:max-w-full dshx:font-mono!"
+            className="dshx:h-8 dshx:w-48 dshx:max-w-full dshx:tabular-nums"
           />
         </div>
         {result?.status === 'ok' && ReviewHeader.showStats(result.fileCount) ? (
@@ -409,43 +399,27 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
           </div>
         ) : null}
 
-        {allPaths.length > 0 ? (
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs">
-            <label className="dshx:flex dshx:items-center dshx:gap-1">
-              <input
-                type="checkbox"
-                aria-label="Select all files in this review"
-                checked={ListSelectionModel.isComplete({ state: selection, orderedIds: allPaths })}
-                onChange={() => setSelection(current => ListSelectionModel.toggleAllVisible({ state: current, orderedIds: allPaths }))}
-                className="dshx:size-3.5 dshx:accent-[var(--color-info)]"
-              />
-              Select all files
-            </label>
-            {selection.ids.length === 0 ? null : (
-              <span className="dshx:ml-auto dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1">
-                <span className="dshx:mr-1 dshx:tabular-nums">{selection.ids.length} selected</span>
-                <Button size="xs" variant="outline" onClick={() => applyReviewed(true)}>
-                  Mark selected reviewed
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => applyReviewed(false)}>
-                  Mark selected unreviewed
-                </Button>
-                <Button size="xs" variant="ghost" onClick={() => setSelection(ListSelectionModel.empty())}>
-                  Clear
-                </Button>
-              </span>
-            )}
-          </div>
+        {allPaths.length > 1 ? (
+          <label className="dshx:flex dshx:w-fit dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:text-xs">
+            <Checkbox
+              checked={allReviewed ? true : someReviewed ? 'indeterminate' : false}
+              onCheckedChange={() => {
+                marks.set(allPaths, !allReviewed)
+                setAnchorPath(null)
+              }}
+            />
+            All files reviewed
+          </label>
         ) : null}
       </Page>
 
       {scopes.length > 0 && packageJson.files.length > 0 ? (
-        <div className="dshx:mx-5 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
+        <div className="dshx:mx-6 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
           <PackageJsonTables headerActions={reviewControls} view={packageJson} />
         </div>
       ) : null}
       {scopes.length > 0 && images.length > 0 ? (
-        <div className="dshx:mx-5 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
+        <div className="dshx:mx-6 dshx:mb-3 dshx:@max-pane-narrow:mx-3">
           <ChangedImages images={images} renderActions={reviewControls} />
         </div>
       ) : null}
@@ -454,7 +428,8 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
           data-testid="diffs-review-diffs"
           className={cn(
             SURFACE,
-            'dshx:mx-5 dshx:mb-5 dshx:flex dshx:min-h-64 dshx:flex-1 dshx:flex-col dshx:overflow-hidden dshx:@max-pane-narrow:mx-3 dshx:@max-pane-narrow:mb-3',
+            // The card ends at its last file instead of stretching to the pane foot (council round 2, D3).
+            'dshx:mx-6 dshx:mb-6 dshx:flex dshx:flex-col dshx:overflow-hidden dshx:@max-pane-narrow:mx-3 dshx:@max-pane-narrow:mb-3',
           )}
         >
           <PatchView
@@ -469,7 +444,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
                   <Badge variant="secondary" className="dshx:text-2xs">
                     {scope.label}
                   </Badge>
-                  <span className={cn(HINT, 'dshx:truncate')}>{aiSummaries?.[scope.key] ?? scope.summary}</span>
+                  <span className={cn(HINT, 'dshx:truncate')}>{ReviewHeader.scopeNote(aiSummaries?.[scope.key] ?? scope.summary)}</span>
                 </span>
               )
             }}

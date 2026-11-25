@@ -249,16 +249,16 @@
       "id": "batch-reviewed-marks",
       "title": "Mark a selection of changed files reviewed",
       "summary": "Select changed files across every scope and mark them reviewed at once.",
-      "details": "The review-wide selector covers files across every scope; per-file checkboxes can still extend or toggle the selection, and one action marks or clears it in the review progress the Host keeps for every browser. A plain click on Mark reviewed still toggles that file.",
+      "details": "Each changed file has one control, a checkbox labelled Reviewed. A click toggles that file, a Shift-click gives every file between it and the last one toggled the same mark, and the review-wide All files reviewed box marks or clears every file across scopes in one action. Marks live in the review progress the Host keeps for every browser.",
       "surfaces": ["client"],
       "surface": "threadFacet",
       "destination": "thread-panel",
       "currentSurface": "left-nav: Review › reviewed marks",
       "configuration": [],
-      "states": ["unselected", "range-selected", "marked", "cleared"],
+      "states": ["unreviewed", "range-marked", "marked", "cleared"],
       "failureModes": [
         "A mark only ever covers paths in the current review, so changing the workspace or revision prunes ids the diff no longer lists.",
-        "The selection is presentation state and never touches the stored reviewed marks until the batch action runs."
+        "A Shift-click range runs from the file toggled last; changing the workspace or revision forgets that anchor."
       ],
       "externalDependencies": [],
       "verification": [
@@ -280,7 +280,7 @@
           "source": "api-dispatch"
         }
       ],
-      "reach": ["click tab \"Land\"", "click button \"Review\"", "expect checkbox \"Select all files in this review\""]
+      "reach": ["click tab \"Land\"", "click button \"Review\"", "expect checkbox \"Reviewed: *\""]
     },
     {
       "id": "changes-facet",
