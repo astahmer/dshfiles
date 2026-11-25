@@ -217,6 +217,9 @@ work on any surface.
 2. **Attention is exclusive.** The indigo diamond is Needs you and the red cross is Failed. Nothing else in a list,
    tab strip or header uses indigo or red at glyph size. Amber marks a limit or configuration that blocks a feature
    (rate limited, sign-in required, quota at 15% or less); it is never a work status.
+   A page's own vocabulary is not a work status and takes no status hue: Backlog's In progress, Done and Dropped,
+   a toolkit's source, a project marked Active are ink and muted shapes. Dropped is a struck ring, never the red
+   cross.
 3. **Results are green, once.** Ready (finished, not yet seen) is a green dot with a bold title. A green check
    confirms an outcome the system verified: landed, every test passed, signed in, connection test passed. Done is a
    muted check. Working is motion, not hue: an ink ring spinner and the shimmer. Green is the glyph only; the text
@@ -305,6 +308,11 @@ The phone shell (top bar, tab bar and status pill instead of the desktop rail) f
 `PHONE_SHELL_QUERY` in `plugin-ui/src/lib/phone-shell.ts`: a viewport under 640px, or a coarse pointer under 500px tall.
 A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not on width alone.
 
+Every control on a phone screen has a 44px hit area. Kit controls have it; a native-fork control takes the kit's
+`dshx-hit-44` class. A full-screen surface on a phone has a visible way out (Cancel or ‹) in its first row. With
+the keyboard up, a floating list is clamped between the top bar and the composer, and opens below the caret when
+fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
+
 ## Layout
 
 **Page anatomy** (`Page` from `@dshfiles/plugin-ui/components/page`):
@@ -330,6 +338,10 @@ A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not 
   as wide as its content and no wider than that measure; its duration or count follows the label after 8px, and its
   hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
   message column. Everything docked above the composer shares the composer card's two edges.
+- Counts: the count beside a heading is the number of rows its list shows with no filter; a filter's count is what
+  it would show; a zero is not drawn. A count the list cannot reproduce is a bug.
+- One name per destination: the rail row, the tab title, the palette row and the `h1` are the same words, with no
+  plugin prefix. On a phone the top bar names the page, so the `h1` and its count hide together.
 
 ## Elevation & Depth
 
@@ -430,6 +442,14 @@ only when all of them have finished. A background job does not make a thread Wor
 surface says a state with one of the six words or with the glyph alone: never Running, Completed, waiting or
 Finished. A subagent that has finished is Done, never Idle.
 
+**Waiting on you is Needs you, whatever asks.** A question, a tool approval and a plan review all make the thread
+Needs you on every surface, the open thread included. The row's detail says which: the question's first words, or
+`Approve: git push --force…`. While it waits nothing counts it as Working: not the status strip, not the browser
+title, not the tool row, which reads "Waiting for approval" in place of a clock. The Inbox lists every thread the
+list calls Needs you, and the two counts are equal. A failed turn stays in Needs you, in the list and in the Inbox,
+until it is retried or marked Done. An approval is decided on its card, where the whole command shows; a row or an
+Inbox item only opens it, and its verb is Review.
+
 **EntityRow / EntityList** (`components/entity-row`). One row shape: `leading control · status glyph · title · muted
 meta chips · trailing inline verb`, with an optional muted description line and full-width children (an output pane).
 The middle is one button when the row selects; leading and trailing stay separate controls. Lists are one bordered
@@ -443,6 +463,66 @@ task description its parent gave, the same string in the row, the list, the head
 no route or account id. One thing is never a card and a row on the same screen.
 
 **PageSection.** `h2` (section title) that names its `section` region, optional muted meta ("3 enabled") and actions.
+
+**Focus ring.** One ring for kit and native controls: `outline: 2px solid` in the accent (`ring`), 1px offset
+(-2px inside a clipping list or a tab strip), on `:focus-visible` only, no halo and no transition. It holds 3:1 on
+bg, panel and raised in both schemes. `ring-ring/50` and box-shadow rings are retired; the kit sheet draws the ring
+for every control.
+
+**Focus never falls to `body`.** An action that removes the focused element moves focus to its next sibling, or the
+previous one at the end. A surface that closes returns focus to what opened it. A shortcut that opens a page
+focuses its first field; one that opens a thread focuses its question card if one waits, else the composer.
+
+**Keyboard.** The rail is navigation (`nav`, `aria-current="page"`): one Tab stop, arrow keys inside. Lists move
+with J/K and the arrow keys. The shortcut sheet shows a chord only on the row that pressing it runs.
+
+**Announcements.** A screen reader hears a state change once, politely: a thread becoming Working, Needs you,
+Failed or Ready; "Reply ready" at the end of a turn; the result of the user's own action; the connection strip. It
+never hears a clock, a streamed token, a count that follows a clock, or a tab opening. A clock is `role="timer"`
+with `aria-live="off"`. A live region wraps only the words that change, never a container that holds a clock or a
+toolbar. `role="alert"` is for a failure that lost the user's input.
+
+## Connection, loading and errors
+
+**Unknown is not empty.** Missing data never regroups, renames or recounts a row. A thread is an empty draft only
+when the Host says it has no prompted turn, not when its title has not arrived. A verb that archives, deletes,
+lands or cleans up is offered only on loaded, current data, and a bulk one names what it will touch and asks first.
+
+**Connection.** One owner: settings-shell watches the socket, probes the Host and publishes `online`,
+`reconnecting` or `offline` (`@dshfiles/plugin-ui/lib/host-connection`, mirrored as `html[data-host-connection]`).
+One drawing: a strip with a `HealthDot`, under the top bar on a phone and at the top centre of the window on
+desktop.
+
+| State        | Strip                                                              | Dot   |
+| ------------ | ------------------------------------------------------------------ | ----- |
+| reconnecting | Reconnecting to DSH…                                               | amber |
+| offline      | Not connected to DSH. What you see may be out of date. · Retry     | red   |
+| back online  | Connected (2s, then it leaves)                                     | green |
+
+While the strip shows, every `LiveElapsed` stops at its last value, spinners and the shimmer stand still, and the
+verbs above are not offered. Cached threads stay readable and a draft stays in the composer. When the Host answers
+again the thread list, open queries and the model catalog refetch; the page never needs a reload.
+
+**Loading.** A Spinner or a skeleton of the final layout. Never a sentence that is true only of an empty result
+("Choose a project", "Nothing needs you") before the first answer.
+
+**A page that did not load** shows `LoadError`: one sentence that names the thing, Retry, and the cause under
+Details. A destination whose plugin did not load says so in its own page, with Reload and a link to Settings ›
+Plugins.
+
+**Error copy.** One sentence from `errorSentence` (`@dshfiles/plugin-ui/lib/error-copy`):
+
+| Cause                                            | Sentence                                                                           |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------- |
+| DSH cannot be reached                            | Could not reach DSH. Your message is kept; send it again once DSH is back.         |
+| A request failed (HTTP 5xx)                      | Inbox did not load (HTTP 500). Retry; if it repeats, check the DSH terminal.       |
+| The plugin's Host half is missing (404)          | Inbox is not available: its plugin did not start. Open Settings › Plugins.         |
+| No account or key can run the model              | No AI account can run this model. Connect an account, then send again.             |
+| The provider refused (4xx other than 408 or 429) | The provider's own sentence; Retry is a secondary button.                          |
+
+Never shown: an endpoint id, `client api:`, a provider route id, an environment variable, a file path, or text
+written for the model. The raw text and the code go under Details. The primary button is the one that can change
+the outcome; Retry leads only when retrying can succeed.
 
 ## Language
 
@@ -476,12 +556,23 @@ translate DSH's built-in parts only.
 - **Don't** draw one thing as a card and as a row, show a generated handle or a route id as a name, or stretch a
   one-line work row across the message column.
 - **Don't** insert a control or a notice in flow where it moves the row, tab or button under the pointer.
+- **Do** read the connection from `useHostConnection`, show a failed load with `LoadError`, and word an error with
+  `errorSentence`.
+- **Do** give every control the kit focus ring, and move focus somewhere useful after an action.
+- **Don't** treat missing data as empty: no regrouping, no "Nothing here", no cleanup verb while a list is loading,
+  errored or offline.
+- **Don't** put a clock, a toolbar or a streaming line inside a live region.
+- **Don't** print an endpoint, a route id, an environment variable or model-directed text to the user.
+- **Don't** give one destination two names, or draw a count its list does not show.
+- **Accepted exception:** the core Plugins page (centred column, ink switches, 10px text) is DSH's own and has no
+  fork here; only its tab title is ours.
 
 Two ratchets in `check:green` and CI hold these rules: they count findings per rule and plugin and fail only when a
 count rises ([repository checks](docs/repository-checks.md#design-and-copy-ratchets)). `check:design-tokens` counts
 arbitrary text sizes and radii, raw colours, native icons, Tailwind's shadow step names, numeric durations, viewport
 variants, solid status fills outside the kit, `chart-1..5` used as identity or decoration, numbered palette colours,
-`uppercase`, spin or pulse without a reduced-motion variant, a control's `outline-none` with no focus ring, and a
-duration formatted outside the kit.
+`uppercase`, spin or pulse without a reduced-motion variant, a control's `outline-none` with no focus ring, a faint
+focus ring (`ring-ring/50`), and a duration formatted outside the kit.
 `check:copy` counts the glossary terms, `Plugin Name:` prefixes, "Host" as the server process, package names, raw
-error echoes, the non-canonical status words, "Try again" and three-dot ellipses.
+error echoes, a transport failure or an error code echoed to the user, the non-canonical status words, "Try again"
+and three-dot ellipses.
