@@ -111,9 +111,11 @@ export function SpendMap({
   )
   const layout = useNodeLinks(mapRef, links, [dimension?.id, leaves.length])
   const activeLinks = [`root:${dimension?.id}`, `leaf:${dimension?.id}:${leaf?.id}`]
-  const linkColors = new Map<string, string>(
-    leaves.flatMap(entry => (entry.color === undefined ? [] : [[`leaf:${dimension?.id}:${entry.id}`, entry.color] as const])),
-  )
+  // A leaf's series colour runs its whole route: the selected leaf colours the branch into its dimension too.
+  const linkColors = new Map<string, string>([
+    ...leaves.flatMap(entry => (entry.color === undefined ? [] : [[`leaf:${dimension?.id}:${entry.id}`, entry.color] as const])),
+    ...(leaf?.color === undefined ? [] : [[`root:${dimension?.id}`, leaf.color] as const]),
+  ])
   const linkStyle = (id: string): React.CSSProperties | undefined => {
     const color = linkColors.get(id)
     return color === undefined ? undefined : { color }
@@ -176,7 +178,7 @@ export function SpendMap({
             {/* The selected route is a second, darker stroke that mounts (and so draws) on each new selection. */}
             <g className="dshx:text-foreground">
               {activeLinks.map(id => (
-                <g key={id} style={linkStyle(id)}>
+                <g key={id} data-spend-link-active={id} style={linkStyle(id)}>
                   <DrawnPath
                     d={layout.paths.get(id) ?? ''}
                     drawKey={id}
@@ -366,6 +368,9 @@ function DimensionCard({
   readonly onSelect: () => void
 }) {
   const top = dimension.leaves.find(entry => entry.id === highlightLeafId) ?? dimension.leaves[0]
+  // The highlighted entry keeps the series colour the chart gives it; ink when it has none.
+  const topColor = selected ? top?.color : undefined
+  const topStyle = topColor === undefined ? undefined : { backgroundColor: topColor }
   return (
     <button
       type="button"
@@ -387,17 +392,24 @@ function DimensionCard({
         {dimension.leaves.map(entry => (
           <span
             key={entry.id}
-            style={{ flexGrow: Math.max(entry.share, 0.02) }}
+            style={{ flexGrow: Math.max(entry.share, 0.02), ...(entry.id === top?.id && topStyle) }}
             className={cn(
               'dshx:h-full dshx:basis-0 dshx:rounded-full dshx:transition-colors dshx:duration-300',
-              entry.id === top?.id && selected ? 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/30',
+              entry.id === top?.id && selected ? topStyle === undefined && 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/30',
             )}
           />
         ))}
       </span>
       {top ? (
         <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-2xs dshx:text-muted-foreground">
-          <span aria-hidden className={cn('dshx:size-1.5 dshx:shrink-0 dshx:rounded-full', selected ? 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/40')} />
+          <span
+            aria-hidden
+            style={topStyle}
+            className={cn(
+              'dshx:size-1.5 dshx:shrink-0 dshx:rounded-full',
+              selected ? topStyle === undefined && 'dshx:bg-foreground' : 'dshx:bg-muted-foreground/40',
+            )}
+          />
           <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{top.label}</span>
           <RollingNumber value={Math.round(top.share * 100)} format={value => `${Math.round(value)}%`} className="dshx:font-medium dshx:text-foreground" />
         </span>
