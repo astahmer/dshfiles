@@ -11,7 +11,7 @@ colors:
   border-hairline: '#dedcda'
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
-  selected-wash: '#edf0f9'
+  selected-wash: '#ebe9e6'
   wash-needs-you: '#e2ebff'
   wash-failed: '#ffe8e6'
   label-faint: '#6a6967'
@@ -26,9 +26,12 @@ colors:
   surface-raised-dark: '#23201d'
   border-hairline-dark: '#2f2c29'
   label-secondary-dark: '#a7a4a1'
-  selected-wash-dark: '#1f222e'
+  selected-wash-dark: '#2a2725'
   wash-needs-you-dark: '#232a42'
-  wash-failed-dark: '#3a211f'
+  wash-needs-you-band-dark: '#242b3d'
+  wash-failed-dark: '#311d1b'
+  primary-dark: '#dad7d3'
+  surface-dialog-dark: '#211f1c'
   signal-indigo-dark: '#839ffc'
   danger-red-dark: '#fa8880'
   success-green-dark: '#65c67d'
@@ -36,9 +39,9 @@ colors:
 typography:
   page-title:
     fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Helvetica Neue, Helvetica, Arial, sans-serif'
-    fontSize: '1.25rem'
-    fontWeight: 600
-    lineHeight: 1.4
+    fontSize: '1.375rem'
+    fontWeight: 650
+    lineHeight: 1.2727
     letterSpacing: '-0.01em'
   display:
     fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Helvetica Neue, Helvetica, Arial, sans-serif'
@@ -116,6 +119,15 @@ components:
     textColor: '{colors.paper}'
     rounded: '{rounded.md}'
     height: '28px'
+  select:
+    backgroundColor: '{colors.paper}'
+    textColor: '{colors.ink}'
+    rounded: '{rounded.lg}'
+    height: '32px'
+    padding: '0 10px'
+  page-tabs-underline:
+    textColor: '{colors.label-secondary}'
+    height: '36px'
   page-tabs:
     backgroundColor: '{colors.surface-raised}'
     textColor: '{colors.label-secondary}'
@@ -176,7 +188,7 @@ The plan behind this file is [docs/ade-ux/README.md](docs/ade-ux/README.md); its
 
 **Key characteristics:**
 
-- One page anatomy for every plugin page; one list row; one empty state; one tab style.
+- One page anatomy for every plugin page; one list row; one empty state; one field look; one tab rule.
 - Colour has four jobs: attention, result, identity, data. It is never decoration and never the only carrier of a fact.
 - Container-sized, not viewport-sized: every surface works from a 360px phone pane to a wide split.
 - Sentence case everywhere; plugin names never appear in labels.
@@ -218,9 +230,10 @@ No slate shell: navigation surfaces keep the warm stone.
 | 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#6a6967` | `#94928f` |
 | 9 muted         | secondary text (AA)                  | `muted-foreground`           | `--dsw-alias-label-secondary`                                  | `#646362` | `#a7a4a1` |
 | 10 text         | primary text, primary fill (AA)      | `foreground`, `primary`      | `--dsw-alias-label-primary`                                    | `#1b1a19` | `#eae7e4` |
-| selected wash   | selection, quiet (with the marker)   | `selected-wash`              | `--dshx-selected-wash` (accent hue)                            | `#edf0f9` | `#1f222e` |
+| selected wash   | selection, neutral (with its cue)    | `selected-wash`              | `--dshx-selected-wash` (neutral)                               | `#ebe9e6` | `#2a2725` |
 | Needs-you wash  | a row that waits on you              | `wash-needs-you`             | `--dshx-wash-needs-you` (accent hue)                           | `#e2ebff` | `#232a42` |
-| Failed wash     | a row that failed                    | `wash-failed`                | `--dshx-wash-failed` (hue 25)                                  | `#ffe8e6` | `#3a211f` |
+| Needs-you band  | a full-width head band (Inbox card)  | `wash-needs-you-band`        | `--dshx-wash-needs-you-band` (accent hue)                      | `#e2ebff` | `#242b3d` |
+| Failed wash     | a row that failed                    | `wash-failed`                | `--dshx-wash-failed` (hue 25)                                  | `#ffe8e6` | `#311d1b` |
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |
@@ -268,14 +281,19 @@ work on any surface.
    headers or body text. A row-level verb that answers what waits on you (Review, Answer, Rate…) is `Button`
    `variant="attention"`: Needs-you text on a 12% tint of it, no border; a failed row's verb is `variant="danger-tint"`.
    Their text is the status colour pulled 30% toward the ink so it holds AA on its own tint. A chip or band reuses
-   the pair (`bg-attention-tint text-attention-foreground`). A selection (the selected row, the active rail item and
-   settings category, a pressed toggle, the palette's highlighted row) is `bg-selected-wash`, a quiet low-chroma
-   accent wash generated per accent hue, with ink text; a selected list row adds the non-colour cue,
-   `selected-marker` (a 2px accent bar inset on its leading edge, which follows a rounded row), and sets its title at
-   `font-selected` (550). Hover stays the ink wash.
+   the pair (`bg-attention-tint text-attention-foreground`). A selection (the selected row, the settings category, a pressed
+   toggle, the palette's highlighted row, a chosen card) is `bg-selected-wash`, a neutral warm grey step with no accent
+   hue, with ink text. Indigo fills mean attention only: the accent rides on the selection's cue, never its fill. A
+   selected list row adds `selected-marker` (a 2px accent bar inset on its leading edge, which follows a rounded row)
+   and sets its title at `font-selected` (550); a chosen card or tile (a theme card, a starter) takes `selected-card`
+   instead: the wash, a 2px ring edge and a check badge in its trailing top corner, with no leading marker. The current
+   place shows strongly once: a leaf row takes the wash, marker and 550; its parent rail item only an ink label and its
+   glyph in colour. Hover stays the ink wash.
    **Attention outranks selection.** A Needs-you row holds `bg-wash-needs-you` and a Failed row `bg-wash-failed` for as
    long as it is in that state: opaque washes of their hue, stronger than the selection wash, with ink, secondary and
-   faint text and the status glyphs at AA on them. A count that names a status is a `StatusCount` (the status glyph at
+   faint text and the status glyphs at AA on them. A full-width head band (an Inbox card's) takes
+   `bg-wash-needs-you-band`, calmer in dark (chroma 0.035 where a row keeps 0.045); dark Failed is
+   `oklch(0.255 0.032 25)`. A count that names a status is a `StatusCount` (the status glyph at
    10px beside a tabular number, on the tint pair for Needs you and Failed), so it reads without its colour.
 8. **Data.** Categorical series use `data-1..6` in order: six identity hues at a chart step (teal, violet, copper,
    magenta, olive, cyan). The data ramp never starts with the accent, and ChartFrame maps the chart library's
@@ -296,7 +314,12 @@ work on any surface.
 10. **Colour through meaning.** Colour enters a grey page through what it means, not as decoration: a provider's
     brand mark wherever a model or provider is named, a `ProjectMark` wherever a project is named, each theme's real
     swatch in the appearance cards, identity tones on the core Plugins icon tiles, a `StatusCount` on the Inbox title.
-    No per-area hue tiles, tinted page headers or coloured section backgrounds.
+    No tinted page headers, panels, primary buttons or coloured section backgrounds.
+11. **Navigation identity.** Each rail destination draws its glyph in its own identity tone, glyph only, and the
+    active one adds a 14% tile of that tone behind the glyph with its ink label at 600; the label never takes the
+    tone. `nav-tone-<id>` on the item, `text-nav-tone` on its icon and `bg-nav-tile` on the active seat
+    (`plugin-ui/src/color-roles.css`): Threads identity-7, Inbox 2, Land 1, Work 3, Agents 4, Observe 6, Knowledge 8,
+    Settings neutral. Identity-5 is left out: it sits beside the success green. The phone tab bar uses the same tones.
 
 Use semantic tokens only, never raw hex in plugin code. The exceptions are brand artwork
 (`ai-accounts/src/account-labels.ts`, `model-effort-picker/src/brand-marks.ts`) and a project colour the user
@@ -319,7 +342,7 @@ than size:
 | Role          | Size / line                     | Weight       | Use                                             |
 | ------------- | ------------------------------- | ------------ | ----------------------------------------------- |
 | Display       | 26/32 (`text-display`)          | 600, -0.02em | Hero headline (new thread)                      |
-| Page title    | 20/28 (`text-title`, `text-xl`) | 600, -0.01em | The page `h1`, exactly one per page             |
+| Page title    | 22/28 (`text-title`)            | 650, -0.01em | The page `h1`, exactly one per page             |
 | Section title | 13px, 15px phone (`text-sm`)    | 600          | `PageSection` `h2`, card titles                 |
 | Body / UI     | 13px, 15px phone (`text-sm`) / 1.45 | 400      | Rows, descriptions, forms                       |
 | Prose         | 14px, 15px phone (`text-base`)  | 400          | Assistant messages, long descriptions           |
@@ -360,9 +383,11 @@ Two densities, switched by pointer and width, never by user agent (`plugin-ui/sr
 Safe areas: `--dshx-safe-top|right|bottom|left` (`env(safe-area-inset-*)`) on the phone top bar, tab bar, composer and
 sheets. Kit buttons, toggles and menu rows already get 44px hit areas on a coarse pointer.
 
-The phone shell (top bar, tab bar and status pill instead of the desktop rail) follows one rule,
+The phone shell (top bar and tab bar instead of the desktop rail) follows one rule,
 `PHONE_SHELL_QUERY` in `plugin-ui/src/lib/phone-shell.ts`: a viewport under 640px, or a coarse pointer under 500px tall.
-A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not on width alone.
+A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not on width alone. Status lives
+in a 44px top-bar status button on Threads and Inbox that opens the status sheet (with the usage ring); there is no
+permanent band above the tab bar, and a strip returns only for an actionable condition (quota low, disconnected).
 
 Every control on a phone screen has a 44px hit area. Kit controls have it; a native-fork control takes the kit's
 `dshx-hit-44` class. A full-screen surface on a phone has a visible way out (Cancel or ‹) in its first row. With
@@ -375,16 +400,21 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 
 ```
 ┌ Page (its own @container; padding 24px, 12px below 28rem) ───────────────────────────┐
-│ h1 Heading  12  [meta chip] [meta chip]          [Secondary] [Secondary] [⋯] [Primary] │
+│ h1 Heading 22/650  12 or ◆2 ✕1  [meta chip]      [Secondary] [Secondary] [⋯] [Primary] │
 │ One-line description, muted, ≤ 72ch                                                    │
-│ [ Tab · Tab · Tab ]   ← optional, one segmented style                                  │
+│ Tab  Tab  Tab  (underline: sections · segmented: ≤ 4 view modes)                       │
 │ ─ body: PageSection (h2 · meta · actions) → EntityList / form / table / EmptyState ─   │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 - At most one primary action. Secondary actions are outline buttons while the page is at least 42rem wide and fold
   into the `⋯` overflow menu below that; the primary never folds.
-- Pages fill their pane (no centred max-width column). Spacing scale: page padding 24px, 20px between the header and
+- One page container: the header and the body share one start-aligned container capped at 1080px (`Page`
+  `width="page"`, the default, `max-w-page`); a list page takes the 920px lane (`width="lane"`, `max-w-lane`); only a
+  diff, a chart or a table runs full bleed (`width="full"`, the default for a `fill` master–detail page). The header
+  actions sit on that container's trailing edge, never the window's. A page that owns its layout puts the standalone
+  `PageHeader` inside the same cap. The `h1` is 22px/650 (`text-title font-title`); its count is tertiary ink, or one
+  `StatusCount` per status present (`statusCounts`). Spacing scale: page padding 24px, 20px between the header and
   the body, body sections stacked 16px apart; narrow panes and phones keep 12px. Rows stay 32px, so density stays
   compact.
 - Size by container, never by viewport: the page root is `@container`; children query `@max-pane-narrow` (< 28rem,
@@ -392,8 +422,10 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   secondary chips hide or wrap, primary text truncates, and only then does a row wrap.
 - No horizontal page overflow at 390px. Filter rows scroll sideways (`overflow-x-auto`) instead of wrapping into a
   column of chips.
-- Transcript measure: prose caps at 34em. A work row (a turn's "Worked for" header, a tool call, a summary line) is
-  as wide as its content and no wider than that measure; its duration or count follows the label after 8px, and its
+- Transcript measure: one 680px column. Prose reads at about 66ch at the transcript size, and cards and code blocks
+  are at most 680px, aligned left with the prose. A succeeded tool row shows a 16px kind glyph (`ToolCard` `kind`:
+  edit, shell and subagent in identity tones; read and search neutral). A work row (a turn's "Worked for" header, a
+  tool call, a summary line) is as wide as its content and no wider than that column; its duration or count follows the label after 8px, and its
   hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
   message column. Everything docked above the composer shares the composer card's two edges.
 - Counts: the count beside a heading is the number of rows its list shows with no filter; a filter's count is what
@@ -420,6 +452,10 @@ Dark adds a 1px inner top highlight (`inset 0 1px 0`) to every level so raised l
 s2/s3 may add a backdrop blur. Declare depth once — a bordered card has no shadow. Stacking bands: Host modals 1000,
 kit dialogs/sheets 1050, floating layers (select, popover, menu, tooltip) 1100. A kit dialog, alert dialog or sheet
 dims the page with `bg-scrim`: the warm ink at 32% in light, black at 50% in dark.
+
+Dialogs, alert dialogs and the command palette sit on `surface-dialog`: in light the page fill, the hairline and s3;
+in dark a raised warm fill `oklch(0.24 0.006 60)`, a faint light edge `oklch(1 0 0 / 0.08)` and one deep shadow
+`0 24px 64px rgb(0 0 0 / 0.55)`. A keycap (`Kbd`) in dark is a faint light cap (`oklch(1 0 0 / 0.08)`) with a 12% edge.
 
 ## Motion
 
@@ -457,8 +493,8 @@ these is an opacity change only; nothing travels or resizes.
 
 ## Shapes
 
-One radius scale for kit and native: **4 chips · 6 controls and rows · 8 cards and code · 12 composer, menus and
-dialogs · 16 phone sheets** (`rounded-sm|md|lg|xl|2xl`). The Host's `--dsw-radius-xs..panel` are remapped onto it
+One radius scale for kit and native: **4 chips · 6 buttons and rows · 8 fields (input, select), cards and code · 12
+composer, menus and dialogs · 16 phone sheets** (`rounded-sm|md|lg|xl|2xl`). The Host's `--dsw-radius-xs..panel` are remapped onto it
 (4/6/8/12/12/16), so native bubbles, composer and panels follow. Badges and chips are full pills. Borders are 1px
 hairlines; no coloured side borders.
 
@@ -467,15 +503,27 @@ Heights: 24 compact · 28 default control · 32 list row · 36 composer bar · 4
 
 ## Components
 
-**Primary button — black.** `Button` `variant="default"` is the Host brand fill (`#0f1115` light, `#f9fafb` dark),
-which most pages already used (MCP Add server, Memory, Backlog New, Hosts). One per page. Header secondary actions are
+**Primary button — ink.** `Button` `variant="default"` is the Host brand fill: the ink in light, and in dark a
+softened warm grey `oklch(0.88 0.006 65)` (`--dshx-primary-fill`) so the one primary is never the brightest thing on
+the screen. Never indigo. One per page. Header secondary actions are
 `outline` `sm`; row verbs are `outline` or `ghost` `sm`, and a row verb that answers what waits on you is
 `attention` (`danger-tint` on a failed row; see the tint rung); destructive verbs `destructive` and always behind a
 confirmation when they lose work.
 
-**Tabs — one style.** The segmented `TabsList` (muted track, paper active pill) for page views, rendered by `Page`
-`tabs`. A filter over one list (Running / Finished / All) is a `ToggleGroup`, which looks the same. No underline tabs
-on pages.
+**Tabs — the rule.** Underline tabs for page sections (`Page` `tabs.variant="underline"`): secondary-ink labels on a
+hairline, the active one in ink over a 2px accent bar. The segmented control (muted track, paper active pill) only for
+up to four view modes of one list; past four items the tabs are always underline. A filter over one list (Running /
+Finished / All) is a `ToggleGroup`.
+
+**Fields — one look.** `Input`, `Textarea`, `InputGroup` and the `Select` trigger share `fieldLook`
+(`@dshfiles/plugin-ui/components/ui/input`): a 1px control border, the page fill, the 8px radius, no shadow and no dark
+fill; the select trigger is 32px with its chevron in secondary ink at full strength. A Host select the kit does not draw
+takes the `select-look` utility. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
+reader hears), never a number glued to a second control.
+
+**DiffStat.** Every change count is `DiffStat` from `@dshfiles/plugin-ui/components/diff-stat`: `+N` then `−N`, sans,
+tabular, 12px, additions in success and deletions in danger (AA on bg, panel, raised and the selected wash), a zero side
+muted, the minus U+2212.
 
 **EmptyState.** One sentence, centred, muted, at most one outline action. It never draws its own frame; the list or
 card it sits in does. Loading is a `Spinner`, not an empty state.
@@ -611,9 +659,10 @@ translate DSH's built-in parts only.
   thread list's projection.
 - **Don't** give Working a hue, colour a row for being healthy beyond its one dot, or add a second attention colour.
 - **Don't** put plugin names in labels ("pulls.review: Reviews", "Thread Sidebar: Navigation").
-- **Don't** use an indigo or blue primary button, an icon tile in a page header, underline page tabs or ALL-CAPS
-  labels. A provider's brand tile belongs to its account row and detail header only.
-- **Don't** centre a page in a max-width column or size a pane with viewport breakpoints (`sm:`/`md:`).
+- **Don't** use an indigo or blue primary button, an indigo selection fill, an icon tile in a page header, a
+  segmented control past four items or ALL-CAPS labels. A provider's brand tile belongs to its account row and detail header only.
+- **Don't** centre a page, stretch a list across a wide pane, or size a pane with viewport breakpoints (`sm:`/`md:`):
+  use the page container's 1080px and 920px widths.
 - **Don't** leak raw ids or absolute paths into labels; show the entity's name and keep the id in a tooltip.
 - **Don't** add a control to a fixed surface. The composer bar is `+ · mode · ⋯ · model · send` with one meta line,
   the thread header is one row with one `⋯`, a reply row is copy + `⋯`. A new verb goes into the matching `⋯` menu

@@ -59,8 +59,39 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '**Chart labels.**',
       '**Colour through meaning.**',
       "  wash-needs-you: '#e2ebff'",
-      "  wash-failed-dark: '#3a211f'",
+      "  wash-failed-dark: '#311d1b'",
     ])
       expect(design, text).toContain(text)
+  })
+
+  it('records the third council pass: neutral selection, nav identity, page container, tabs, one field look, DiffStat, phone status (council round 3 A9)', () => {
+    for (const text of [
+      "  selected-wash: '#ebe9e6'",
+      "  selected-wash-dark: '#2a2725'",
+      "  wash-needs-you-band-dark: '#242b3d'",
+      "  primary-dark: '#dad7d3'",
+      'Indigo fills mean attention only',
+      '`selected-card`',
+      '**Navigation identity.**',
+      '`nav-tone-<id>`',
+      '`width="lane"`',
+      '1080px',
+      '920px',
+      '**Tabs — the rule.**',
+      '**Fields — one look.**',
+      '`UnitInput`',
+      '`select-look`',
+      '`@dshfiles/plugin-ui/components/diff-stat`',
+      '`surface-dialog`',
+      '44px top-bar status button',
+      'Transcript measure: one 680px column',
+      '`ToolCard` `kind`',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass.
+    expect(design).not.toContain('No underline tabs\non pages')
+    expect(design).not.toContain('Pages fill their pane (no centred max-width column)')
+    expect(design).not.toContain('prose caps at 34em')
+    expect(design).not.toContain('a quiet low-chroma\n   accent wash')
   })
 })
