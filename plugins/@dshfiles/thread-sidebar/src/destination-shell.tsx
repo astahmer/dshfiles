@@ -1344,6 +1344,8 @@ const PhoneNavigation = (
   const bar = PhoneTopBarModel.resolve(stack)
   // The drawer never covers the stage, so its top bar always names what the stage shows.
   const stageBar = drawer ? PhoneTopBarModel.resolve({ ...stack, listOpen: false, moreOpen: false }) : bar
+  // A page or a list centres its title (council round 4 B3); a thread's title leads, after the back chevron.
+  const centred = !(stageBar.thread && (drawer || !listOpen))
   // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
   const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
   const backToPage = (): void => {
@@ -1557,7 +1559,7 @@ const PhoneNavigation = (
             <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
           </button>
         )}
-        <h2 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold">
+        <h2 className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-heading">
           {drawerView === 'more' ? 'More' : props.destination.label}
         </h2>
         {drawerView === 'threads' ? (
@@ -1602,7 +1604,17 @@ const PhoneNavigation = (
         )}
         style={{ height: PHONE_TOP_HEIGHT }}
       >
-        <div className="dshx:flex dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-0.5">
+        {/* A page or a list centres its title between the way back and the trailing controls (council round 4 B3); a
+            thread's title starts 12px after the back chevron, its length needs the width. */}
+        <div
+          data-phone-bar-layout={centred ? 'centred' : 'leading'}
+          className={cn(
+            // Back and title read at 17px (council round 4 B3); the title adds the weight.
+            'dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:text-[17px] dshx:leading-[22px]',
+            centred ? 'dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,1fr)] dshx:gap-1' : 'dshx:flex dshx:gap-0.5',
+          )}
+        >
+          <div className={centred ? 'dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-self-start' : 'dshx:contents'}>
           {pageBack === null ? null : (
             <button
               type="button"
@@ -1634,22 +1646,31 @@ const PhoneNavigation = (
               data-phone-back=""
               aria-label={`Back to ${bar.back.label}`}
               onClick={back}
-              className="dshx:flex dshx:h-11 dshx:min-w-11 dshx:max-w-[40%] dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:pr-2 dshx:pl-1 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+              className={cn(
+                'dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:pl-1 dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent',
+                // On a thread the chevron alone goes back, as in other chat apps: 28px wide so the title starts 12px after
+                // the glyph, with a 44px touch area that reaches under the title's first pixels.
+                bar.thread
+                  ? "dshx:w-7 dshx:after:absolute dshx:after:inset-y-0 dshx:after:left-0 dshx:after:w-11 dshx:after:content-['']"
+                  : 'dshx:min-w-11 dshx:max-w-full dshx:pr-2',
+              )}
             >
               <ChevronLeftIcon className="dshx:size-5 dshx:shrink-0" aria-hidden="true" />
-              {/* On a thread the title needs the width: the chevron alone goes back, as in other chat apps. */}
               <span className={cn('dshx:min-w-0 dshx:truncate', bar.thread && 'dshx:sr-only')}>{bar.back.label}</span>
             </button>
           )}
+          </div>
           <h1
             data-phone-title=""
             className={cn(
-              'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-[15px] dshx:leading-tight dshx:font-semibold',
-              !drawer && bar.back === null && 'dshx:pl-2.5',
+              'dshx:min-w-0 dshx:truncate dshx:font-semibold',
+              centred ? 'dshx:text-center' : 'dshx:flex-1',
+              !centred && !drawer && bar.back === null && 'dshx:pl-2.5',
             )}
           >
             {stageBar.title}
           </h1>
+          <div className={centred ? 'dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-self-end' : 'dshx:contents'}>
           {showNew && !drawer && phoneStatus.status === 'active' ? <phoneStatus.value.Button /> : null}
           {showNew && !drawer ? (
             <button
@@ -1673,6 +1694,7 @@ const PhoneNavigation = (
               <PanelBottomOpenIcon className="dshx:size-5" aria-hidden="true" />
             </button>
           ) : null}
+          </div>
         </div>
       </header>
       {listOpen && !drawer ? (

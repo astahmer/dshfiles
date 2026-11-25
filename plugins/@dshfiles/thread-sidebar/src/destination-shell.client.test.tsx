@@ -594,6 +594,29 @@ describe('DestinationShell', () => {
     expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Fix the login race')
     expect(document.querySelector('header[data-phone-top-bar]')?.getAttribute('data-phone-stage')).toBe('thread')
   })
+
+  it('on a phone, centres a page title apart from a muted 17px Back, and starts a thread title 12px after the chevron (council round 4 B3)', () => {
+    setPhone(true)
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    expect(document.querySelector('[data-phone-bar-layout]')?.getAttribute('data-phone-bar-layout')).toBe('centred')
+    const title = document.querySelector('[data-phone-title]')
+    expect(title?.className).toContain('dshx:text-center')
+    expect(title?.className).toContain('dshx:font-semibold')
+    const back = screen.getByRole('button', { name: 'Back to More' })
+    expect(back.textContent).toBe('More')
+    expect(back.className).toContain('dshx:text-muted-foreground')
+    // Both read at 17px, set once on the bar row they share.
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:text-[17px]')
+    // The way back and the title are two cells of the bar, not one run of text.
+    expect(back.contains(title)).toBe(false)
+    cleanup()
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race' })
+    expect(document.querySelector('[data-phone-bar-layout]')?.getAttribute('data-phone-bar-layout')).toBe('leading')
+    const chevron = screen.getByRole('button', { name: 'Back to Threads' })
+    // 28px wide (the title starts 12px after the glyph), with a 44px touch area.
+    expect(chevron.className).toContain('dshx:w-7')
+    expect(chevron.className).toContain('dshx:after:w-11')
+  })
 })
 
 describe('phone navigation: drawer', () => {
