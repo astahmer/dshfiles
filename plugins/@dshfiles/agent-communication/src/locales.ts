@@ -15,7 +15,7 @@ const en = {
   intent: 'Intent',
   notice: 'Notice',
   request: 'Request · action asked',
-  intentHint: 'A request records that the sender asks for action. It never starts, resumes, or redirects an agent.',
+  intentHint: 'A notice stays passive. A request wakes an idle recipient with a pointer to its inbox, bounded by a cooldown and an hourly cap.',
   priority: 'Priority',
   refresh: 'Refresh',
   connected: 'Host connected',

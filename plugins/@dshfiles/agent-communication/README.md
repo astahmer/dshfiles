@@ -2,7 +2,7 @@
 
 ![Post messages from the communication browser](docs/screenshots/human-browser.png)
 
-This owned DSH bundle provides durable topic channels and direct Agent inboxes. Incoming messages are passive records: arrival never adds a Session/user message, calls `Agent.followup()` or `Agent.steer()`, or replays a notification when an Agent is created. Completed turns stay completed. `priority` (`normal`/`urgent`) and `intent` (`notice`/`request`) are descriptive metadata only; a `request` records that the sender asks for action and still starts no turn.
+This owned DSH bundle provides durable direct Agent inboxes and opt-in topic channels. A direct message is stored first; a `notice` stays passive and is read at the recipient's next natural execution, while a `request` wakes an idle recipient with a pointer message ("read your inbox") so the work is not stranded. The wake never carries peer text, and it is bounded by a per-recipient cooldown, a pair cooldown that damps reply loops, and an hourly cap; Settings can turn it off. Topic messages stay passive. Completed turns stay completed.
 
 Agents in the same resolved working directory are grouped in the directory, but nothing subscribes them anywhere automatically: the direct inbox needs no registration, and a workspace `workspace/<hash>` topic is an explicit opt-in (the panel's Rejoin, or the CLI/MCP subscribe). That used to register every Agent at startup and `agent/created`, which left thousands of subscriptions for broadcasts nobody read; the generated channels are now pruned once no live Agent works there for 24 hours. A full topic reports `topic-full`.
 

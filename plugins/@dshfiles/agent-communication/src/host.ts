@@ -1,5 +1,6 @@
 import type {} from '@deepseek-ai/dsh-agent'
 import { Api, DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { Clock, Duration, Effect, Layer } from 'effect'
 import { cleanupInactiveWorkspaceChannels } from './agent-lifecycle.js'
 import { agentCommunicationApi } from './api.js'
@@ -7,8 +8,10 @@ import { CommunicationOperations } from './api-operations.js'
 import { CommunicationHub } from './communication-hub-promise.js'
 import { communicationTools } from './communication-tools.js'
 import { HostAgents, SessionCorpus, ThreadAgents } from './host-edge-promise.js'
+import { MailWake } from './mail-wake.js'
 import { RecipientDirectory } from './recipient-directory.js'
 import { recurringTask } from './recurring-task.js'
+import { agentCommunicationSettings, CommSettingsLive } from './settings.js'
 import { UnreadCounts, UnreadPrompt } from './unread-counts.js'
 import { UnreadNudgeRules } from './unread-nudge.js'
 
@@ -77,21 +80,38 @@ const Maintenance = Layer.effectDiscard(
 
 const HostServices = Layer.mergeAll(HostAgents.layer, SessionCorpus.layer, ThreadAgents.layer)
 
+const WakeLive = MailWake.layer.pipe(Layer.provide(Layer.mergeAll(HostApis.layer, CommSettingsLive)))
+
 const AgentCommunicationLive = Layer.mergeAll(Maintenance, ActivityBackfill, UnreadPrompt).pipe(
-  Layer.provideMerge(Layer.mergeAll(UnreadCounts.layer, RecipientDirectory.layer, CommunicationOperations.layer)),
+  Layer.provideMerge(Layer.mergeAll(UnreadCounts.layer, RecipientDirectory.layer, CommunicationOperations.layer, WakeLive)),
   Layer.provideMerge(Layer.mergeAll(CommunicationHub.layer, HostServices)),
 )
 
 export default DshxPlugin.make({
   name: 'agent-communication',
   inject: ['agents'],
+  settings: [agentCommunicationSettings],
   layer: AgentCommunicationLive,
   tools: communicationTools,
   apis: [
     Api.bind(agentCommunicationApi, {
       diagnostics: input => CommunicationOperations.use(operations => operations.diagnostics(input.limit)),
       browseMessages: input => CommunicationOperations.use(operations => operations.browseMessages(input)),
-      postMessage: input => CommunicationOperations.use(operations => operations.postMessage(input)),
+      postMessage: input =>
+        Effect.gen(function* () {
+          const result = yield* CommunicationOperations.use(operations => operations.postMessage(input))
+          if (result.topic === null && input.agentId !== undefined)
+            yield* MailWake.use(wake =>
+              wake.deliver({
+                recipientId: input.agentId ?? '',
+                senderId: 'communication-browser',
+                senderLabel: 'the communication panel',
+                messageId: result.messageId,
+                intent: result.intent,
+              }),
+            )
+          return result
+        }),
       messageRecipients: input => CommunicationOperations.use(operations => operations.messageRecipients(input.messageId)),
       revealMessageBody: input => CommunicationOperations.use(operations => operations.revealMessageBody(input.messageId)),
       setSubscription: input => CommunicationOperations.use(operations => operations.setSubscription(input)),

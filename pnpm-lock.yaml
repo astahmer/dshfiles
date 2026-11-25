@@ -655,12 +655,18 @@ importers:
 
   plugins/@dshfiles/agent-communication:
     dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: 'catalog:'
+        version: 3.19.0
       '@dshfiles/agents':
         specifier: workspace:*
         version: link:../agents
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/session-controller':
+        specifier: workspace:*
+        version: link:../session-controller
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

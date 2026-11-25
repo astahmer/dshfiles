@@ -5,6 +5,7 @@ import { CommunicationHub } from './communication-hub-promise.js'
 import { CommunicationDelegation } from './delegation-guard.js'
 import { HostAgents, ThreadAgents } from './host-edge-promise.js'
 import { LiveAgentDirectoryModel } from './live-agent-directory.js'
+import { MailWake } from './mail-wake.js'
 import { formatInbox } from './messages.js'
 import { RecipientDirectory, UnknownRecipient } from './recipient-directory.js'
 import { UnreadCounts } from './unread-counts.js'
@@ -117,7 +118,7 @@ const emitMessage = (message: CommunicationMessage, sender: CommunicationPrincip
 const agentsTool = Tool.make({
   name: 'dshx_comm_agents',
   description:
-    'List DSH Agents for peer discovery. Related and same-workspace peers come first; includeAll lists every live Agent. Each entry includes its title/label and parent Session id when available. For your own parent or child Agents, native send_message and subagent results are the right channel; use dshx_comm_send only between other top-level threads. Peer messages remain passive and never start or resume a turn.',
+    'List DSH Agents for peer discovery. Related and same-workspace peers come first; includeAll lists every live Agent. Each entry includes its title/label and parent Session id when available. For your own parent or child Agents, native send_message and subagent results are the right channel; use dshx_comm_send only between other top-level threads. A direct `request` wakes an idle recipient with a pointer to its inbox; a notice stays passive.',
   input: Schema.Struct({
     includeAll: Schema.optionalKey(Schema.Boolean.annotate({ description: 'Include all live Agents instead of the default peer-focused ordering.' })),
   }),
@@ -153,7 +154,7 @@ const delegationOf = (sessionId: string) => ThreadAgents.use(threads => Effect.m
 const sendTool = Tool.make({
   name: 'dshx_comm_send',
   description:
-    'Store untrusted peer text for another top-level thread. For your own parent or child Agents, native send_message and subagent results are the right channel. Sending never adds a Session message or starts, resumes, or redirects the recipient. intent "request" records the request but never starts a turn.',
+    'Store untrusted peer text for another top-level thread. For your own parent or child Agents, native send_message and subagent results are the right channel. A direct `request` wakes its recipient with a pointer message ("read your inbox"), so an idle thread acts without a user prompt; a notice never starts or resumes a turn. Waking is bounded by a cooldown and an hourly cap, and can be turned off in Settings.',
   input: Schema.Struct({
     toAgentId: describedString('Recipient DSH Agent Session id.'),
     text: describedString('Message text, up to 12,000 characters.'),
@@ -183,6 +184,12 @@ const sendTool = Tool.make({
         }),
       )
       yield* emitMessage(message, sender)
+      if (message.topic === null) {
+        const senderLabel = call.agent === undefined ? sender.id : ((yield* HostAgents).titleOf(call.agent) ?? sender.id)
+        yield* MailWake.use(wake =>
+          wake.deliver({ recipientId: input.toAgentId, senderId: sender.id, senderLabel, messageId: message.id, intent: message.intent }),
+        )
+      }
       const recipient = recipientStatus === 'live' ? 'currently live' : 'not currently live; the message stays pending until that Session runs again'
       return summarized(`Sent ${message.id} to ${input.toAgentId} as ${message.intent}; durably stored in the recipient inbox (recipient ${recipient}).`)
     }).pipe(tracked('dshx_comm_send', call)),
