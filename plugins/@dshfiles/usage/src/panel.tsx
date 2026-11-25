@@ -224,6 +224,8 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
   return (
     <Page
       scroll
+      // Charts and the request table run full width (council round 3 A5: full bleed for charts and tables).
+      width="full"
       className="dshx:bg-background dshx:text-foreground"
       heading="Usage"
       description={USAGE_PAGE_DESCRIPTION}
@@ -244,7 +246,11 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
         <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:border-b dshx:border-border">
           <TabsList variant="line" aria-label="Usage views" className="dshx:h-9 dshx:gap-5 dshx:p-0">
             {USAGE_TAB_ITEMS.map(tab => (
-              <TabsTrigger key={tab.value} value={tab.value} className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]!">
+              <TabsTrigger
+                key={tab.value}
+                value={tab.value}
+                className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]! dshx:after:bg-(--dsw-alias-state-business-primary)"
+              >
                 {tab.label}
               </TabsTrigger>
             ))}

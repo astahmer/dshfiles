@@ -63,3 +63,10 @@ describe('Usage page sections and chart toolbar (council round 3, D1)', () => {
     expect(toolbar?.[1]).toMatch(/dshx:gap-(?:1|2|3|4)\b/u)
   })
 })
+
+describe('Usage page width (council round 3 A5)', () => {
+  it('runs full width, since it holds charts and a table, and marks the current section with the kit accent', () => {
+    expect(read('panel.tsx')).toMatch(/<Page\s+scroll\s+(?:\/\/[^\n]*\n\s*)?width="full"/u)
+    expect(read('panel.tsx')).toContain('dshx:after:bg-(--dsw-alias-state-business-primary)')
+  })
+})
