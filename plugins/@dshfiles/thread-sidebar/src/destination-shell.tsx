@@ -1673,6 +1673,8 @@ const PhoneNavigation = (
               <span className={cn('dshx:min-w-0 dshx:truncate', bar.thread && 'dshx:sr-only')}>{bar.back.label}</span>
             </button>
           )}
+          {/* The status gauge leads, in the seat the Inbox bar gives it (council round 6 B1); + stays trailing. */}
+          {showNew && !drawer && phoneStatus.status === 'active' ? <phoneStatus.value.Button /> : null}
           </div>
           <h1
             data-phone-title=""
@@ -1685,7 +1687,6 @@ const PhoneNavigation = (
             {stageBar.title}
           </h1>
           <div className={centred ? 'dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-self-end' : 'dshx:contents'}>
-          {showNew && !drawer && phoneStatus.status === 'active' ? <phoneStatus.value.Button /> : null}
           {showNew && !drawer ? (
             <button
               type="button"

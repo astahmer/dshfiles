@@ -516,7 +516,7 @@ describe('DestinationShell', () => {
     expect(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'More' }).getAttribute('aria-current')).toBe('page')
   })
 
-  it('on a phone, puts the status button in the Threads bar before New thread, and none without frame-layout (council round 3 B6)', () => {
+  it('on a phone, puts the status button in the Threads bar\'s leading seat, New thread trailing, and none without frame-layout (council round 3 B6, round 6 B1)', () => {
     setPhone(true)
     renderShell({ collapsed: false })
     expect(document.querySelector('[data-phone-status-probe]')).toBeNull()
@@ -530,6 +530,11 @@ describe('DestinationShell', () => {
       expect(status).not.toBeNull()
       if (status == null || add == null) throw new Error('Phone status button or + button missing')
       expect(status.compareDocumentPosition(add)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      // The same seat as the Inbox bar's gauge: before the centred title, with + alone after it.
+      const title = bar?.querySelector('[data-phone-title]')
+      if (title == null) throw new Error('Phone title missing')
+      expect(status.compareDocumentPosition(title)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(title.compareDocumentPosition(add)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     } finally {
       phoneStatus.Button = undefined
     }
