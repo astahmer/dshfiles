@@ -40,6 +40,8 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
    the system back gesture closes them instead of leaving the thread. Still open: every other popover and sheet.
 8. **P32 (partial)** — the open phone drawer traps Tab through the kit dialog focus hook and returns focus on close;
    21 drawer journey tests pass. Still open: `inert` on the stage, reduced motion everywhere, large-text check.
+9. **P15 (partial)** — the phone thread-panel sheet resumes the last real view instead of opening on the chooser, with
+   the selection logic covered by 3 tests. Still open: unmounting hidden dock views.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
@@ -63,8 +65,9 @@ not re-checked on a phone:
    safe-area insets.
 7. **P25 (partial)** — the transcript owns `overscroll-behavior` (`ChatView.module.css`); the
    `interactive-widget=resizes-content` half waits for a real-phone keyboard check.
-8. **P15 (partial)** — `PhoneSheet` already has one header, a 44px close, focus trap, back-gesture layer and drag;
-   the chooser default and unmounted hidden views still need work.
+8. **P15 (partial)** — `PhoneSheet` already has one header, a 44px close, focus trap, back-gesture layer and drag; the
+   chooser default is fixed (see P15 in the shipped list) and the dock now resumes its last real view. Unmounting
+   hidden dock views is still open (Dockview keeps every panel mounted).
 
 
 Goal: DSH on a phone (owner: Redmi, HyperOS, Android Chrome PWA over Tailscale HTTPS, ~393 CSS px, gesture navigation)
