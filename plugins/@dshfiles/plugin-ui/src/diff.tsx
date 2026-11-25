@@ -94,9 +94,11 @@ export class PatchLook {
 
   /**
    * The library's own header counts read `−N +N` in its mono face; the header shows the kit DiffStat instead
-   * (`headerMetadata`), so they are hidden inside the shadow root (council round 3, D5).
+   * (`headerMetadata`), so they are hidden inside the shadow root (council round 3, D5). The file name reads 13/18 at
+   * 600, one step above the 12 px code, so a file starts where its name is (council round 4, D3).
    */
-  static readonly HEADER_CSS = '[data-deletions-count], [data-additions-count] { display: none; }'
+  static readonly HEADER_CSS =
+    '[data-deletions-count], [data-additions-count] { display: none; } [data-title] { font-size: 13px; line-height: 18px; font-weight: 600; }'
 
   /** Explicit `+`/`−` gutter marks (`classic`), so a changed line reads without its colour. */
   static options(dark: boolean): Pick<DiffOptions, 'diffIndicators' | 'theme' | 'themeType' | 'unsafeCSS'> {

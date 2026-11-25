@@ -35,3 +35,12 @@ describe('PatchView file header (council round 3, D5)', () => {
     expect(markup.indexOf('data-slot="diff-stat"')).toBeLessThan(markup.indexOf('data-caller'))
   })
 })
+
+describe('PatchView file name (council round 4, D3)', () => {
+  it('sets the file name 13/18 at 600 inside the shadow root, above the 12 px code', () => {
+    for (const dark of [false, true]) {
+      const css = PatchLook.options(dark).unsafeCSS ?? ''
+      expect(css).toMatch(/\[data-title\]\s*\{\s*font-size:\s*13px;\s*line-height:\s*18px;\s*font-weight:\s*600;?\s*\}/u)
+    }
+  })
+})
