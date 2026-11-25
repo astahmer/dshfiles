@@ -57,9 +57,10 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
 13. **P2 (attempt)** — chat flow items skip style/layout/paint off screen on phones (`content-visibility: auto`, remembered
     intrinsic size), the transcript render being the remaining open cost. Unverified until a landed build can be
     measured.
-14. **P17 (partial)** — the JJ graph draws eight placeholder rows while its first revision page loads instead of
-    collapsing to a spinner; older-page/search keep the spinner. Typecheck + build clean. Gestures and `jj op undo`
-    remain, the gesture half blocked on P12.
+14. **P17 (partial)** — the JJ graph draws eight placeholder rows while its first revision page loads, and its toolbar now
+    has Undo (`jj op undo`) through the preview/confirm flow: the preview binds to the current op id, so confirmation is
+    refused once another operation lands. Argv test + regenerated API schema; typecheck/build clean. Gestures remain,
+    blocked on P12.
 15. **P16 (partial)** — generated output, vendored code and lockfiles are folded below the changed-file list
     (`isNoiseFile`, two tests), and below 640px the patch view renders one file at a time, the changed-file list acting
     as the picker (desktop keeps every file). Still open: explicit wrap toggle and a dedicated file sheet;
