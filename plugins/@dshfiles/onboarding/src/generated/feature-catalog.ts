@@ -7107,11 +7107,25 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"All statuses*\"",
+          "text": "click button \"Filter\"",
           "action": "click",
           "by": "button",
-          "name": "All statuses*",
+          "name": "Filter",
           "value": null
+        },
+        {
+          "text": "click menuitemcheckbox \"All*\"",
+          "action": "click",
+          "by": "menuitemcheckbox",
+          "name": "All*",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "fill textbox \"Capture\" \"Start a thread from b:1\"",
@@ -7347,11 +7361,25 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"All statuses*\"",
+          "text": "click button \"Filter\"",
           "action": "click",
           "by": "button",
-          "name": "All statuses*",
+          "name": "Filter",
           "value": null
+        },
+        {
+          "text": "click menuitemcheckbox \"All*\"",
+          "action": "click",
+          "by": "menuitemcheckbox",
+          "name": "All*",
+          "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "fill textbox \"Capture\" \"Start a thread from b:1\"",
@@ -12719,10 +12747,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect checkbox \"Select all files in this review\"",
+          "text": "expect checkbox \"Reviewed: *\"",
           "action": "expect",
           "by": "checkbox",
-          "name": "Select all files in this review",
+          "name": "Reviewed: *",
           "value": null
         }
       ],
