@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { StatusCount } from '@dshfiles/plugin-ui/components/work-status'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -22,13 +23,12 @@ interface ThreadGroupHeaderProps {
   /** Local checkouts this row stands for; above one, the row names the repository rather than a path. */
   readonly checkoutCount?: number
   /**
-   * The Needs you group's split (round five T2): its count chips take their status hue, indigo for the threads that need
-   * you and red for the failed ones, while the label stays muted. The spoken name keeps the plain total.
+   * The Needs you group's split (round five T2, B3): one StatusCount chip per state, the status glyph beside the number
+   * on its tint, so the two counts read apart without their colour. The label stays muted; the spoken name keeps the
+   * plain total.
    */
   readonly statusCounts?: { readonly needsYou: number; readonly failed: number }
 }
-
-const COUNT_CHIP = 'dshx:inline-flex dshx:h-4 dshx:min-w-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:px-1 dshx:font-medium dshx:tabular-nums'
 
 export const ThreadGroupHeader = ({
   label,
@@ -66,16 +66,8 @@ export const ThreadGroupHeader = ({
         {tinted ? (
           <>
             <span className="dshx:sr-only">({count})</span>
-            {statusCounts.needsYou === 0 ? null : (
-              <span aria-hidden="true" data-group-count="needs-you" className={cn(COUNT_CHIP, 'dshx:bg-attention-tint dshx:text-attention-foreground')}>
-                {statusCounts.needsYou}
-              </span>
-            )}
-            {statusCounts.failed === 0 ? null : (
-              <span aria-hidden="true" data-group-count="failed" className={cn(COUNT_CHIP, 'dshx:bg-danger-tint dshx:text-danger-tint-foreground')}>
-                {statusCounts.failed}
-              </span>
-            )}
+            <StatusCount aria-hidden="true" data-group-count="needs-you" status="needs-you" count={statusCounts.needsYou} />
+            <StatusCount aria-hidden="true" data-group-count="failed" status="failed" count={statusCounts.failed} />
           </>
         ) : (
           <span className="dshx:shrink-0 dshx:font-normal dshx:tabular-nums dshx:text-(--dsw-alias-label-tertiary)">({count})</span>

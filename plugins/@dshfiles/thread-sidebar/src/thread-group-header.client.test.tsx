@@ -116,15 +116,18 @@ describe('ThreadGroupHeader', () => {
     const header = mount({ label: 'Needs you', statusCounts: { needsYou: 2, failed: 1 } })
     const toggle = screen.getByRole('button', { name: 'Needs you (12)' })
     const chips = Array.from(header.container.querySelectorAll<HTMLElement>('[data-group-count]'))
-    expect(chips.map(chip => [chip.dataset.groupCount, chip.textContent])).toEqual([
+    expect(chips.map(chip => [chip.dataset.groupCount, chip.textContent?.replace(/\s.*$/su, '')])).toEqual([
       ['needs-you', '2'],
       ['failed', '1'],
     ])
+    // The kit's StatusCount (round five B3): each number beside its status glyph, so the counts read without colour.
+    expect(chips.map(chip => chip.getAttribute('data-slot'))).toEqual(['status-count', 'status-count'])
+    expect(chips.map(chip => chip.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status'))).toEqual(['needs-you', 'failed'])
     expect(chips[0]?.className).toContain('dshx:bg-attention-tint')
     expect(chips[0]?.className).toContain('dshx:text-attention-foreground')
     expect(chips[1]?.className).toContain('dshx:bg-danger-tint')
     expect(chips[1]?.className).toContain('dshx:text-danger-tint-foreground')
-    expect(screen.getByText('Needs you').className).toContain('dshx:truncate')
+    expect(screen.getAllByText('Needs you')[0]?.className).toContain('dshx:truncate')
     expect(toggle.className).toContain('dshx:text-muted-foreground')
     cleanup()
     const plain = mount({ label: 'Working' })
