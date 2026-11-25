@@ -23,7 +23,7 @@ const row = (id: string, overrides: Partial<HeroThreadRow> = {}): HeroThreadRow 
 
 describe('hero suggestion cards', () => {
   it('offers nothing without threads', () => {
-    expect(HeroSuggestionsModel.pick([], undefined)).toEqual({ resume: undefined, review: undefined, inbox: 0 })
+    expect(HeroSuggestionsModel.pick([], undefined)).toEqual({ resume: undefined, review: undefined, inbox: { waiting: 0, failed: 0 } })
   })
 
   it('resumes the most recent quiet thread, never a running, blank or the hero thread', () => {
@@ -53,13 +53,20 @@ describe('hero suggestion cards', () => {
     expect(HeroSuggestionsModel.pick([row('read', { signal: signal('ready', undefined) })], undefined).review).toBeUndefined()
   })
 
-  it('counts the threads that need you for the Inbox card', () => {
+  // Council round 6 B7: the card read "2 threads need you" while the Inbox badge said 3 (two waiting, one failed).
+  it('splits the Inbox card the way the badge counts: waiting on you, and failed', () => {
     const rows = [
       row('a', { signal: signal('blocking', 'Answer') }),
       row('b', { signal: signal('blocking', 'Approve') }),
       row('c', { signal: signal('failed', 'Retry') }),
+      row('d', { signal: signal('ready', 'Land') }),
     ]
-    expect(HeroSuggestionsModel.pick(rows, undefined).inbox).toBe(2)
+    const inbox = HeroSuggestionsModel.pick(rows, undefined).inbox
+    expect(inbox).toEqual({ waiting: 2, failed: 1 })
+    expect(HeroSuggestionsModel.inboxLabel(inbox)).toBe('2 waiting on you · 1 failed')
+    expect(HeroSuggestionsModel.inboxLabel({ waiting: 1, failed: 0 })).toBe('1 waiting on you')
+    expect(HeroSuggestionsModel.inboxLabel({ waiting: 0, failed: 2 })).toBe('2 failed')
+    expect(HeroSuggestionsModel.inboxLabel({ waiting: 0, failed: 0 })).toBeUndefined()
   })
 
   it('reads top-level threads from the Session list with their signal', () => {

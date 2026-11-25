@@ -28,18 +28,31 @@ export interface HeroThreadRow {
 export interface HeroSuggestions {
   readonly resume: { readonly id: string; readonly title: string; readonly at: number } | undefined
   readonly review: { readonly id: string; readonly title: string; readonly cwd: string | undefined } | undefined
-  /** Threads that need you (questions, approvals, resumes). */
-  readonly inbox: number
+  /**
+   * The Inbox's two populations, as its badge counts them (council round 6 B7): threads waiting on you (questions,
+   * approvals, resumes) and threads whose turn failed.
+   */
+  readonly inbox: InboxSplit
 }
 
-const needsYou = (signal: InboxThreadSignal | undefined): boolean => signal?.severity === 'blocking'
+export interface InboxSplit {
+  readonly waiting: number
+  readonly failed: number
+}
+
+/** "2 waiting on you · 1 failed"; nothing when both are zero. */
+const inboxLabel = (split: InboxSplit): string | undefined => {
+  const parts = [split.waiting > 0 ? `${String(split.waiting)} waiting on you` : undefined, split.failed > 0 ? `${String(split.failed)} failed` : undefined]
+  const shown = parts.filter(part => part !== undefined)
+  return shown.length === 0 ? undefined : shown.join(' · ')
+}
 
 /**
  * Pick the cards.
  * - Review: the most recently active thread whose Inbox item offers Land.
  * - Resume: a thread whose Inbox item offers Resume first, then the most recently active quiet thread; never a
  *   running or blank thread, the hero's own thread, or the Review thread.
- * - Inbox: how many threads need you.
+ * - Inbox: how many threads wait on you, and how many failed: the two the Inbox badge adds up.
  */
 const pick = (rows: readonly HeroThreadRow[], heroSessionId: string | undefined): HeroSuggestions => {
   const candidates = rows.filter(row => !row.blank && row.id !== heroSessionId)
@@ -51,7 +64,10 @@ const pick = (rows: readonly HeroThreadRow[], heroSessionId: string | undefined)
   return {
     resume: resume === undefined ? undefined : { id: resume.id, title: resume.title, at: resume.activityAt },
     review: review === undefined ? undefined : { id: review.id, title: review.title, cwd: review.cwd },
-    inbox: candidates.filter(row => needsYou(row.signal)).length,
+    inbox: {
+      waiting: candidates.filter(row => row.signal?.severity === 'blocking').length,
+      failed: candidates.filter(row => row.signal?.severity === 'failed').length,
+    },
   }
 }
 
@@ -134,14 +150,14 @@ export const HeroSuggestionCards = (props: {
       </button>,
     )
   }
-  if (suggestions.inbox > 0) {
-    const count = suggestions.inbox
+  const inboxText = inboxLabel(suggestions.inbox)
+  if (inboxText !== undefined) {
     cards.push(
       <button key="inbox" type="button" className={CARD} data-hero-card="inbox" onClick={props.actions.openInbox}>
         <InboxIcon aria-hidden="true" />
         <span className="dshx:font-medium dshx:text-foreground">Inbox</span>
         <span aria-hidden="true">·</span>
-        <span className="dshx:flex-none dshx:tabular-nums">{count === 1 ? '1 thread needs you' : `${count} threads need you`}</span>
+        <span className="dshx:flex-none dshx:tabular-nums">{inboxText}</span>
       </button>,
     )
   }
@@ -151,4 +167,5 @@ export const HeroSuggestionCards = (props: {
 export class HeroSuggestionsModel {
   static readonly pick = pick
   static readonly rowsOf = rowsOf
+  static readonly inboxLabel = inboxLabel
 }
