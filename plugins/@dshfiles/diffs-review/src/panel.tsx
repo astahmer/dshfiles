@@ -240,9 +240,12 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
     const imagePaths = new Set(images.map(image => image.path))
     return packageJson.textFiles.filter(file => !imagePaths.has(file.name))
   }, [images, packageJson.textFiles])
-  /** One reviewed control per file (council round 2, D3): a checkbox labelled Reviewed; Shift-click marks a range. */
+  /**
+   * One reviewed control per file (council round 2, D3): a checkbox labelled Reviewed; Shift-click marks a range. It is
+   * a bounded 32 px box on the file row, so the target reads as one (council round 4, D3).
+   */
   const reviewControls = (path: string): ReactNode => (
-    <label className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground dshx:has-data-[state=checked]:text-foreground">
+    <label className={ReviewLook.REVIEWED_TOGGLE}>
       <Checkbox
         aria-label={`Reviewed: ${path}`}
         checked={reviewedPaths.has(path)}
@@ -301,17 +304,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
             </Badge>
           ) : undefined
         }
-        {...(canSummarize
-          ? {
-              primaryAction: {
-                id: 'summarize',
-                label: aiSummaries === undefined ? 'Summarize' : 'Re-summarize',
-                icon: <Sparkles aria-hidden className="dshx:size-3.5" />,
-                onSelect: () => summarize.mutate(),
-                pending: summarize.isPending,
-              },
-            }
-          : {})}
+        // Summarize is an outline action beside Refresh: the page has no filled primary (council round 4, D3).
         actions={[
           ...(reviewSessionId === undefined
             ? []
@@ -324,6 +317,17 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
                 },
               ]),
           { id: 'refresh', label: 'Refresh', icon: <RefreshCw aria-hidden />, onSelect: () => void query.refetch(), pending: query.isFetching },
+          ...(canSummarize
+            ? [
+                {
+                  id: 'summarize',
+                  label: aiSummaries === undefined ? 'Summarize' : 'Re-summarize',
+                  icon: <Sparkles aria-hidden className="dshx:size-3.5" />,
+                  onSelect: () => summarize.mutate(),
+                  pending: summarize.isPending,
+                },
+              ]
+            : []),
         ]}
         className="dshx:shrink-0"
       >
@@ -364,12 +368,29 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
             className="dshx:h-8 dshx:w-48 dshx:max-w-full dshx:tabular-nums"
           />
         </div>
+        {/* The file toolbar over the diff card: what changed on the left, review progress on the right (round 4, D3). */}
         {result?.status === 'ok' && ReviewHeader.showStats(result.fileCount) ? (
-          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <Stat label={result.fileCount === 1 ? '1 file' : `${result.fileCount} files`} />
-            <DiffStat added={result.additions} removed={result.deletions} />
-            <Stat label={`${totalReviewed}/${result.fileCount} reviewed`} />
-            <Progress value={progress} className={ReviewLook.PROGRESS} />
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-x-4 dshx:gap-y-2" data-review-toolbar>
+            <span className="dshx:flex dshx:items-center dshx:gap-2">
+              <Stat label={result.fileCount === 1 ? '1 file' : `${result.fileCount} files`} />
+              <DiffStat added={result.additions} removed={result.deletions} />
+            </span>
+            <span className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3">
+              {allPaths.length > 1 ? (
+                <label className="dshx:flex dshx:w-fit dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:text-xs">
+                  <Checkbox
+                    checked={allReviewed ? true : someReviewed ? 'indeterminate' : false}
+                    onCheckedChange={() => {
+                      marks.set(allPaths, !allReviewed)
+                      setAnchorPath(null)
+                    }}
+                  />
+                  All files reviewed
+                </label>
+              ) : null}
+              <Stat label={`${totalReviewed}/${result.fileCount} reviewed`} />
+              <Progress value={progress} className={ReviewLook.PROGRESS} />
+            </span>
           </div>
         ) : null}
         {result?.status === 'ok' && result.truncated ? (
@@ -389,19 +410,6 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
           <div className={SURFACE}>
             <EmptyState>{ReviewHeader.emptyText({ target: reviewTarget, base: result.base })}</EmptyState>
           </div>
-        ) : null}
-
-        {allPaths.length > 1 ? (
-          <label className="dshx:flex dshx:w-fit dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:text-xs">
-            <Checkbox
-              checked={allReviewed ? true : someReviewed ? 'indeterminate' : false}
-              onCheckedChange={() => {
-                marks.set(allPaths, !allReviewed)
-                setAnchorPath(null)
-              }}
-            />
-            All files reviewed
-          </label>
         ) : null}
       </Page>
 

@@ -23,3 +23,28 @@ describe('Review look (round five P7, A4)', () => {
     expect(panel).not.toContain('dshx:min-w-24 dshx:flex-1')
   })
 })
+
+describe('Review header and file toolbar (council round 4, D3)', () => {
+  const panel = read('panel.tsx')
+  it('offers Summarize as an outline header action, not the filled primary', () => {
+    expect(panel).not.toContain('primaryAction')
+    const actions = panel.slice(panel.indexOf("id: 'refresh'"), panel.indexOf('className="dshx:shrink-0"', panel.indexOf("id: 'refresh'")))
+    expect(actions).toMatch(/id: 'summarize'/u)
+  })
+
+  it('reads the file count on the left of the file toolbar and the review progress on its right', () => {
+    const toolbar = /<div className="([^"]*)" data-review-toolbar>([\s\S]*?)\n {8}<\/div>\n/u.exec(panel)
+    expect(toolbar?.[1]).toContain('dshx:justify-between')
+    const body = toolbar?.[2] ?? ''
+    expect(body.indexOf('<DiffStat')).toBeLessThan(body.indexOf('reviewed`}'))
+    expect(body).toContain('All files reviewed')
+  })
+
+  it("draws each file's Reviewed control as a bounded 32 px box on the file row", () => {
+    expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:h-8')
+    expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:border')
+    expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:rounded-md')
+    expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:pointer-coarse:h-11')
+    expect(panel).toMatch(/<label className=\{ReviewLook\.REVIEWED_TOGGLE\}>/u)
+  })
+})
