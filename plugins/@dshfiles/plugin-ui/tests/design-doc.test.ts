@@ -45,4 +45,22 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     ])
       expect(design, text).toContain(text)
   })
+
+  it('records the second council pass: selection marker, attention washes, StatusCount, diff and syntax, chart labels, colour through meaning (round five A8)', () => {
+    for (const text of [
+      '`selected-marker`',
+      '`font-selected`',
+      '`bg-wash-needs-you`',
+      '`bg-wash-failed`',
+      'Attention outranks selection',
+      '`StatusCount`',
+      '**Diff and syntax.**',
+      'one syntax pair',
+      '**Chart labels.**',
+      '**Colour through meaning.**',
+      "  wash-needs-you: '#e2ebff'",
+      "  wash-failed-dark: '#3a211f'",
+    ])
+      expect(design, text).toContain(text)
+  })
 })

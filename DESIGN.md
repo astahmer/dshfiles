@@ -12,6 +12,8 @@ colors:
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
   selected-wash: '#edf0f9'
+  wash-needs-you: '#e2ebff'
+  wash-failed: '#ffe8e6'
   label-faint: '#6a6967'
   label-secondary: '#646362'
   signal-indigo: '#3b5bd4'
@@ -25,6 +27,8 @@ colors:
   border-hairline-dark: '#2f2c29'
   label-secondary-dark: '#a7a4a1'
   selected-wash-dark: '#1f222e'
+  wash-needs-you-dark: '#232a42'
+  wash-failed-dark: '#3a211f'
   signal-indigo-dark: '#839ffc'
   danger-red-dark: '#fa8880'
   success-green-dark: '#65c67d'
@@ -129,6 +133,10 @@ components:
     padding: '8px 12px'
   entity-row-selected:
     backgroundColor: '{colors.selected-wash}'
+  entity-row-needs-you:
+    backgroundColor: '{colors.wash-needs-you}'
+  entity-row-failed:
+    backgroundColor: '{colors.wash-failed}'
   button-attention:
     textColor: '{colors.signal-indigo}'
     rounded: '{rounded.md}'
@@ -210,7 +218,9 @@ No slate shell: navigation surfaces keep the warm stone.
 | 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#6a6967` | `#94928f` |
 | 9 muted         | secondary text (AA)                  | `muted-foreground`           | `--dsw-alias-label-secondary`                                  | `#646362` | `#a7a4a1` |
 | 10 text         | primary text, primary fill (AA)      | `foreground`, `primary`      | `--dsw-alias-label-primary`                                    | `#1b1a19` | `#eae7e4` |
-| selected wash   | selection at the tint rung           | `selected-wash`              | `--dshx-selected-wash` (accent hue)                            | `#edf0f9` | `#1f222e` |
+| selected wash   | selection, quiet (with the marker)   | `selected-wash`              | `--dshx-selected-wash` (accent hue)                            | `#edf0f9` | `#1f222e` |
+| Needs-you wash  | a row that waits on you              | `wash-needs-you`             | `--dshx-wash-needs-you` (accent hue)                           | `#e2ebff` | `#232a42` |
+| Failed wash     | a row that failed                    | `wash-failed`                | `--dshx-wash-failed` (hue 25)                                  | `#ffe8e6` | `#3a211f` |
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |
@@ -259,13 +269,34 @@ work on any surface.
    `variant="attention"`: Needs-you text on a 12% tint of it, no border; a failed row's verb is `variant="danger-tint"`.
    Their text is the status colour pulled 30% toward the ink so it holds AA on its own tint. A chip or band reuses
    the pair (`bg-attention-tint text-attention-foreground`). A selection (the selected row, the active rail item and
-   settings category, a pressed toggle, the palette's highlighted row) is `bg-selected-wash`, a soft accent wash
-   generated per accent hue, with ink text. Hover stays the ink wash.
+   settings category, a pressed toggle, the palette's highlighted row) is `bg-selected-wash`, a quiet low-chroma
+   accent wash generated per accent hue, with ink text; a selected list row adds the non-colour cue,
+   `selected-marker` (a 2px accent bar inset on its leading edge, which follows a rounded row), and sets its title at
+   `font-selected` (550). Hover stays the ink wash.
+   **Attention outranks selection.** A Needs-you row holds `bg-wash-needs-you` and a Failed row `bg-wash-failed` for as
+   long as it is in that state: opaque washes of their hue, stronger than the selection wash, with ink, secondary and
+   faint text and the status glyphs at AA on them. A count that names a status is a `StatusCount` (the status glyph at
+   10px beside a tabular number, on the tint pair for Needs you and Failed), so it reads without its colour.
 8. **Data.** Categorical series use `data-1..6` in order: six identity hues at a chart step (teal, violet, copper,
    magenta, olive, cyan). The data ramp never starts with the accent, and ChartFrame maps the chart library's
    palette onto it. A status hue appears in a chart only when the series is
    that status (failed requests are `destructive`). Quota is ink while healthy, amber at 15% or less, red when
-   spent. Diff lines keep the success and danger tints.
+   spent.
+   **Chart labels.** Axis ticks and legend labels inside a `ChartFrame` read at the full secondary ink (`#646362`,
+   `#a7a4a1`: AA on bg, panel and raised), 12px, tabular figures; the chart library's own 68–78% opacity is overridden.
+   Gridlines stay quiet.
+9. **Diff and syntax.** The transcript's code blocks and the diff view share one syntax pair: Shiki's `css-variables`
+   theme reading the `--shiki-token-*` values the theme block generates (keyword violet, function blue, string teal,
+   constant copper, parameter magenta, every hue 25° or more from the status hues), each fitted per scheme to hold
+   4.6:1 on the page, the code block, raised and every diff band. The diff body sits on the ramp (the page in light,
+   the panel step in dark, never a near-black); added and removed lines are a 12% tint of success and danger over it
+   (a changed word 20%), written as `color-mix()` over the theme tones so every preset follows; the gutter shows `+`
+   and `−`, so a change reads without its colour; the collapsed-lines bar is a 3% ink wash. Comments are the faint
+   step, darkened only as far as the deletion band needs.
+10. **Colour through meaning.** Colour enters a grey page through what it means, not as decoration: a provider's
+    brand mark wherever a model or provider is named, a `ProjectMark` wherever a project is named, each theme's real
+    swatch in the appearance cards, identity tones on the core Plugins icon tiles, a `StatusCount` on the Inbox title.
+    No per-area hue tiles, tinted page headers or coloured section backgrounds.
 
 Use semantic tokens only, never raw hex in plugin code. The exceptions are brand artwork
 (`ai-accounts/src/account-labels.ts`, `model-effort-picker/src/brand-marks.ts`) and a project colour the user
@@ -462,7 +493,8 @@ item — thread, subagent, job, check, workspace, host. Plugins map onto them an
 | Done      | landed or closed; workspace released | muted check               | muted     |
 
 Every glyph sits in a 16px seat, so a row never shifts when its state changes. Needs you, Failed and Working draw at
-14px and the Ready dot at 10px.
+14px and the Ready dot at 10px. A count chip (`StatusCount`) draws the same glyph in a 10px seat beside its number;
+a zero draws nothing.
 
 Two glyph-only states draw but never group or sort: **stale** (dashed faint ring: a reading or workspace that may be
 out of date) and **stopped** (muted square: cancelled or parked by the user).
@@ -486,7 +518,8 @@ Inbox item only opens it, and its verb is Review.
 meta chips · trailing inline verb`, with an optional muted description line and full-width children (an output pane).
 The middle is one button when the row selects; leading and trailing stay separate controls. Lists are one bordered
 card with hairline dividers. In narrow panes meta wraps under the title and trailing verbs drop to their own line.
-A selected row takes `bg-selected-wash` with ink text.
+A selected row takes `bg-selected-wash` and the `selected-marker`, with its title at 550; a Needs-you or Failed row
+holds its attention wash instead.
 
 **Live work row** (a subagent, a background job). One row in the EntityRow shape: `status glyph · name · muted
 current step · elapsed · Open`. While the work runs it lives in the dock above the composer, where it expands to its

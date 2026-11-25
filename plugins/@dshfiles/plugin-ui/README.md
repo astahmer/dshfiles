@@ -386,7 +386,11 @@ Its other blocks were compared against what this repository already ships, and n
 string (`patch`) or pre-parsed `files` (`parsePatchFiles(patch).flatMap(p => p.files)`), a `layout` of `unified`
 (default) or `split`, an optional `focusPath` to scroll to, and `empty` content. It virtualizes files and lines, so
 megabyte patches stay responsive; give it a bounded height through `className`. Light/dark follows
-`body[data-ds-dark-theme]` with the `pierre-light`/`pierre-dark` themes. Every file renders in its own shadow root
+`body[data-ds-dark-theme]`. It highlights with the `dshx-syntax` theme (Shiki `css-variables`), so a diff and the
+transcript's code blocks share one syntax pair (`--shiki-token-*`, fitted per scheme in `theme/theme-css.ts`); its
+body sits on the ramp with 12% add and delete tints, `+`/`−` gutter marks and a quiet collapsed-lines bar, all set by
+`PatchLook.style()` as inherited custom properties over the theme tones (`theme/diff-look.ts`); a caller adds no diff
+colours of its own. Every file renders in its own shadow root
 with adopted stylesheets, so no library CSS leaks into the page; style it only through inherited `--diffs-*`
 custom properties. `pluginUiVite()` aliases the library's `shiki` import to `src/shiki-slim.ts` (a curated grammar
 set on the JavaScript regex engine) and drops unused themes and the WASM engine, because dshx inlines every dynamic
