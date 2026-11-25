@@ -39,6 +39,7 @@ import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
 import { RpcFailure } from '../../rpc-failure.ts'
+import { useTriggerMenuRoom } from '../../trigger-menu-room.ts'
 import { SendWhenUploaded, settleHeldSend, uploadGate, type HeldDraft, type HeldSend, type UploadGate } from '../../held-send.ts'
 import { isImageMediaType, withCanonicalImageType } from '../canonical-image-type.ts'
 import { ContextMeter } from './ContextMeter.tsx'
@@ -248,6 +249,8 @@ export const InputBar = memo(function InputBar({
     return observeControlRow(row, { iconStep: () => !row.classList.contains(css.rowHero ?? '') })
   }, [])
   const cardRef = useRef<HTMLDivElement | null>(null)
+  // dshfiles (round four R12): the `@`/`/` list stays between the top bar and the keyboard on a phone.
+  useTriggerMenuRoom(cardRef)
   const scrollRef = useRef<HTMLDivElement | null>(null)
 
   const continuable = subagent?.address.mode === 'continuable'

@@ -94,10 +94,17 @@
   cursor: pointer;
 }
 
-.meterMore:hover,
+/* dshfiles (round four R12): hover styles sit behind (hover: hover), so a tap does not leave them stuck on a phone. */
 .meterMore:focus-visible {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
+}
+
+@media (hover: hover) {
+  .meterMore:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-secondary);
+  }
 }
 
 .dock:not(:has(> :global([data-run-summary]), :global([data-composer-stat]), :global([data-composer-meta]), .queued)) {
@@ -217,8 +224,10 @@
   cursor: pointer;
 }
 
-.largePasteAction:hover {
-  background: var(--dsw-alias-interactive-bg-hover);
+@media (hover: hover) {
+  .largePasteAction:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
 }
 
 /* The held send's Cancel is the phone's way out besides the waiting Send: a full touch target. */
@@ -966,5 +975,20 @@
 
   .root:not(.hero) {
     padding-bottom: 10px;
+  }
+}
+
+/* dshfiles (round four R12): with the keyboard up a phone has little room above the composer. The `@`/`/` list stays
+   under the top bar (`--dsh-trigger-menu-max`, measured by useTriggerMenuRoom), and opens under the caret, above the
+   keyboard, when fewer than three rows fit above. The input-trigger menu sets its own inline max-height. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .card :global([data-trigger-menu]) {
+    max-height: min(400px, var(--dsh-trigger-menu-max, 400px)) !important;
+  }
+
+  :global(html[data-shell-phone-nav]) .card[data-trigger-menu-below] :global([data-trigger-menu]) {
+    top: var(--dsh-trigger-menu-top, auto) !important;
+    bottom: auto !important;
+    z-index: 5;
   }
 }

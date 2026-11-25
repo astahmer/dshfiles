@@ -186,7 +186,7 @@ export function ConversationContent(props: ConversationContentProps) {
       <span className={css.runPlace} data-run-place="" data-place-open={placeOpen ? '' : undefined} data-row-break="" ref={placeRef}>
         <button
           type="button"
-          className={css.placeSummary}
+          className={clsx(css.placeSummary, 'dshx-hit-44')}
           aria-expanded={placeOpen}
           aria-label={t('runRow.placeSummary', { place: placeText ?? chipTitle ?? t('runRow.project') })}
           onClick={() => { setPlaceOpen(open => !open) }}

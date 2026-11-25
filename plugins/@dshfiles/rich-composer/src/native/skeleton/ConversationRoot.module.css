@@ -375,8 +375,11 @@ button.crumbEditable {
   cursor: pointer;
 }
 
-.tab:hover {
-  color: var(--dsw-alias-label-primary);
+/* dshfiles (round four R12): hover styles sit behind (hover: hover), so a tap does not leave them stuck on a phone. */
+@media (hover: hover) {
+  .tab:hover {
+    color: var(--dsw-alias-label-primary);
+  }
 }
 
 .tab:focus-visible {
@@ -965,10 +968,16 @@ button.crumbEditable {
   outline: none;
 }
 
-.runSummary:hover,
 .runSummary:has(:focus-visible) {
   background: var(--dsw-alias-interactive-bg-hover);
   color: var(--dsw-alias-label-secondary);
+}
+
+@media (hover: hover) {
+  .runSummary:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+    color: var(--dsw-alias-label-secondary);
+  }
 }
 
 .runSummaryText {
@@ -1206,11 +1215,17 @@ button.crumbEditable {
     cursor: pointer;
   }
 
-  .placeSummary:hover,
   .placeSummary:focus-visible,
   .runPlace[data-place-open] .placeSummary {
     background: var(--dsw-alias-interactive-bg-hover);
     color: var(--dsw-alias-label-primary);
+  }
+
+  @media (hover: hover) {
+    .placeSummary:hover {
+      background: var(--dsw-alias-interactive-bg-hover);
+      color: var(--dsw-alias-label-primary);
+    }
   }
 
   .placeSheet {
