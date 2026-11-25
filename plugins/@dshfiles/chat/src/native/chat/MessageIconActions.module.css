@@ -48,13 +48,8 @@
     transition: opacity 80ms ease;
   }
 
-  /* dshfiles (unslop r5 C3): the latest reply keeps its actions at rest. Hidden, its 28px row and the 20px above it
-     read as a dead band between the last answer and the dock; earlier replies still reveal theirs on hover. */
-  [data-chat-flow-kind='turn-tail']:not(:has(~ :is([data-chat-flow-kind='turn-tail'], [data-chat-flow-kind='user'], [data-chat-flow-kind='turn-trigger'])))
-    [data-actions-reveal='hover'] .actions {
-    opacity: 1;
-  }
-
+  /* dshfiles (unslop r5 C1, council round 3): the latest reply reveals its actions on hover or focus like every other
+     one; pinned at rest they read as an orphan copy and ⋯ row under the answer. */
   [data-actions-reveal='hover']:hover .actions,
   [data-actions-reveal='hover']:focus-within .actions,
   :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(
