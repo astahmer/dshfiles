@@ -146,6 +146,19 @@ describe('DestinationShell', () => {
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(false)
   })
 
+  it('on a phone, drops the page description and row descriptions in a destination list', () => {
+    setPhone(true)
+    renderShell({
+      collapsed: false,
+      panels: [...panels, { id: 'jj-integration', label: 'Workspaces', order: 1 }, { id: 'diffs-review', label: 'Review', order: 2 }],
+    })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'Land' }))
+    // The top bar already names the destination; the two lines of copy only truncated at 390px.
+    expect(screen.queryByText('Workspaces ready to land, and repository history.')).toBeNull()
+    expect(screen.queryByText('Thread workspaces ready, blocked or behind.')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Workspaces' })).toBeTruthy()
+  })
+
   it('on a phone, starts a thread from the + in the Threads list header and lists Land outside More', () => {
     setPhone(true)
     const shell = renderShell({ collapsed: false })

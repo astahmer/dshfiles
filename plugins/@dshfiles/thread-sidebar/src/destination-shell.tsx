@@ -509,7 +509,8 @@ const FolderIndex = (props: {
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <h2 className={cn('dshx:text-sm dshx:font-semibold', props.phone === true && 'dshx:sr-only')}>{folder.label}</h2>
-          <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>
+          {/* Phone pages already name the page in the top bar, and a one-line description only truncates there. */}
+          {props.phone === true ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>}
         </div>
         {folderUi === undefined || resolved === undefined || props.phone === true ? null : (
           <FolderMenu folder={resolved} ui={folderUi} onRename={() => setRenaming(true)} />
@@ -527,7 +528,7 @@ const FolderIndex = (props: {
             {settings === null ? null : (
               <SectionButton label="All settings" description="Appearance, models, agents, tools and more." selected={false} onSelect={settings} />
             )}
-            {rows(mapped)}
+            {rows(mapped, props.phone !== true)}
             {folderUi === undefined || resolved === undefined || props.phone === true ? null : <AddPanelButton folder={resolved} ui={folderUi} />}
           </nav>
         )}
