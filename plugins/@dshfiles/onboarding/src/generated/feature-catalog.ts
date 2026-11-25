@@ -23312,6 +23312,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Advanced: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: Main tabs",
+          "value": null
+        },
+        {
           "text": "click radio \"JSON\"",
           "action": "click",
           "by": "radio",
@@ -23374,6 +23381,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Reset to default",
+          "value": null
+        },
+        {
+          "text": "click button \"Advanced: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: Main tabs",
           "value": null
         },
         {
@@ -23479,6 +23493,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Advanced: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: Main tabs",
+          "value": null
+        },
+        {
           "text": "click button \"Plugin details: Main tabs\"",
           "action": "click",
           "by": "button",
@@ -23520,6 +23541,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "option",
           "name": "Layout",
+          "value": null
+        },
+        {
+          "text": "click button \"Advanced: Main tabs\"",
+          "action": "click",
+          "by": "button",
+          "name": "Advanced: Main tabs",
           "value": null
         },
         {
