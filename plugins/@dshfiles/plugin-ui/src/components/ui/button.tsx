@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.js'
+import { fieldLook } from './input.js'
 import { Slot } from 'radix-ui'
 
 /**
@@ -33,6 +34,17 @@ const buttonVariants = cva(
           'dshx:bg-status-needs-you/12 dshx:text-attention-foreground dshx:hover:bg-status-needs-you/18 dshx:active:bg-status-needs-you/24',
         /** The same tint rung in the danger pair, for a failed row's recovery verb (Retry, Open). */
         'danger-tint': 'dshx:bg-status-failed/12 dshx:text-danger-tint-foreground dshx:hover:bg-status-failed/18 dshx:active:bg-status-failed/24',
+        /*
+         * A popover trigger that shows a value, not an action (council round 7 A4: a date range, a purpose, a project
+         * picker): the field look of `SelectTrigger` (field boundary, page fill, 8px), the value in ink at the body weight
+         * and its chevron in secondary ink, so a filter row never mixes the field edge with the quiet button edge. No
+         * hover fill, as a select trigger has none; the kit focus ring and the press wash stay. Outside `Button`, read it
+         * through `cn(buttonVariants({ variant: 'field' }))` so the body weight replaces the base 500.
+         */
+        field: cn(
+          fieldLook,
+          'dshx:justify-between dshx:font-normal dshx:text-foreground dshx:active:bg-(--dsw-alias-interactive-bg-active) dshx:[&_svg:not([class*=text-])]:text-muted-foreground',
+        ),
       },
       size: {
         default: 'dshx:h-(--dshx-control-h) dshx:px-3 dshx:py-1.5 dshx:has-[>svg]:px-2.5',

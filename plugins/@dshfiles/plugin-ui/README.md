@@ -132,6 +132,12 @@ text is the status colour pulled 30% toward the ink, so it holds AA on its own t
 that is not a button uses the same pair: `bg-attention-tint text-attention-foreground`, `bg-danger-tint
 text-danger-tint-foreground`. Neither is a page primary: that stays the one ink button.
 
+**Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
+filter, a project picker) is `Button` `variant="field"`: the `SelectTrigger` look (`fieldLook`: field boundary, page fill,
+8px), the value in ink at 400, its chevron in secondary ink, no hover fill. A filter row then shows one field edge:
+selects and value triggers alike; action buttons (Refresh) stay `outline`. Outside `Button`, use
+`cn(buttonVariants({ variant: 'field' }))`.
+
 **Selection: the selected wash and marker.** A selection is a neutral wash: `bg-selected-wash`
 (`--dshx-selected-wash`, a warm grey step with no accent hue: light `oklch(0.935 0.004 80)`, dark
 `oklch(0.275 0.006 60)`) with ink text (`text-foreground`), so indigo means attention only. A selected list row, nav

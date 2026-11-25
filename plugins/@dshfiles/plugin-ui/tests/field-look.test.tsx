@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { Button, buttonVariants } from '../src/components/ui/button.js'
 import { Input, fieldLook } from '../src/components/ui/input.js'
 import { InputGroup } from '../src/components/ui/input-group.js'
 import { Select, SelectTrigger, SelectValue, selectLook } from '../src/components/ui/select.js'
@@ -76,6 +77,36 @@ describe('one field look (council round 3 A4)', () => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     expect(PaletteMath.contrastRatio(p.neutral[9]!, p.neutral[0]!)).toBeGreaterThanOrEqual(4.5)
     expect(PaletteMath.contrastRatio(p.neutral[10]!, p.neutral[0]!)).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+describe('field trigger (council round 7 A4)', () => {
+  it('draws a popover trigger that shows a value in the field look, beside the select trigger in a filter row', () => {
+    const view = render(
+      <>
+        <Button variant="field" aria-label="Range">
+          Custom <svg data-testid="chevron" />
+        </Button>
+        <Select>
+          <SelectTrigger aria-label="Purpose">
+            <SelectValue placeholder="Purpose" />
+          </SelectTrigger>
+        </Select>
+      </>,
+    )
+    const trigger = view.getByRole('button', { name: 'Range' })
+    expect(trigger.getAttribute('data-variant')).toBe('field')
+    expect(classes(trigger)).toEqual(expect.arrayContaining([...fieldLook.split(' '), 'dshx:font-normal', 'dshx:text-foreground', 'dshx:h-(--dshx-control-h)']))
+    expect(classes(trigger)).not.toContain('dshx:font-medium')
+    // Not the quiet button edge: no shadow, no dark input fill, no default border colour.
+    expect(trigger.className).not.toMatch(/shadow-xs|dark:bg-input|dark:border-input|hover:bg-accent/u)
+    // Its glyph is the select chevron's muted ink, unless the caller colours it.
+    expect(classes(trigger)).toContain('dshx:[&_svg:not([class*=text-])]:text-muted-foreground')
+    // The same edge as the select trigger in the same row.
+    const select = view.container.querySelector('[data-slot="select-trigger"]')!
+    for (const part of fieldLook.split(' ')) expect(classes(select)).toContain(part)
+    // A trigger the kit does not render as a Button reads the same classes.
+    expect(buttonVariants({ variant: 'field' })).toContain('dshx:border-field-border')
   })
 })
 
