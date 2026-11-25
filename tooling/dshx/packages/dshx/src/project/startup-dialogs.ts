@@ -3,10 +3,32 @@ import type { Locator, Page } from '@playwright/test'
 /**
  * DSH 0.2.1 renamed this dialog and replaced its "Configure later" button with "Close". Both generations still mean
  * "this scratch Host has no provider", so both names and both dismissal buttons stay accepted.
+ *
+ * Core localizes both dialogs' copy through its own dictionaries, so a scratch on a non-English machine shows the same
+ * dialog under another title and button: every translation core ships today (zh, en, ja, es, fr, de, ru, pt) is
+ * accepted beside the English names, and `ja` falls back to them.
  */
-const PROVIDER_SETUP_DIALOG = /^(Add an API key to get started|Get started)$/
-const PROVIDER_SETUP_DISMISS_BUTTONS = ['Configure later', 'Close'] as const
-const PREVIEW_NOTICE_DIALOG = 'Preview Notice'
+const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+const exactly = (names: readonly string[]): RegExp => new RegExp(`^(?:${names.map(escaped).join('|')})$`, 'u')
+
+const PROVIDER_SETUP_DIALOG = exactly([
+  'Add an API key to get started', 'Get started',
+  '添加一个 API Key 开始使用', 'Agregue una clave API para comenzar', 'Ajoutez une clé API pour commencer',
+  'Fügen Sie einen API-Schlüssel hinzu, um loszulegen', 'Добавьте ключ API, чтобы начать работу.', 'Adicione uma chave API para começar',
+])
+const PROVIDER_SETUP_DISMISS_BUTTONS = [
+  'Configure later', 'Close',
+  '稍后配置', 'Configurar más tarde', 'Configurer plus tard', 'Später konfigurieren', 'Настроить позже', 'Configurar mais tarde',
+] as const
+const PREVIEW_NOTICE_CONTINUE = exactly(['Continue', '继续', 'Continuar', 'Continuer', 'Weiter', 'Продолжить'])
+
+/**
+ * The notice is the one modal carrying its continue action, matched by that action rather than by a translated title: a
+ * regex title with an apostrophe (`Avis d'aperçu`) serializes into a selector Playwright cannot parse once the dialog
+ * is chained, so the title is deliberately not matched.
+ */
+const previewNoticeDialog = (page: Page): Locator =>
+  page.getByRole('dialog').filter({ has: page.getByRole('button', { name: PREVIEW_NOTICE_CONTINUE }) })
 
 const providerSetupDialog = (page: Page): Locator => page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG })
 
@@ -19,8 +41,6 @@ const dismissProviderSetupDialog = async (dialog: Locator, timeoutMs: number): P
     return
   }
 }
-
-const previewNoticeDialog = (page: Page): Locator => page.getByRole('dialog', { name: PREVIEW_NOTICE_DIALOG, exact: true })
 
 const appears = (dialog: Locator, timeoutMs: number): Promise<boolean> =>
   dialog.waitFor({ state: 'visible', timeout: timeoutMs }).then(
@@ -82,7 +102,7 @@ const reloadPastProviderSetup = async (page: Page, timeoutMs = 5_000): Promise<v
 
 const clickContinue = (previewNotice: Locator, timeoutMs: number): Promise<void> =>
   previewNotice
-    .getByRole('button', { name: 'Continue', exact: true })
+    .getByRole('button', { name: PREVIEW_NOTICE_CONTINUE })
     .click({ timeout: timeoutMs })
     .catch(() => undefined)
 
