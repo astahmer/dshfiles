@@ -82,7 +82,10 @@ const openThroughRail = async (page: Page, timeoutMs: number, target: { readonly
 
 const openAIAccountsPanel = async (page: Page, timeoutMs: number): Promise<void> => {
   const wizard = page.locator('[data-setup-wizard]')
-  if (await wizard.isVisible()) await wizard.getByRole('button', { name: 'Skip', exact: true }).click({ timeout: timeoutMs })
+  // A fresh profile opens the wizard shortly after boot, over the AI accounts page's header actions: wait for it briefly.
+  await wizard.waitFor({ state: 'visible', timeout: 2_000 }).catch(() => undefined)
+  // The onboarding wizard's dismiss button was Skip; since the tour it is Don't show again. Either closes it for good.
+  if (await wizard.isVisible()) await wizard.getByRole('button', { name: /^(?:Skip|Don't show again)$/u }).click({ timeout: timeoutMs })
   const accounts = page.getByRole('complementary', { name: 'Provider accounts' })
   if (await accounts.isVisible()) return
   if (await openThroughRail(page, timeoutMs, { destination: 'Settings', section: 'AI accounts' })) {

@@ -419,6 +419,20 @@ describe('dshx dev scratch commands', () => {
     }
   })
 
+  it("dismisses the setup wizard by Don't show again, its button since the onboarding tour", async () => {
+    const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
+    try {
+      const page = await browser.newPage()
+      await page.setContent(
+        `<section data-setup-wizard="account"><button onclick="this.parentElement.remove()">Don't show again</button><button>Next</button></section><aside role="complementary" aria-label="Provider accounts">Accounts</aside>`,
+      )
+      await ScratchSeedRuntime.openAIAccountsPanel(page, 1_000)
+      expect(await page.locator('[data-setup-wizard]').count()).toBe(0)
+    } finally {
+      await browser.close()
+    }
+  })
+
   it('seeds Backlog Jev enabled idempotently through Settings', async () => {
     const browser = await chromium.launch({ headless: true, ...(await chromiumLaunchOptions()) })
     try {
