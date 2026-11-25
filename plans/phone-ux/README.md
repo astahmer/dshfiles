@@ -54,6 +54,9 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
 12. **P19 (partial)** — the context detail slot is now a `renderDetail` function the meter calls only inside its open
     panel, so the closed meter no longer mounts its providers' queries on every composer render. Request-count proof
     waits for a working scratch session; hidden right-dock panels also unmount since P15.
+13. **P2 (attempt)** — chat flow items skip style/layout/paint off screen on phones (`content-visibility: auto`, remembered
+    intrinsic size), the transcript render being the remaining open cost. Unverified until a landed build can be
+    measured.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
