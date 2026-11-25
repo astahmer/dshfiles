@@ -79,7 +79,7 @@ const en = {
   allStatuses: 'All',
   errorsOnly: 'Errors',
   okOnly: 'No errors',
-  minDuration: 'Min duration (ms)',
+  minDuration: 'Min duration, ms',
   clearFilters: 'Clear filters',
   window: 'Window',
   window15m: '15 min',

@@ -52,7 +52,8 @@ const formatValue = (rule: Pick<AlertRule, 'kind'>, value: number | null): strin
 const conditionOf = (rule: AlertRule, t: TracesAlertsTranslate): string => {
   const measure = rule.kind === 'latency' ? `p${String(rule.percentile)}` : AlertRuleLabels.kind(rule.kind, t).toLowerCase()
   const comparator = rule.kind === 'duration' || rule.comparator === 'above' ? '>' : '<'
-  return `${measure} ${comparator} ${formatValue(rule, rule.threshold)} · ${String(rule.windowMinutes)} ${t('minutesShort')}`
+  // One duration grammar in the cell: the window reads like the threshold ("15m 00s · 30m 00s", not "… · 30 min").
+  return `${measure} ${comparator} ${formatValue(rule, rule.threshold)} · ${TraceFormat.duration(rule.windowMinutes * 60_000)}`
 }
 
 const filterOf = (rule: AlertRule, t: TracesAlertsTranslate): string =>

@@ -302,7 +302,7 @@ export const TracesPanel = (props: {
                     min={0}
                     aria-label={t('minDuration')}
                     placeholder={t('minDuration')}
-                    className="dshx:h-8 dshx:w-36 dshx:font-mono!"
+                    className="dshx:h-8 dshx:w-40"
                     value={view.minDurationMs ?? ''}
                     onChange={event => update({ minDurationMs: event.target.value === '' ? null : Math.max(0, Number(event.target.value)) })}
                   />
