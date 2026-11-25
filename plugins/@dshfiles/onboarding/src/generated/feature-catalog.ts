@@ -12550,10 +12550,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"since main\"",
+          "text": "expect textbox \"Base branch or bookmark\"",
           "action": "expect",
-          "by": "text",
-          "name": "since main",
+          "by": "textbox",
+          "name": "Base branch or bookmark",
           "value": null
         },
         {
