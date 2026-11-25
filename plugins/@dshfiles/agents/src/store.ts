@@ -2,7 +2,7 @@ import { defineDomain } from '@deepseek-ai/dsh-storage-domain'
 import { zodSchemaFromEffect } from '@dshfiles/dshx/api'
 import { StorageDomain, type StorageDomainWriteFailed } from '@dshfiles/dshx/effect/storage-domain'
 import { ToolAccess, type ToolAccessEntry, type ToolAccessPolicy, type ToolAccessSubject } from '@dshfiles/tool-search/access'
-import { Clock, Context, Effect, Layer, Ref } from 'effect'
+import { Clock, Context, Effect, FiberSet, Layer, Ref } from 'effect'
 import {
   agentSchema,
   agentThreadSchema,
@@ -142,7 +142,8 @@ export class AgentsRegistry extends Context.Service<
       const sessionRows = domain.table('sessions')
       const projectRows = domain.table('projects')
       const locator = yield* ProjectLocator
-      const runFork = Effect.runForkWith(yield* Effect.context<never>())
+      // Pending decision writes belong to the registry's scope: unloading interrupts them.
+      const runFork = yield* FiberSet.makeRuntime<never>()
       const persist = (write: Effect.Effect<unknown, StorageDomainWriteFailed>) =>
         write.pipe(Effect.catchTag('StorageDomainWriteFailed', error => Effect.logError('Agent registry write failed', error)))
 
