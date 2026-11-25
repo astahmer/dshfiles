@@ -144,6 +144,7 @@ const astGrepNativeEntryImporters = [
   'plugins/@dshfiles/sidebar-terminal/src/registration.test.ts',
   'plugins/@dshfiles/tool-fs/src/read.test.ts',
   'plugins/@dshfiles/tool-subagent/src/live-model-selection.test.ts',
+  'plugins/@dshfiles/tool-subagent/src/agent-selection.test.ts',
 ]
 
 const ruleCapsSchema = Schema.Record(Schema.String, Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)))

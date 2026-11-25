@@ -9,6 +9,8 @@ import type { ToolRunContext } from '@deepseek-ai/dsh-tools'
 import type { ProjectionHandle } from '@deepseek-ai/dsh-session-projection'
 import type { AllowedModelRoute, ModelSelectionPolicy } from './model-selection.ts'
 import { subagentModelSelectionPolicy } from './model-selection-state.ts'
+import type {} from '../agent-resolver.ts'
+import { agentListingText, subagentAgentSubject } from './agent-selection.ts'
 
 interface ListSubagentModelsRequest {
   readonly provider?: string
@@ -65,9 +67,12 @@ async function listSubagentModels(
   if (request.provider === undefined) {
     const providers = llm.listProviders()
       .filter(provider => policy.routes.some(route => route.provider === provider.id))
-    return providers.length === 0
+    const routesText = providers.length === 0
       ? '(no LLM providers)'
       : providers.map(provider => `${provider.id} — ${provider.name}`).join('\n')
+    // dshfiles delta: the agents this caller may start, beside the routes it may select.
+    const resolver = ctx.get('dshfilesSubagentAgents')
+    return `${routesText}\n\n${agentListingText(resolver?.list(subagentAgentSubject(exec.agent)))}`
   }
   if (request.provider.length === 0) throw new Error('`provider` must be non-empty')
   const allowedRoutes = policy.routes.filter(route => route.provider === request.provider)
@@ -109,7 +114,7 @@ export function registerListSubagentModels(
   ctx.tools.register(defineTool({
     name: 'list_subagent_models',
     description:
-      'Inspect the routes available for explicit subagent model selection. No arguments: authorized providers. '
+      'Inspect the routes available for explicit subagent model selection. No arguments: authorized providers, then the agents you may start with `subagent`\'s `agent` argument. '
       + '`provider`: that provider\'s authorized models. `provider` + `model`: that model and its reasoning efforts. '
       + 'Query when choosing an explicit child route or reasoning effort. '
       + 'Omit optional fields rather than sending empty strings.',
