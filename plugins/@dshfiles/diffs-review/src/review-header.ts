@@ -16,4 +16,10 @@ export class ReviewHeader {
 
   /** A one-sentence scope note is a label beside the scope badge, so it loses its full stop; a longer summary keeps it. */
   static readonly scopeNote = (text: string): string => (/[.!?]\s/u.test(text) ? text : text.replace(/\.$/u, ''))
+
+  /**
+   * A file header names its scope only when that is news: with one scope every file has it, so "Code · Source changes"
+   * on each header is inferable noise, unless a written summary says more (council round 6, D2).
+   */
+  static readonly showScope = (input: { readonly scopeCount: number; readonly summarized: boolean }): boolean => input.scopeCount > 1 || input.summarized
 }

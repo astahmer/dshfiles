@@ -2,7 +2,6 @@ import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useApi } from '@dshfiles/dshx/client'
 import { EmptyState, PAGE_FRAME_CLASS, Page } from '@dshfiles/plugin-ui/components/page'
 import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
-import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
@@ -452,19 +451,23 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
               files={textFiles}
               className={cn('dshx:flex-1', ReviewLook.DARK_DIFF_TINTS)}
               empty={<p className={cn(HINT, 'dshx:p-3')}>No diff hunks to display.</p>}
-              renderHeaderPrefix={file => {
+              // The header leads with the file-type mark and the path at 13/600; the scope is quiet trailing text, and
+              // only when it says something: several scopes, or a written summary (council round 6, D2).
+              renderHeaderMetadata={file => {
                 const scope = scopeByPath.get(file.name)
-                if (scope === undefined) return null
+                const summary = scope === undefined ? undefined : aiSummaries?.[scope.key]
+                const shown = scope !== undefined && ReviewHeader.showScope({ scopeCount: scopes.length, summarized: summary !== undefined })
                 return (
-                  <span className="dshx:mr-2 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
-                    <Badge variant="secondary" className="dshx:text-2xs">
-                      {scope.label}
-                    </Badge>
-                    <span className={cn(HINT, 'dshx:truncate')}>{ReviewHeader.scopeNote(aiSummaries?.[scope.key] ?? scope.summary)}</span>
-                  </span>
+                  <>
+                    {shown ? (
+                      <span className={cn(HINT, 'dshx:max-w-80 dshx:truncate')} data-review-scope-note>
+                        <span className="dshx:font-medium">{scope.label}</span> · {ReviewHeader.scopeNote(summary ?? scope.summary)}
+                      </span>
+                    ) : null}
+                    {reviewControls(file.name)}
+                  </>
                 )
               }}
-              renderHeaderMetadata={file => reviewControls(file.name)}
             />
           </div>
         ) : null}

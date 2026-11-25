@@ -11,9 +11,9 @@ export class ReviewLook {
   static readonly PROGRESS = 'dshx:h-1 dshx:w-32 dshx:flex-none'
 
   /**
-   * A file's Reviewed control: checkbox and word in one bounded 32 px box (44 px under a coarse pointer), quiet until
-   * checked (council round 4, D3).
+   * A file's Reviewed control: checkbox and word in one bounded 32 px box (44 px under a coarse pointer, council round 4,
+   * D3), on the fields' 3:1 boundary with its label in full ink, so it reads as a control (council round 6, D2).
    */
   static readonly REVIEWED_TOGGLE =
-    'dshx:inline-flex dshx:h-8 dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:has-data-[state=checked]:text-foreground dshx:pointer-coarse:h-11'
+    'dshx:inline-flex dshx:h-8 dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-field-border dshx:bg-background dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-foreground dshx:transition-colors dshx:hover:bg-accent dshx:pointer-coarse:h-11'
 }

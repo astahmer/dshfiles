@@ -29,7 +29,7 @@ describe('the Review page controls (council round 2, D3)', () => {
     expect(ReviewHeader.scopeNote('Source changes.')).toBe('Source changes')
     expect(ReviewHeader.scopeNote('Rounds tax per line. Adds a test.')).toBe('Rounds tax per line. Adds a test.')
     expect(ReviewHeader.scopeNote('Docs')).toBe('Docs')
-    expect(panel).toContain('ReviewHeader.scopeNote(aiSummaries?.[scope.key] ?? scope.summary)')
+    expect(panel).toContain('ReviewHeader.scopeNote(summary ?? scope.summary)')
   })
 
   it('sets counters and the base field in the UI sans with tabular figures, never monospace', () => {
@@ -83,5 +83,34 @@ describe('the Review page controls (council round 5, D3)', () => {
   it('folds Refresh into the overflow menu', () => {
     const refresh = panel.slice(panel.indexOf("id: 'refresh'"), panel.indexOf('}', panel.indexOf("id: 'refresh'")))
     expect(refresh).toContain("placement: 'overflow'")
+  })
+})
+
+describe('the Review file header (council round 6, D2)', () => {
+  const panel = readFileSync(fileURLToPath(new URL('panel.tsx', import.meta.url)), 'utf8')
+  const look = readFileSync(fileURLToPath(new URL('review-look.ts', import.meta.url)), 'utf8')
+
+  it('leads with the file-type mark and the path: nothing renders before them', () => {
+    expect(panel).not.toContain('renderHeaderPrefix')
+    expect(panel).not.toContain('<Badge')
+  })
+
+  it('names the scope as quiet trailing text only when it is news: several scopes, or a written summary', () => {
+    expect(ReviewHeader.showScope({ scopeCount: 1, summarized: false })).toBe(false)
+    expect(ReviewHeader.showScope({ scopeCount: 2, summarized: false })).toBe(true)
+    expect(ReviewHeader.showScope({ scopeCount: 1, summarized: true })).toBe(true)
+    expect(panel).toMatch(/ReviewHeader\.showScope\(\{ scopeCount: scopes\.length, summarized: summary !== undefined \}\)/u)
+    // The label stays its own element ("Docs", "Code"), the note follows it, and the reviewed control ends the header.
+    expect(panel).toMatch(
+      /data-review-scope-note>\s*<span className="dshx:font-medium">\{scope\.label\}<\/span> · \{ReviewHeader\.scopeNote\(summary \?\? scope\.summary\)\}\s*<\/span>\s*\) : null\}\s*\{reviewControls\(file\.name\)\}/u,
+    )
+  })
+
+  it("draws Mark reviewed on the fields' 3:1 boundary with a full-ink label", () => {
+    const toggle = /REVIEWED_TOGGLE =\s*'([^']*)'/u.exec(look)?.[1] ?? ''
+    expect(toggle).toContain('dshx:border-field-border')
+    expect(toggle).toContain('dshx:text-foreground')
+    expect(toggle).not.toContain('dshx:text-muted-foreground')
+    expect(toggle).not.toContain('dshx:border-border')
   })
 })

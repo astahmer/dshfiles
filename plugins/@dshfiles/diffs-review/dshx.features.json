@@ -44,7 +44,7 @@
         "expect textbox \"Base branch or bookmark\"",
         "expect text \"1 file\"",
         "expect text \"seeded-work.md*\"",
-        "expect text \"Docs\"",
+        "expect checkbox \"seeded-work.md*\"",
         "click button \"Choose project or workspace\"",
         "expect dialog \"Choose project or workspace\"",
         "click button \"Filter by scope\"",
