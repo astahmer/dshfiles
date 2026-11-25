@@ -152,7 +152,7 @@ const segmentClass =
   'dshx-root dshx:inline-flex dshx:h-5 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50'
 
 /**
- * One account's compact segment (b:hbtt): glyph · short name · 28 px meter · "51%". Neutral while healthy, amber at
+ * One account's compact segment (b:hbtt): glyph · short name · 24 px meter · "51%". Neutral while healthy, amber at
  * 15% left or less, red "limit" once reached; an account that is off is dimmed and reads "off".
  */
 const AccountSegment = (props: {
@@ -176,9 +176,10 @@ const AccountSegment = (props: {
       <span className={cn(props.long === true ? 'dshx:max-w-28' : 'dshx:max-w-12', 'dshx:truncate', props.active && 'dshx:font-medium dshx:text-foreground')}>
         {props.label}
       </span>
+      {/* A 24 × 3 px track in tertiary ink at 40%, visible on the bar; the fill holds 3:1 on it (council round 5, C6). */}
       <span
         aria-hidden="true"
-        className="dshx:relative dshx:inline-block dshx:h-1 dshx:w-7 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted"
+        className="dshx:relative dshx:inline-block dshx:h-0.75 dshx:w-6 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-full dshx:bg-faint-foreground/40"
         data-quota-meter=""
       >
         {'unavailable' in item ? null : (

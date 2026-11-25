@@ -7,6 +7,7 @@ import type { ApiClient, ApiContract } from '@dshfiles/dshx/api'
 import { PluginQueryProvider, QueryClient } from '@dshfiles/plugin-ui/query'
 import type { aiAccountsApi, AccountsUsage } from './api.js'
 import { QuotaStatusLine } from './quota-status-line.js'
+import { PaletteMath, WARM_STONE } from '@dshfiles/plugin-ui/theme/palette'
 
 // Only the typed Host boundary is replaced; Query, the usage hooks, the arrangement and Radix stay real.
 type AccountsClient = typeof aiAccountsApi extends ApiContract<infer Methods> ? ApiClient<Methods> : never
@@ -161,6 +162,32 @@ describe('quota status line', () => {
     expect(toneOf(container, 'spent')).toBe('critical')
     expect(accountText(container, 'spent')).toBe('Slimit· 1d 21h')
     expect(toneOf(container, 'fine')).toBe('ok')
+  })
+
+  it('draws each meter as a visible 24 × 3 px rounded track behind the fill (council round 5, C6)', async () => {
+    const container = await mount({ cards: [card('jarvis', 'Jarvis', 51)] })
+    const meter = container.querySelector('[data-quota-segment] [data-quota-meter]')
+    for (const look of ['dshx:h-0.75', 'dshx:w-6', 'dshx:rounded-full', 'dshx:bg-faint-foreground/40']) expect(meter?.className, look).toContain(look)
+    expect(meter?.className).not.toContain('dshx:bg-muted')
+    // The track: tertiary ink at 40% over the bar. The fill, which carries the reading, holds 3:1 against the track and
+    // the bar in both schemes; the track itself stands visibly off the bar (about 1.7-2:1).
+    const rgb = (hex: string): number[] => [1, 3, 5].map(index => Number.parseInt(hex.slice(index, index + 2), 16))
+    for (const scheme of ['light', 'dark'] as const) {
+      const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+      const [panel, faint, fill] = [p.neutral[1]!, p.neutral[8]!, p.neutral[9]!]
+      const track = PaletteMath.hexToOklch(
+        `#${rgb(PaletteMath.toHex(faint))
+          .map((value, index) =>
+            Math.round(value * 0.4 + rgb(PaletteMath.toHex(panel))[index]! * 0.6)
+              .toString(16)
+              .padStart(2, '0'),
+          )
+          .join('')}`,
+      )
+      expect(PaletteMath.contrastRatio(track, panel), scheme).toBeGreaterThanOrEqual(1.7)
+      expect(PaletteMath.contrastRatio(fill, track), scheme).toBeGreaterThanOrEqual(3)
+      expect(PaletteMath.contrastRatio(fill, panel), scheme).toBeGreaterThanOrEqual(3)
+    }
   })
 
   it('marks the item actionable only while an account is low or spent, so the phone strip shows then (round five C2)', async () => {
