@@ -564,8 +564,10 @@ translate DSH's built-in parts only.
 - **Don't** put a clock, a toolbar or a streaming line inside a live region.
 - **Don't** print an endpoint, a route id, an environment variable or model-directed text to the user.
 - **Don't** give one destination two names, or draw a count its list does not show.
-- **Accepted exception:** the core Plugins page (centred column, ink switches, 10px text) is DSH's own and has no
-  fork here; only its tab title is ours.
+- **Accepted exception:** the core Plugins page (centred column, 10px text) is DSH's own and has no fork here; only
+  its tab title is ours. Its switches are the one thing we restyle: a checked Host primitives `Switch`
+  (`button[role=switch][aria-checked=true]`) takes `control-on` like every kit switch, through one unlayered rule in
+  `ui-styles/src/client.css` that `ui-styles/tests/core-switch.test.ts` guards across DSH bumps.
 
 Two ratchets in `check:green` and CI hold these rules: they count findings per rule and plugin and fail only when a
 count rises ([repository checks](docs/repository-checks.md#design-and-copy-ratchets)). `check:design-tokens` counts
