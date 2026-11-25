@@ -191,6 +191,7 @@ import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.
 import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, pageLoadThreadRoute, readThreadUrl } from './thread-url.js'
 import { PHONE_HISTORY_SELF_POP_EVENT } from '@dshfiles/workbench/phone-history'
+import { ScreenWakeLock, useScreenWakeLock } from './wake-lock.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import {
   EMPTY_THREAD_SELECTION,
@@ -1055,6 +1056,7 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   const { session, unread, archived, pinned, parked, settled, notifyTarget } = props
   const t = props.actions.translate
   const openAside = useAsideOpen()
+  const wakeLockOn = useScreenWakeLock()
   const registry = workbenchPanels()
   useSyncExternalStore(registry.subscribe, registry.list, registry.list)
   const sidePanelDefinitions = registry.listContextMenuPanels()
@@ -1098,6 +1100,14 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
           </ContextMenuItem>
         </ContextMenuSubContent>
       </ContextMenuSub>
+      {coarsePointer() && ScreenWakeLock.available ? (
+        <>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => void ScreenWakeLock.toggle()}>
+            {t(wakeLockOn ? 'threadSidebarAllowScreenSleep' : 'threadSidebarKeepScreenOn')}
+          </ContextMenuItem>
+        </>
+      ) : null}
       <ContextMenuSeparator />
       <ContextMenuItem onSelect={() => requestThreadMentionInsertion(session.id)}>{t('threadSidebarInsertMention')}</ContextMenuItem>
       <ContextMenuItem disabled={props.workspaceId === undefined} onSelect={() => props.actions.followUp(session.id, props.workspaceId)}>
