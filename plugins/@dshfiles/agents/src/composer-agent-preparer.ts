@@ -27,6 +27,10 @@ const warn = (sessionId: string, what: string, reason: string | null): void => {
   if (reason !== null) console.warn(`agents: new thread ${sessionId} ${what}: ${reason}`)
 }
 
+/** A step that throws is a failed step: logged and skipped like one that reports an error, never the whole send. */
+const attempt = (step: () => Promise<string | null>): Promise<string | null> =>
+  step().catch((cause: unknown) => (cause instanceof Error ? cause.message : String(cause)))
+
 /**
  * The composer's first-send step: start the thread as its agent (a leading mention, the chip's pick, else the project
  * default) the way a dispatch does — its Agent preset, model route, recorded agent and an opening message with its
@@ -45,12 +49,14 @@ export const createComposerAgentPreparer = (ports: ComposerAgentPorts): Composer
     const record = plan.record
       ? ports.recordAgent(sessionId, plan.agent.handle).catch((cause: unknown) => warn(sessionId, 'kept its default agent', String(cause)))
       : undefined
-    if (plan.preset !== null) warn(sessionId, `kept its Agent preset instead of ${plan.preset}`, await ports.applyPreset(sessionId, plan.preset))
-    if (selection !== null) warn(sessionId, 'kept its model', await ports.applyModel(selection))
+    const preset = plan.preset
+    if (preset !== null) warn(sessionId, `kept its Agent preset instead of ${preset}`, await attempt(() => ports.applyPreset(sessionId, preset)))
+    if (selection !== null) warn(sessionId, 'kept its model', await attempt(() => ports.applyModel(selection)))
     await record
     if (!plan.introduce) return undefined
     // The opening message starts with the agent's identity, so the thread is titled from the request instead.
-    warn(sessionId, 'kept its title', await ports.rename(sessionId, AgentDispatch.title({ agent: plan.agent, prompt: text, target: { kind: 'default' } })))
+    const title = AgentDispatch.title({ agent: plan.agent, prompt: text, target: { kind: 'default' } })
+    warn(sessionId, 'kept its title', await attempt(() => ports.rename(sessionId, title)))
     return { text: AgentDispatch.composerMessage(plan.agent, text) }
   },
 })

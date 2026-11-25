@@ -21,17 +21,10 @@ const EMPTY_DRAFTS: Readonly<Record<string, never>> = {}
 const noSubscription = (): (() => void) => () => {}
 
 /**
- * The composer side of agents: the agent chip of a new thread, the Tools control of a running one (both in the
- * composer's left tool row) and the first-send step that starts a new thread as its agent (rich-composer's
- * `composer-send` registry). `sessionDrafts` (the owned session controller) and the preset Remote are optional: without
- * them a new thread still gets its instructions and recorded agent, and the Host applies the rest it can.
+ * The Host and draft steps of a new thread's first send. The preset Remote is read with `ctx.get`: the client entry does
+ * not inject `remote.agentPresets` (it is optional), and Cordis refuses `ctx.remote.agentPresets` without that inject.
  */
-export const registerComposerAgent = (input: {
-  readonly ctx: Context
-  readonly decorate: <Component>(component: Component) => Component
-  readonly plugin: PluginContext | undefined
-}): void => {
-  const { ctx } = input
+export const createComposerAgentPorts = (ctx: Context): ComposerAgentPorts => {
   const api = createApiClient(ctx, agentsApi)
   const drafts = (): SessionDrafts | undefined => ctx.get('sessionDrafts')
   const workspaceRows = () =>
@@ -39,7 +32,7 @@ export const registerComposerAgent = (input: {
   const loadAgents = async (signal: AbortSignal) => (await api.list(undefined, { signal })).agents
   const loadProjectDefaults = async (signal: AbortSignal) => (await api.projectDefaults(undefined, { signal })).projects
 
-  const ports: ComposerAgentPorts = {
+  return {
     listAgents: loadAgents,
     hostAgentOf: async (sessionId, signal) => {
       const [defaults, view] = await Promise.all([loadProjectDefaults(signal), api.threadAccess({ sessionId }, { signal }).catch(() => null)])
@@ -65,7 +58,7 @@ export const registerComposerAgent = (input: {
       const id = sessionId as SessionId
       const local = drafts()
       if (local?.list.getSnapshot()[sessionId]?.local === true && local.stagePreset(id, preset)) return null
-      const presets = ctx.remote.agentPresets
+      const presets = ctx.get('remote.agentPresets')
       if (presets === undefined) return 'this Host composes no Agent preset roster'
       const result = await presets.select(id, preset)
       return result.ok ? null : result.error.message
@@ -86,7 +79,25 @@ export const registerComposerAgent = (input: {
       return result.ok ? null : result.error.message
     },
   }
-  input.plugin?.add(ComposerSendPreparers, createComposerAgentPreparer(ports))
+}
+
+/**
+ * The composer side of agents: the agent chip of a new thread, the Tools control of a running one (both in the
+ * composer's left tool row) and the first-send step that starts a new thread as its agent (rich-composer's
+ * `composer-send` registry). `sessionDrafts` (the owned session controller) and the preset Remote are optional: without
+ * them a new thread still gets its instructions and recorded agent, and the Host applies the rest it can.
+ */
+export const registerComposerAgent = (input: {
+  readonly ctx: Context
+  readonly decorate: <Component>(component: Component) => Component
+  readonly plugin: PluginContext | undefined
+}): void => {
+  const { ctx } = input
+  const api = createApiClient(ctx, agentsApi)
+  const drafts = (): SessionDrafts | undefined => ctx.get('sessionDrafts')
+  const loadAgents = async (signal: AbortSignal) => (await api.list(undefined, { signal })).agents
+  const loadProjectDefaults = async (signal: AbortSignal) => (await api.projectDefaults(undefined, { signal })).projects
+  input.plugin?.add(ComposerSendPreparers, createComposerAgentPreparer(createComposerAgentPorts(ctx)))
 
   const Entry = (props: PropsRuntime<'conversation.input.left'>): ReactNode => {
     const sessionId = String(props.sessionId)

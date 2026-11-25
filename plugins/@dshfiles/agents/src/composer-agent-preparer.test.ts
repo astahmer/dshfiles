@@ -88,6 +88,16 @@ describe('the composer agent first send', () => {
     expect(prepared?.text.startsWith('Work as @reviewer')).toBe(true)
   })
 
+  it('a Host step that throws is skipped: the model, title and introduced message still go out', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const value = ports({ applyPreset: vi.fn(() => Promise.reject(new Error('cannot get property "remote.agentPresets" without inject'))) })
+    const prepared = await send(value, 'Review the diff')
+    expect(value.applyModel).toHaveBeenCalledWith({ sessionId: 's1', provider: 'openai', model: 'gpt-6' })
+    expect(value.rename).toHaveBeenCalledWith('s1', 'Review the diff')
+    expect(prepared?.text.startsWith('Work as @reviewer')).toBe(true)
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('kept its Agent preset instead of review: cannot get property'))
+  })
+
   it('a slash command passes through untouched', async () => {
     const value = ports()
     await expect(send(value, '/plan')).resolves.toBeUndefined()
