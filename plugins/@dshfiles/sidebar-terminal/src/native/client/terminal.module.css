@@ -22,3 +22,6 @@
 .screen :global(.xterm .xterm-rows .xterm-cursor.xterm-cursor-underline) { border-bottom-color: var(--terminal-cursor); }
 .screen :global(.xterm .xterm-rows.xterm-focus .xterm-cursor.xterm-cursor-block.xterm-cursor-blink) { animation: terminal-cursor-blink 1s step-end infinite; }
 @keyframes terminal-cursor-blink { 0% { background-color: var(--terminal-cursor); color: var(--terminal-cursor-accent); } 50% { background-color: var(--terminal-cursor-cell-background); color: var(--terminal-cursor-cell-foreground); } }
+
+/* Virtual trigger for link context menu - positioned by JavaScript */
+.linkMenuTrigger { position: absolute; pointer-events: none; }
