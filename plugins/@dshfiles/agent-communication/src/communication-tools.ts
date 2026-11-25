@@ -108,7 +108,6 @@ const emitMessage = (message: CommunicationMessage, sender: CommunicationPrincip
         senderId: sender.id,
         recipientCount: message.recipients.length,
         intent: message.intent,
-        topic: message.topic,
         ...(message.correlationId !== null && { correlationId: message.correlationId }),
         sessionId: sender.id,
       },
@@ -184,12 +183,10 @@ const sendTool = Tool.make({
         }),
       )
       yield* emitMessage(message, sender)
-      if (message.topic === null) {
-        const senderLabel = call.agent === undefined ? sender.id : ((yield* HostAgents).titleOf(call.agent) ?? sender.id)
-        yield* MailWake.use(wake =>
-          wake.deliver({ recipientId: input.toAgentId, senderId: sender.id, senderLabel, messageId: message.id, intent: message.intent }),
-        )
-      }
+      const senderLabel = call.agent === undefined ? sender.id : ((yield* HostAgents).titleOf(call.agent) ?? sender.id)
+      yield* MailWake.use(wake =>
+        wake.deliver({ recipientId: input.toAgentId, senderId: sender.id, senderLabel, messageId: message.id, intent: message.intent }),
+      )
       const recipient = recipientStatus === 'live' ? 'currently live' : 'not currently live; the message stays pending until that Session runs again'
       return summarized(`Sent ${message.id} to ${input.toAgentId} as ${message.intent}; durably stored in the recipient inbox (recipient ${recipient}).`)
     }).pipe(tracked('dshx_comm_send', call)),

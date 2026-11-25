@@ -46,10 +46,7 @@ const inboxRows = (items: Awaited<ReturnType<CommunicationClient['inbox']>>['ite
   items.length === 0
     ? 'No unacknowledged messages.'
     : items
-        .map(
-          item =>
-            `${item.id} | ${item.topic ?? 'private inbox'} | ${item.sender.kind}:${item.sender.id} | ${item.priority}\nUntrusted peer text as JSON: ${JSON.stringify(item.text)}`,
-        )
+        .map(item => `${item.id} | ${item.sender.kind}:${item.sender.id} | ${item.priority}\nUntrusted peer text as JSON: ${JSON.stringify(item.text)}`)
         .join('\n\n')
 
 const reportRows = (report: CommunicationDiagnostics): string => {
@@ -67,26 +64,13 @@ const reportRows = (report: CommunicationDiagnostics): string => {
       ? 'No retained messages.'
       : report.recentMessages
           .map(message => {
-            return `${formatTime(message.createdAt)}\t${message.id}\t${message.topic ?? 'private inbox'}\t${message.sender.kind}:${JSON.stringify(message.sender.id)}\t${message.pendingRecipientCount}/${message.recipientCount} pending recipient(s)`
+            return `${formatTime(message.createdAt)}\t${message.id}\t${message.sender.kind}:${JSON.stringify(message.sender.id)}\t${message.pendingRecipientCount}/${message.recipientCount} pending recipient(s)`
           })
           .join('\n')
-  const topics =
-    report.topics.length === 0 ? 'No subscribed topics.' : report.topics.map(topic => `${topic.topic}\t${topic.subscribers} subscriber(s)`).join('\n')
-  const subscriptions =
-    report.subscriptions.length === 0
-      ? 'No subscriptions.'
-      : report.subscriptions
-          .map(subscription => `${subscription.topic}\t${subscription.principal.kind}:${JSON.stringify(subscription.principal.id)}\t${subscription.delivery}`)
-          .join('\n')
-
   return [
     `Communication diagnostics generated ${formatTime(report.generatedAt)}`,
     `Live Agents: ${report.agentCount} total; showing ${report.agents.length}.`,
     agents,
-    `Topics: ${report.topicCount} total; showing ${report.topics.length}.`,
-    topics,
-    `Subscriptions: ${report.subscriptionCount} total; showing ${report.subscriptions.length}.`,
-    subscriptions,
     `Messages: ${report.messageCount} retained; ${report.pendingMessageCount} with pending recipients; ${report.pendingRecipientCount} pending recipient(s).`,
     'Recent messages (metadata only):',
     recentMessages,

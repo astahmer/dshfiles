@@ -58,14 +58,13 @@ export const communicationPrincipalSchema = Schema.Union([
 ])
 export type CommunicationPrincipal = Schema.Schema.Type<typeof communicationPrincipalSchema>
 
-export const communicationSubscriptionSchema = strictStruct({
+/** Only retired state versions below still hold subscription rows; new state never writes one. */
+const communicationSubscriptionSchema = strictStruct({
   principal: communicationPrincipalSchema,
   topic: boundedString(1, 128),
   delivery: communicationDeliverySchema,
   createdAt: nonNegativeInteger,
 })
-
-export type CommunicationSubscription = Schema.Schema.Type<typeof communicationSubscriptionSchema>
 
 export const communicationRecipientSchema = strictStruct({
   principal: communicationPrincipalSchema,
@@ -88,9 +87,22 @@ const communicationMessageV3Schema = strictStruct({
   recipients: boundedArray(communicationRecipientSchema, 512),
 })
 
-export const communicationMessageSchema = strictStruct({
+const communicationMessageV4Schema = strictStruct({
   id: Schema.String.check(Schema.isUUID()),
   topic: Schema.NullOr(boundedString(1, 128)),
+  sender: communicationPrincipalSchema,
+  text: boundedString(1, 12_000),
+  intent: communicationMessageIntentSchema.pipe(Schema.withDecodingDefaultType(Effect.succeed('notice'))),
+  priority: communicationPrioritySchema,
+  correlationId: Schema.NullOr(boundedString(1, 128)).pipe(Schema.withDecodingDefaultType(Effect.succeed(null))),
+  dedupeKey: Schema.NullOr(boundedString(1, 128)).pipe(Schema.withDecodingDefaultType(Effect.succeed(null))),
+  createdAt: nonNegativeInteger,
+  recipients: boundedArray(communicationRecipientSchema, 512),
+})
+
+/** A direct message: peer topics are gone, so a message always names its recipients. */
+export const communicationMessageSchema = strictStruct({
+  id: Schema.String.check(Schema.isUUID()),
   sender: communicationPrincipalSchema,
   text: boundedString(1, 12_000),
   intent: communicationMessageIntentSchema.pipe(Schema.withDecodingDefaultType(Effect.succeed('notice'))),
@@ -112,20 +124,8 @@ const communicationAgentFields = {
 export const communicationAgentSchema = strictStruct(communicationAgentFields)
 export type CommunicationAgent = Schema.Schema.Type<typeof communicationAgentSchema>
 
-export const communicationDiagnosticAgentSchema = strictStruct({
-  ...communicationAgentFields,
-  workspaceTopic: Schema.NullOr(boundedString(1, 128)),
-  workspaceOptedOut: Schema.Boolean,
-  workspaceSubscribed: Schema.optional(Schema.Boolean),
-})
+export const communicationDiagnosticAgentSchema = strictStruct({ ...communicationAgentFields })
 export type CommunicationDiagnosticAgent = Schema.Schema.Type<typeof communicationDiagnosticAgentSchema>
-
-export const communicationTopicSchema = strictStruct({
-  topic: boundedString(1, 128),
-  subscribers: nonNegativeInteger,
-})
-
-export type CommunicationTopic = Schema.Schema.Type<typeof communicationTopicSchema>
 
 export const communicationInboxSchema = strictStruct({
   items: boundedArray(communicationMessageSchema, 500),
@@ -241,12 +241,23 @@ export const communicationStateV3Schema = strictStruct({
 
 export type CommunicationStateV3 = Schema.Schema.Type<typeof communicationStateV3Schema>
 
-export const communicationStateSchema = strictStruct({
+export const communicationStateV4Schema = strictStruct({
   schemaVersion: Schema.Literal(4),
-  messages: boundedArray(communicationMessageSchema, 5_000),
+  messages: boundedArray(communicationMessageV4Schema, 5_000),
   subscriptions: boundedArray(communicationSubscriptionSchema, 5_000),
   acknowledgements: boundedArray(communicationAcknowledgementSchema, 100_000),
   workspaceOptOuts: boundedArray(boundedString(1, 256), 10_000),
+  activityStartedAt: Schema.NullOr(nonNegativeInteger),
+  activityEvents: boundedArray(communicationActivityEventSchema, 5_000),
+})
+
+export type CommunicationStateV4 = Schema.Schema.Type<typeof communicationStateV4Schema>
+
+/** Peer topics are gone: the store keeps mail, acknowledgements and activity only. */
+export const communicationStateSchema = strictStruct({
+  schemaVersion: Schema.Literal(5),
+  messages: boundedArray(communicationMessageSchema, 5_000),
+  acknowledgements: boundedArray(communicationAcknowledgementSchema, 100_000),
   activityStartedAt: Schema.NullOr(nonNegativeInteger),
   activityEvents: boundedArray(communicationActivityEventSchema, 5_000),
 })
@@ -279,19 +290,8 @@ export const communicationMessageBodySchema = strictStruct({
 
 export type CommunicationMessageBody = Schema.Schema.Type<typeof communicationMessageBodySchema>
 
-export const communicationDiagnosticSubscriptionSchema = strictStruct({
-  principal: communicationPrincipalSchema,
-  topic: boundedString(1, 128),
-  delivery: Schema.Union([communicationDeliverySchema, legacyCommunicationDeliverySchema]),
-  createdAt: nonNegativeInteger,
-  allowSteerFromCount: Schema.optional(nonNegativeInteger),
-})
-
-export type CommunicationDiagnosticSubscription = Schema.Schema.Type<typeof communicationDiagnosticSubscriptionSchema>
-
 export const communicationDiagnosticMessageSchema = strictStruct({
   id: Schema.String.check(Schema.isUUID()),
-  topic: Schema.NullOr(boundedString(1, 128)),
   sender: communicationPrincipalSchema,
   intent: communicationMessageIntentSchema.pipe(Schema.withDecodingDefaultType(Effect.succeed('notice'))),
   priority: communicationPrioritySchema,
@@ -307,10 +307,6 @@ export const communicationDiagnosticsSchema = strictStruct({
   generatedAt: nonNegativeInteger,
   agentCount: nonNegativeInteger,
   agents: boundedArray(communicationDiagnosticAgentSchema, 100),
-  topicCount: nonNegativeInteger,
-  topics: boundedArray(communicationTopicSchema, 100),
-  subscriptionCount: nonNegativeInteger,
-  subscriptions: boundedArray(communicationDiagnosticSubscriptionSchema, 100),
   messageCount: nonNegativeInteger,
   pendingMessageCount: nonNegativeInteger,
   pendingRecipientCount: nonNegativeInteger,

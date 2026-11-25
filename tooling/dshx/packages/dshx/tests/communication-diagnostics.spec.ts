@@ -25,8 +25,7 @@ describe('communication diagnostics', () => {
     const service = new CommunicationService({ statePath: path, now: () => now })
     const reader: Extract<CommunicationPrincipal, { readonly kind: 'agent' }> = { kind: 'agent', id: 'agent-reader' }
     const sender: Extract<CommunicationPrincipal, { readonly kind: 'agent' }> = { kind: 'agent', id: 'agent-sender' }
-    await service.subscribe(reader, { topic: 'workspace/demo' })
-    await service.publish({ sender, topic: 'workspace/demo', text: 'private-message-body' })
+    await service.send({ sender, toAgentId: reader.id, text: 'private-message-body' })
     await service.recordActivity({
       principal: reader,
       operation: 'dshx_comm_inbox',
@@ -52,8 +51,6 @@ describe('communication diagnostics', () => {
     expect(await readFile(path, 'utf8')).toBe(beforeReport)
     expect(report).toMatchObject({
       agentCount: 1,
-      topicCount: 1,
-      subscriptionCount: 1,
       messageCount: 1,
       pendingMessageCount: 1,
       pendingRecipientCount: 1,
@@ -117,36 +114,17 @@ describe('communication diagnostics', () => {
     expect(report.activity).toMatchObject({ trackingStartedAt: null, retainedCount: 0, events: [] })
     expect(await readFile(path, 'utf8')).toBe(beforeReport)
 
-    await service.subscribe({ kind: 'agent', id: 'agent-reader' }, { topic: 'builds.ready' })
+    await service.send({ sender: principal, toAgentId: 'agent-sender', text: 'upgrade trigger' })
     const upgraded = Schema.decodeUnknownSync(communicationStateSchema)(JSON.parse(await readFile(path, 'utf8')))
-    expect(upgraded).toMatchObject({
-      schemaVersion: 4,
-      activityStartedAt: null,
-      activityEvents: [],
-      workspaceOptOuts: ['agent-opted-out'],
-    })
+    expect(upgraded).toMatchObject({ schemaVersion: 5, activityStartedAt: null, activityEvents: [] })
     expect(upgraded).not.toHaveProperty('notifications')
-    expect(upgraded.messages).toMatchObject([{ text: 'legacy message body', recipients: [{ principal, delivery: 'passive', readAt: null }] }])
-    expect(upgraded.subscriptions).toMatchObject([
-      { principal, topic: 'workspace/demo', delivery: 'passive' },
-      { principal, topic: 'builds.ready', delivery: 'passive' },
+    expect(upgraded).not.toHaveProperty('subscriptions')
+    expect(upgraded).not.toHaveProperty('workspaceOptOuts')
+    expect(upgraded.messages).toMatchObject([
+      { text: 'legacy message body', recipients: [{ principal, delivery: 'passive', readAt: null }] },
+      { text: 'upgrade trigger' },
     ])
-    expect(upgraded.subscriptions).toHaveLength(2)
     expect(upgraded.acknowledgements).toHaveLength(1)
-  })
-
-  it('reports workspace opt-out state and clears it when the Agent rejoins', async () => {
-    const service = new CommunicationService({ statePath: await statePath(), now: () => 1_800_000_000_000 })
-    const agent: Extract<CommunicationPrincipal, { readonly kind: 'agent' }> = { kind: 'agent', id: 'agent-reader' }
-    await service.subscribe(agent, { topic: 'workspace/demo' })
-    await service.unsubscribe(agent, 'workspace/demo')
-
-    const optedOut = await service.diagnostics({ agents: [{ id: agent.id, workspaceTopic: 'workspace/demo' }] })
-    expect(optedOut.agents).toMatchObject([{ id: agent.id, workspaceTopic: 'workspace/demo', workspaceOptedOut: true }])
-
-    await service.subscribe(agent, { topic: 'workspace/demo' })
-    const rejoined = await service.diagnostics({ agents: [{ id: agent.id, workspaceTopic: 'workspace/demo' }] })
-    expect(rejoined.agents).toMatchObject([{ id: agent.id, workspaceTopic: 'workspace/demo', workspaceOptedOut: false }])
   })
 
   it('excludes activity older than the 30-day retention window without writing during diagnostics', async () => {

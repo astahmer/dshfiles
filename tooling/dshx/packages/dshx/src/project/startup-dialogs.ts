@@ -12,13 +12,24 @@ const escaped = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/gu, '
 const exactly = (names: readonly string[]): RegExp => new RegExp(`^(?:${names.map(escaped).join('|')})$`, 'u')
 
 const PROVIDER_SETUP_DIALOG = exactly([
-  'Add an API key to get started', 'Get started',
-  '添加一个 API Key 开始使用', 'Agregue una clave API para comenzar', 'Ajoutez une clé API pour commencer',
-  'Fügen Sie einen API-Schlüssel hinzu, um loszulegen', 'Добавьте ключ API, чтобы начать работу.', 'Adicione uma chave API para começar',
+  'Add an API key to get started',
+  'Get started',
+  '添加一个 API Key 开始使用',
+  'Agregue una clave API para comenzar',
+  'Ajoutez une clé API pour commencer',
+  'Fügen Sie einen API-Schlüssel hinzu, um loszulegen',
+  'Добавьте ключ API, чтобы начать работу.',
+  'Adicione uma chave API para começar',
 ])
 const PROVIDER_SETUP_DISMISS_BUTTONS = [
-  'Configure later', 'Close',
-  '稍后配置', 'Configurar más tarde', 'Configurer plus tard', 'Später konfigurieren', 'Настроить позже', 'Configurar mais tarde',
+  'Configure later',
+  'Close',
+  '稍后配置',
+  'Configurar más tarde',
+  'Configurer plus tard',
+  'Später konfigurieren',
+  'Настроить позже',
+  'Configurar mais tarde',
 ] as const
 const PREVIEW_NOTICE_CONTINUE = exactly(['Continue', '继续', 'Continuar', 'Continuer', 'Weiter', 'Продолжить'])
 
@@ -27,8 +38,7 @@ const PREVIEW_NOTICE_CONTINUE = exactly(['Continue', '继续', 'Continuar', 'Con
  * regex title with an apostrophe (`Avis d'aperçu`) serializes into a selector Playwright cannot parse once the dialog
  * is chained, so the title is deliberately not matched.
  */
-const previewNoticeDialog = (page: Page): Locator =>
-  page.getByRole('dialog').filter({ has: page.getByRole('button', { name: PREVIEW_NOTICE_CONTINUE }) })
+const previewNoticeDialog = (page: Page): Locator => page.getByRole('dialog').filter({ has: page.getByRole('button', { name: PREVIEW_NOTICE_CONTINUE }) })
 
 const providerSetupDialog = (page: Page): Locator => page.getByRole('dialog', { name: PROVIDER_SETUP_DIALOG })
 

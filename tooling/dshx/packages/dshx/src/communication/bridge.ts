@@ -22,8 +22,6 @@ import {
   type CommunicationMessage,
   type CommunicationMessageIntent,
   type CommunicationPrincipal,
-  type CommunicationSubscription,
-  type CommunicationTopic,
 } from './types.js'
 
 const PROTOCOL_VERSION = 1
@@ -142,9 +140,7 @@ const readMetadata = async (stateHome?: string): Promise<Schema.Schema.Type<type
 /** One communication operation's result, as the JSON response envelope carries it. */
 type CommunicationOperationResult =
   | readonly CommunicationAgent[]
-  | readonly CommunicationTopic[]
   | CommunicationDiagnostics
-  | CommunicationSubscription
   | { readonly removed: boolean }
   | CommunicationMessage
   | readonly CommunicationMessage[]
@@ -190,7 +186,6 @@ const dispatch = async (
   if (request.operation === 'inbox') {
     const input = decode(
       strictStruct({
-        topic: Schema.optional(boundedString(1, 128)),
         limit: Schema.optional(boundedInteger(1, 500)),
         includeSeen: Schema.optional(Schema.Boolean),
       }),
@@ -199,7 +194,6 @@ const dispatch = async (
     return {
       items: await service.inbox({
         principal: request.principal,
-        ...(input.topic !== undefined && { topic: input.topic }),
         ...(input.limit !== undefined && { limit: input.limit }),
         ...(input.includeSeen !== undefined && { includeSeen: input.includeSeen }),
       }),

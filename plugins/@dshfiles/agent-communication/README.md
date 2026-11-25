@@ -22,7 +22,7 @@ Task boards remain separate from this live directory. When Agent Teams is compos
 
 The Messages panel lists direct conversations only, with bounded search and pagination, message context, recipient read/acknowledgement status, Agent runtime status, and a secondary diagnostics/activity view. A human sends a direct message to one Agent thread; the receipt reports how many recipients matched. A notice does not create or resume Agent work; a request wakes an idle recipient through the pointer wake. An idle Agent is not assumed to be finished, and an Agent absent from the live registry is not assumed to be complete.
 
-Idle status or absence from the live registry alone never proves a Session is stale. The bridge-owning Host still runs one startup and hourly pass that removes any generated `workspace/<24-hex>` topic left by older versions once no live Agent works there for 24 hours. Message and activity retention is bounded to 30 days and 5,000 entries.
+Idle status or absence from the live registry alone never proves a Session is stale. Message and activity retention is bounded to 30 days and 5,000 entries; a store from an older version migrates to direct mail on first read and drops its subscription rows and topic messages.
 
 The CLI and MCP stdio adapter use the same typed Host service:
 

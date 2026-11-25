@@ -282,7 +282,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const threadAgents = new Map<string, CommunicationDiagnosticAgent | undefined>()
   for (const agent of diagnostics?.agents ?? []) threadAgents.set(agent.id, agent)
   for (const message of navigationQuery.data?.items ?? []) {
-    if (message.topic !== null) continue
     if (message.sender.kind === 'agent')
       threadAgents.set(
         message.sender.id,
@@ -363,8 +362,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const connected = diagnostics !== undefined && diagnosticsQuery.error === null
   const currentDirectAgent = selection.kind === 'direct' ? selection.agentId : null
   const currentTitle = currentDirectAgent === null ? t('allConversations') : t('directThread', { agent: sessionLabel(currentDirectAgent) })
-  const legacyHost =
-    diagnostics?.unnotifiedRecipientCount !== undefined || diagnostics?.subscriptions.some(subscription => subscription.delivery !== 'passive') === true
+  const legacyHost = diagnostics?.unnotifiedRecipientCount !== undefined
   const submitMessage = (): void => {
     if (draft.trim().length === 0 || sendMutation.isPending || selection.kind !== 'direct') return
     setReceiptCount(null)
@@ -619,10 +617,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('sender')}</p>
                           <p className="dshx:break-all dshx:text-sm dshx:font-medium">{principalLabel(selectedMessage.sender, labels, t)}</p>
-                        </div>
-                        <div>
-                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('topic')}</p>
-                          <p className="dshx:break-all dshx:text-sm">{selectedMessage.topic ?? t('directMessages')}</p>
                         </div>
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</p>

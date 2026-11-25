@@ -10,7 +10,7 @@
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "configuration": [],
-      "states": ["no-agents", "live-agent", "related-peers-first", "include-all", "workspace-subscribed", "workspace-subscription-missing", "opted-out"],
+      "states": ["no-agents", "live-agent", "related-peers-first", "include-all"],
       "failureModes": [
         "The listing carries title, status, parent Session id and relation only; it contains no task text, transcript content or path.",
         "For an Agent's own parent or children, native send_message and subagent results are the channel; the peer tools serve separate top-level threads.",
@@ -23,12 +23,6 @@
           "kind": "gherkin",
           "id": "agent-communication.host-report",
           "featureFile": "tooling/dshx/e2e/features/agent-communication.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "agent-communication.lifecycle-workspace-subscribers",
-          "file": "plugins/@dshfiles/agent-communication/src/agent-lifecycle.test.ts",
-          "testName": "prunes a generated workspace topic once no live Agent remains and it has been idle past the window"
         },
         {
           "kind": "unit-test",
@@ -109,7 +103,7 @@
           "kind": "unit-test",
           "id": "agent-communication.service-passive-read-receipts",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
-          "testName": "stores topic messages passively and tracks explicit inbox reads separately from acknowledgements"
+          "testName": "keeps direct messages available after reopen until the recipient acknowledges them"
         },
         {
           "kind": "unit-test",

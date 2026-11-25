@@ -15,7 +15,6 @@ const hubOperations = [
   'enqueueActivity',
   'inbox',
   'messageRecipients',
-  'pruneInactiveWorkspaceTopics',
   'revealMessageBody',
   'send',
   'unreadCount',

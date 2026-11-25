@@ -50,13 +50,7 @@ describe('Agent communication API operations', () => {
     const legacyDiagnostics = communicationDiagnosticsSchema.safeParse({
       generatedAt: 1_800_000_000_000,
       agentCount: 1,
-      agents: [{ id: 'agent-reader', status: 'idle', workspaceTopic: 'workspace/demo', workspaceOptedOut: false }],
-      topicCount: 1,
-      topics: [{ topic: 'workspace/demo', subscribers: 1 }],
-      subscriptionCount: 1,
-      subscriptions: [
-        { principal: { kind: 'agent', id: 'agent-reader' }, topic: 'workspace/demo', delivery: 'queue', createdAt: 1_800_000_000_000, allowSteerFromCount: 0 },
-      ],
+      agents: [{ id: 'agent-reader', status: 'idle' }],
       messageCount: 1,
       pendingMessageCount: 1,
       pendingRecipientCount: 1,
@@ -64,7 +58,6 @@ describe('Agent communication API operations', () => {
       recentMessages: [
         {
           id: messageId,
-          topic: 'workspace/demo',
           sender: { kind: 'agent', id: 'agent-sender' },
           priority: 'urgent',
           createdAt: 1_800_000_000_000,
@@ -79,8 +72,7 @@ describe('Agent communication API operations', () => {
 
     expect(legacyDiagnostics.success).toBe(true)
     if (legacyDiagnostics.success) {
-      expect(legacyDiagnostics.data.agents[0]?.workspaceSubscribed).toBeUndefined()
-      expect(legacyDiagnostics.data.subscriptions[0]?.delivery).toBe('queue')
+      expect(legacyDiagnostics.data.agents[0]?.id).toBe('agent-reader')
       expect(legacyDiagnostics.data.recentMessages[0]?.intent).toBe('notice')
     }
 
@@ -117,7 +109,7 @@ describe('Agent communication API operations', () => {
     const directReceipt = await operations.postMessage({ agentId: 'agent-reader', text: 'A direct browser message.' })
     expect(directReceipt).toMatchObject({ recipientCount: 1 })
     expect((await operations.browseMessages({ agentId: 'agent-reader' })).items).toContainEqual(
-      expect.objectContaining({ id: directReceipt.messageId, topic: null, text: 'A direct browser message.' }),
+      expect.objectContaining({ id: directReceipt.messageId, text: 'A direct browser message.' }),
     )
 
     const offlineReceipt = await operations.postMessage({ agentId: 'agent-offline', text: 'A durable message for an offline Agent.' })

@@ -1,8 +1,7 @@
 import type {} from '@deepseek-ai/dsh-agent'
 import { Api, DshxPlugin, HostEvents } from '@dshfiles/dshx/effect'
 import { HostApis } from '@dshfiles/dshx/effect/host-apis'
-import { Clock, Duration, Effect, Layer } from 'effect'
-import { cleanupInactiveWorkspaceChannels } from './agent-lifecycle.js'
+import { Duration, Effect, Layer } from 'effect'
 import { agentCommunicationApi } from './api.js'
 import { CommunicationOperations } from './api-operations.js'
 import { CommunicationHub } from './communication-hub-promise.js'
@@ -14,15 +13,6 @@ import { recurringTask } from './recurring-task.js'
 import { agentCommunicationSettings, CommSettingsLive } from './settings.js'
 import { UnreadCounts, UnreadPrompt } from './unread-counts.js'
 import { UnreadNudgeRules } from './unread-nudge.js'
-
-const workspaceTopicCleanupInterval = Duration.hours(1)
-
-/** One pass over the generated workspace topics: no live Agent there and idle past the window means it goes. */
-const pruneWorkspaceTopics = Effect.gen(function* () {
-  const agents = yield* HostAgents
-  const now = yield* Clock.currentTimeMillis
-  return yield* cleanupInactiveWorkspaceChannels({ liveAgentCwds: (yield* agents.list).map(agent => agent.session.header.cwd), now })
-})
 
 /** Every message the timeline asks to backfill is re-announced once on the activity event. */
 const ActivityBackfill = Layer.effectDiscard(
@@ -42,7 +32,6 @@ const ActivityBackfill = Layer.effectDiscard(
               senderId: message.sender.id,
               recipientCount: message.recipients.length,
               intent: message.intent,
-              topic: message.topic,
               ...(message.correlationId !== null && { correlationId: message.correlationId }),
               sessionId: message.sender.kind === 'agent' ? message.sender.id : null,
             },
@@ -64,17 +53,11 @@ const Maintenance = Layer.effectDiscard(
     const agents = yield* HostAgents
     const unread = yield* UnreadCounts
     const listAgents = yield* DshxPlugin.callback(() => agents.communicationAgents)
-    const ownsBridge = yield* hub.serveBridge(listAgents)
+    yield* hub.serveBridge(listAgents)
     const reportFailure = (task: string) => (cause: unknown) => Effect.logWarning(`agent-communication: ${task} failed`, cause)
-    // One pass at startup clears the subscriptions older versions created for every Agent and every workspace.
-    yield* pruneWorkspaceTopics.pipe(Effect.catchCause(cause => Effect.logWarning('agent-communication: startup workspace topic cleanup failed', cause)))
     yield* DshxPlugin.worker(
       recurringTask({ run: unread.refresh, interval: Duration.millis(UnreadNudgeRules.refreshIntervalMs), onFailure: reportFailure('unread count refresh') }),
     )
-    if (ownsBridge)
-      yield* DshxPlugin.worker(
-        recurringTask({ run: pruneWorkspaceTopics, interval: workspaceTopicCleanupInterval, onFailure: reportFailure('workspace topic maintenance') }),
-      )
   }),
 )
 
