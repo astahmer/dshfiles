@@ -351,7 +351,7 @@
       ],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; UI in a later wave",
+      "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; editor UI in agent-tools-tree",
       "configuration": [],
       "states": [
         "explicit",
@@ -412,8 +412,8 @@
         },
         {
           "kind": "not-applicable",
-          "id": "agents.tool-access-no-ui-yet",
-          "reason": "This wave ships the Host contract and agent tools only; the tool-access controls in the Agents panel and composer come with the UI wave and its journeys."
+          "id": "agents.tool-access-host-contract",
+          "reason": "Host contract and agent tools; the browser journey that edits and reloads tool access is agents.tool-access-tree under agent-tools-tree."
         }
       ],
       "telemetry": [
@@ -480,6 +480,106 @@
         {
           "kind": "automatic",
           "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "agent-tools-tree",
+      "title": "Choose an agent's tools, subagents and projects",
+      "summary": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through tool_search), a filter by name or description and an N of M selected count. Each row says whether its state is set on it or inherited from its group, and a reset drops an explicit entry. Collapsed groups render one row and expanded ones a page at a time, and the tree has one tab stop (arrows, Space, P, Delete). Delegation picks which agents subagents may run as and the default one; Default for projects picks the projects this agent is the default of, showing the agent each uses now. One Save sends the agent's changed fields, one setToolAccess batch of sparse edits, subagents and project defaults; threads started afterwards get them.",
+      "reach": [
+        "click button \"Agents\"",
+        "click button \"New agent\"",
+        "fill textbox \"Name\" \"Reviewer\"",
+        "click treeitem \"DSH, DSH*\"",
+        "click treeitem \"read, default\"",
+        "expect treeitem \"read, set here, unsaved\"",
+        "expect text \"unsaved*\"",
+        "click button \"Pin present\"",
+        "expect treeitem \"present, pinned, set here, unsaved\"",
+        "click textbox \"Filter tools\"",
+        "expect text \"2 unsaved*\""
+      ],
+      "reachNarrow": [
+        "click button \"Open sidebar\"",
+        "click button \"Agents\"",
+        "click button \"New agent\"",
+        "fill textbox \"Name\" \"Reviewer\"",
+        "click treeitem \"DSH, DSH*\"",
+        "click treeitem \"read, default\"",
+        "expect treeitem \"read, set here, unsaved\"",
+        "expect text \"unsaved*\"",
+        "click button \"Pin present\"",
+        "expect treeitem \"present, pinned, set here, unsaved\"",
+        "click textbox \"Filter tools\"",
+        "expect text \"2 unsaved*\""
+      ],
+      "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents › agent editor › Tools, Delegation, Default for projects",
+      "configuration": [],
+      "states": ["collapsed", "expanded", "filtered", "inherited", "set-here", "pinned", "unsaved", "catalog-error", "no-projects"],
+      "failureModes": [
+        "A tool list that fails to load says so with Retry and the restart hint for an updated Host.",
+        "A default subagent outside the allowed list blocks the save, with a fix to use the parent thread's agent.",
+        "A save that fails part-way keeps the remaining edits dirty against the refreshed agent, so saving again sends only what is missing.",
+        "tool_search and tool_call stay selected whatever their group says."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agents.tool-access-tree",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-tristate",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "a group checkbox is checked, cleared or mixed by its children"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-inherited",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "a tool shows whether its state is set on it or inherited from its group"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-batch",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "the save batch holds one edit per changed entry, null for a removed one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-reset",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "toggling back to the inherited value leaves no entry, and reset drops an entry"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.save-plan-tools-only",
+          "file": "plugins/@dshfiles/agents/src/agent-save-plan.test.ts",
+          "testName": "a tools-only change sends one setToolAccess batch and no whole-agent save"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.save-plan-projects",
+          "file": "plugins/@dshfiles/agents/src/agent-save-plan.test.ts",
+          "testName": "project picks set new defaults and clear only projects this agent holds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tools-tree-keyboard",
+          "file": "plugins/@dshfiles/agents/src/agent-tools-tree.test.tsx",
+          "testName": "opens a group with the keyboard, pages long groups, and toggles and pins tools"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
         }
       ]
     }
