@@ -1082,7 +1082,7 @@ When('the next five New thread destination lookups fail', async ({ page }: { pag
 Then('a failed destination lookup leaves the first send retryable', async ({ page }: { page: Page }) => {
   const destination = page.getByLabel('New thread destination', { exact: true })
   const composer = newThreadComposer(page)
-  await expect(destination.getByRole('alert')).toContainText('Could not determine the workspace destination.')
+  await expect(destination.getByRole('alert')).toContainText("Could not read the project's workspaces.")
   await composer.fill('first message from the inherited workspace')
   await composer.press('Enter')
   await expect(composer).toHaveText('first message from the inherited workspace')

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import { LandStatusModel } from './land-status.js'
 
@@ -29,5 +32,24 @@ describe('land filters', () => {
       'completed',
       'all',
     ])
+  })
+})
+
+// DESIGN.md › Layout, counts: the heading counts what the unfiltered list shows, and a zero is not drawn.
+describe('Workspaces counts', () => {
+  it('counts the heading from the All filter and draws no zero', () => {
+    expect(LandStatusModel.drawnCount(2)).toBe(2)
+    expect(LandStatusModel.drawnCount(0)).toBeUndefined()
+  })
+
+  it('takes the heading count from the All filter, counted once from the list', () => {
+    const panel = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'panel.tsx'), 'utf8')
+    expect(panel).toContain('const headerCount = LandStatusModel.drawnCount(counts.all)')
+    expect(panel).not.toMatch(/count: threads\.length/u)
+  })
+
+  it('names what could not be read when the destination lookup fails', () => {
+    const locales = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'locales.ts'), 'utf8')
+    expect(locales).toContain(`workspaceDestinationUnavailable: "Could not read the project's workspaces.",`)
   })
 })

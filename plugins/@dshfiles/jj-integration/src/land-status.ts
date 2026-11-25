@@ -29,7 +29,11 @@ const visibleFilters = <Filter extends string>(input: {
 }): readonly Filter[] =>
   input.filters.filter((filter, index) => index === 0 || index === input.filters.length - 1 || filter === input.selected || input.counts[filter] > 0)
 
+/** A count worth drawing: a zero is not drawn (DESIGN.md › Layout, counts). */
+const drawnCount = (count: number): number | undefined => (count > 0 ? count : undefined)
+
 export class LandStatusModel {
   static readonly glyph = glyph
   static readonly visibleFilters = visibleFilters
+  static readonly drawnCount = drawnCount
 }

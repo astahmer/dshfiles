@@ -1083,6 +1083,8 @@ export const ThreadWorkspacesPanel = (props: {
   const activeTitle = activeIntegrationPath === null ? undefined : entries.find(entry => entry.thread.path === activeIntegrationPath)?.thread
   const activeLabel = activeTitle === undefined ? undefined : threadLabelOf(activeTitle, sessionById, t('untitledThread'))
   const queueVisible = queueBusy || failedPaths.length > 0
+  // The heading counts what the All filter lists, from the same entries, not every workspace before the state filter.
+  const headerCount = LandStatusModel.drawnCount(counts.all)
 
   return (
     <TooltipProvider>
@@ -1090,7 +1092,7 @@ export const ThreadWorkspacesPanel = (props: {
         scroll
         heading={t('title')}
         description={t('subtitle', { bookmark: panelBookmark })}
-        {...(threads.length > 0 ? { count: threads.length } : {})}
+        {...(headerCount === undefined ? {} : { count: headerCount })}
         actions={[
           {
             id: 'refresh',
@@ -1176,7 +1178,7 @@ export const ThreadWorkspacesPanel = (props: {
                 >
                   {tab.category === undefined ? null : <StatusGlyph status={LandStatusModel.glyph(tab.category)} decorative />}
                   {tab.label}
-                  <span className="dshx:text-muted-foreground dshx:tabular-nums">{counts[tab.id]}</span>
+                  {counts[tab.id] === 0 ? null : <span className="dshx:text-muted-foreground dshx:tabular-nums">{counts[tab.id]}</span>}
                 </Button>
               ))}
               <Separator orientation="vertical" className="dshx:mx-1 dshx:h-5!" />

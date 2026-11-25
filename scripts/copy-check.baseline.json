@@ -16,7 +16,7 @@
     "ascii-ellipsis": 0
   },
   "counts": {
-    "code-echo/jj-integration": 1,
+    "code-echo/jj-integration": 0,
     "code-echo/multi-host": 1,
     "conversation/agent-preset": 1,
     "conversation/backlog": 5,
