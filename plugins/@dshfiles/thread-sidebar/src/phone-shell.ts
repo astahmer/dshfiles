@@ -18,6 +18,15 @@ export interface PhoneTopBar {
   readonly thread: boolean
 }
 
+/**
+ * The phone thread bar's second line (council round 7 B5), what the desktop header's chip says: the thread's subagents
+ * ("1 subagent") or, without any, that it works; the working glyph leads it while the thread or a subagent works.
+ */
+export interface PhoneThreadSubtitle {
+  readonly working: boolean
+  readonly label: string
+}
+
 /** What the phone stack shows: the list (and which), or the stage (and what it came from). */
 export interface PhoneStackInput {
   readonly listOpen: boolean
@@ -102,6 +111,16 @@ export const PhoneTopBarModel = {
     if (back.to === 'page')
       return 1 + PhoneTopBarModel.depth({ ...input, listOpen: false, moreOpen: false, activePanelId: back.panelId, selectedThreadId: null, origin: undefined })
     return ROOTS.has(back.to) ? 1 : 2
+  },
+
+  /** The thread bar's subtitle: its subagents, else Working while it works; none for a quiet thread without any. */
+  subtitle(input: {
+    readonly working: boolean
+    readonly subagents: number
+    readonly labels: { readonly working: string; readonly subagents: (count: number) => string }
+  }): PhoneThreadSubtitle | undefined {
+    if (input.subagents > 0) return { working: input.working, label: input.labels.subagents(input.subagents) }
+    return input.working ? { working: true, label: input.labels.working } : undefined
   },
 
   /** A page's name as Back shows it: the Inbox by its tab name, any other page by its section label. */

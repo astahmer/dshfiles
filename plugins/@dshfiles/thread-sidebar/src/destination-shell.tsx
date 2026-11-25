@@ -46,7 +46,8 @@ import type { NavigationRecord } from './navigation-api.js'
 import { ListHeaderExtras } from './list-header-extras.js'
 import { AddPanelButton, EntryMenu, FolderDialog, FolderGlyph, FolderMenu, FolderNotice, ViewGlyph, viewDrag, type SidebarFolderUi } from './sidebar-folders.js'
 import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
-import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
+import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar, type PhoneThreadSubtitle } from './phone-shell.js'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { PhoneLayout } from './phone-layout.js'
 import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
@@ -179,6 +180,8 @@ export interface DestinationShellProps {
   readonly stageTitle?: string | undefined
   /** A thread picked in the list that the stage has not opened yet: the phone bar names it at once. */
   readonly pendingTitle?: string | undefined
+  /** The phone thread bar's second line: the thread's subagents or that it works (council round 7 B5). */
+  readonly stageSubtitle?: PhoneThreadSubtitle | undefined
   /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
   readonly togglePanels?: (() => void) | null
   /** A swipe in from the right edge, inside a thread, opens the thread panel (Settings › phoneEdgeSwipePanels). */
@@ -564,6 +567,9 @@ const EntryRows = (props: {
     ))}
   </>
 )
+
+/** The phone bar's title: the bar row's 17/22, at 600 (council round 4 B3, round 7 B5). */
+const PHONE_TITLE_CLASS = 'dshx:min-w-0 dshx:truncate dshx:font-semibold'
 
 const SETTINGS_GROUP_HEAD = 'dshx:px-2.5 dshx:pb-1 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground'
 
@@ -1372,6 +1378,8 @@ const PhoneNavigation = (
   const stageBar = drawer ? PhoneTopBarModel.resolve({ ...stack, listOpen: false, moreOpen: false }) : bar
   // A page or a list centres its title (council round 4 B3); a thread's title leads, after the back chevron.
   const centred = !(stageBar.thread && (drawer || !listOpen))
+  // Only a thread's title carries a second line; a page or a list keeps its one centred line.
+  const subtitle = centred ? undefined : props.stageSubtitle
   // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
   const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
   const backToPage = (): void => {
@@ -1688,16 +1696,29 @@ const PhoneNavigation = (
           {/* The status gauge leads, in the seat the Inbox bar gives it (council round 6 B1); + stays trailing. */}
           {showNew && !drawer && phoneStatus.status === 'active' ? <phoneStatus.value.Button /> : null}
           </div>
-          <h1
-            data-phone-title=""
-            className={cn(
-              'dshx:min-w-0 dshx:truncate dshx:font-semibold',
-              centred ? 'dshx:text-center' : 'dshx:flex-1',
-              !centred && !drawer && bar.back === null && 'dshx:pl-2.5',
-            )}
-          >
-            {stageBar.title}
-          </h1>
+          {subtitle === undefined ? (
+            <h1
+              data-phone-title=""
+              className={cn(
+                PHONE_TITLE_CLASS,
+                centred ? 'dshx:text-center' : 'dshx:flex-1',
+                !centred && !drawer && bar.back === null && 'dshx:pl-2.5',
+              )}
+            >
+              {stageBar.title}
+            </h1>
+          ) : (
+            // A thread's title over its 13px status line, as the desktop header's title and chip (council round 7 B5).
+            <div className={cn('dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:justify-center', !drawer && bar.back === null && 'dshx:pl-2.5')}>
+              <h1 data-phone-title="" className={PHONE_TITLE_CLASS}>
+                {stageBar.title}
+              </h1>
+              <p data-phone-subtitle="" className="dshx:m-0 dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-sm dshx:leading-4 dshx:text-muted-foreground">
+                {subtitle.working ? <StatusGlyph status="working" decorative /> : null}
+                <span className="dshx:min-w-0 dshx:truncate">{subtitle.label}</span>
+              </p>
+            </div>
+          )}
           <div className={centred ? 'dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-self-end' : 'dshx:contents'}>
           {showNew && !drawer ? (
             <button

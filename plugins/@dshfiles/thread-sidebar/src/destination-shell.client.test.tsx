@@ -681,6 +681,36 @@ describe('DestinationShell', () => {
     expect(chevron.className).toContain('dshx:w-7')
     expect(chevron.className).toContain('dshx:after:w-11')
   })
+
+  it('on a phone, titles a thread 17/600 over a 13px muted line with its status glyph and subagents (council round 7 B5)', () => {
+    setPhone(true)
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'session-1',
+      stageThreadId: 'session-1',
+      stageTitle: 'Fix invoice tax rounding',
+      stageSubtitle: { working: true, label: '1 subagent' },
+    })
+    const title = document.querySelector('[data-phone-title]')
+    expect(title?.textContent).toBe('Fix invoice tax rounding')
+    // 17px from the bar row it sits in, at 600.
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:text-[17px]')
+    expect(title?.className).toContain('dshx:font-semibold')
+    expect(title?.className).not.toContain('dshx:font-bold')
+    expect(title?.className).not.toMatch(/dshx:text-(xl|lg|title|\[20px\])/u)
+    const subtitle = document.querySelector('[data-phone-subtitle]')
+    expect(subtitle?.textContent).toContain('1 subagent')
+    // 13px: the kit's text-sm.
+    expect(subtitle?.className).toContain('dshx:text-sm')
+    expect(subtitle?.className).toContain('dshx:text-muted-foreground')
+    expect(subtitle?.querySelector('[data-status]')?.getAttribute('data-status')).toBe('working')
+    // Title and subtitle stack in one cell after the chevron.
+    expect(title?.parentElement?.contains(subtitle ?? null)).toBe(true)
+    cleanup()
+    // A page keeps its one centred line.
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageSubtitle: { working: true, label: '1 subagent' } })
+    expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
+  })
 })
 
 describe('phone navigation: drawer', () => {
