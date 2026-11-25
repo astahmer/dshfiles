@@ -68,6 +68,8 @@ describe('theme definitions', () => {
     expect(css).toContain('--shiki-token-keyword: #81a1c1;')
     // A pinned theme's panel is its nav column too (council round 6 A4): the generated lift never overrides it.
     expect(css).toContain(`--dshx-tone-nav: ${NORD.dark!.colours.panel};`)
+    // Its Ready dot is its own success colour (council round 6 A6).
+    expect(css).toContain(`--dshx-ready-mark: ${NORD.dark!.colours.success};`)
     expect(css).toContain(`${RUNTIME_DARK_SELECTOR} ${BACKDROP_HOST}::before {`)
     expect(css).toContain('animation: nord-drift 9s infinite;')
     expect(css).toContain('@keyframes nord-drift')

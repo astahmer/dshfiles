@@ -623,7 +623,9 @@ item — thread, subagent, job, check, workspace, host. Plugins map onto them an
 | Done      | landed or closed; workspace released | muted check               | muted     |
 
 Every glyph sits in a 16px seat, so a row never shifts when its state changes. Needs you, Failed and Working draw at
-14px and the Ready dot at 10px. A count chip (`StatusCount`) draws the same glyph in a 10px seat beside its number;
+14px; the Ready dot and the Idle ring both at 10px (the ring as wide as the dot, council round 6 A6). In light the
+Ready dot is a lighter green than the ready text (`--dshx-ready-mark`, `oklch(0.55 0.13 150)`, 3:1 on every row surface)
+so it is not the heaviest mark in a list; dark keeps the success tone. A count chip (`StatusCount`) draws the same glyph in a 10px seat beside its number;
 a zero draws nothing.
 
 Two glyph-only states draw but never group or sort: **stale** (dashed faint ring: a reading or workspace that may be

@@ -83,6 +83,11 @@ export interface Palette {
    */
   readonly navSurface: Oklch
   /**
+   * The Ready dot (council round 6 A6): in light a lighter green than the status text (L 0.55, chroma 0.13) so the dot is
+   * not the heaviest mark in a list; 3:1 on bg, panel, raised, nav and the selection wash. Dark keeps the success tone.
+   */
+  readonly readyMark: Oklch
+  /**
    * The primary button's fill: in light a soft warm near-black (council round 4 A2: oklch 0.30 0.01 on the grey hue, a
    * step off the 0.22 ink so it is not a black slab); in dark a softened warm light grey (council round 3 A3: oklch 0.88
    * 0.006), so the one primary stops being the brightest thing on the screen. Its label is the page colour, AA at rest
@@ -164,6 +169,7 @@ function palette(input: PaletteInput): Palette {
     needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
     // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
     failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.94, c: 0.031, h: STATUS_HUES.danger },
+    readyMark: dark ? status(STATUS_HUES.success) : { l: 0.55, c: 0.13, h: STATUS_HUES.success },
     navSurface: dark ? { l: 0.225, c: 0.006, h: 60 } : panel,
     promptFill: dark ? { l: 0.255, c: 0.018, h: 230 } : { l: 0.965, c: 0.012, h: 230 },
     fieldBorder: { l: round(clamp(base + ((dark ? 0.55 : 0.61) - base) * contrast, 0, 1), 4), c: primaryChroma, h: hue },

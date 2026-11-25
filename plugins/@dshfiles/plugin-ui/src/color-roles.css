@@ -18,6 +18,8 @@
   --color-status-needs-you: var(--dsw-alias-state-business-primary);
   --color-status-failed: var(--dsw-alias-state-error-primary);
   --color-status-ready: var(--dsw-alias-state-success-primary);
+  /* The Ready dot (council round 6 A6): lighter than the ready text green in light; the success tone in dark. */
+  --color-status-ready-mark: var(--dshx-ready-mark, var(--dsw-alias-state-success-primary));
   --color-status-working: var(--dsw-alias-label-primary);
   --color-status-idle: var(--dsw-alias-label-tertiary);
   --color-status-done: var(--dsw-alias-label-secondary);

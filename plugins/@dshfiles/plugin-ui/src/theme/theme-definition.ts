@@ -302,6 +302,8 @@ function pins(theme: SchemeTheme): string[] {
   NEUTRAL_ROLES.forEach((role, step) => push(`--dshx-tone-${step}`, theme.colours[role]))
   // The nav column is the theme's own panel colour (council round 6 A4 lifts only the generated dark palette).
   push('--dshx-tone-nav', theme.colours.panel)
+  // Its Ready dot is its own success colour (council round 6 A6 lightens only the generated light palette's).
+  push('--dshx-ready-mark', theme.colours.success)
   push('--dshx-tone-accent', theme.colours.accent)
   push('--dshx-tone-accent-bg', rgba(theme.colours.accent, 0.14))
   push('--dshx-tone-accent-border', rgba(theme.colours.accent, 0.35))

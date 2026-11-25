@@ -210,6 +210,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-field-border', PaletteMath.toCss(p.fieldBorder))
   push('--dshx-prompt-fill', PaletteMath.toCss(p.promptFill))
   push('--dshx-tone-nav', PaletteMath.toCss(p.navSurface))
+  push('--dshx-ready-mark', PaletteMath.toCss(p.readyMark))
   push('--dshx-primary-fill', PaletteMath.toCss(p.primaryFill))
   push('--dshx-primary-hover', PaletteMath.toCss(p.primaryHover))
   for (const key of ['success', 'warning', 'danger', 'info'] as const) {

@@ -61,7 +61,8 @@ const glyphClass = {
   working: 'dshx:text-status-working',
   'needs-you': 'dshx:text-info',
   failed: 'dshx:text-destructive',
-  ready: 'dshx:text-status-ready',
+  // The dot's own green (council round 6 A6): lighter than the status text green in light, so it is not the heaviest mark.
+  ready: 'dshx:text-status-ready-mark',
   idle: 'dshx:text-(--dsw-alias-label-tertiary)',
   done: 'dshx:text-muted-foreground',
   stale: 'dshx:text-(--dsw-alias-label-tertiary)',
@@ -114,7 +115,8 @@ const GlyphMark = ({ status, size }: { readonly status: StatusGlyphState; readon
     case 'ready':
       return <span aria-hidden className={cn(dot, 'dshx:rounded-full dshx:bg-current')} />
     case 'idle':
-      return <span aria-hidden className={cn(ring, 'dshx:rounded-full dshx:border dshx:border-current')} />
+      // The Ready dot's 10px seat (council round 6 A6): a ring as wide as the dot, not a smaller 8px one.
+      return <span aria-hidden className={cn(dot, 'dshx:rounded-full dshx:border dshx:border-current')} />
     case 'done':
       return <CheckIcon aria-hidden className={mark} strokeWidth={2.5} />
     case 'stale':
@@ -144,7 +146,7 @@ function useChangedWhileMounted(status: StatusGlyphState): boolean {
  * The status mark of a work item, in a fixed 16 px box so rows align whatever the state (StatusGlyph v2). The marks that
  * carry a state you act on read at 14 px (needs-you, failed, working) and the ready dot at 10 px (round five K6): working is
  * an ink phase-synced spinner, needs-you the indigo diamond, failed the red cross, ready a green dot, idle a faint
- * ring, done a muted check, stale a dashed ring, stopped a muted square. A mark that changes while on screen
+ * ring as wide as the dot (council round 6 A6), done a muted check, stale a dashed ring, stopped a muted square. A mark that changes while on screen
  * cross-fades in 120ms.
  */
 export const StatusGlyph = React.forwardRef<HTMLSpanElement, StatusGlyphProps>(function StatusGlyph(

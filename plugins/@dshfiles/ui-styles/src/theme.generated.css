@@ -44,6 +44,7 @@ html body {
   --dshx-field-border: oklch(0.61 0.01 65);
   --dshx-prompt-fill: oklch(0.965 0.012 230);
   --dshx-tone-nav: oklch(0.962 0.0035 65);
+  --dshx-ready-mark: oklch(0.55 0.13 150);
   --dshx-primary-fill: oklch(0.3 0.01 65);
   --dshx-primary-hover: oklch(0.24 0.01 65);
   --dshx-tone-success: oklch(0.5 0.15 150);
@@ -202,6 +203,7 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dshx-field-border: oklch(0.55 0.01 65);
   --dshx-prompt-fill: oklch(0.255 0.018 230);
   --dshx-tone-nav: oklch(0.225 0.006 60);
+  --dshx-ready-mark: oklch(0.75 0.14 150);
   --dshx-primary-fill: oklch(0.88 0.006 65);
   --dshx-primary-hover: oklch(0.7827 0.0061 65);
   --dshx-tone-success: oklch(0.75 0.14 150);
