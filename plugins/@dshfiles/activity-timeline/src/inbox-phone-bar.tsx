@@ -71,7 +71,8 @@ export const InboxPhoneBar = (): JSX.Element | null => {
     <Dialog open modal={false}>
       <DialogPortal>
         <div data-inbox-phone-bar="" className={InboxView.PHONE_BAR}>
-          {status.status === 'active' ? <status.value.Button /> : null}
+          {/* With Start triage present the three controls run over the centred title at 390 px; Threads keeps status. */}
+          {primary === undefined && status.status === 'active' ? <status.value.Button /> : null}
           {value.actions.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

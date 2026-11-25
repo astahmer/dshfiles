@@ -48,6 +48,10 @@ describe('an Inbox card on a phone (round five C3, council round 3)', () => {
 
   it("carries the frame's status button in the phone top bar (round five C2)", () => {
     expect(phoneBar).toMatch(/const status = useContract\(PhoneStatus\)/u)
-    expect(phoneBar).toMatch(/status\.status === 'active' \? <status\.value\.Button \/> : null/u)
+  })
+
+  it('leaves the centred title clear: the status button only shows when the bar has no primary (council round 5)', () => {
+    // Status, ⋯ and Start triage together ran over the centred "Inbox" title at 390 px; the Threads bar keeps status.
+    expect(phoneBar).toMatch(/primary === undefined && status\.status === 'active' \? <status\.value\.Button \/> : null/u)
   })
 })
