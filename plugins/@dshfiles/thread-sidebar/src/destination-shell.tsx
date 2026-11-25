@@ -1,6 +1,7 @@
 import { WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
 import { usePhoneHistoryLayer } from '@dshfiles/workbench/phone-history'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -491,6 +492,8 @@ const FolderIndex = (props: {
   readonly phone?: boolean
   /** List the pages for plugin authors, in their own group at the end of Settings. */
   readonly showDeveloperPages?: boolean | undefined
+  /** Settings › Plugins, where a page that did not load is diagnosed. */
+  readonly openPlugins?: (() => void) | undefined
 }): JSX.Element => {
   const { folder, folderUi } = props
   const [renaming, setRenaming] = useState(false)
@@ -504,6 +507,7 @@ const FolderIndex = (props: {
   const unmapped = folder.entries.filter(entry => other(entry) && entry.developer !== true)
   const settings = folder.id === 'settings' ? props.openSettings : null
   const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
+  const missingPage = Destinations.expectedPageOf(folder.id)
   const rows = (entries: readonly ResolvedEntry[], descriptions = true): JSX.Element => (
     <EntryRows
       folder={folder}
@@ -530,12 +534,28 @@ const FolderIndex = (props: {
         )}
       </header>
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-1.5">
+        {empty && missingPage !== undefined ? (
+          // A page this destination is known for did not register: its plugin did not load (D6).
+          <LoadError
+            subject={missingPage}
+            sentence={`${missingPage} did not load. Reload the page; if it keeps failing, open Settings › Plugins.`}
+            data-destination-load-error={folder.id}
+            actions={
+              <>
+                <Button type="button" size="sm" variant="outline" onClick={() => window.location.reload()}>
+                  Reload
+                </Button>
+                {props.openPlugins === undefined ? null : (
+                  <Button type="button" size="sm" variant="ghost" onClick={props.openPlugins}>
+                    Open Plugins
+                  </Button>
+                )}
+              </>
+            }
+          />
+        ) : null}
         {empty && folderUi === undefined ? (
-          <EmptyState>
-            {folder.id === 'inbox'
-              ? 'The inbox is not installed in this profile yet. Threads that need you are marked in the thread list.'
-              : 'No page here yet. Plugins add their pages to this list.'}
-          </EmptyState>
+          missingPage === undefined ? <EmptyState>No page here yet. Plugins add their pages to this list.</EmptyState> : null
         ) : (
           <nav aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col dshx:gap-0.5">
             {settings === null ? null : (
@@ -639,6 +659,7 @@ const ListPane = (
       folderUi={props.folderUi}
       phone={props.phone === true}
       showDeveloperPages={props.showDeveloperPages}
+      openPlugins={() => props.selectPanel('plugins')}
     />
   )
 

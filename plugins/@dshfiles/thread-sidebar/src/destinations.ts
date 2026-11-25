@@ -107,6 +107,16 @@ const resolve = (panels: readonly DestinationPanel[], contributed: readonly Dest
   }))
 }
 
+/**
+ * The page a destination is known for, by its label ("Inbox"): when that destination lists nothing, this page's plugin
+ * did not load, and the rail says so instead of showing an empty column. Undefined for a destination with no built-in
+ * page (it is simply empty) and for Threads and Settings, which always have content.
+ */
+const expectedPageOf = (destination: string): string | undefined =>
+  destination === 'threads' || destination === 'settings'
+    ? undefined
+    : KNOWN_SECTIONS.find(section => section.destination === destination && section.group !== 'developer' && section.unlisted !== true)?.label
+
 /** The destination that lists this page, if any. */
 const owning = (destinations: readonly ResolvedDestination[], panelId: string | null | undefined): ResolvedDestination | undefined =>
   panelId === null || panelId === undefined ? undefined : destinations.find(destination => destination.sections.some(section => section.panelId === panelId))
@@ -114,5 +124,6 @@ const owning = (destinations: readonly ResolvedDestination[], panelId: string | 
 export class Destinations {
   static readonly resolve = resolve
   static readonly owning = owning
+  static readonly expectedPageOf = expectedPageOf
   static readonly withoutPluginPrefix = withoutPluginPrefix
 }

@@ -201,6 +201,16 @@ describe('DestinationShell', () => {
     expect(seat?.className).toContain('dshx:[&_[data-attention-badge]>span]:right-8')
   })
 
+  it('says the Inbox did not load, with Reload and Open Plugins, when its page never registered', () => {
+    setPhone(false)
+    const shell = renderShell()
+    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }))
+    expect(screen.getByText('Inbox did not load. Reload the page; if it keeps failing, open Settings › Plugins.')).toBeDefined()
+    expect(screen.getByRole('button', { name: 'Reload' })).toBeDefined()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Plugins' }))
+    expect(shell.selectPanel).toHaveBeenCalledWith('plugins')
+  })
+
   it('on a phone, the Inbox tab opens the Inbox page directly', () => {
     setPhone(true)
     const inboxPanels = [
