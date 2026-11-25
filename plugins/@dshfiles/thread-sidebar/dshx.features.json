@@ -4267,7 +4267,7 @@
       "id": "phone-tab-bar",
       "title": "Navigate from a bottom tab bar on a phone",
       "summary": "On a phone, a bottom tab bar holds Threads, Inbox, New and More.",
-      "details": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations. The frame then gives the stage the full width and leaves room for the bar instead of keeping the 56px rail.",
+      "details": "Below 640px the rail becomes a bottom tab bar (Threads, Inbox, New, More). Threads and Inbox open their list full screen; opening a thread or page closes it, so the stage is pushed; a second tap on the open tab goes back. More lists the other destinations. The frame then gives the stage the full width and leaves room for the bar instead of keeping the 60px rail.",
       "surfaces": ["client"],
       "surface": "destinationSection",
       "destination": "threads",

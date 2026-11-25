@@ -391,8 +391,8 @@ const RailButton = (props: {
         {props.icon}
       </span>
       {props.showLabel ? (
-        // 10.5px at -0.01em (council round 4 B6): "Knowledge", the longest, keeps side room in the 56px rail.
-        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-[10.5px] dshx:leading-tight dshx:tracking-[-0.01em]', props.active && 'dshx:font-semibold')}>
+        // The 11px floor at -0.01em (round five B3): "Knowledge", the longest, keeps side room in the 60px rail.
+        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-[-0.01em]', props.active && 'dshx:font-semibold')}>
           {props.folder.label}
         </span>
       ) : null}
@@ -1024,9 +1024,10 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         aria-label="Destinations"
         className={cn(
           'dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pb-2 dshx:[scrollbar-width:none]',
-          // One width open and folded: the frame's folded track (56px) holds the rail whole (round five B1). Unpadded
-          // buttons: "Knowledge", the longest destination, fits whole at the label size (productivity pass Q5, T5.3).
-          'dshx:w-14 dshx:px-0',
+          // One width open and folded: the frame's folded track (60px, frame-layout's SIDEBAR_COLLAPSED) holds the rail
+          // whole (round five B1, B3). Unpadded buttons: "Knowledge", the longest destination, fits whole at the label
+          // size (productivity pass Q5, T5.3).
+          'dshx:w-15 dshx:px-0',
           // One rail surface open and folded, on every destination (council round 4 B2): the panel step the frame's folded
           // track paints, not the base of the pane the open column sits in.
           'dshx:bg-[var(--dsw-specific-sidebar-fill)]',
@@ -1055,6 +1056,9 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         <div role="tablist" aria-orientation="vertical" aria-label="Destinations" className="dshx:flex dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           {railFolders.filter(candidate => !candidate.bottom).map(railButton)}
           <div className="dshx:mt-auto dshx:flex dshx:flex-col dshx:pt-2">
+            {/* The labelled destinations and the glyph-only bottom cluster are two instruments: one hairline between
+                them, inset like the icon tiles (round five B3). */}
+            <div aria-hidden="true" data-rail-divider="" className="dshx:mx-3 dshx:mb-1.5 dshx:border-t dshx:border-border" />
             {folderUi === undefined ? null : (
               <Tooltip>
                 <TooltipTrigger asChild>

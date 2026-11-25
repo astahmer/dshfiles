@@ -6,8 +6,8 @@
  * set by `client.css` only while such a strip is mounted and zen mode is off). A phone and a hidden track (the macOS desktop app, a drawer) keep their own chrome.
  */
 
-/** The rail's width open and folded: the frame's folded track (56 px) holds it whole, so folding never moves it. */
-const RAIL_WIDTH = 56
+/** The rail's width open and folded: the frame's folded track (60 px, round five B3) holds it whole, so folding never moves it. */
+const RAIL_WIDTH = 60
 /** A track at most this wide is the folded rail; an open column is never narrower than the frame's 264 px floor. */
 const TRACK_MAX = 64
 /** The open width before the column was ever seen open: the frame's default. */

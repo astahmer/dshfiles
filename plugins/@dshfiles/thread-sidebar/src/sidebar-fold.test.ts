@@ -7,23 +7,23 @@ const shell = readFileSync(new URL('./sidebar-shell.tsx', import.meta.url), 'utf
 
 describe('SidebarFold (round five B1: one chrome)', () => {
   it('draws the open header over the stage only for a desktop column folded to its rail', () => {
-    expect(SidebarFold.overhangs({ collapsed: true, phone: false, width: 56 })).toBe(true)
+    expect(SidebarFold.overhangs({ collapsed: true, phone: false, width: 60 })).toBe(true)
     // Open, on a phone, or with no track at all (the macOS app, a drawer): the frame's own chrome stays.
     expect(SidebarFold.overhangs({ collapsed: false, phone: false, width: 280 })).toBe(false)
-    expect(SidebarFold.overhangs({ collapsed: true, phone: true, width: 56 })).toBe(false)
+    expect(SidebarFold.overhangs({ collapsed: true, phone: true, width: 60 })).toBe(false)
     expect(SidebarFold.overhangs({ collapsed: true, phone: false, width: 0 })).toBe(false)
     // A drawer reports its open width while collapsed: not the rail.
     expect(SidebarFold.overhangs({ collapsed: true, phone: false, width: 280 })).toBe(false)
   })
 
   it('overhangs the folded track by the rest of the open width, so the tabs start where they do open', () => {
-    expect(SidebarFold.overhang(280, 56)).toBe(224)
-    expect(SidebarFold.overhang(SidebarFold.OPEN_FALLBACK, 56)).toBe(224)
-    expect(SidebarFold.overhang(40, 56)).toBe(0)
+    expect(SidebarFold.overhang(280, 60)).toBe(220)
+    expect(SidebarFold.overhang(SidebarFold.OPEN_FALLBACK, 60)).toBe(220)
+    expect(SidebarFold.overhang(40, 60)).toBe(0)
   })
 
   it('keeps the rail as wide as the folded track, so folding never moves it', () => {
-    expect(SidebarFold.RAIL_WIDTH).toBe(56)
+    expect(SidebarFold.RAIL_WIDTH).toBe(60)
     expect(SidebarFold.RAIL_WIDTH).toBeLessThanOrEqual(SidebarFold.TRACK_MAX)
   })
 
