@@ -2,7 +2,7 @@ import type { SessionSummary } from '@deepseek-ai/dsh-api-session-controller/cli
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import * as Schema from 'effect/Schema'
 import { threadWorkspaceName } from '@dshfiles/jj-integration/api'
-import { type ThreadDirectories, WorkspacePaths, workspaceName } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspacePaths, workspaceName } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 /**
  * An empty draft thread: a Session that never got a first prompt. The Host titles a thread only after its first turn

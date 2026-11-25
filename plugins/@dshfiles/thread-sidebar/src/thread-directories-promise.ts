@@ -1,7 +1,7 @@
 import type { Context as CordisContext } from '@deepseek-ai/cordis'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { Effect } from 'effect'
-import { WorkspacePaths } from './workspace-paths.js'
+import { WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 const MAX_REPO_ROOTS = 1000
 
