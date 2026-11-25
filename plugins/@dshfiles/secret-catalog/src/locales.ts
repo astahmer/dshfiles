@@ -87,7 +87,8 @@ const en = {
   noMatchingAliases: 'No aliases match these filters. Try another scope or clear the search.',
   noMatchingAliasesHint: 'Try another scope or clear the search.',
   loadingMetadata: 'Loading alias metadata…',
-  loadFailed: 'Secret metadata could not be loaded. Check the secret CLI and refresh.',
+  loadFailed:
+    'Secrets did not load: the `secret` CLI did not answer. If it is not installed, install it and restart DSH from a shell that has it on its PATH; if the vault is locked, run `secret unlock --store`. Then Retry.',
   revealFailed: 'Could not reveal this alias. Unlock the vault (`secret unlock --store`), then reveal it again.',
   copied: 'Copied {alias} to the clipboard.',
   copyFailed: 'Could not copy this alias. Unlock the vault (`secret unlock --store`), then copy it again.',
@@ -302,7 +303,7 @@ const zh = {
   noMatchingAliases: '没有符合筛选条件的别名。',
   noMatchingAliasesHint: '试试其他作用域，或清除搜索。',
   loadingMetadata: '正在加载别名元数据…',
-  loadFailed: '无法加载密钥元数据。请检查密钥 CLI 后刷新。',
+  loadFailed: '无法加载密钥：`secret` CLI 没有响应。若尚未安装，请安装后从 PATH 中包含它的 shell 重启 DSH；若保管库已锁定，请运行 `secret unlock --store`。然后重试。',
   revealFailed: '无法显示此别名。',
   copied: '已将 {alias} 复制到剪贴板。',
   copyFailed: '无法复制此别名。',

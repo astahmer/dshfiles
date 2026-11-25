@@ -612,10 +612,13 @@ Then('only global aliases are listed until a project folder is chosen', async ({
 
 Then('only the load error is shown, without an empty catalog', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'secret-catalog-load-error-replaces-the-empty-catalog', async () => {
-    await expect(catalog(page).getByText('Secret metadata could not be loaded. Check the secret CLI and refresh.', { exact: true })).toBeVisible({
+    await expect(catalog(page).getByText(/^Secrets did not load: the `secret` CLI did not answer\./u)).toBeVisible({
       timeout: 30_000,
     })
     await expect(catalog(page).getByRole('button', { name: 'Retry', exact: true })).toBeVisible()
+    // One way back: the header Refresh and the filters wait for a loaded list.
+    await expect(catalog(page).getByRole('button', { name: 'Refresh', exact: true })).toHaveCount(0)
+    await expect(catalog(page).getByRole('textbox', { name: 'Filter aliases', exact: true })).toHaveCount(0)
     await expect(catalog(page).getByText(/^No secrets yet\./u)).toHaveCount(0)
     await expect(catalog(page).getByText('0 aliases', { exact: true })).toHaveCount(0)
   })
