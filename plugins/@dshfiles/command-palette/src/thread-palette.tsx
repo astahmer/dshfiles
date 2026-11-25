@@ -709,7 +709,9 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     <Dialog open onOpenChange={(open: boolean) => (open ? undefined : props.onClose())}>
       <DialogContent
         className={cn(
-          'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl',
+          // A 16px outer inset (council round 3 B5): the kit dialog's 24px read as a loose frame around the search. Important,
+          // to beat the kit's own sm: padding without a viewport variant here; the full-screen phone search keeps none.
+          'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-4! dshx:phone:p-0! dshx:sm:max-w-2xl',
           // One frame (round five B6): the raised surface with a hairline and the top elevation step; in dark it sits
           // one tone above the page (tone 2) so it does not sink into the dimmed stage.
           'dshx:border-(color:--dshx-tone-line) dshx:shadow-s3 dshx:dark:bg-(--dshx-tone-raised)',
@@ -740,7 +742,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             <CommandInput
               autoFocus
               aria-label={props.copy.searchLabel}
-              className={cn('dshx:h-11 dshx:text-ellipsis dshx:phone:pr-20', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16 dshx:phone:pr-20')}
+              // The query reads at 16px (council round 3 B5), the size of what you type, above 14px results.
+              className={cn('dshx:h-11 dshx:text-base dshx:text-ellipsis dshx:phone:pr-20', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16 dshx:phone:pr-20')}
               value={query}
               onValueChange={next => {
                 sendNavigation({ type: 'query.change', query: next })

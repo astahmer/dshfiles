@@ -206,6 +206,19 @@ describe('ThreadPalette navigation', () => {
   })
 })
 
+describe('ThreadPalette frame (council round 3 B5)', () => {
+  it('keeps a 16 px outer inset and a 16 px query line', () => {
+    mount()
+    const dialog = screen.getByRole('dialog')
+    // The kit dialog's 24 px sm: padding read as a loose frame: 16 px on every side.
+    expect(dialog.className).toContain('dshx:p-4!')
+    expect(dialog.className).toContain('dshx:phone:p-0!')
+    const query = screen.getByRole('combobox')
+    expect(query.className).toContain('dshx:text-base')
+    expect(query.className).not.toContain('dshx:text-sm')
+  })
+})
+
 describe('ThreadPalette ways out', () => {
   it('returns focus to what was focused when it opened', async () => {
     const row = document.createElement('button')
