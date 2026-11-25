@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { ShellTranslate } from './locales.js'
 import { useObservable } from './use-observable.js'
 import { DshReleaseIndicator } from '../release-notice.js'
+import { SECTION_TITLE_CLASS } from '../section-title.js'
 
 /** The control a search entry names: the row tagged with its id, focused on its first control. */
 const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly entryId: string }): boolean => {
@@ -116,6 +117,8 @@ export const GeneralSection = (
         // Each card leads with its theme's 96×56 preview (`themeSwatches`, round five B7) in place of core's icon, label
         // under it; cards in core order, Light, Dark, System. Tighter padding keeps the card about as tall as before.
         "dshx:[&_[class*=_themeCube]>svg]:hidden! dshx:[&_[class*=_themeCube]]:py-3! dshx:[&_[class*=_themeCube]]:gap-2! dshx:[&_[class*=_themeCube]]:before:order-first dshx:[&_[class*=_themeCube]]:before:h-14 dshx:[&_[class*=_themeCube]]:before:w-24 dshx:[&_[class*=_themeCube]]:before:shrink-0 dshx:[&_[class*=_themeCube]]:before:content-['']",
+        // Helper copy reads in lines of 60 characters at most (council round 6 B5), whichever plugin drew the row.
+        'dshx:[&_[class*=_desc]]:max-w-[60ch]! dshx:[&_[class*=Description]]:max-w-[60ch]!',
         'dshx:[&_[class*=_themeCube]:nth-child(1)]:before:[background:var(--settings-swatch-light)] dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)] dshx:[&_[class*=_themeCube]:nth-child(3)]:before:[background:var(--settings-swatch-system)]',
       )}
       data-settings-theme-swatches=""
@@ -127,6 +130,23 @@ export const GeneralSection = (
     </div>
   )
 }
+
+/**
+ * General's group headings (council round 6 B5): the transcript rows chat registers (View mode, When to collapse work
+ * details, Replies after collapse, order 12) sit under one "Transcript" heading, after core's Font size (11); the rows
+ * after them (Show coding view at 15 onwards) start a "Behavior" group, so the transcript group ends where its rows do.
+ */
+export const GENERAL_HEADINGS = [
+  { id: 'dshfiles-general-transcript-heading', key: 'general.transcriptHeading', order: 11.5 },
+  { id: 'dshfiles-general-behavior-heading', key: 'general.behaviorHeading', order: 13 },
+] as const
+
+/** One General group heading: 15/20 ink, 24px above it, no divider of its own (the row above keeps its own). */
+export const GeneralGroupHeading = (props: { readonly label: string }): JSX.Element => (
+  <h3 className={cn(SECTION_TITLE_CLASS, 'dshx:pt-6 dshx:pb-1')} data-settings-general-heading="">
+    {props.label}
+  </h3>
+)
 
 /** The release the native client build embeds; the port keeps the version it was taken from. */
 export const CurrentVersionRow = (props: { readonly t: ShellTranslate; readonly version: string }): JSX.Element => (
@@ -163,7 +183,7 @@ export const DeveloperToolsRow = (props: {
     >
       <div>
         <div className="dshx:text-base dshx:leading-5">{props.t('developerTools.title')}</div>
-        <div className="dshx:mt-1 dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">{props.t('developerTools.description')}</div>
+        <div className="dshx:mt-1 dshx:max-w-[60ch] dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">{props.t('developerTools.description')}</div>
         {failed && <div role="alert">{props.t('developerTools.error')}</div>}
       </div>
       <Switch

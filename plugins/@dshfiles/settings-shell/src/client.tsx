@@ -38,7 +38,7 @@ import type { ShortcutCatalogEntry } from '@deepseek-ai/dsh-client-shortcuts/cli
 import { DesktopUpdateBadge, DesktopUpdateSource, desktopUpdateBridge } from './native/desktop-update.js'
 import { SettingsDocumentStore } from './native/document-action.js'
 import { OpenConfigAction, type ConfigFileOpeners } from './open-config-action.js'
-import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
+import { CloseLabel, CurrentVersionRow, DeveloperToolsRow, GENERAL_HEADINGS, GeneralGroupHeading, GeneralSection, HeaderContent, TriggerContent } from './native/general-section.js'
 import { LanguageCoverageNote } from './native/language-note.js'
 import { HostReleasePrompt } from './native/host-release-prompt.js'
 import { SHELL_LOCALE_NAMESPACE, shellLocale, type ShellTranslate } from './native/locales.js'
@@ -1014,6 +1014,15 @@ export default defineClient({
         ),
       ),
     )
+    // Council round 6 B5: General's transcript rows under one heading, and the rows after them under the next.
+    for (const heading of GENERAL_HEADINGS) {
+      ctx.slots.inject('settings.general.item', () =>
+        ctx.slots.register(
+          { name: 'settings.general.item', id: heading.id, order: heading.order, locale: SHELL_LOCALE_NAMESPACE },
+          (props: { readonly t: ShellTranslate }) => <GeneralGroupHeading label={props.t(heading.key)} />,
+        ),
+      )
+    }
     ctx.slots.inject('settings.general.item', () =>
       ctx.slots.register(
         { name: 'settings.general.item', id: 'developer-tools', order: 15, locale: SHELL_LOCALE_NAMESPACE },
