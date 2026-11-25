@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
+import { ReviewLook } from './review-look.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { ArrowLeft, Check, ChevronDown, PanelRight, RefreshCw, Sparkles } from '@dshfiles/plugin-ui/icons'
 import { ListSelectionModel, type ListSelection } from '@dshfiles/plugin-ui/hooks/list-selection'
@@ -386,7 +387,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
             <Stat label={`+${result.additions}`} tone="add" />
             <Stat label={`−${result.deletions}`} tone="del" />
             <Stat label={`${totalReviewed}/${result.fileCount} reviewed`} />
-            <Progress value={progress} className="dshx:min-w-24 dshx:flex-1" />
+            <Progress value={progress} className={ReviewLook.PROGRESS} />
           </div>
         ) : null}
         {result?.status === 'ok' && result.truncated ? (
@@ -458,7 +459,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         >
           <PatchView
             files={textFiles}
-            className="dshx:flex-1"
+            className={cn('dshx:flex-1', ReviewLook.DARK_DIFF_TINTS)}
             empty={<p className={cn(HINT, 'dshx:p-3')}>No diff hunks to display.</p>}
             renderHeaderPrefix={file => {
               const scope = scopeByPath.get(file.name)

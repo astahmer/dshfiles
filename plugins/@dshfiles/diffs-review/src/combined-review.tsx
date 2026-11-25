@@ -5,6 +5,7 @@ import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { PatchView, parsePatchFiles, type PatchLineSelection } from '@dshfiles/plugin-ui/diff'
+import { ReviewLook } from './review-look.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { ChevronLeft, ChevronRight, RefreshCw } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -310,7 +311,7 @@ export const CombinedReview = (props: CombinedReviewProps): JSX.Element => {
               data-testid="combined-diff"
             >
               <PatchView
-                className="dshx:flex-1"
+                className={cn('dshx:flex-1', ReviewLook.DARK_DIFF_TINTS)}
                 empty={<p className={cn(HINT, 'dshx:p-3')}>This revision changes no file contents.</p>}
                 files={packageJson.textFiles}
                 focusPath={chosen?.commitId === current.commitId ? chosen.focusPath : null}

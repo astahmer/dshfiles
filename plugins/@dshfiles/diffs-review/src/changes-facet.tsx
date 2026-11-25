@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
+import { ReviewLook } from './review-look.js'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { MessageSquarePlus, RefreshCw, X } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
@@ -627,7 +628,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               ref={diffsRoot}
             >
               <PatchView
-                className="dshx:flex-1"
+                className={cn('dshx:flex-1', ReviewLook.DARK_DIFF_TINTS)}
                 empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
                 files={packageJson.textFiles}
                 focusPath={focusPath}
