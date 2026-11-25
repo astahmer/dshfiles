@@ -235,8 +235,8 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
   return (
     <Page
       scroll
-      // Charts and the request table run full width (council round 3 A5: full bleed for charts and tables).
-      width="full"
+      // A data page sits on the wide frame, min(100%, 1200px): charts and tables share the header's edges (round 5 A2).
+      width="wide"
       className="dshx:bg-background dshx:text-foreground"
       heading="Usage"
       description={USAGE_PAGE_DESCRIPTION}

@@ -51,19 +51,22 @@ describe('Usage › Cost numbers', () => {
     for (const label of ['Per day', 'Failed / aborted', 'Cache savings (estimate)', 'Cost per turn']) expect(markup).not.toContain(label)
     expect(markup).toMatch(/<button[^>]*aria-expanded="false"[^>]*>(?:(?!<\/button>).)*More numbers<\/button>/u)
   })
-  it('draws each lead number in neutral ink at 20 px semibold tabular figures, with no series dot (council round 2, D1)', () => {
+  it('draws each lead number in neutral ink at 22/650 tabular figures, with no series dot (council round 5, D1)', () => {
     const values = [...markup.matchAll(/<span class="([^"]*)" data-kpi-value="true">/gu)].map(match => match[1])
     expect(values).toHaveLength(3)
-    for (const value of values) expect(value).toContain('dshx:text-xl dshx:font-semibold dshx:tabular-nums')
+    for (const value of values) expect(value).toContain('dshx:text-title dshx:font-title dshx:tabular-nums')
     // A dot keys a series; no series of the KPI row is on screen, so a coloured dot would be decoration.
     expect(markup).not.toContain('data-kpi-dot')
     expect(markup).not.toMatch(/style="background:/u)
   })
-  it('makes "More numbers" a ghost button with a chevron, aligned with the numbers above it', () => {
+  it('makes "More numbers" a ghost button with a chevron on the stats card\'s trailing edge', () => {
     const button = /<button([^>]*)>((?:(?!<\/button>).)*)More numbers<\/button>/u.exec(markup)
-    expect(button?.[1]).toContain('dshx:-ml-2')
     expect(button?.[1]).toContain('aria-expanded="false"')
     expect(button?.[2]).toMatch(/^<svg[^>]*aria-hidden="true"[^>]*>.*<\/svg>$/u)
+    // The button is the card's last cell, after the three numbers, pushed to the trailing edge.
+    const card = /<div data-usage-stats="true" class="[^"]*">(.*)<\/div>$/u.exec(markup)?.[1] ?? ''
+    expect(card.indexOf('More numbers')).toBeGreaterThan(card.indexOf('Cache hit'))
+    expect(card).toMatch(/<div class="[^"]*dshx:ml-auto[^"]*" data-usage-stats-more="true"><button/u)
   })
   it('explains no absent number and puts the price caveat on the cost, never in a native title', () => {
     expect(markup).not.toContain('no earlier usage to compare')
@@ -72,10 +75,15 @@ describe('Usage › Cost numbers', () => {
   })
 })
 
-describe('Usage › Overview numbers (council round 3, D1)', () => {
+describe('Usage › Overview numbers (council round 5, D1)', () => {
   const markup = renderToStaticMarkup(<CostSummary days={7} pricingNote="List-price estimate." summary={summary()} />)
-  it('groups the three lead numbers in ~200 px columns instead of spreading them across the page', () => {
-    const grid = /<div class="([^"]*)"><div class="[^"]*"><span[^>]*>Cost \(estimate\)/u.exec(markup)
-    expect(grid?.[1]).toContain('dshx:@min-[42rem]:grid-cols-[repeat(3,200px)]')
+  it('sets the three lead numbers in one hairline card, split by two dividers', () => {
+    const card = /<div data-usage-stats="true" class="([^"]*)">/u.exec(markup)
+    expect(card?.[1]).toContain('dshx:rounded-lg dshx:border dshx:border-border')
+    const row = /<div class="([^"]*)" data-usage-stats-row="true">(.*?)<div class="[^"]*" data-usage-stats-more/u.exec(markup)
+    expect(row?.[1]).toContain('dshx:divide-x dshx:divide-border')
+    expect(row?.[1]).toContain('dshx:grid-cols-3')
+    // Three cells: two dividers between them, none after the last.
+    expect([...(row?.[2] ?? '').matchAll(/data-kpi-value/gu)]).toHaveLength(3)
   })
 })

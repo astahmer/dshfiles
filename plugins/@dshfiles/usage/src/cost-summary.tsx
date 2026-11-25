@@ -12,7 +12,7 @@ type Summary = ChartView['summary']
 export const usageIsEmpty = (summary: Pick<Summary, 'requests'>): boolean => summary.requests === 0
 
 const Tile = (props: { readonly label: ReactNode; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
-  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:py-1">
+  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
     <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
     <span className="dshx:text-base dshx:font-semibold dshx:tabular-nums">{props.value}</span>
     {props.detail === undefined || props.detail === null ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
@@ -20,13 +20,13 @@ const Tile = (props: { readonly label: ReactNode; readonly value: string; readon
 )
 
 /**
- * A lead number: 20 px tabular figures in neutral ink. No series dot: none of these measures is a series on screen,
- * so a coloured dot would key nothing (council round 2, D1).
+ * A lead number: 22/650 tabular figures in neutral ink, the page title's step (council round 5, D1). No series dot:
+ * none of these measures is a series on screen, so a coloured dot would key nothing (council round 2, D1).
  */
 const LeadTile = (props: { readonly label: ReactNode; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
-  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:py-1">
+  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:px-4 dshx:py-3 dshx:@max-pane-narrow:px-3">
     <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
-    <span className="dshx:text-xl dshx:font-semibold dshx:tabular-nums dshx:leading-tight" data-kpi-value>
+    <span className="dshx:truncate dshx:text-title dshx:font-title dshx:tabular-nums" data-kpi-value>
       {props.value}
     </span>
     {props.detail === undefined || props.detail === null ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
@@ -46,8 +46,9 @@ const Change = (props: { readonly current: number; readonly previous: number }):
 }
 
 /**
- * The Overview tab's numbers: cost, requests and cache hit lead; the other five open on "More numbers". The estimate's
- * caveat (list price, catalog age) is a tooltip on the cost label.
+ * The Overview tab's numbers: cost, requests and cache hit lead, in one hairline card split by two dividers, with
+ * "More numbers" on its trailing edge (council round 5, D1); the other five open under a hairline inside the same card.
+ * The estimate's caveat (list price, catalog age) is a tooltip on the cost label.
  */
 export const CostSummary = (props: { readonly summary: Summary; readonly days: number; readonly pricingNote: string }): JSX.Element => {
   const [open, setOpen] = useState(false)
@@ -58,38 +59,51 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
   const change = (current: number, previous: number): JSX.Element | undefined =>
     UsageFormattingModel.changeRatio(current, previous) === null ? undefined : <Change current={current} previous={previous} />
   return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-2">
-      {/* Grouped in ~200 px columns: three numbers spread across a 1500 px page read as three unrelated facts. */}
-      <div className="dshx:grid dshx:grid-cols-3 dshx:gap-2 dshx:@min-[42rem]:grid-cols-[repeat(3,200px)] dshx:@min-[42rem]:gap-x-4">
-        <LeadTile
-          label={
-            <>
-              Cost (estimate)
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button aria-label="About this estimate" className="dshx:inline-flex dshx:rounded-sm dshx:text-muted-foreground" type="button">
-                      <InfoIcon aria-hidden className="dshx:size-3" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent className="dshx-root dshx:max-w-64">{props.pricingNote}</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </>
-          }
-          value={UsageFormattingModel.formatCost(summary.cost)}
-          detail={change(summary.cost, summary.previous.cost)}
-        />
-        <LeadTile label="Requests" value={summary.requests.toLocaleString()} detail={change(summary.requests, summary.previous.requests)} />
-        <LeadTile
-          label="Cache hit"
-          value={UsageFormattingModel.formatPercent(cacheHit)}
-          detail={cacheHit === null ? undefined : `${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
-        />
+    <div data-usage-stats className="dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card">
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:items-stretch">
+        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-3 dshx:divide-x dshx:divide-border" data-usage-stats-row>
+          <LeadTile
+            label={
+              <>
+                Cost (estimate)
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button aria-label="About this estimate" className="dshx:inline-flex dshx:rounded-sm dshx:text-muted-foreground" type="button">
+                        <InfoIcon aria-hidden className="dshx:size-3" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent className="dshx-root dshx:max-w-64">{props.pricingNote}</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
+            }
+            value={UsageFormattingModel.formatCost(summary.cost)}
+            detail={change(summary.cost, summary.previous.cost)}
+          />
+          <LeadTile label="Requests" value={summary.requests.toLocaleString()} detail={change(summary.requests, summary.previous.requests)} />
+          <LeadTile
+            label="Cache hit"
+            value={UsageFormattingModel.formatPercent(cacheHit)}
+            detail={cacheHit === null ? undefined : `${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
+          />
+        </div>
+        <div
+          className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:px-3 dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:border-t dshx:@max-pane-narrow:border-border dshx:@max-pane-narrow:px-1 dshx:@max-pane-narrow:py-1"
+          data-usage-stats-more
+        >
+          <Button aria-controls={moreId} aria-expanded={open} onClick={() => setOpen(!open)} size="xs" type="button" variant="ghost">
+            <ChevronDownIcon
+              aria-hidden
+              className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
+            />
+            {open ? 'Fewer numbers' : 'More numbers'}
+          </Button>
+        </div>
       </div>
       {open ? (
         <div
-          className="dshx:grid dshx:grid-cols-2 dshx:gap-2 dshx:@min-[42rem]:grid-cols-[repeat(3,200px)] dshx:@min-[42rem]:gap-x-4 dshx:@min-[72rem]:grid-cols-[repeat(5,200px)]"
+          className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3 dshx:@min-[42rem]:grid-cols-3 dshx:@min-[64rem]:grid-cols-5 dshx:@max-pane-narrow:px-3"
           id={moreId}
         >
           <Tile
@@ -119,15 +133,6 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
           />
         </div>
       ) : null}
-      <div>
-        <Button aria-controls={moreId} aria-expanded={open} className="dshx:-ml-2" onClick={() => setOpen(!open)} size="xs" type="button" variant="ghost">
-          <ChevronDownIcon
-            aria-hidden
-            className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
-          />
-          {open ? 'Fewer numbers' : 'More numbers'}
-        </Button>
-      </div>
     </div>
   )
 }

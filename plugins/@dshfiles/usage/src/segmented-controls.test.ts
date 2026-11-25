@@ -71,18 +71,22 @@ describe('Usage control row and chart header (council round 4, D1)', () => {
     expect(row).toMatch(/<PopoverContent[\s\S]*aria-label="From date"[\s\S]*aria-label="To date"[\s\S]*<\/PopoverContent>/u)
   })
 
-  it("puts the metric switch in the chart card's header, across from its title", () => {
+  it("puts the metric switch beside the chart card's title, not across the card (council round 5, D1)", () => {
     const charts = read('charts.tsx')
     expect(charts).not.toContain('role="toolbar" aria-label="Chart options"')
     const header = /<header className="([^"]*)" data-usage-chart-header>([\s\S]*?)<\/header>/u.exec(charts)
-    expect(header?.[1]).toContain('dshx:justify-between')
-    expect(header?.[2]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
+    expect(header?.[1]).not.toContain('dshx:justify-between')
+    const titleRow = /<span className="[^"]*" data-usage-chart-title-row>([\s\S]*?)<\/span>\s*<span className="dshx:text-xs">/u.exec(header?.[2] ?? '')
+    expect(titleRow?.[1]).toContain('over time')
+    expect(titleRow?.[1]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
+    // The stats card's edge already parts it from the chart: no second hairline right under the card.
+    expect(charts).toMatch(/<Panel className="dshx:border-t-0 dshx:pt-1">\s*\{\/\*[\s\S]*?\*\/\}\s*<header className="[^"]*" data-usage-chart-header>/u)
   })
 })
 
-describe('Usage page width (council round 3 A5)', () => {
-  it('runs full width, since it holds charts and a table, and marks the current section with the kit accent', () => {
-    expect(read('panel.tsx')).toMatch(/<Page\s+scroll\s+(?:\/\/[^\n]*\n\s*)?width="full"/u)
+describe('Usage page width (council round 5 A2)', () => {
+  it('sits on the wide data frame and marks the current section with the kit accent', () => {
+    expect(read('panel.tsx')).toMatch(/<Page\s+scroll\s+(?:\/\/[^\n]*\n\s*)?width="wide"/u)
     expect(read('panel.tsx')).toContain('dshx:after:bg-(--dsw-alias-state-business-primary)')
   })
 })

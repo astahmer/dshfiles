@@ -326,21 +326,21 @@ export const UsageCharts = (props: {
 
       {jevCard}
 
-      <Panel>
+      <Panel className="dshx:border-t-0 dshx:pt-1">
         {/*
-         * The page's one metric switch, across from the card's title: "Where it went" and the daily calendar follow it
-         * (council round 2 and round 4, D1). The grouping is on the page's filter row.
+         * The page's one metric switch, beside the card's title, so the title and what it measures read as one phrase
+         * (council round 5, D1): "Where it went" and the daily calendar follow it. The grouping is on the filter row.
          */}
-        <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-x-3 dshx:gap-y-2" data-usage-chart-header>
-          <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+        <header className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5" data-usage-chart-header>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1" data-usage-chart-title-row>
             <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">
               {`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}
             </span>
-            <span className="dshx:text-xs">
-              {trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
-            </span>
+            <SlidingSegments size="sm" aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
           </span>
-          <SlidingSegments size="sm" aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
+          <span className="dshx:text-xs">
+            {trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
+          </span>
         </header>
         <Chart
           ariaLabel={`${trendMetric} over time`}
