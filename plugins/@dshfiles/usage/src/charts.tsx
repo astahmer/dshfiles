@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, singleBucketTotal } from './chart-geometry.js'
+import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, singleBucketTotal, trendRows as buildTrendRows } from './chart-geometry.js'
 import { DATA_SERIES, FAILED_SERIES } from './data-series.js'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -106,8 +106,8 @@ export const UsageCharts = (props: {
       const present = new Set(rows.map(row => row.label))
       return labels.filter(label => !present.has(label))
     }
-    const cost = buckets.filter(row => row.cost > 0).map(row => ({ label: labelOf.get(row.start) ?? '', key: keyOf(row.key), cost: row.cost }))
-    cost.push(...missing(cost).map(label => ({ label, key: firstKey, cost: 0 })))
+    const trend = (metric: 'cost' | 'tokens' | 'requests') =>
+      buildTrendRows({ labels, buckets, labelOf: start => labelOf.get(start) ?? '', keyOf, firstKey, metric })
     const totals = new Map<number, { input: number; cacheRead: number; cacheWrite: number; output: number; requests: number; failed: number }>()
     for (const row of buckets) {
       const total = totals.get(row.start) ?? { input: 0, cacheRead: 0, cacheWrite: 0, output: 0, requests: 0, failed: 0 }
@@ -119,12 +119,6 @@ export const UsageCharts = (props: {
       total.failed += row.failed
       totals.set(row.start, total)
     }
-    const groupedTokens = buckets.map(row => ({
-      label: labelOf.get(row.start) ?? '',
-      key: keyOf(row.key),
-      value: row.input + row.cacheRead + row.cacheWrite + row.output,
-    }))
-    const groupedRequests = buckets.map(row => ({ label: labelOf.get(row.start) ?? '', key: keyOf(row.key), value: row.requests }))
     const tokens = [...totals.entries()].flatMap(([start, total]) => {
       const label = labelOf.get(start) ?? ''
       return [
@@ -157,9 +151,9 @@ export const UsageCharts = (props: {
     const byTime = (left: { readonly label: string }, right: { readonly label: string }): number => (order.get(left.label) ?? 0) - (order.get(right.label) ?? 0)
     return {
       labels,
-      cost: cost.sort(byTime),
-      groupedTokens: groupedTokens.sort(byTime),
-      groupedRequests: groupedRequests.sort(byTime),
+      cost: trend('cost'),
+      groupedTokens: trend('tokens'),
+      groupedRequests: trend('requests'),
       tokens: tokens.sort(byTime),
       cache,
       requests: requests.sort(byTime),
@@ -196,12 +190,7 @@ export const UsageCharts = (props: {
     [series.labels, props.bucket, props.range.from, props.range.to],
   )
 
-  const trendRows =
-    trendMetric === 'cost'
-      ? series.cost.map(row => ({ label: row.label, key: row.key, value: row.cost }))
-      : trendMetric === 'tokens'
-        ? series.groupedTokens
-        : series.groupedRequests
+  const trendRows = trendMetric === 'cost' ? series.cost : trendMetric === 'tokens' ? series.groupedTokens : series.groupedRequests
   const trendChart = useMemo(() => {
     const formatTrend = (value: number): string => (trendMetric === 'cost' ? UsageFormattingModel.formatCost(value) : UsageFormattingModel.formatCount(value))
     const trendTotal = singleBucketTotal(trendRows, row => row.value)

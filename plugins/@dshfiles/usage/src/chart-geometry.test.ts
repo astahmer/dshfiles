@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, singleBucketTotal } from './chart-geometry.js'
+import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, singleBucketTotal, trendRows } from './chart-geometry.js'
 
 const read = (name: string): string => readFileSync(new URL(name, import.meta.url), 'utf8')
 
@@ -43,5 +43,24 @@ describe('Usage value label', () => {
   })
   it('puts the label on the trend chart', () => {
     expect(read('charts.tsx')).toMatch(/text\(\s*trendLabel/u)
+  })
+})
+
+describe('Usage trend rows (council round 3, D1)', () => {
+  const DAY = 86_400_000
+  const labels = Array.from({ length: 7 }, (_, index) => String(index * DAY))
+  const buckets = [{ start: 6 * DAY, key: 'gpt-6-luna', cost: 0, input: 50_000, cacheRead: 0, cacheWrite: 0, output: 5_000, requests: 16 }]
+  const rowsFor = (metric: 'cost' | 'tokens' | 'requests') =>
+    trendRows({ labels, buckets, labelOf: String, keyOf: key => key, firstKey: 'gpt-6-luna', metric })
+
+  it('gives a 7-day daily view one slot per day in every measure, so its axis shows seven ticks', () => {
+    for (const metric of ['cost', 'tokens', 'requests'] as const) {
+      expect(new Set(rowsFor(metric).map(row => row.label)), metric).toEqual(new Set(labels))
+    }
+  })
+
+  it('keeps the recorded values and orders rows by time', () => {
+    expect(rowsFor('tokens').at(-1)).toEqual({ label: String(6 * DAY), key: 'gpt-6-luna', value: 55_000 })
+    expect(rowsFor('requests').map(row => row.label)).toEqual(labels)
   })
 })

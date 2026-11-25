@@ -25,3 +25,46 @@ export const singleBucketTotal = <Row extends { readonly label: string }>(
   const [only, ...rest] = [...totals]
   return only === undefined || rest.length > 0 ? null : { label: only[0], total: only[1] }
 }
+
+export type TrendMetric = 'cost' | 'tokens' | 'requests'
+
+interface TrendBucket {
+  readonly start: number
+  readonly key: string
+  readonly cost: number
+  readonly input: number
+  readonly cacheRead: number
+  readonly cacheWrite: number
+  readonly output: number
+  readonly requests: number
+}
+
+export interface TrendRow {
+  readonly label: string
+  readonly key: string
+  readonly value: number
+}
+
+/**
+ * The "… over time" chart's rows for one measure, one per bucket and series key, in time order. Band scales take their
+ * domain from the rows, so every bucket of the range with no row gets a zero row: a 7-day view keeps seven slots and
+ * seven ticks in every measure.
+ */
+export const trendRows = (input: {
+  readonly labels: readonly string[]
+  readonly buckets: readonly TrendBucket[]
+  readonly labelOf: (start: number) => string
+  readonly keyOf: (key: string) => string
+  readonly firstKey: string
+  readonly metric: TrendMetric
+}): TrendRow[] => {
+  const valueOf = (row: TrendBucket): number =>
+    input.metric === 'cost' ? row.cost : input.metric === 'tokens' ? row.input + row.cacheRead + row.cacheWrite + row.output : row.requests
+  const rows = input.buckets
+    .filter(row => input.metric !== 'cost' || row.cost > 0)
+    .map(row => ({ label: input.labelOf(row.start), key: input.keyOf(row.key), value: valueOf(row) }))
+  const present = new Set(rows.map(row => row.label))
+  rows.push(...input.labels.filter(label => !present.has(label)).map(label => ({ label, key: input.firstKey, value: 0 })))
+  const order = new Map(input.labels.map((label, index) => [label, index]))
+  return rows.sort((left, right) => (order.get(left.label) ?? 0) - (order.get(right.label) ?? 0))
+}
