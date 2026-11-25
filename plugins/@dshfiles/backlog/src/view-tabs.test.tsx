@@ -42,3 +42,12 @@ describe('Backlog view tabs (council round 6, D6)', () => {
     expect(inactive).toContain('dshx:text-muted-foreground')
   })
 })
+
+describe('Backlog search field (council round 6, A2)', () => {
+  it("draws the fields' 3:1 boundary, like every kit field", () => {
+    const panel = readFileSync(new URL('backlog-panel.tsx', import.meta.url), 'utf8')
+    const search = panel.slice(panel.lastIndexOf('<label', panel.indexOf('aria-label="Search backlog"')), panel.indexOf('aria-label="Search backlog"'))
+    expect(search).toContain('dshx:border-field-border')
+    expect(search).not.toContain('dshx:border-input')
+  })
+})

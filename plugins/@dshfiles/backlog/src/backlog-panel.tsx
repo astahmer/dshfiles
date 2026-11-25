@@ -589,7 +589,7 @@ export const BacklogPanel = (props: {
             <BacklogViewSwitch view={view} onSelect={switchView} modifierHeld={modifierHeld} />
             <Tooltip>
               <TooltipTrigger asChild>
-                <label className="dshx:ml-auto dshx:flex dshx:h-7 dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-input dshx:bg-background dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-ring dshx:focus-within:ring-[3px] dshx:focus-within:ring-ring/50 dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:h-touch dshx:@max-pane-narrow:basis-full">
+                <label className="dshx:ml-auto dshx:flex dshx:h-7 dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-field-border dshx:bg-background dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-ring dshx:focus-within:ring-[3px] dshx:focus-within:ring-ring/50 dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:h-touch dshx:@max-pane-narrow:basis-full">
                   <SearchIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
                   <input
                     ref={searchInput}
