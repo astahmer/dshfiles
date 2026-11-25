@@ -7168,8 +7168,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) holdOrder('focus', false)
           }}
           // A floor of about two rows: in a short docked column (free docking with the bottom pane open) the section
-          // scrolls past its controls instead of squeezing the list to a sliver no row fits in.
-          className={cn('dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3', isBoard && 'dshx:p-4')}
+          // scrolls past its controls instead of squeezing the list to a sliver no row fits in. The list ends in 12px of
+          // padding under a 24px fade (round five C5), so a row scrolled to the status bar thins out instead of being cut.
+          className={cn(
+            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]',
+            isBoard && 'dshx:p-4 dshx:[mask-image:none]',
+          )}
           onKeyDown={event => {
             if (!isBoard) navigateThreadList(event.nativeEvent)
           }}

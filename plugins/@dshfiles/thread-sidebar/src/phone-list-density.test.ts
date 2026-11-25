@@ -33,4 +33,8 @@ describe('phone thread list density (round five B1)', () => {
     expect(client).toContain("'dshx:pointer-coarse:right-11 dshx:pointer-coarse:bottom-1'")
     expect(client).toContain("className=\"dshx:z-10 dshx:h-6 dshx:px-2 dshx:pointer-coarse:h-7\"")
   })
+
+  it('ends the list in 12px of padding under a 24px fade, so the status bar never cuts the last row hard (round five C5)', () => {
+    expect(client).toContain("'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]'")
+  })
 })
