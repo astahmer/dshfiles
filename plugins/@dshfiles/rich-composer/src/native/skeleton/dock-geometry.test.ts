@@ -35,7 +35,8 @@ describe('composer dock geometry', () => {
 
   // Phone: a closed disclosure whose rows are all `w-full` has no content width and shrank to its 2px border.
   it('gives a closed entry a 10rem floor on the phone', () => {
-    const entries = blocks().filter(block => block.selector === `:global(html[data-shell-phone-nav]) .composerStack > ${DOCK} > *`)
+    const entries = blocks().filter(block => block.selector === `:global(html[data-shell-phone-nav]) .composerStack > ${DOCK} > *`
+      && block.context.startsWith('@media (max-width: 639.98px)'))
     expect(entries).toHaveLength(1)
     expect(entries[0]?.body).toMatch(/flex:\s*1 1 10rem/)
     expect(entries[0]?.body).not.toMatch(/flex:\s*0 1 auto/)

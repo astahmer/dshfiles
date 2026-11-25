@@ -11,6 +11,7 @@ import { HeroShell, WorkspaceChip, workspaceLabel } from './EmptyHero.tsx'
 import { ConversationWidthControls } from './ConversationWidthControls.tsx'
 import { confirmedRemoteWorkspaceCwd } from '../../remote-workspace-context.ts'
 import { AgentPresetVisibility } from '../../agent-preset-visibility.ts'
+import { LiveWork, LiveWorkSummary, useLiveWorkCounts } from '../../live-work.tsx'
 import css from './ConversationRoot.module.css'
 
 function ConversationSessionView({ renderSlot }: ConversationViewsProps) {
@@ -69,6 +70,11 @@ export function ConversationContent(props: ConversationContentProps) {
   const [placeOpen, setPlaceOpen] = useState(false)
   const placeRef = useRef<HTMLSpanElement>(null)
   const placeText = useRunPlaceText(placeRef)
+  // Unslop r5 C1: below 28rem the dock's jobs and subagents fold into one Live work row; open per thread.
+  const stackRef = useRef<HTMLDivElement>(null)
+  const liveWork = useLiveWorkCounts(stackRef)
+  const [liveWorkOpenFor, setLiveWorkOpenFor] = useState<string | undefined>(undefined)
+  const liveWorkOpen = sessionId !== undefined && liveWorkOpenFor === sessionId
   useEffect(() => {
     if (!placeOpen) return
     const place = placeRef.current
@@ -289,8 +295,18 @@ export function ConversationContent(props: ConversationContentProps) {
   // Review / Inbox) their owners fill from real data; each card renders nothing without data. On a phone the cards
   // move above the composer, which sits on the keyboard (ConversationRoot.module.css).
   const composerBar = (
-    <div className={clsx(css.composerStack, hero && css.composerHero)}>
+    <div ref={stackRef} className={clsx(css.composerStack, hero && css.composerHero)} data-live-work-open={liveWorkOpen ? '' : undefined}>
       {hero && <HeroShell t={t} project={chipTitle} />}
+      {session !== undefined && (
+        <LiveWorkSummary
+          className={css.liveWork}
+          counts={liveWork}
+          open={liveWorkOpen}
+          onToggle={() => { setLiveWorkOpenFor(liveWorkOpen ? undefined : sessionId) }}
+          label={t('liveWork.label')}
+          detail={LiveWork.detail(liveWork, t)}
+        />
+      )}
       {session !== undefined && <ComposerInputDock session={session} useInput={useInput} renderSlot={renderSlot} />}
       {inputBar}
       {hero && (

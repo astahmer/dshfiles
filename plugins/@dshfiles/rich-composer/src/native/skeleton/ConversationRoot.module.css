@@ -1094,6 +1094,36 @@ button.crumbEditable {
   }
 }
 
+/* Live work on a narrow phone (unslop r5 C1, src/live-work.tsx): below 28rem two chips side by side kept about 170px
+   each and truncated everything (a clipped elapsed time read as a stray "^"). Every dock entry takes the whole width,
+   and running jobs and working subagents fold into one 44px "Live work · 1 job · 1 subagent" row that opens to them.
+   The summary renders only while it counts live work, so without it nothing hides. */
+.liveWork {
+  display: none;
+}
+
+@media (max-width: 27.99rem) {
+  /* The composer card's edges, like the dock entries under it. */
+  :global(html[data-shell-phone-nav]) .liveWork {
+    display: flex;
+    width: auto;
+    margin-inline: var(--dsh-composer-side-clearance, 0px);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > * {
+    flex-basis: 100%;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack:has(> .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
+    display: none;
+  }
+
+  /* A dock holding only live work leaves no empty seat (and no stack gap) while the summary is closed. */
+  :global(html[data-shell-phone-nav]) .composerStack:has(> .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']):not(:has(> :not([data-dshfiles-live-preview-dock]))) {
+    display: none !important;
+  }
+}
+
 /* Phone pickers as bottom sheets (visual refresh T3.5). The composer's pickers belong to their owners (kit Dialog,
    Radix popovers, the native menu); while one of them is open from the composer card on the phone shell, its layer
    presents as a 16px-radius sheet on the bottom edge with a grabber, the only shadowed layer besides the composer.
