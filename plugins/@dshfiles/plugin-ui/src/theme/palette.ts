@@ -60,7 +60,7 @@ export interface Palette {
   readonly needsYouWash: Oklch
   /**
    * The Needs-you wash for a full-width band (council round 3 A2): an Inbox card's head band spans the list, so in dark
-   * it drops to chroma 0.035 where a row keeps 0.045. Light is already at 0.035 and the band equals the row wash.
+   * it drops to chroma 0.035 where a row keeps 0.045. Light is already at the gamut edge and the band equals the row wash.
    */
   readonly needsYouBandWash: Oklch
   readonly failedWash: Oklch
@@ -140,10 +140,12 @@ function palette(input: PaletteInput): Palette {
     info: trio(accentFg),
     // Neutral (council round 3 A1): the marker or the card's edge carries the accent, not the fill.
     selectedWash: dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 },
-    needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
-    needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
+    // Light washes sit on the sRGB edge (council round 5 A8): at L 0.94 a 0.035 blue clipped to 0.029, so each light
+    // wash takes the lowest L where faint text still holds AA and the most chroma that L renders unclipped.
+    needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
+    needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
     // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
-    failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
+    failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.94, c: 0.031, h: STATUS_HUES.danger },
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
     primaryHover: dark
       ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue }

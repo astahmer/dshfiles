@@ -152,8 +152,8 @@ active item's icon seat; the label stays ink (600 when active). The `text-`/`bg-
 `dshx:text-nav-threads`, `dshx:bg-nav-threads/14`. Never tint a row, panel or header with them.
 
 **Attention washes.** A row that waits on you outranks a selected one: a Needs-you row takes `bg-wash-needs-you`
-(`--dshx-wash-needs-you`, accent hue, light `oklch(0.94 0.035 h)`, dark `oklch(0.29 0.045 h)`) and a Failed row
-`bg-wash-failed` (`--dshx-wash-failed`, hue 25, light `oklch(0.95 0.025 25)`, dark `oklch(0.255 0.032 25)`). A
+(`--dshx-wash-needs-you`, accent hue, light `oklch(0.935 0.032 h)`, dark `oklch(0.29 0.045 h)`) and a Failed row
+`bg-wash-failed` (`--dshx-wash-failed`, hue 25, light `oklch(0.94 0.031 25)`, dark `oklch(0.255 0.032 25)`). A
 full-width head band (an Inbox card's) takes `bg-wash-needs-you-band` instead: the same in light, calmer in dark
 (`oklch(0.29 0.035 h)`). Ink, secondary and faint text and the status glyphs hold AA on all three
 (`tests/attention-wash.test.ts`).

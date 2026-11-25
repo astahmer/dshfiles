@@ -12,8 +12,8 @@ colors:
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
   selected-wash: '#ebe9e6'
-  wash-needs-you: '#e2ebff'
-  wash-failed: '#ffe8e6'
+  wash-needs-you: '#e1e9ff'
+  wash-failed: '#ffe4e1'
   label-faint: '#6a6967'
   label-secondary: '#646362'
   signal-indigo: '#3b5bd4'
@@ -234,9 +234,9 @@ No slate shell: navigation surfaces keep the warm stone.
 | 9 muted         | secondary text (AA)                  | `muted-foreground`           | `--dsw-alias-label-secondary`                                  | `#646362` | `#a7a4a1` |
 | 10 text         | primary text, primary fill (AA)      | `foreground`, `primary`      | `--dsw-alias-label-primary`                                    | `#1b1a19` | `#eae7e4` |
 | selected wash   | selection, neutral (with its cue)    | `selected-wash`              | `--dshx-selected-wash` (neutral)                               | `#ebe9e6` | `#2a2725` |
-| Needs-you wash  | a row that waits on you              | `wash-needs-you`             | `--dshx-wash-needs-you` (accent hue)                           | `#e2ebff` | `#232a42` |
-| Needs-you band  | a full-width head band (Inbox card)  | `wash-needs-you-band`        | `--dshx-wash-needs-you-band` (accent hue)                      | `#e2ebff` | `#242b3d` |
-| Failed wash     | a row that failed                    | `wash-failed`                | `--dshx-wash-failed` (hue 25)                                  | `#ffe8e6` | `#311d1b` |
+| Needs-you wash  | a row that waits on you              | `wash-needs-you`             | `--dshx-wash-needs-you` (accent hue)                           | `#e1e9ff` | `#232a42` |
+| Needs-you band  | a full-width head band (Inbox card)  | `wash-needs-you-band`        | `--dshx-wash-needs-you-band` (accent hue)                      | `#e1e9ff` | `#242b3d` |
+| Failed wash     | a row that failed                    | `wash-failed`                | `--dshx-wash-failed` (hue 25)                                  | `#ffe4e1` | `#311d1b` |
 
 | Signal                                             | Tailwind token | Host variable                                            | Light     | Dark      |
 | -------------------------------------------------- | -------------- | -------------------------------------------------------- | --------- | --------- |

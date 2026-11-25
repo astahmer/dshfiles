@@ -38,9 +38,9 @@ html body {
   --dshx-tone-accent-border: oklch(0.52 0.19 268 / 0.3);
   --dshx-tone-accent-on-solid: oklch(0.99 0 270);
   --dshx-selected-wash: oklch(0.935 0.004 80);
-  --dshx-wash-needs-you: oklch(0.94 0.035 270);
-  --dshx-wash-needs-you-band: oklch(0.94 0.035 270);
-  --dshx-wash-failed: oklch(0.95 0.025 25);
+  --dshx-wash-needs-you: oklch(0.935 0.032 270);
+  --dshx-wash-needs-you-band: oklch(0.935 0.032 270);
+  --dshx-wash-failed: oklch(0.94 0.031 25);
   --dshx-primary-fill: oklch(0.3 0.01 65);
   --dshx-primary-hover: oklch(0.24 0.01 65);
   --dshx-tone-success: oklch(0.5 0.15 150);

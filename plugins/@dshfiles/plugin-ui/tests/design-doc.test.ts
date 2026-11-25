@@ -58,7 +58,7 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       'one syntax pair',
       '**Chart labels.**',
       '**Colour through meaning.**',
-      "  wash-needs-you: '#e2ebff'",
+      "  wash-needs-you: '#e1e9ff'",
       "  wash-failed-dark: '#311d1b'",
     ])
       expect(design, text).toContain(text)
