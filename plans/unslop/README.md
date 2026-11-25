@@ -39,7 +39,12 @@ marks; one focus ring on compound fields; data ramp from identity hues; softer s
 core switches on control-on; DESIGN.md). Attention text and project letters are pulled toward ink to hold AA (the
 specified #3e5ed8 read 3.8:1 on its tint). C transcript done (5 revisions `orpmprwn` … `qvlnrkrp`: one phone Live work
 row, Back to bottom in its own band, phone composer shows the brand mark and mode icon, prose at 1.62, raised dark code
-cards, ProjectMark on composer chips). P pages and T thread list, tabs and palette running.
+cards, ProjectMark on composer chips). P pages done (11 revisions `lzrzzppx` … `ontvmoyk`: Usage bars capped at 44 px with
+a value label, teal-first series, one segmented style, 20 px lead numbers; Inbox cards with a status-tinted band, one
+attention verb each and utilities in ⋯, phone answers as 44 px rows; phone status pill clears the home indicator; Settings
+selected wash and a checked Appearance card; AI accounts rail as a selector with picker checkboxes; Backlog titles in ink
+and tinted tags; calm dark diff tints). T thread list, tabs and palette running. Follow-up: chat's "When to Collapse
+Work Details" in sentence case.
 
 ## Round four
 
