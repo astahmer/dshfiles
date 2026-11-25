@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { trendCaption } from './trend-caption.js'
 
 const read = (name: string): string => readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8')
 
@@ -77,7 +78,7 @@ describe('Usage control row and chart header (council round 4, D1)', () => {
     const header = /<header className="([^"]*)" data-usage-chart-header>([\s\S]*?)<\/header>/u.exec(charts)
     expect(header?.[1]).not.toContain('dshx:justify-between')
     const titleRow = /<span className="[^"]*" data-usage-chart-title-row>([\s\S]*?)<\/span>\s*<span className="dshx:text-xs">/u.exec(header?.[2] ?? '')
-    expect(titleRow?.[1]).toContain('over time')
+    expect(titleRow?.[1]).toContain('Usage over time')
     expect(titleRow?.[1]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
     // The chart is its own hairline card (council round 6, D1): no loose hairline right under the stats card.
     expect(charts).toMatch(/<ChartFrame className=\{TREND_CARD\}>\s*\{\/\*[\s\S]*?\*\/\}\s*<header className="[^"]*" data-usage-chart-header>/u)
@@ -119,5 +120,22 @@ describe('Usage filter triggers (council round 7, D3 / A4)', () => {
     const purpose = /<DropdownMenuTrigger asChild>\s*<Button([^>]*?)>/u.exec(row)?.[1] ?? ''
     expect(purpose).toContain('variant="field"')
     expect(row).not.toContain('variant="outline"')
+  })
+})
+
+describe('Usage overview chart (council round 7, D3)', () => {
+  const charts = read('charts.tsx')
+  it('names the chart "Usage over time" with a caption that says its bucket and grouping, and draws it 190 px tall', () => {
+    const header = /<header className="[^"]*" data-usage-chart-header>([\s\S]*?)<\/header>/u.exec(charts)?.[1] ?? ''
+    expect(header).toContain('Usage over time')
+    expect(header).not.toContain('grouped by the selected dimension')
+    expect(header).toContain('trendCaption(')
+    expect(charts).toMatch(/const TREND_CHART_HEIGHT = 190\b/u)
+    expect(charts).toMatch(/definition=\{trendChart\}\s*height=\{TREND_CHART_HEIGHT\}/u)
+  })
+  it('captions the bucket and the grouping as one short line', () => {
+    expect(trendCaption({ bucket: 'day', groupBy: 'model', metric: 'tokens' })).toBe('Daily · by model')
+    expect(trendCaption({ bucket: 'hour', groupBy: 'provider', metric: 'requests' })).toBe('Hourly · by account')
+    expect(trendCaption({ bucket: 'day', groupBy: 'project', metric: 'cost' })).toBe('Daily · by project · list-price estimate')
   })
 })

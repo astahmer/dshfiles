@@ -59,17 +59,20 @@ describe('Usage › Cost numbers', () => {
     expect(markup).not.toContain('data-kpi-dot')
     expect(markup).not.toMatch(/style="background:/u)
   })
-  it('makes "More numbers" a 13 px link under the stats card, on its trailing edge (council round 6, D1)', () => {
+  it('puts "More numbers" in the stats card\'s footer, a 13 px link on its trailing edge (council round 7, D3)', () => {
     const button = /<button([^>]*)>More numbers((?:(?!<\/button>).)*)<\/button>/u.exec(markup)
     expect(button?.[1]).toContain('aria-expanded="false"')
     expect(button?.[1]).toContain('dshx:text-sm')
     expect(button?.[1]).toContain('dshx:hover:underline')
     expect(button?.[2]).toMatch(/^<svg[^>]*aria-hidden="true"[^>]*>.*<\/svg>$/u)
-    // Not a cell of the card: the Cache hit cell holds only its number, and the link row follows the card.
-    const card = /<div data-usage-stats="true" class="[^"]*">(.*?)<\/div><div class="([^"]*)" data-usage-stats-more="true"><button/u.exec(markup)
-    expect(card?.[1]).toContain('Cache hit')
-    expect(card?.[1]).not.toContain('More numbers')
-    expect(card?.[2]).toContain('dshx:justify-end')
+    // Inside the card, under a hairline, not a detached line under it; the Cache hit cell still holds only its number.
+    const card = /<div data-usage-stats="true" class="[^"]*">(.*)<\/div><\/div>$/u.exec(markup)
+    const footer = /<div class="([^"]*)" data-usage-stats-more="true"><button/u.exec(card?.[1] ?? '')
+    expect(footer?.[1]).toContain('dshx:justify-end')
+    expect(footer?.[1]).toContain('dshx:border-t')
+    const cells = /data-usage-stats-row="true">(.*?)<div class="[^"]*" data-usage-stats-more/u.exec(markup)?.[1] ?? ''
+    expect(cells).toContain('Cache hit')
+    expect(cells).not.toContain('More numbers')
   })
   it('explains no absent number and puts the price caveat on the cost, never in a native title', () => {
     expect(markup).not.toContain('no earlier usage to compare')

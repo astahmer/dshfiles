@@ -10,6 +10,7 @@ import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/qu
 import { useApi } from '@dshfiles/dshx/client'
 import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ChartQuery } from './api.js'
+import { trendCaption } from './trend-caption.js'
 import { UsageBucketsModel } from './buckets.js'
 import { JevUsageCard } from './jev-usage-card.js'
 import { CostSummary, usageIsEmpty } from './cost-summary.js'
@@ -20,6 +21,9 @@ import { UsageSpendMap } from './usage-spend-map.js'
 
 const DAY_MS = UsageBucketsModel.DAY_MS
 const CHART_HEIGHT = 220
+/** The overview's one trend chart, about 190 px at a 1124 px pane: tall enough to read, short enough to keep "Where it went" in view (council round 7, D3). */
+const TREND_CHART_HEIGHT = 190
+
 const TOKEN_KINDS = ['Input', 'Cache read', 'Cache write', 'Output'] as const
 
 const TREND_METRICS: readonly SlidingSegmentOption<'cost' | 'tokens' | 'requests'>[] = [
@@ -341,20 +345,17 @@ export const UsageCharts = (props: {
          */}
         <header className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5" data-usage-chart-header>
           <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1" data-usage-chart-title-row>
-            <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">
-              {`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}
-            </span>
+            {/* One title for every measure; the switch beside it says which (council round 7, D3). */}
+            <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">Usage over time</span>
             <SlidingSegments size="sm" aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
           </span>
-          <span className="dshx:text-xs">
-            {trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
-          </span>
+          <span className="dshx:text-xs">{trendCaption({ bucket: props.bucket, groupBy: props.groupBy, metric: trendMetric })}</span>
         </header>
         <Chart
           ariaLabel={`${trendMetric} over time`}
           ariaDescription={`${trendMetric} per ${props.bucket}, grouped by ${props.groupBy}.`}
           definition={trendChart}
-          height={CHART_HEIGHT}
+          height={TREND_CHART_HEIGHT}
         />
       </ChartFrame>
 

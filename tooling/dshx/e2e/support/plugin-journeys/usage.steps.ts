@@ -164,7 +164,7 @@ Then('a failed request opens the thread that made it', async ({ page }: { page: 
 When('the Charts tab is opened', async ({ page }: { page: Page }) => {
   await page.getByRole('tab', { name: 'Overview', exact: true }).click()
   try {
-    await expect(page.getByText('Cost over time', { exact: true })).toBeVisible()
+    await expect(page.getByText('Usage over time', { exact: true })).toBeVisible()
   } catch (error) {
     process.stdout.write(`Usage charts diagnostics: ${JSON.stringify(browserDiagnosticsFor(page))}\n`)
     throw error

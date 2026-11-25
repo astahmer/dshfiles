@@ -47,8 +47,9 @@ const Change = (props: { readonly current: number; readonly previous: number }):
 
 /**
  * The Overview tab's numbers: cost, requests and cache hit lead, in one hairline card split by two dividers; the other
- * five open under a hairline inside the same card. "More numbers" is a 13 px link under the card, on its trailing edge,
- * so the third cell holds only its number (council round 6, D1). The estimate's caveat (list price, catalog age) is a
+ * five open under a hairline inside the same card. "More numbers" is a 13 px link in the card's footer, under a hairline
+ * on its trailing edge, so the third cell holds only its number and the toggle belongs to the strip it opens (council
+ * round 6, D1; round 7, D3). The estimate's caveat (list price, catalog age) is a
  * tooltip on the cost label.
  */
 export const CostSummary = (props: { readonly summary: Summary; readonly days: number; readonly pricingNote: string }): JSX.Element => {
@@ -121,19 +122,22 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
             />
           </div>
         ) : null}
-      </div>
-      <div className="dshx:flex dshx:justify-end" data-usage-stats-more>
-        <Button aria-controls={moreId} aria-expanded={open} className={STATS_MORE_LINK} onClick={() => setOpen(!open)} type="button" variant="link">
-          {open ? 'Fewer numbers' : 'More numbers'}
-          <ChevronDownIcon
-            aria-hidden
-            className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
-          />
-        </Button>
+        <div
+          className="dshx:flex dshx:justify-end dshx:border-t dshx:border-border dshx:px-4 dshx:py-1.5 dshx:pointer-coarse:py-0 dshx:@max-pane-narrow:px-3"
+          data-usage-stats-more
+        >
+          <Button aria-controls={moreId} aria-expanded={open} className={STATS_MORE_LINK} onClick={() => setOpen(!open)} type="button" variant="link">
+            {open ? 'Fewer numbers' : 'More numbers'}
+            <ChevronDownIcon
+              aria-hidden
+              className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
+            />
+          </Button>
+        </div>
       </div>
     </div>
   )
 }
 
-/** "More numbers": a 13 px ink link, 20 px tall (44 px under a coarse pointer), its text on the card's trailing edge. */
+/** "More numbers": a 13 px ink link, 20 px tall (44 px under a coarse pointer), its text on the card footer's trailing edge. */
 export const STATS_MORE_LINK = 'dshx:h-5 dshx:gap-1 dshx:px-0 dshx:text-sm dshx:has-[>svg]:px-0 dshx:pointer-coarse:h-11'
