@@ -37,7 +37,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 - Put `dshx-root` on each surface root you render. Prefix every utility (`dshx:hover:bg-accent`), write complete static class strings, merge with `cn`.
 - Animated components: `src/components/motion/` on the shared motion layer (see [Motion](#motion)).
-- Components: `src/components/ui/` (button, input, textarea, label, select, checkbox, switch, tabs, badge, card, table, dialog, alert-dialog, dropdown-menu, context-menu, popover, tooltip, command, combobox, separator, skeleton, toggle, toggle-group, collapsible, alert, kbd, spinner, empty, field, input-group, item, progress, scroll-area, page-header, search-input, status-dot, project-mark). Wrap tooltips in `TooltipProvider`.
+- Components: `src/components/ui/` (button, input, textarea, label, select, checkbox, switch, tabs, badge, card, table, dialog, alert-dialog, dropdown-menu, context-menu, popover, tooltip, command, combobox, separator, skeleton, toggle, toggle-group, collapsible, alert, kbd, spinner, empty, field, input-group, item, progress, scroll-area, page-header, search-input, status-dot, project-mark, attention-badge). Wrap tooltips in `TooltipProvider`.
 - `PageHeader` (`components/ui/page-header`) is a plugin page's top row: `heading` (the `h1`) over a one-line `description`, with badges and actions as children on the right.
 - `SearchInput` (`components/ui/search-input`) is the search field: the input group with a leading search glyph. `className` sizes the group; `aria-label`, `value`, `ref` and every other prop reach the input.
 - `StatusDot` (`components/ui/status-dot`) is the round status marker: `tone` (`current`, `success`, `destructive`, `warning`, `info`, `muted`) or a computed color class, `size` `sm` (6px) or default (8px). It is `aria-hidden` unless given an `aria-label`, which makes it `role="img"`; it forwards its ref so a `TooltipTrigger asChild` can wrap it.
@@ -162,6 +162,16 @@ full-width head band (an Inbox card's) takes `bg-wash-needs-you-band` instead: t
 (`StatusGlyph size="small"`) and a tabular number: `<StatusCount status="needs-you" count={3} />`. Needs you and Failed
 sit on their tint pair; other states are a muted chip. A zero draws nothing; `label` sets what a screen reader hears
 (default "3 Needs you"). Use it for a group header's count and a page title's count of what waits on you.
+
+**The attention badge.** `AttentionBadge` (`components/ui/attention-badge`) is the Needs-you count on a nav glyph or a
+tab: `<AttentionBadge count={3} label="need you" />` draws a 16px pill (`dshx:badge-attention`, usable on a plain span)
+in the attention fill (light: the Needs-you colour with white text; dark: the accent hue at L 0.72 with L 0.2 text) and
+a 2px ring in the surface it sits on, the rail's panel step by default; set `--dshx-badge-ring` on a different surface
+(the phone tab bar). A zero draws nothing; past `max` (99) it reads `99+`. Seat it in a trailing corner beside the
+glyph, never over it.
+
+**Contextual heading.** `dshx:text-heading` is 15/20 at 600 (size, line height and weight in one class) for an in-page
+section heading: a Settings category's sections, an Inbox card title. The page `h1` stays `text-title font-title`.
 
 **Floating surfaces.** A dialog, an alert dialog and the command palette sit on `dshx:surface-dialog`
 (`src/surfaces.css`): light keeps the page fill, the hairline and s3; dark is a raised warm fill

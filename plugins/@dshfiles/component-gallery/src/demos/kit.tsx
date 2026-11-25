@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { Alert, AlertDescription, AlertTitle } from '@dshfiles/plugin-ui/components/ui/alert'
+import { AttentionBadge } from '@dshfiles/plugin-ui/components/ui/attention-badge'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
@@ -322,6 +323,36 @@ export const kitDemos: readonly GalleryDemo[] = [
         {workStatusValues.map((status, index) => (
           <StatusCount key={status} status={status} count={index + 1} />
         ))}
+      </div>
+    ),
+  },
+  {
+    id: 'kit-attention-badge',
+    title: 'AttentionBadge',
+    description: 'The Needs-you count on a nav glyph: a 16px attention pill ringed in its surface, seated beside the glyph.',
+    source: "import { AttentionBadge } from '@dshfiles/plugin-ui/components/ui/attention-badge'",
+    static: true,
+    render: () => (
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-6 dshx:rounded-lg dshx:bg-[var(--dsw-specific-sidebar-fill)] dshx:p-3">
+        {[1, 12, 140].map(count => (
+          <span key={count} className="dshx:relative dshx:inline-flex dshx:size-8 dshx:items-center dshx:justify-center">
+            <InboxIcon aria-hidden className="dshx:size-4.5" />
+            <AttentionBadge count={count} label="need you" className="dshx:absolute dshx:-top-1 dshx:left-5.5" />
+          </span>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: 'kit-heading',
+    title: 'Contextual heading',
+    description: 'One step for in-page section headings: 15/20 at 600, between the 13px section title and the page title.',
+    source: '<h3 className="dshx:text-heading">Appearance</h3>',
+    static: true,
+    render: () => (
+      <div className="dshx:flex dshx:flex-col dshx:gap-1">
+        <h3 className="dshx:text-heading">Appearance</h3>
+        <p className="dshx:text-sm dshx:text-muted-foreground">Theme, font and density for every surface.</p>
       </div>
     ),
   },
