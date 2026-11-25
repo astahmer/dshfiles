@@ -136,6 +136,25 @@ describe('page container (council round 3 A5)', () => {
     expect(frame(1000, resolved('--container-wide'))).toBe(1000)
   })
 
+  it('caps the lane CONTENT at 880px, 960px on a pane of 1280px or more, with the padding outside (council round 6 A3)', () => {
+    const lane = render(<Page heading="Inbox" width="lane" />)
+    const box = container(lane.container)!
+    // The cap applies to the content box: Inbox and Backlog rows end where Plugins rows (core-plugins.css) end.
+    expect(classes(box)).toEqual(expect.arrayContaining(['dshx:box-content', 'dshx:max-w-lane', 'dshx:@min-pane-wide:max-w-lane-wide']))
+    expect(classes(box)).toContain('dshx:p-6')
+    // The pane tier is the Page root's own width (it is the @container), in px so the Host's root font cannot move it.
+    expect(classes(lane.container.querySelector('[data-slot="page"]'))).toContain('dshx:@container')
+    expect(resolved('--container-pane-wide')).toBe(1280)
+    expect(resolved('--container-lane-wide')).toBe(960)
+    // Content width at a given pane: min(pane - 2 × 24px padding, cap), the cap 960 from a 1280px pane up.
+    const content = (pane: number): number => Math.min(pane - 48, pane >= resolved('--container-pane-wide') ? resolved('--container-lane-wide') : resolved('--container-lane'))
+    expect(content(1440)).toBe(960)
+    expect(content(1279)).toBe(880)
+    expect(content(900)).toBe(852)
+    // Still start-aligned, never centred.
+    expect(classes(box).join(' ')).not.toMatch(/mx-auto|justify-center|items-center/u)
+  })
+
   it('lets a master-detail page (fill) use the whole pane unless it asks for a width', () => {
     const view = render(<Page heading="Memory" fill />)
     expect(classes(container(view.container)).join(' ')).not.toMatch(/max-w-/u)

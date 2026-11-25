@@ -176,7 +176,13 @@
    * In px, not rem, so the caps hold whatever the Host's root font is.
    */
   --container-page: 1080px;
+  /*
+   * The lane caps its CONTENT box (council round 6 A3): 880px, 960px once the pane is 1280px or wider
+   * (`@min-pane-wide`), with the page padding outside the cap, so a Page lane and core-plugins.css end on one edge.
+   */
   --container-lane: 880px;
+  --container-lane-wide: 960px;
+  --container-pane-wide: 1280px;
   --container-wide: 1200px;
 }
 

@@ -16,7 +16,7 @@ export interface PageHeaderProps {
  * A page header for a page that owns its layout (Settings, a split view); everything else uses `Page` from
  * `components/page`, which draws this same anatomy (council round 3 A5): one `h1` at 22px/650, an optional count or
  * `StatusCount`s, a description of at most 72ch, and the actions on the trailing edge of the container it sits in, so
- * put it inside the same frame as the content: `PAGE_FRAME_CLASS.lane` (880px, lists and forms) or
+ * put it inside the same frame as the content: `PAGE_FRAME_CLASS.lane` (880px of content, 960px on a pane of 1280px or more; lists and forms) or
  * `PAGE_FRAME_CLASS.wide` (min(100%, 1200px), data) from `components/page`.
  */
 export const PageHeader = (props: PageHeaderProps): JSX.Element => (

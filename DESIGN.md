@@ -456,8 +456,10 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 
 - At most one primary action. Secondary actions are outline buttons while the page is at least 42rem wide and fold
   into the `⋯` overflow menu below that; the primary never folds.
-- **Two page frames, not four widths.** The header and the body share one start-aligned container: `lane`, 880px,
-  for lists and forms (Inbox, Backlog, Plugins, Settings; the Settings field column stays 680px inside it), and
+- **Two page frames, not four widths.** The header and the body share one start-aligned container: `lane`, 880px
+  of content (960px once the pane is 1280px or wider, `@min-pane-wide`; the cap is the content box, the 24px padding
+  sits outside it, so Inbox, Backlog and Plugins rows end on one edge), for lists and forms (Inbox, Backlog, Plugins,
+  Settings; the Settings field column stays 680px inside it), never centred, and
   `wide`, min(100%, 1200px), for data (Usage, Review, AI accounts) — `Page` `width="lane"` / `width="wide"`
   (`max-w-lane`, `max-w-wide`). Both start at the same 24px pane inset. Only a diff, a chart or a table runs full
   bleed (`width="full"`, the default for a `fill` master–detail page); `width="page"` (1080px) is the legacy default
