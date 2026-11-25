@@ -30,7 +30,10 @@ const KIND_CHOICES: readonly { readonly kind: CleanupKindView; readonly label: s
   { kind: 'stale', label: 'Stale work' },
 ]
 
-const KIND_TAG = { empty: 'WS', integrated: 'WS', merged: 'PR', secondary: 'JJ', stale: 'WS', untracked: 'DIR' } as const satisfies Record<CleanupKindView, string>
+const KIND_TAG = { empty: 'WS', integrated: 'WS', merged: 'PR', secondary: 'JJ', stale: 'WS', untracked: 'DIR' } as const satisfies Record<
+  CleanupKindView,
+  string
+>
 
 const AGE_SUFFIX = { now: '', minutes: 'm', hours: 'h', days: 'd', months: 'mo', years: 'y' } as const
 
@@ -177,8 +180,8 @@ export const WorkspaceCleanupDialog = (props: {
         <DialogHeader className="dshx:px-5 dshx:pb-4 dshx:pt-5">
           <DialogTitle>Clean up workspaces</DialogTitle>
           <DialogDescription className="dshx:sr-only">
-            Select idle workspaces and untracked folders to remove. Active threads and uncommitted changes are always kept; unlanded
-            work is kept unless you select its Stale work group.
+            Select idle workspaces and untracked folders to remove. Active threads and uncommitted changes are always kept; unlanded work is kept unless you
+            select its Stale work group.
           </DialogDescription>
         </DialogHeader>
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:px-5 dshx:pb-4 dshx:text-xs">

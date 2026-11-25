@@ -355,7 +355,9 @@ const make = Effect.gen(function* () {
       const landedWorkspaces = threadWorkspaces.filter(workspace => workspace.kind !== 'stale')
       const secondaryWorkspaces = plannedWorkspaces.filter(workspace => workspace.kind === 'secondary')
       const staleOutcome =
-        staleWorkspaces.length === 0 ? { results: [] } : yield* threads.discardMany({ repoRoot, names: staleWorkspaces.map(workspace => workspace.name), force: true })
+        staleWorkspaces.length === 0
+          ? { results: [] }
+          : yield* threads.discardMany({ repoRoot, names: staleWorkspaces.map(workspace => workspace.name), force: true })
       const threadOutcome =
         landedWorkspaces.length === 0
           ? { results: [] }
