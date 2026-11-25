@@ -8,7 +8,19 @@ import type { SettingField } from './schema-form/schema-model.js'
  * or namespace nobody placed lands in "Other", so nothing becomes unreachable when a plugin adds one; every one this
  * repository ships is placed (`settings-groups.test.ts` fails otherwise and says where to add it).
  */
-export type SettingsGroupId = 'general' | 'models' | 'agents' | 'tools' | 'projects' | 'hosts' | 'security' | 'notifications' | 'plugins' | 'about' | 'other'
+export type SettingsGroupId =
+  | 'general'
+  | 'models'
+  | 'agents'
+  | 'tools'
+  | 'projects'
+  | 'hosts'
+  | 'security'
+  | 'notifications'
+  | 'plugins'
+  | 'about'
+  | 'other'
+  | 'pages'
 
 export interface SettingsGroup {
   readonly id: SettingsGroupId
@@ -28,6 +40,22 @@ export const SETTINGS_GROUPS: readonly SettingsGroup[] = [
   { id: 'plugins', label: 'Plugins', description: 'Installed plugins and the marketplace.' },
   { id: 'about', label: 'About', description: 'Version, release notes and diagnostics.' },
   { id: 'other', label: 'Other', description: 'Settings no group claims yet.' },
+  { id: 'pages', label: 'Pages', description: 'Other Settings pages, opened in the stage.' },
+]
+
+/**
+ * The Settings destination's pages this list does not otherwise reach (round five B1). With the Settings page on the
+ * stage the sidebar folds to its rail, so the page lists them itself, as rows that open the page: nothing that
+ * destination holds becomes unreachable. A page an entry already links (Secrets, Installed plugins) or names is left
+ * out, so no page is listed twice.
+ */
+export const DESTINATION_PAGES: ReadonlyArray<{ readonly panelId: string; readonly label: string }> = [
+  { panelId: 'secret-catalog', label: 'Secrets' },
+  { panelId: 'plugins', label: 'Plugins' },
+  { panelId: 'dshfiles-plugin-market', label: 'Plugin market' },
+  { panelId: 'dshfiles-capabilities-hub', label: 'Capabilities hub' },
+  { panelId: 'component-gallery', label: 'Component gallery' },
+  { panelId: 'dshfiles-plugin-guide', label: 'Plugin guide' },
 ]
 
 /** Where one section, namespace or page sits. `entry` merges it into another entry (one nav row for one task). */
@@ -279,6 +307,8 @@ export interface SettingsEntry {
   readonly hiddenPages: readonly PluginSettingsPage[]
   /** Another plugin's stage page it opens. */
   readonly link?: PageLink
+  /** A row of the Pages group: picking it opens this stage page instead of a Settings entry. */
+  readonly opens?: string
   /** Words that find it in search without showing: namespaces, former names. */
   readonly keywords: string
 }
@@ -487,7 +517,14 @@ const groupEntries = (input: {
       keywords: [link.panelId, link.description],
     })
   }
-  const byGroup = new Map<SettingsGroupId, SettingsEntry[]>()
+  const linked = new Set([...entries.values()].flatMap(entry => (entry.link === undefined ? [] : [entry.link.panelId])))
+  const named = new Set([...entries.values()].map(entry => entry.label.trim().toLowerCase()))
+  const pageRows: SettingsEntry[] = DESTINATION_PAGES.flatMap((page, index) =>
+    !input.panels.has(page.panelId) || linked.has(page.panelId) || named.has(page.label.toLowerCase())
+      ? []
+      : [{ id: `page:${page.panelId}`, group: 'pages', label: page.label, order: index, pages: [], hiddenPages: [], opens: page.panelId, keywords: page.panelId }],
+  )
+  const byGroup = new Map<SettingsGroupId, SettingsEntry[]>(pageRows.length === 0 ? [] : [['pages', pageRows]])
   for (const [id, entry] of entries) {
     const row: SettingsEntry = {
       id,

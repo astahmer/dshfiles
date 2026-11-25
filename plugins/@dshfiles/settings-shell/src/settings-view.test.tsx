@@ -272,6 +272,26 @@ describe('settings view: one grouped page', () => {
     view.unmount()
   })
 
+  it('lists the Settings pages it does not otherwise reach in a Pages group whose rows open them (round five B1)', () => {
+    const panels = new Set(['mcp-servers', 'secret-catalog', 'plugins', 'dshfiles-capabilities-hub', 'dshfiles-plugin-guide'])
+    const view = mount({ groups: SettingsGroups.group({ sections: rows, pages: [], panels }) })
+    const pages = view.host.querySelector('[data-settings-group="pages"]')
+    // Secrets and Installed plugins are linked entries of their own groups, so they are not listed twice.
+    expect([...(pages?.querySelectorAll('[data-nav-id]') ?? [])].map(row => row.textContent)).toEqual(['Capabilities hub', 'Plugin guide'])
+    act(() => pages?.querySelector<HTMLButtonElement>('[data-nav-id="page:dshfiles-plugin-guide"]')?.click())
+    expect(view.openPanel).toHaveBeenCalledWith('dshfiles-plugin-guide')
+    view.unmount()
+  })
+
+  it('prints no General group label above the General entry: one General, not three', () => {
+    const view = mount({})
+    const general = view.host.querySelector('[data-settings-group="general"]')
+    expect(general?.getAttribute('aria-label')).toBe('General')
+    expect([...(general?.children ?? [])].filter(child => child.textContent === 'General' && !child.hasAttribute('data-nav-id'))).toEqual([])
+    expect(view.host.querySelector('[data-settings-group="other"]')?.firstElementChild?.textContent).toBe('Other')
+    view.unmount()
+  })
+
   it('finds key bindings by command name and by keys', () => {
     const byName = mount({ query: 'open settings' })
     expect(byName.host.querySelector('[data-settings-shortcut="settings.open"]')?.textContent).toContain('Open Settings')

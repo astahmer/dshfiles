@@ -87,6 +87,8 @@ const NavCell = (props: {
     type="button"
   >
     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.entry.label}</span>
+    {/* A Pages row opens its page in the stage rather than an entry here. */}
+    {props.entry.opens !== undefined && <ArrowUpRightIcon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />}
     {props.count !== undefined && props.count > 0 && (
       <span className="dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
         {props.count}
@@ -388,6 +390,12 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     const ids = new Set([entry.id, ...(entry.sectionId === undefined ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)])
     return [...ids].reduce((sum, id) => sum + (result.counts.get(id) ?? 0), 0)
   }
+  // A Pages row (round five B1) opens its stage page; any other entry opens here.
+  const openEntry = (id: string): void => {
+    const opens = SettingsGroups.entryFor(props.groups, id)?.opens
+    if (opens === undefined) props.onSelect(id)
+    else props.openPanel(opens)
+  }
   // While searching, a tree entry with matches scrolls to its results (VS Code filters the same way); others open.
   const select = (id: string): void => {
     const entry = SettingsGroups.entryFor(props.groups, id)
@@ -398,7 +406,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           .find(element => element !== null && element !== undefined)
       : undefined
     if (group !== undefined && group !== null) group.scrollIntoView({ block: 'start' })
-    else props.onSelect(id)
+    else openEntry(id)
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
   return (
@@ -489,7 +497,8 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           >
             {props.groups.map(({ group, entries }) => (
               <div aria-label={group.label} className={navGroupBlock} data-settings-group={group.id} key={group.id} role="group">
-                <span className={navGroup}>{group.label}</span>
+                {/* General leads the list and names its first entry: its label would print "General" a third time (B1). */}
+                {group.id !== 'general' && <span className={navGroup}>{group.label}</span>}
                 {entries.map(entry => (
                   <NavCell active={!searching && entry.id === active?.id} count={countOf(entry)} entry={entry} key={entry.id} onSelect={select} />
                 ))}
@@ -502,7 +511,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           >
             {/* One reading width for every entry: sections, plugin pages and search results share this column. */}
             <div className="dshx:max-w-[760px]" data-settings-column="">
-              {searching && <SearchResults {...props} result={result} />}
+              {searching && <SearchResults {...props} onSelect={openEntry} result={result} />}
               {!searching && active !== undefined && <EntryView {...props} entry={active} jevNamespaces={jevNamespaces} key={active.id} />}
             </div>
           </div>

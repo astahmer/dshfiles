@@ -742,9 +742,10 @@ export default defineClient({
             group: 'command',
             run: () => openSettings(),
           }),
-          // One row per Settings entry, named by the entry and its group, never by the package behind it.
+          // One row per Settings entry, named by the entry and its group, never by the package behind it. A Pages row
+          // opens another plugin's page, which has its own palette row.
           ...groups.getSnapshot().flatMap(({ group, entries }) =>
-            entries.map(entry =>
+            entries.filter(entry => entry.opens === undefined).map(entry =>
               addPaletteAction({
                 id: `@dshfiles/settings-shell/section/${entry.id}`,
                 label: () => t('palette.section', { section: entry.label }),
