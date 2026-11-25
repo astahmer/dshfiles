@@ -134,4 +134,19 @@
   .dshx-project-mark-letters {
     color: color-mix(in oklab, currentColor 75%, var(--dsw-alias-label-primary));
   }
+
+  /*
+   * Chart labels (round five A5): TanStack charts draw axis ticks and legend labels in currentColor at 68–78% opacity
+   * and 11px, which measured 2.95:1. Inside a `ChartFrame` they read at full secondary ink (the frame's
+   * `text-muted-foreground`, AA on bg, panel and raised), at the 12px meta size and with tabular figures. A CSS rule
+   * beats the library's presentation attributes; gridlines and value labels keep their own style.
+   */
+  .dshx-chart-frame text[data-ts-key*='tick-label'],
+  .dshx-chart-frame text[data-ts-key^='legend-label'],
+  .dshx-chart-frame text[data-ts-key^='legend-step-label'] {
+    fill: currentColor;
+    fill-opacity: 1;
+    font-size: var(--dshx-density-text-meta);
+    font-variant-numeric: tabular-nums;
+  }
 }
