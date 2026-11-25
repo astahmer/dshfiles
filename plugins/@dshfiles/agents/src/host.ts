@@ -9,6 +9,7 @@ import { AgentPresets } from './agent-presets-promise.js'
 import { agentsApi, type ToolCatalogView } from './api.js'
 import { DelegationGuard } from './delegation-guard.js'
 import { ProjectLocator } from './project-locator.js'
+import { SubagentAgentsProviderLayer } from './subagent-agents-promise.js'
 import { ToolAccessProviderLayer } from './tool-access-provider.js'
 import { AgentsRegistry } from './store.js'
 
@@ -70,7 +71,7 @@ const registryLayer = AgentsRegistry.layer.pipe(Layer.provide(Layer.merge(Storag
 export default DshxPlugin.make({
   name: '@dshfiles/agents',
   inject: ['storageDomain', 'workspaceRegistry'],
-  layer: Layer.mergeAll(delegationGuard, ToolAccessProviderLayer, AgentPresets.layer, ToolCatalog.layer).pipe(Layer.provideMerge(registryLayer)),
+  layer: Layer.mergeAll(delegationGuard, ToolAccessProviderLayer, SubagentAgentsProviderLayer, AgentPresets.layer, ToolCatalog.layer).pipe(Layer.provideMerge(registryLayer)),
   apis: [
     Api.bind(agentsApi, {
       list: () => AgentsRegistry.use(registry => registry.snapshot),

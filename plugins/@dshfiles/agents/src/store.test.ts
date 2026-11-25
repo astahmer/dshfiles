@@ -13,6 +13,7 @@ import { TestClock } from 'effect/testing'
 import type { AgentDraft } from './agent.js'
 import { ProjectLocator } from './project-locator.js'
 import { AgentsRegistry } from './store.js'
+import { SubagentAgentsProviderLayer } from './subagent-agents-promise.js'
 import { ToolAccessProviderLayer } from './tool-access-provider.js'
 
 /** A real JSON-backed storage domain facility in a temporary directory, as the Host serves it. */
@@ -389,6 +390,50 @@ describe('AgentsRegistry', () => {
           }),
         )
         expect(host.ctx.get('dshfilesToolAccess')).toBeUndefined()
+      }),
+    )
+  })
+
+  it.layer(storageHost)(it => {
+    it.effect('provides dshfilesSubagentAgents: a default agent recorded for the child before it attaches, refusals, a listing', () =>
+      Effect.gen(function* () {
+        yield* TestClock.setTime(16_000)
+        const host = yield* HostContext
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            const services = yield* Layer.build(
+              SubagentAgentsProviderLayer.pipe(
+                Layer.provideMerge(AgentsRegistry.layer.pipe(Layer.provide(Layer.merge(StorageDomain.layer, ProjectLocator.layerTest(workspaces))))),
+              ),
+            )
+            const registry = Context.get(services, AgentsRegistry)
+            const route = { provider: 'beta', model: 'review-model' }
+            yield* registry.save({ ...draftOf('reviewer'), route, preset: 'review', instructions: 'Be strict.', tools: { tools: { bash: { enabled: false } }, groups: {} } })
+            yield* registry.save({ ...draftOf('ops') })
+            yield* registry.save({ ...draftOf('lead'), subagents: { allowed: ['reviewer'], default: 'reviewer' } })
+            yield* registry.recordThreadAgent('parent-thread', 'lead')
+            const resolver = host.ctx.get('dshfilesSubagentAgents')
+            if (resolver === undefined || resolver === null) return expect.fail('the resolver should be registered')
+            const parent = { sessionId: 'parent-thread', cwd: undefined, parentSessionId: undefined }
+
+            const choice = resolver.resolve({ parent, handle: undefined })
+            if (choice.kind !== 'agent') return expect.fail(`expected the default agent, got ${choice.kind}`)
+            expect(choice).toMatchObject({ handle: 'reviewer', route, preset: 'review' })
+            expect(choice.preamble).toBe('Work as @reviewer — reviewer.\n\nBe strict.')
+            yield* Effect.promise(() => choice.record('child-1'))
+            // The child's first tool policy read (tool-search, at attach) already sees @reviewer, not the inherited @lead.
+            expect(registry.threadPolicyNow({ sessionId: 'child-1', cwd: undefined, parentSessionId: 'parent-thread' })).toMatchObject({
+              agent: 'reviewer',
+              source: 'agent',
+              access: { tools: { bash: { enabled: false } } },
+            })
+
+            const refused = resolver.resolve({ parent, handle: 'ops' })
+            expect(refused.kind === 'refused' ? refused.message : '').toContain("@lead's subagents may not run as @ops")
+            expect(resolver.list(parent)).toMatchObject({ parent: 'lead', default: 'reviewer', agents: [{ handle: 'lead' }, { handle: 'reviewer' }] })
+          }),
+        )
+        expect(host.ctx.get('dshfilesSubagentAgents')).toBeUndefined()
       }),
     )
   })

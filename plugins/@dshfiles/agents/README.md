@@ -106,8 +106,8 @@ Cordis service); tool-search applies it. Without tool-search installed nothing c
   appear later included; a tool entry beats its group entry beats the default, and a tool added later to a disabled group
   is disabled. `tool_search` and `tool_call` are never disabled.
 - **Per agent: `subagents`.** `{ allowed: 'any' | handles[], default: handle | null }`: which agents its subagents may
-  run as and which one they run as by default (null: the parent thread's agent). Stored now; the `subagent` tool reads
-  it in a later wave.
+  run as and which one they run as by default (null: the parent thread's agent). The `subagent` tool applies it; see
+  [Subagents as agents](#subagents-as-agents).
 - **Per project: a default agent**, keyed by the project's workspace id. A Session belongs to a project by the shared
   [`@dshfiles/vcs-provider-port/workspace-attribution`](../vcs-provider-port/README.md) rule, so a thread workspace
   (`<repo>-threads/thread-…`, or a provider's custom threads folder) counts for its project.
@@ -134,6 +134,25 @@ Cordis service); tool-search applies it. Without tool-search installed nothing c
 Write tools run only when the user asked. The calling thread can read its own agent and access with tool-search's
 `tool_search_access`.
 
+## Subagents as agents
+
+This plugin provides the [`@dshfiles/tool-subagent/agent-resolver`](../tool-subagent/README.md#the-agent-argument)
+contract (the `dshfilesSubagentAgents` Cordis service). The `subagent` tool's `agent` argument asks it which agent a
+fresh child starts as:
+
+1. The `agent` argument, else the calling agent's `subagents.default`, else nothing: the child inherits its parent
+   thread's agent, as before.
+2. The calling agent's `subagents.allowed` must list the handle, unless it is `any` or the calling agent itself. An
+   unlisted handle is refused with both handles, the allowed ones and `agents_subagents_set`; an unknown or disabled
+   one is refused with the valid handles. A default that no longer exists is refused the same way, so it is noticed.
+3. The tool gets the agent's route, preset and a preamble (`Work as @handle — Name.`, the description and the
+   instructions, clipped to 4,000 characters; nothing for the bare built-in `@dsh`; no routine). It reserves the child's
+   Session id and awaits `record`, which stores the agent as the child's `explicit` agent, before the child exists, so
+   tool-search applies that agent's tools from the child's first request.
+4. `list_subagent_models` with no arguments lists the agents the caller may start, the default, and how to change it.
+
+A child started this way is not added to the agent's thread list (that list holds dispatches).
+
 ## Decisions
 
 - **One handle namespace; a model is a property of an agent.** `@reviewer` may pin `codex/gpt-6-luna`, and the built-in
@@ -159,7 +178,8 @@ See [research.md](docs/research.md) for the reference-product comparison and the
 - A handle is the identity: it cannot be renamed after creation.
 - 50 threads are kept per agent, newest first; an older row is pruned on dispatch.
 - Memory, routines and delegation targets are per agent (see above). Delegation target _handles_ apply to messaging;
-  subagents and workflows are allowed or refused as a whole, because the native tools expose no target to filter.
+  `delegation.subagents` allows or refuses subagents and workflows as a whole, and `subagents.allowed` then narrows
+  which agents a `subagent` child may run as. Workflow children and `subagent_fork` children keep the parent's agent.
 - A routine is text, not a parsed rule: the thread decides the timing with the schedule tool, so the schedule record
   stays the single source of truth and the panel reads it back from the Host's catalog.
 

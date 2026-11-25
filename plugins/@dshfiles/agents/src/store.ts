@@ -103,6 +103,8 @@ export class AgentsRegistry extends Context.Service<
     readonly threadAgent: (sessionId: string) => Effect.Effect<Agent | null>
     /** The same read as `threadAgent`, for a synchronous Host guard that cannot run an Effect. */
     readonly threadAgentNow: (sessionId: string) => Agent | null
+    /** Every agent by handle, read synchronously (the subagent tool decides a child's agent inside a tool call). */
+    readonly agentsNow: () => ReadonlyMap<string, Agent>
     /** Every remembered thread with the handle of the configured agent that started it, for thread lists. */
     readonly threadHandles: Effect.Effect<readonly { readonly sessionId: string; readonly handle: string }[]>
     /** Edit an agent's tool access, one sparse entry at a time; threads started afterwards get it. */
@@ -371,6 +373,7 @@ export class AgentsRegistry extends Context.Service<
         threads: handle => Effect.map(Ref.get(state), current => threadsOf(current.history, handle)),
         threadAgent: sessionId => Effect.map(Ref.get(state), current => agentOfThread(current, sessionId)),
         threadAgentNow: sessionId => agentOfThread(Ref.getUnsafe(state), sessionId),
+        agentsNow: () => Ref.getUnsafe(state).records,
         threadHandles: Effect.map(Ref.get(state), current =>
           [...current.history.values()].flatMap(thread => (current.records.has(thread.handle) ? [{ sessionId: thread.sessionId, handle: thread.handle }] : [])),
         ),

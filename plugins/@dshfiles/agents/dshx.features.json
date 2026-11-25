@@ -15,12 +15,28 @@
         "expect text \"Saved.\"",
         "expect text \"@reviewer\""
       ],
-      "surfaces": ["client", "host", "storage", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "tool"
+      ],
       "surface": "destinationSection",
       "destination": "agents",
       "currentSurface": "left-nav: Agents",
       "configuration": [],
-      "states": ["empty", "built-in-only", "editing", "unsaved", "invalid", "enabled", "disabled", "thread-history", "delegation-listed", "removed-undoable"],
+      "states": [
+        "empty",
+        "built-in-only",
+        "editing",
+        "unsaved",
+        "invalid",
+        "enabled",
+        "disabled",
+        "thread-history",
+        "delegation-listed",
+        "removed-undoable"
+      ],
       "failureModes": [
         "A handle is a slug; a name alone is enough to create one.",
         "Removing the built-in @dsh agent is refused and reported.",
@@ -155,12 +171,21 @@
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
       "summary": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was — the backlog reports the new thread in a toast whose Open action shows it — the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
-      "surfaces": ["client", "host", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "tool"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: @agent mention",
       "configuration": [],
-      "states": ["idle", "mentioned", "dispatched", "reported"],
+      "states": [
+        "idle",
+        "mentioned",
+        "dispatched",
+        "reported"
+      ],
       "failureModes": [
         "An unknown handle stays a plain comment.",
         "A disabled agent is not offered and does not dispatch.",
@@ -168,7 +193,9 @@
       ],
       "externalDependencies": [],
       "onboarding": {
-        "prerequisites": ["account"],
+        "prerequisites": [
+          "account"
+        ],
         "firstAction": "Start a new thread with @ followed by an agent's handle and your request.",
         "doneWhen": "A thread runs on that agent with your text as its first prompt."
       },
@@ -218,18 +245,29 @@
           "source": "agent-tool"
         }
       ],
-      "reach": ["fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@agent:\"", "expect text \"@dsh\""]
+      "reach": [
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@agent:\"",
+        "expect text \"@dsh\""
+      ]
     },
     {
       "id": "agent-mention-preview",
       "title": "Preview an agent from its mention",
       "summary": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "surface": "entityProvider",
       "destination": "agents",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), agent kind",
       "configuration": [],
-      "states": ["known-agent", "disabled-agent", "removed-agent", "many-mentions", "thread-history"],
+      "states": [
+        "known-agent",
+        "disabled-agent",
+        "removed-agent",
+        "many-mentions",
+        "thread-history"
+      ],
       "failureModes": [
         "An unknown handle stays plain text.",
         "A removed agent's mention stays plain text until the registry list refreshes.",
@@ -306,13 +344,23 @@
     {
       "id": "agent-tool-access",
       "title": "An agent decides its threads' tools",
-      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as. Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
-      "surfaces": ["host", "integration"],
+      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
+      "surfaces": [
+        "host",
+        "integration"
+      ],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; UI in a later wave",
       "configuration": [],
-      "states": ["explicit", "inherited", "project-default", "default", "override-agent", "override-all"],
+      "states": [
+        "explicit",
+        "inherited",
+        "project-default",
+        "default",
+        "override-agent",
+        "override-all"
+      ],
       "failureModes": [
         "A project default naming a removed agent falls back to @dsh for threads started afterwards.",
         "An override naming an unknown agent is refused (missing-agent) and the thread keeps its tools.",
@@ -373,6 +421,62 @@
           "kind": "automatic",
           "source": "api-dispatch"
         },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "subagent-agents",
+      "title": "A subagent starts as a configured agent",
+      "summary": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own agent); unknown, disabled or unlisted handles are refused with the handles involved and agents_subagents_set. The child gets the agent's route, preset and a bounded preamble, and its Session is recorded as the agent's explicit thread before it exists, so tool-search applies that agent's tools from its first request. list_subagent_models lists the agents a caller may start.",
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: the dshfilesSubagentAgents Cordis service, read by @dshfiles/tool-subagent's subagent and list_subagent_models tools",
+      "configuration": [],
+      "states": [
+        "inherit",
+        "agent",
+        "default-agent",
+        "refused"
+      ],
+      "failureModes": [
+        "Without @dshfiles/tool-subagent's rows in the profile, the native subagent tool has no agent argument and children inherit their parent's agent.",
+        "A default naming a removed agent refuses subagent calls that omit agent until the default is changed or agent is passed.",
+        "subagent_fork and workflow children keep the parent's agent; only subagent takes agent."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.subagent-rules",
+          "file": "plugins/@dshfiles/agents/src/subagent-agents.test.ts",
+          "testName": "refuses an unlisted handle naming both handles, the allowed ones and how to change it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.subagent-default",
+          "file": "plugins/@dshfiles/agents/src/subagent-agents.test.ts",
+          "testName": "starts the parent's default agent when none is named"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.subagent-provider",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "provides dshfilesSubagentAgents: a default agent recorded for the child before it attaches, refusals, a listing"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.subagent-no-ui",
+          "reason": "Host-only contract: the Subagents controls belong to the Agents panel wave; the tool side is covered by @dshfiles/tool-subagent unit tests on the real runtimes."
+        }
+      ],
+      "telemetry": [
         {
           "kind": "automatic",
           "source": "agent-tool"

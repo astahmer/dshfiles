@@ -36,6 +36,7 @@
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/tool-search": "workspace:*",
+    "@dshfiles/tool-subagent": "workspace:*",
     "@dshfiles/vcs-provider-port": "workspace:*",
     "effect": "catalog:"
   },
