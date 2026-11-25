@@ -11,7 +11,6 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
-import { tabsListVariants } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, ChevronDownIcon, FolderIcon, ListFilterIcon, XIcon } from '@dshfiles/plugin-ui/icons'
@@ -49,22 +48,25 @@ export const sortNames = {
 } satisfies Record<BacklogSort, string>
 const sortOrders = ['updated', 'created', 'priority', 'due'] as const
 
-/** The kit segmented tab, drawn on buttons so each view stays a navigation link with `aria-current`. */
+/**
+ * An underline tab, drawn on buttons so each view stays a navigation link with `aria-current`: page sections are
+ * underline tabs, a segmented track is only for a few view modes (council round 3, D2). The 2 px marker sits on the
+ * toolbar row's bottom rule.
+ */
 const tabClass = (active: boolean): string =>
   cn(
-    'dshx:relative dshx:inline-flex dshx:h-full dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:px-2.5 dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:outline-none dshx:transition-colors dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50',
-    active
-      ? 'dshx:bg-background dshx:text-foreground dshx:shadow-sm dshx:dark:border-input dshx:dark:bg-input/30'
-      : 'dshx:text-foreground/60 dshx:hover:text-foreground dshx:dark:text-muted-foreground dshx:dark:hover:text-foreground',
+    'dshx:relative dshx:inline-flex dshx:h-full dshx:items-center dshx:gap-1.5 dshx:rounded-none dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50',
+    'dshx:after:absolute dshx:after:inset-x-0 dshx:after:bottom-[-1px] dshx:after:h-0.5 dshx:after:rounded-full dshx:after:bg-foreground',
+    active ? 'dshx:text-foreground dshx:after:opacity-100' : 'dshx:text-muted-foreground dshx:after:opacity-0 dshx:hover:text-foreground',
   )
 
 /**
- * The Backlog's views: labelled segmented tabs, and one labelled select once the pane is phone-narrow, so no view is
+ * The Backlog's views: labelled underline tabs, and one labelled select once the pane is phone-narrow, so no view is
  * ever an unlabeled icon. Holding the shortcut modifier shows each tab's digit.
  */
 export const BacklogViewSwitch = (props: { readonly view: View; readonly onSelect: (view: View) => void; readonly modifierHeld: boolean }): JSX.Element => (
   <>
-    <nav aria-label="Backlog views" className={cn(tabsListVariants(), 'dshx:h-8 dshx:shrink-0 dshx:@max-pane-narrow:hidden')}>
+    <nav aria-label="Backlog views" data-tabs="underline" className="dshx:flex dshx:h-full dshx:shrink-0 dshx:items-stretch dshx:gap-5 dshx:@max-pane-narrow:hidden">
       {views.map((entry, index) => (
         <Tooltip key={entry}>
           <TooltipTrigger asChild>

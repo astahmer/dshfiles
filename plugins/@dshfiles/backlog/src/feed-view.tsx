@@ -96,6 +96,8 @@ const FeedEntry = (props: {
   readonly openThread: (sessionId: string) => void
   /** False when every row in the feed has the same author: the avatar would repeat one face down the page. */
   readonly showAuthor: boolean
+  /** A tag's tone among the tags on screen (`FeedLook.tagTones`). */
+  readonly tagTone: (tag: string) => string
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -103,6 +105,12 @@ const FeedEntry = (props: {
   const activity = activityLine(item)
   const closed = item.status === 'done' || item.status === 'dropped'
   const rename = useBacklogInlineRename(() => props.select(item.id))
+  const inlineTag = FeedLook.inlineTag(item)
+  const tagChip = (tag: string): JSX.Element => (
+    <span key={tag} className={cn(FeedLook.TAG_CHIP, props.tagTone(tag))}>
+      <span className="dshx-project-mark-letters">#{tag}</span>
+    </span>
+  )
   return (
     <BacklogItemMenu
       item={item}
@@ -125,7 +133,7 @@ const FeedEntry = (props: {
         }}
         onDoubleClick={rename.renameOnDoubleClick}
         className={cn(
-          'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:rounded-lg dshx:px-2 dshx:py-2.5 dshx:transition-colors dshx:duration-100 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
+          'dshx:group/entry dshx:relative dshx:flex dshx:cursor-default dshx:gap-3 dshx:min-h-[44px] dshx:rounded-lg dshx:px-2 dshx:py-[10px] dshx:transition-colors dshx:duration-100 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-info/50',
           props.selection.selected.has(item.id) || props.open ? 'dshx:bg-accent/70' : props.cursor ? 'dshx:bg-accent/45' : 'dshx:hover:bg-accent/35',
         )}
       >
@@ -140,7 +148,7 @@ const FeedEntry = (props: {
         ) : null}
         {props.showAuthor ? <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" /> : null}
         {/* One grid for every row (council round 2, D2): 16 px status seat, title, 104 px meta; the rest sits under the title. */}
-        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1">
+        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1">
           <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:w-4 dshx:justify-center">
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
@@ -162,12 +170,15 @@ const FeedEntry = (props: {
                 text={imageTitleFallback(item.title)}
                 className={cn(
                   // The native compact Markdown root (`> div > div`) sets 13 px tertiary text of its own: the title restyles it.
-                  'dshx:min-w-0 dshx:flex-1 dshx:cursor-text dshx:truncate dshx:text-base dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:font-medium! dshx:[&>div>div]:text-base! dshx:[&>div>div]:leading-5! dshx:[&>div>div]:text-foreground! dshx:[&>div_p]:my-0 dshx:[&>div_p]:truncate',
+                  // With an inline tag the title hugs its text, so the tag follows it instead of waiting at the far edge.
+                  inlineTag === null ? 'dshx:flex-1' : 'dshx:flex-initial',
+                  'dshx:min-w-0 dshx:cursor-text dshx:truncate dshx:text-base dshx:font-medium dshx:[&>div]:truncate dshx:[&>div]:font-medium! dshx:[&>div>div]:text-base! dshx:[&>div>div]:leading-5! dshx:[&>div>div]:text-foreground! dshx:[&>div_p]:my-0 dshx:[&>div_p]:truncate',
                   closed &&
                     'dshx:text-muted-foreground dshx:line-through dshx:decoration-muted-foreground/40 dshx:[&>div>div]:text-muted-foreground! dshx:[&>div]:line-through',
                 )}
               />
             )}
+            {inlineTag === null ? null : tagChip(inlineTag)}
           </div>
           <FeedEntryMeta item={item} author={author} showAuthor={props.showAuthor} />
           {item.preview === '' ? null : (
@@ -188,11 +199,7 @@ const FeedEntry = (props: {
                 <ItemGlyphs.ProjectLabel project={item.project} />
               </Chip>
             )}
-            {item.tags.map(tag => (
-              <span key={tag} className={cn(FeedLook.TAG_CHIP, FeedLook.tagTone(tag))}>
-                <span className="dshx-project-mark-letters">#{tag}</span>
-              </span>
-            ))}
+            {inlineTag === null ? item.tags.map(tagChip) : null}
             {item.attachments.length === 0 ? null : (
               <Chip>
                 <PaperclipIcon className="dshx:size-3" />
@@ -311,6 +318,8 @@ export const FeedView = (props: {
   const selection = useBacklogSelection({ items: [...pinned, ...visible], openId: props.openId, scope: JSON.stringify(props.statuses) })
   const lastId = ordered.at(-1)?.id
   const showAuthor = FeedLook.authorsDiffer([...pinned, ...ordered])
+  const tagTones = useMemo(() => FeedLook.tagTones(props.items.flatMap(item => item.tags)), [props.items])
+  const tagTone = (tag: string): string => tagTones.get(tag) ?? FeedLook.tagTone(tag)
 
   useLayoutEffect(() => {
     const element = scroller.current
@@ -346,6 +355,7 @@ export const FeedView = (props: {
           triageOff={props.triageOff}
           openThread={props.openThread}
           showAuthor={showAuthor}
+          tagTone={tagTone}
         />
       </div>
     )

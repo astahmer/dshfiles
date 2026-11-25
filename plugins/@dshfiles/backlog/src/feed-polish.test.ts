@@ -26,7 +26,7 @@ describe('Backlog feed (round five P6)', () => {
     expect(new Set(['billing', 'finance', 'web-app', 'a11y', 'docs'].map(FeedLook.tagTone)).size).toBeGreaterThan(2)
     for (const tag of ['billing', 'docs']) expect(FeedLook.tagTone(tag)).toMatch(/^project-tone-balanced-[0-5]$/u)
     expect(feed).toMatch(
-      /<span key=\{tag\} className=\{cn\(FeedLook\.TAG_CHIP, FeedLook\.tagTone\(tag\)\)\}>\s*<span className="dshx-project-mark-letters">#\{tag\}<\/span>/u,
+      /<span key=\{tag\} className=\{cn\(FeedLook\.TAG_CHIP, props\.tagTone\(tag\)\)\}>\s*<span className="dshx-project-mark-letters">#\{tag\}<\/span>/u,
     )
     expect(FeedLook.TAG_CHIP).toContain('dshx:bg-current/14')
     expect(FeedLook.TAG_CHIP).not.toMatch(/text-muted|border/u)
@@ -62,7 +62,7 @@ describe('Backlog feed (council round 2, D2)', () => {
   })
 
   it('lays each row on one grid: 16 px status, title, 104 px meta, with tags 4 px under the title', () => {
-    expect(feed).toContain('dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1')
+    expect(feed).toContain('dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1')
     expect(feed).toMatch(/data-feed-entry-chips="" className="dshx:col-span-2 dshx:col-start-2/u)
   })
 
@@ -70,5 +70,46 @@ describe('Backlog feed (council round 2, D2)', () => {
     expect(feed).not.toContain('<StatusFilterBar')
     expect(read('backlog-toolbar.tsx')).toMatch(/DropdownMenuLabel[^>]*>Status<\/DropdownMenuLabel>/u)
     expect(panel).toMatch(/status=\{\s*view === 'feed'/u)
+  })
+})
+
+describe('Backlog feed (council round 3, D2)', () => {
+  const feed = read('feed-view.tsx')
+  const bare = { attention: 'none' as const, proposal: null, project: null, attachments: [], links: [], activity: { comments: 0 }, freshness: 'fresh' as const }
+
+  it('gives the tags on one screen distinct tones, never two neighbouring hues (#docs and #finance were both teal)', () => {
+    const tones = FeedLook.tagTones(['billing', 'finance', 'web-app', 'a11y', 'docs', 'billing'])
+    expect(tones.get('docs')).not.toBe(tones.get('finance'))
+    expect(new Set(tones.values()).size).toBe(5)
+    // Tones 0/5 (225°/195°) and 3/4 (305°/340°) read as one colour: no pair of them while a far tone is free.
+    const four = FeedLook.tagTones(['docs', 'finance', 'billing', 'a11y'])
+    const indices = [...four.values()].map(tone => Number(tone.at(-1)))
+    expect(indices.includes(0) && indices.includes(5)).toBe(false)
+    expect(indices.includes(3) && indices.includes(4)).toBe(false)
+    // Stable: the same set gives the same tones whatever the order of the rows.
+    expect(FeedLook.tagTones(['docs', 'finance'])).toEqual(FeedLook.tagTones(['finance', 'docs']))
+  })
+
+  it('puts one short tag inline with the title, and keeps a second line for previews or several chips', () => {
+    expect(FeedLook.inlineTag({ ...bare, tags: ['billing'] })).toBe('billing')
+    expect(FeedLook.inlineTag({ ...bare, tags: ['billing', 'docs'] })).toBeNull()
+    expect(FeedLook.inlineTag({ ...bare, tags: ['a-very-long-tag-name-here'] })).toBeNull()
+    expect(FeedLook.inlineTag({ ...bare, tags: ['billing'], attention: 'blocked' })).toBeNull()
+    expect(FeedLook.inlineTag({ ...bare, tags: ['billing'], links: [{}] })).toBeNull()
+    expect(feed).toMatch(/const inlineTag = FeedLook\.inlineTag\(item\)/u)
+  })
+
+  it('gives a one-line row 44 px, its line centred; a two-line row grows from there', () => {
+    // A 44 px floor rather than padding alone: the title line height follows the density scale.
+    expect(feed).toContain('dshx:min-h-[44px] dshx:rounded-lg dshx:px-2 dshx:py-[10px] dshx:transition-colors')
+    expect(feed).toContain('dshx:grid-cols-[16px_minmax(0,1fr)_104px] dshx:content-center')
+  })
+})
+
+describe('Backlog feed lane (council round 3, D2)', () => {
+  const panel = read('backlog-panel.tsx')
+  it('holds the feed, its toolbar and the capture box to one 920 px lane', () => {
+    expect(panel).toMatch(/const FEED_LANE = 'dshx:w-full dshx:max-w-\[57\.5rem\]'/u)
+    expect([...panel.matchAll(/hugsContent && FEED_LANE/gu)]).toHaveLength(3)
   })
 })

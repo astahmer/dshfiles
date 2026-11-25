@@ -69,3 +69,15 @@ test('the toolbar folds project scope, sort, agent items and saved views into on
   expect(agentItems?.getAttribute('aria-pressed')).toBe('true')
   expect([...document.querySelectorAll('button')].some(button => button.textContent?.startsWith('Saved views') === true)).toBe(true)
 })
+
+test('the seven views are underline tabs, not a segmented track (council round 3, D2)', () => {
+  render(<BacklogViewSwitch view="feed" onSelect={() => undefined} modifierHeld={false} />)
+  const nav = document.querySelector('nav[aria-label="Backlog views"]')
+  expect(nav?.getAttribute('data-tabs')).toBe('underline')
+  expect(nav?.className).not.toContain('dshx:bg-muted')
+  const tabs = [...(nav?.querySelectorAll('button') ?? [])]
+  const active = tabs.find(tab => tab.getAttribute('aria-current') === 'page')
+  expect(active?.className).toContain('dshx:after:opacity-100')
+  expect(active?.className).not.toContain('dshx:shadow-sm')
+  for (const tab of tabs.filter(tab => tab !== active)) expect(tab.className).toContain('dshx:text-muted-foreground')
+})
