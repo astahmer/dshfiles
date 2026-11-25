@@ -47,7 +47,7 @@ export const ThreadGroupHeader = ({
   const tinted = statusCounts !== undefined && statusCounts.needsYou + statusCounts.failed > 0
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
   return (
-    <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5')}>
+    <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5 dshx:pointer-coarse:h-7')}>
       <button
         type="button"
         data-thread-section-header=""

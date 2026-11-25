@@ -1507,6 +1507,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   // "Waiting on 1 subagent" already says what keeps the thread busy; a job chip beside it read as a second count of it.
   const waitingOnSubagents = workStatus?.status === 'working' && !session.running && props.childThreads.length > 0
   const jobCount = waitingOnSubagents ? 0 : (props.runningJobs ?? 0)
+  // The same line also names how many it waits on, so the toggle keeps only its chevron (round five B1).
+  const childCounterShown = !(waitingOnSubagents && workStatus?.detail !== undefined)
   // Why it needs you leads the second line, so the title keeps the first line to itself.
   const statusDetail =
     workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
@@ -1560,8 +1562,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         type="button"
         size="xs"
         variant={verbVariant}
-        // Above the neighbouring rows, so its 44 px touch area is not covered by the row painted after it.
-        className="dshx:z-10 dshx:h-6 dshx:px-2"
+        // Above the neighbouring rows, so its 44 px touch area is not covered by the row painted after it. On touch it is
+        // 28px, the height of the row it sits in (round five B1).
+        className="dshx:z-10 dshx:h-6 dshx:px-2 dshx:pointer-coarse:h-7"
         data-testid="thread-row-verb"
         data-verb={inlineVerb}
         onClick={() => props.actions.actOnStatus(session.id, workStatus)}
@@ -1774,9 +1777,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
                 'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
-                // Phone rows are 56pt two-line targets (T1.3; council round 4 B4: 60pt kept the first Ready row under the
-                // tab bar at 390x844), whatever the density preference.
-                'dshx:pointer-coarse:min-h-14 dshx:pointer-coarse:justify-center',
+                // Phone rows are a two-row grid (round five B1): [title | time ⋯] over [subtitle | verb], 6px apart, at
+                // least 52pt tall, whatever the density preference, so the first Ready row shows above the tab bar.
+                'dshx:pointer-coarse:min-h-13 dshx:pointer-coarse:justify-center dshx:pointer-coarse:gap-1.5 dshx:pointer-coarse:py-1',
                 // Touch: the row's actions menu button takes the top-right corner's column.
                 'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
@@ -1902,7 +1905,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     // A two-line question keeps the project mark on its first line.
                     ask === 'question' && askSubtitle === undefined && liveStep === undefined && statusDetail !== undefined ? 'dshx:items-start' : 'dshx:items-center',
                     // Room for what sits at the end of this line: the verb, the subagent counter, or both.
-                    verbSeat === 'meta' ? (childCount > 0 ? 'dshx:pr-34' : 'dshx:pr-17.5') : childCount > 0 && 'dshx:pr-16',
+                    verbSeat === 'meta' ? (childCount > 0 ? 'dshx:pr-34' : 'dshx:pr-17.5') : childCount > 0 && (childCounterShown ? 'dshx:pr-16' : 'dshx:pr-8'),
+                    // Touch: row 2 is at least the 28px verb it carries (round five B1).
+                    verbSeat === 'meta' && 'dshx:pointer-coarse:min-h-7',
                   )}
                   data-thread-where=""
                 >
@@ -1940,7 +1945,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         'dshx:min-w-0 dshx:flex-1',
                         ask === 'question' && askSubtitle === undefined ? 'dshx:line-clamp-2 dshx:break-words' : 'dshx:truncate',
                         askSubtitle !== undefined
-                          ? 'dshx:text-sm/[18px] dshx:text-muted-foreground'
+                          ? 'dshx:text-sm/[18px] dshx:text-muted-foreground dshx:pointer-coarse:text-xs/[18px]'
                           : (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
                       )}
                       data-testid="thread-row-status-detail"
@@ -1996,8 +2001,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 'dshx:absolute dshx:right-1.5 dshx:flex dshx:items-center dshx:gap-1',
                 verbSeat !== 'meta' || props.renaming
                   ? 'dshx:bottom-1'
-                  : // Touch: the verb ends where the time above it does, left of the row menu's column (council round 4 B4).
-                    cn(compact ? 'dshx:bottom-0.5 dshx:pointer-coarse:bottom-2' : 'dshx:bottom-1.5', 'dshx:pointer-coarse:right-11'),
+                  : // Touch: the verb ends where the time above it does, left of the row menu's column (council round 4 B4),
+                    // and stands on the row's 4px bottom padding, so it fills row 2 and never meets the time (round five B1).
+                    cn(compact ? 'dshx:bottom-0.5' : 'dshx:bottom-1.5', 'dshx:pointer-coarse:right-11 dshx:pointer-coarse:bottom-1'),
               )}
             >
               {verbSeat === 'meta' && !props.renaming ? verbButton : null}
@@ -2011,6 +2017,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
               onClick={() => props.actions.toggleChildren(session.id, props.childrenOpen)}
             >
+              {childCounterShown ? (
               <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
                 {props.childThreads.slice(0, 3).map(child => {
                   const attentionLabel = props.childAttentionLabels.get(child.id)
@@ -2030,7 +2037,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   )
                 })}
               </span>
-              <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span>
+              ) : null}
+              {childCounterShown ? <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span> : null}
               {/* A real chevron in a 24 px seat (round five B3), not a 12 px caret: it turns over when the sub-rows open. */}
               <span className="dshx:inline-flex dshx:size-6 dshx:items-center dshx:justify-center" data-children-chevron="" aria-hidden="true">
                 <ChevronDownIcon
@@ -7546,10 +7554,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   return (
                     <section
                       className={cn(
-                        // Groups stand 20px apart in the list: the last row's 6px gap and this 14px; 12px on a phone, so
-                        // more of the list shows above the tab bar (council round 4 B4).
+                        // Groups stand 20px apart in the list: the last row's 6px gap and this 14px; 6px on a phone, and none
+                        // above the first, so the first Ready row shows above the tab bar (round five B1).
                         'dshx:mt-1 dshx:rounded-md',
-                        !isBoard && 'dshx:not-pointer-coarse:not-first:mt-3.5 dshx:pointer-coarse:not-first:mt-1.5',
+                        !isBoard && 'dshx:not-pointer-coarse:not-first:mt-3.5 dshx:pointer-coarse:not-first:mt-0.5 dshx:pointer-coarse:first:mt-0',
                         isBoard && 'dshx:flex dshx:min-h-[24rem] dshx:min-w-72 dshx:flex-1 dshx:flex-col dshx:bg-muted/45 dshx:p-1.5',
                       )}
                       key={group.key}

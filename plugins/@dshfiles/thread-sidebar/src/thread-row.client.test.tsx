@@ -163,6 +163,19 @@ describe('a row that needs you', () => {
     expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('dshx:size-4')
   })
 
+  it('drops the counter\'s dots and number when line 2 already says how many subagents it waits on (round five B1)', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const row = await renderRow({ childThreads: [child], workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) })
+    const toggle = row.querySelector<HTMLElement>('[data-thread-children-toggle]')
+    expect(toggle?.textContent).toBe('')
+    expect(toggle?.querySelector('[data-children-chevron]')).not.toBeNull()
+    // The spoken name keeps the count.
+    expect(toggle?.getAttribute('aria-label')).toBe('threadSidebarShowChildren (1)')
+    cleanup()
+    const plain = await renderRow({ childThreads: [child], workStatus: rowStatus({ status: 'idle' }) })
+    expect(plain.querySelector('[data-thread-children-toggle]')?.textContent).toBe('1')
+  })
+
   it('keeps the question readable beside a subagent counter', async () => {
     // The verb and the counter share line 2's end; the question keeps the rest of the line.
     const children = ['c1', 'c2', 'c3'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
