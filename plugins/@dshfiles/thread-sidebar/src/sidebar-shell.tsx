@@ -246,9 +246,14 @@ const SETTINGS_COMMAND_ID = 'settings.open'
 /** `@dshfiles/workbench`'s right-pane toggle; on a phone that pane is the thread panel's bottom sheet. */
 const THREAD_PANEL_COMMAND_ID = 'workbench.toggleSidePanel'
 
+/**
+ * Open Settings, never close it: settings-shell's open request comes first, because its `settings.open` command toggles
+ * (pressing "All settings" a second time used to close the page). The command is the fallback for a shell without the
+ * request.
+ */
 export const requestSettings = (runCommand: ((commandId: string) => boolean) | null): void => {
-  if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
   if (dispatchOpenSettings()) return
+  if (runCommand?.(SETTINGS_COMMAND_ID) === true) return
   // A native settings root owns the seat instead of the dshx shell: its trigger is the only public opener there.
   document.querySelector<HTMLButtonElement>('[data-footer-entry="settings"] button[aria-haspopup="dialog"]')?.click()
 }

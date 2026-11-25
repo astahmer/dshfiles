@@ -34,7 +34,7 @@ export interface DestinationDefinition {
 
 export const DESTINATIONS: readonly DestinationDefinition[] = [
   { id: 'threads', label: 'Threads', description: 'Every thread, grouped by status.', icon: 'messages-square' },
-  { id: 'inbox', label: 'Inbox', description: 'Questions, approvals and failures, answered in place.', icon: 'inbox', badgeFromPanel: 'attention-inbox' },
+  { id: 'inbox', label: 'Inbox', description: 'Questions, approvals and failures waiting on you.', icon: 'inbox', badgeFromPanel: 'attention-inbox' },
   { id: 'land', label: 'Land', description: 'Workspaces ready to land, and repository history.', icon: 'git-merge' },
   { id: 'work', label: 'Work', description: 'Backlog items and schedules that start threads.', icon: 'list-todo' },
   { id: 'agents', label: 'Agents', description: 'Configured agents and their messages.', icon: 'bot' },

@@ -93,7 +93,15 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     order: 1,
     formerLabels: ['Backlog: Items', 'Backlog'],
   },
-  { panelId: 'schedules', destination: 'work', label: 'Schedules', description: 'Reminders and recurring prompts.', order: 2, formerLabels: ['Schedules'] },
+  {
+    panelId: 'schedules',
+    destination: 'work',
+    label: 'Schedules',
+    // Item 30's wording: Schedules prompts a thread that exists; Automations starts a new one.
+    description: 'Prompts sent to a thread at a set time.',
+    order: 2,
+    formerLabels: ['Schedules', 'Automation tasks'],
+  },
   {
     panelId: 'dshfiles-agents',
     destination: 'agents',
