@@ -34,6 +34,10 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
 5. **P28** — the phone shell hides `KeyHint` and the menu shortcut slots under 640px: no keycaps without a keyboard.
 6. **P7 not reproduced** (2026-11-25 live check): the context meter panel opened at x114 y577, 264×159 in a 390×844
    viewport. Keep it open as a regression check rather than a fix.
+7. **P4 (partial)** — the kit gained `useCloseWatcher` (tested) and the composer picker plus the context meter adopt it, so
+   the system back gesture closes them instead of leaving the thread. Still open: every other popover and sheet.
+8. **P32 (partial)** — the open phone drawer traps Tab through the kit dialog focus hook and returns focus on close;
+   21 drawer journey tests pass. Still open: `inert` on the stage, reduced motion everywhere, large-text check.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
