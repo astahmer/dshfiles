@@ -117,9 +117,10 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 | `StatusGlyph`              | Fixed 16px box (`size="small"`: a 10px seat for `StatusCount`). Dark cockpit: working is a colourless ring spinner (all spinners phase-synced, paused off screen), needs-you the `info` diamond, failed the `destructive` cross, ready a solid foreground dot, idle a faint ring, done a muted check; glyph-only `stale` (dashed ring) and `stopped` (muted square). Labelled by default; `decorative` when the row already states it in text.                                                                                                                                                                                                                                                                                                                |
 | `EntityRow` / `EntityList` | `leading` (checkbox, chevron) · glyph · `heading` · muted `meta` chips · `description` line · `trailing` inline verb; `children` render full width below (an output pane). `onSelect` makes the middle one button; `leading`/`trailing` stay separate controls. Ready titles are bold, done titles muted, nothing else is coloured. In narrow panes meta wraps under the title and trailing verbs drop to their own line. `EntityList` is the one bordered list with hairline dividers; give its rows `role="listitem"`.                                                                                                                                                                                      |
 
-**Primary button: black.** The primary action is `Button` `variant="default"`, which is `bg-primary` = the Host
-`--dsw-alias-brand-primary` (`#0f1115` light, `#f9fafb` dark), the convention most plugins already use (MCP Add
-server, Memory, Backlog New, Hosts). Blue (`info`, `--dsw-alias-state-business-primary`) is never a button fill: it is
+**Primary button: ink.** The primary action is `Button` `variant="default"`, which is `bg-primary` = the Host
+`--dsw-alias-brand-primary`: the ink in light, and in dark a softened warm grey (`--dshx-primary-fill`,
+`oklch(0.88 0.006 65)`) so it is not the brightest thing on the screen; its label is the page colour, AA at rest and on
+hover (`tests/primary-fill.test.ts`). Native primary buttons read the same alias. Blue (`info`, `--dsw-alias-state-business-primary`) is never a button fill: it is
 reserved for focus rings, selection and the Needs-you glyph. One primary per page; everything else is `outline`
 (header) or `ghost`/`outline` `sm` (rows).
 

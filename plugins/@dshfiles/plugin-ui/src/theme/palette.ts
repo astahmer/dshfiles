@@ -64,6 +64,12 @@ export interface Palette {
    */
   readonly needsYouBandWash: Oklch
   readonly failedWash: Oklch
+  /**
+   * The primary button's fill (council round 3 A3): the ink in light; in dark a softened warm light grey
+   * (oklch 0.88 0.006 on the grey hue), so the one primary stops being the brightest thing on the screen. Its label is
+   * the page colour, AA at rest and on hover.
+   */
+  readonly primaryFill: Oklch
 }
 
 export const NEUTRAL_STEP_NAMES = ['bg', 'panel', 'raised', 'selected', 'line', 'border', 'border-strong', 'strong', 'faint', 'muted', 'text'] as const
@@ -133,6 +139,8 @@ function palette(input: PaletteInput): Palette {
     needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
     // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
     failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
+    // SAFETY: the ramp has all eleven steps, so step 10 exists.
+    primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : (neutral[10] as Oklch),
   }
 }
 
