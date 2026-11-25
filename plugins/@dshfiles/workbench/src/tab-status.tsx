@@ -1,5 +1,5 @@
 import { StatusGlyph, workStatusLabels, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
-import { ActivityIcon, BotIcon, GitMergeIcon, InboxIcon, LibraryIcon, ListTodoIcon, MessagesSquareIcon, SettingsIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, BotIcon, GitMergeIcon, InboxIcon, LibraryIcon, ListTodoIcon, MessagesSquareIcon, SettingsIcon, SquarePenIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { TabDestination, TabDestinationIcon, TabDestinationId, TabStatus } from './tabs.js'
 
@@ -85,3 +85,27 @@ export const TabDestinationGlyph = (props: {
     </span>
   )
 }
+
+/**
+ * A new thread tab's mark (council round 6 B6): a thread with no status and no project yet would leave its 16px seat
+ * empty, so it draws the compose glyph there, tertiary on a background tab and the Threads tone on the tab on screen,
+ * as a page tab draws its destination. Its status replaces it once the thread runs. Decorative: the title names it.
+ */
+export const TabComposeGlyph = (props: {
+  /** The tab on screen; omit when the strip marks it with CSS and pass `activeClassName` instead. */
+  readonly active?: boolean
+  readonly activeClassName?: string
+}): JSX.Element => (
+  <span
+    aria-hidden="true"
+    data-tab-compose=""
+    className={cn(
+      'dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center',
+      DESTINATION_TONES.threads,
+      props.active === true ? 'dshx:text-nav-tone' : 'dshx:text-(--dsw-alias-label-tertiary)',
+      props.activeClassName,
+    )}
+  >
+    <SquarePenIcon size={14} strokeWidth={1.5} />
+  </span>
+)

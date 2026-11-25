@@ -190,6 +190,24 @@ describe('workbench semantic tab chrome', () => {
     expect((glyph?.compareDocumentPosition(screen.getByText('Registered title')) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
+  it('seats the compose glyph in the Threads tone on a new thread tab, which has no status and no project yet (council round 6 B6)', () => {
+    const tab = fixture()
+    tab.update({ status: null, title: 'New thread' })
+    const seat = document.querySelector<HTMLElement>('[data-tab-status-slot]')
+    const glyph = seat?.querySelector<HTMLElement>('[data-tab-compose]')
+    expect(glyph).not.toBeNull()
+    expect(glyph?.getAttribute('aria-hidden')).toBe('true')
+    expect(glyph?.className).toContain('dshx:nav-tone-threads')
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:text-nav-tone')
+    // A running thread shows its status there instead; a thread in a project shows the project's tile.
+    tab.update({ status: 'running' })
+    expect(document.querySelector('[data-tab-compose]')).toBeNull()
+    cleanup()
+    const inProject = fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
+    inProject.update({ status: null, workspaceId: 'workspace-a' })
+    expect(document.querySelector('[data-tab-compose]')).toBeNull()
+  })
+
   it('keeps the ProjectMark, not a destination glyph, on a thread tab', () => {
     fixture()
     expect(document.querySelector('[data-tab-destination]')).toBeNull()
@@ -321,7 +339,8 @@ describe('workbench semantic tab chrome', () => {
     expect(seat()?.childElementCount).toBe(1)
     tab.update({ status: null })
     expect(seat()?.className).toContain('dshx:size-4')
-    expect(seat()?.childElementCount).toBe(0)
+    // No status glyph; without a project the seat shows the compose glyph instead (council round 6 B6).
+    expect(seat()?.querySelector('[data-tab-status]')).toBeNull()
   })
 
   it('marks a preview tab with a muted title instead of italics, and caps the title width with an ellipsis', () => {
