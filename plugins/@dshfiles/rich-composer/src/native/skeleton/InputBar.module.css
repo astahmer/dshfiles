@@ -785,6 +785,14 @@
   display: contents;
 }
 
+/* dshfiles (unslop r5 C5, council round 5): the New thread bar's chips come from several owners (the project, multi-host's
+   host, jj-integration's workspace, the access mode, the model); their icons all take the secondary ink, as the project
+   chip's and the mode chip's already did, so no chip's glyph reads heavier than the next. Brand marks and project tiles
+   keep their colour. */
+.rowHero :global([data-run-segment]) svg:not(:global([data-brand])) {
+  color: var(--dsw-alias-label-secondary);
+}
+
 /* One line before wrapping (visual refresh T5.4, carried from T3): once the bar is compact (`data-model-compact`: the
    effort badge hides, Prompts becomes an icon) the run pickers tighten their side padding, and the hidden file input,
    which is a zero-width flex item, stops costing a gap. Wrapping stays the last resort. */

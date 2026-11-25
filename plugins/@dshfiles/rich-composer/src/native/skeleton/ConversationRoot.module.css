@@ -896,6 +896,29 @@ button.crumbEditable {
   z-index: 1;
 }
 
+/* dshfiles (unslop r5 C5, council round 5): the heading sits 24px above the composer (16px here plus the stack's 8px
+   gap); it was 9px, closer than the composer is to the suggestions under it. */
+.composerHero > :global([data-hero-shell]) {
+  margin-bottom: 16px;
+}
+
+/* dshfiles (unslop r5 C5, council round 5): in a pane at least 800px tall the heading and the composer are the pane's
+   centre (a phone keeps its bottom-anchored stack), with the suggestions hanging below them: the centred box takes, above, what hangs below the composer (the
+   8px gap, the suggestions' 12px inset and each 28px line, 12px apart) instead of a 32px foot that lifted the pair. */
+@media (min-height: 800px) and (min-width: 640px) {
+  .composerHero {
+    padding-bottom: 0;
+  }
+
+  .composerHero:has(> .heroSuggestions :global([data-hero-card])) {
+    padding-top: 48px;
+  }
+
+  .composerHero:has(> .heroSuggestions :global([data-hero-card^='starter-'])):has(> .heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-']))) {
+    padding-top: 88px;
+  }
+}
+
 .heroWorkspaceRow {
   display: flex;
   align-items: center;
@@ -1086,6 +1109,7 @@ button.crumbEditable {
 
   :global(html[data-shell-phone-nav]) .composerHero > :global([data-hero-shell]) {
     order: -2;
+    margin-bottom: 0;
     justify-content: flex-start;
     padding: 0 var(--dsh-composer-side-clearance);
   }
