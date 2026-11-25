@@ -132,7 +132,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "chat",
       "description": "Owned fork of DSH's native Chat plugin that mounts only the transcript rows near the viewport.",
       "ui": true,
-      "features": 15
+      "features": 16
     },
     {
       "name": "command-palette",
@@ -2885,7 +2885,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "antigravity-accounts",
       "title": "Use a Google AI plan through the Antigravity CLI",
-      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with DSH's system prompt, none of Antigravity's built-in tools,…",
+      "summary": "An Antigravity account runs Gemini (and the other models the plan offers) through Google's official `agy acp` server, signed in with the account's own Google login. Each conversation drives one private `agy` process with a neutral system prompt, none of Antigravity's built-in to…",
       "destination": "settings",
       "currentSurface": "dialog: Add AI account › Antigravity",
       "reach": [
@@ -11051,6 +11051,21 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": null
+    },
+    {
+      "key": "chat#inline-annotations",
+      "plugin": "chat",
+      "id": "inline-annotations",
+      "title": "See draft annotations beside the passage they quote",
+      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Quote and Annotate share one selection…",
+      "destination": "transcript",
+      "currentSurface": "transcript: numbered markers beside annotated assistant passages, with a comments column on a wide window",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Select a passage in an assistant reply and press Annotate.",
+        "doneWhen": "A numbered marker sits beside the passage and its comment can be written right there."
+      }
     },
     {
       "key": "command-palette#palette-search",
