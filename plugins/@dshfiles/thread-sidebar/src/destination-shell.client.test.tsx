@@ -247,6 +247,18 @@ describe('DestinationShell', () => {
     // General's first row names its group; the others keep a heading.
     expect(within(list).getByRole('group', { name: 'General' }).querySelector('h3')).toBeNull()
     expect(within(within(list).getByRole('group', { name: 'Models & accounts' })).getByText('Models & accounts')).toBeTruthy()
+    // Round five B5: every category row has its 16px muted glyph; group heads are 13/600 secondary, 8px under the group above.
+    for (const name of ['General', 'Appearance', 'AI accounts']) {
+      const glyph = within(list).getByRole('button', { name }).querySelector('[data-section-icon] [data-settings-glyph]')
+      expect(glyph?.getAttribute('class'), name).toContain('dshx:size-4')
+    }
+    const head = within(list).getByRole('group', { name: 'Models & accounts' }).querySelector('h3')
+    expect(head?.className).toContain('dshx:text-sm')
+    expect(head?.className).toContain('dshx:font-semibold')
+    expect(head?.className).toContain('dshx:text-muted-foreground')
+    expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-2')
+    // The column sits on the nav surface (kit A4).
+    expect(screen.getByRole('tabpanel', { name: 'Settings' }).className).toContain('dshx:surface-nav')
     // The page's current category is the column's current row.
     expect(within(list).getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('page')
     // The column draws the list while it shows: the Settings page drops its own.

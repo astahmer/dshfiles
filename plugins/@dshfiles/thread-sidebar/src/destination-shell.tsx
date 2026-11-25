@@ -57,6 +57,7 @@ import { StageFold, type StageFoldState } from './stage-fold.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
 import { SettingsColumn, type SettingsColumnRow } from './settings-column.js'
+import { SettingsEntryGlyph } from '@dshfiles/settings-shell/settings-icons'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -563,6 +564,8 @@ const EntryRows = (props: {
   </>
 )
 
+const SETTINGS_GROUP_HEAD = 'dshx:px-2.5 dshx:pb-1 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground'
+
 /**
  * The Settings column (council round 4 B1): Settings' categories by task group and the destination's pages, one list
  * with no entry twice. While it shows, the Settings page drops its own list (`attach`).
@@ -596,9 +599,10 @@ const SettingsColumnList = (props: {
           role="group"
           aria-label={group.label}
           data-settings-group={group.id}
-          className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0"
+          // Round five B5: group heads 13/600 in the secondary ink, 8px under the group above.
+          className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0"
         >
-          {group.named ? <h3 className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.label}</h3> : null}
+          {group.named ? <h3 className={SETTINGS_GROUP_HEAD}>{group.label}</h3> : null}
           {group.rows.map(row => {
             const here = SettingsColumn.isCurrent(row, { state, activePanelId: props.activePanelId })
             const category = row.category
@@ -608,6 +612,8 @@ const SettingsColumnList = (props: {
               <Fragment key={row.id}>
                 <SectionButton
                   label={row.label}
+                  // Every category's 16px muted glyph (round five B5), the one its phone tile draws.
+                  icon={<SettingsEntryGlyph className="dshx:text-current" group={group.id} label={row.label} />}
                   selected={here}
                   onSelect={() => open(row)}
                   count={state.searching ? row.count : undefined}
@@ -629,8 +635,8 @@ const SettingsColumnList = (props: {
         </div>
       ))}
       {rest.length === 0 ? null : (
-        <div role="group" aria-label="Pages" data-settings-group="pages" className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5">
-          <h3 className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Pages</h3>
+        <div role="group" aria-label="Pages" data-settings-group="pages" className="dshx:mt-2 dshx:flex dshx:flex-col dshx:gap-0.5">
+          <h3 className={SETTINGS_GROUP_HEAD}>Pages</h3>
           {props.rows(rest)}
         </div>
       )}
@@ -1081,7 +1087,8 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         </div>
       </nav>
       {props.collapsed ? null : (
-        <div id={listId} role="tabpanel" aria-label={folder.label} className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+        // Every navigation column sits on the nav surface (round five B5, kit A4); the page beside it is on stage.
+        <div id={listId} role="tabpanel" aria-label={folder.label} className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:surface-nav">
           <ListPane {...props} folder={folder} openEntry={openEntryIn(folder)} />
           {folderUi === undefined ? null : <FolderNotice notice={folderUi.notice} dismiss={folderUi.dismissNotice} />}
         </div>

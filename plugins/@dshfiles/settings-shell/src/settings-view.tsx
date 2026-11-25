@@ -623,9 +623,10 @@ const stopTyping = (event: KeyboardEvent): void => {
 export const SettingsTab = (props: SettingsViewProps & { readonly host: HTMLElement }): ReactNode => {
   const titleId = useId()
   return createPortal(
+    // The page sits on the stage surface, the column beside it on nav (round five B5, kit A4), in both schemes.
     <section
       aria-labelledby={titleId}
-      className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:bg-[var(--dsw-alias-bg-layer-1)]"
+      className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:w-full dshx:surface-stage"
       data-settings-view="tab"
       onClick={stopPropagation}
       onKeyDown={stopTyping}

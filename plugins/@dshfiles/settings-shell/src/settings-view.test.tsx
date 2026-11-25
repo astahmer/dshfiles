@@ -385,6 +385,15 @@ describe('settings view: phone toolbar (council round 4 B3, round five B6)', () 
   })
 })
 
+describe('settings view: surface roles (round five B5)', () => {
+  it('puts the page on the stage surface, beside the navigation column on the nav surface', () => {
+    const view = mount({})
+    expect(view.host.querySelector('[data-settings-view]')?.className).toContain('dshx:surface-stage')
+    expect(view.host.querySelector('[data-settings-view]')?.className).not.toContain('--dsw-alias-bg-layer-1')
+    view.unmount()
+  })
+})
+
 describe('settings view: phone drill-down (round five B6)', () => {
   it('opens on the grouped category list in a narrow pane, with no Sections dropdown', () => {
     const onSelect = vi.fn()
