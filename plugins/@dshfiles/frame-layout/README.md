@@ -6,7 +6,7 @@
 
 ![The status strip along the bottom of the frame, here with the Quota item](docs/screenshots/status-strip.png)
 
-![On a phone the strip is one pill that names its first items and opens the list](docs/screenshots/status-strip-phone.png)
+![On a phone status is a 44px button in the top bar that opens the items as a sheet](docs/screenshots/status-strip-phone.png)
 
 ![Settings › General › Status bar: show, hide and reorder the strip's items](docs/screenshots/status-bar-settings.png)
 
