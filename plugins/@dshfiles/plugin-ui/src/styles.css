@@ -133,10 +133,11 @@
   --ease-exit: var(--dshx-motion-ease-exit);
 
   /*
-   * Headings, tight tracking: the page `h1` 22/28 at 650 (council round 3 A5: `text-title font-title`), 26/32 hero title.
+   * Headings, tight tracking: the page `h1` 22/28 at 650 (council round 3 A5: `text-title font-title`; px, since the
+   * Host's root font is about 12.5px), 26/32 hero title.
    */
-  --text-title: 1.375rem;
-  --text-title--line-height: 1.75rem;
+  --text-title: 22px;
+  --text-title--line-height: 28px;
   --text-title--letter-spacing: -0.01em;
   --font-weight-title: 650;
   --text-display: 1.625rem;
@@ -154,10 +155,11 @@
   --container-pane-compact: 42rem;
   /*
    * Page widths (council round 3 A5): `max-w-page` caps a page (header and body) at 1080px, `max-w-lane` a list page or
-   * a list lane at 920px. Full bleed is for a diff, a chart or a table only.
+   * a list lane at 920px. Full bleed is for a diff, a chart or a table only. In px, not rem: the Host's root font is
+   * about 12.5px, so a rem cap came out a fifth short.
    */
-  --container-page: 67.5rem;
-  --container-lane: 57.5rem;
+  --container-page: 1080px;
+  --container-lane: 920px;
 }
 
 @layer base {

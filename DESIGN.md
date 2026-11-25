@@ -39,7 +39,7 @@ colors:
 typography:
   page-title:
     fontFamily: 'Geist, -apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Helvetica Neue, Helvetica, Arial, sans-serif'
-    fontSize: '1.375rem'
+    fontSize: '22px'
     fontWeight: 650
     lineHeight: 1.2727
     letterSpacing: '-0.01em'

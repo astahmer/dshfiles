@@ -15,14 +15,24 @@ const tabs = (items: readonly PageTab[], variant?: 'underline' | 'segmented'): P
   const base: PageTabs = { label: 'Views', value: items[0]?.value ?? '', onValueChange: vi.fn(), items }
   return variant === undefined ? base : { ...base, variant }
 }
+/**
+ * A theme token's size in CSS px under the Host page, whose root font is about 12.5px rather than 16 (a rem token came
+ * out at 796px instead of 1080 in a capture): px values hold, rem values scale with that root.
+ */
+const HOST_ROOT_PX = 12.5
+const resolved = (token: string): number => {
+  const value = new RegExp(`${token}: ([\\d.]+)(px|rem);`, 'u').exec(styles)
+  if (value === null) return Number.NaN
+  return Number(value[1]) * (value[2] === 'rem' ? HOST_ROOT_PX : 1)
+}
 const views = (n: number): readonly PageTab[] => Array.from({ length: n }, (_, index) => ({ value: `v${index}`, label: `View ${index}` }))
 
 describe('page header (council round 3 A5)', () => {
   it('sets the one h1 at 22px and 650', () => {
     const view = render(<Page heading="Settings" />)
     expect(classes(view.getByRole('heading', { level: 1 }))).toEqual(expect.arrayContaining(['dshx:text-title', 'dshx:font-title']))
-    expect(styles).toContain('--text-title: 1.375rem;')
-    expect(styles).toContain('--text-title--line-height: 1.75rem;')
+    expect(resolved('--text-title')).toBe(22)
+    expect(resolved('--text-title--line-height')).toBe(28)
     expect(styles).toContain('--font-weight-title: 650;')
   })
 
@@ -79,7 +89,9 @@ describe('page container (council round 3 A5)', () => {
     expect(classes(box)).toContain('dshx:max-w-page')
     expect(view.getByRole('button', { name: 'Start triage' }).closest('[data-slot="page-container"]')).toBe(box)
     expect(view.getByText('body').closest('[data-slot="page-container"]')).toBe(box)
-    expect(styles).toMatch(/--container-page: 67\.5rem;\s*--container-lane: 57\.5rem;/u)
+    // Computed under the Host's root font: the caps are px, not rem.
+    expect(resolved('--container-page')).toBe(1080)
+    expect(resolved('--container-lane')).toBe(920)
   })
 
   it('takes a 920px lane for a list page and full bleed only on request (diff, chart, table)', () => {
