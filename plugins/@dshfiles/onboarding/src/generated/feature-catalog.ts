@@ -17648,16 +17648,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"MCP endpoint\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"MCP endpoint\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "MCP endpoint",
           "value": null
         },
@@ -22714,10 +22707,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect combobox \"Sections\"",
+          "text": "expect button \"Appearance\"",
           "action": "expect",
-          "by": "combobox",
-          "name": "Sections",
+          "by": "button",
+          "name": "Appearance",
           "value": null
         }
       ],
@@ -22912,13 +22905,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "Settings Accounts, tools, secrets and plugins.",
-          "value": null
-        },
-        {
-          "text": "click combobox \"Sections\"",
-          "action": "click",
-          "by": "combobox",
-          "name": "Sections",
           "value": null
         },
         {
@@ -23146,16 +23132,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Layout\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "Layout",
           "value": null
         },
@@ -23244,16 +23223,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Layout\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "Layout",
           "value": null
         },
@@ -23377,16 +23349,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Layout\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "Layout",
           "value": null
         },
@@ -23558,16 +23523,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Layout\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Layout\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "Layout",
           "value": null
         },
@@ -30564,16 +30522,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click combobox \"Sections\"",
+          "text": "click button \"Projects\"",
           "action": "click",
-          "by": "combobox",
-          "name": "Sections",
-          "value": null
-        },
-        {
-          "text": "click option \"Projects\"",
-          "action": "click",
-          "by": "option",
+          "by": "button",
           "name": "Projects",
           "value": null
         },

@@ -144,7 +144,7 @@ describe('onboarding Host', () => {
       expect(settings.feature?.narrowSteps?.map(step => step.text)).toEqual([
         'click button "More"',
         'click button "Settings Accounts, tools, secrets and plugins."',
-        'expect combobox "Sections"',
+        'expect button "Appearance"',
       ])
       const memory = await client.reach({ key: 'memory#memory-panel' })
       expect(memory.feature?.steps.length).toBe(3)

@@ -2562,6 +2562,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/settings-shell/settings-icons",
+      "kind": "module",
+      "title": "@dshfiles/settings-shell/settings-icons",
+      "summary": "One glyph per Settings category (round five B5, B6): the desktop column draws it at 16px in muted ink beside each row, the phone root list as a 28px identity tile. Published as the `@dshfiles/settings-shell/settings-icons` dshx module, so the thread sidebar's Settings column draws the same glyph the page does without…",
+      "publicSymbol": "SettingsIconGroup, SettingsEntryGlyph, SettingsEntryTile, SettingsIcons",
+      "importFrom": "@dshfiles/settings-shell/settings-icons",
+      "owner": "@dshfiles/settings-shell",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/settings-shell/src/settings-icons.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/sidebar-right/resource-panels",
       "kind": "module",
       "title": "@dshfiles/sidebar-right/resource-panels",
@@ -3146,7 +3166,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/workbench/tabs",
       "summary": "Public module of @dshfiles/workbench.",
-      "publicSymbol": "HostTarget, TabTarget, TabStatus, TabView, WorkbenchTab, WorkbenchTabsSnapshot",
+      "publicSymbol": "HostTarget, TabTarget, TabStatus, TabDestinationId, TabDestinationIcon, TabDestination",
       "importFrom": "@dshfiles/workbench/tabs",
       "owner": "@dshfiles/workbench",
       "scope": "client or host",
@@ -3157,7 +3177,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [
-        "Also exports: WorkbenchTabsActions, WorkbenchTabsProvider, WorkbenchTabAsideHandler, workbenchTabs, connectWorkbenchTabs, WorkbenchTabDocking, TabProjectChip, TabProjectMarkPaint, TabProjectMark"
+        "Also exports: TabView, WorkbenchTab, WorkbenchTabsSnapshot, WorkbenchTabsActions, WorkbenchTabsProvider, WorkbenchTabAsideHandler, workbenchTabs, connectWorkbenchTabs, WorkbenchTabDocking, TabProjectChip, TabProjectMarkPaint, TabProjectMark"
       ],
       "source": "plugins/@dshfiles/workbench/src/tabs.ts",
       "docs": "docs/plugin-boundaries.md",
@@ -3168,7 +3188,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/workbench/tab-status",
       "summary": "The one mapping from a thread tab's status onto the shared work-status vocabulary (DESIGN.md \"Status vocabulary\"). Both tab strips draw it, so a thread shows the same glyph on its tab as in the thread list: working is the colourless ink ring, Needs you the indigo diamond, failed the red cross, an unseen finish (Ready)…",
-      "publicSymbol": "TAB_WORK_STATUS, TabStatusGlyph",
+      "publicSymbol": "TAB_WORK_STATUS, TabStatusGlyph, TabDestinationGlyph",
       "importFrom": "@dshfiles/workbench/tab-status",
       "owner": "@dshfiles/workbench",
       "scope": "client",
