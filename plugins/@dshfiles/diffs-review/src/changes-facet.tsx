@@ -44,6 +44,16 @@ export interface ChangesFacetProps {
 }
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
+
+/** The frame's phone rule: below it a diff shows one file at a time, chosen from the changed-file list above. */
+const PHONE_QUERY = '(max-width: 639.98px)'
+const subscribePhone = (listener: () => void): (() => void) => {
+  if (typeof window.matchMedia !== 'function') return () => undefined
+  const query = window.matchMedia(PHONE_QUERY)
+  query.addEventListener('change', listener)
+  return () => query.removeEventListener('change', listener)
+}
+const readPhone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches
 const noValue = (): undefined => undefined
 
 interface UserQuestionsProjection {
@@ -228,6 +238,17 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
       .sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
   }, [diff])
   const packageJson = usePackageJsonTables(diff?.patch ?? '', parsedFiles)
+  const phone = useSyncExternalStore(subscribePhone, readPhone, () => false)
+  // One file at a time on a phone: the changed-file list above is the file picker; focusPath follows its tap.
+  const diffFiles = ((): typeof packageJson.textFiles => {
+    if (!phone) return packageJson.textFiles
+    const focused =
+      focusPath === null
+        ? undefined
+        : (packageJson.textFiles.find(file => file.name === focusPath) ?? packageJson.textFiles.find(file => file.name.endsWith(`/${focusPath}`)))
+    const first = packageJson.textFiles[0]
+    return focused === undefined ? (first === undefined ? [] : [first]) : [focused]
+  })()
   const paths = useMemo(() => (diff?.files ?? []).map(file => file.path), [diff])
   const reviewFiles = useMemo(() => (diff?.files ?? []).filter(file => !isNoiseFile(file.path)), [diff])
   const noiseFiles = useMemo(() => (diff?.files ?? []).filter(file => isNoiseFile(file.path)), [diff])
@@ -671,7 +692,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               <PatchView
                 className="dshx:flex-1"
                 empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
-                files={packageJson.textFiles}
+                files={diffFiles}
                 focusPath={focusPath}
                 onLineSelection={next => {
                   patchFacet({ selection: next, commentNotice: null })
