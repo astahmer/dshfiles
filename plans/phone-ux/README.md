@@ -28,6 +28,12 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
 2. **P31b** — `mainTabs.newTab` no longer claims Mod+T on desktop (kept the web binding), so `newThread` registers.
 3. **P29** — phone lists keep the page heading for assistive tech only, omit the page description, and render rows
    without descriptions; covered by a focused test.
+4. **P6 (partial)** — the picker now paints the menu surface (it computed to `rgba(0,0,0,0)`), gives rows 44px and
+   18px glyphs on the phone rule, and Escape dismisses it from the document, so a tap on `+` no longer leaves the key
+   unanswered. Still open on P6: turning it into a bottom sheet, 48px rows, and files/threads before skills.
+5. **P28** — the phone shell hides `KeyHint` and the menu shortcut slots under 640px: no keycaps without a keyboard.
+6. **P7 not reproduced** (2026-11-25 live check): the context meter panel opened at x114 y577, 264×159 in a 390×844
+   viewport. Keep it open as a regression check rather than a fix.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
