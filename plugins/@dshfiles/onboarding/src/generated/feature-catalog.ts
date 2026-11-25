@@ -606,7 +606,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 56
+      "features": 57
     },
     {
       "name": "thread-transfer",
@@ -24296,6 +24296,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#reminder-wake",
+      "plugin": "thread-sidebar",
+      "id": "reminder-wake",
+      "title": "Wake a settled or archived thread for its reminder",
+      "summary": "A reminder is a prompt that comes back to its thread, but a settled thread rejects the step it proposes and the Schedule service refuses an archived target outright, so the reminder would be dropped. The Host never settles a thread holding an active reminder, however far out its…",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › Reminder wake",
+      "reach": [],
       "reachNarrow": null,
       "onboarding": null
     },

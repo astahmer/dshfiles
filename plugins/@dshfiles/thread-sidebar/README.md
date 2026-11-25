@@ -400,10 +400,11 @@ when enabled, the Host checks the same idle threshold on the configured scan
 interval (`src/auto-settle-host.ts`, first scan 30 s after boot, again at once
 when the policy settings change) and writes `settledSessionIds`, so threads
 settle with no browser open. It skips running, blank, archived, pinned, parked,
-already-settled, excluded-session, excluded-project, waiting-for-an-answer and
-still-running-descendant entries. The same scan settles rebased threads once
-`rebasedThreadSettleDelay` passes, reading jj-integration's thread workspaces
-through its Host API.
+already-settled, excluded-session, excluded-project, waiting-for-an-answer, a
+thread waiting for its resume after a restart or a crash, and any entry whose
+subagent tree still works (a running turn, a pending answer or a running
+background job below it), plus every thread holding an active reminder. The same scan settles rebased threads once `rebasedThreadSettleDelay`
+passes, reading jj-integration's thread workspaces through its Host API.
 
 **Finished subagents settle on their own.** Independently of the idle switch, the
 same Host scan settles a subagent thread (one with a parent) that stayed idle for
@@ -437,6 +438,20 @@ reported per id), writes the settled status once, and lists the settle with its
 source and reason in `thread_auto_settle_status`. Callers that run without the
 sidebar treat `isApiOwnerMissing(error)` as "nothing settles".
 
+**Reminders always wake their thread.** A settled or archived thread would
+drop the reminder aimed at it: the settle gate rejects the step, and the Schedule
+service refuses an archived target. So a thread with any active reminder is never
+settled — however far out its next occurrence is, the same effect as the
+per-thread auto-settle override a right-click menu sets — and the Host's separate
+wake pass (`src/reminder-wake-host.ts`, once a
+minute after boot) lifts the status one interval before the reminder is due:
+settled becomes unsettled, archived is restored, and a missed occurrence is
+delivered at once through the service's run-now, which does not consume a
+recurring rule: a Host restart can deliver that same missed occurrence once
+more. The settle gate is the second line: a schedule-sourced step that still
+finds a settled owner lifts it and runs, instead of the loop ending blocked.
+`remindersWakeEnabled` (default on) switches the whole behavior off.
+
 Settled exists because auto-archive used to push idle threads into the native
 archived state, and native navigation drops an archived Session from the main
 view right after it opens, so clicking an idle thread fought that cleanup.
@@ -445,7 +460,8 @@ The Host no-wake gate (`src/settled-gate.ts`) walks the subagent lineage through
 live agents' headers plus the child's recorded `parentSession`, so a settled
 grandparent whose intermediate subagent is no longer live is not detected; the
 client refuses to settle a thread with a running descendant, which covers the
-case that matters. Every preference decoder field needs the same default as the
+case that matters. A reminder's own step is the one wake a settled status does
+not refuse. Every preference decoder field needs the same default as the
 Host schema: Schemastery drops a null-valued union field from its resolved
 output, and one field without a default once made the strict decoder reject
 every Host document, silently falling back to browser storage.
@@ -848,8 +864,11 @@ offers **Resume all** (up to three requests at once). The status-grouped **Needs
 group offer the same verb, so every list of blocked threads can resume them together. Resume sends a new
 continuation prompt that directs the agent to inspect its transcript and
 workspace before continuing; it does not replay the interrupted model/tool call.
-A row leaves its group as soon as that thread runs again, and dismissing drops it
-by hand.
+Resuming also lifts the statuses that would silently reject that prompt: a settled
+thread is unsettled and an archived one is restored before the request is queued,
+whether the resume comes from **Resume**, **Resume all**, or the opt-in automatic
+resume. A row leaves its group as soon as that thread runs again, and dismissing
+drops it by hand.
 
 **Automatic resume after a restart** is opt-in (`resumeAfterRestart`, off by default: each resume is one turn nobody
 asked for). When on, after a managed restart the new Host waits `resumeAfterRestartDelaySeconds` (default 10) and for

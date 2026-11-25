@@ -81,6 +81,8 @@ export interface SidebarPreferences {
   idleMinutes: number
   /** Settle a finished subagent thread after this many idle hours and stop its jobs; 0 leaves subagents to the idle rule. */
   subagentSettleHours: number
+  /** Lift a thread's settled or archived status before one of its reminders is due, so the reminder always runs. */
+  remindersWakeEnabled: boolean
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
   excludedSessionIds: string[]
@@ -214,6 +216,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   settledArchiveDelay: 'disabled',
   idleMinutes: 120,
   subagentSettleHours: 24,
+  remindersWakeEnabled: true,
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],
   excludedSessionIds: [],

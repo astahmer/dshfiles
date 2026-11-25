@@ -9011,6 +9011,9 @@ importers:
       '@deepseek-ai/dsh-llm':
         specifier: 'catalog:'
         version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-error@0.2.2-rc.2)
+      '@deepseek-ai/dsh-schedule':
+        specifier: 0.2.2-rc.2
+        version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-agent@0.2.2-rc.2)(@deepseek-ai/dsh-api-session-controller@0.2.2-rc.2)(@deepseek-ai/dsh-brand@0.2.2-rc.2)(@deepseek-ai/dsh-llm@0.2.2-rc.2)(@deepseek-ai/dsh-session-persistence@0.2.2-rc.2)(@deepseek-ai/dsh-session-projection@0.2.2-rc.2)(@deepseek-ai/dsh-session@0.2.2-rc.2)(@deepseek-ai/dsh-storage-domain@0.2.2-rc.2)(@deepseek-ai/dsh-subagent@0.2.2-rc.2)(@deepseek-ai/dsh-tools@0.2.2-rc.2)(@deepseek-ai/dsh-typert-protocol@0.2.2-rc.2)(@deepseek-ai/dsh-util-time@0.2.2-rc.2)(@deepseek-ai/dsh-workspace@0.2.2-rc.2)
       '@deepseek-ai/dsh-session':
         specifier: 'catalog:'
         version: 0.2.2-rc.2(@deepseek-ai/cordis@4.1.0)(@deepseek-ai/dsh-error@0.2.2-rc.2)(@deepseek-ai/dsh-scope@0.2.2-rc.2)

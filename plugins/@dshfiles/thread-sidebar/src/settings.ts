@@ -223,6 +223,11 @@ export const threadSidebarSettings = defineSettings({
       .description(
         'Settle a subagent thread idle for this many hours and stop the background jobs it left running. Pinned, opted-out, waiting or running threads stay. 0 turns it off.',
       ),
+    remindersWakeEnabled: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.remindersWakeEnabled)
+      .description(
+        'Unsettle or restore a thread just before one of its reminders is due, so a settled or archived thread still runs its reminder instead of dropping it.',
+      ),
     scanIntervalMinutes: Schema.natural()
       .min(1)
       .max(120)

@@ -1,4 +1,5 @@
 import { DshxEffect } from '@dshfiles/dshx/effect'
+import { ScheduleId } from '@deepseek-ai/dsh-schedule'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from '@effect/vitest'
@@ -33,6 +34,7 @@ const session = (overrides: Partial<ScannedSession> & Pick<ScannedSession, 'id' 
   running: false,
   blank: false,
   pendingInteraction: false,
+  workingJobs: false,
   ...overrides,
 })
 
@@ -60,6 +62,8 @@ const fakeSources = (input: {
             archivedSessionIds: new Set(),
             pinnedSessionIds: yield* Ref.get(input.pinned),
             settledSessionIds: new Set(yield* settings.settledSessionIds),
+            reminders: [],
+            interruptedSessionIds: new Set(),
           }
         }),
         rebasedThreads: Effect.succeedNone,
@@ -105,7 +109,76 @@ describe('AutoSettleScanModel.decide', () => {
     pinnedSessionIds: new Set<string>(),
     settledSessionIds: new Set<string>(),
     rebasedThreads: undefined,
+    reminders: [],
+    interruptedSessionIds: new Set<string>(),
   }
+
+  it('keeps a parent whose subagent runs, waits for an answer or holds a background job', () => {
+    const sessions = [
+      session({ id: 'runningParent', updatedAt: BOOT }),
+      session({ id: 'runningChild', updatedAt: BOOT, parentId: 'runningParent', running: true }),
+      session({ id: 'waitingParent', updatedAt: BOOT }),
+      session({ id: 'waitingChild', updatedAt: BOOT, parentId: 'waitingParent', pendingInteraction: true }),
+      session({ id: 'jobParent', updatedAt: BOOT }),
+      session({ id: 'jobChild', updatedAt: BOOT, parentId: 'jobParent', workingJobs: true }),
+      session({ id: 'jobHolder', updatedAt: BOOT, workingJobs: true }),
+      session({ id: 'idle', updatedAt: BOOT }),
+    ]
+    const decision = AutoSettleScanModel.decide({ ...base, now: BOOT + 200 * MINUTE, policy: policy(), sessions })
+    expect(decision.idle).toEqual(['idle'])
+  })
+
+  it('keeps a thread an active reminder will wake, and reports the reminder as the skip reason', () => {
+    const sessions = [
+      session({ id: 'reminded', updatedAt: BOOT }),
+      session({ id: 'far', updatedAt: BOOT }),
+      session({ id: 'paused', updatedAt: BOOT }),
+      session({ id: 'idle', updatedAt: BOOT }),
+    ]
+    const reminders = [
+      { id: ScheduleId('task-1'), sessionId: 'reminded', scheduledAt: BOOT + 300 * MINUTE, active: true },
+      // A reminder weeks out holds its thread like the per-thread auto-settle override does, not only near its due time.
+      { id: ScheduleId('task-3'), sessionId: 'far', scheduledAt: BOOT + 30 * 24 * 60 * MINUTE, active: true },
+      { id: ScheduleId('task-2'), sessionId: 'paused', scheduledAt: BOOT + 300 * MINUTE, active: false },
+    ]
+    const decision = AutoSettleScanModel.decide({ ...base, now: BOOT + 200 * MINUTE, policy: policy(), sessions, reminders })
+    expect(decision.idle).toEqual(['paused', 'idle'])
+    expect(
+      AutoSettleScanModel.requestOutcome({
+        ...base,
+        policy: policy(),
+        sessions,
+        reminders,
+        sessionId: 'reminded',
+      }),
+    ).toBe('reminder')
+  })
+
+  it('keeps a thread waiting for its resume after a restart or a crash, and reports it as interrupted', () => {
+    const sessions = [
+      session({ id: 'interrupted', updatedAt: BOOT }),
+      session({ id: 'parent', updatedAt: BOOT }),
+      session({ id: 'child', updatedAt: BOOT, parentId: 'parent' }),
+      session({ id: 'idle', updatedAt: BOOT }),
+    ]
+    const decision = AutoSettleScanModel.decide({
+      ...base,
+      now: BOOT + 200 * MINUTE,
+      policy: policy(),
+      sessions,
+      interruptedSessionIds: new Set(['interrupted', 'child']),
+    })
+    expect(decision.idle).toEqual(['idle'])
+    expect(
+      AutoSettleScanModel.requestOutcome({
+        ...base,
+        policy: policy(),
+        sessions,
+        interruptedSessionIds: new Set(['interrupted', 'child']),
+        sessionId: 'interrupted',
+      }),
+    ).toBe('interrupted')
+  })
 
   it('settles a thread only once it has been idle for the threshold', () => {
     const sessions = [session({ id: 'a', updatedAt: BOOT })]
