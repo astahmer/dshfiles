@@ -121,6 +121,7 @@ import { GraphViewStatus, LandmarkControls, RelationshipInspector } from './grap
 import { ReviewSelectionModel } from './review-selection.js'
 import { useGraphNavigation } from './use-graph-navigation.js'
 import { WorkspaceLabels } from './workspace-labels.js'
+import { LandLabels } from './land-labels.js'
 import { useJujutsuApi } from './use-jujutsu-api.js'
 import { TOUCH_HIT_AREA } from './touch-hit-area.js'
 
@@ -158,6 +159,8 @@ interface JujutsuPanelProps {
   readonly reviewRevisions?: ((input: { readonly workspacePath: string; readonly revisions: readonly string[] }) => boolean) | undefined
   /** The title of the thread working in a folder, so a thread workspace is named by its thread (b:212a). */
   readonly threadTitleOf?: ((path: string) => string | undefined) | undefined
+  /** The title of the thread working in a jj workspace of that name, for History's workspace chips. */
+  readonly threadTitleOfWorkspace?: ((name: string) => string | undefined) | undefined
 }
 
 const REPO_HISTORY_KEY = 'dshfiles.jujutsu.repositories'
@@ -1893,6 +1896,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                       rowHeight={rowHeight}
                       revision={item.revision}
                       defaultWorkspaceCommitId={defaultWorkspaceCommitId}
+                      workspaceTitleOf={props.threadTitleOfWorkspace}
                       metrics={graphMetrics}
                     >
                       {selectedRevision?.commitId === item.revision.commitId && revisionDetails(item.revision)}
@@ -2552,6 +2556,7 @@ const InlineDropPreview = (props: InlineDropPreviewProps): JSX.Element => (
 interface RevisionRowProps {
   readonly revision: Revision
   readonly defaultWorkspaceCommitId: string | null
+  readonly workspaceTitleOf?: ((name: string) => string | undefined) | undefined
   readonly expanded: boolean
   readonly dimmed: boolean
   readonly connectionDimmed: boolean
@@ -2607,7 +2612,8 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
       }}
     >
       <MonitorIcon aria-hidden className="dshx:size-3 dshx:flex-none" />
-      <span className="dshx:truncate">{workspace}</span>
+      {/* A thread workspace reads as its thread (b:212a); the tooltip keeps the workspace name. */}
+      <span className="dshx:truncate">{props.workspaceTitleOf?.(workspace) ?? workspace}</span>
     </span>
   )
   const workspaceHint = (workspace: string): string =>
@@ -2831,8 +2837,10 @@ const RevisionRow = (props: RevisionRowProps): JSX.Element => {
                     )}
                     dateTime={props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime)}
                   >
-                    {formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
-                    {props.revisionDate === 'both' && props.editedAt !== undefined && (
+                    {LandLabels.isRootCommit(revision.commitId)
+                      ? null
+                      : formatAge(props.revisionDate === 'created' ? revision.authorTime : (props.editedAt ?? revision.authorTime))}
+                    {props.revisionDate === 'both' && props.editedAt !== undefined && !LandLabels.isRootCommit(revision.commitId) && (
                       <span className="dshx:text-muted-foreground/50"> · {formatAge(revision.authorTime)}</span>
                     )}
                   </time>

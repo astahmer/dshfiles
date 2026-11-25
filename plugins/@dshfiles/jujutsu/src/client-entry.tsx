@@ -47,6 +47,7 @@ import { containsPath, sidePanelRepository } from './side-panel-repository.js'
 import { SurfaceVisibility } from './surface-visibility.js'
 import { JujutsuPanelSession } from './use-jujutsu-api.js'
 import { OwnerRouting, type OwnerPort } from './owner-routed-api.js'
+import { LandLabels } from './land-labels.js'
 import './client.css'
 
 const PANEL_ID = 'dshfiles-jujutsu'
@@ -138,12 +139,15 @@ export default defineClient({
       }
       return best?.title
     }
+    const threadTitleOfWorkspace = (name: string): string | undefined =>
+      LandLabels.threadTitleOfWorkspace(name, Object.values(ctx.sessions.list.getSnapshot().byId))
     const panel = (options: SurfacePanelOptions): JSX.Element => (
       <PluginQueryProvider>
         <JujutsuPanelSession sessionId={options.sessionId ?? null}>
           <ProjectsBoundPanel
             workspaces={ctx.workspaces}
             threadTitleOf={threadTitleOf}
+            threadTitleOfWorkspace={threadTitleOfWorkspace}
             // Remounting per scope is what gives each tab, thread or the dock its own state; the scope's state outlives it.
             key={options.scope}
             scope={options.scope}

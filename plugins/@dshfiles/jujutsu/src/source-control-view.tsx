@@ -33,6 +33,7 @@ import { SourceControlModel } from './source-control.js'
 import { useOpenInEditor } from './open-in-editor.js'
 import { JUJUTSU_QUERY_GC_TIME, JUJUTSU_QUERY_STALE_TIME, jujutsuQueryKeys } from './repository-query-cache.js'
 import { useJujutsuApi } from './use-jujutsu-api.js'
+import { LandLabels } from './land-labels.js'
 
 interface SourceControlViewProps {
   readonly repoId: string
@@ -120,7 +121,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
             {workingCopy !== undefined && (
               <IconAction
                 disabled={props.busy}
-                label="New change on top of @ (jj new)"
+                label="New change on top of the working copy"
                 onClick={() => props.onAction({ kind: 'new', commitId: workingCopy.commitId })}
               >
                 <PlusIcon />
@@ -133,7 +134,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <SelectTrigger aria-label="Ancestor groups" className="dshx:h-6 dshx:gap-1 dshx:px-1.5 dshx:text-2xs" size="sm">
-                    <span className="dshx:text-muted-foreground">@-</span>
+                    <span className="dshx:text-muted-foreground">Ancestors</span>
                     <SelectValue />
                   </SelectTrigger>
                 </TooltipTrigger>
@@ -163,21 +164,21 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                   commit()
                 }
               }}
-              placeholder="Message (describes @, ⌘Enter to commit)"
+              placeholder="Describe the working copy"
               rows={2}
               value={message}
             />
             <div className="dshx:flex dshx:items-center dshx:gap-1.5">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button className="dshx:flex-1" disabled={props.busy || commitMessage.length === 0} onClick={commit} size="xs" type="button">
+                  <Button disabled={props.busy || commitMessage.length === 0} onClick={commit} size="xs" type="button">
                     <CheckIcon />
                     Commit
                     <Kbd className="dshx:ml-1 dshx:h-4 dshx:bg-primary-foreground/20 dshx:text-2xs dshx:text-primary-foreground">⌘↵</Kbd>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent className="dshx-root" side="bottom">
-                  jj commit: describe @ and start a new empty change
+                  Describe the working copy and start a new empty change
                 </TooltipContent>
               </Tooltip>
               <Button
@@ -188,7 +189,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                 variant="outline"
               >
                 <PencilLineIcon />
-                Describe @
+                Describe
               </Button>
             </div>
           </>
@@ -206,7 +207,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
           const editable = !revision.immutable
           const parent = group.parent
           const child = group.child
-          const label = group.depth === 0 ? 'Working copy' : `@-${group.depth}`
+          const label = LandLabels.sourceControlGroup(group.depth)
           const describeText = describing?.commitId === revision.commitId ? describing.text : null
           const splitMessage = splitMessages[revision.commitId] ?? ''
           return (
@@ -231,7 +232,7 @@ export const SourceControlView = (props: SourceControlViewProps): JSX.Element =>
                         className={cn('dshx:size-3 dshx:flex-none dshx:text-muted-foreground dshx:transition-transform', open && 'dshx:rotate-90')}
                       />
                       <span className="dshx:flex-none dshx:font-semibold">{label}</span>
-                      <span className="dshx:flex-none dshx:font-mono dshx:text-info">{revision.shortestChangeId}</span>
+                      <span className="dshx:flex-none dshx:font-mono dshx:text-muted-foreground">{revision.shortestChangeId}</span>
                       <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-muted-foreground', revision.description.trim().length === 0 && 'dshx:italic')}>
                         {firstLine(revision.description)}
                       </span>
