@@ -6,6 +6,8 @@
  * overlay layer is its own stacking context under the top bar. `InboxView.PHONE_BAR` shows it only while the top bar
  * names the Inbox, so a retained page that is not on stage draws nothing.
  */
+import { useContract } from '@dshfiles/dshx/client'
+import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogPortal } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
@@ -60,13 +62,16 @@ export const usePublishInboxPhoneActions = (value: InboxPhoneActions): void => {
 /** The bar itself, registered in `shell.overlay`. */
 export const InboxPhoneBar = (): JSX.Element | null => {
   const value = useSyncExternalStore(InboxPhoneActionsStore.subscribe, InboxPhoneActionsStore.read, () => undefined)
-  if (value === undefined || (value.primary === undefined && value.actions.length === 0)) return null
+  // Round five C2: the frame's status button (usage, working threads) leads the bar; no band above the tab bar.
+  const status = useContract(PhoneStatus)
+  if (value === undefined || (value.primary === undefined && value.actions.length === 0 && status.status !== 'active')) return null
   const primary = value.primary
   // A dialog root with no content is only a portal: no focus trap, no scroll lock, nothing hidden from assistive tech.
   return (
     <Dialog open modal={false}>
       <DialogPortal>
         <div data-inbox-phone-bar="" className={InboxView.PHONE_BAR}>
+          {status.status === 'active' ? <status.value.Button /> : null}
           {value.actions.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

@@ -77,6 +77,39 @@ const CARD = 'dshx:relative dshx:overflow-hidden dshx:rounded-lg dshx:border dsh
 const LIST_WIDTH = 'dshx:max-w-[880px]'
 
 /**
+ * The page header stops at the list's width (round five C3, council round 3): Start triage and the page menu end at the
+ * list's trailing edge instead of the window's.
+ */
+const HEADER_WIDTH = 'dshx:[&_[data-slot=page-header]]:max-w-[880px]'
+
+/**
+ * A card's question, note and verbs start under its title on a wide pane (36px, past the glyph); on a phone (a narrow
+ * pane) they take the card's own 16px inset, so a question wraps across the card instead of a narrow column.
+ */
+const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-4'
+
+/** On a phone the card's menu sits in its head band's trailing corner, a 44pt target, not on the row of verbs. */
+const BAND_MENU = 'dshx:@max-pane-narrow:absolute dshx:@max-pane-narrow:top-0 dshx:@max-pane-narrow:right-1'
+
+/** The phone head band is 44pt tall and keeps the menu's corner free. */
+const PHONE_HEAD = 'dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pane-narrow:[&>div:first-child]:pr-12'
+
+/**
+ * The title's counts, one StatusCount per status present (◆2 ✕1): the Needs-you view holds blocking items (Needs you)
+ * and failed ones (Failed), and one ◆ count of both hid a failure.
+ */
+const titleCounts = (
+  counts: { readonly needsYou: number; readonly blocking: number } | undefined,
+): readonly { readonly status: 'needs-you' | 'failed'; readonly count: number }[] => {
+  if (counts === undefined) return []
+  const failed = Math.max(0, counts.needsYou - counts.blocking)
+  return [
+    ...(counts.blocking > 0 ? [{ status: 'needs-you', count: counts.blocking } as const] : []),
+    ...(failed > 0 ? [{ status: 'failed', count: failed } as const] : []),
+  ]
+}
+
+/**
  * The Inbox's header actions on a phone: a bar in the trailing corner of thread-sidebar's top bar, shown only while that
  * bar names the Inbox (`data-phone-stage` is the stage's panel id), so Start triage shares the title row instead of
  * taking a row of its own. Hidden everywhere else, including every wider screen.
@@ -222,6 +255,11 @@ export class InboxView {
   static readonly headerBand = headerBand
   static readonly CARD = CARD
   static readonly LIST_WIDTH = LIST_WIDTH
+  static readonly HEADER_WIDTH = HEADER_WIDTH
+  static readonly BODY_INSET = BODY_INSET
+  static readonly BAND_MENU = BAND_MENU
+  static readonly PHONE_HEAD = PHONE_HEAD
+  static readonly titleCounts = titleCounts
   static readonly PHONE_BAR = PHONE_BAR
   static readonly bodyReason = bodyReason
   static readonly clampsText = clampsText

@@ -245,7 +245,9 @@ const InboxRow = (props: {
       className={cn(
         // The card draws the surface (InboxView.CARD); the row fills it edge to edge, so the head band is flush with its top.
         'dshx:rounded-none dshx:bg-card dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
-        phone && 'dshx:relative',
+        // The card menu is positioned in the head band on a narrow pane (InboxView.BAND_MENU).
+        'dshx:relative',
+        InboxView.PHONE_HEAD,
         phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
         InboxView.headerBand(status),
       )}
@@ -283,7 +285,8 @@ const InboxRow = (props: {
         <div
           data-inbox-card-body=""
           className={cn(
-            'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:pt-2 dshx:pl-9',
+            'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:pt-2',
+            InboxView.BODY_INSET,
             answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
             props.actionRow === false && 'dshx:pb-3',
           )}
@@ -304,7 +307,7 @@ const InboxRow = (props: {
         </div>
       )}
       {props.actionRow === false ? null : (
-        <div data-inbox-row-actions="" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2.5 dshx:pb-3 dshx:pl-9">
+        <div data-inbox-row-actions="" className={cn('dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2.5 dshx:pb-3', InboxView.BODY_INSET)}>
           {answerable
             ? [
                 ...item.choices.map((choice, index) => (
@@ -312,13 +315,19 @@ const InboxRow = (props: {
                     key={choice.id}
                     size="sm"
                     variant={choice.recommended === true ? 'attention' : 'outline'}
-                    // On a phone each option is a full-width 44 px row: an answer reads in full and is easy to hit.
-                    className={cn('dshx:shrink dshx:max-w-full', INBOX_CHIP, 'dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start')}
+                    // On a phone each option is a full-width row of at least 44 px: a long answer wraps inside it and
+                    // reads in full (round five C3), and the row is easy to hit.
+                    className={cn(
+                      'dshx:shrink dshx:max-w-full',
+                      INBOX_CHIP,
+                      'dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start',
+                      'dshx:pointer-coarse:h-auto dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:py-2.5 dshx:pointer-coarse:whitespace-normal',
+                    )}
                     disabled={props.busy}
                     onClick={() => props.onAct(item, 'Answer', choice.id)}
                   >
                     {props.showChoiceKeys === true && index < 9 ? <KeyHint keys={String(index + 1)} className="dshx:opacity-70" /> : null}
-                    <span className="dshx:truncate">{choice.label}</span>
+                    <span className="dshx:truncate dshx:pointer-coarse:whitespace-normal dshx:pointer-coarse:text-left">{choice.label}</span>
                     {/* The recommendation reads in words, not only in the tint (round five C4). */}
                     {choice.recommended === true ? (
                       <span data-inbox-recommended="" className="dshx:shrink-0 dshx:text-xs dshx:font-normal dshx:pointer-coarse:ml-auto">
@@ -406,7 +415,7 @@ const InboxRow = (props: {
           {doneable || snoozable || quickReplies.length > 0 || mutable ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className="dshx:pointer-coarse:size-11" aria-label={t('more')} disabled={props.busy}>
+                <Button size="sm" variant="ghost" className={cn('dshx:pointer-coarse:size-11', InboxView.BAND_MENU)} aria-label={t('more')} disabled={props.busy}>
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
@@ -1307,12 +1316,23 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
     <Page
       scroll
       heading={t('title')}
-      // The Needs-you count beside the title, glyph and tint (kit StatusCount, A6); 0 draws nothing.
-      meta={<StatusCount status="needs-you" count={counts?.needsYou ?? 0} label={`${String(counts?.needsYou ?? 0)} ${t('needsYou')}`} />}
+      // One count per status present beside the title (◆2 ✕1, round five C3), glyph and tint (kit StatusCount).
+      meta={
+        <>
+          {InboxView.titleCounts(counts).map(entry => (
+            <StatusCount
+              key={entry.status}
+              status={entry.status}
+              count={entry.count}
+              label={`${String(entry.count)} ${statusLabelOf(entry.status, t)}`}
+            />
+          ))}
+        </>
+      }
       // On a phone the top bar names the page (its own h1) and holds its actions (InboxPhoneBar), so the page header
       // goes and the segmented control leads the page.
       description={<span className="dshx:in-data-shell-phone-nav:hidden">{t('subtitle')}</span>}
-      className="dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden"
+      className={cn('dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden', InboxView.HEADER_WIDTH)}
       {...(primaryAction === undefined ? {} : { primaryAction })}
       actions={headerActions}
       overflowLabel={t('more')}

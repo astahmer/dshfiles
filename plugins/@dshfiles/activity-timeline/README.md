@@ -36,9 +36,12 @@ Each item is one card (desktop and phone, the list capped at 880 px): a head ban
 glyph, the title, the type and the age, on the kit's attention wash for Needs you and Failed; the neutral body below
 holds the question or detail and the actions. The recommended answer says **Recommended** in words, **Write your
 own…** beside the answers opens the thread to reply in free text, and a failed turn's card names its thread once. The
-page title carries a Needs-you count chip (the kit's `StatusCount`). On a phone the type leaves the band (the body says
-"Asks:" or "Approve:"), and **Start triage** and the page menu sit in the top bar beside the "Inbox" title
-(`src/inbox-phone-bar.tsx`, drawn from the frame's root overlay) instead of a row of their own.
+page title carries one count chip per status present, ◆2 ✕1 (the kit's `StatusCount`), and the header ends at the
+list's trailing edge, so Start triage and the page menu line up with the cards. On a phone the type leaves the band (the
+body says "Asks:" or "Approve:"), the band is 44 pt tall with the card's `⋯` menu in its corner, the body takes the
+card's 16 pt inset and a long answer wraps inside its 44 pt row; **Start triage**, the page menu and the frame's status
+button (frame-layout's `PhoneStatus`) sit in the top bar beside the "Inbox" title (`src/inbox-phone-bar.tsx`, drawn
+from the frame's root overlay) instead of a row of their own.
 
 An item that asks a question never offers the prompt library's quick replies, and a row prints a question as plain
 words: the first paragraph of its Markdown, at most two lines (`src/inbox-preview.ts`). **Start triage** shows one item
