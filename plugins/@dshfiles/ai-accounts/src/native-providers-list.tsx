@@ -4,7 +4,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
 import { aiAccountsApi, type NativeProviders } from './api.js'
-import { NativeProviderMark } from './model-mark.js'
+import { NativeProviderMark } from '@dshfiles/plugin-ui/components/model-mark'
 
 export type NativeProviderRow = NativeProviders['providers'][number]
 export const nativeProviderStatus = (provider: NativeProviderRow, liveReload: boolean): string => {

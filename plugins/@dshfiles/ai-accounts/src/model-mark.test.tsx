@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { ModelMark, NativeProviderMark, modelFamily } from './model-mark.js'
+import { ModelMark, NativeProviderMark, modelFamily } from '@dshfiles/plugin-ui/components/model-mark'
 import { ProviderGlyph } from './panel-primitives.js'
 
 const read = (name: string): string => readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8')

@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ActionHint } from './panel-primitives.js'
-import { ModelMark } from './model-mark.js'
+import { ModelMark } from '@dshfiles/plugin-ui/components/model-mark'
 import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
