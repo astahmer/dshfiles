@@ -16,6 +16,14 @@ import css from './code-fold.module.css'
 /** Lines a settled block shows before it folds; about one screen of code at 18px. */
 export const CODE_FOLD_LINES = 24
 
+/** Council round 7 C4: a card narrower than this (a phone, a split pane) soft-wraps short code by default. */
+export const CODE_NARROW_WIDTH = 448
+/** The longest block that soft-wraps by default; a longer one keeps its rows and scrolls sideways with the edge fade. */
+export const CODE_SOFT_WRAP_LINES = 12
+
+/** Whether a block starts wrapped: short code on a narrow card reads without a sideways gesture. */
+export const wrapsByDefault = (lines: number, width: number): boolean => width > 0 && width < CODE_NARROW_WIDTH && lines <= CODE_SOFT_WRAP_LINES
+
 /** The native `CodeBlock` props this wrapper reads or sets. */
 export interface FoldableCodeBlockProps {
   readonly code: string
@@ -45,7 +53,9 @@ export const overflowEdgesOf = (box: { readonly scrollWidth: number; readonly cl
 /** Wraps one native code card element; `block` is the element the native renderer produced. */
 export function CodeFold({ block }: { readonly block: ReactElement<FoldableCodeBlockProps> }): ReactNode {
   const { code, streaming, toolbarLabels } = block.props
-  const [wrapped, setWrapped] = useState(false)
+  // The user's Wrap choice wins; until they make one, the card's width and length pick (council round 7 C4).
+  const [choice, setChoice] = useState<boolean | undefined>(undefined)
+  const [width, setWidth] = useState(0)
   const [open, setOpen] = useState(false)
   const root = useRef<HTMLDivElement>(null)
   const [actions, setActions] = useState<Element | null>(null)
@@ -55,6 +65,21 @@ export function CodeFold({ block }: { readonly block: ReactElement<FoldableCodeB
   const [overflows, setOverflows] = useState(false)
   const lines = codeLineCount(code)
   const foldable = streaming !== true && lines > CODE_FOLD_LINES
+  const softWraps = wrapsByDefault(lines, width)
+  const hasToolbar = toolbarLabels !== undefined
+  const wrapped = choice ?? softWraps
+  useLayoutEffect(() => {
+    const host = root.current
+    if (host === null) return
+    setWidth(host.getBoundingClientRect().width)
+    if (typeof ResizeObserver !== 'function') return
+    const observer = new ResizeObserver(entries => {
+      const entry = entries[entries.length - 1]
+      if (entry !== undefined) setWidth(entry.contentRect.width)
+    })
+    observer.observe(host)
+    return () => observer.disconnect()
+  }, [hasToolbar])
   // The toolbar is the native card's; its action group is the last child of the banner.
   useLayoutEffect(() => {
     const banner = root.current?.querySelector('[data-code-block-banner]')
@@ -102,7 +127,13 @@ export function CodeFold({ block }: { readonly block: ReactElement<FoldableCodeB
   if (toolbarLabels === undefined) return block
   const label = wrapped ? toolbarLabels.unwrapLabel : toolbarLabels.wrapLabel
   return (
-    <div ref={root} className={css.fold} data-code-fold={foldable ? (open ? 'open' : 'closed') : undefined} data-code-overflow-edges={edges}>
+    <div
+      ref={root}
+      className={css.fold}
+      data-code-fold={foldable ? (open ? 'open' : 'closed') : undefined}
+      data-code-overflow-edges={edges}
+      data-code-narrow={wrapped && width > 0 && width < CODE_NARROW_WIDTH ? '' : undefined}
+    >
       {cloneElement(block, { wrap: wrapped })}
       {actions !== null &&
         createPortal(
@@ -113,11 +144,12 @@ export function CodeFold({ block }: { readonly block: ReactElement<FoldableCodeB
               aria-label={toolbarLabels.wrapLabel}
               aria-pressed={wrapped}
               onClick={() => {
-                setWrapped(value => !value)
+                setChoice(!wrapped)
               }}
             >
               <WrapTextIcon size={14} strokeWidth={1.5} aria-hidden />
-              {overflows ? (
+              {/* A soft-wrapped block keeps the word too, so the toggle never changes width under the finger. */}
+              {overflows || softWraps ? (
                 <span className={css.wrapLabel} aria-hidden>
                   Wrap
                 </span>

@@ -107,3 +107,55 @@ describe('a code card that overflows (round six C3)', () => {
     expect(css).toMatch(/\.wrapLabel \{[^}]*font-size: 12px;/u)
   })
 })
+
+/** Lay the fold out at `width` px: the card measures its own box to pick its default. */
+const atWidth = (width: number): void => {
+  vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ width, height: 100, top: 0, left: 0, right: width, bottom: 100, x: 0, y: 0, toJSON: () => ({}) })
+}
+
+const lines = (count: number): string => Array.from({ length: count }, (_, index) => `const line${String(index)} = ${String(index)}`).join('\n')
+
+describe('short code on a narrow pane (council round 7 C4)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('soft-wraps a block of 12 lines or fewer when the pane is narrower than 448px', () => {
+    atWidth(358)
+    const { container } = render(<CodeFold block={<Card code={lines(5)} toolbarLabels={labels} />} />)
+    expect(container.querySelector('.md-code-block')?.getAttribute('data-code-wrap')).toBe('true')
+    expect(container.querySelector('button[aria-pressed]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(container.firstElementChild?.hasAttribute('data-code-narrow')).toBe(true)
+  })
+
+  it('keeps a longer block on one line per row, scrolling sideways with the edge fade', () => {
+    atWidth(358)
+    const { container } = render(<CodeFold block={<Card code={lines(13)} toolbarLabels={labels} />} />)
+    expect(container.querySelector('.md-code-block')?.getAttribute('data-code-wrap')).toBe('false')
+  })
+
+  it('keeps short code unwrapped on a wide pane', () => {
+    atWidth(680)
+    const { container } = render(<CodeFold block={<Card code={lines(5)} toolbarLabels={labels} />} />)
+    expect(container.querySelector('.md-code-block')?.getAttribute('data-code-wrap')).toBe('false')
+  })
+
+  it('lets Wrap flip a soft-wrapped block back to one line per row, and again', () => {
+    atWidth(358)
+    const { container } = render(<CodeFold block={<Card code={lines(5)} toolbarLabels={labels} />} />)
+    const toggle = container.querySelector('button[aria-pressed]')
+    if (toggle === null) throw new Error('no wrap toggle')
+    // The word stays while wrapped, so the toggle never changes width under the finger.
+    expect(toggle.textContent).toBe('Wrap')
+    fireEvent.click(toggle)
+    expect(container.querySelector('.md-code-block')?.getAttribute('data-code-wrap')).toBe('false')
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+    fireEvent.click(toggle)
+    expect(container.querySelector('.md-code-block')?.getAttribute('data-code-wrap')).toBe('true')
+  })
+
+  it('sets a soft-wrapped narrow block at 12/18 mono', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/code-fold.module.css'), 'utf8')
+    expect(css).toMatch(/\.fold\[data-code-narrow\] \{[^}]*--dsw-font-markdown-code-block-font-size: 12px;[^}]*--dsw-font-markdown-code-block-line-height: 18px;/u)
+  })
+})

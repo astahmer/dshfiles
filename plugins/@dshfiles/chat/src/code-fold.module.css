@@ -72,6 +72,14 @@
   --code-overflow-mask: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
 }
 
+/* Council round 7 C4: short code on a narrow card (a phone, a split pane) soft-wraps by default at 12/18 mono, each
+   continuation indented 2ch by the transcript stylesheet, so it reads without a sideways gesture. */
+.fold[data-code-narrow] {
+  --dsw-font-markdown-code-block: 400 12px / 18px var(--ds-font-family-code);
+  --dsw-font-markdown-code-block-font-size: 12px;
+  --dsw-font-markdown-code-block-line-height: 18px;
+}
+
 .fold[data-code-overflow-edges] :global(.md-code-block[data-code-wrap='false']) pre {
   mask-image: var(--code-overflow-mask);
 }
