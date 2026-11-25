@@ -138,7 +138,7 @@ describe('account detail sections (council round 3, D3)', () => {
     const classOf = (label: string): string => new RegExp(`<button[^>]*aria-label="${label}"[^>]*class="([^"]*)"`, 'u').exec(markup)?.[1] ?? ''
     const effort = classOf('Default reasoning effort for GPT Six')
     const mode = classOf('Model settings mode')
-    for (const look of ['dshx:border-input', 'dshx:bg-background', 'dshx:h-(--dshx-control-h)']) {
+    for (const look of ['dshx:border-field-border', 'dshx:bg-background', 'dshx:h-(--dshx-control-h)']) {
       expect(effort).toContain(look)
       expect(mode).toContain(look)
     }
