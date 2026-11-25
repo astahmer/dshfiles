@@ -93,7 +93,7 @@ When('the Usage analytics panel is opened on the range since {string}', async ({
   await expect(page.getByRole('heading', { name: 'Usage', exact: true, level: 1 })).toBeVisible()
   // Overview is the first tab (Overview · Quota · Requests · Tools); the log is Requests.
   await page.getByRole('tab', { name: 'Requests', exact: true }).click()
-  await page.getByRole('radio', { name: 'Custom', exact: true }).click()
+  await page.getByRole('button', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)
   await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
   await expect(page.getByText(/ of the latest \d+ requests$/)).toBeVisible()

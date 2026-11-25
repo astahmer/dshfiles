@@ -1,7 +1,6 @@
 import { Chart, ChartFrame, barY, colorLegend, defineChart, lineY, scaleBand, scaleLinear, scalePoint, text, tooltip } from '@dshfiles/plugin-ui/chart'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -29,17 +28,10 @@ const TREND_METRICS: readonly SlidingSegmentOption<'cost' | 'tokens' | 'requests
   { value: 'requests', label: 'Requests' },
 ]
 
-const GROUP_BY_OPTIONS: readonly { readonly value: ChartQuery['groupBy']; readonly label: string }[] = [
-  { value: 'model', label: 'Model' },
-  { value: 'provider', label: 'Provider / account' },
-  { value: 'project', label: 'Project' },
-  { value: 'purpose', label: 'Purpose' },
-]
-
 /** Purpose ids arrive as series keys; the legend and tooltips show their product names. */
 const purposeLabelsByKey = new Map(Object.entries(UsageFormattingModel.purposeLabels))
 
-const Panel = (props: { readonly title: string; readonly description?: string; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
+const Panel = (props: { readonly title?: string; readonly description?: string; readonly className?: string; readonly children: ReactNode }): JSX.Element => (
   <ChartFrame title={props.title} description={props.description} className={cn('dshx:border-t dshx:border-border dshx:pt-4', props.className)}>
     {props.children}
   </ChartFrame>
@@ -334,27 +326,22 @@ export const UsageCharts = (props: {
 
       {jevCard}
 
-      <Panel
-        title={`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}
-        description={trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
-      >
-        {/* The page's one metric switch: "Where it went" and the daily calendar follow it (council round 2, D1). */}
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-3" role="toolbar" aria-label="Chart options">
-          <SlidingSegments aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
-          <Select value={props.groupBy} onValueChange={value => props.onGroupBy(GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model')}>
-            <SelectTrigger size="sm" aria-label="Group by" className="dshx:justify-start dshx:gap-1.5">
-              <span className="dshx:text-muted-foreground">By</span>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="dshx-root" align="end">
-              {GROUP_BY_OPTIONS.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+      <Panel>
+        {/*
+         * The page's one metric switch, across from the card's title: "Where it went" and the daily calendar follow it
+         * (council round 2 and round 4, D1). The grouping is on the page's filter row.
+         */}
+        <header className="dshx:flex dshx:flex-wrap dshx:items-start dshx:justify-between dshx:gap-x-3 dshx:gap-y-2" data-usage-chart-header>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5">
+            <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">
+              {`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}
+            </span>
+            <span className="dshx:text-xs">
+              {trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
+            </span>
+          </span>
+          <SlidingSegments size="sm" aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
+        </header>
         <Chart
           ariaLabel={`${trendMetric} over time`}
           ariaDescription={`${trendMetric} per ${props.bucket}, grouped by ${props.groupBy}.`}

@@ -3,6 +3,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { Page } from '@dshfiles/plugin-ui/components/page'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import {
@@ -14,7 +15,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { panelOccurrence, useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
-import { ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarIcon, ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -23,7 +24,7 @@ import { Effect, Option } from 'effect'
 import type * as SchemaTypes from 'effect/Schema'
 import * as Schema from 'effect/Schema'
 import { useState, useSyncExternalStore } from 'react'
-import { purposeSchema, usageApi } from './api.js'
+import { purposeSchema, usageApi, type ChartQuery } from './api.js'
 import { UsageCharts } from './charts.js'
 import { USAGE_PAGE_DESCRIPTION, indexedLogsLabel } from './page-copy.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
@@ -34,13 +35,22 @@ import { UsageQuota } from './quota-tab.js'
 
 const PRESETS = ['today', '7d', '30d', '365d', 'custom'] as const
 
-const PRESET_OPTIONS: readonly SlidingSegmentOption<(typeof PRESETS)[number]>[] = [
+/** Four preset segments; Custom opens its own date popover, so range, granularity, grouping and purpose fit one row. */
+const PRESET_OPTIONS: readonly SlidingSegmentOption<Exclude<(typeof PRESETS)[number], 'custom'>>[] = [
   { value: 'today', label: 'Today' },
   { value: '7d', label: '7 d' },
   { value: '30d', label: '30 d' },
   { value: '365d', label: '1 y' },
-  { value: 'custom', label: 'Custom' },
 ]
+
+const GROUP_BY_OPTIONS: readonly { readonly value: ChartQuery['groupBy']; readonly label: string }[] = [
+  { value: 'model', label: 'Model' },
+  { value: 'provider', label: 'Provider / account' },
+  { value: 'project', label: 'Project' },
+  { value: 'purpose', label: 'Purpose' },
+]
+
+const formatShortDay = (at: number): string => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
 const BUCKETS = ['hour', 'day'] as const
 const BUCKET_LABELS = { hour: 'Hourly', day: 'Daily' } satisfies Record<(typeof BUCKETS)[number], string>
@@ -181,6 +191,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
     storedPreferences.set({ ...storedPreferences.get(), ...patch })
   }
   const [logSearch, setLogSearch] = useState('')
+  const [customOpen, setCustomOpen] = useState(false)
   const thread = useSyncExternalStore(state.subscribe, state.thread, state.thread)
   const [mountedAt] = useState(() => Date.now())
 
@@ -279,38 +290,58 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                 role="group"
                 aria-label="Filters"
               >
-                <SlidingSegments
+                <SlidingSegments<(typeof PRESETS)[number]>
                   aria-label="Time range"
+                  // A custom range checks no preset: remount without the pill instead of leaving it on the last preset.
+                  key={preferences.preset === 'custom' ? 'custom' : 'preset'}
+                  className={preferences.preset === 'custom' ? 'dshx:[&>span[aria-hidden]]:hidden' : undefined}
                   options={PRESET_OPTIONS}
                   value={preferences.preset}
                   onValueChange={preset =>
                     update({
                       preset,
                       bucket: preset === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
-                      ...(preset === 'custom' &&
-                        preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
                     })
                   }
                 />
-                {preferences.preset === 'custom' ? (
-                  <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs">
+                <Popover open={customOpen} onOpenChange={setCustomOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      aria-pressed={preferences.preset === 'custom'}
+                      className="dshx:aria-pressed:border-foreground/30 dshx:aria-pressed:bg-muted"
+                      onClick={() => {
+                        if (preferences.preset === 'custom') return
+                        update({
+                          preset: 'custom',
+                          bucket: preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+                          ...(preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
+                        })
+                      }}
+                    >
+                      <CalendarIcon aria-hidden />
+                      {preferences.preset === 'custom' ? `${formatShortDay(range.from)} – ${formatShortDay(range.to - 1)}` : 'Custom'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="start" className="dshx-root dshx:flex dshx:w-auto dshx:items-center dshx:gap-2 dshx:p-3 dshx:text-xs">
                     <Input
                       type="date"
                       aria-label="From date"
-                      className="dshx:h-7 dshx:w-36"
+                      className="dshx:h-8 dshx:w-36"
                       value={preferences.customFrom}
-                      onChange={event => update({ customFrom: event.target.value })}
+                      onChange={event => update({ preset: 'custom', customFrom: event.target.value })}
                     />
                     <span aria-hidden>→</span>
                     <Input
                       type="date"
                       aria-label="To date"
-                      className="dshx:h-7 dshx:w-36"
+                      className="dshx:h-8 dshx:w-36"
                       value={preferences.customTo}
-                      onChange={event => update({ customTo: event.target.value })}
+                      onChange={event => update({ preset: 'custom', customTo: event.target.value })}
                     />
-                  </span>
-                ) : null}
+                  </PopoverContent>
+                </Popover>
                 <Select value={preferences.bucket} onValueChange={value => update({ bucket: BUCKETS.find(bucket => bucket === value) ?? 'day' })}>
                   <SelectTrigger size="sm" aria-label="Group by time" className="dshx:w-28">
                     <SelectValue />
@@ -323,6 +354,24 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                     ))}
                   </SelectContent>
                 </Select>
+                {preferences.tab === 'charts' ? (
+                  <Select
+                    value={preferences.groupBy}
+                    onValueChange={value => update({ groupBy: GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model' })}
+                  >
+                    <SelectTrigger size="sm" aria-label="Group by" className="dshx:justify-start dshx:gap-1.5">
+                      <span className="dshx:text-muted-foreground">By</span>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="dshx-root">
+                      {GROUP_BY_OPTIONS.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : null}
                 {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

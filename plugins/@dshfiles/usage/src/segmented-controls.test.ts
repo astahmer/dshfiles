@@ -14,7 +14,9 @@ describe('Usage controls', () => {
 
   // Council round 2, D1: at most two segmented controls on the page; the range and the chart's metric.
   it('draws at most two segmented controls on the Cost tab: the range and the chart metric', () => {
-    const segmented = COST_TAB_SOURCES.flatMap(name => [...read(name).matchAll(/<SlidingSegments\s+aria-label="([^"]+)"/gu)].map(match => match[1]))
+    const segmented = COST_TAB_SOURCES.flatMap(name =>
+      [...read(name).matchAll(/<SlidingSegments(?:<[^>\n]*>)?\s+(?:size="sm"\s+)?aria-label="([^"]+)"/gu)].map(match => match[1]),
+    )
     expect(segmented).toEqual(['Time range', 'Usage measure'])
     // The spend map's own Measure switch is off: it follows the chart's metric.
     expect(read('usage-spend-map.tsx')).not.toMatch(/\bmetrics=/u)
@@ -38,8 +40,11 @@ describe('Usage controls', () => {
     expect(row).not.toContain('>Purpose</span>')
   })
 
-  it('picks the chart grouping from a select on the chart card', () => {
-    expect(read('charts.tsx')).toMatch(/<SelectTrigger size="sm" aria-label="Group by"/u)
+  it('picks the chart grouping from a select on the filter row, not on the chart card', () => {
+    const panel = read('panel.tsx')
+    const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("preferences.tab === 'log' ?"))
+    expect(row).toMatch(/<SelectTrigger size="sm" aria-label="Group by"/u)
+    expect(read('charts.tsx')).not.toContain('aria-label="Group by"')
   })
 
   it('hides "Where it went" while the range cost nothing', () => {
@@ -54,13 +59,24 @@ describe('Usage page sections and chart toolbar (council round 3, D1)', () => {
     const labels = [...tabs.matchAll(/\{ value: '(\w+)', label: '([^']+)' \}/gu)].map(match => `${match[1]}:${match[2]}`)
     expect(labels).toEqual(['charts:Overview', 'quota:Quota', 'log:Requests', 'activity:Tools'])
   })
+})
 
-  it('keeps the measure and the grouping together on the chart toolbar, at most 16 px apart', () => {
+describe('Usage control row and chart header (council round 4, D1)', () => {
+  it('offers four range segments and keeps Custom in its own popover, so the filters fit one row', () => {
+    const panel = read('panel.tsx')
+    const presets = panel.slice(panel.indexOf('const PRESET_OPTIONS'), panel.indexOf('const GROUP_BY_OPTIONS'))
+    expect([...presets.matchAll(/value: '(\w+)'/gu)].map(match => match[1])).toEqual(['today', '7d', '30d', '365d'])
+    const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("preferences.tab === 'log' ?"))
+    expect(row).toMatch(/<PopoverTrigger asChild>\s*<Button[^>]*aria-pressed=\{preferences\.preset === 'custom'\}/u)
+    expect(row).toMatch(/<PopoverContent[\s\S]*aria-label="From date"[\s\S]*aria-label="To date"[\s\S]*<\/PopoverContent>/u)
+  })
+
+  it("puts the metric switch in the chart card's header, across from its title", () => {
     const charts = read('charts.tsx')
-    const toolbar = /<div className="([^"]*)" role="toolbar" aria-label="Chart options">/u.exec(charts)
-    expect(toolbar?.[1]).toBeDefined()
-    expect(toolbar?.[1]).not.toContain('justify-between')
-    expect(toolbar?.[1]).toMatch(/dshx:gap-(?:1|2|3|4)\b/u)
+    expect(charts).not.toContain('role="toolbar" aria-label="Chart options"')
+    const header = /<header className="([^"]*)" data-usage-chart-header>([\s\S]*?)<\/header>/u.exec(charts)
+    expect(header?.[1]).toContain('dshx:justify-between')
+    expect(header?.[2]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
   })
 })
 
