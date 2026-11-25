@@ -75,6 +75,10 @@ before, so P2/P3 had no fresh measurement in drawer mode. First live numbers are
 297/506 ms, first message 2061/2244 ms and 2.9/4.3 s of long tasks over 4.2–4.8k DOM elements: the remaining P2 lever
 is windowed transcript rendering, a product choice between scroll-back completeness and open latency.
 
+On this machine `pnpm --version` itself was taking ~28 s, so `dshx dev up` failed its 30 s version probe. A PATH shim
+that answers only `--version` instantly and delegates everything else let the scratch instance boot; the scratch phone
+checks below were run that way.
+
 ### Verified on a scratch DSH (2026-11-25, this workspace)
 
 Built only the seven touched plugins (`--concurrency=2`), booted `dshx dev up --name phone --skip-build`, drove it with
@@ -90,6 +94,15 @@ Playwright at 390×844 (Android UA, touch):
 3. **P31b** — no `mainTabs.newTab` / `Conflicting shortcut defaults` warning in the scratch console.
 4. P4's back gesture, P28 keycaps and P32 focus were not exercised on the scratch phone (no thread with a menu there);
    their proofs stay unit-level for now.
+
+Second scratch pass (same day, after a phone-sized failed prompt created a real thread row):
+
+1. **P28 verified** — the thread row menu at 390px shows Pin, Settle and Park with no keycap letters; the keycap spans are
+   present in the DOM but not visible. Evidence: `phone-fix-audit/b12-row-menu.png`.
+2. **P27 verified in UI** — the same menu shows a `Keep screen on` row between Mute thread and @Mention thread; the
+   hardware screen-lock behavior is still the owner's phone check.
+3. The menu also still shows `Open in side panel` / `Open plugin in side panel`; on a phone that opens the workbench
+   sheet, so it is not counted as a leak here.
 
 ### Code sweep (2026-11-25): already present, no work left
 
