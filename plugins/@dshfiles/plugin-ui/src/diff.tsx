@@ -1,6 +1,7 @@
 import { getFiletypeFromFileName, parsePatchFiles, registerCustomTheme, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, Virtualizer } from '@pierre/diffs/react'
 import { useEffect, useMemo, useRef, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
+import { DiffStat } from './components/diff-stat.js'
 import { cn } from './lib/utils.js'
 import { bundledLanguages, createCssVariablesTheme } from './shiki-slim.js'
 import { DiffLook } from './theme/diff-look.js'
@@ -91,9 +92,32 @@ registerCustomTheme(THEME, () => Promise.resolve(createCssVariablesTheme({ name:
 export class PatchLook {
   static readonly THEME = THEME
 
+  /**
+   * The library's own header counts read `−N +N` in its mono face; the header shows the kit DiffStat instead
+   * (`headerMetadata`), so they are hidden inside the shadow root (council round 3, D5).
+   */
+  static readonly HEADER_CSS = '[data-deletions-count], [data-additions-count] { display: none; }'
+
   /** Explicit `+`/`−` gutter marks (`classic`), so a changed line reads without its colour. */
-  static options(dark: boolean): Pick<DiffOptions, 'diffIndicators' | 'theme' | 'themeType'> {
-    return { themeType: dark ? 'dark' : 'light', theme: { dark: THEME, light: THEME }, diffIndicators: 'classic' }
+  static options(dark: boolean): Pick<DiffOptions, 'diffIndicators' | 'theme' | 'themeType' | 'unsafeCSS'> {
+    return { themeType: dark ? 'dark' : 'light', theme: { dark: THEME, light: THEME }, diffIndicators: 'classic', unsafeCSS: PatchLook.HEADER_CSS }
+  }
+
+  /** A file header's trailing slot: the file's change count as the kit DiffStat (`+N −N`), then what the caller adds. */
+  static headerMetadata(file: FileDiffMetadata, extra: ReactNode): ReactNode {
+    let added = 0
+    let removed = 0
+    for (const hunk of file.hunks) {
+      added += hunk.additionLines
+      removed += hunk.deletionLines
+    }
+    // One row: the slot stacks its children otherwise, which put the count above the caller's control.
+    return (
+      <span className="dshx:flex dshx:items-center dshx:gap-3" data-patch-header-metadata="">
+        <DiffStat added={added} removed={removed} />
+        {extra}
+      </span>
+    )
   }
 
   /** Font, ramp body, 12% line tints and the shared syntax pair, as custom properties the shadow roots inherit. */
@@ -153,7 +177,7 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
             <FileDiff
               fileDiff={file}
               options={diffOptions(file)}
-              renderHeaderMetadata={file => props.renderHeaderMetadata?.(file)}
+              renderHeaderMetadata={file => PatchLook.headerMetadata(file, props.renderHeaderMetadata?.(file))}
               renderHeaderPrefix={file => props.renderHeaderPrefix?.(file)}
             />
           </div>
