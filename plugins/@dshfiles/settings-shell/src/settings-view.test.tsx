@@ -77,11 +77,11 @@ describe('settings view: page header (council round 3 B3)', () => {
     view.unmount()
   })
 
-  it('reads in one 680px column, the header ending with it, so values sit near their labels (council round 4 B5)', () => {
+  it('reads in one 680px column inside the 880px lane frame, its header actions on the frame edge (round five A2)', () => {
     const view = mount({ columnNavigation: true })
     expect(view.host.querySelector('[data-settings-column]')?.className).toBe('dshx:max-w-[680px]')
-    expect(view.host.querySelector('[data-settings-toolbar]')?.className).toContain('dshx:max-w-[680px]')
-    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-[680px]')
+    expect(view.host.querySelector('[data-settings-toolbar]')?.className).toContain('dshx:max-w-lane')
+    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-lane')
     view.unmount()
   })
 })

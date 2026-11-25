@@ -1,6 +1,7 @@
 import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-settings/client'
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { PAGE_FRAME_CLASS } from '@dshfiles/plugin-ui/components/page'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
@@ -469,9 +470,9 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
     else openEntry(id)
   }
   const foundText = result.total === 1 ? t('search.foundOne') : t('search.found', { count: result.total })
-  // The header ends where the settings column does: the column alone beside the side column's list, after the page's own
-  // 208px list otherwise.
-  const headerWidth = props.columnNavigation === true ? 'dshx:max-w-[680px]' : 'dshx:max-w-[888px]'
+  // Beside the side column's list the page is on the kit's 880px lane frame (round five A2): the header and its actions end
+  // on the frame's edge, the 680px field column inside it. After the page's own 208px list the header ends with the column.
+  const headerWidth = props.columnNavigation === true ? PAGE_FRAME_CLASS.lane : 'dshx:max-w-[888px]'
   return (
     <PageViewMemoryProvider>
       <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
