@@ -18,6 +18,17 @@ script in `.cache/unslop-audit/r5/capture/`, so every round is scored on the sam
 Claude Opus 5.5, GPT-6.2 Sol and Mistral Large 4 at high effort (core), with GLM-5.3 high as a non-blocking seat. The
 round ends when every core seat scores the set at least 9/10.
 
+Capture: `node .cache/unslop-audit/r5/capture/capture.mjs <workspace> <out-dir>` (about 5.5 min) seeds three projects
+(`billing-api`, `web-app`, `docs-site`), eight threads in every status, a rich transcript with a running subagent and a
+background job, backlog items and usage, and switches dark through Settings › Appearance. Two runs differ only in live
+clocks. Round 0 (the PR tip before any round-five change) is in `.cache/unslop-audit/r5/round-0/`. Found while building
+it: tool-meta's "Waiting for approval" chip shows outside its hidden parent in a background tab; the start screen
+counts 2 threads needing you while the Inbox counts 3.
+
+| Council round | Claude Opus | GPT Sol | Mistral Large | Notes |
+| --- | --- | --- | --- | --- |
+| 1 (round-0 shots) | running | running | running | GLM non-blocking |
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
