@@ -46,10 +46,10 @@ describe('PatchView file name (council round 4, D3)', () => {
 })
 
 describe('PatchView collapsed-lines bar (council round 6, D2)', () => {
-  it('runs the bar edge to edge like the diff rows: no gutter inset, square ends', () => {
+  it('runs the bar edge to edge like the diff rows: no inset on either side, square ends', () => {
     for (const dark of [false, true]) {
       const css = PatchLook.options(dark).unsafeCSS ?? ''
-      expect(css).toMatch(/\[data-separator=line-info\] \[data-separator-wrapper\]\s*\{\s*padding-left:\s*0;?\s*\}/u)
+      expect(css).toMatch(/\[data-separator=line-info\] \[data-separator-wrapper\]\s*\{[^}]*padding-inline:\s*0;/u)
       expect(css).toMatch(/\[data-separator=line-info\] \[data-separator-content\]\s*\{\s*border-radius:\s*0;?\s*\}/u)
     }
   })
