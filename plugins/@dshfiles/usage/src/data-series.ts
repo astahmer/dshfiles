@@ -1,16 +1,16 @@
 /**
- * Chart series colours (DESIGN.md › Colour roles 8). Categorical series take `data-1..6` in order: the accent, then
- * the identity teal, orange, violet, pink and olive. The kit's `dshx:*-data-*` utilities inline these values and emit
- * no CSS variable, so a plot spec names the same sources. The kit's ChartFrame still maps the default `--ts-chart-*`
- * palette onto status hues, so every categorical scale here passes `range` explicitly.
+ * Chart series colours (DESIGN.md › Colour roles 8). Categorical series take the kit's data ramp `data-1..6` in order:
+ * teal, violet, copper, magenta, olive, cyan, at a chart step clear of every status hue. The accent stays the colour of
+ * interaction, never the first series (round five K5). The kit's ChartFrame maps `--ts-chart-*` onto the same ramp, and
+ * every categorical scale here still passes `range` explicitly.
  */
 export const DATA_SERIES = [
-  'var(--dsw-alias-state-business-primary)',
-  'var(--dshx-identity-1)',
-  'var(--dshx-identity-3)',
-  'var(--dshx-identity-2)',
-  'var(--dshx-identity-4)',
-  'var(--dshx-identity-6)',
+  'var(--dshx-data-1)',
+  'var(--dshx-data-2)',
+  'var(--dshx-data-3)',
+  'var(--dshx-data-4)',
+  'var(--dshx-data-5)',
+  'var(--dshx-data-6)',
 ] as const
 
 /** The one series that is a status: failed requests. */

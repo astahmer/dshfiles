@@ -25,6 +25,11 @@ describe('usage charts colour series by the data ramp (DESIGN.md › Colour role
     )
     expect(missing).toEqual([])
   })
+  it('starts the series with the identity data ramp, never the interaction accent (round five K5/P1)', async () => {
+    const { DATA_SERIES } = await import('./data-series.js')
+    expect(DATA_SERIES).toEqual([1, 2, 3, 4, 5, 6].map(step => `var(--dshx-data-${String(step)})`))
+    expect(DATA_SERIES.join(' ')).not.toContain('business-primary')
+  })
   it('colours only the Failed series with the danger hue', async () => {
     const { DATA_SERIES, FAILED_SERIES } = await import('./data-series.js')
     expect(DATA_SERIES).toHaveLength(6)
