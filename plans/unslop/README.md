@@ -46,7 +46,8 @@ Round four pushed 2026-11-25 on upstream `687a72ad` (455 commits): CI fails exac
 reasons (two smoke scenarios, the profile-sync test, ai-accounts' `inject: ['subprocess']`, lint caps); lint is oxlint 906 against
 upstream's 915, ast-grep 145 against 145. Open after round four: the first-run Send gate (no "has a key" signal from the built-in
 provider), healthy quota still green, the rail as one Tab stop, ⌥J into the question card, the New tab chooser cleanup, approvals
-asked before a plugin-only reload showing Resolved, plan reviews outside the Inbox, Usage's account name.
+asked before a plugin-only reload showing Resolved, plan reviews outside the Inbox, Usage's account name, agentsview's
+summary cards without singular forms ("1 threads · 1 prompts"), jujutsu's reach steps stuck on the project picker's Enter.
 
 ## Round three
 
