@@ -15,6 +15,21 @@ export const SIDEBAR_MIN = 264
 export const SIDEBAR_MAX = 420
 /** Sidebar width before any user drag. */
 export const SIDEBAR_DEFAULT = 280
+/**
+ * Local delta (dshfiles, round five B4): from this frame width the untouched default is wider, a 256px thread column
+ * beside thread-sidebar's 56px labelled rail.
+ */
+export const SIDEBAR_WIDE_VIEWPORT = 1440
+export const SIDEBAR_DEFAULT_WIDE = 312
+
+export class SidebarDefaultModel {
+  /** The default for a frame this wide. */
+  static readonly width = (viewport: number): number => (viewport >= SIDEBAR_WIDE_VIEWPORT ? SIDEBAR_DEFAULT_WIDE : SIDEBAR_DEFAULT)
+
+  /** The open sidebar's preference: a width the user set (dragged, or restored from storage) wins over the default. */
+  static readonly preference = (input: { readonly custom: boolean; readonly sidebar: number; readonly viewport: number }): number =>
+    input.custom ? input.sidebar : SidebarDefaultModel.width(input.viewport)
+}
 /** Closed-sidebar rail: a 24px icon column between 16px horizontal paddings. */
 export const SIDEBAR_COLLAPSED = 56
 /** Frame width below which the sidebar overlays the main content without a rail. */
