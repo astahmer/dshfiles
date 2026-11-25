@@ -3,12 +3,11 @@
   outline-offset: 2px;
 }
 
-/* One tab chrome for both surfaces: the selected tab sits on the content background, the others stay one tint
- * above it, and a hairline divides them (Zed's flat tab strip). Derived from the label colour so the same
- * mix reads on the light and the dark palette. */
+/* One tab chrome for both surfaces: the selected tab sits on the content background and joins it, the others sit on
+ * the panel step (round five T5) and lift to the raised step on hover, and a hairline divides them (Zed's flat tab
+ * strip). Without the generated tones, a mix of the label colour keeps the steps on the light and the dark palette. */
 [data-dshfiles-main-tabs] {
-  --dsh-main-tab-bg: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-base));
-  --dsh-main-tab-bg-hover: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base));
-  --dsh-main-tab-chip: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+  --dsh-main-tab-bg: var(--dshx-tone-panel, color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-base)));
+  --dsh-main-tab-bg-hover: var(--dshx-tone-raised, color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base)));
   --dsh-main-tab-divider: var(--dsw-alias-border-l3);
 }

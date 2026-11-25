@@ -1,6 +1,6 @@
 {
   "totals": {
-    "arbitrary-text": 16,
+    "arbitrary-text": 14,
     "arbitrary-radius": 58,
     "raw-colour": 99,
     "native-icons": 125,
@@ -28,11 +28,11 @@
     "arbitrary-radius/thread-sidebar": 1,
     "arbitrary-text/jj-integration": 1,
     "arbitrary-text/jujutsu": 2,
-    "arbitrary-text/main-tabs": 3,
+    "arbitrary-text/main-tabs": 2,
     "arbitrary-text/plugin-ui": 6,
     "arbitrary-text/settings-shell": 1,
     "arbitrary-text/thread-sidebar": 2,
-    "arbitrary-text/workbench": 1,
+    "arbitrary-text/workbench": 0,
     "chart-hue/backlog": 5,
     "chart-hue/memory": 1,
     "chart-hue/plugin-ui": 2,

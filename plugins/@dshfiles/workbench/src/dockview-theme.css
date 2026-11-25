@@ -47,11 +47,11 @@
   --dv-separator-border: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   --dv-paneview-header-border-color: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   /* One tab chrome for both surfaces (the native strip declares the same names in main-tabs): the selected tab
-   * sits on the content background, the others stay one tint above it, and a hairline divides them. Derived from
-   * the label colour so the same mix reads on the light and the dark palette. */
-  --dsh-main-tab-bg: color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-base));
-  --dsh-main-tab-bg-hover: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base));
-  --dsh-main-tab-chip: color-mix(in srgb, var(--dsw-alias-label-primary) 10%, transparent);
+   * sits on the content background and joins it, the others sit on the panel step (round five T5) and lift to the
+   * raised step on hover, and a hairline divides them. Without the generated tones, a mix of the label colour keeps
+   * the same steps on the light and the dark palette. */
+  --dsh-main-tab-bg: var(--dshx-tone-panel, color-mix(in srgb, var(--dsw-alias-label-primary) 6%, var(--dsw-alias-bg-base)));
+  --dsh-main-tab-bg-hover: var(--dshx-tone-raised, color-mix(in srgb, var(--dsw-alias-label-primary) 10%, var(--dsw-alias-bg-base)));
   color: var(--dsw-alias-label-primary);
 }
 
@@ -64,6 +64,12 @@
 
 .dshfiles-workbench-theme .dv-groupview > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-inactive-tab:hover {
   background-color: var(--dsh-main-tab-bg-hover);
+}
+
+/* Every tab starts its content 12px in (round five T5): the tab content owns the inset, so a tab with a status seat,
+ * a pinned tab and a page tab line up. Dockview's own 8px side padding would add to it. */
+.dshfiles-workbench-theme .dv-tabs-container > .dv-tab {
+  padding-inline: 0;
 }
 
 /* The divider stops at a selected tab: the tab merges with the content below instead of sitting in a box. */

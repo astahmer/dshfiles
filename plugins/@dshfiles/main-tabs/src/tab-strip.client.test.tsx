@@ -267,14 +267,32 @@ describe('TabStrip layout', () => {
     }
   })
 
-  it('shows the project name as a chip before thread titles only', () => {
+  it('shows the project as a ProjectMark tile before thread titles only (round five T5)', () => {
     render(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={new Map([['workspace-1', 'dshfiles']])} />)
     const thread = screen.getByRole('tab', { name: 'dshfiles / Thread, Working' })
-    expect(within(thread).getByText('dshfiles')).toBeTruthy()
+    const mark = thread.querySelector<HTMLElement>('[data-tab-project]')
+    expect(mark?.getAttribute('data-slot')).toBe('project-mark')
+    expect(mark?.getAttribute('data-size')).toBe('dense')
+    expect(mark?.textContent).toBe('DS')
+    // No tinted pill with the name: the tab's spoken name and tooltip carry it.
+    expect(within(thread).queryByText('dshfiles')).toBeNull()
     expect(screen.getByRole('tab', { name: 'Workbench' }).querySelector('[data-tab-project]')).toBeNull()
   })
 
-  it('keeps a custom chip colour readable by clamping its text lightness in each scheme', () => {
+  it('paints the tile in the chosen tone, and clamps a custom colour per scheme', () => {
+    render(
+      <TabStrip
+        tabs={tabs}
+        send={() => {}}
+        t={t}
+        newTabKeys=""
+        renameThread={async () => {}}
+        projectNames={new Map([['workspace-1', 'dshfiles']])}
+        projectChips={{ 'workspace-1': { className: 'project-tone-balanced-4', tone: 4 } }}
+      />,
+    )
+    expect(screen.getByRole('tab', { name: 'dshfiles / Thread, Working' }).querySelector('[data-tab-project]')?.className).toContain('project-tone-balanced-4')
+    cleanup()
     render(
       <TabStrip
         tabs={tabs}
@@ -286,13 +304,16 @@ describe('TabStrip layout', () => {
         projectChips={{ 'workspace-1': { color: '#ffd400' } }}
       />,
     )
-    const chip = within(screen.getByRole('tab', { name: 'dshfiles / Thread, Working' })).getByText('dshfiles')
-    expect(chip.style.getPropertyValue('--chip')).toBe('#ffd400')
-    expect(chip.style.color).toBe('')
-    expect(chip.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
-    expect(chip.style.getPropertyValue('--chip-dark')).toBe('oklch(from var(--chip) max(l, 0.78) c h)')
-    expect(chip.className).toContain('dshx:text-(--chip-light)')
-    expect(chip.className).toContain('dshx:dark:text-(--chip-dark)')
+    const mark = screen.getByRole('tab', { name: 'dshfiles / Thread, Working' }).querySelector<HTMLElement>('[data-tab-project]')
+    expect(mark?.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(mark?.style.color).toBe('var(--chip-clamped)')
+    expect(mark?.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
+    expect(mark?.className).toContain('dshx:dark:[--chip-clamped:var(--chip-dark)]')
+  })
+
+  it('starts every tab 12px in', () => {
+    mount()
+    for (const tab of screen.getAllByRole('tab')) expect(tab.className).toContain('dshx:pl-3')
   })
 })
 

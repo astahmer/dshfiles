@@ -32,7 +32,7 @@ const fixture = (
     readonly semantic?: boolean
     readonly closeButtonPosition?: CloseButtonPosition
     readonly projectNames?: Readonly<Record<string, string>>
-    readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string }>>
+    readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string; readonly tone?: number }>>
     readonly presentation?: Pick<WorkbenchTabsProvider, 'renderTabMenu' | 'label'>
   } = {},
 ) => {
@@ -129,32 +129,43 @@ describe('workbench semantic tab chrome', () => {
     reveal.mockRestore()
   })
 
-  it('shows the project chip before a thread title when the provider publishes project names', () => {
+  it('shows the project as a ProjectMark tile before a thread title, named for assistive tech', () => {
     const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
     tab.update({ workspaceId: 'workspace-a' })
-    const chip = screen.getByText('NixConfig')
+    const mark = screen.getByRole('img', { name: 'NixConfig' })
     const title = screen.getByText('Thread A')
-    expect(chip.getAttribute('data-workbench-tab-project')).toBe('')
-    expect(chip.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(mark.getAttribute('data-workbench-tab-project')).toBe('')
+    expect(mark.getAttribute('data-slot')).toBe('project-mark')
+    expect(mark.getAttribute('data-size')).toBe('dense')
+    expect(mark.textContent).toBe('NI')
+    expect(mark.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // No rose pill: the tile carries the colour, the name is not repeated as tinted text.
+    expect(screen.queryByText('NixConfig')).toBeNull()
   })
 
-  it('tints the project chip with its chosen tone', () => {
-    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectChips: { 'workspace-a': { className: 'project-tone-balanced-3' } } })
+  it('paints the tile in the project\'s chosen tone', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectChips: { 'workspace-a': { className: 'project-tone-balanced-3', tone: 3 } } })
     tab.update({ workspaceId: 'workspace-a' })
-    expect(screen.getByText('NixConfig').className).toContain('project-tone-balanced-3')
+    expect(screen.getByRole('img', { name: 'NixConfig' }).className).toContain('project-tone-balanced-3')
   })
 
-  it('keeps a custom chip colour readable by clamping its text lightness in each scheme', () => {
+  it('keeps a custom tile colour readable by clamping its lightness in each scheme', () => {
     const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' }, projectChips: { 'workspace-a': { color: '#ffd400' } } })
     tab.update({ workspaceId: 'workspace-a' })
-    const chip = screen.getByText('NixConfig')
-    // The pick rides as --chip; the text is the pick at L ≤ 0.52 in light and L ≥ 0.78 in dark, its tint follows the text.
-    expect(chip.style.getPropertyValue('--chip')).toBe('#ffd400')
-    expect(chip.style.color).toBe('')
-    expect(chip.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
-    expect(chip.style.getPropertyValue('--chip-dark')).toBe('oklch(from var(--chip) max(l, 0.78) c h)')
-    expect(chip.className).toContain('dshx:text-(--chip-light)')
-    expect(chip.className).toContain('dshx:dark:text-(--chip-dark)')
+    const mark = screen.getByRole('img', { name: 'NixConfig' })
+    // The pick rides as --chip; the tile is the pick at L ≤ 0.52 in light and L ≥ 0.78 in dark.
+    expect(mark.style.getPropertyValue('--chip')).toBe('#ffd400')
+    expect(mark.style.color).toBe('var(--chip-clamped)')
+    expect(mark.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
+    expect(mark.style.getPropertyValue('--chip-dark')).toBe('oklch(from var(--chip) max(l, 0.78) c h)')
+    expect(mark.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
+    expect(mark.className).toContain('dshx:dark:[--chip-clamped:var(--chip-dark)]')
+  })
+
+  it('starts every tab\'s content 12px from its edge', () => {
+    fixture()
+    const content = document.querySelector<HTMLElement>('[data-workbench-tab-id]')
+    expect(content?.className).toContain('dshx:pl-3')
   })
 
   it('hides the project chip without a project name for the tab', () => {

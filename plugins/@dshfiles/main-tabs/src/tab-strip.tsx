@@ -1,12 +1,13 @@
 import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { InlineTitleEditor } from '@dshfiles/plugin-ui/components/ui/inline-title-editor'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, PinIcon } from '@dshfiles/plugin-ui/icons'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ThreadMentionDrag } from '@dshfiles/thread-sidebar/thread-mention'
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactElement } from 'react'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { createPortal } from 'react-dom'
 import type { MainTabsTranslate } from './locales.js'
 import { ASIDE_DROP_ATTRIBUTE, asideDropColumn } from './aside-drop.js'
@@ -18,7 +19,7 @@ import { TabMenuItems } from './tab-menu-items.js'
 import type { TabsEvent } from './tabs-machine.js'
 
 export type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
-import { DEFAULT_CLOSE_BUTTON_POSITION, type CloseButtonPosition, type TabView, type TabStatus } from '@dshfiles/workbench/tabs'
+import { DEFAULT_CLOSE_BUTTON_POSITION, TabProjectMark, type CloseButtonPosition, type TabProjectChip, type TabView, type TabStatus } from '@dshfiles/workbench/tabs'
 import { TabStatusGlyph } from '@dshfiles/workbench/tab-status'
 
 /** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
@@ -40,23 +41,8 @@ interface TabStripProps {
   /** Project name per thread workspace id, shown before thread titles; absent hides project names. */
   readonly projectNames?: ReadonlyMap<string, string>
   /** Resolved project colour per thread workspace id: a palette class, or a custom `#rrggbb`. */
-  readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string }>>
+  readonly projectChips?: Readonly<Record<string, TabProjectChip>>
 }
-
-const projectChipStyle = (chip: { readonly color?: string } | undefined): CSSProperties | undefined => {
-  if (chip === undefined) return undefined
-  const style: CSSProperties = { backgroundColor: 'color-mix(in srgb, currentColor 16%, transparent)' }
-  // A custom pick rides as --chip; its text clamps the lightness so a pale or dark pick still reads in each scheme.
-  if (chip.color !== undefined)
-    Object.assign(style, {
-      '--chip': chip.color,
-      '--chip-light': 'oklch(from var(--chip) min(l, 0.52) c h)',
-      '--chip-dark': 'oklch(from var(--chip) max(l, 0.78) c h)',
-    })
-  return style
-}
-
-const customChipText = 'dshx:text-(--chip-light) dshx:dark:text-(--chip-dark)'
 
 /** One glyph per thread tab, most urgent first: a question or approval waits, then work in progress, then a failed last turn, then an unseen finish. */
 export const threadTabStatus = (facts: {
@@ -309,7 +295,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         tabIndex={tab.active || (activeId === undefined && index === 0) ? 0 : -1}
                         draggable={renamingTabId !== tab.id}
                         className={cn(
-                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:bg-(--dsh-main-tab-bg) dshx:px-2.5 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-(--dsh-main-tab-bg-hover) dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
+                          'dshx:group dshx:relative dshx:flex dshx:h-7 dshx:cursor-pointer dshx:items-center dshx:bg-(--dsh-main-tab-bg) dshx:pr-2.5 dshx:pl-3 dshx:leading-none dshx:whitespace-nowrap dshx:text-muted-foreground dshx:outline-none dshx:select-none dshx:hover:bg-(--dsh-main-tab-bg-hover) dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset',
                           // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
                           'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                           props.fixedWidth === true
@@ -365,18 +351,8 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                           {tab.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? null : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : null}
                           {project === undefined ? null : (
-                            <span
-                              data-tab-project=""
-                              className={cn(
-                                'dshx:max-w-[45%] dshx:flex-none dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-0.5 dshx:text-[10px] dshx:leading-none',
-                                projectChip === undefined
-                                  ? 'dshx:bg-(--dsh-main-tab-chip) dshx:text-(--dsw-alias-label-secondary)'
-                                  : cn('dshx:font-medium', projectChip.className ?? (projectChip.color === undefined ? undefined : customChipText)),
-                              )}
-                              style={projectChipStyle(projectChip)}
-                            >
-                              {project}
-                            </span>
+                            // The project's tile (round five T5); the tab's spoken name and tooltip carry its name.
+                            <ProjectMark name={project} size="dense" data-tab-project="" {...TabProjectMark.paint(projectChip)} />
                           )}
                           {tab.kind === 'thread' && renamingTabId === tab.id ? (
                             <InlineTitleEditor
