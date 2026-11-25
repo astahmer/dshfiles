@@ -290,3 +290,27 @@
   display: inline-flex;
   color: var(--dsw-alias-menu-icon);
 }
+
+/* Phone: the picker covers the composer as a touch surface. It painted no
+   background at all (the listbox computed to rgba(0,0,0,0)), so the thread
+   showed through the menu; rows also stayed at the desktop 34px. */
+@media (max-width: 639.98px) {
+  .menu {
+    background: var(--dsw-specific-menu);
+    backdrop-filter: var(--dsw-menu-backdrop-filter);
+    border: 1px solid var(--dsw-alias-border-l1);
+    border-radius: var(--dsw-radius-lg);
+    padding: 6px;
+  }
+
+  .item {
+    min-height: 44px;
+    padding: 10px 10px;
+  }
+
+  .itemIcon,
+  .itemIcon svg {
+    width: 18px;
+    height: 18px;
+  }
+}

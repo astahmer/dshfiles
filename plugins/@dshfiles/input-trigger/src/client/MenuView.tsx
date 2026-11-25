@@ -155,6 +155,20 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
     updateOverflowHint()
   }, [state, maxHeight, updateOverflowHint])
   const highlight = state.open ? state.highlight : null
+  // Escape closes the picker wherever focus sits: the + button owns focus after
+  // a tap, so the controller's composer keydown never sees the key there.
+  useEffect(() => {
+    if (!state.open) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onDismiss()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [state.open, onDismiss])
   // Focus stays in the textarea (combobox pattern), so the browser never
   // scrolls the active option into view on keyboard moves — do it here.
   useEffect(() => {
