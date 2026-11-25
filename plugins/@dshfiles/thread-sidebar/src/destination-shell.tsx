@@ -682,6 +682,10 @@ const FolderIndex = (props: {
   // The one Settings navigation (council round 4 B1): categories and pages in one list, beside the stage; a phone keeps
   // its list of pages and the page's own Sections select.
   const settingsNavigation = folder.id === 'settings' && props.phone !== true ? props.settingsNavigation : undefined
+  // Beside the Settings page the rail and the page's h1 already name the destination: the column's own "Settings" sat on
+  // the h1's line and read "Settings Settings" (council round 6 B9). It stays for assistive tech; another Settings page
+  // (AI accounts) keeps it, with the folder's ⋯.
+  const titleOnStage = settingsNavigation !== undefined && settingsOnStage
   const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
   const missingPage = Destinations.expectedPageOf(folder.id)
   // Rows are names only (round five B1): the header's one line describes the destination, each page says the rest.
@@ -700,13 +704,17 @@ const FolderIndex = (props: {
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index={folder.id}>
       {/* The right padding keeps the folder's ⋯ clear of the pane's own top-right Show tab row control (b:952m). */}
       <header
-        className={cn('dshx:flex dshx:shrink-0 dshx:items-start dshx:gap-1 dshx:pt-1 dshx:pb-2 dshx:pl-3', props.phone === true ? 'dshx:pr-3' : 'dshx:pr-9')}
+        className={cn(
+          'dshx:flex dshx:shrink-0 dshx:items-start dshx:gap-1 dshx:pt-1 dshx:pb-2 dshx:pl-3',
+          props.phone === true ? 'dshx:pr-3' : 'dshx:pr-9',
+          titleOnStage && 'dshx:sr-only',
+        )}
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-          <h2 className={cn('dshx:text-sm dshx:font-semibold', props.phone === true && 'dshx:sr-only')}>{folder.label}</h2>
+          <h2 className={cn('dshx:text-sm dshx:font-semibold', (props.phone === true || titleOnStage) && 'dshx:sr-only')}>{folder.label}</h2>
           {settingsOnStage || settingsNavigation !== undefined ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>}
         </div>
-        {folderUi === undefined || resolved === undefined || props.phone === true ? null : (
+        {folderUi === undefined || resolved === undefined || props.phone === true || titleOnStage ? null : (
           <FolderMenu folder={resolved} ui={folderUi} onRename={() => setRenaming(true)} />
         )}
       </header>

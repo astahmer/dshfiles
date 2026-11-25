@@ -261,6 +261,11 @@ describe('DestinationShell', () => {
     expect(head?.className).toContain('dshx:text-muted-foreground')
     expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-4')
     expect(head?.className).toContain('dshx:pb-1')
+    // Council round 6 B9: beside the Settings page the rail and the page's h1 name the destination, so the column draws
+    // no second "Settings" on the h1's line (it stays for assistive tech).
+    const columnTitle = screen.getByRole('heading', { level: 2, name: 'Settings' })
+    expect(columnTitle.className).toContain('dshx:sr-only')
+    expect(columnTitle.closest('header')?.className).toContain('dshx:sr-only')
     // The column sits on the nav surface (kit A4).
     expect(screen.getByRole('tabpanel', { name: 'Settings' }).className).toContain('dshx:surface-nav')
     // The page's current category is the column's current row.
@@ -287,6 +292,8 @@ describe('DestinationShell', () => {
     expect(screen.getByRole('button', { name: 'AI accounts' }).getAttribute('aria-current')).toBe('page')
     // Council round 6 B3: the child row starts 12px past its parent's text edge (10px inset + 16px glyph + 8px gap).
     expect(screen.getByRole('button', { name: 'AI accounts settings' }).className).toContain('dshx:pl-11.5')
+    // On another Settings page the column keeps its visible title: the page's h1 names that page, not Settings.
+    expect(screen.getByRole('heading', { level: 2, name: 'Settings' }).className).not.toContain('dshx:sr-only')
     fireEvent.click(screen.getByRole('button', { name: 'AI accounts settings' }))
     expect(navigation.select).toHaveBeenCalledWith('ai-accounts')
   })
