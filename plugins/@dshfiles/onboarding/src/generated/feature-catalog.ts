@@ -12571,10 +12571,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Docs\"",
+          "text": "expect checkbox \"seeded-work.md*\"",
           "action": "expect",
-          "by": "text",
-          "name": "Docs",
+          "by": "checkbox",
+          "name": "seeded-work.md*",
           "value": null
         },
         {
