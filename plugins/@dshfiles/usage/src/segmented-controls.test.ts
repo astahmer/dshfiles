@@ -108,3 +108,16 @@ describe('Usage page title mark (council round 7, D1)', () => {
     expect(page).toContain('markTone="observe"')
   })
 })
+
+describe('Usage filter triggers (council round 7, D3 / A4)', () => {
+  it('draws Custom and Purpose, which show a value, in the field look of the selects beside them', () => {
+    const panel = read('panel.tsx')
+    const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("{preferences.tab === 'log' ? ("))
+    const custom = /<PopoverTrigger asChild>\s*<Button([^>]*?)>/u.exec(row)?.[1] ?? ''
+    expect(custom).toContain('variant="field"')
+    expect(custom).not.toContain('aria-pressed:border')
+    const purpose = /<DropdownMenuTrigger asChild>\s*<Button([^>]*?)>/u.exec(row)?.[1] ?? ''
+    expect(purpose).toContain('variant="field"')
+    expect(row).not.toContain('variant="outline"')
+  })
+})

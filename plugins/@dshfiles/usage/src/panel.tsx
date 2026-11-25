@@ -307,12 +307,13 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                     })
                   }
                 />
+                {/* A trigger that shows a value (the range) takes the field look of the selects beside it; the range
+                    replacing "Custom" is the pressed cue (council round 7, D3 / A4). */}
                 <Popover open={customOpen} onOpenChange={setCustomOpen}>
                   <PopoverTrigger asChild>
                     <Button
-                      variant="outline"
+                      variant="field"
                       aria-pressed={preferences.preset === 'custom'}
-                      className="dshx:aria-pressed:border-foreground/30 dshx:aria-pressed:bg-muted"
                       onClick={() => {
                         if (preferences.preset === 'custom') return
                         update({
@@ -377,7 +378,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                 {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" aria-label={`Purpose: ${purposeSummary}`}>
+                    <Button variant="field" aria-label={`Purpose: ${purposeSummary}`}>
                       <span className="dshx:text-muted-foreground">Purpose:</span>
                       {purposeSummary}
                       <ChevronDownIcon aria-hidden />
