@@ -1,39 +1,76 @@
 /**
- * One glyph per Settings category (round five B5, B6): the desktop column draws it at 16px in muted ink beside each
- * row, the phone root list as a 28px identity tile. Published as the `@dshfiles/settings-shell/settings-icons` dshx
- * module, so the thread sidebar's Settings column draws the same glyph the page does without restating the table.
+ * One glyph per Settings category (round five B5, B6): the desktop column draws it at 16px beside each row, the phone
+ * root list as a 28px identity tile. Published as the `@dshfiles/settings-shell/settings-icons` dshx module, so the
+ * thread sidebar's Settings column draws the same glyph the page does without restating the table.
+ *
+ * Council round 6 B3, B4: every item has its own glyph (Models and Model picker, MCP servers and MCP endpoint no longer
+ * share one), and both the column glyph and the phone tile take their group's tone, one tone per group.
  */
 import {
+  AppWindowIcon,
+  ArchiveIcon,
   BellIcon,
+  BlocksIcon,
+  BookOpenIcon,
   BotIcon,
   BrainIcon,
+  ChevronsUpDownIcon,
+  CircleArrowUpIcon,
   CircleDashedIcon,
   CodeIcon,
+  CompassIcon,
   CpuIcon,
+  EraserIcon,
   FileTextIcon,
+  FileUpIcon,
+  FolderGit2Icon,
   FolderIcon,
+  GitPullRequestIcon,
   GlobeIcon,
+  HistoryIcon,
+  IdCardIcon,
   InfoIcon,
   KeyboardIcon,
   KeyRoundIcon,
+  LanguagesIcon,
+  LayersIcon,
+  LayoutGridIcon,
+  ListChecksIcon,
   ListIcon,
+  ListTodoIcon,
+  MessageSquarePlusIcon,
   MessageSquareTextIcon,
+  NetworkIcon,
+  PackageIcon,
   PaletteIcon,
+  PanelBottomIcon,
   PanelsTopLeftIcon,
   PlugIcon,
   PuzzleIcon,
+  RadioTowerIcon,
   RefreshCwIcon,
+  RepeatIcon,
+  ScanTextIcon,
+  ScrollTextIcon,
   ServerIcon,
+  ShapesIcon,
+  Share2Icon,
+  ShieldCheckIcon,
   ShieldIcon,
   SlidersHorizontalIcon,
   SquarePenIcon,
+  SquareTerminalIcon,
+  StethoscopeIcon,
+  StoreIcon,
   TimerIcon,
-  UserRoundIcon,
+  UsersRoundIcon,
+  WorkflowIcon,
   WrenchIcon,
+  ZapIcon,
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { createElement } from 'react'
+import { createElement, type CSSProperties } from 'react'
 
 /** A category's group, as Settings groups its entries. */
 export type SettingsIconGroup =
@@ -50,21 +87,91 @@ export type SettingsIconGroup =
   | 'other'
   | 'pages'
 
-/** What a category is about, read from its name first; its group's glyph otherwise. */
+/** The entries Settings places, by their exact (lower-case) name: one glyph each, never repeated in the column. */
+const BY_LABEL: ReadonlyMap<string, LucideIcon> = new Map([
+  // General
+  ['general', SlidersHorizontalIcon],
+  ['appearance', PaletteIcon],
+  ['keyboard shortcuts', KeyboardIcon],
+  ['thread list', ListIcon],
+  ['layout', PanelsTopLeftIcon],
+  ['status bar', PanelBottomIcon],
+  ['composer', SquarePenIcon],
+  ['transcript', MessageSquareTextIcon],
+  ['editor', CodeIcon],
+  ['archived threads', ArchiveIcon],
+  ['language', LanguagesIcon],
+  // Models & accounts: the accounts list and the one DeepSeek sign-in read apart.
+  ['ai accounts', UsersRoundIcon],
+  ['models', CpuIcon],
+  ['model picker', ChevronsUpDownIcon],
+  ['deepseek account', IdCardIcon],
+  ['account', IdCardIcon],
+  // Agents
+  ['agent definitions', BotIcon],
+  ['agents', BotIcon],
+  ['agent presets', LayersIcon],
+  ['subagents', WorkflowIcon],
+  ['background jobs', TimerIcon],
+  ['memory', BrainIcon],
+  ['agent loop', RepeatIcon],
+  // Tools & MCP: the servers agents call, and the endpoint DSH serves.
+  ['mcp servers', PlugIcon],
+  ['mcp endpoint', RadioTowerIcon],
+  ['web search and fetch', GlobeIcon],
+  ['jev', ScanTextIcon],
+  // Projects & workspaces
+  ['projects', FolderIcon],
+  ['new thread', MessageSquarePlusIcon],
+  ['thread workspaces', FolderGit2Icon],
+  ['repository history', HistoryIcon],
+  ['checks and tests', ListChecksIcon],
+  ['preview and dev servers', AppWindowIcon],
+  ['backlog', ListTodoIcon],
+  ['pull requests', GitPullRequestIcon],
+  ['automations', ZapIcon],
+  // Hosts & network
+  ['hosts', ServerIcon],
+  ['network access', NetworkIcon],
+  ['thread sharing', Share2Icon],
+  // Security
+  ['secrets', KeyRoundIcon],
+  ['policies', ScrollTextIcon],
+  ['shell sandbox', SquareTerminalIcon],
+  ['thread cleanup', EraserIcon],
+  ['thread log sharing', FileUpIcon],
+  ['permission presets', ShieldCheckIcon],
+  // Notifications
+  ['thread notifications', BellIcon],
+  // Plugins: what ships built in, what is installed, and where more come from.
+  ['built-in plugins', PuzzleIcon],
+  ['installed plugins', PackageIcon],
+  ['plugins', PackageIcon],
+  ['plugin market', StoreIcon],
+  ['plugin updates', CircleArrowUpIcon],
+  ['opencode plugins', BlocksIcon],
+  ['capabilities hub', LayoutGridIcon],
+  ['component gallery', ShapesIcon],
+  ['plugin guide', BookOpenIcon],
+  // About
+  ['update dsh', RefreshCwIcon],
+  ['getting started', CompassIcon],
+  ['diagnostics', StethoscopeIcon],
+])
+
+/** What a category nobody listed is about, read from its name; its group's glyph otherwise. */
 const BY_NAME: ReadonlyArray<readonly [RegExp, LucideIcon]> = [
-  [/^general$|interface/u, SlidersHorizontalIcon],
-  [/appearance|theme|colou?r/u, PaletteIcon],
-  [/keyboard|shortcut/u, KeyboardIcon],
-  [/thread list|sidebar/u, ListIcon],
-  [/layout|pane|tabs/u, PanelsTopLeftIcon],
-  [/composer|prompt/u, SquarePenIcon],
-  [/transcript|chat|turn/u, MessageSquareTextIcon],
-  [/editor/u, CodeIcon],
-  [/account/u, UserRoundIcon],
+  [/interface/u, SlidersHorizontalIcon],
+  [/theme|colou?r/u, PaletteIcon],
+  [/shortcut/u, KeyboardIcon],
+  [/sidebar/u, ListIcon],
+  [/pane|tabs/u, PanelsTopLeftIcon],
+  [/prompt/u, SquarePenIcon],
+  [/chat|turn/u, MessageSquareTextIcon],
+  [/account/u, UsersRoundIcon],
   [/model/u, CpuIcon],
-  [/subagent|agent/u, BotIcon],
-  [/background job|job/u, TimerIcon],
-  [/memory/u, BrainIcon],
+  [/agent/u, BotIcon],
+  [/job/u, TimerIcon],
   [/mcp/u, PlugIcon],
   [/web|search|fetch/u, GlobeIcon],
   [/secret|key/u, KeyRoundIcon],
@@ -72,7 +179,7 @@ const BY_NAME: ReadonlyArray<readonly [RegExp, LucideIcon]> = [
   [/notification/u, BellIcon],
   [/plugin|market|capabilit/u, PuzzleIcon],
   [/update|release/u, RefreshCwIcon],
-  [/project|workspace|backlog|repositor/u, FolderIcon],
+  [/project|workspace|repositor/u, FolderIcon],
   [/host|network|machine/u, ServerIcon],
 ]
 
@@ -91,56 +198,70 @@ const BY_GROUP = {
   pages: FileTextIcon,
 } as const satisfies Record<SettingsIconGroup, LucideIcon>
 
+/** The secondary ink: the groups the ramp leaves neutral (Developer, Pages, About and the rest). */
+const NEUTRAL = 'var(--dsw-alias-label-secondary)'
+
 /**
- * Each group's identity tone for the phone tiles (DESIGN.md › Colour roles: identity tells things apart and never says
- * state), skipping the green and amber tones that sit near the status hues. Literal classes, so the stylesheet owner
- * sees them: a 14% tile of the tone with the glyph in the tone.
+ * Each group's identity tone (DESIGN.md › Colour roles: identity tells things apart and never says state), one per group
+ * on the council's ramp (round 6 B3): General sky, Models & accounts violet, Agents rose, Tools & MCP orange, Projects
+ * olive, Security slate, Plugins teal; the rest neutral. Slate is the sky step greyed into the secondary ink in sRGB,
+ * so it stays on the kit's tokens in both schemes. Green and amber are skipped: they sit near the status hues.
  */
-const TILE_TONE = {
-  general: 'dshx:bg-identity-7/14 dshx:text-identity-7',
-  models: 'dshx:bg-identity-2/14 dshx:text-identity-2',
-  agents: 'dshx:bg-identity-3/14 dshx:text-identity-3',
-  tools: 'dshx:bg-identity-1/14 dshx:text-identity-1',
-  projects: 'dshx:bg-identity-6/14 dshx:text-identity-6',
-  hosts: 'dshx:bg-identity-7/14 dshx:text-identity-7',
-  security: 'dshx:bg-identity-4/14 dshx:text-identity-4',
-  notifications: 'dshx:bg-identity-3/14 dshx:text-identity-3',
-  plugins: 'dshx:bg-identity-2/14 dshx:text-identity-2',
-  about: 'dshx:bg-identity-1/14 dshx:text-identity-1',
-  other: 'dshx:bg-identity-6/14 dshx:text-identity-6',
-  pages: 'dshx:bg-identity-1/14 dshx:text-identity-1',
+const TONE = {
+  general: 'var(--dshx-identity-7)',
+  models: 'var(--dshx-identity-2)',
+  agents: 'var(--dshx-identity-4)',
+  tools: 'var(--dshx-identity-3)',
+  projects: 'var(--dshx-identity-6)',
+  hosts: NEUTRAL,
+  security: `color-mix(in srgb, var(--dshx-identity-7) 45%, ${NEUTRAL})`,
+  notifications: NEUTRAL,
+  plugins: 'var(--dshx-identity-1)',
+  about: NEUTRAL,
+  other: NEUTRAL,
+  pages: NEUTRAL,
 } as const satisfies Record<SettingsIconGroup, string>
 
 const isGroup = (group: string): group is SettingsIconGroup => Object.hasOwn(BY_GROUP, group)
 
+/** A group's tone, as a CSS colour value. */
+const toneOf = (group: string): string => (isGroup(group) ? TONE[group] : NEUTRAL)
+
+/** The custom property the glyph and tile classes read, set per element to its group's tone. */
+const toneStyle = (group: string): CSSProperties & Record<'--settings-tone', string> => ({ '--settings-tone': toneOf(group) })
+
 /** The glyph of one category: by its name, else by its group's. */
 const glyphOf = (entry: { readonly label: string; readonly group: string }): LucideIcon => {
   const name = entry.label.trim().toLowerCase()
-  const named = BY_NAME.find(([pattern]) => pattern.test(name))?.[1]
+  const named = BY_LABEL.get(name) ?? BY_NAME.find(([pattern]) => pattern.test(name))?.[1]
   return named ?? (isGroup(entry.group) ? BY_GROUP[entry.group] : CircleDashedIcon)
 }
 
-/** The desktop column's mark: 16px, muted ink, decorative (the row's label names it). */
+/** The desktop column's mark: 16px in its group's tone, decorative (the row's label names it). */
 export const SettingsEntryGlyph = (props: { readonly label: string; readonly group: string; readonly className?: string }): JSX.Element => (
-  <span aria-hidden="true" data-settings-glyph="" className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground', props.className)}>
+  <span
+    aria-hidden="true"
+    data-settings-glyph={props.group}
+    className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:text-(--settings-tone)', props.className)}
+    style={toneStyle(props.group)}
+  >
     {createElement(glyphOf(props), { className: 'dshx:size-4', strokeWidth: 1.5 })}
   </span>
 )
 
-/** The phone root list's mark: a 28px tile in its group's identity tone with a 16px glyph, decorative. */
+/** The phone root list's mark: a 28px tile, 14% of its group's tone, with the 16px glyph in the tone; decorative. */
 export const SettingsEntryTile = (props: { readonly label: string; readonly group: string }): JSX.Element => (
-    <span
-      aria-hidden="true"
-      data-settings-tile={props.group}
-      className={cn(
-        'dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md',
-        isGroup(props.group) ? TILE_TONE[props.group] : TILE_TONE.other,
-      )}
-    >
-      {createElement(glyphOf(props), { className: 'dshx:size-4', strokeWidth: 1.75 })}
-    </span>
+  <span
+    aria-hidden="true"
+    data-settings-tile={props.group}
+    className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-(--settings-tone)/14 dshx:text-(--settings-tone)"
+    style={toneStyle(props.group)}
+  >
+    {createElement(glyphOf(props), { className: 'dshx:size-4', strokeWidth: 1.75 })}
+  </span>
 )
 
 export class SettingsIcons {
   static readonly glyphOf = glyphOf
+  static readonly toneOf = toneOf
 }
