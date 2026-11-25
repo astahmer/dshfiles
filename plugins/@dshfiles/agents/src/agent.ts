@@ -235,15 +235,31 @@ export class Agents {
    */
   static openingMessage(input: { readonly agent: AgentIdentity; readonly text: string; readonly fallback: string }): string {
     const task = input.text.trim() === '' ? input.fallback : input.text.trim()
-    const header = [`Work as @${input.agent.handle} — ${input.agent.name}.`, input.agent.description].filter(line => line.trim() !== '').join('\n')
-    const instructions = input.agent.instructions.trim()
-    const routine = Agents.routineSection(input.agent.routine ?? '')
-    const separator = '\n\n---\n\n'
-    const preamble = [instructions, routine].filter(section => section !== '').join('\n\n')
+    const { header, preamble, separator } = Agents.openingParts(input.agent)
     if (preamble === '') return clip(`${header}${separator}${task}`, MAX_MESSAGE_CHARS)
     const room = MAX_MESSAGE_CHARS - header.length - '\n\n'.length - separator.length - task.length
     if (room <= 0) return clip(`${header}${separator}${task}`, MAX_MESSAGE_CHARS)
     return `${header}\n\n${clip(preamble, room)}${separator}${task}`
+  }
+
+  /**
+   * A message the person typed, opened the way a dispatch opens: identity, instructions, then their text exactly as
+   * written. Nothing of the text is clipped or trimmed (the composer has no dispatch length limit); only the preamble
+   * keeps its own bound.
+   */
+  static introducedMessage(input: { readonly agent: AgentIdentity; readonly text: string }): string {
+    const { header, preamble, separator } = Agents.openingParts(input.agent)
+    const intro = preamble === '' ? header : `${header}\n\n${clip(preamble, MAX_MESSAGE_CHARS)}`
+    return `${intro}${separator}${input.text}`
+  }
+
+  /** The identity line, the instructions-and-routine preamble and the separator before the task. */
+  private static openingParts(agent: AgentIdentity) {
+    const header = [`Work as @${agent.handle} — ${agent.name}.`, agent.description].filter(line => line.trim() !== '').join('\n')
+    const instructions = agent.instructions.trim()
+    const routine = Agents.routineSection(agent.routine ?? '')
+    const preamble = [instructions, routine].filter(section => section !== '').join('\n\n')
+    return { header, preamble, separator: '\n\n---\n\n' }
   }
 
   /**

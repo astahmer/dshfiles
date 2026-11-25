@@ -8,6 +8,10 @@
 
 <img alt="Choose an agent's tools at 390 px" src="docs/screenshots/agent-tools-tree-narrow.png" width="260">
 
+![Start a new thread as the project's default agent](docs/screenshots/composer-agent.png)
+
+![See and switch a running thread's tools](docs/screenshots/thread-tools.png)
+
 Persistent, mentionable agents. An agent is saved configuration — identity, instructions, model
 route and Agent preset — that dispatches an **ordinary DSH thread** when you mention its handle
 where a thread starts.
@@ -115,12 +119,14 @@ follows [DESIGN.md](../../../DESIGN.md).
 
 ## Surfaces
 
-| Surface              | Behavior                                                                                                                                                                                                                                        |
-| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agents sidebar panel | List, create (blank or from a template), edit, duplicate, enable/disable and remove agents with undo (the built-in `@dsh` is not removable), choose tools, subagents and default projects, start a thread, and open a thread the agent started. |
-| `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                                                                                                                   |
-| Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in), and the [tool access](#tool-access) tools.                                                                                        |
-| Mention preview      | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                                                                                                                             |
+| Surface               | Behavior                                                                                                                                                                                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agents sidebar panel  | List, create (blank or from a template), edit, duplicate, enable/disable and remove agents with undo (the built-in `@dsh` is not removable), choose tools, subagents and default projects, start a thread, and open a thread the agent started. |
+| `@` menu              | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                                                                                                                   |
+| Agent tools           | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in), and the [tool access](#tool-access) tools.                                                                                        |
+| Mention preview       | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                                                                                                                             |
+| New-thread agent chip | "as @reviewer" in a new thread's composer: the agent the thread starts as. See [Composer](#composer).                                                                                                                                           |
+| Tools control         | A wrench "@reviewer" in a running thread's composer: its agent, where it came from and whose tools apply. See [Composer](#composer).                                                                                                            |
 
 ## Tool access
 
@@ -179,6 +185,41 @@ fresh child starts as:
 4. `list_subagent_models` with no arguments lists the agents the caller may start, the default, and how to change it.
 
 A child started this way is not added to the agent's thread list (that list holds dispatches).
+
+## Composer
+
+Both controls sit in the composer's left tool row (`conversation.input.left`), from `src/composer-wiring.tsx`.
+
+**A new thread starts as the project's default agent.** The chip shows the agent a new thread starts as: a message that
+starts with an `@agent` mention → the agent picked in the chip for this one thread → the project's default agent (a
+thread workspace counts for its project) → `@dsh` (`ComposerAgent.resolve`, `src/composer-agent.ts`). It shows once the
+project has a default, a pick was made, or any enabled agent of the person's own exists; someone without agents never
+sees it. Its menu switches this one thread to another agent or `@dsh`, and **Make @x this project's default** / **Stop
+using @x as this project's default** set or clear the default (`setProjectDefault`, the same
+`agents_project_default_set` the Agent has).
+
+The first send applies it the way a dispatch does, through rich-composer's `composer-send` registry
+(`src/composer-agent-preparer.ts`): the agent's Agent preset (staged on a local draft, else `agentPresets.select` on
+the blank Session), its model route unless the person picked a model for the draft, a thread title from the request,
+and an opening message from `AgentDispatch.composerMessage` (identity, instructions and routine, then the text exactly
+as typed). The Host decides the project default (or `@dsh`) itself when the thread's agent attaches, so the thread's
+agent is recorded (`recordThreadAgent`) only when it differs from that decision — a pick, a mention, or a blank Session
+the Host already decided before the project got its default. A slash command as the first message is sent as typed. A
+Host step that fails is logged and skipped; the message still goes out. The pick is page state of one draft (no tool).
+
+**A running thread shows its tools.** The Tools control names the thread's agent and how it was decided (agent,
+project default, override, default; "decided at its next request" while the Host has not recorded it yet). Its menu
+switches this thread to another agent's tools or **All tools**, and **Reset to @x's tools** clears the override
+(`threadAccess`, `setThreadOverride` / `agents_thread_override_set`). It says that the change applies from the
+thread's next request.
+
+Both menus open on a click or Enter/Space, not on pointer-down: on a phone the kit shows a menu as a sheet over the
+composer, and a pointer-down open let the finger's release choose the row under it. At pane-narrow widths the chip
+drops "as" and the Tools control shows its wrench alone (its accessible name keeps the words); touch targets are 44 px.
+
+| Composer at 390 px                                                                        | Tools at 390 px                                                                  |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| ![The agent chip's menu as a sheet at 390 px](docs/screenshots/composer-agent-narrow.png) | ![The Tools menu as a sheet at 390 px](docs/screenshots/thread-tools-narrow.png) |
 
 ## Decisions
 

@@ -1253,6 +1253,12 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
+      '@dshfiles/session-controller':
+        specifier: workspace:*
+        version: link:../session-controller
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime

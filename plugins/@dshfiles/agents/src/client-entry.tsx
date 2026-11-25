@@ -21,6 +21,7 @@ import { AgentReference } from './agent-reference.js'
 import { agentUserTextRule } from './agent-user-text.js'
 import { AgentReferenceDecorations, AgentReferencePreview } from './agent-reference-preview.jsx'
 import { AgentsPanel, type AgentsPanelProps } from './agents-panel.js'
+import { registerComposerAgent } from './composer-wiring.js'
 import { agentsApi } from './api.js'
 import { AgentDispatch, type AgentDispatchRequest, type AgentModelSelection, type AgentThreadCreation } from './dispatch.js'
 
@@ -48,6 +49,7 @@ export default defineClient({
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'agent', priority: 100 }, AgentMentionChip),
     )
     const api = createApiClient(ctx, agentsApi)
+    registerComposerAgent({ ctx, decorate, plugin: metadata?.plugin })
 
     const startThread = async (request: AgentDispatchRequest): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> => {
       const target = AgentDispatch.creationArgs(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId)

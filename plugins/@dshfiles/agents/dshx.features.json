@@ -582,6 +582,164 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "composer-agent",
+      "title": "Start a new thread as the project's default agent",
+      "summary": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the person picked a model for the draft), the recorded thread agent and an opening message with its instructions ahead of the text as typed. The chip's menu switches this one thread to another agent or @dsh, and makes the shown agent the project's default or stops it being one; a message that starts with an @agent mention runs as that agent instead.",
+      "surfaces": ["client", "host", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: new-thread agent chip",
+      "configuration": [],
+      "states": ["hidden", "project-default", "picked", "mentioned", "sent"],
+      "failureModes": [
+        "Someone with no agents of their own and no project default sees no chip; the composer is unchanged.",
+        "A preset, model or record step the Host refuses is logged and skipped; the message still goes out with the agent's instructions.",
+        "A slash command as the first message is sent as typed and leaves the thread's agent undecided.",
+        "A project default that names a removed or disabled agent falls back to @dsh, as the Host's resolution does."
+      ],
+      "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "In a new thread, open the \"as @agent\" chip beside the composer's tools and make an agent this project's default.",
+        "doneWhen": "New threads in that project start as that agent without picking it."
+      },
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-project-default",
+          "file": "plugins/@dshfiles/agents/src/composer-agent.test.ts",
+          "testName": "starts a new thread as the project default agent with no manual step"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-mention-wins",
+          "file": "plugins/@dshfiles/agents/src/composer-agent.test.ts",
+          "testName": "a leading mention wins over the pick and the project default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-first-send",
+          "file": "plugins/@dshfiles/agents/src/composer-agent-preparer.test.ts",
+          "testName": "starts the thread as the project default agent: preset, model and instructions, no manual step"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-chip",
+          "file": "plugins/@dshfiles/agents/src/composer-agent-chip.test.tsx",
+          "testName": "shows the project default agent with no manual step"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-send-preparers",
+          "file": "plugins/@dshfiles/rich-composer/src/draft-retry.test.ts",
+          "testName": "send the first message of a blank Session as the preparers rewrote it"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.composer-agent-no-gherkin-journey",
+          "reason": "Its reach steps walk it on a scratch DSH with dshx dev open (create an agent, pick it in the chip, make it the project default); the resolution order, the first send and the chip states are unit-tested, and the send hook itself in rich-composer's draft-retry.test.ts through the real composer shell."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "reach": [
+        "click tab \"Agents\"",
+        "expect text \"Start from a template\"",
+        "click button \"Reviews diffs and pull requests*\"",
+        "expect textbox \"Instructions\"",
+        "click button \"Create agent\"",
+        "expect text \"Saved.\"",
+        "click button \"New thread\"",
+        "click button \"New thread runs as @dsh (default). Change agent\"",
+        "click text \"@reviewer\"",
+        "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+        "click menuitem \"Make @reviewer this project’s default\"",
+        "expect button \"New thread runs as @reviewer (project default). Change agent\"",
+        "click button \"New thread\"",
+        "click button \"New thread runs as @reviewer (project default). Change agent\"",
+        "expect menuitem \"Stop using @reviewer as this project’s default\""
+      ]
+    },
+    {
+      "id": "thread-tools",
+      "title": "See and switch a running thread's tools",
+      "summary": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread's next request, the same agents_thread_override_set the Agent has.",
+      "surfaces": ["client", "host", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Tools control",
+      "configuration": [],
+      "states": ["agent", "project-default", "override", "default", "preview"],
+      "failureModes": [
+        "An override naming an agent removed meanwhile is refused with a sentence to pick another one or reset; nothing changes.",
+        "A thread whose agent is not decided yet shows the preview its next request would decide."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-tools-state",
+          "file": "plugins/@dshfiles/agents/src/thread-tools-model.test.ts",
+          "testName": "names the agent, its source and its own tools"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-tools-request",
+          "file": "plugins/@dshfiles/agents/src/thread-tools-model.test.ts",
+          "testName": "maps a choice to the override; picking the thread agent clears it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-tools-control",
+          "file": "plugins/@dshfiles/agents/src/composer-agent-chip.test.tsx",
+          "testName": "shows an all-tools override"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.thread-tools-no-gherkin-journey",
+          "reason": "Its reach steps send a first message as the project default agent on a scratch DSH (the opening message shows its instructions) and open the Tools control; the control's states and the override request are unit-tested, and the override write is the existing agents_thread_override_set method."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "reach": [
+        "click tab \"Agents\"",
+        "expect text \"Start from a template\"",
+        "click button \"Reviews diffs and pull requests*\"",
+        "expect textbox \"Instructions\"",
+        "click button \"Create agent\"",
+        "expect text \"Saved.\"",
+        "click button \"New thread\"",
+        "click button \"New thread runs as @dsh (default). Change agent\"",
+        "click text \"@reviewer\"",
+        "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+        "click menuitem \"Make @reviewer this project’s default\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Review the open diff\"",
+        "press Enter",
+        "expect text \"Review the change for correctness first*\"",
+        "click button \"Tools: *\"",
+        "click menuitemradio \"All tools\"",
+        "expect button \"Tools: All tools*\"",
+        "click button \"Tools: *\"",
+        "expect menuitem \"Reset to @reviewer’s tools\""
+      ]
     }
   ]
 }
