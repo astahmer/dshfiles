@@ -51,7 +51,12 @@ export const AccountGroup = (props: {
                 !selected && 'dshx:hover:border-muted-foreground/40',
               )}
             >
-              <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-3', selected && 'dshx:bg-selected-wash dshx:text-foreground')}>
+              <div
+                className={cn(
+                  'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-3',
+                  selected && 'dshx:bg-selected-wash dshx:text-foreground dshx:selected-marker',
+                )}
+              >
                 <button
                   aria-current={selected ? 'true' : undefined}
                   aria-label={`Select ${profile.displayName}`}
@@ -59,9 +64,9 @@ export const AccountGroup = (props: {
                   onClick={() => props.onSelect(profile.instanceId)}
                   type="button"
                 >
-                  <ProviderGlyph kind={profile.kind} />
+                  <ProviderGlyph kind={profile.kind} list />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
-                    <strong className="dshx:truncate dshx:text-sm dshx:font-semibold">{profile.displayName}</strong>
+                    <strong className={cn('dshx:truncate dshx:text-sm', selected ? 'dshx:font-selected' : 'dshx:font-medium')}>{profile.displayName}</strong>
                     <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground">{identity || signIn}</span>
                   </span>
                 </button>

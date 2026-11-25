@@ -74,13 +74,14 @@ export const AccountsPanel = (props: {
       <Page
         data-account-dashboard
         scroll
-        className="dshx:bg-muted/10"
+        width="wide"
+        className="dshx:surface-stage"
         heading="AI accounts"
         description="Manage your accounts and model settings."
         count={accountsPageCount({ accounts: state.file.accounts, native: nativeProviders.data })}
         primaryAction={{ id: 'add-account', label: 'Add account', icon: <PlusIcon aria-hidden />, onSelect: addAccount }}
       >
-        <div className="dshx:mx-auto dshx:grid dshx:w-full dshx:max-w-[1680px] dshx:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] dshx:items-start dshx:gap-6 dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-narrow:gap-4">
+        <div className="dshx:grid dshx:w-full dshx:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] dshx:items-start dshx:gap-6 dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-narrow:gap-4">
           <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
             <AccountsToolbar file={state.file} onSearchChange={setSearch} search={search} state={state} />
             <AccountRail
@@ -132,7 +133,7 @@ export const AccountsPanel = (props: {
                   : 'Select an account to manage its models, settings and usage.'}
               </EmptyState>
             )}
-            <details className="dshx:rounded-lg dshx:border dshx:bg-card dshx:px-4 dshx:py-2.5">
+            <details className="dshx:disclosure dshx:rounded-lg dshx:border dshx:bg-card dshx:px-4 dshx:py-2.5">
               <summary className="dshx:cursor-pointer dshx:text-xs dshx:text-muted-foreground">Quota recovery</summary>
               <QuotaContinuations accountId={state.selectedId} />
             </details>

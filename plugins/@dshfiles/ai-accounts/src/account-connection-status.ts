@@ -1,4 +1,5 @@
 import type { Health } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 import type { AccountProfile, AccountsUsage } from './api.js'
 
 /** Local credentials are not a token-validity probe. Only authenticated provider data earns Connected. */
@@ -58,7 +59,8 @@ const accountConnectionStatus = (account: AccountProfile, usage: AccountsUsage |
 }
 
 type ConnectionStatus = ReturnType<typeof accountConnectionStatus>
-const clockTime = (at: number): string => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+/** The kit clock, so the last check reads like the transcript's turn times (council round 5, D2). */
+const clockTime = (at: number): string => formatClockTime(at)
 
 /**
  * The one word of state in the account header, drawn after its health dot ("Connected"). The text is muted while

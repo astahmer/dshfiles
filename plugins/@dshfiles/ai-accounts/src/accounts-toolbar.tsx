@@ -43,18 +43,21 @@ export const AccountsToolbar = (props: {
     <div ref={headerRef} className="dshx:flex dshx:flex-col dshx:pb-1">
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
         <div className="dshx:relative dshx:min-w-0 dshx:flex-1">
-          <SearchIcon aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:top-3 dshx:left-3 dshx:size-4 dshx:text-muted-foreground" />
+          <SearchIcon
+            aria-hidden
+            className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-3 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
+          />
           <Input
             aria-label="Search accounts and known models"
             aria-keyshortcuts="Control+K Meta+K"
-            className="dshx:h-10 dshx:pr-12 dshx:pl-9"
+            className="dshx:pr-12 dshx:pl-9"
             onChange={event => props.onSearchChange(event.target.value)}
             placeholder="Search accounts or models…"
             ref={searchRef}
             type="search"
             value={props.search}
           />
-          <kbd className="dshx:pointer-events-none dshx:absolute dshx:top-2.5 dshx:right-3 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
+          <kbd className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:right-3 dshx:-translate-y-1/2 dshx:rounded dshx:bg-muted dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
             ⌘K
           </kbd>
         </div>

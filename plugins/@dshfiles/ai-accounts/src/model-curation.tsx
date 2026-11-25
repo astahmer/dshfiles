@@ -108,17 +108,20 @@ export const ModelCuration = (props: {
             { value: 'customize', label: 'Customize for this account' },
           ]}
           onValueChange={value => props.onChange({ inheritModelSettings: value === 'inherit' })}
-          triggerClassName="dshx:h-8 dshx:w-56 dshx:text-xs dshx:@max-pane-narrow:w-full"
+          triggerClassName="dshx:w-56 dshx:@max-pane-narrow:w-full"
         />
         <div className="dshx:relative dshx:w-48 dshx:min-w-0 dshx:@max-pane-narrow:w-full">
-          <SearchIcon aria-hidden className="dshx:pointer-events-none dshx:absolute dshx:left-2.5 dshx:top-2 dshx:size-4 dshx:text-muted-foreground" />
+          <SearchIcon
+            aria-hidden
+            className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
+          />
           <Input
             aria-label="Search models"
             type="search"
             placeholder="Search models…"
             value={current.search}
             onChange={event => updateView({ search: event.target.value, expanded: false })}
-            className="dshx:h-8 dshx:pl-8 dshx:text-xs"
+            className="dshx:pl-8"
           />
         </div>
       </div>
@@ -191,8 +194,8 @@ export const ModelCuration = (props: {
                         ...model.efforts.map(effort => ({ value: effort.id, label: effort.name })),
                       ]}
                       onValueChange={value => setEffort(model, value)}
-                      // Quiet text with a chevron, not a boxed field: the value is the default most rows keep (council round 3, D3).
-                      triggerClassName="dshx:h-8 dshx:w-auto dshx:max-w-full dshx:justify-start dshx:border-transparent dshx:bg-transparent dshx:text-xs dshx:shadow-none dshx:hover:bg-accent dshx:dark:bg-transparent dshx:disabled:[&>svg]:hidden"
+                      // The table's one field look, the same as the mode and search fields above it (council round 5, D2).
+                      triggerClassName="dshx:w-40 dshx:max-w-full dshx:disabled:[&>svg]:hidden"
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">

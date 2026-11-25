@@ -100,8 +100,12 @@ export const ModelMark = (props: { readonly modelId: string; readonly className?
   )
 }
 
-/** A built-in provider's 32 px tile, like an account's: the DeepSeek mark for DeepSeek, a neutral cube otherwise. */
-export const NativeProviderMark = (props: { readonly label: string }): JSX.Element => {
+/**
+ * A built-in provider's tile, like an account's: the DeepSeek mark for DeepSeek, a neutral cube otherwise. 32 px in a
+ * detail header, 28 px in a list row (`size="list"`, council round 5 D2).
+ */
+export const NativeProviderMark = (props: { readonly label: string; readonly size?: 'header' | 'list' }): JSX.Element => {
+  const list = props.size === 'list'
   const deepseek = modelFamily(props.label) === 'deepseek'
   return (
     <span
@@ -109,12 +113,12 @@ export const NativeProviderMark = (props: { readonly label: string }): JSX.Eleme
       data-native-provider-mark={deepseek ? 'deepseek' : 'generic'}
       className={cn(
         'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-lg',
-        'dshx:size-8',
+        list ? 'dshx:size-7' : 'dshx:size-8',
         deepseek ? 'dshx:text-primary-foreground' : 'dshx:bg-muted dshx:text-muted-foreground',
       )}
       style={deepseek ? { backgroundColor: BRAND_COLOURS.deepseek } : undefined}
     >
-      {deepseek ? <FamilyGlyph family="deepseek" className="dshx:size-5" color="white" /> : <BoxIcon className="dshx:size-4" />}
+      {deepseek ? <FamilyGlyph family="deepseek" className={list ? 'dshx:size-4.5' : 'dshx:size-5'} color="white" /> : <BoxIcon className="dshx:size-4" />}
     </span>
   )
 }

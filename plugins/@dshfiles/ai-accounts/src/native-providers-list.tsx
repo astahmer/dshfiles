@@ -43,7 +43,7 @@ export const NativeProvidersList = (props: {
             <li
               className={cn(
                 'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border/60 dshx:bg-card dshx:px-3 dshx:py-3',
-                props.selectedEntryId === provider.entryId && 'dshx:bg-selected-wash dshx:text-foreground',
+                props.selectedEntryId === provider.entryId && 'dshx:bg-selected-wash dshx:text-foreground dshx:selected-marker',
               )}
               key={provider.entryId}
             >
@@ -54,9 +54,16 @@ export const NativeProvidersList = (props: {
                 onClick={() => props.onSelect?.(provider.entryId)}
                 type="button"
               >
-                <NativeProviderMark label={provider.label} />
+                <NativeProviderMark label={provider.label} size="list" />
                 <span className="dshx:min-w-0">
-                  <strong className="dshx:block dshx:truncate dshx:text-sm dshx:font-semibold">{provider.label}</strong>
+                  <strong
+                    className={cn(
+                      'dshx:block dshx:truncate dshx:text-sm',
+                      props.selectedEntryId === provider.entryId ? 'dshx:font-selected' : 'dshx:font-medium',
+                    )}
+                  >
+                    {provider.label}
+                  </strong>
                   <span className="dshx:mt-1 dshx:block dshx:text-2xs dshx:text-muted-foreground">Built-in provider</span>
                 </span>
               </button>

@@ -33,13 +33,13 @@ describe('AI accounts marks (council round 2, D4)', () => {
     expect(deepseek).toContain('data-native-provider-mark="deepseek"')
     expect(deepseek).not.toContain('lucide-box')
     expect(renderToStaticMarkup(<NativeProviderMark label="Local runtime" />)).toContain('lucide-box')
-    expect(read('native-providers-list.tsx')).toContain('<NativeProviderMark label={provider.label} />')
+    expect(read('native-providers-list.tsx')).toContain('<NativeProviderMark label={provider.label} size="list" />')
     expect(read('native-providers-list.tsx')).not.toContain('<BoxIcon')
   })
 
-  it('draws rail tiles at 32 px in a 260\u2013300 px list column', () => {
-    expect(renderToStaticMarkup(<ProviderGlyph kind="commandcode" />)).toContain('dshx:size-8')
-    expect(renderToStaticMarkup(<NativeProviderMark label="DeepSeek" />)).toContain('dshx:size-8')
+  it('draws rail tiles at 28 px (council round 5, D2) in a 260\u2013300 px list column', () => {
+    expect(renderToStaticMarkup(<ProviderGlyph kind="commandcode" list />)).toContain('dshx:size-7')
+    expect(renderToStaticMarkup(<NativeProviderMark label="DeepSeek" size="list" />)).toContain('dshx:size-7')
     expect(read('accounts-panel.tsx')).toContain('dshx:grid-cols-[minmax(260px,300px)_minmax(0,1fr)]')
   })
 

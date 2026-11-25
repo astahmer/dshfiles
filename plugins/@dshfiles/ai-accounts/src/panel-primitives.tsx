@@ -30,12 +30,13 @@ export const ActionHint = (props: { readonly label: string; readonly children: J
 )
 
 /** Branded marks match the account rail/header, independently of editable picker tags: each provider keeps its colour. */
-export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean }): JSX.Element => (
+export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean; readonly list?: boolean }): JSX.Element => (
   <span
     aria-hidden
     className={cn(
       'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-foreground dshx:text-background dshx:shadow-sm',
-      props.large ? 'dshx:size-16' : 'dshx:size-8',
+      // A list row's mark is 28 px, the detail header's 32 (council round 5, D2).
+      props.large ? 'dshx:size-16' : props.list === true ? 'dshx:size-7' : 'dshx:size-8',
       props.kind === 'opencode-go' && 'dshx:bg-violet dshx:text-primary-foreground',
     )}
     style={
@@ -44,7 +45,7 @@ export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; re
         : undefined
     }
   >
-    <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : 'dshx:size-5'} />
+    <ProviderLogo kind={props.kind} monochrome className={props.large ? 'dshx:size-10' : props.list === true ? 'dshx:size-4.5' : 'dshx:size-5'} />
   </span>
 )
 
