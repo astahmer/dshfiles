@@ -33,8 +33,13 @@ Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: c
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
 rose/amber/green that read as Failed or Warning; the Usage chart is one flat accent slab; sidebar titles cut to about 12
 characters; Settings has three navigation columns; phone dock fragments, double focus ring, status pill over content.
-Lanes: K kit and tokens (running), C transcript and composer (running), P pages (running), T thread list, tabs and
-palette (after K).
+Lanes: K kit and tokens done (11 revisions `ssppouml` … `toulklss`: ProjectMark and status-safe project hues 225, 110, 55,
+305, 340, 195; attention and danger-tint buttons; selected wash; wider surface steps and faint text at AA; 10/14 px status
+marks; one focus ring on compound fields; data ramp from identity hues; softer scrim; page 24 / section 20 / stack 16;
+core switches on control-on; DESIGN.md). Attention text and project letters are pulled toward ink to hold AA (the
+specified #3e5ed8 read 3.8:1 on its tint). C transcript done (5 revisions `orpmprwn` … `qvlnrkrp`: one phone Live work
+row, Back to bottom in its own band, phone composer shows the brand mark and mode icon, prose at 1.62, raised dark code
+cards, ProjectMark on composer chips). P pages and T thread list, tabs and palette running.
 
 ## Round four
 
