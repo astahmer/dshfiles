@@ -1,7 +1,7 @@
 /**
- * One navigation at a time (round five B1, B2). When the stage shows the page a destination's list would only repeat,
- * the left column folds to its rail: Settings, whose page draws its own category list, and a destination with a single
- * page (the Inbox, a 290 px column for one row). The rail keeps that destination's item active. When the page leaves
+ * One navigation at a time (round five B2). When the stage shows the page a destination's list would only repeat, the
+ * left column folds to its rail: a destination with a single page (the Inbox, a 290 px column for one row). Settings
+ * never folds: its column is its one navigation, the categories and pages in one list (council round 4 B1). The rail keeps that destination's item active. When the page leaves
  * the stage, the column opens again, but only if this folded it: a column the person collapsed stays collapsed, and one
  * they opened by hand while the page shows stays open until the page leaves.
  *
@@ -48,7 +48,8 @@ const wants = (input: {
   readonly solePanelId: string | undefined
 }): boolean => {
   if (input.activePanelId === null) return false
-  if (input.folderId === 'settings') return input.activePanelId === input.settingsPanelId
+  // The Settings column is the page's navigation (council round 4 B1): it stays open on every Settings page.
+  if (input.folderId === 'settings') return false
   return input.builtIn && input.solePanelId !== undefined && input.solePanelId === input.activePanelId
 }
 

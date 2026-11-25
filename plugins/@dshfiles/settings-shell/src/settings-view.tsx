@@ -18,6 +18,7 @@ import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
+import { SettingsNavigationModel } from './navigation-state.js'
 
 export interface SectionRow {
   readonly id: string
@@ -71,6 +72,11 @@ export interface SettingsViewProps {
   readonly openPanel: (panelId: string) => void
   /** Absent in a tab the strip closes. */
   readonly onClose: (() => void) | undefined
+  /**
+   * The side column draws the category list (council round 4 B1: one Settings navigation): the page drops its own list
+   * and the entry title the column's selected row already names.
+   */
+  readonly columnNavigation?: boolean
 }
 
 /** A nav entry: name, a mark for a page that opens elsewhere and, while searching, how many matches it holds. */
@@ -296,8 +302,9 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
       {ownHeading && (
-        // In a narrow pane the Sections select right above names the entry, so the title is not printed a second time.
-        <header className="dshx:@max-pane-compact:sr-only">
+        // In a narrow pane the Sections select right above names the entry, and beside the column its selected row does,
+        // so the title is not printed a second time.
+        <header className={props.columnNavigation === true ? 'dshx:sr-only' : 'dshx:@max-pane-compact:sr-only'}>
           <h2 className={SECTION_TITLE_CLASS}>{entry.label}</h2>
         </header>
       )}
@@ -395,8 +402,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   const countOf = (entry: SettingsEntry): number | undefined => {
     if (!searching) return undefined
     // A page that is the whole entry shares its id with it: each id counts once ("Main tabs 2" for one match).
-    const ids = new Set([entry.id, ...(entry.sectionId === undefined ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)])
-    return [...ids].reduce((sum, id) => sum + (result.counts.get(id) ?? 0), 0)
+    return SettingsNavigationModel.matchCount(entry, result.counts)
   }
   // A Pages row (round five B1) opens its stage page; any other entry opens here.
   const openEntry = (id: string): void => {
@@ -502,6 +508,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           />
         </div>
         <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
+          {props.columnNavigation === true ? null : (
           <nav
             aria-label={t('title')}
             className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
@@ -516,6 +523,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
               </div>
             ))}
           </nav>
+          )}
           <div
             className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
             ref={content}

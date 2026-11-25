@@ -41,7 +41,7 @@
         "firstAction": "Open Settings › General › Appearance and pick a preset, or change the accent and the interface font.",
         "doneWhen": "The whole app takes the new colours and fonts at once, light and dark."
       },
-      "reach": ["click button \"Settings\"", "click text \"All settings\"", "click button \"Appearance\"", "expect text \"Colour preset for every surface*\""],
+      "reach": ["click button \"Settings\"", "click button \"Appearance\"", "expect text \"Colour preset for every surface*\""],
       "surfaces": ["client", "host", "settings", "tool"],
       "surface": "settingsSection",
       "destination": "settings",

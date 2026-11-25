@@ -34,8 +34,9 @@ describe('StageFold.step', () => {
 describe('StageFold.wants', () => {
   const base = { builtIn: true, settingsPanelId: 'dshfiles-settings', solePanelId: undefined }
 
-  it('wants Settings folded only while its page is on stage', () => {
-    expect(StageFold.wants({ ...base, folderId: 'settings', activePanelId: 'dshfiles-settings' })).toBe(true)
+  it('never wants the Settings column folded (council round 4 B1)', () => {
+    // The Settings column is the one Settings navigation: it never folds (council round 4 B1).
+    expect(StageFold.wants({ ...base, folderId: 'settings', activePanelId: 'dshfiles-settings' })).toBe(false)
     expect(StageFold.wants({ ...base, folderId: 'settings', activePanelId: 'plugins' })).toBe(false)
     expect(StageFold.wants({ ...base, folderId: 'threads', activePanelId: 'dshfiles-settings' })).toBe(false)
   })

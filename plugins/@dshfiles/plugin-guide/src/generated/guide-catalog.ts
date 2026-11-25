@@ -2540,6 +2540,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "SettingsNavigation",
+      "importFrom": "@dshfiles/settings-shell/settings-navigation",
+      "owner": "@dshfiles/settings-shell",
+      "source": "plugins/@dshfiles/settings-shell/src/settings-navigation.ts:51",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "contract:@dshfiles/settings-shell.navigation",
+      "kind": "contract",
+      "title": "SettingsNavigation",
+      "summary": "Client service contract provided by @dshfiles/settings-shell.",
+      "scope": "client",
+      "mode": "one provider",
+      "registration": "ctx.use(SettingsNavigation) to consume; only @dshfiles/settings-shell provides it",
+      "risk": "additive",
+      "riskNote": "Consuming is additive. Providing it is @dshfiles/settings-shell's job: a second provider would compete with the owner.",
+      "details": [
+        "Contract id: @dshfiles/settings-shell.navigation"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "module:@dshfiles/sidebar-right/resource-panels",
       "kind": "module",
       "title": "@dshfiles/sidebar-right/resource-panels",

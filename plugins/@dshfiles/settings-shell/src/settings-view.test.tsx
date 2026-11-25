@@ -338,3 +338,24 @@ describe('settings view: one grouped page', () => {
     byKeys.unmount()
   })
 })
+
+describe('settings view: one Settings navigation (council round 4 B1)', () => {
+  it('drops its own category list and the entry title the column names while the side column draws the list', () => {
+    const view = mount({ columnNavigation: true, activeId: 'general' })
+    expect(view.host.querySelector('nav[aria-label="title"]')).toBeNull()
+    expect(view.host.querySelector('[data-nav-id]')).toBeNull()
+    // The entry title stays for screen readers; the column's current row names it on screen.
+    expect(view.host.querySelector('[data-settings-entry="general"] header')?.className).toBe('dshx:sr-only')
+    // The page header and the toolbar stay.
+    expect(view.host.querySelector('[data-settings-page-header] h1')).not.toBeNull()
+    expect(view.host.querySelector('[data-settings-toolbar] [role="searchbox"]')).not.toBeNull()
+    view.unmount()
+  })
+
+  it('keeps its own list without a column (a docked pane, no thread sidebar)', () => {
+    const view = mount({ activeId: 'general' })
+    expect(view.host.querySelector('nav[aria-label="title"]')).not.toBeNull()
+    expect(view.host.querySelector('[data-settings-entry="general"] header')?.className).toBe('dshx:@max-pane-compact:sr-only')
+    view.unmount()
+  })
+})

@@ -100,8 +100,13 @@ export const openSettingsDialog = async (page: Page, options?: { readonly timeou
     .first()
   if (!(await launcher.isVisible()) && (await rail.isVisible())) {
     await rail.click(clickOptions)
-    // The Settings destination lists "All settings" first; the page itself opens from there.
-    const all = page.getByRole('button', { name: /^All settings/u }).or(page.getByRole('option', { name: /^All settings/u })).first()
+    // The rail opens the page; a Settings column that lists the categories (council round 4 B1) starts with General,
+    // an older one with "All settings".
+    const all = page
+      .getByRole('button', { name: /^All settings/u })
+      .or(page.getByRole('option', { name: /^All settings/u }))
+      .or(page.getByRole('navigation', { name: 'Settings pages', exact: true }).getByRole('button', { name: 'General', exact: true }))
+      .first()
     if (!(await settingsPage(page).isVisible().catch(() => false))) await all.click(clickOptions)
     // The page stays in the stage; the rail goes back to Threads, as the foot row's launcher left it.
     const threads = destinations.getByRole('tab', { name: 'Threads', exact: true })
@@ -132,10 +137,15 @@ const escapeRegExp = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/
  * One Settings navigation entry by its label, whatever task group holds it. Pass the native shell's label too when it
  * differs ("AI accounts" here, "AI Accounts" natively).
  */
-export const settingsNavEntry = (page: Page, label: string, ...nativeLabels: readonly string[]): Locator =>
-  settingsPage(page)
-    .getByRole('button', { name: new RegExp(`^(?:${[label, ...nativeLabels].map(escapeRegExp).join('|')})$`, 'u') })
+export const settingsNavEntry = (page: Page, label: string, ...nativeLabels: readonly string[]): Locator => {
+  const name = new RegExp(`^(?:${[label, ...nativeLabels].map(escapeRegExp).join('|')})$`, 'u')
+  // The Settings column lists the categories while it shows (council round 4 B1); otherwise the page lists them.
+  return page
+    .getByRole('navigation', { name: 'Settings pages', exact: true })
+    .getByRole('button', { name })
+    .or(settingsPage(page).getByRole('button', { name }))
     .first()
+}
 
 export const reloadPastProviderSetup = async (page: Page): Promise<void> => StartupDialogs.reloadPastProviderSetup(page)
 

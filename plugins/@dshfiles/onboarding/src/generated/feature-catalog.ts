@@ -28646,13 +28646,6 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click text \"All settings\"",
-          "action": "click",
-          "by": "text",
-          "name": "All settings",
-          "value": null
-        },
-        {
           "text": "click button \"Appearance\"",
           "action": "click",
           "by": "button",

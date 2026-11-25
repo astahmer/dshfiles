@@ -224,6 +224,60 @@ describe('Settings workbench sources', () => {
     }
   })
 
+  it('drops its own list while a side column draws it, and reports what it shows to that column (council round 4 B1)', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const groups = createSnapshotStore<readonly GroupedEntries[]>(
+      SettingsGroups.group({ sections: [{ id: 'general', label: 'General', order: 0 }], pages: [page], panels: new Set() }),
+    )
+    const columns = createSnapshotStore(0)
+    const report = vi.fn()
+    const router = createSettingsHubRouter()
+    const Hub = createSettingsWorkbenchHub({
+      groups,
+      router,
+      closeSettings: vi.fn(),
+      columns,
+      report,
+      view: input => ({
+        ...input,
+        rows: [],
+        pluginPages: SettingsGroups.searchablePages(input.groups),
+        shortcuts: [],
+        openPanel: vi.fn(),
+        sectionEntries: [],
+        sectionTarget: undefined,
+        onReveal: vi.fn(),
+        renderSlot: () => null,
+        renderPluginPage: () => null,
+        renderMatches: () => null,
+        sectionOwner: { close: vi.fn() },
+        t: key => key,
+        onSelect: vi.fn(),
+        onSearch: vi.fn(),
+      }),
+    })
+    const host = document.createElement('div')
+    document.body.append(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => root.render(<Hub panelId="settings-one" />))
+      expect(host.querySelector('[data-nav-id="general"]')).not.toBeNull()
+      expect(report).toHaveBeenLastCalledWith({ activeId: undefined, query: '' })
+      await act(async () => columns.set(1))
+      expect(host.querySelector('[data-nav-id="general"]')).toBeNull()
+      await act(async () => {
+        router.open({ sectionId: 'plugin:example' })
+      })
+      expect(report).toHaveBeenLastCalledWith({ activeId: 'plugin:example', query: '' })
+      await act(async () => root.render(<Hub panelId="settings-one" visible={false} />))
+      expect(report).toHaveBeenLastCalledWith(undefined)
+    } finally {
+      await act(async () => root.unmount())
+      host.remove()
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('offers one Settings hub and keeps individual sections/pages registered but hidden from the chooser', () => {
     const state = fixture()
     try {

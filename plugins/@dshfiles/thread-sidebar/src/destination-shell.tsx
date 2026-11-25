@@ -31,7 +31,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import * as Schema from 'effect/Schema'
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import {
   DESTINATION_IDS,
@@ -55,6 +55,8 @@ import { PhoneRailActions, RailActionGroup, type RailAction } from './rail-actio
 import { PhoneDrawer } from './phone-drawer.js'
 import { StageFold, type StageFoldState } from './stage-fold.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
+import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
+import { SettingsColumn, type SettingsColumnRow } from './settings-column.js'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -167,6 +169,11 @@ export interface DestinationShellProps {
   readonly customizeThreads?: { readonly label: string; readonly expanded: boolean; readonly toggle: () => void }
   /** Settings › All settings; null when the Host serves no settings page. */
   readonly openSettings: (() => void) | null
+  /**
+   * Settings' categories (`@dshfiles/settings-shell`): the Settings column lists them with its pages, as the one Settings
+   * navigation (council round 4 B1). Absent, the column lists its pages under All settings.
+   */
+  readonly settingsNavigation?: SettingsNavigationService | undefined
   /** The thread the stage shows, as its title (the phone top bar names the stage). */
   readonly stageTitle?: string | undefined
   /** A thread picked in the list that the stage has not opened yet: the phone bar names it at once. */
@@ -439,7 +446,7 @@ const SectionButton = (props: {
   readonly label: string
   readonly description?: string | undefined
   readonly selected: boolean
-  readonly panelId?: string
+  readonly panelId?: string | undefined
   /** The page's own sidebar glyph, which may carry its badge (RAM's detached memory, the Inbox count). */
   readonly icon?: ReactNode
   readonly onSelect: () => void
@@ -447,6 +454,10 @@ const SectionButton = (props: {
   readonly menu?: ReactNode
   /** Drag the row to another folder or before another row (b:952m). */
   readonly drag?: { readonly onDropBefore: (viewId: string) => void } | undefined
+  /** While Settings searches: the row's matches; none dims it. */
+  readonly count?: number | undefined
+  /** A row under the row above it (a category's settings under its page). */
+  readonly nested?: boolean
 }): JSX.Element => {
   const descriptionId = useId()
   const [dropping, setDropping] = useState(false)
@@ -482,6 +493,8 @@ const SectionButton = (props: {
         className={cn(
           'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+          props.nested === true && 'dshx:pl-6',
+          props.count === 0 && 'dshx:opacity-45',
           // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
           SECTION_ROW_BADGE_ROOM,
           // The open page (round five T3, A1; council round 3 B2): the neutral selected wash and its leading marker, which
@@ -511,6 +524,11 @@ const SectionButton = (props: {
             </span>
           )}
         </span>
+        {props.count === undefined || props.count === 0 ? null : (
+          <span className="dshx:self-center dshx:rounded-full dshx:bg-secondary dshx:px-1.5 dshx:text-2xs dshx:leading-4 dshx:text-muted-foreground dshx:tabular-nums">
+            {props.count}
+          </span>
+        )}
       </button>
       {props.menu === undefined ? null : <div className="dshx:absolute dshx:top-1.5 dshx:right-1">{props.menu}</div>}
     </div>
@@ -544,6 +562,82 @@ const EntryRows = (props: {
   </>
 )
 
+/**
+ * The Settings column (council round 4 B1): Settings' categories by task group and the destination's pages, one list
+ * with no entry twice. While it shows, the Settings page drops its own list (`attach`).
+ */
+const SettingsColumnList = (props: {
+  readonly navigation: SettingsNavigationService
+  readonly folder: RailFolder
+  /** The destination's mapped pages: a category claims its own, the rest follow under Pages. */
+  readonly entries: readonly ResolvedEntry[]
+  readonly activePanelId: string | null
+  readonly openEntry: (entry: ResolvedEntry) => void
+  readonly selectPanel: (panelId: string) => void
+  readonly folderUi: SidebarFolderUi | undefined
+  readonly rows: (entries: readonly ResolvedEntry[]) => JSX.Element
+  readonly addPanel: ReactNode
+}): JSX.Element => {
+  const { navigation, folder, folderUi } = props
+  const state: SettingsNavigationState = useSyncExternalStore(navigation.state.subscribe, navigation.state.get, navigation.state.get)
+  useEffect(() => navigation.attach(), [navigation])
+  const { groups, rest } = useMemo(() => SettingsColumn.merge({ state, entries: props.entries }), [state, props.entries])
+  const open = (row: SettingsColumnRow): void => {
+    if (row.page === undefined) navigation.select(row.id)
+    else if (row.entry !== undefined) props.openEntry(row.entry)
+    else props.selectPanel(row.page)
+  }
+  return (
+    <nav aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col" data-settings-column="">
+      {groups.map(group => (
+        <div
+          key={group.id}
+          role="group"
+          aria-label={group.label}
+          data-settings-group={group.id}
+          className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0"
+        >
+          {group.named ? <h3 className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.label}</h3> : null}
+          {group.rows.map(row => {
+            const here = SettingsColumn.isCurrent(row, { state, activePanelId: props.activePanelId })
+            const category = row.category
+            const settingsHere = category !== undefined && state.activeId === category
+            const entry = row.entry
+            return (
+              <Fragment key={row.id}>
+                <SectionButton
+                  label={row.label}
+                  selected={here}
+                  onSelect={() => open(row)}
+                  count={state.searching ? row.count : undefined}
+                  panelId={entry?.viewId}
+                  menu={folderUi === undefined || entry === undefined ? undefined : <EntryMenu entry={entry} folderId={folder.id} ui={folderUi} />}
+                  drag={
+                    folderUi === undefined || entry === undefined
+                      ? undefined
+                      : { onDropBefore: viewId => folderUi.actions.movePanel(viewId, folder.id, entry.viewId) }
+                  }
+                />
+                {/* The category's own settings, one row under its page while either is the current place. */}
+                {category !== undefined && (here || settingsHere) ? (
+                  <SectionButton nested label={`${row.label} settings`} selected={settingsHere} onSelect={() => navigation.select(category)} />
+                ) : null}
+              </Fragment>
+            )
+          })}
+        </div>
+      ))}
+      {rest.length === 0 ? null : (
+        <div role="group" aria-label="Pages" data-settings-group="pages" className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5">
+          <h3 className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Pages</h3>
+          {props.rows(rest)}
+        </div>
+      )}
+      {props.addPanel}
+    </nav>
+  )
+}
+
 /** One folder's list: its rows, opened in the stage, and + Add panel. Threads shows the thread list instead. */
 const FolderIndex = (props: {
   readonly folder: RailFolder
@@ -558,6 +652,9 @@ const FolderIndex = (props: {
   readonly showDeveloperPages?: boolean | undefined
   /** Settings › Plugins, where a page that did not load is diagnosed. */
   readonly openPlugins?: (() => void) | undefined
+  /** Settings' categories, listed with the Settings pages (council round 4 B1). */
+  readonly settingsNavigation?: SettingsNavigationService | undefined
+  readonly selectPanel: (panelId: string) => void
 }): JSX.Element => {
   const { folder, folderUi } = props
   const [renaming, setRenaming] = useState(false)
@@ -573,6 +670,9 @@ const FolderIndex = (props: {
   // With the Settings page on stage the column folds to the rail (round five B1); opened by hand, this list drops its
   // header line and reads as a plain list of the other Settings pages.
   const settingsOnStage = folder.id === 'settings' && props.activePanelId === SETTINGS_PANEL_ID
+  // The one Settings navigation (council round 4 B1): categories and pages in one list, beside the stage; a phone keeps
+  // its list of pages and the page's own Sections select.
+  const settingsNavigation = folder.id === 'settings' && props.phone !== true ? props.settingsNavigation : undefined
   const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
   const missingPage = Destinations.expectedPageOf(folder.id)
   // Rows are names only (round five B1): the header's one line describes the destination, each page says the rest.
@@ -595,7 +695,7 @@ const FolderIndex = (props: {
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <h2 className={cn('dshx:text-sm dshx:font-semibold', props.phone === true && 'dshx:sr-only')}>{folder.label}</h2>
-          {settingsOnStage ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>}
+          {settingsOnStage || settingsNavigation !== undefined ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>}
         </div>
         {folderUi === undefined || resolved === undefined || props.phone === true ? null : (
           <FolderMenu folder={resolved} ui={folderUi} onRename={() => setRenaming(true)} />
@@ -622,7 +722,19 @@ const FolderIndex = (props: {
             }
           />
         ) : null}
-        {empty && folderUi === undefined ? (
+        {settingsNavigation !== undefined ? (
+          <SettingsColumnList
+            navigation={settingsNavigation}
+            folder={folder}
+            entries={mapped}
+            activePanelId={props.activePanelId}
+            openEntry={props.openEntry}
+            selectPanel={props.selectPanel}
+            folderUi={folderUi}
+            rows={rows}
+            addPanel={folderUi === undefined || resolved === undefined ? null : <AddPanelButton folder={resolved} ui={folderUi} />}
+          />
+        ) : empty && folderUi === undefined ? (
           missingPage === undefined ? <EmptyState>No page here yet. Plugins add their pages to this list.</EmptyState> : null
         ) : (
           <nav aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col dshx:gap-0.5">
@@ -723,6 +835,8 @@ const ListPane = (
       phone={props.phone === true}
       showDeveloperPages={props.showDeveloperPages}
       openPlugins={() => props.selectPanel('plugins')}
+      settingsNavigation={props.settingsNavigation}
+      selectPanel={props.selectPanel}
     />
   )
 

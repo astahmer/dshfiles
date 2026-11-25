@@ -5,6 +5,7 @@ import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
+import { SettingsNavigation } from '@dshfiles/settings-shell/settings-navigation'
 import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
 import {
   AlertDialog,
@@ -479,6 +480,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // phone-pairing's QR (upstream): the rail's Pair a phone (b:kgcc), ⌘K → Pair a phone and, with the rail actions off,
   // a footer button all open it; the rail and ⌘K show it in a dialog.
   const pairingQr = useContract(PhonePairingQr)
+  // Settings' categories, drawn in the Settings column (council round 4 B1).
+  const settingsNavigation = useContract(SettingsNavigation)
   const pairingAvailable = pairingQr.status === 'active'
   const [pairingOpen, setPairingOpen] = useState(false)
   const [footerSnapshot, setFooterSnapshot] = useState(props.readFooterSnapshot)
@@ -1413,6 +1416,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             customizeThreads={{ label: text(props.t, 'threadSidebarSettings'), expanded: customizeOpen, toggle: () => setCustomizeOpen(value => !value) }}
             labels={{ newThread: text(props.t, 'threadSidebarNewThread'), searchThreads: text(props.t, 'threadSidebarSearch') }}
             openSettings={footerSnapshot.settingsId === null ? null : () => requestSettings(props.runCommand)}
+            settingsNavigation={settingsNavigation.status === 'active' ? settingsNavigation.value : undefined}
             toggleSidebar={toggleSidebar}
             record={recordNavigation}
             folderUi={folderUi}

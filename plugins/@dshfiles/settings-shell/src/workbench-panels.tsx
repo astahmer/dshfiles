@@ -71,6 +71,14 @@ export const createSettingsHubRouter = () => {
   }
 }
 
+/** What a shown Settings pane displays: its category and its search. */
+export interface SettingsHubShown {
+  readonly activeId: string | undefined
+  readonly query: string
+}
+
+const NO_COLUMNS: ObservableSnapshot<number> = { getSnapshot: () => 0, subscribe: () => () => undefined }
+
 /**
  * The Settings page as a free-docking pane, with navigation and search owned by this pane rather than the shell actor.
  * Open requests still steer it: without them every caller naming a section landed on General.
@@ -81,6 +89,10 @@ export const createSettingsWorkbenchHub = (sources: {
   readonly initial?: () => SettingsOpenRequest
   readonly view: (input: SettingsWorkbenchHubInput) => Omit<SettingsViewProps, 'onClose'>
   readonly closeSettings: () => void
+  /** How many side columns draw the category list now (council round 4 B1): above 0 the pane drops its own. */
+  readonly columns?: ObservableSnapshot<number> | undefined
+  /** The shown pane's category and query, so the column marks and counts what this pane shows; undefined once hidden. */
+  readonly report?: ((shown: SettingsHubShown | undefined) => void) | undefined
 }): WorkbenchPanelDefinition['component'] =>
   function SettingsWorkbenchHub(props) {
     const groups = useObservable(sources.groups)
@@ -114,6 +126,13 @@ export const createSettingsWorkbenchHub = (sources: {
       if (shown) sources.router.activate(hub)
     }, [shown, hub])
     const close = props.onClose ?? sources.closeSettings
+    const columnNavigation = useObservable(sources.columns ?? NO_COLUMNS) > 0
+    const report = sources.report
+    useEffect(() => {
+      if (!shown || report === undefined) return
+      report({ activeId, query })
+      return () => report(undefined)
+    }, [shown, activeId, query, report])
     const view = sources.view({ groups, activeId, field, query })
     const owner: SettingsSectionOwnerProps & {
       readonly openSection: (sectionId: string) => void
@@ -137,6 +156,7 @@ export const createSettingsWorkbenchHub = (sources: {
         {host !== null && (
           <SettingsTab
             {...view}
+            columnNavigation={columnNavigation}
             host={host}
             sectionOwner={owner}
             sectionTarget={target}

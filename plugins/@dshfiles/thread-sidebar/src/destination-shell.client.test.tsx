@@ -5,6 +5,7 @@ import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DestinationSelection, DestinationShell, type DestinationShellProps } from './destination-shell.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
+import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
 
 /** frame-layout's phone status button (council round 3 B6): absent unless a test provides it. */
 type PhoneStatusStub = { Button: (() => JSX.Element) | undefined }
@@ -46,6 +47,35 @@ const props = (overrides: Partial<DestinationShellProps> = {}): DestinationShell
   record: vi.fn(),
   ...overrides,
 })
+
+/** Settings' category list as `@dshfiles/settings-shell` provides it (council round 4 B1). */
+const settingsState: SettingsNavigationState = {
+  open: true,
+  searching: false,
+  activeId: 'general',
+  groups: [
+    {
+      id: 'general',
+      label: 'General',
+      items: [
+        { id: 'general', label: 'General' },
+        { id: 'plugin:dshfiles-ui-styles', label: 'Appearance' },
+      ],
+    },
+    { id: 'models', label: 'Models & accounts', items: [{ id: 'ai-accounts', label: 'AI accounts', page: 'ai-accounts' }] },
+    { id: 'plugins', label: 'Plugins', items: [{ id: 'link:plugins', label: 'Plugins', page: 'plugins', linkOnly: true }] },
+  ],
+}
+
+const navigationOf = (state: SettingsNavigationState) => {
+  const release = vi.fn()
+  return {
+    state: { get: () => state, subscribe: () => () => undefined },
+    select: vi.fn(),
+    attach: vi.fn(() => release),
+    release,
+  } satisfies SettingsNavigationService & { readonly release: () => void }
+}
 
 const renderShell = (overrides: Partial<DestinationShellProps> = {}) => {
   const shell = props(overrides)
@@ -180,40 +210,79 @@ describe('DestinationShell', () => {
     expect(traces.className).not.toContain('dshx:bg-selected-wash')
   })
 
-  it('shows one Settings navigation: the Settings page on stage folds the column to the rail (round five B1)', () => {
+  it('keeps the Settings column open on every Settings page: it is the one Settings navigation (council round 4 B1)', () => {
     setPhone(false)
     DestinationSelection.set('settings')
-    const shell = props({ activePanelId: 'dshfiles-settings' })
-    const view = render(
-      <TooltipProvider>
-        <DestinationShell {...shell} />
-      </TooltipProvider>,
-    )
-    // The page draws its own category list: the column folds to the rail.
-    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
-    const draw = (overrides: Partial<DestinationShellProps>): void =>
-      view.rerender(
-        <TooltipProvider>
-          <DestinationShell {...shell} {...overrides} />
-        </TooltipProvider>,
-      )
-    draw({ collapsed: true })
-    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('navigation', { name: 'Settings pages' })).toBeNull()
-    // Folded by the stage, the rail keeps its Settings item active.
-    const settings = screen.getByRole('tab', { name: 'Settings' })
-    expect(settings.getAttribute('aria-selected')).toBe('true')
-    expect(settings.querySelector('[data-rail-icon]')?.className).toContain('dshx:bg-nav-tile')
-    expect(document.querySelector('[data-stage-folded]')).not.toBeNull()
-    // The page leaves the stage: the column this folded opens again.
-    draw({ collapsed: true, activePanelId: null })
-    expect(shell.toggleSidebar).toHaveBeenCalledTimes(2)
+    const shell = renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(settingsState) })
+    expect(shell.toggleSidebar).not.toHaveBeenCalled()
+    expect(document.querySelector('[data-stage-folded]')).toBeNull()
+    expect(screen.getByRole('navigation', { name: 'Settings pages' })).toBeTruthy()
   })
 
-  it('opens the folded list again from its own rail item, so the other Settings pages stay one click away', () => {
+  it('lists Settings categories and pages in one list, each once, and the page drops its own list (council round 4 B1)', () => {
     setPhone(false)
     DestinationSelection.set('settings')
-    const shell = props({ activePanelId: 'dshfiles-settings' })
+    const settingsPanels = [...panels, { id: 'ai-accounts', label: 'AI accounts', order: 1 }, { id: 'secret-catalog', label: 'Secrets', order: 2 }]
+    const contributed = [
+      { panelId: 'ai-accounts', destination: 'settings' as const, label: 'AI accounts', order: 0 },
+      { panelId: 'secret-catalog', destination: 'settings' as const, label: 'Secrets', order: 1 },
+    ]
+    const navigation = navigationOf(settingsState)
+    const shell = renderShell({ panels: settingsPanels, contributed, activePanelId: 'dshfiles-settings', settingsNavigation: navigation })
+    const list = screen.getByRole('navigation', { name: 'Settings pages' })
+    const labels = within(list)
+      .getAllByRole('button')
+      .map(button => button.getAttribute('aria-label'))
+    expect(labels).toEqual(['General', 'Appearance', 'AI accounts', 'Plugins', 'Secrets'])
+    expect(screen.queryByRole('button', { name: 'All settings' })).toBeNull()
+    // General's first row names its group; the others keep a heading.
+    expect(within(list).getByRole('group', { name: 'General' }).querySelector('h3')).toBeNull()
+    expect(within(within(list).getByRole('group', { name: 'Models & accounts' })).getByText('Models & accounts')).toBeTruthy()
+    // The page's current category is the column's current row.
+    expect(within(list).getByRole('button', { name: 'General' }).getAttribute('aria-current')).toBe('page')
+    // The column draws the list while it shows: the Settings page drops its own.
+    expect(navigation.attach).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(list).getByRole('button', { name: 'Appearance' }))
+    expect(navigation.select).toHaveBeenCalledWith('plugin:dshfiles-ui-styles')
+    // A category that stands for a page opens the page; one no category claims follows under Pages.
+    fireEvent.click(within(list).getByRole('button', { name: 'AI accounts' }))
+    expect(shell.selectPanel).toHaveBeenCalledWith('ai-accounts')
+    expect(within(within(list).getByRole('group', { name: 'Pages' })).getByRole('button', { name: 'Secrets' })).toBeTruthy()
+    cleanup()
+    expect(navigation.release).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps a page's own category one row under it while the page shows (council round 4 B1)", () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const settingsPanels = [...panels, { id: 'ai-accounts', label: 'AI accounts', order: 1 }]
+    const contributed = [{ panelId: 'ai-accounts', destination: 'settings' as const, label: 'AI accounts', order: 0 }]
+    const navigation = navigationOf({ ...settingsState, open: false, activeId: undefined })
+    renderShell({ panels: settingsPanels, contributed, activePanelId: 'ai-accounts', settingsNavigation: navigation })
+    expect(screen.getByRole('button', { name: 'AI accounts' }).getAttribute('aria-current')).toBe('page')
+    fireEvent.click(screen.getByRole('button', { name: 'AI accounts settings' }))
+    expect(navigation.select).toHaveBeenCalledWith('ai-accounts')
+  })
+
+  it('shows match counts while Settings searches, and dims a category without one', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const searching = {
+      ...settingsState,
+      searching: true,
+      activeId: undefined,
+      groups: settingsState.groups.map(group => ({ ...group, items: group.items.map((item, index) => ({ ...item, count: index === 0 ? 3 : 0 })) })),
+    }
+    renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(searching) })
+    expect(screen.getByRole('button', { name: 'General' }).textContent).toBe('General3')
+    expect(screen.getByRole('button', { name: 'Appearance' }).className).toContain('dshx:opacity-45')
+  })
+
+  it('opens the folded list again from its own rail item, so a one-page destination stays one click away', () => {
+    setPhone(false)
+    DestinationSelection.set('inbox')
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    const shell = props({ panels: inboxPanels, activePanelId: 'attention-inbox' })
     const view = render(
       <TooltipProvider>
         <DestinationShell {...shell} />
@@ -226,19 +295,21 @@ describe('DestinationShell', () => {
       </TooltipProvider>,
     )
     expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
-    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    expect(document.querySelector('[data-stage-folded]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('tab', { name: 'Inbox' }))
     expect(shell.toggleSidebar).toHaveBeenCalledTimes(2)
   })
 
   it('leaves a column the person collapsed or opened by hand as they left it', () => {
     setPhone(false)
-    DestinationSelection.set('settings')
-    const collapsedByHand = renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    DestinationSelection.set('inbox')
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    const collapsedByHand = renderShell({ panels: inboxPanels, collapsed: true, activePanelId: 'attention-inbox' })
     expect(collapsedByHand.toggleSidebar).not.toHaveBeenCalled()
     cleanup()
     localStorage.clear()
-    DestinationSelection.set('settings')
-    const shell = props({ activePanelId: 'dshfiles-settings' })
+    DestinationSelection.set('inbox')
+    const shell = props({ panels: inboxPanels, activePanelId: 'attention-inbox' })
     const view = render(
       <TooltipProvider>
         <DestinationShell {...shell} />
@@ -251,11 +322,10 @@ describe('DestinationShell', () => {
         </TooltipProvider>,
       )
     draw({ collapsed: true })
-    // Opened by hand while Settings shows: it stays open, listing the other Settings pages.
+    // Opened by hand while the Inbox shows: it stays open.
     draw({ collapsed: false })
     expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: 'All settings' }).getAttribute('aria-current')).toBe('page')
-    expect(screen.getByRole('button', { name: 'Plugins' }).getAttribute('aria-describedby')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Inbox' }).getAttribute('aria-current')).toBe('page')
   })
 
   it('folds the column while the page of a one-page destination is on stage (round five B2)', () => {

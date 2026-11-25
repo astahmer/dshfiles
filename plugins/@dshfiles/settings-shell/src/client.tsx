@@ -59,6 +59,8 @@ import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
 import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { SettingsNavigationModel } from './navigation-state.js'
+import { SettingsNavigation, type SettingsNavigationService, type SettingsNavigationState } from './settings-navigation.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type PluginPageHeading, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import { shellMachine, type FieldTarget } from './shell-machine.js'
@@ -69,6 +71,7 @@ import {
   createSettingsWorkbenchHub,
   registerSettingsWorkbenchPanels,
   settingsWorkbenchPanelId,
+  type SettingsHubShown,
   type SettingsOpenRequest,
 } from './workbench-panels.js'
 
@@ -478,6 +481,80 @@ export default defineClient({
       openSection: sectionId => openSettings(sectionId),
     }
 
+    // One Settings navigation (council round 4 B1): the side column draws the category list while it shows, and the
+    // stage page drops its own. `columns` counts the columns attached now.
+    const columns = createSnapshotStore(0)
+    // With the Workbench, Settings opens as its pane (the hub), which keeps its own category and search.
+    const hubShown = createSnapshotStore<SettingsHubShown | undefined>(undefined)
+    let navigationInputs: readonly unknown[] = []
+    let navigationLast: SettingsNavigationState | undefined
+    const navigationSnapshot = (): SettingsNavigationState => {
+      const snapshot = actor.getSnapshot()
+      const grouped = groups.getSnapshot()
+      const entries = sectionEntries.getSnapshot()
+      const catalog = ctx.shortcuts.catalog.getSnapshot()
+      const hub = hubShown.getSnapshot()
+      const open = hub !== undefined || snapshot.matches('tab')
+      const sectionId = hub === undefined ? snapshot.context.sectionId : hub.activeId
+      const query = hub === undefined ? snapshot.context.query : hub.query
+      const inputs = [grouped, entries, catalog, open, sectionId, query]
+      if (navigationLast !== undefined && inputs.every((value, index) => value === navigationInputs[index])) return navigationLast
+      const counts =
+        query.trim() === ''
+          ? undefined
+          : SettingsSearch.search({
+              query,
+              sections: searchRows(grouped),
+              pages: SettingsGroups.searchablePages(grouped),
+              entries,
+              shortcuts: shortcutsFor(catalog),
+            }).counts
+      navigationInputs = inputs
+      navigationLast = SettingsNavigationModel.state({ groups: grouped, open, sectionId, counts })
+      return navigationLast
+    }
+    /** While searching, a category with matches scrolls the results to them, as the page's own list did. */
+    const scrollToResults = (ids: readonly string[]): boolean => {
+      const found = ids
+        .flatMap(id => [...document.querySelectorAll<HTMLElement>(`[data-settings-view] [data-results-page="${CSS.escape(id)}"]`)])
+        .find(element => element.checkVisibility?.() !== false)
+      if (found === undefined || found === null) return false
+      found.scrollIntoView({ block: 'start' })
+      return true
+    }
+    const navigation: SettingsNavigationService = {
+      state: {
+        get: navigationSnapshot,
+        subscribe: listener => {
+          const disposers = [
+            subscribeActor(listener),
+            groups.subscribe(listener),
+            sectionEntries.subscribe(listener),
+            ctx.shortcuts.catalog.subscribe(listener),
+            hubShown.subscribe(listener),
+          ]
+          return () => disposers.forEach(dispose => dispose())
+        },
+      },
+      select: id => {
+        const entry = SettingsGroups.entryFor(groups.getSnapshot(), id)
+        if (entry?.opens !== undefined) return openPanel(entry.opens)
+        const ids = entry === undefined ? [id] : [entry.id, ...(entry.sectionId === undefined ? [] : [entry.sectionId]), ...entry.pages.map(page => page.pageId)]
+        if (navigationSnapshot().searching && scrollToResults(ids)) return
+        openSettings(id)
+      },
+      attach: () => {
+        columns.set(columns.getSnapshot() + 1)
+        let attached = true
+        return () => {
+          if (!attached) return
+          attached = false
+          columns.set(columns.getSnapshot() - 1)
+        }
+      },
+    }
+    metadata?.plugin?.provide(SettingsNavigation, navigation)
+
     /** Everything the Settings page shows, minus its frame and close button: the stage page and the docking hub share it. */
     const settingsViewProps = (input: {
       readonly renderSlot: ShellRenderSlot
@@ -536,6 +613,7 @@ export default defineClient({
         void describe.ensure()
       }, [])
       const tabsLoaded = useObservable(mainTabsLoaded)
+      const columnNavigation = useObservable(columns) > 0
       if (!open || host === null) return null
       const view = settingsViewProps({
         renderSlot: props.renderSlot,
@@ -549,7 +627,7 @@ export default defineClient({
         shortcuts: shortcutsFor(catalog),
       })
       // With main-tabs the strip closes the tab; without it the header keeps a way back to the previous view.
-      return <SettingsTab {...view} host={host} onClose={tabsLoaded ? undefined : deps.closeSettings} />
+      return <SettingsTab {...view} columnNavigation={columnNavigation} host={host} onClose={tabsLoaded ? undefined : deps.closeSettings} />
     }
 
     // The sidebar.settings entry remains the only settings.section declarer. Panels borrow its renderer; they never
@@ -579,6 +657,8 @@ export default defineClient({
                 return request
               },
               closeSettings: deps.closeSettings,
+              columns,
+              report: shown => hubShown.set(shown),
               view: input =>
                 settingsViewProps({
                   ...input,

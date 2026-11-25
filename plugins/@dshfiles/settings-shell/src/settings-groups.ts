@@ -307,6 +307,8 @@ export interface SettingsEntry {
   readonly hiddenPages: readonly PluginSettingsPage[]
   /** Another plugin's stage page it opens. */
   readonly link?: PageLink
+  /** The stage page this entry stands for: its link's, or the one its section links itself (AI accounts). */
+  readonly page?: string
   /** A row of the Pages group: picking it opens this stage page instead of a Settings entry. */
   readonly opens?: string
   /** Words that find it in search without showing: namespaces, former names. */
@@ -385,6 +387,8 @@ const groupEntries = (input: {
     pages: Array<{ readonly page: PluginSettingsPage; readonly order: number }>
     hiddenPages: PluginSettingsPage[]
     link?: PageLink
+    /** The stage page its section already links itself (AI accounts). */
+    page?: string
     keywords: string[]
   }
   const entries = new Map<string, Draft>()
@@ -499,6 +503,7 @@ const groupEntries = (input: {
     // A section that already opens its own page needs no second button.
     if (target !== undefined && SECTIONS_LINKING_THEIR_PAGE.has(target.sectionId ?? '')) {
       target.keywords.push(link.panelId)
+      target.page = link.panelId
       continue
     }
     if (target !== undefined) {
@@ -538,7 +543,9 @@ const groupEntries = (input: {
     }
     const withSection: SettingsEntry = entry.sectionId === undefined ? row : { ...row, sectionId: entry.sectionId }
     const withSectionLabel: SettingsEntry = entry.sectionLabel === undefined ? withSection : { ...withSection, sectionLabel: entry.sectionLabel }
-    const finished: SettingsEntry = entry.link === undefined ? withSectionLabel : { ...withSectionLabel, link: entry.link }
+    const linked: SettingsEntry = entry.link === undefined ? withSectionLabel : { ...withSectionLabel, link: entry.link }
+    const page = entry.link?.panelId ?? entry.page
+    const finished: SettingsEntry = page === undefined ? linked : { ...linked, page }
     const list = byGroup.get(entry.group) ?? []
     list.push(finished)
     byGroup.set(entry.group, list)
