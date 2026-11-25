@@ -34,7 +34,7 @@ describe('Usage controls', () => {
     const panel = read('panel.tsx')
     const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("preferences.tab === 'log' ?"))
     expect(row).toContain('aria-label="Time range"')
-    expect(row).toMatch(/<SelectTrigger size="sm" aria-label="Group by time"/u)
+    expect(row).toMatch(/<SelectTrigger aria-label="Group by time"/u)
     expect(row).toContain('<DropdownMenuCheckboxItem')
     expect(row).toMatch(/aria-label=\{`Purpose: \$\{purposeSummary\}`\}/u)
     expect(row).not.toContain('>Purpose</span>')
@@ -43,7 +43,7 @@ describe('Usage controls', () => {
   it('picks the chart grouping from a select on the filter row, not on the chart card', () => {
     const panel = read('panel.tsx')
     const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("preferences.tab === 'log' ?"))
-    expect(row).toMatch(/<SelectTrigger size="sm" aria-label="Group by"/u)
+    expect(row).toMatch(/<SelectTrigger aria-label="Group by"/u)
     expect(read('charts.tsx')).not.toContain('aria-label="Group by"')
   })
 
@@ -81,6 +81,15 @@ describe('Usage control row and chart header (council round 4, D1)', () => {
     expect(titleRow?.[1]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
     // The stats card's edge already parts it from the chart: no second hairline right under the card.
     expect(charts).toMatch(/<Panel className="dshx:border-t-0 dshx:pt-1">\s*\{\/\*[\s\S]*?\*\/\}\s*<header className="[^"]*" data-usage-chart-header>/u)
+  })
+})
+
+describe('Usage filter row (council round 5 A1/D1)', () => {
+  it('draws Custom, the time grouping, By and Purpose at the kit control height, level with the range segments', () => {
+    const panel = read('panel.tsx')
+    const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("{preferences.tab === 'log' ? ("))
+    expect(row).toContain('<SlidingSegments')
+    expect(row).not.toContain('size="sm"')
   })
 })
 

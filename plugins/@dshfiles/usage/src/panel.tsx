@@ -308,7 +308,6 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                   <PopoverTrigger asChild>
                     <Button
                       variant="outline"
-                      size="sm"
                       aria-pressed={preferences.preset === 'custom'}
                       className="dshx:aria-pressed:border-foreground/30 dshx:aria-pressed:bg-muted"
                       onClick={() => {
@@ -343,7 +342,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                   </PopoverContent>
                 </Popover>
                 <Select value={preferences.bucket} onValueChange={value => update({ bucket: BUCKETS.find(bucket => bucket === value) ?? 'day' })}>
-                  <SelectTrigger size="sm" aria-label="Group by time" className="dshx:w-28">
+                  <SelectTrigger aria-label="Group by time" className="dshx:w-28">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="dshx-root">
@@ -359,7 +358,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                     value={preferences.groupBy}
                     onValueChange={value => update({ groupBy: GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model' })}
                   >
-                    <SelectTrigger size="sm" aria-label="Group by" className="dshx:justify-start dshx:gap-1.5">
+                    <SelectTrigger aria-label="Group by" className="dshx:justify-start dshx:gap-1.5">
                       <span className="dshx:text-muted-foreground">By</span>
                       <SelectValue />
                     </SelectTrigger>
@@ -375,7 +374,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                 {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" aria-label={`Purpose: ${purposeSummary}`}>
+                    <Button variant="outline" aria-label={`Purpose: ${purposeSummary}`}>
                       <span className="dshx:text-muted-foreground">Purpose:</span>
                       {purposeSummary}
                       <ChevronDownIcon aria-hidden />
