@@ -2,6 +2,7 @@ import { Option, Schema } from 'effect'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { InputActions } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { useMemo } from 'react'
+import { ListTodoIcon } from '@dshfiles/plugin-ui/icons'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -422,19 +423,10 @@ export default defineClient({
   },
 })
 
+/**
+ * The Backlog's nav glyph is the Work destination's list glyph, the one its rail item and tab draw, at the nav's 1.5
+ * stroke, so the item reads as the same place in all three seats (council round 6, D3).
+ */
 const PanelGlyph = (props: { readonly size?: number }): JSX.Element => (
-  <svg
-    aria-hidden
-    width={props.size ?? 18}
-    height={props.size ?? 18}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeLinecap="round"
-  >
-    <rect x="3.5" y="4" width="5" height="16" rx="1.5" />
-    <rect x="10" y="4" width="5" height="10" rx="1.5" />
-    <rect x="16.5" y="4" width="4" height="6" rx="1.5" />
-  </svg>
+  <ListTodoIcon aria-hidden data-backlog-panel-glyph="" size={props.size ?? 18} strokeWidth={1.5} />
 )
