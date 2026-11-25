@@ -17,6 +17,7 @@ import {
 } from 'dockview-react'
 import { createContext, useContext, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type PointerEvent } from 'react'
 import { WorkbenchLayout, WORKBENCH_COMPONENT, type LayoutStore, type WorkbenchDefaultLayout } from './layout-store.js'
+import { dockRenderer } from './dock-renderer.js'
 import type { WorkbenchTranslate } from './locales.js'
 import { workbenchRegions, type WorkbenchRegionId } from './dock-regions.js'
 import type { WorkbenchPanelDefinition, WorkbenchPanelRegistry } from './registry.js'
@@ -63,6 +64,8 @@ interface WorkbenchViewProps {
   readonly registry: WorkbenchPanelRegistry
   readonly store: LayoutStore
   readonly t: WorkbenchTranslate
+  /** Phone: unmount workbench panels that are not visible, instead of keeping every hidden view mounted. */
+  readonly unmountHiddenViews?: boolean
   /** Retained surfaces propagate real visibility to resource presenters without remounting their components. */
   readonly visible?: boolean
   /** Receives the Dockview API once the saved layout is restored, for callers that drive the layout (commands, tests). */
@@ -121,6 +124,8 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
   const windowFloats = WindowFloatingGeometry.supports(region)
   const dropBoundary = useRef<HTMLDivElement>(null)
   const [api, setApi] = useState<DockviewApi | null>(null)
+  // A Dockview creation option: the renderer never changes for the life of this surface.
+  const [defaultRenderer] = useState(() => dockRenderer(props.unmountHiddenViews === true))
   const [openIds, setOpenIds] = useState<readonly string[]>([])
   const selectView = useRef<(definition: WorkbenchPanelDefinition, target?: NewViewSelection) => void>(() => undefined)
 
@@ -676,7 +681,7 @@ export const WorkbenchView = (props: WorkbenchViewProps): JSX.Element => {
             defaultTabComponent={Tab}
             leftHeaderActionsComponent={GroupActions}
             rightHeaderActionsComponent={PaneActions}
-            defaultRenderer="always"
+            defaultRenderer={defaultRenderer}
             {...(windowFloats ? { floatingGroupBounds: 'boundedWithinViewport' as const } : {})}
             theme={workbenchTheme}
             onReady={onReady}

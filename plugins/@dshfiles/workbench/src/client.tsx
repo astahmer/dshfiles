@@ -1401,6 +1401,7 @@ export default defineClient({
               surface="dock"
               defaultLayout="empty"
               visible={shown}
+              unmountHiddenViews={phone}
               onClose={dockActions.close}
               t={props.t}
               heading={props.t('dockHeading')}
