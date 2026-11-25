@@ -5,6 +5,11 @@ import { InboxView } from './inbox-view.js'
 const panel = readFileSync(new URL('./inbox-panel.tsx', import.meta.url), 'utf8')
 
 describe('inbox page layout', () => {
+  it('shows a load failure with the kit LoadError, and no row claims aria-selected', () => {
+    expect(panel).toContain('<LoadError subject=')
+    expect(panel).not.toMatch(/aria-selected=/u)
+  })
+
   it('fills its pane: no centred max-width column on the page (DESIGN.md, Layout)', () => {
     const pages = panel.match(/<Page\b[^>]*>/gu) ?? []
     expect(pages.length).toBeGreaterThan(0)
@@ -25,5 +30,7 @@ describe('inbox page layout', () => {
     expect(InboxView.pageActions({ triagePrimary: true, alertSettings: true })).toEqual([{ id: 'alerts', placement: 'overflow' }])
     expect(InboxView.pageActions({ triagePrimary: false, alertSettings: false })).toEqual([{ id: 'triage', placement: 'inline' }])
     expect(panel).not.toMatch(/<InboxNotifications\.Toggle|<InboxPush\.Control/u)
+    // Nothing open to triage: Start triage is not offered, rather than drawn disabled.
+    expect(InboxView.pageActions({ triagePrimary: false, alertSettings: false, triageable: false })).toEqual([])
   })
 })

@@ -134,8 +134,13 @@ export interface InboxPageAction {
  * The header's actions besides the primary: Start triage (unless it is the primary, as on a phone), then this device's
  * alert settings in the page menu. Settings never sit under the work list.
  */
-const pageActions = (input: { readonly triagePrimary: boolean; readonly alertSettings: boolean }): readonly InboxPageAction[] => [
-  ...(input.triagePrimary ? [] : [{ id: 'triage', placement: 'inline' } as const]),
+const pageActions = (input: {
+  readonly triagePrimary: boolean
+  readonly alertSettings: boolean
+  /** Something is open to triage; without it Start triage is not offered at all (a disabled button is noise). */
+  readonly triageable?: boolean
+}): readonly InboxPageAction[] => [
+  ...(input.triagePrimary || input.triageable === false ? [] : [{ id: 'triage', placement: 'inline' } as const]),
   ...(input.alertSettings ? [{ id: 'alerts', placement: 'overflow' } as const] : []),
 ]
 

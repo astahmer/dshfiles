@@ -36,6 +36,7 @@ import { BellIcon, ClockIcon, EllipsisIcon, ListChecksIcon, MessagesSquareIcon, 
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
+import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -220,7 +221,6 @@ const InboxRow = (props: {
       }}
       selected={props.selected === true}
       data-cursor={props.cursor === true ? '' : undefined}
-      aria-selected={props.selected === true}
       className={cn(
         'dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
         phone && 'dshx:relative dshx:bg-card dshx:py-1',
@@ -1134,11 +1134,11 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
           onSelect: () => transition.mutate({ kind: 'resume-all', itemIds: resumableIds }),
         }
       : null
+  const triageable = (counts?.needsYou ?? 0) + (counts?.other ?? 0) > 0
   const triageAction = {
     id: 'triage',
     label: t('triageStart'),
     icon: <ListChecksIcon aria-hidden />,
-    disabled: (counts?.needsYou ?? 0) + (counts?.other ?? 0) === 0,
     onSelect: () => void startTriage(),
   }
   const [alertSettingsOpen, setAlertSettingsOpen] = useState(false)
@@ -1146,7 +1146,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const alertSettingsAction = { id: 'alerts', label: t('alertSettings'), icon: <BellIcon aria-hidden />, onSelect: () => setAlertSettingsOpen(true) }
   // On a phone, Triage (one card at a time, 1 of N, verbs in the thumb zone) is the way through the Inbox: it is the
   // page's visible button rather than an entry in its overflow menu, unless Resume all needs that seat.
-  const triageOnTop = coarsePointer() && resumeAllAction === null
+  const triageOnTop = coarsePointer() && resumeAllAction === null && triageable
   const tabs: readonly { readonly view: AttentionView; readonly label: string; readonly count: number }[] = [
     { view: 'needs-you', label: t('needsYou'), count: counts?.needsYou ?? 0 },
     { view: 'other', label: t('other'), count: counts?.other ?? 0 },
@@ -1233,7 +1233,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       heading={t('title')}
       description={t('subtitle')}
       {...(resumeAllAction !== null ? { primaryAction: resumeAllAction } : triageOnTop ? { primaryAction: triageAction } : {})}
-      actions={InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available() }).map(action =>
+      actions={InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available(), triageable }).map(action =>
         action.id === 'triage' ? triageAction : { ...alertSettingsAction, placement: action.placement },
       )}
       overflowLabel={t('more')}
@@ -1250,16 +1250,8 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         </Alert>
       )}
       {listQuery.status !== 'error' ? null : (
-        <Alert variant="destructive">
-          <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <span>
-              {errorMessage(listQuery.error, t('loadFailed'))} {t('loadFailedHint')}
-            </span>
-            <Button size="sm" variant="outline" onClick={() => void listQuery.refetch()}>
-              {t('retry')}
-            </Button>
-          </AlertDescription>
-        </Alert>
+        // One sentence that names the Inbox, Retry, the cause under Details: never an endpoint id (D6, D7).
+        <LoadError subject={t('title')} error={listQuery.error} onRetry={() => void listQuery.refetch()} retryLabel={t('retry')} />
       )}
       {data !== undefined && data.items.length === 0 ? <EmptyState>{emptyCopy(view, t)}</EmptyState> : null}
       {view === 'closed' && props.openNotifications !== undefined ? (
