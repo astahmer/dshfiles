@@ -181,6 +181,23 @@ describe('TabStrip layout', () => {
     expect(document.querySelectorAll('[data-tab-status-slot]')).toHaveLength(1)
   })
 
+  it('draws a page tab\'s destination glyph, in its nav tone only on the active tab (round five B4)', () => {
+    const pages = tabs.map(tab =>
+      tab.kind === 'panel' ? { ...tab, destination: { id: 'work', icon: 'list-todo' } as const } : { ...tab, active: false },
+    )
+    const { unmount } = mount(undefined, undefined, pages)
+    const glyph = (): HTMLElement | null => document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(glyph()?.className).toContain('dshx:nav-tone-work')
+    expect(glyph()?.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(glyph()?.className).not.toContain('dshx:text-nav-tone')
+    unmount()
+    mount(undefined, undefined, pages.map(tab => (tab.kind === 'panel' ? { ...tab, active: true } : tab)))
+    expect(glyph()?.className).toContain('dshx:text-nav-tone')
+    // The title stays ink; the thread tab keeps no destination glyph.
+    expect(screen.getByText('Workbench').className).not.toContain('nav-tone')
+    expect(document.querySelectorAll('[data-tab-destination]')).toHaveLength(1)
+  })
+
   it('marks a preview tab with a muted title instead of italics', () => {
     mount(
       undefined,

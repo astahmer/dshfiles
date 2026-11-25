@@ -34,9 +34,10 @@ const fixture = (
     readonly projectNames?: Readonly<Record<string, string>>
     readonly projectChips?: Readonly<Record<string, { readonly className?: string; readonly color?: string; readonly tone?: number }>>
     readonly presentation?: Pick<WorkbenchTabsProvider, 'renderTabMenu' | 'label'>
+    readonly tab?: WorkbenchTab
   } = {},
 ) => {
-  const initial: WorkbenchTab = {
+  const initial: WorkbenchTab = options.tab ?? {
     id: 'thread:a',
     kind: 'thread',
     sessionId: 'a',
@@ -100,7 +101,7 @@ const fixture = (
   const view = render(<Tab api={panel.api} containerApi={api} params={{}} tabLocation="header" />)
   const update = (patch: Partial<Extract<WorkbenchTab, { kind: 'thread' }>>) =>
     act(() => {
-      snapshot = { ...snapshot, tabs: [{ ...initial, ...patch }] }
+      snapshot = { ...snapshot, tabs: [initial.kind === 'thread' ? { ...initial, ...patch } : initial] }
       for (const listener of listeners) listener()
     })
   const trigger = () => {
@@ -160,6 +161,38 @@ describe('workbench semantic tab chrome', () => {
     expect(mark.style.getPropertyValue('--chip-dark')).toBe('oklch(from var(--chip) max(l, 0.78) c h)')
     expect(mark.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
     expect(mark.className).toContain('dshx:dark:[--chip-clamped:var(--chip-dark)]')
+  })
+
+  it('names a page tab\'s destination with its rail glyph, in its nav tone while the tab is on screen (round five B4)', () => {
+    fixture({
+      tab: {
+        id: 'panel:backlog',
+        kind: 'panel',
+        panelId: 'dshfiles-backlog-panel',
+        destination: { id: 'work', icon: 'list-todo' },
+        target: { kind: 'panel', panelId: 'dshfiles-backlog-panel' },
+        title: 'Backlog',
+        active: true,
+        pinned: false,
+        preview: false,
+        available: true,
+        status: null,
+      },
+    })
+    const glyph = document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(glyph?.getAttribute('data-tab-destination')).toBe('work')
+    expect(glyph?.getAttribute('aria-hidden')).toBe('true')
+    expect(glyph?.className).toContain('dshx:nav-tone-work')
+    // Tertiary on a background tab; the tone only where Dockview marks the tab active. The label stays ink.
+    expect(glyph?.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:text-nav-tone')
+    expect(glyph?.querySelector('svg')?.getAttribute('width')).toBe('14')
+    expect((glyph?.compareDocumentPosition(screen.getByText('Registered title')) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps the ProjectMark, not a destination glyph, on a thread tab', () => {
+    fixture()
+    expect(document.querySelector('[data-tab-destination]')).toBeNull()
   })
 
   it('starts every tab\'s content 12px from its edge', () => {

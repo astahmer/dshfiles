@@ -1,5 +1,7 @@
 import { StatusGlyph, workStatusLabels, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
-import type { TabStatus } from './tabs.js'
+import { ActivityIcon, BotIcon, GitMergeIcon, InboxIcon, LibraryIcon, ListTodoIcon, MessagesSquareIcon, SettingsIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import type { TabDestination, TabDestinationIcon, TabDestinationId, TabStatus } from './tabs.js'
 
 /**
  * The one mapping from a thread tab's status onto the shared work-status vocabulary (DESIGN.md "Status vocabulary").
@@ -30,3 +32,56 @@ export const TabStatusGlyph = (props: {
     {...(props.className === undefined ? {} : { className: props.className })}
   />
 )
+
+const DESTINATION_GLYPHS = {
+  'messages-square': MessagesSquareIcon,
+  inbox: InboxIcon,
+  'git-merge': GitMergeIcon,
+  'list-todo': ListTodoIcon,
+  bot: BotIcon,
+  activity: ActivityIcon,
+  library: LibraryIcon,
+  settings: SettingsIcon,
+} as const satisfies Record<TabDestinationIcon, LucideIcon>
+
+/** The rail's identity tones (DESIGN.md › Navigation identity), so a page tab names its destination in the same colour. */
+const DESTINATION_TONES = {
+  threads: 'dshx:nav-tone-threads',
+  inbox: 'dshx:nav-tone-inbox',
+  land: 'dshx:nav-tone-land',
+  work: 'dshx:nav-tone-work',
+  agents: 'dshx:nav-tone-agents',
+  observe: 'dshx:nav-tone-observe',
+  knowledge: 'dshx:nav-tone-knowledge',
+  settings: 'dshx:nav-tone-settings',
+} as const satisfies Record<TabDestinationId, string>
+
+/**
+ * A page tab's destination glyph (round five B4): 14px in a 16px seat before the title, tertiary ink on a background tab
+ * and the destination's nav tone on the tab on screen; the label stays ink. Every page tab draws it, so activating one
+ * never moves its title. Decorative: the title names the page.
+ */
+export const TabDestinationGlyph = (props: {
+  readonly destination: TabDestination
+  /** The tab on screen; omit when the strip marks it with CSS and pass `activeClassName` instead. */
+  readonly active?: boolean
+  /** Classes that turn the tone on from the strip's own active marker (`dshx:in-[.dv-active-tab]:text-nav-tone`). */
+  readonly activeClassName?: string
+}): JSX.Element => {
+  const Glyph = DESTINATION_GLYPHS[props.destination.icon]
+  return (
+    <span
+      aria-hidden="true"
+      data-tab-destination={props.destination.id}
+      data-active={props.active === true ? '' : undefined}
+      className={cn(
+        'dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center',
+        DESTINATION_TONES[props.destination.id],
+        props.active === true ? 'dshx:text-nav-tone' : 'dshx:text-(--dsw-alias-label-tertiary)',
+        props.activeClassName,
+      )}
+    >
+      <Glyph size={14} strokeWidth={1.5} />
+    </span>
+  )
+}

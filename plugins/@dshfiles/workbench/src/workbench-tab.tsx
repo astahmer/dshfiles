@@ -21,7 +21,7 @@ import { SurfaceAction } from './surface-action.js'
 import { NewViewTabs } from './new-view.js'
 import { closeWorkbenchPanel, type WorkbenchPanelIdentity } from './panel-close.js'
 import { TabRows } from './tab-row-visibility.js'
-import { TabStatusGlyph } from './tab-status.js'
+import { TabDestinationGlyph, TabStatusGlyph } from './tab-status.js'
 
 /** The main seat's compact action drives the existing tab provider, never a second tab actor. */
 export const WorkbenchNewTabButton = (props: { readonly label: string }): JSX.Element | null => {
@@ -132,6 +132,10 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
             {tab?.pinned && <PinIcon aria-label={channel.label?.('pinned') || 'Pinned'} size={12} />}
             {tab?.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? null : <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} className="dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : tab?.status && <TabStatusGlyph status={tab.status} label={channel.label?.(tab.status)} />}
             {closeButtonPosition === 'left' ? closeButton : null}
+            {tab?.kind === 'panel' && tab.destination !== undefined ? (
+              // A page names its destination with the rail glyph; the tab on screen takes its nav tone (round five B4).
+              <TabDestinationGlyph destination={tab.destination} activeClassName="dshx:in-[.dv-active-tab]:text-nav-tone" />
+            ) : null}
             {project === undefined ? null : (
               // The tile names the project: the tab has no tooltip, and the title beside it is the thread's.
               <ProjectMark name={project} size="dense" decorative={false} data-workbench-tab-project="" {...TabProjectMark.paint(projectChip)} />

@@ -24,9 +24,21 @@ interface TabViewBase {
   readonly status: TabStatus | null
 }
 
+/**
+ * The rail destination a page belongs to (round five B4): its id names the nav tone, its icon the rail glyph. The tabs
+ * provider resolves it from thread-sidebar's destination table (which depends on Workbench, so Workbench cannot read
+ * it); a tab strip draws the glyph before the page title, in the destination's tone while the tab is on screen.
+ */
+export type TabDestinationId = 'threads' | 'inbox' | 'land' | 'work' | 'agents' | 'observe' | 'knowledge' | 'settings'
+export type TabDestinationIcon = 'messages-square' | 'inbox' | 'git-merge' | 'list-todo' | 'bot' | 'activity' | 'library' | 'settings'
+export interface TabDestination {
+  readonly id: TabDestinationId
+  readonly icon: TabDestinationIcon
+}
+
 export type TabView =
   | (TabViewBase & { readonly kind: 'thread'; readonly sessionId: string; readonly workspaceId?: string })
-  | (TabViewBase & { readonly kind: 'panel'; readonly panelId: string })
+  | (TabViewBase & { readonly kind: 'panel'; readonly panelId: string; readonly destination?: TabDestination })
   | (TabViewBase & { readonly kind: 'start' })
 
 /** The existing computed strip view, plus its actor-owned target (including panel scope). */

@@ -32,6 +32,7 @@ import { PanelIcon, StartPage, type StartSection } from './start-page.js'
 import { OPEN_PANEL_TAB_EVENT, PANEL_TAB_TITLE_EVENT, PanelTabs } from './panel-tabs.js'
 import { panelShortcut, recentThreads } from './start-suggestions.js'
 import { PanelTitlesModel } from './panel-titles.js'
+import { PanelDestinationsModel } from './panel-destinations.js'
 import { TabMenuItems } from './tab-menu-items.js'
 import { effectiveTabPreferences } from './tab-preferences-policy.js'
 import { installThreadLinkClicks } from './thread-link-click.js'
@@ -479,6 +480,8 @@ export default defineClient({
                 ...base,
                 kind: 'panel',
                 panelId,
+                // The page's rail destination: both strips draw its glyph in its nav tone (round five B4).
+                destination: PanelDestinationsModel.of(panelId, contributedSections),
                 title: PanelTitlesModel.tabTitleOf(tab.title, panelLabels.get(panelId), panelTitleFallback(panelId)),
                 available: registeredPanels.has(panelId),
                 status: null,
