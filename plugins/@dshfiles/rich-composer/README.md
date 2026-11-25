@@ -136,6 +136,16 @@ off: Send then refuses with "Files are still uploading" as upstream does. This r
 
 The fork provides dshx's `Composer` contract (`src/composer-service.ts`) over its per-session input shells, so other plugins read and edit the draft, add chips, pick the model and move focus without a slot of their own. Quote, note, terminal-excerpt and line-comment chips are reference chips of the `composer-snippet` input-trigger source (`src/composer-snippets.ts`): the chip carries its content in `ref`, so a restored draft still sends it, and the model reads a quote as a Markdown block quote, a note inside `<note>` tags, a terminal excerpt inside `<terminal-excerpt>` tags and a comment inside `<comment path lines>`. A terminal excerpt's label is the terminal line range it came from (`Terminal 12-14`), and activating the chip reveals the captured output the draft holds. File chips use the native `reference` source the composer's file drop already uses. A plain-text draft whose serialized references still name chips (`[Image 1]`, `b:<ref>`, `@{handle}`, a file or thread mention) is turned back into those chips with `restoreReferences()`: every trigger source's `restore` grammar supplies the spans and the draft text itself is unchanged. `setModel` goes through the `modelDirectories` service, the same path as the model picker.
 
+## New-thread send preparers
+
+`@dshfiles/rich-composer/composer-send` publishes the `ComposerSendPreparers` registry. When the composer sends the
+first message of a blank Session, after the Host created it and before the prompt, it runs each preparer in `order`
+(`src/composer-send-pipeline.ts`): a preparer may set the thread up and return the text to send instead.
+`@dshfiles/agents` uses it to start a new thread as the project's default agent (preset, model, record and the agent's
+instructions ahead of the request). The draft stays as typed; only the sent text changes. A preparer that throws or
+takes longer than 8 s is skipped and the message goes out as typed, so a missing or failing provider never blocks a
+send. Messages of a started thread never pass through it.
+
 ## The composer bar
 
 One calm card (composer redesign b:v9yh): a 44px text

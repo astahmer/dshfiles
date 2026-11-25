@@ -9,6 +9,7 @@ import { SessionInputShell } from './native/input/facade.ts'
 import { InputHub } from './native/input/hub.ts'
 import type { DraftAttachmentId, InputTriggerController, SubmitOutcome } from './native/contract/input.ts'
 import { observeSessionDraft } from './session-draft-tracking.ts'
+import { ComposerSendPipeline } from './composer-send-pipeline.ts'
 
 // Rendering is outside this routing test; keep the real Lexical nodes, facade and submit machine.
 vi.mock('./native/input/editor/ReferenceChip.tsx', () => ({ ReferenceChip: () => null }))
@@ -19,11 +20,11 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0).reverse()) await cleanup()
 })
 
-function fixture() {
+function fixture(options: { readonly blank?: boolean } = {}) {
   const ctx = new Context()
   cleanups.push(() => ctx.fiber.dispose())
-  // SAFETY: the sink only reads the identity and passes this opaque face to the injected conversation seam.
-  const session = { sessionId: 'session-retry' as SessionId } as SessionFace
+  // SAFETY: the sink only reads the identity and blankness and passes this opaque face to the injected conversation seam.
+  const session = { sessionId: 'session-retry' as SessionId, getSnapshot: () => ({ blank: options.blank ?? true }) } as unknown as SessionFace
   const update = vi.fn<SessionDrafts['update']>()
   const retry = vi.fn(async () => session.sessionId)
   const drafts: SessionDrafts = {
@@ -35,7 +36,7 @@ function fixture() {
     retry,
     whenCreated: vi.fn(async () => undefined),
   }
-  const send = vi.fn(async () => ({ kind: 'success' as const }))
+  const send = vi.fn(async (_session: SessionFace, _text: string): Promise<SubmitOutcome> => ({ kind: 'success' }))
   ctx.provide('sessionDrafts', drafts)
   ctx.provide('conversation', { sendSession: send })
   const release = vi.fn()
@@ -83,6 +84,28 @@ function fixture() {
   cleanups.push(observeSessionDraft({ state: shell.state, update: content => drafts.update(session.sessionId, content) }))
   return { session, drafts, update, retry, send, shell, outcome, serialized, serializeReference, retain, release, readiness }
 }
+
+describe('new-thread send preparers', () => {
+  it('send the first message of a blank Session as the preparers rewrote it', async () => {
+    cleanups.push(ComposerSendPipeline.bind(() => [{ id: 'agent', prepare: async ({ text }) => ({ text: `Work as @x.\n\n---\n\n${text}` }) }]))
+    const { send, shell, outcome } = fixture()
+    shell.setDraft({ text: 'Fix the build', references: [] })
+    shell.submit()
+    await expect(outcome.promise).resolves.toEqual({ kind: 'success' })
+    expect(send.mock.calls[0]?.[1]).toBe('Work as @x.\n\n---\n\nFix the build')
+  })
+
+  it('leave a started thread\'s messages as typed', async () => {
+    const prepare = vi.fn(async () => ({ text: 'rewritten' }))
+    cleanups.push(ComposerSendPipeline.bind(() => [{ id: 'agent', prepare }]))
+    const { send, shell, outcome } = fixture({ blank: false })
+    shell.setDraft({ text: 'Next step', references: [] })
+    shell.submit()
+    await expect(outcome.promise).resolves.toEqual({ kind: 'success' })
+    expect(prepare).not.toHaveBeenCalled()
+    expect(send.mock.calls[0]?.[1]).toBe('Next step')
+  })
+})
 
 describe('draft retry after the real composer clears its outgoing content', () => {
   it('retains the session through both draft creation and send admission', async () => {

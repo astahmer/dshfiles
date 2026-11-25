@@ -16,6 +16,8 @@ import type {} from '@deepseek-ai/dsh-permission-presets/remote'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { UseProjection } from '@deepseek-ai/dsh-api-session-controller/client'
 import { ComposerBar, type ComposerBarPlacement } from './composer-more.ts'
+import { ComposerSendPreparers } from './composer-send.ts'
+import { ComposerSendPipeline } from './composer-send-pipeline.ts'
 import { ComposerMoreMenu } from './composer-more-menu.tsx'
 import { ModeChip } from './mode-chip.tsx'
 import { ModeChipCatalog, type ModeChipHost } from './mode-chip-model.ts'
@@ -32,6 +34,8 @@ export default defineClient({
     metadata?.plugin?.provide(PhoneThreadMenu, createPhoneThreadMenu())
     metadata?.plugin?.provide(ConversationScope, { Scope: PhoneMenuScope })
     apply(ctx)
+    const preparers = metadata?.plugin?.list(ComposerSendPreparers)
+    if (preparers !== undefined) ctx.effect(() => ComposerSendPipeline.bind(() => preparers.get()), 'rich-composer: new-thread send preparers')
     metadata?.plugin?.provide(Composer, createComposerService(ctx))
     // The composer's own keymap runs these chords (it knows the draft, the uploads and the IME); these rows only list
     // them in the ? sheet, so their run declines and the key goes on to the editor.
