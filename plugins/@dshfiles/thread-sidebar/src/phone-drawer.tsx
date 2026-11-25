@@ -9,6 +9,7 @@
  * inline style until the release, so a gesture never re-renders the list per frame. Closed, the drawer stays laid out but
  * hidden, so opening is a compositor transform rather than a fresh layout.
  */
+import { useDialogFocus } from '@dshfiles/plugin-ui/hooks/dialog-focus'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { DrawerGestureModel, type DrawerOpeningOrigin, type DrawerSample } from './drawer-gesture.js'
@@ -65,6 +66,8 @@ export const PhoneDrawer = (props: {
   const latest = useRef(props)
   latest.current = props
   const { open, swipeToOpen } = props
+  // Focus stays inside the open drawer: Tab cannot reach the stage behind the scrim.
+  useDialogFocus({ open, container: panelRef, trap: true })
 
   /** Follow the finger: the drawer and scrim leave their transitions and track `progress` directly. */
   const follow = (progress: number): void => {
