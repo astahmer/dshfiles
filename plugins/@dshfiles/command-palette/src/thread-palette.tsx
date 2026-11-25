@@ -3,6 +3,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from '@dshfiles/plugin-ui/components/ui/command'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
+import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
@@ -84,6 +85,8 @@ export interface ThreadPaletteCopy {
   readonly askPending: string
   readonly askSend: string
   readonly askExit: string
+  /** The phone's way out of the full-screen search, at the trailing edge of its first row. */
+  readonly cancel: string
   readonly askFailed: string
 }
 
@@ -268,6 +271,20 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     const subscription = navigationActor.on('close', () => latestOnClose.current())
     return () => subscription.unsubscribe()
   }, [navigationActor])
+  // Read once per visit: the phone shell does not change while the palette is open.
+  const [phoneShell] = useState(() => matchesPhoneShell())
+  // Closing returns focus to what was focused when the palette opened (a list row, the composer), never to the page body.
+  const [opener] = useState(() => (typeof document === 'undefined' ? null : document.activeElement))
+  useEffect(
+    () => () => {
+      if (!(opener instanceof HTMLElement)) return
+      // After the dialog's own focus scope lets go, which happens in the same unmount.
+      requestAnimationFrame(() => {
+        if (opener.isConnected && (document.activeElement === null || document.activeElement === document.body)) opener.focus({ preventScroll: true })
+      })
+    },
+    [opener],
+  )
   // Ranking happens within one palette visit, so the instant it opened is the whole clock the memo needs.
   const [openedAt] = useState(() => Date.now())
   const latestOnAsk = useRef(props.onAsk)
@@ -714,7 +731,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             <CommandInput
               autoFocus
               aria-label={props.copy.searchLabel}
-              className={cn('dshx:h-11 dshx:text-ellipsis', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16')}
+              className={cn('dshx:h-11 dshx:text-ellipsis dshx:phone:pr-20', showAskEntry && 'dshx:pr-24 dshx:pointer-coarse:pr-16 dshx:phone:pr-20')}
               value={query}
               onValueChange={next => {
                 sendNavigation({ type: 'query.change', query: next })
@@ -729,7 +746,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 title={props.copy.ask}
                 onMouseDown={event => event.preventDefault()}
                 onClick={() => sendNavigation({ type: 'ask.enter' })}
-                className="dshx:absolute dshx:right-2 dshx:top-1/2 dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:gap-2 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
+                className="dshx:absolute dshx:right-2 dshx:top-1/2 dshx:flex dshx:-translate-y-1/2 dshx:items-center dshx:gap-2 dshx:rounded dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground dshx:phone:hidden"
               >
                 <span>{props.copy.ask}</span>
                 <KbdGroup className="dshx:pointer-coarse:hidden">
@@ -737,6 +754,16 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 </KbdGroup>
               </button>
             ) : null}
+            {/* A full-screen surface on a phone has a visible way out in its first row (DESIGN.md Density). */}
+            <Button
+              type="button"
+              variant="ghost"
+              className="dshx:absolute dshx:right-1 dshx:top-0 dshx:hidden dshx:h-11 dshx:min-w-11 dshx:px-3 dshx:phone:inline-flex"
+              data-palette-cancel=""
+              onClick={() => props.onClose()}
+            >
+              {props.copy.cancel}
+            </Button>
           </div>
           <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:px-3 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground dshx:phone:flex-wrap">
             {ask || subview ? (
@@ -771,7 +798,15 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               </Tabs>
             )}
             {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
-            <span className="dshx:truncate dshx:phone:basis-full dshx:phone:whitespace-normal">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
+            <span
+              className={cn(
+                'dshx:truncate dshx:phone:basis-full dshx:phone:whitespace-normal',
+                // The prefix legend is for a keyboard: the phone keeps the row for a notice or Ask DSH's status only.
+                notice === null && !ask && !actionSnapshot.matches('failed') && 'dshx:phone:hidden',
+              )}
+            >
+              {notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}
+            </span>
           </div>
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1 dshx:phone:max-h-none dshx:phone:min-h-0 dshx:phone:flex-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
@@ -781,6 +816,17 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
                   : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
             </CommandEmpty>
+            {showAskEntry && phoneShell ? (
+              // On the phone the search row's trailing edge is Cancel, so Ask DSH leads the results instead.
+              <CommandGroup>
+                <CommandItem value="ask-dsh-entry" className={itemClass} onSelect={() => sendNavigation({ type: 'ask.enter' })}>
+                  <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+                    <MessageSquareIcon className="dshx:size-4" />
+                  </span>
+                  <span className="dshx:truncate dshx:text-sm">{props.copy.ask}</span>
+                </CommandItem>
+              </CommandGroup>
+            ) : null}
             {backlogRows.length > 0 ? (
               <CommandGroup heading={props.copy.backlog}>
                 {backlogRows.map(row => (

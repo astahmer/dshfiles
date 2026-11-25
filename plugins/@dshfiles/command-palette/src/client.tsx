@@ -312,6 +312,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         askPending: props.translate('commandPaletteAskPending'),
         askSend: props.translate('commandPaletteAskSend'),
         askExit: props.translate('commandPaletteAskExit'),
+        cancel: props.translate('commandPaletteCancel'),
         askFailed: props.translate('commandPaletteAskFailed'),
         contentSearching: props.translate('commandPaletteContentSearching'),
         contentUnavailable: props.translate('commandPaletteContentUnavailable'),

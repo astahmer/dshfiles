@@ -68,6 +68,7 @@ const copy: ThreadPaletteCopy = {
   askPending: 'Sending your question…',
   askSend: 'Send question',
   askExit: 'Back to search',
+  cancel: 'Cancel',
   askFailed: 'Ask DSH could not send that question.',
 }
 
@@ -202,6 +203,41 @@ describe('ThreadPalette navigation', () => {
     fireEvent.keyDown(input, { key: 'Escape', code: 'Escape' })
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1))
+  })
+})
+
+describe('ThreadPalette ways out', () => {
+  it('returns focus to what was focused when it opened', async () => {
+    const row = document.createElement('button')
+    row.textContent = 'A thread row'
+    document.body.append(row)
+    row.focus()
+    const view = render(
+      <ThreadPalette
+        mode="all"
+        threads={[]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    await waitFor(() => expect(document.activeElement).not.toBe(row))
+    view.unmount()
+    await waitFor(() => expect(document.activeElement).toBe(row))
+    row.remove()
+  })
+
+  it('offers Cancel in its first row, which closes it', () => {
+    const { onClose } = mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
 
