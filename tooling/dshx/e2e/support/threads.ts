@@ -69,7 +69,7 @@ export const confirmFolderSetupStep = async (page: Page, path: string): Promise<
 
 /** Send a message from whichever composer is on screen and wait until that turn settles. */
 export const sendMessage = async (page: Page, text: string): Promise<void> => {
-  const settled = page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
+  const settled = page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ })
   const before = await settled.count()
   const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true }).or(page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true }))
   await composer.fill(text)

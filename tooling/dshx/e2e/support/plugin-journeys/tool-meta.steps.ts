@@ -29,7 +29,7 @@ const timingLine = (page: Page) => page.locator('[data-dshfiles-tool-meta]')
 
 /** A settled turn folds its steps and groups its shell calls; both are reopened to reach the tool card. */
 const revealSettledToolCard = async (page: Page): Promise<void> => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const card = page.locator('[data-chat-call-id]').first()
   if (await card.isVisible()) return
   const group = page.getByText('Ran commands', { exact: true }).last()

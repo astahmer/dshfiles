@@ -1,6 +1,7 @@
 import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { memo, useLayoutEffect, useRef } from 'react'
 import type { ChatNodeViewProps } from '../contract/slots.ts'
+import type { ChatKey } from '../locale.ts'
 import { turnProcessAlwaysOpen } from '../contract/turn-process.ts'
 import { formatRunDuration } from './message-chrome.ts'
 import a11yCss from './accessibility.module.css'
@@ -67,6 +68,15 @@ export function holdReaderAboveInsert(row: HTMLElement): () => void {
 }
 
 /** Settled Turn duration and process disclosure above its content. */
+
+/**
+ * dshfiles (round four D14): what the hidden status says once a turn ends. A finished turn says "Reply ready" (the
+ * reply is what the reader waited for, not that the agent "Worked"); a failure says "Turn failed"; a stop, "Stopped".
+ */
+export const turnEndAnnouncement = (reason: string | undefined, t: (key: ChatKey) => string): string =>
+  reason === 'aborted' || reason === 'interrupted' ? t('message.stopped')
+    : reason === 'error' ? t('message.turnProcess.turnFailed')
+      : t('message.turnProcess.replyReady')
 export const TurnProcessNodeView = memo(function TurnProcessNodeView({
   node, turnProcess, t,
 }: ChatNodeViewProps<'turn-process'>) {
@@ -98,9 +108,7 @@ export const TurnProcessNodeView = memo(function TurnProcessNodeView({
     : reason === 'error' ? t('message.turnProcess.failed')
       : duration === undefined ? t('message.turnProcess.worked')
         : t('message.turnProcess.took')
-  const announcement = stopped ? t('message.stopped')
-    : reason === 'error' ? t('message.turnProcess.failed')
-      : t('message.turnProcess.worked')
+  const announcement = turnEndAnnouncement(reason, t)
   const status = <span className={a11yCss.visuallyHidden} role="status" aria-live="polite" aria-atomic="true">{announcement}</span>
   // dshfiles (unslop T10): a failed Turn stays open and its failure card says "This turn failed" right below, so a
   // "Failed" heading that folds nothing only repeats it. The announcement stays for screen readers.

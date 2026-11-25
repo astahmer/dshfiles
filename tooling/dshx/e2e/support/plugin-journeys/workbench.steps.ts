@@ -753,7 +753,7 @@ const newWorkbenchThread = async (page: Page, prompt: string): Promise<string> =
         .filter({ visible: true })
       await expect(chat).toHaveCount(1)
       await expect(chat).toContainText(prompt)
-      await expect(chat.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
+      await expect(chat.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
       return id
     } catch (error) {
       const ownership = await page.evaluate(

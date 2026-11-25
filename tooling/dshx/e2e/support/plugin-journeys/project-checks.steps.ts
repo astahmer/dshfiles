@@ -178,7 +178,7 @@ When('a thread is started in the {string} folder', async ({ page }: { page: Page
   await expect(
     page
       .getByRole('status')
-      .filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
+      .filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ })
       .last(),
   ).toBeVisible({ timeout: 60_000 })
   await expect(page.getByRole('textbox', { name: /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u })).toBeVisible()

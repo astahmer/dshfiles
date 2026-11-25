@@ -154,7 +154,7 @@ Then('the original thread shows its turns again', async ({ page }: { page: Page 
 
 Then('the original thread shows its turn again', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'session-undo-redo-returns-to-thread', async () => {
-    await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed)$/ })).toHaveCount(1, { timeout: 30_000 })
+    await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed)$/ })).toHaveCount(1, { timeout: 30_000 })
     await expectComposerMoreEnabled(page, 'Undo last turn')
   })
   await finishJourneyAssertions(page)

@@ -661,7 +661,7 @@ Then('the reply to the answer ends on screen with no "Back to bottom"', async ({
   const last = page.getByText(/^Paragraph 6 of the reply after the answer\./).last()
   await expect(last).toBeAttached({ timeout: 60_000 })
   // Both turns settled: the history turn and the one that asked.
-  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(2, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed)$/ })).toHaveCount(2, { timeout: 60_000 })
   await recordAssertion(page, 'chat-answer-follows-reply', async () => {
     await expect.poll(async () => {
       const reply = await last.boundingBox()

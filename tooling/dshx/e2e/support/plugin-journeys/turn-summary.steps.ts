@@ -35,7 +35,7 @@ When('the fake model runs one build command in a fresh workspace', async ({ page
 })
 
 Then("choosing the build command under the finished turn opens the turn and shows the command's output", async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const summary = page.locator('[data-dshfiles-turn-summary]')
   const output = page.getByText('output line number 1 of the build').first()
   await recordAssertion(page, 'turn-summary-command-output-folded-away', async () => {
@@ -79,7 +79,7 @@ Then('the finished turn opens a walkthrough naming the written files by folder',
 })
 
 Then('the finished turn names the failed command and its outcome', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const summary = page.locator('[data-dshfiles-turn-summary]')
   await recordAssertion(page, 'turn-summary-shows-tool-count-and-failure', async () => {
     await expect(summary).toBeVisible()

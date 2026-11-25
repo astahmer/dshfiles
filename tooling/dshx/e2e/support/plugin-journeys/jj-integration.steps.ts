@@ -1502,7 +1502,7 @@ Then('the New thread picker lists Projects but not the thread workspaces of a di
   await expectDraftThreadWorkspace(page, /^thread-/)
   provisionedThreads.set(page, await currentThreadName(page))
   await selectModelForNewThread(page, 'commandcode_work/gpt-6-luna')
-  const settled = page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })
+  const settled = page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ })
   const settledCount = await settled.count()
   await newThreadComposer(page).fill('jj picker workspace seed')
   await newThreadComposer(page).press('Enter')

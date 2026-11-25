@@ -74,7 +74,7 @@ When('a third real Workbench conversation has its own draft', async ({ page }: {
   await welcomeInput.fill(names.third)
   await welcomeInput.press('Enter')
   await expect(own.getByText(names.third, { exact: true })).toBeVisible()
-  await expect(own.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(own.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed|Stopped|Cancelled)$/ })).toHaveCount(1, { timeout: 60_000 })
   await expect(composer(own)).toHaveAttribute('contenteditable', 'true')
   await composer(own).fill(drafts.third)
   const ids = { first: await identity(page, names.first), second: await identity(page, names.second), third }

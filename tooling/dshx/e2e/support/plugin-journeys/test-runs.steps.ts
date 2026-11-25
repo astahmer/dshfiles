@@ -19,7 +19,7 @@ When('the fake model runs the test-runs Vitest suite in the selected workspace',
 })
 
 Then('the finished tool call shows a Vitest results card', async ({ page }: { page: Page }) => {
-  await expect(page.getByRole('status').filter({ hasText: /^(Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
+  await expect(page.getByRole('status').filter({ hasText: /^(Reply ready|Turn failed|Worked|Completed|Failed)$/ })).toHaveCount(1, { timeout: 60_000 })
   const card = page.locator('[data-chat-call-id]').first()
   const commandGroup = page.getByText('Ran commands', { exact: true }).last()
   const testCardToggle = card.getByRole('button', { name: /^Ran tests\b/ })
