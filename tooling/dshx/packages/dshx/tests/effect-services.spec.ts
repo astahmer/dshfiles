@@ -372,7 +372,7 @@ describe('HostApis', () => {
 })
 
 describe('Communication', () => {
-  it.live('lifts every bridge method and streams new inbox messages once', () =>
+  it.live('lifts the bridge methods it still serves', () =>
     Effect.gen(function* () {
       const directory = yield* temporaryDirectory('dshx-effect-communication-')
       const service = createCommunicationService({ statePath: join(directory, 'messages.json') })
@@ -380,19 +380,10 @@ describe('Communication', () => {
         Effect.promise(() => startHostCommunicationBridge(service, { stateHome: directory, listAgents: () => [] })),
         bridge => Effect.promise(() => bridge.close()),
       )
-      const sender = yield* Effect.promise(() => connectCommunicationClient({ stateHome: directory, principalId: 'sender' }))
 
       const communication = yield* Effect.provide(Communication, Communication.layer({ stateHome: directory, principalId: 'reader' }))
       expect(communication.principal).toEqual({ kind: 'external', id: 'reader' })
       expect(yield* communication.listAgents()).toEqual([])
-      yield* communication.subscribe({ topic: 'builds.ready' })
-      expect(yield* communication.listTopics()).toMatchObject([{ topic: 'builds.ready', subscribers: 1 }])
-
-      const inbox = yield* Stream.runCollect(Stream.take(communication.messages({ every: '20 millis' }), 2)).pipe(Effect.forkChild)
-      yield* Effect.promise(() => sender.publish({ topic: 'builds.ready', text: 'first' }))
-      yield* Effect.promise(() => sender.publish({ topic: 'builds.ready', text: 'second' }))
-      const received = yield* Fiber.join(inbox).pipe(Effect.timeout('5 seconds'))
-      expect(received.map(message => message.text).sort()).toEqual(['first', 'second'])
 
       const failure = yield* communication.acknowledge('not-a-uuid').pipe(Effect.flip)
       expect(failure).toBeInstanceOf(CommunicationFailed)

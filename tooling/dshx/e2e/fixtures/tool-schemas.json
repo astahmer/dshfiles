@@ -4812,10 +4812,6 @@
       "parameters": {
         "type": "object",
         "properties": {
-          "topic": {
-            "description": "Optional topic filter; use inbox for direct messages.",
-            "type": "string"
-          },
           "limit": {
             "description": "Maximum messages, 1 to 500; defaults to 20.",
             "type": "integer"

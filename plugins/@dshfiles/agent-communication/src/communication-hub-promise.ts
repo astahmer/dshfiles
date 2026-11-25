@@ -13,18 +13,13 @@ const hubOperations = [
   'browseMessages',
   'diagnostics',
   'enqueueActivity',
-  'ensureSubscription',
   'inbox',
-  'listTopics',
   'messageRecipients',
   'pruneInactiveWorkspaceTopics',
-  'publish',
   'revealMessageBody',
   'send',
-  'subscribe',
   'unreadCount',
   'unreadCounts',
-  'unsubscribe',
 ] as const
 
 /** A communication store operation failed; `code` and `detail` are the store's own error code and message. */
