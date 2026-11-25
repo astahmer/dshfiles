@@ -15,9 +15,11 @@ export interface AnnotationAnchor {
   readonly annotation: ComposerAnnotation
   /** The paragraph the marker sits beside; its step owns the locator. */
   readonly block: Element
-  /** Viewport bounds of the quoted text; the block's own bounds when that text no longer renders. */
+  /** Viewport bounds of that paragraph. */
+  readonly bounds: Box
+  /** Viewport bounds of the quoted text; the paragraph's own bounds when that text no longer renders. */
   readonly text: Box
-  /** The line the marker anchors to: the quote's last line (inline) or the block's first line (gutter). */
+  /** The line the marker anchors to: the quote's last line (inline) or the paragraph's first line (gutter). */
   readonly marker: Box
 }
 
@@ -40,12 +42,12 @@ export const annotationAnchors = (input: {
     if (block === undefined) return []
     const range = SelectionAnnotation.rangeOf({ block, text: annotation.text })
     const blockBox = boxOf(block.getBoundingClientRect())
-    if (range === undefined) return [{ annotation, block, text: blockBox, marker: blockBox }]
+    if (range === undefined) return [{ annotation, block, bounds: blockBox, text: blockBox, marker: blockBox }]
     const text = boxOf(range.getBoundingClientRect())
     const lines = [...range.getClientRects()]
     const last = lines.at(-1)
     const marker = input.mode === 'inline' && last !== undefined ? boxOf(last) : blockBox
-    return [{ annotation, block, text, marker }]
+    return [{ annotation, block, bounds: blockBox, text, marker }]
   })
 }
 
@@ -72,7 +74,9 @@ export const markerPlacement = (input: {
   readonly size?: number
 }): MarkerPlacement => {
   const size = input.size ?? MARKER_SIZE_PX
-  const left = input.mode === 'inline' ? input.anchor.marker.right + 4 : input.column.right + 6
+  const left = input.mode === 'inline'
+    ? input.anchor.marker.right + 4
+    : Math.min(input.anchor.bounds.right + 10, input.column.right + 6)
   return {
     left: clamp(left, 8, input.windowWidth - size - 8),
     top: clamp(input.anchor.marker.top + 1, input.bound.top + 4, input.bound.bottom - size - 4),
@@ -80,18 +84,18 @@ export const markerPlacement = (input: {
 }
 
 /**
- * The comments column's left edge, when the window has room for it beside the transcript.
- * @param input - the transcript column bounds, the card width, the window width and the gap from the column.
+ * The comments column's left edge, when the transcript pane leaves room for it beside the quoted paragraphs.
+ * @param input - the widest quoted paragraph's right edge, the card width, the pane's right edge and the gap.
  * @returns its fixed-position left edge, or undefined when the column would not fit.
  */
 export const columnLeft = (input: {
-  readonly column: Box
+  readonly contentRight: number
   readonly width: number
-  readonly windowWidth: number
+  readonly boundRight: number
   readonly gap: number
 }): number | undefined => {
-  const left = input.column.right + input.gap
-  return left + input.width + 8 <= input.windowWidth ? left : undefined
+  const left = input.contentRight + input.gap
+  return left + input.width + 8 <= input.boundRight ? left : undefined
 }
 
 /**

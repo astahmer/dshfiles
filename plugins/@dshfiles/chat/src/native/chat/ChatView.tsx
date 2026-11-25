@@ -565,7 +565,7 @@ export function ChatView({
   }, [recap, transcript.entries, entryTurn, jumpToTurn, dismissSince, t, railItems, unreadLanding, running])
 
   return (
-    <div ref={frameRef} className={css.frame}>
+    <div ref={frameRef} className={css.frame} data-chat-frame="">
       <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t}
         quickComment={annotationQuickComment}
         actionRow={textInteraction.active?.trigger === 'selection' ? interactionSurface : null} />

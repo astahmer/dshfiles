@@ -1,7 +1,7 @@
 /** Inline draft annotations: a marker beside each quoted passage, and its comment where the reader looks. */
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
-import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
+import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { MessageSquareTextIcon, PencilIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { Composer, useContract, type ComposerAnnotation } from '@dshfiles/dshx/client'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
@@ -32,9 +32,11 @@ interface Layout {
   readonly anchors: readonly AnnotationAnchor[]
   readonly column: Box
   readonly band: Band
+  /** Right edge of the transcript pane; the comments column may not cross it. */
+  readonly paneRight: number
 }
 
-const emptyLayout: Layout = { anchors: [], column: EMPTY_LAYOUT_COLUMN, band: { top: 0, bottom: 0 } }
+const emptyLayout: Layout = { anchors: [], column: EMPTY_LAYOUT_COLUMN, band: { top: 0, bottom: 0 }, paneRight: 0 }
 
 const boxOf = (rect: DOMRect): Box => ({ left: rect.left, top: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height })
 
@@ -78,6 +80,8 @@ const useAnnotationLayout = (input: {
       frame = undefined
       if (disposed) return
       const column = boxOf(container.getBoundingClientRect())
+      const pane = container.closest('[data-chat-frame]')?.getBoundingClientRect()
+      const paneRight = Math.min(window.innerWidth, pane?.right ?? window.innerWidth)
       const scrollport = scrollportOf(container).getBoundingClientRect()
       const composer = container.closest('[data-conversation-scroll]')?.querySelector<HTMLElement>('[data-composer-seat]')
       const composerTop = composer == null ? window.innerHeight : composer.getBoundingClientRect().top
@@ -85,7 +89,7 @@ const useAnnotationLayout = (input: {
         top: Math.max(0, scrollport.top),
         bottom: Math.min(window.innerHeight, composerTop > 0 ? composerTop : window.innerHeight),
       }
-      setLayout({ anchors: annotationAnchors({ container, annotations, mode }), column, band })
+      setLayout({ anchors: annotationAnchors({ container, annotations, mode }), column, band, paneRight })
     }
     const schedule = (): void => {
       if (frame !== undefined) return
@@ -97,6 +101,8 @@ const useAnnotationLayout = (input: {
     mutations.observe(container, { childList: true, subtree: true, characterData: true })
     const resize = new ResizeObserver(schedule)
     resize.observe(container)
+    const pane = container.closest('[data-chat-frame]')
+    if (pane !== null) resize.observe(pane)
     const scrollport = scrollportOf(container)
     view.addEventListener('resize', schedule)
     scrollport.addEventListener('scroll', schedule, { passive: true })
@@ -199,7 +205,7 @@ const Marker = ({ anchor, index, left, top, onSave, onRemove, t }: {
   readonly t: Translate
 }): ReactNode => (
   <Popover>
-    <PopoverAnchor asChild>
+    <PopoverTrigger asChild>
       <button
         type="button"
         className={css.marker}
@@ -209,7 +215,7 @@ const Marker = ({ anchor, index, left, top, onSave, onRemove, t }: {
       >
         {index + 1}
       </button>
-    </PopoverAnchor>
+    </PopoverTrigger>
     <PopoverContent side="bottom" align="start" className={css.popover}>
       <CommentBody annotation={anchor.annotation} onSave={onSave} onRemove={onRemove} t={t} />
     </PopoverContent>
@@ -261,7 +267,14 @@ export const AnnotationMarks = ({ sessionId, containerRef, mode, t }: {
   const save = (annotation: ComposerAnnotation) => (comment: string) => { composer.value.setAnnotationComment({ sessionId, id: annotation.id, comment }) }
   const remove = (annotation: ComposerAnnotation) => () => { composer.value.removeAnnotation({ sessionId, id: annotation.id }) }
   const markerTops = layout.anchors.map(anchor => markerPlacement({ anchor, mode, column: layout.column, bound: layout.band, windowWidth: width }).top)
-  const commentsLeft = mode === 'column' ? columnLeft({ column: layout.column, width: 248, windowWidth: width, gap: 24 }) : undefined
+  const commentsLeft = mode === 'column' && layout.anchors.length > 0
+    ? columnLeft({
+        contentRight: Math.max(...layout.anchors.map(anchor => anchor.bounds.right)),
+        width: 248,
+        boundRight: layout.paneRight,
+        gap: 24,
+      })
+    : undefined
   const tops = commentsLeft === undefined ? [] : stackTops({
     tops: markerTops,
     heights: layout.anchors.map((anchor, index) => cardHeights[index] ?? (anchor.annotation.comment === '' ? 96 : 128)),

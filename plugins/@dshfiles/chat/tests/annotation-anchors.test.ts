@@ -42,13 +42,14 @@ const bound = { top: 40, bottom: 800 }
 const anchor = (marker: { left: number; top: number; right: number; bottom: number } = { left: 100, top: 200, right: 700, bottom: 240 }): AnnotationAnchor => ({
   annotation: { id: 1, text: 'Where do operations stop?', comment: '', source: 'step=s1&block=0' },
   block: document.createElement('p'),
+  bounds: { left: 100, top: 200, right: marker.right, bottom: marker.bottom },
   text: marker,
   marker,
 })
 
 describe('markerPlacement', () => {
-  it('sits in the gutter right of the transcript column', () => {
-    expect(markerPlacement({ anchor: anchor(), mode: 'popover', column, bound, windowWidth: 1400 })).toEqual({ left: 786, top: 201 })
+  it('sits in the gutter just past the quoted paragraph', () => {
+    expect(markerPlacement({ anchor: anchor(), mode: 'popover', column, bound, windowWidth: 1400 })).toEqual({ left: 710, top: 201 })
   })
 
   it('sits past the quoted line in inline shape, clamped to the window', () => {
@@ -63,12 +64,12 @@ describe('markerPlacement', () => {
 })
 
 describe('columnLeft', () => {
-  it('uses the gap beside the column when it fits', () => {
-    expect(columnLeft({ column, width: 248, windowWidth: 1400, gap: 24 })).toBe(804)
+  it('uses the gap beside the quoted paragraphs when the pane fits it', () => {
+    expect(columnLeft({ contentRight: 780, width: 248, boundRight: 1400, gap: 24 })).toBe(804)
   })
 
-  it('declines when the window leaves no room', () => {
-    expect(columnLeft({ column, width: 248, windowWidth: 1040, gap: 24 })).toBeUndefined()
+  it('declines when the pane leaves no room', () => {
+    expect(columnLeft({ contentRight: 780, width: 248, boundRight: 1040, gap: 24 })).toBeUndefined()
   })
 })
 
