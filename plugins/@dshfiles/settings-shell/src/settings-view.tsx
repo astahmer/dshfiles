@@ -2,6 +2,7 @@ import type { SettingsSectionOwnerProps } from '@deepseek-ai/dsh-client-ui-setti
 import type { SettingsSectionSearchProps } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
+import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
@@ -419,13 +420,15 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   return (
     <PageViewMemoryProvider>
       <div className="dshx:@container dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-        <div className="dshx:box-border dshx:flex dshx:h-[58px] dshx:flex-none dshx:items-center dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-4 dshx:@max-pane-compact:gap-2 dshx:@max-pane-compact:px-3">
-          <div
-            className="dshx:w-[176px] dshx:shrink-0 dshx:px-2 dshx:text-base dshx:leading-6 dshx:font-medium dshx:text-foreground dshx:@max-pane-compact:sr-only"
-            id={props.titleId}
-          >
-            {props.renderSlot('settings.header', {})}
+        {/* The page header (council round 3 B3, kit A5): one h1 and a line on what the page holds, with the search,
+            Modified and the configuration file on a toolbar under it. It ends where the settings column does (the 208px
+            category list plus the 760px column), so the actions line up with the rows. A narrow pane (a phone) names
+            the page in its top bar, so the header is kept for screen readers only there. */}
+        <div className="dshx:flex dshx:flex-none dshx:flex-col dshx:gap-3 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:px-6 dshx:pt-5 dshx:pb-3 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-2 dshx:@max-pane-compact:pb-2">
+          <div className="dshx:max-w-[968px] dshx:@max-pane-compact:sr-only" data-settings-page-header="">
+            <PageHeader heading={<span id={props.titleId}>{props.renderSlot('settings.header', {})}</span>} description={t('description')} />
           </div>
+          <div className="dshx:flex dshx:max-w-[968px] dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:@max-pane-compact:gap-2" data-settings-toolbar="">
           <InputGroup className="dshx:h-8 dshx:min-w-0 dshx:max-w-[560px] dshx:flex-1">
             <InputGroupAddon>
               <SearchIcon />
@@ -484,6 +487,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
                 <span className="dshx:sr-only">{props.renderSlot('settings.close', {})}</span>
               </button>
             )}
+          </div>
           </div>
         </div>
         <div className="dshx:hidden dshx:shrink-0 dshx:border-b dshx:border-border dshx:px-3 dshx:py-2 dshx:@max-pane-compact:block">

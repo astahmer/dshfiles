@@ -55,6 +55,27 @@ afterEach(() => {
   document.body.replaceChildren()
 })
 
+describe('settings view: page header (council round 3 B3)', () => {
+  it('titles the page with one h1 and a description, with search, Modified and the actions on a toolbar under it', () => {
+    const view = mount({})
+    const header = view.host.querySelector('[data-settings-page-header]')
+    const heading = header?.querySelector('h1')
+    expect(heading).not.toBeNull()
+    expect(heading?.className).toContain('dshx:text-title')
+    expect(header?.textContent).toContain('description')
+    // The section label is printed once, as the entry heading, not as a second page title.
+    expect(view.host.querySelectorAll('h1')).toHaveLength(1)
+    const toolbar = view.host.querySelector('[data-settings-toolbar]')
+    expect(toolbar?.querySelector('[role="searchbox"]')).not.toBeNull()
+    expect(toolbar?.querySelector('[data-settings-modified-filter]')).not.toBeNull()
+    // The header comes first, the toolbar under it; both end where the settings column (208 + 760 px) ends.
+    if (header == null || toolbar == null) throw new Error('Settings header or toolbar missing')
+    expect(header.compareDocumentPosition(toolbar)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(toolbar?.className).toContain('dshx:max-w-[968px]')
+    view.unmount()
+  })
+})
+
 describe('settings view: section entries', () => {
   it('lists matching entries under their section and reveals the picked one', () => {
     const view = mount({ query: 'dark' })
