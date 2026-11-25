@@ -36,6 +36,12 @@ describe('page header (council round 3 A5)', () => {
     expect(styles).toContain('--font-weight-title: 650;')
   })
 
+  it('offers one contextual heading step, 15/20 at 600, for in-page section headings (council round 4 A4)', () => {
+    expect(resolved('--text-heading')).toBe(15)
+    expect(resolved('--text-heading--line-height')).toBe(20)
+    expect(styles).toContain('--text-heading--font-weight: 600;')
+  })
+
   it('shows a plain count in tertiary ink', () => {
     const view = render(<Page heading="Hosts" count={3} />)
     expect(classes(view.container.querySelector('[data-slot="page-count"]'))).toContain('dshx:text-faint-foreground')

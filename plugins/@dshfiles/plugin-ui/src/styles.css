@@ -134,12 +134,17 @@
 
   /*
    * Headings, tight tracking: the page `h1` 22/28 at 650 (council round 3 A5: `text-title font-title`; px, since the
-   * Host's root font is about 12.5px), 26/32 hero title.
+   * Host's root font is about 12.5px), 26/32 hero title. `text-heading` is the contextual heading (council round 4 A4):
+   * 15/20 at 600 for an in-page section heading (a Settings category's sections, an Inbox card title), one step above
+   * the 13px section title and below the page `h1`; it carries its own weight.
    */
   --text-title: 22px;
   --text-title--line-height: 28px;
   --text-title--letter-spacing: -0.01em;
   --font-weight-title: 650;
+  --text-heading: 15px;
+  --text-heading--line-height: 20px;
+  --text-heading--font-weight: 600;
   --text-display: 1.625rem;
   --text-display--line-height: 1.2308;
   --text-display--letter-spacing: -0.02em;
