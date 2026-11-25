@@ -1,7 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { BoxIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { BoxIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
@@ -65,16 +64,16 @@ export const NativeProvidersList = (props: {
               {nativeProviderSettled(provider) ? null : (
                 <span className="dshx:shrink-0 dshx:text-2xs dshx:text-muted-foreground">{nativeProviderStatus(provider, state.liveReload)}</span>
               )}
-              <Switch
-                aria-label={`${provider.enabled ? 'Disable' : 'Enable'} ${provider.label}`}
-                checked={provider.enabled}
-                disabled={toggle.isPending || provider.lockedReason !== null}
-                onCheckedChange={enabled => toggle.mutate({ entryId: provider.entryId, enabled })}
-                size="sm"
-              />
-              <Button aria-label={`Open ${provider.label}`} onClick={() => props.onSelect?.(provider.entryId)} size="icon-xs" type="button" variant="ghost">
-                <ChevronRightIcon />
-              </Button>
+              {/* Where the row selects (the AI accounts rail) the detail owns the switch; the Models page list keeps it. */}
+              {props.onSelect === undefined ? (
+                <Switch
+                  aria-label={`${provider.enabled ? 'Disable' : 'Enable'} ${provider.label}`}
+                  checked={provider.enabled}
+                  disabled={toggle.isPending || provider.lockedReason !== null}
+                  onCheckedChange={enabled => toggle.mutate({ entryId: provider.entryId, enabled })}
+                  size="sm"
+                />
+              ) : null}
             </li>
           ))}
       </ul>

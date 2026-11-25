@@ -11,7 +11,6 @@ export const AccountRail = (props: {
   readonly accounts: readonly AccountProfile[]
   readonly searching: boolean
   readonly search: string
-  readonly activeSection: AccountSection
   readonly selectedNative: string | null
   readonly onSelect: (accountId: string) => void
   readonly onSection: (accountId: string, section: AccountSection) => void
@@ -34,10 +33,8 @@ export const AccountRail = (props: {
         kind={kind}
         onMove={(instanceId, direction) => props.state.moveAccount(instanceId, direction)}
         onSelect={props.onSelect}
-        onToggle={profile => void props.state.toggleEnabled(profile)}
         reorderingDisabled={props.state.dirty || props.state.saving || props.state.reordering}
         selectedId={props.selectedNative === null ? props.state.selectedId : null}
-        activeSection={props.activeSection}
         onSection={props.onSection}
         onRename={props.onRename}
         onConnect={props.onConnect}

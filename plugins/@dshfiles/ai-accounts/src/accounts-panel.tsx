@@ -89,7 +89,6 @@ export const AccountsPanel = (props: {
               searching={search.trim() !== ''}
               search={search}
               state={state}
-              activeSection={section}
               selectedNative={nativeEntry}
               onSelect={selectAccount}
               onSection={selectSection}

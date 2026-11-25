@@ -3,7 +3,7 @@ import { PageSection } from '@dshfiles/plugin-ui/components/page'
 import { Empty, EmptyDescription } from '@dshfiles/plugin-ui/components/ui/empty'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
-import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -192,10 +192,10 @@ export const ModelCuration = (props: {
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">
-                    <Switch
+                    <Checkbox
                       aria-label={`Show ${model.name} in the picker`}
                       checked={!hidden.has(model.id)}
-                      onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, !checked) })}
+                      onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, checked !== true) })}
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">

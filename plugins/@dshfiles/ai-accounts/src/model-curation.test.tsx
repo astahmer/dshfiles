@@ -84,7 +84,9 @@ describe('reference Models table', () => {
     const add = [...container.querySelectorAll('button')].find(element => element.textContent?.includes('Add custom model'))
     await click(add ?? null)
     expect(container.querySelector('[aria-label="Additional model ID"]')).not.toBeNull()
-    expect(container.querySelectorAll('tbody [role="switch"]')).toHaveLength(9)
+    // Round five P5: a column of checkboxes, not a column of accent switches.
+    expect(container.querySelectorAll('tbody [role="switch"]')).toHaveLength(0)
+    expect(container.querySelectorAll('tbody [role="checkbox"]')).toHaveLength(9)
     expect(container.textContent).not.toContain('Default model')
   })
 

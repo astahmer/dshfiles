@@ -158,8 +158,11 @@ When('a supported legacy Codex model is selected without validating a new connec
   await expect(page.getByRole('heading', { name: 'Codex 1', exact: true })).toBeVisible()
   // This pre-existing fixture tests catalog controls only, never provider authentication or new-account admission.
   const card = providerAccounts.getByRole('listitem').filter({ has: page.getByText('Codex 1', { exact: true }) })
-  await card.getByRole('switch').click()
-  await expect(card.getByRole('switch')).toBeChecked()
+  // The rail row only selects; the account's picker switch is in its detail header.
+  await card.getByRole('button', { name: 'Select Codex 1', exact: true }).click()
+  const enabled = page.getByRole('region', { name: 'Selected account', exact: true }).getByRole('switch', { name: /model picker$/u })
+  await enabled.click()
+  await expect(enabled).toBeChecked()
   const home = profileFor(page).homeRoot
   const readLegacy = async () =>
     Schema.decodeUnknownSync(Schema.Struct({ accounts: Schema.Array(accountDraftSchema) }))(

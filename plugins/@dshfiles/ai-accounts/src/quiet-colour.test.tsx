@@ -47,7 +47,6 @@ const row = (profile: AccountProfile, selectedId: string | null, reading: typeof
         kind="codex"
         onMove={noop}
         onSelect={noop}
-        onToggle={noop}
         reorderingDisabled={false}
         selectedId={selectedId}
         usage={reading}

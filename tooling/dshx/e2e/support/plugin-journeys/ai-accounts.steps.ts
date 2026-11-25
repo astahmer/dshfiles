@@ -169,7 +169,7 @@ const addCommandCodeAccount = async (page: Page, input: { readonly name: string;
   await keyDialog.getByRole('button', { name: 'Verify and add account', exact: true }).click()
   await expect(keyDialog).toBeHidden()
   await expect(selectedAccount(page).getByRole('heading', { name: input.name, exact: true })).toBeVisible()
-  await expect(accountCard(page, input.name).getByRole('switch')).toBeChecked()
+  await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
   if (input.routeSlug === undefined) return
   // Only rename a successfully connected saved route. Keep its verified unique credential reference unchanged.
   await openAccountAdvanced(page)
@@ -371,7 +371,7 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
     await selectedAccount(page).getByRole('tab', { name: 'Models', exact: true }).click()
     await selectedAccount(page).getByRole('button', { name: 'Star gpt-6-luna', exact: true }).click()
     await expect(selectedAccount(page).getByRole('button', { name: 'Unstar gpt-6-luna', exact: true })).toHaveAttribute('aria-pressed', 'true')
-    const show = selectedAccount(page).getByRole('switch', { name: 'Show gpt-6-luna in the picker', exact: true })
+    const show = selectedAccount(page).getByRole('checkbox', { name: 'Show gpt-6-luna in the picker', exact: true })
     await show.click()
     await expect(show).not.toBeChecked()
     await expect
@@ -388,9 +388,9 @@ Then('the dashboard model routing and sign-out controls preserve saved account s
     await selectedAccount(page).getByRole('tab', { name: 'Settings', exact: true }).click()
     const routing = selectedAccount(page).getByRole('switch', { name: 'Enable for model routing', exact: true })
     await routing.click()
-    await expect(accountCard(page, 'Command Code Work').getByRole('switch')).not.toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'Hidden from model picker', exact: true })).not.toBeChecked()
     await routing.click()
-    await expect(accountCard(page, 'Command Code Work').getByRole('switch')).toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
     await expect
       .poll(async () => (await readSavedAccounts(page)).find(account => account.instanceId === 'commandcode_work'))
       .toMatchObject({ enabled: true, favoriteModelIds: [], hiddenModelIds: [] })
@@ -976,7 +976,7 @@ When('a Command Code account backed by a local fake provider is added', async ({
   const saved = await readSavedAccounts(page)
   expect(saved).toHaveLength(1)
   expect(saved[0]).toMatchObject({ enabled: true, kind: 'commandcode', instanceId: 'commandcode_work' })
-  await expect(accountCard(page, 'Command Code 1').getByRole('switch')).toBeChecked()
+  await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
 })
 
 Then('existing reference and CLI methods verify against only the loopback provider', async ({ page }: { page: Page }) => {
@@ -1076,7 +1076,7 @@ Then('failed verification reports a retry error without adding the account', asy
     await expect(page.getByRole('button', { name: /^Command Code 2: Weekly limit/ })).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(savedAccountCards(page)).toHaveCount(1)
-    await expect(accountCard(page, 'Command Code 1').getByRole('switch')).toBeChecked()
+    await expect(selectedAccount(page).getByRole('switch', { name: 'Enabled in model picker', exact: true })).toBeChecked()
     const before = await readSavedAccounts(page)
     await selectedAccount(page).getByRole('tab', { name: 'Settings', exact: true }).click()
     await selectedAccount(page).getByRole('button', { name: 'Reauthenticate', exact: true }).click()
@@ -1401,7 +1401,7 @@ Then('the sidebar moves the current thread between accounts without the model pi
     await openAccountsPanel(page)
     await accountCard(page, 'Command Code 1').getByRole('button', { name: 'Select Command Code 1', exact: true }).click()
     await selectedAccount(page).getByRole('tab', { name: 'Models', exact: true }).click()
-    const show = selectedAccount(page).getByRole('switch', { name: 'Show gpt-6-luna in the picker', exact: true })
+    const show = selectedAccount(page).getByRole('checkbox', { name: 'Show gpt-6-luna in the picker', exact: true })
     await expect(show).toBeChecked()
     await show.click()
     await expect(show).not.toBeChecked()
