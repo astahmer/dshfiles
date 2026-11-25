@@ -1,7 +1,7 @@
 {
   "totals": {
     "plugin-prefix": 12,
-    "session": 54,
+    "session": 53,
     "conversation": 22,
     "new-chat": 2,
     "integrate": 2,
@@ -59,7 +59,7 @@
     "session/ai-accounts": 2,
     "session/attachment-gallery": 1,
     "session/chat": 3,
-    "session/command-palette": 5,
+    "session/command-palette": 4,
     "session/cordis-cards": 2,
     "session/editor": 2,
     "session/frame-layout": 1,

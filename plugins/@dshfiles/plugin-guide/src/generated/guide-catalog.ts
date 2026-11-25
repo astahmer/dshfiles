@@ -835,7 +835,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/chat/turn-error-action",
       "summary": "The seat the owned Chat fork adds beside Retry on a terminal turn error: the one row of recovery actions. Published as its own contract module (`@dshfiles/chat/turn-error-action`) so a feature plugin can fill it without importing the whole Chat contract.",
-      "publicSymbol": "TurnErrorActionOwnerProps",
+      "publicSymbol": "TurnErrorActionOwnerProps, TurnFailure",
       "importFrom": "@dshfiles/chat/turn-error-action",
       "owner": "@dshfiles/chat",
       "scope": "client or host",
