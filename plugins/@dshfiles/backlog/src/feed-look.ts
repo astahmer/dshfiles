@@ -28,13 +28,10 @@ export class FeedLook {
   static readonly tagTone = (tag: string): string => `project-tone-balanced-${String(projectToneIndex(tag))}`
 
   /**
-   * The time every row of a day shares, which its divider names once instead of each row (council round 4, D4). Null
-   * when the rows differ or there is only one row.
+   * Whether the row at `index` repeats the time of the row just above it: a run of consecutive rows captured in the
+   * same minute prints its time once, on its first row (council round 5, D4). `times` are one day's rows, in order.
    */
-  static readonly sharedTime = (times: readonly string[]): string | null => {
-    const [first] = times
-    return first !== undefined && times.length > 1 && times.every(time => time === first) ? first : null
-  }
+  static readonly timeShownAbove = (times: readonly string[], index: number): boolean => index > 0 && times[index] === times[index - 1]
 
   /**
    * The one tag a row shows beside its title: only when it is the row's single chip and short, so the row stays one

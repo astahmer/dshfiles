@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, expect, test } from 'vitest'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { FeedEntryMeta } from './feed-view.js'
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 
 let root: Root | undefined
 let host: HTMLElement | undefined
@@ -30,7 +31,7 @@ test('a feed row names author and time in one trailing muted line; the id waits 
     ),
   )
   const meta = host.querySelector('[data-feed-entry-meta]')
-  const time = new Date(createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+  const time = formatClockTime(createdAt)
   expect(meta?.textContent).toBe(`You ·${time}`)
   expect(meta?.querySelector('[data-backlog-mention-handle]')?.textContent).toBe(time)
   expect(meta?.className).toContain('dshx:text-muted-foreground')
@@ -50,10 +51,11 @@ test('a feed whose rows share one author names no author on any row (council rou
     ),
   )
   const meta = host.querySelector('[data-feed-entry-meta]')
-  expect(meta?.textContent).toBe(new Date(createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }))
+  // The kit clock, so the feed agrees with every other time on screen (council round 5, D4).
+  expect(meta?.textContent).toBe(formatClockTime(createdAt))
 })
 
-test('a row whose time its day divider already names keeps the time as a hover handle (council round 4, D4)', () => {
+test('a row whose time the row above already shows keeps the time as a hover handle (council round 5, D4)', () => {
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -61,7 +63,7 @@ test('a row whose time its day divider already names keeps the time as a hover h
   act(() =>
     root?.render(
       <TooltipProvider>
-        <FeedEntryMeta item={{ id: 3, ref: 'w33f', title: 'Feed item', createdAt }} author="user" showAuthor={false} timeInDivider />
+        <FeedEntryMeta item={{ id: 3, ref: 'w33f', title: 'Feed item', createdAt }} author="user" showAuthor={false} timeShownAbove />
       </TooltipProvider>,
     ),
   )

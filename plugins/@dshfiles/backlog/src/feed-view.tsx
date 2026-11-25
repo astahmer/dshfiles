@@ -22,6 +22,7 @@ import { useBacklogActions } from './use-backlog-actions.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { FeedLook } from './feed-look.js'
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 
 const DAY_MS = 86_400_000
 /** Like a chat history: the newest page is mounted first, older entries appear as the scroller reaches its top. */
@@ -34,7 +35,8 @@ const dayLabel = (time: number, now: number): string => {
   return new Date(time).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })
 }
 
-const rowTime = (time: number): string => new Date(time).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+/** The kit clock, so a row's time reads like every other time on screen (council round 5, D4). */
+const rowTime = (time: number): string => formatClockTime(time)
 
 /** "Agent 80c6ed moved it inbox → doing · 4 updates": the actor stays separate so it can link to its thread. */
 const activityLine = (item: BacklogSummaryView): { readonly actorId: string; readonly summary: string } | null => {
@@ -64,8 +66,8 @@ export const FeedEntryMeta = (props: {
   readonly item: { readonly id: number; readonly ref?: string | undefined; readonly title: string; readonly createdAt: number }
   readonly author: string | undefined
   readonly showAuthor?: boolean
-  /** The day divider already names this time: the row keeps it as a handle that shows on hover or focus (round 4, D4). */
-  readonly timeInDivider?: boolean
+  /** The row above shows the same time: this row keeps it as a handle that shows on hover or focus (round 5, D4). */
+  readonly timeShownAbove?: boolean
 }): JSX.Element => (
   <span
     data-feed-entry-meta=""
@@ -80,7 +82,7 @@ export const FeedEntryMeta = (props: {
         <span
           data-feed-entry-time=""
           className={cn(
-            props.timeInDivider === true &&
+            props.timeShownAbove === true &&
               'dshx:opacity-0 dshx:transition-opacity dshx:group-hover/entry:opacity-100 dshx:focus-within:opacity-100 dshx:pointer-coarse:opacity-100',
           )}
         >
@@ -108,7 +110,7 @@ const FeedEntry = (props: {
   readonly showAuthor: boolean
   /** A tag's fixed tone (`FeedLook.tagTone`). */
   readonly tagTone: (tag: string) => string
-  readonly timeInDivider: boolean
+  readonly timeShownAbove: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
   const item = props.item
@@ -191,7 +193,7 @@ const FeedEntry = (props: {
             )}
             {inlineTag === null ? null : tagChip(inlineTag)}
           </div>
-          <FeedEntryMeta item={item} author={author} showAuthor={props.showAuthor} timeInDivider={props.timeInDivider} />
+          <FeedEntryMeta item={item} author={author} showAuthor={props.showAuthor} timeShownAbove={props.timeShownAbove} />
           {item.preview === '' ? null : (
             <BacklogText
               text={item.preview}
@@ -329,16 +331,8 @@ export const FeedView = (props: {
   const selection = useBacklogSelection({ items: [...pinned, ...visible], openId: props.openId, scope: JSON.stringify(props.statuses) })
   const lastId = ordered.at(-1)?.id
   const showAuthor = FeedLook.authorsDiffer([...pinned, ...ordered])
-  /** Per day divider, the time its rows all show (when they were captured in the same minute that day). */
-  const dayRows = new Map<string, BacklogSummaryView[]>()
-  for (const item of visible) {
-    const label = dayLabel(backlogSortTime(item, props.sort), now)
-    dayRows.set(label, [...(dayRows.get(label) ?? []), item])
-  }
-  const sharedTimes = new Map<string, string | null>()
-  for (const [label, rows] of dayRows) {
-    sharedTimes.set(label, rows.every(row => dayLabel(row.createdAt, now) === label) ? FeedLook.sharedTime(rows.map(row => rowTime(row.createdAt))) : null)
-  }
+  /** Each row's printed time; a run of same-minute rows under one divider shows it once (council round 5, D4). */
+  const times = visible.map(item => rowTime(item.createdAt))
 
   useLayoutEffect(() => {
     const element = scroller.current
@@ -354,16 +348,12 @@ export const FeedView = (props: {
     const label = dayLabel(itemDate, now)
     const previous = visible[index - 1]
     const separator = previous === undefined || dayLabel(backlogSortTime(previous, props.sort), now) !== label
-    const shared = sharedTimes.get(label) ?? null
     return (
       <div key={item.id}>
+        {/* Start-aligned on the rows' glyph edge, the rule running after it (council round 5, D4). */}
         {separator ? (
           <div role="separator" className="dshx:my-2 dshx:flex dshx:items-center dshx:gap-3 dshx:px-2">
-            <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
-            <span className="dshx:text-2xs dshx:font-medium dshx:text-muted-foreground dshx:tabular-nums">
-              {label}
-              {shared === null ? '' : ` · ${shared}`}
-            </span>
+            <span className="dshx:text-2xs dshx:font-medium dshx:text-muted-foreground dshx:tabular-nums">{label}</span>
             <span className="dshx:h-px dshx:flex-1 dshx:bg-border" />
           </div>
         ) : null}
@@ -379,7 +369,7 @@ export const FeedView = (props: {
           openThread={props.openThread}
           showAuthor={showAuthor}
           tagTone={FeedLook.tagTone}
-          timeInDivider={shared !== null}
+          timeShownAbove={!separator && FeedLook.timeShownAbove(times, index)}
         />
       </div>
     )

@@ -86,13 +86,20 @@ describe('Backlog feed (council round 3, D2)', () => {
     expect(feed).toMatch(/tagTone=\{FeedLook\.tagTone\}/u)
   })
 
-  it('names a time shared by every row of a day once, in its divider', () => {
-    expect(FeedLook.sharedTime(['07:16 PM', '07:16 PM', '07:16 PM'])).toBe('07:16 PM')
-    expect(FeedLook.sharedTime(['07:16 PM', '07:17 PM'])).toBeNull()
-    // One row has nothing to repeat: its own time stays on the row.
-    expect(FeedLook.sharedTime(['07:16 PM'])).toBeNull()
-    expect(feed).toMatch(/\{label\}\s*\{shared === null \? '' : ` · \$\{shared\}`\}/u)
-    expect(feed).toMatch(/timeInDivider=\{shared !== null\}/u)
+  it("prints one time per run of consecutive same-minute rows, on the run's first row (council round 5, D4)", () => {
+    const times = ['08:41', '08:41', '08:41', '08:42', '08:42', '08:41']
+    expect(times.map((_, index) => FeedLook.timeShownAbove(times, index))).toEqual([false, true, true, false, true, false])
+    expect(FeedLook).not.toHaveProperty('sharedTime')
+    expect(feed).not.toContain('sharedTimes')
+    expect(feed).toMatch(/timeShownAbove=\{/u)
+  })
+
+  it('start-aligns the day divider with the rows: its label first, one rule after it (council round 5, D4)', () => {
+    const divider = /<div role="separator" className="([^"]*)">([\s\S]*?)<\/div>/u.exec(feed)
+    expect(divider?.[1]).toContain('dshx:px-2')
+    const body = divider?.[2] ?? ''
+    expect(body.match(/dshx:h-px dshx:flex-1 dshx:bg-border/gu)).toHaveLength(1)
+    expect(body.indexOf('{label}')).toBeLessThan(body.indexOf('dshx:h-px'))
   })
 
   it('puts one short tag inline with the title, and keeps a second line for previews or several chips', () => {
