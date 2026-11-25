@@ -300,6 +300,8 @@ function pins(theme: SchemeTheme): string[] {
   const out: string[] = []
   const push = (name: string, value: string) => out.push(`  ${name}: ${value};`)
   NEUTRAL_ROLES.forEach((role, step) => push(`--dshx-tone-${step}`, theme.colours[role]))
+  // The nav column is the theme's own panel colour (council round 6 A4 lifts only the generated dark palette).
+  push('--dshx-tone-nav', theme.colours.panel)
   push('--dshx-tone-accent', theme.colours.accent)
   push('--dshx-tone-accent-bg', rgba(theme.colours.accent, 0.14))
   push('--dshx-tone-accent-border', rgba(theme.colours.accent, 0.35))

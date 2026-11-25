@@ -66,6 +66,8 @@ describe('theme definitions', () => {
     const css = AppearanceModel.runtimeThemeCss(settings)
     expect(css).toContain(`${RUNTIME_DARK_SELECTOR} {\n  --dshx-tone-0: #2e3440;`)
     expect(css).toContain('--shiki-token-keyword: #81a1c1;')
+    // A pinned theme's panel is its nav column too (council round 6 A4): the generated lift never overrides it.
+    expect(css).toContain(`--dshx-tone-nav: ${NORD.dark!.colours.panel};`)
     expect(css).toContain(`${RUNTIME_DARK_SELECTOR} ${BACKDROP_HOST}::before {`)
     expect(css).toContain('animation: nord-drift 9s infinite;')
     expect(css).toContain('@keyframes nord-drift')

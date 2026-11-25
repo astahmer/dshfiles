@@ -43,6 +43,7 @@ html body {
   --dshx-wash-failed: oklch(0.94 0.031 25);
   --dshx-field-border: oklch(0.61 0.01 65);
   --dshx-prompt-fill: oklch(0.965 0.012 230);
+  --dshx-tone-nav: oklch(0.962 0.0035 65);
   --dshx-primary-fill: oklch(0.3 0.01 65);
   --dshx-primary-hover: oklch(0.24 0.01 65);
   --dshx-tone-success: oklch(0.5 0.15 150);
@@ -145,7 +146,7 @@ html body {
   --dsw-alias-state-error-primary: var(--dshx-tone-danger);
   --dsw-alias-code-diff-added: var(--dshx-tone-success-bg);
   --dsw-alias-code-diff-deleted: var(--dshx-tone-danger-bg);
-  --dsw-specific-sidebar-fill: var(--dshx-tone-1);
+  --dsw-specific-sidebar-fill: var(--dshx-tone-nav);
   --dsw-specific-sidebar-nav-item-active: var(--dshx-tone-3);
   --dsw-specific-sidebar-nav-item-active-accent: var(--dshx-tone-accent-bg);
   --dsw-specific-bubble: var(--dshx-tone-2);
@@ -200,6 +201,7 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dshx-wash-failed: oklch(0.255 0.032 25);
   --dshx-field-border: oklch(0.55 0.01 65);
   --dshx-prompt-fill: oklch(0.255 0.018 230);
+  --dshx-tone-nav: oklch(0.225 0.006 60);
   --dshx-primary-fill: oklch(0.88 0.006 65);
   --dshx-primary-hover: oklch(0.7827 0.0061 65);
   --dshx-tone-success: oklch(0.75 0.14 150);
@@ -302,7 +304,7 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dsw-alias-state-error-primary: var(--dshx-tone-danger);
   --dsw-alias-code-diff-added: var(--dshx-tone-success-bg);
   --dsw-alias-code-diff-deleted: var(--dshx-tone-danger-bg);
-  --dsw-specific-sidebar-fill: var(--dshx-tone-1);
+  --dsw-specific-sidebar-fill: var(--dshx-tone-nav);
   --dsw-specific-sidebar-nav-item-active: var(--dshx-tone-3);
   --dsw-specific-sidebar-nav-item-active-accent: var(--dshx-tone-accent-bg);
   --dsw-specific-bubble: var(--dshx-tone-2);

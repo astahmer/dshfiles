@@ -16,12 +16,13 @@
   body {
     /*
      * Surface roles (council round 5 A4; DESIGN.md › Elevation & Depth). Every navigation column (the thread list,
-     * the Settings categories, a master list beside a detail) sits on `nav`, the panel step (#F4F2F0 light, #1B1815
-     * dark); every page sits on `stage`, the canvas (#FEFCFA / #15120F). They follow the active theme's steps; the
+     * the Settings categories, a master list beside a detail) sits on `nav` (`--dshx-tone-nav`, also the Host sidebar
+     * fill): the panel step #F4F2F0 in light, lifted to oklch(0.225 0.006 60) #1E1B19 in dark (council round 6 A4) so
+     * column and page separate without a hairline; every page sits on `stage`, the canvas (#FEFCFA / #15120F). They follow the active theme's steps; the
      * Host fallbacks hold without ui-styles. `surface-nav` / `surface-stage` also set `--dshx-surface`, the fill a
      * fade, a badge ring or a sticky header blends into.
      */
-    --dshx-surface-nav: var(--dshx-tone-panel, var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1)));
+    --dshx-surface-nav: var(--dshx-tone-nav, var(--dshx-tone-panel, var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1))));
     --dshx-surface-stage: var(--dshx-tone-bg, var(--dsw-alias-bg-base));
     --dshx-dialog-fill: var(--dsw-alias-bg-base);
     --dshx-dialog-border: var(--dsw-alias-border-l2);

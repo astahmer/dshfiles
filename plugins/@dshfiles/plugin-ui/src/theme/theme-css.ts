@@ -130,7 +130,8 @@ export const HOST_ALIASES: readonly AliasRow[] = [
   ['--dsw-alias-state-error-primary', 'var(--dshx-tone-danger)', 'var(--dshx-tone-danger)'],
   ['--dsw-alias-code-diff-added', 'var(--dshx-tone-success-bg)', 'var(--dshx-tone-success-bg)'],
   ['--dsw-alias-code-diff-deleted', 'var(--dshx-tone-danger-bg)', 'var(--dshx-tone-danger-bg)'],
-  ['--dsw-specific-sidebar-fill', 1, 1],
+  // The nav column's own tone (council round 6 A4): the panel step in light, lifted in dark.
+  ['--dsw-specific-sidebar-fill', 'var(--dshx-tone-nav)', 'var(--dshx-tone-nav)'],
   ['--dsw-specific-sidebar-nav-item-active', 3, 3],
   ['--dsw-specific-sidebar-nav-item-active-accent', 'var(--dshx-tone-accent-bg)', 'var(--dshx-tone-accent-bg)'],
   ['--dsw-specific-bubble', 2, 2],
@@ -208,6 +209,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-wash-failed', PaletteMath.toCss(p.failedWash))
   push('--dshx-field-border', PaletteMath.toCss(p.fieldBorder))
   push('--dshx-prompt-fill', PaletteMath.toCss(p.promptFill))
+  push('--dshx-tone-nav', PaletteMath.toCss(p.navSurface))
   push('--dshx-primary-fill', PaletteMath.toCss(p.primaryFill))
   push('--dshx-primary-hover', PaletteMath.toCss(p.primaryHover))
   for (const key of ['success', 'warning', 'danger', 'info'] as const) {

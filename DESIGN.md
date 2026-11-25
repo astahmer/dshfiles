@@ -25,6 +25,7 @@ colors:
   ink-dark: '#eae7e4'
   paper-dark: '#15120f'
   surface-panel-dark: '#1b1815'
+  surface-nav-dark: '#1e1b19'
   surface-raised-dark: '#23201d'
   border-hairline-dark: '#2f2c29'
   field-border-dark: '#76706c'
@@ -227,7 +228,8 @@ No slate shell: navigation surfaces keep the warm stone.
 | Step            | Job                                  | Tailwind token               | Host variable                                                  | Light     | Dark      |
 | --------------- | ------------------------------------ | ---------------------------- | -------------------------------------------------------------- | --------- | --------- |
 | 0 bg            | page, cards in light                 | `background`, `card` (light) | `--dsw-alias-bg-base`                                          | `#fefcfa` | `#15120f` |
-| 1 panel         | sidebar, code blocks, dark cards     | `card` (dark)                | `--dsw-specific-sidebar-fill`, `--dsw-alias-bg-layer-1` (dark) | `#f4f2f0` | `#1b1815` |
+| 1 panel         | code blocks, dark cards              | `card` (dark)                | `--dsw-alias-bg-layer-1` (dark)                                | `#f4f2f0` | `#1b1815` |
+| nav             | sidebar, rail, navigation columns    | `surface-nav`                | `--dshx-tone-nav`, `--dsw-specific-sidebar-fill`               | `#f4f2f0` | `#1e1b19` |
 | 2 raised        | hover fill, chips, tab track         | `muted`, `secondary`         | `--dsw-alias-bg-module-platform`                               | `#ebe9e7` | `#23201d` |
 | 3 selected      | selected row, active nav             | —                            | `--dsw-specific-sidebar-nav-item-active`                       | `#e4e2e0` | `#292623` |
 | 4 line          | hairline border                      | `border`                     | `--dsw-alias-border-l2`                                        | `#dedcda` | `#2f2c29` |
@@ -338,7 +340,7 @@ work on any surface.
     lower (teal and cyan in light, about 0.105), so no tone reads muddy; every hue 25° or more from the status hues
     (25, 80, 150, 270); Threads at hue 235 or less and 30° or more from Land; every pair ΔE 0.06 or more; the glyph
     3:1 on bg, panel, raised and its own 14% tile, the ink label AA on that tile. The phone tab bar uses the same tones.
-    **Rail surface.** The rail is one surface in every state: the panel step (`--dsw-specific-sidebar-fill`) beside a
+    **Rail surface.** The rail is one surface in every state: the nav tone (`--dsw-specific-sidebar-fill`) beside a
     page on bg, whichever destination is open, whether its side column is open or folded. A destination never repaints
     the rail. **Active destination tab.** The active main tab of a destination page (Inbox, Backlog, Usage, Review,
     Settings, Plugins…) draws the destination's glyph in its nav tone (`text-nav-<id>`, or `nav-tone-<id>` with
@@ -503,7 +505,10 @@ shadow. Four elevation levels, and only the composer floats at rest:
 | s3    | `shadow-s3`        | Dialogs and phone bottom sheets                    |
 
 **Two surface roles** (`surfaces.css`). Every navigation column — the thread list, the Settings categories, a master
-list beside its detail — sits on `nav`, the panel step (`#F4F2F0` light, `#1B1815` dark); every page sits on
+list beside its detail — sits on `nav` (`--dshx-tone-nav`, also the Host sidebar fill): the panel step `#F4F2F0` in
+light; in dark it is lifted to `oklch(0.225 0.006 60)` (`#1E1B19`, from the panel's `#1B1815`) so column and page
+separate without relying on a hairline (**dark layering**; every text role AA, field edges 3:1 on it). A custom
+theme's own panel colour stays its nav. Every page sits on
 `stage`, the canvas (`#FEFCFA` / `#15120F`). Write `dshx:surface-nav` / `dshx:surface-stage` (they also set
 `--dshx-surface`, the fill a fade, a badge ring or a sticky header blends into) or `dshx:bg-surface-nav` /
 `dshx:bg-surface-stage`; CSS modules read `var(--dshx-surface-nav)` / `var(--dshx-surface-stage)`. The roles follow the
