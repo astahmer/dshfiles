@@ -66,6 +66,29 @@ describe('secret reference resolution', () => {
     }),
   )
 
+  it.effect('resolves a vault item named global/<alias> when no config declares the alias', () =>
+    Effect.gen(function* () {
+      const fixture = catalogWithRows({
+        rows: [],
+        unaliased: [{ alias: 'TOKEN', item: 'global/token', field: 'password' }],
+        value: 'vault-item-value',
+      })
+      expect(yield* resolve(fixture, { reference: { alias: 'TOKEN', environment: 'prod' }, cwd: null })).toBe('vault-item-value')
+      expect(reveals(fixture)).toEqual([{ args: ['get', 'TOKEN', '--env', 'prod', '--config', expectGlobalConfig()], cwd: null }])
+    }),
+  )
+
+  it.effect('keeps the vault fallback out of a folder-scoped resolution and out of a non-default environment', () =>
+    Effect.gen(function* () {
+      const folder = catalogWithRows({ rows: [], unaliased: [{ alias: 'TOKEN', item: 'global/token', field: 'password' }] })
+      const projectError = yield* Effect.flip(resolve(folder, { reference: { alias: 'TOKEN', environment: 'prod' }, cwd: '/tmp/project' }))
+      expect(projectError.message).toContain('No secret alias TOKEN is configured')
+      const devError = yield* Effect.flip(resolve(folder, { reference: { alias: 'TOKEN', environment: 'dev' }, cwd: null }))
+      expect(devError.message).toContain('No secret alias TOKEN is configured for environment dev.')
+      expect(reveals(folder)).toEqual([])
+    }),
+  )
+
   it.effect('refuses a duplicate alias rather than guessing its scope', () =>
     Effect.gen(function* () {
       const fixture = catalogWithRows({ rows: [row({ scope: 'global' }), row({ scope: 'project' })] })

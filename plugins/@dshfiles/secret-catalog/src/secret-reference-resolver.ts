@@ -1,7 +1,7 @@
 import type { SecretReferenceResolution } from '@dshfiles/credential-port'
 import { secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import { Effect, Option, Schema } from 'effect'
-import { SecretCatalog } from './secret-catalog.js'
+import { SecretCatalog, type UnaliasedSecret } from './secret-catalog.js'
 
 const unresolvedMessages = {
   missing: (alias: string, environment: string) => `No secret alias ${alias} is configured for environment ${environment}. Add it in the Secret Catalog first.`,
@@ -29,7 +29,9 @@ export class SecretReferenceUnresolved extends Schema.TaggedError<SecretReferenc
 /**
  * Resolves a stored `secret:ALIAS[@env]` reference on the Host, through the same CLI path the Catalog reveals with.
  * A folder given by the caller also covers its project and machine-local aliases; without one only global aliases
- * resolve, so a settings field never picks up an unrelated project's secret.
+ * resolve, so a settings field never picks up an unrelated project's secret. When no config declares the alias, the
+ * vault itself answers: the CLI reads a unique item named `global/<alias>`, which is what `secret set --global`
+ * creates, so a machine that only unlocked the vault resolves the reference without a per-device config entry.
  */
 export const resolveSecretValue = Effect.fn('secret resolve')(function* (input: Omit<SecretReferenceResolution, 'signal'>) {
   const catalog = yield* SecretCatalog
@@ -38,7 +40,15 @@ export const resolveSecretValue = Effect.fn('secret resolve')(function* (input: 
   yield* Effect.annotateCurrentSpan({ 'secret.alias': alias, 'secret.environment': environment, 'secret.project_scoped': input.cwd !== null })
   const matches = (yield* catalog.list(input.cwd)).filter(row => row.alias === alias && row.environment === environment)
   const [match] = matches
-  if (match === undefined) return yield* new SecretReferenceUnresolved({ reason: 'missing', alias, environment })
+  if (match === undefined) {
+    // The fallback is global-only and lives in the default environment: a vault item carries neither scope nor env.
+    const fallback =
+      input.cwd === null && environment === 'prod' ? yield* catalog.unaliased.pipe(Effect.orElseSucceed((): readonly UnaliasedSecret[] => [])) : []
+    const vaultItem = fallback.find(row => row.alias === alias)
+    if (vaultItem === undefined) return yield* new SecretReferenceUnresolved({ reason: 'missing', alias, environment })
+    yield* Effect.annotateCurrentSpan({ 'secret.scope': 'global', 'secret.source': 'vault-item' })
+    return yield* catalog.reveal({ alias, scope: 'global', cwd: null, environment })
+  }
   if (matches.length > 1) return yield* new SecretReferenceUnresolved({ reason: 'ambiguous', alias, environment })
   const scope = Schema.decodeUnknownOption(secretScopeSchemaEffect)(match.scope)
   if (Option.isNone(scope) || (input.expectedScope !== undefined && scope.value !== input.expectedScope))
