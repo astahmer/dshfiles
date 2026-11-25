@@ -61,8 +61,9 @@ Shipped in the `thread-1a2f07` workspace (not on main yet):
     collapsing to a spinner; older-page/search keep the spinner. Typecheck + build clean. Gestures and `jj op undo`
     remain, the gesture half blocked on P12.
 15. **P16 (partial)** — generated output, vendored code and lockfiles are folded below the changed-file list
-    (`isNoiseFile`, two tests); the reviewable files lead and "Mark all viewed" still covers everything. Still open:
-    one-file-at-a-time diff sheet, wrap toggle, tap-line-to-quote on the phone.
+    (`isNoiseFile`, two tests), and below 640px the patch view renders one file at a time, the changed-file list acting
+    as the picker (desktop keeps every file). Still open: explicit wrap toggle and a dedicated file sheet;
+    tap-a-diff-line-to-quote is already possible through line selection and the comment box.
 
 Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
 restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
