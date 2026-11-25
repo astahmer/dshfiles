@@ -10,6 +10,7 @@ import { DiffToolCard, type DiffTranslate } from './diff-tool-card.js'
 import { TOOL_META_LOCALE_NAMESPACE, toolMetaLocale } from './locales.js'
 import { NativeToolView } from './native-tool-view.js'
 import { ReadToolCard, type ReadTranslate } from './read-tool-card.js'
+import { SpillNotice } from './spill-notice.js'
 import { ToolCallSections, type ToolCallSectionProps } from './tool-call-sections.js'
 import { installToolCallTreeWrapper, isToolCallTreeWrapped } from './tool-call-tree.js'
 import { toolMetaSettings } from './settings.js'
@@ -18,10 +19,11 @@ import { warnOnce } from './warn-once.js'
 
 const ToolCallSectionList = (props: ToolCallSectionProps): JSX.Element | null => {
   const sections = useRegistry(ToolCallSections)
-  if (sections.length === 0) return null
   const ordered = sections.toSorted((left, right) => (left.order ?? 0) - (right.order ?? 0))
   return (
     <>
+      {/* First under the card: a way to the whole output when DSH cut it and stored the rest. */}
+      <SpillNotice owner={props.owner} />
       {ordered.map(({ id, Section }) => (
         <Section key={id} owner={props.owner} sessionId={props.sessionId} />
       ))}
