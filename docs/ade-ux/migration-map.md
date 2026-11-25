@@ -633,7 +633,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | main-tabs/new-tab-page: Open a new tab with suggestions of what to show | command | main-tabs: New tab |
 | main-tabs/tab-keyboard: Jump between tabs from the keyboard | command | keyboard: tab jumps |
 | pull-requests/github-pull-request-create: Create a GitHub pull request from a thread | command | palette: Create pull request from this thread (dialog) |
-| shortcuts/panel-selection-chords: Select native panels with keyboard shortcuts | command | keyboard: Mod+N / Mod+, |
+| shortcuts/panel-selection-chords: Shortcuts that leave text fields and the terminal alone | command | keyboard: every bound chord |
 | shortcuts/scoped-key-layers: Single keys, sequences and scoped keys | command | keyboard: J / K / E / ? / G then I |
 | shortcuts/shortcut-cheat-sheet: Keyboard shortcut sheet | command | keyboard: ? / Mod+/ |
 | shortcuts/sidebar-toggle-chord: Toggle the sidebar with the platform primary chord | command | keyboard: Mod+B |

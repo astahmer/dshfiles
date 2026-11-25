@@ -240,7 +240,7 @@ From the onboarding feature catalog: 208 features, the 100 curated ones first.
 87. **Keep palette ranking within the interaction budget** (`command-palette`) — The palette stays fast to open and to type in, even with many threads and files.
 88. **Commands show the keys they answer to** (`command-palette`) — Each command shows the keys it answers to, including the ones you changed.
 89. **Toggle the sidebar with the platform primary chord** (`shortcuts`) — Press Cmd+B on a Mac, or Ctrl+B elsewhere, to show or hide the sidebar.
-90. **Select native panels with keyboard shortcuts** (`shortcuts`) — Press Cmd+N or Cmd+, to open their panels, without taking keys from text fields or the terminal.
+90. **Shortcuts that leave text fields and the terminal alone** (`shortcuts`) — Shortcuts never take keys from a text field or the terminal unless they are meant to.
 91. **Rebindable command keys** (`shortcuts`, settings) — Change the keys of any command in Keyboard shortcuts, and the new keys work at once.
 92. **Single keys, sequences and scoped keys** (`shortcuts`) — Single keys and two-key sequences such as G then I work where they apply, never while you type.
 93. **Keyboard shortcut sheet** (`shortcuts`) — Press ? or Cmd+/ to see every shortcut, grouped by where it works.
