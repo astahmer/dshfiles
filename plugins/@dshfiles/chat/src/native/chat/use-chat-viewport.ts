@@ -85,6 +85,8 @@ export class ChatViewport {
   private events: ViewportEvents | null = null
   private turns: ReturnType<ChatSnapshot['navigation']['items']> = []
   private observation: { top: number; landing: ViewportLanding | null } = { top: 0, landing: null }
+  /** dshfiles (unslop r5 C1): an unread landing the range could not reach yet; see {@link ChatViewport.landAtUnread}. */
+  private heldUnread: { row: HTMLElement; label: string } | null = null
   private paging: PagingPosition | null = null
   private historyPrepend: PagingPosition | null = null
   private reader: FoldReader | null = null
@@ -845,7 +847,33 @@ export class ChatViewport {
     // dshfiles (unslop r5 C3): a 24px inset showed the bottom half of the Turn's "Worked for" row (12px above the
     // answer) cut by the scrollport's top edge. That row now lands whole, 12px below the edge; with no such row
     // directly above, the answer lands 12px below it, inside the smallest flow gap, so nothing above shows clipped.
-    return this.align(row, UNREAD_TOP_INSET + this.leadIn(row), Number.isInteger(turn) ? turn : null)
+    const offset = UNREAD_TOP_INSET + this.leadIn(row)
+    const landing = this.align(row, offset, Number.isInteger(turn) ? turn : null)
+    // dshfiles (unslop r5 C1, council round 3): on open the Turn's tail (its summary, the edit card) mounts after the
+    // landing, so the range may still end short of it: the landing stops at the floor, and the reading policy then
+    // followed the floor down as the tail grew, cutting "Worked for" again. A landing that fell short is held and
+    // re-applied as rows below mount (`resumeUnreadLanding`), until it is reached or the reader scrolls.
+    const short = landing?.position !== null && landing?.position !== undefined && landing.position.anchorTop > offset + 1
+    this.heldUnread = short ? { row, label } : null
+    return landing
+  }
+
+  /**
+   * Re-apply an unread landing that the content could not reach yet, after it grew.
+   * @returns the new landing, or null when no landing is held (reached, dropped, or its row left).
+   */
+  resumeUnreadLanding(): ViewportLanding | null {
+    const held = this.heldUnread
+    if (held === null || !held.row.isConnected) {
+      this.heldUnread = null
+      return null
+    }
+    return this.landAtUnread(held.row, held.label)
+  }
+
+  /** The reader scrolled or typed: a held unread landing no longer moves the transcript. */
+  dropUnreadLanding(): void {
+    this.heldUnread = null
   }
 
   /**

@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ChatViewport } from '../src/native/chat/use-chat-viewport.ts'
 import { SeenAnswers } from '../src/native/unread-landing.ts'
@@ -171,5 +174,77 @@ describe('ChatViewport unread landing geometry (round five C3)', () => {
   it('lands an answer with no row directly above it 12px below the top edge', () => {
     // The prompt above ends 100px before the answer: nothing of it shows within the 12px inset.
     expect(landing(false).scrollTop).toBe(1000 - 12)
+  })
+})
+
+describe('an unread landing the content cannot reach yet (round five C1, council round 3)', () => {
+  beforeEach(() => {
+    vi.stubGlobal('ResizeObserver', InertResizeObserver)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    document.body.replaceChildren()
+  })
+
+  const setup = () => {
+    const answer = row({ key: 'answer', turn: 2, answer: true })
+    const worked = document.createElement('div')
+    worked.dataset.chatFlowKind = 'turn-process'
+    const answerItem = document.createElement('div')
+    answerItem.dataset.chatFlowKind = 'assistant-step'
+    answerItem.append(answer)
+    const scroller = document.createElement('div')
+    scroller.dataset.conversationScroll = ''
+    const list = document.createElement('div')
+    const column = document.createElement('div')
+    column.append(worked, answerItem)
+    list.append(column)
+    scroller.append(list)
+    document.body.append(scroller)
+    Object.defineProperty(scroller, 'clientHeight', { configurable: true, value: 600 })
+    // The turn's tail (its summary, the edit card) has not mounted yet: the range ends 23px short of the landing.
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 600 + 929 })
+    // SAFETY: the viewport reads only the box fields set here; DOMRect's other members are never called.
+    scroller.getBoundingClientRect = () => ({ top: 0, bottom: 600, height: 600, left: 0, right: 600, width: 600, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect
+    place(worked, scroller, 964, 24)
+    place(answerItem, scroller, 1000, 400)
+    place(answer, scroller, 1000, 400)
+    const viewport = new ChatViewport()
+    viewport.attach(list, column)
+    viewport.updateTurns([{ turn: 2, anchorKey: 'turn-2', prompt: '', response: '' }])
+    return { viewport, scroller }
+  }
+
+  it('lands at the floor, then puts "Worked for" 12px below the top once the rows below mount, not at the new floor', () => {
+    const { viewport, scroller } = setup()
+    const answer = document.querySelector<HTMLElement>('[data-chat-anchor-key="answer"]')
+    if (answer === null) throw new Error('no answer row')
+    viewport.landAtUnread(answer, 'New')
+    expect(scroller.scrollTop).toBe(929)
+    // The tail mounts: the range grows past the landing.
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 600 + 1100 })
+    const resumed = viewport.resumeUnreadLanding()
+    expect(resumed).not.toBeNull()
+    expect(scroller.scrollTop).toBe(964 - 12)
+    // Reached: nothing is held any more, so later growth leaves the reader where they are.
+    expect(viewport.resumeUnreadLanding()).toBeNull()
+  })
+
+  it('lets go once the reader scrolls', () => {
+    const { viewport, scroller } = setup()
+    const answer = document.querySelector<HTMLElement>('[data-chat-anchor-key="answer"]')
+    if (answer === null) throw new Error('no answer row')
+    viewport.landAtUnread(answer, 'New')
+    viewport.dropUnreadLanding()
+    Object.defineProperty(scroller, 'scrollHeight', { configurable: true, value: 600 + 1100 })
+    expect(viewport.resumeUnreadLanding()).toBeNull()
+  })
+
+  it('re-applies the held landing on a resize before the reading policy can follow the tail', () => {
+    const scroll = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/native/chat/use-chat-scroll.ts'), 'utf8')
+    const resize = scroll.slice(scroll.indexOf('resize: () => {'), scroll.indexOf('reading.onResize()', scroll.indexOf('resize: () => {')))
+    expect(resize).toContain('viewport.resumeUnreadLanding()')
+    expect(scroll).toMatch(/interact: \(\) => \{[^}]*viewport\.dropUnreadLanding\(\)/u)
+    expect(scroll).toMatch(/intent: \(\) => \{[^}]*viewport\.dropUnreadLanding\(\)/u)
   })
 })

@@ -145,16 +145,31 @@ export function useChatScroll(input: ChatScrollInput): ChatScrollState {
         reading.onScrollEnd(outer)
         navigation.requestHistoryCheck()
       },
-      interact: () => { navigation.readerInteracted() },
+      interact: () => {
+        viewport.dropUnreadLanding()
+        navigation.readerInteracted()
+      },
       history: () => {
         setHistoryInputHeld(viewport.historyInputHeld)
         if (content.current.opened) navigation.requestHistoryCheck()
       },
-      intent: () => { cancelPendingFollow(); reading.interruptFollow() },
+      intent: () => {
+        viewport.dropUnreadLanding()
+        cancelPendingFollow()
+        reading.interruptFollow()
+      },
       resize: () => {
         if (!content.current.opened) return
         navigation.requestHistoryCheck()
         if (navigation.contentCommitted()) {
+          navigation.reconcile()
+          return
+        }
+        // dshfiles (unslop r5 C1): an unread landing the range could not reach on open keeps its place as the Turn's
+        // tail mounts below it, instead of the policy following the new floor.
+        const held = viewport.resumeUnreadLanding()
+        if (held !== null) {
+          reading.acceptNavigation(held)
           navigation.reconcile()
           return
         }
