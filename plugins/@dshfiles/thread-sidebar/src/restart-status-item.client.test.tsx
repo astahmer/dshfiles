@@ -64,6 +64,8 @@ describe('RestartStatusItem', () => {
     act(() => RestartBridge.publish({ hostPlugins: ['@dshfiles/a'], available: true, waitingLabel: null, onRail: false }))
     view.rerender(item())
     expect(screen.getByTestId('status-item-restart').textContent).toBe('Restart pending · 1 plugins')
+    // A pending restart is actionable: the phone keeps the status strip for it (council round 3 B6).
+    expect(screen.getByTestId('status-item-restart').hasAttribute('data-status-actionable')).toBe(true)
   })
 
   it('is the one strip item for updates and restarts: the update notice shows only while no restart waits', () => {

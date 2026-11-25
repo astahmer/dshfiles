@@ -156,6 +156,8 @@ export const RestartStatusItem = (props: StatusItemProps & { readonly text: Rest
           type="button"
           className="dshx-root dshx:inline-flex dshx:h-5 dshx:min-w-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:text-warning dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
           data-testid="status-item-restart"
+          // A pending restart is the user's to act on: the phone keeps the strip for it (council round 3 B6, frame-layout).
+          data-status-actionable=""
           aria-label={label}
         >
           <span className="dshx:truncate">{label}</span>

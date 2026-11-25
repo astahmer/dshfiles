@@ -307,6 +307,8 @@ const UpdateStatusView = (props: StatusItemProps): JSX.Element | null => {
         props.compact && 'dshx:text-xs',
       )}
       data-testid="status-item-update-dsh"
+      // Waiting revisions or a stopped update are the user's to act on; a running one only reports (council round 3 B6).
+      data-status-actionable={job?.state === 'running' ? undefined : ''}
     >
       {job?.state === 'running' ? <Spinner className="dshx:size-3" /> : <DownloadIcon aria-hidden className="dshx:size-3" />}
       <span className="dshx:truncate">{label}</span>
