@@ -61,7 +61,7 @@ When('the fake model starts a three-second bash call in a fresh workspace', asyn
 
 Then('the running tool card counts its elapsed seconds', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'tool-meta-running-call-counts-up', async () => {
-    const timer = page.getByRole('timer', { name: /^Running for \d+s, started \d{2}:\d{2}$/ })
+    const timer = page.getByRole('timer', { name: /^Running for \d+s, started \d{1,2}:\d{2}(?: [AP]M)?$/ })
     await expect(timer).toBeVisible({ timeout: 30_000 })
     const first = Number(/^(\d+)s/.exec((await timer.textContent()) ?? '')?.[1])
     await expect(async () => {
@@ -208,7 +208,7 @@ Then('the approval card is gone and the command never ran', async ({ page }: { p
 Then('once the turn settles the tool card shows how long the call took and when it started', async ({ page }: { page: Page }) => {
   await revealSettledToolCard(page)
   await recordAssertion(page, 'tool-meta-settled-call-shows-duration-and-start', async () => {
-    const note = page.getByRole('note', { name: /^Took \d+s, started \d{2}:\d{2}$/ })
+    const note = page.getByRole('note', { name: /^Took \d+s, started \d{1,2}:\d{2}(?: [AP]M)?$/ })
     await expect(note).toBeVisible()
     await expect(note).toHaveText(/^[3-9]s$/)
     await expect(page.getByRole('timer')).toHaveCount(0)

@@ -1,3 +1,4 @@
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 import { describe, expect, it } from 'vitest'
 import type { ToolMetaTranslate } from './locales.js'
 import { ToolTimingModel, type WaitTimerOwner } from './timing.js'
@@ -99,8 +100,8 @@ describe('formatDuration', () => {
 
 describe('formatMoment', () => {
   it('shows the clock time today and adds the day otherwise', () => {
-    expect(ToolTimingModel.formatMoment({ at: at('14:02:11'), now: at('15:00:00'), format: 'absolute', t })).toMatch(/^14:02$/)
-    expect(ToolTimingModel.formatMoment({ at: at('14:02:11') - 86_400_000, now: at('15:00:00'), format: 'absolute', t })).toMatch(/13.* 14:02$/)
+    expect(ToolTimingModel.formatMoment({ at: at('14:02:11'), now: at('15:00:00'), format: 'absolute', t })).toBe(formatClockTime(at('14:02:11')))
+    expect(ToolTimingModel.formatMoment({ at: at('14:02:11') - 86_400_000, now: at('15:00:00'), format: 'absolute', t })).toMatch(new RegExp(`13.* ${formatClockTime(at('14:02:11'))}$`, 'u'))
   })
 
   it('counts back from now in the relative format', () => {
@@ -142,7 +143,7 @@ describe('describeTiming', () => {
     const now = at('14:02:15')
     expect(ToolTimingModel.describeTiming({ timing: { kind: 'running', startedAt: at('14:02:11') }, now, format: 'absolute', t })).toEqual({
       text: '4s',
-      label: 'Running for 4s, started 14:02',
+      label: `Running for 4s, started ${formatClockTime(at('14:02:11'))}`,
     })
     expect(
       ToolTimingModel.describeTiming({ timing: { kind: 'finished', startedAt: at('14:02:11'), endedAt: at('14:02:11') + 1_200 }, now, format: 'relative', t }),
@@ -157,7 +158,7 @@ describe('describeTiming', () => {
     expect(ToolTimingModel.describeTiming({ timing: { kind: 'running', startedAt: at('14:02:11') }, now, format: 'absolute', t }).text).toBe('')
     expect(
       ToolTimingModel.describeTiming({ timing: { kind: 'finished', startedAt: at('14:02:11'), endedAt: at('14:02:11') + 40 }, now, format: 'absolute', t }),
-    ).toEqual({ text: '', label: 'Took 0s, started 14:02' })
+    ).toEqual({ text: '', label: `Took 0s, started ${formatClockTime(at('14:02:11'))}` })
     expect(
       ToolTimingModel.describeTiming({ timing: { kind: 'finished', startedAt: at('14:02:11'), endedAt: at('14:02:11') + 999 }, now, format: 'absolute', t })
         .text,
@@ -168,7 +169,7 @@ describe('describeTiming', () => {
     const now = at('14:02:15')
     expect(ToolTimingModel.describeTiming({ timing: { kind: 'ended', endedAt: at('14:02:12') }, now, format: 'absolute', t })).toEqual({
       text: '',
-      label: 'Finished 14:02',
+      label: `Finished ${formatClockTime(at('14:02:12'))}`,
     })
   })
 })

@@ -3,6 +3,7 @@ import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type { ToolMetaTranslate } from './locales.js'
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 
 export type TimeFormat = 'absolute' | 'relative'
 
@@ -57,12 +58,6 @@ const waitArgumentsSchema = Schema.Struct({
 export type ToolCallTimes = Schema.Codec.Encoded<typeof toolCallOwnerSchema>
 
 export class ToolTimingModel {
-  private static readonly clockFormat = new Intl.DateTimeFormat(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  })
-
   private static readonly dayFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
   /**
@@ -113,7 +108,8 @@ export class ToolTimingModel {
 
   static readonly formatMoment = (input: { readonly at: number; readonly now: number; readonly format: TimeFormat; readonly t: ToolMetaTranslate }): string => {
     if (input.format === 'absolute') {
-      const clock = ToolTimingModel.clockFormat.format(input.at)
+      // The locale's 12/24 h through the kit's one clock formatter (council round 5 A6), as every other surface prints it.
+      const clock = formatClockTime(input.at)
       return new Date(input.at).toDateString() === new Date(input.now).toDateString() ? clock : `${ToolTimingModel.dayFormat.format(input.at)} ${clock}`
     }
     const seconds = Math.max(0, Math.floor((input.now - input.at) / 1000))

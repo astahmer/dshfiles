@@ -2,6 +2,7 @@ import { useSyncExternalStore } from 'react'
 import type { ReactElement } from 'react'
 import type { ReasoningBlockTiming } from '../contract/chat-nodes.ts'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 import { formatRunDuration } from './message-chrome.ts'
 import css from './ReasoningRow.module.css'
 
@@ -29,9 +30,6 @@ const clock = (() => {
 })()
 
 const subscribeNever = (): (() => void) => () => {}
-const clockFormat = new Intl.DateTimeFormat(undefined, {
-  hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-})
 const dayFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' })
 
 export const ReasoningTiming = ({ timing, t }: {
@@ -45,7 +43,8 @@ export const ReasoningTiming = ({ timing, t }: {
     .map(part => part.text).join('')
   const started = new Date(timing.startedAt)
   const today = new Date(now)
-  const time = clockFormat.format(started)
+  // dshfiles (council round 5 A6): the locale's 12/24 h, through the kit's one clock formatter.
+  const time = formatClockTime(started)
   const timestamp = started.getFullYear() === today.getFullYear()
     && started.getMonth() === today.getMonth()
     && started.getDate() === today.getDate()

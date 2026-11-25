@@ -1,6 +1,7 @@
 // Shared time-label helpers for user/assistant IconActions rows.
 
 import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
+import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 
 /** The date-template share of the conversation dictionary the clock consumes. */
@@ -8,10 +9,6 @@ export type ClockTranslate = Translate<'clock.md' | 'clock.ymd'>
 
 /** Refresh interval for whole-second live run clocks. */
 export const LIVE_RUN_CLOCK_INTERVAL_MS = 1000
-
-function pad2(n: number): string {
-  return String(n).padStart(2, '0')
-}
 
 /**
  * Local calendar-day epoch (ms at local midnight) for an instant.
@@ -73,12 +70,13 @@ export function formatTokensPerSecond(tps: number): string {
  * @param time - Unix epoch ms from the source session event.
  * @param t - translate seat supplying the `clock.md` / `clock.ymd` templates.
  * @param now - Reference instant for the day/year cut (defaults to wall clock).
- * @returns Date-aware clock string (24-hour, zero-padded time).
+ * @returns Date-aware clock string; the time follows the locale's 12/24 h through the kit's one clock formatter
+ *   (dshfiles, council round 5 A6), so the transcript and every other surface print an instant the same way.
  */
 export function formatMessageClock(time: number, t: ClockTranslate, now: number = Date.now()): string {
   const d = new Date(time)
   const n = new Date(now)
-  const clock = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+  const clock = formatClockTime(time)
   if (
     d.getFullYear() === n.getFullYear()
     && d.getMonth() === n.getMonth()
