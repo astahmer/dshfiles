@@ -3,6 +3,7 @@ import clsx from 'clsx'
 import { IconFolderOpenRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { workspaceDisplayTitle } from '@deepseek-ai/dsh-api-workspace-controller/default-workspace'
@@ -198,7 +199,7 @@ export function ConversationContent(props: ConversationContentProps) {
           onClick={() => { setPlaceOpen(open => !open) }}
           data-place-summary=""
         >
-          <IconFolderOpenRegular size={13} aria-hidden />
+          {chipTitle === undefined ? <IconFolderOpenRegular size={13} aria-hidden /> : <ProjectMark name={chipTitle} size="dense" />}
           <span className={css.runSummaryText}>{placeText ?? chipTitle ?? t('runRow.project')}</span>
           <ChevronDownIcon size={12} aria-hidden />
         </button>
@@ -208,10 +209,14 @@ export function ConversationContent(props: ConversationContentProps) {
           <span className={css.placeLabel} data-place-label="host" aria-hidden>{t('runRow.placeHost')}</span>
           <span className={css.placeLabel} data-place-label="workspace" aria-hidden>{t('runRow.placeWorkspace')}</span>
       <span className={css.runProject} data-run-segment="project" data-thread-workspace={threadWorkspaceName}>
+        {/* Unslop r5 C5: the project's identity tile, the one the thread list and tabs draw, beside the chip rather than
+            in it, so the chip's text stays the project's name (scratch seeding and journeys read it). */}
+        {chipTitle === undefined ? null : <ProjectMark name={chipTitle} size="dense" />}
         <Tooltip label={t('runRow.project')} side="top" delayMs={400} disabled={pickerOpen} portal>
           <WorkspaceChip
             buttonRef={pickerAnchor}
             label={chipTitle}
+            marked={chipTitle !== undefined}
             menuOpen={pickerOpen}
             onClick={() => { setPickerOpen(open => !open) }}
             t={t}
@@ -250,7 +255,8 @@ export function ConversationContent(props: ConversationContentProps) {
   const runSummary = useMemo(() => chipTitle === undefined ? undefined : (
     <Tooltip label={t('runRow.summary', { project: chipTitle, host: summaryHost })} side="top" delayMs={400} portal>
       <span className={css.runSummary} tabIndex={0} data-run-summary="" data-thread-workspace={threadWorkspaceName}>
-        <IconFolderOpenRegular size={13} aria-hidden />
+        {/* Unslop r5 C5: the project's identity tile, the one the thread list and tabs draw, instead of a folder. */}
+        <ProjectMark name={chipTitle} size="dense" />
         <span className={css.runSummaryText}>{chipTitle}</span>
         {remoteWorkspaceCwd === undefined ? null : (
           <>
@@ -356,6 +362,16 @@ export function ConversationContent(props: ConversationContentProps) {
   )
 }
 
+/** A segment's text without a project mark's letters (unslop r5 C5): "billing-api", never "BAbilling-api". */
+export function textWithoutMarks(element: Element | null): string {
+  if (element === null) return ''
+  if (element.querySelector('[data-slot="project-mark"]') === null) return element.textContent ?? ''
+  const copy = element.cloneNode(true)
+  if (!(copy instanceof Element)) return element.textContent ?? ''
+  for (const mark of copy.querySelectorAll('[data-slot="project-mark"]')) mark.remove()
+  return copy.textContent ?? ''
+}
+
 /**
  * "sample · In the project": what the project, host and workspace pickers in the place group say now, read
  * from their own segments (b:4qjm) so each owner keeps its state. Undefined until a segment has text.
@@ -372,7 +388,7 @@ function useRunPlaceText(ref: { readonly current: HTMLElement | null }): string 
         const element = place.querySelector(`[data-run-segment="${segment}"]`)
         // b:212a: "sample · Own workspace": this machine is the default, so only a remote host is named.
         if (segment === 'host' && element?.getAttribute('data-host-kind') === 'local') return []
-        const value = element?.textContent?.replace(/\s+/gu, ' ').trim() ?? ''
+        const value = textWithoutMarks(element).replace(/\s+/gu, ' ').trim()
         return value === '' ? [] : [value]
       })
       const next = parts.length === 0 ? undefined : parts.join(' · ')

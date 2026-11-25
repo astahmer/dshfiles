@@ -930,6 +930,11 @@ button.crumbEditable {
   order: -2;
 }
 
+/* Unslop r5 C5: the project's mark sits where the chip's folder was, so the name keeps its place. */
+.runProject > :global([data-slot='project-mark']) {
+  margin-inline: 6px -2px;
+}
+
 .runSegment {
   display: inline-flex;
   align-items: center;
