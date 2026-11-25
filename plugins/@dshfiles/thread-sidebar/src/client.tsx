@@ -40,6 +40,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type RowInlineVerb, type ThreadStatus, type ThreadStatusCopy, type ThreadStatusGroup } from './thread-status.js'
 import { RowVerb } from './row-verb.js'
+import { AttentionSubtitleModel } from './attention-subtitle.js'
 import { plural, useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
 import { useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
@@ -1511,6 +1512,15 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
     workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
       ? undefined
       : (workStatus.detail ?? t(workStatusLabelKeys[workStatus.status]))
+  // Round five B2: an ask whose description repeats the title says what kind of ask it is and where, in the secondary
+  // ink; only a real question may take two lines.
+  const ask = workStatus?.status === 'needs-you' ? AttentionSubtitleModel.askOf(workStatus.verb) : undefined
+  const askRepeatsTitle = ask !== undefined && statusDetail !== undefined && AttentionSubtitleModel.repeatsTitle(statusDetail, session.displayTitle)
+  const askSubtitle = askRepeatsTitle
+    ? [t(ask === 'question' ? 'threadSidebarAskQuestion' : 'threadSidebarAskApproval'), showMark ? (props.workspaceTitle ?? t('threadSidebarUnassigned')) : undefined]
+        .filter(part => part !== undefined)
+        .join(' · ')
+    : undefined
   // A working thread trades its static meta for what it is doing now (polish pass b:r4et): its step or the subagent
   // rollup, with the working shimmer. Under a status glyph the spinner and the group already say Working, so a turn
   // with no known step keeps the meta line (where it runs) instead of naming the state again; the dot-only groupings
@@ -1890,7 +1900,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
                     // A two-line question keeps the project mark on its first line.
-                    workStatus?.status === 'needs-you' && liveStep === undefined && statusDetail !== undefined ? 'dshx:items-start' : 'dshx:items-center',
+                    ask === 'question' && askSubtitle === undefined && liveStep === undefined && statusDetail !== undefined ? 'dshx:items-start' : 'dshx:items-center',
                     // Room for what sits at the end of this line: the verb, the subagent counter, or both.
                     verbSeat === 'meta' ? (childCount > 0 ? 'dshx:pr-34' : 'dshx:pr-17.5') : childCount > 0 && 'dshx:pr-16',
                   )}
@@ -1928,12 +1938,14 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         // A Needs-you row's question or command may take a second line (round five B4): it is what you
                         // decide on, so more of it reads before you open the thread.
                         'dshx:min-w-0 dshx:flex-1',
-                        workStatus?.status === 'needs-you' ? 'dshx:line-clamp-2 dshx:break-words' : 'dshx:truncate',
-                        (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
+                        ask === 'question' && askSubtitle === undefined ? 'dshx:line-clamp-2 dshx:break-words' : 'dshx:truncate',
+                        askSubtitle !== undefined
+                          ? 'dshx:text-sm/[18px] dshx:text-muted-foreground'
+                          : (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
                       )}
                       data-testid="thread-row-status-detail"
                     >
-                      {statusDetail}
+                      {askSubtitle ?? statusDetail}
                     </span>
                   )}
                   {showProjectName ? (

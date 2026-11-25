@@ -119,6 +119,28 @@ describe('a row that needs you', () => {
     expect(idle.querySelector<HTMLElement>('[data-thread-title]')?.className).toContain('dshx:truncate')
   })
 
+  it('names the ask and the project instead of a description that repeats the title (round five B2)', async () => {
+    const row = await renderRow({
+      session: rowSession({ displayTitle: 'Publish preview build' }),
+      workStatus: rowStatus({ status: 'needs-you', verb: 'Review', detail: 'Publish the preview build' }),
+    })
+    const detail = row.querySelector<HTMLElement>('[data-testid="thread-row-status-detail"]')
+    expect(detail?.textContent).toBe('threadSidebarAskApproval · sample')
+    // 13/18 in the secondary ink, on one line.
+    expect(detail?.className).toContain('dshx:text-sm/[18px]')
+    expect(detail?.className).toContain('dshx:text-muted-foreground')
+    expect(detail?.className).toContain('dshx:truncate')
+    expect(detail?.className).not.toContain('dshx:text-foreground')
+  })
+
+  it('keeps an approval to one line: only a real question takes two (round five B2)', async () => {
+    const row = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Approve', detail: 'git push --force origin main' }) })
+    const detail = row.querySelector<HTMLElement>('[data-testid="thread-row-status-detail"]')
+    expect(detail?.textContent).toBe('git push --force origin main')
+    expect(detail?.className).toContain('dshx:truncate')
+    expect(detail?.className).not.toContain('dshx:line-clamp-2')
+  })
+
   it('gives a failed row\'s verb the danger tint', async () => {
     const row = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
     expect(row.querySelector('[data-testid="thread-row-verb"]')?.getAttribute('data-variant')).toBe('danger-tint')
