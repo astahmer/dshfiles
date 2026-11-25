@@ -59,7 +59,8 @@ describe('Inbox card (round five C4)', () => {
   })
 
   it('keeps the head band to glyph, title, type and age: the question sits in the neutral body', () => {
-    const entity = row.slice(row.indexOf('<EntityRow'), row.indexOf('data-inbox-row-actions'))
+    // The verbs are built before the row (round five C3, council round 4: a compact Failed item carries them in the band).
+    const entity = row.slice(row.indexOf('<EntityRow'), row.indexOf('</EntityRow>'))
     expect(entity).not.toMatch(/\bdescription=\{/u)
     expect(entity).toContain('data-inbox-card-body')
   })

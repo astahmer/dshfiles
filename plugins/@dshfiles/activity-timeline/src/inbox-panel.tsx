@@ -215,7 +215,10 @@ const InboxRow = (props: {
   const statusLabel = statusLabelOf(status, t)
   const title = InboxView.subjectTitleOf(item, props.sessionLabel)
   const text = InboxView.textOf(item)
-  const reason = InboxView.bodyReason(text.reason, title)
+  // Council round 4 (C3): an approval says its title once and reads its command as one; a bodyless Failed item is one row.
+  const card = InboxView.cardText({ source: item.source, reason: InboxView.bodyReason(text.reason, title), detail: text.detail }, title)
+  const reason = card.reason
+  const compact = InboxView.compact(status, card)
   const clamped = InboxView.clampsText(item, props.view)
   // A question the card answers reads at body size in ink; any other text is a muted note under the head band.
   const answerable = open && item.verbs.includes('Answer') && item.choices.length > 0
@@ -230,84 +233,12 @@ const InboxRow = (props: {
     item.subject.kind === 'session'
       ? null
       : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
-  const row = (
-    <EntityRow
-      role="listitem"
-      ref={props.rowRef}
-      {...(phone ? { 'data-row-gestures': '', ...gestures.handlers } : {})}
-      style={gestures.offset === 0 ? undefined : { transform: `translateX(${String(gestures.offset)}px)` }}
-      tabIndex={-1}
-      onFocus={event => {
-        if (event.target === event.currentTarget) props.onFocusRow?.()
-      }}
-      selected={props.selected === true}
-      data-cursor={props.cursor === true ? '' : undefined}
-      className={cn(
-        // The card draws the surface (InboxView.CARD); the row fills it edge to edge, so the head band is flush with its top.
-        'dshx:rounded-none dshx:bg-card dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
-        // The card menu is positioned in the head band on a narrow pane (InboxView.BAND_MENU).
-        'dshx:relative',
-        InboxView.PHONE_HEAD,
-        phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
-        InboxView.headerBand(status),
-      )}
-      data-attention-item={item.id}
-      data-severity={item.severity}
-      status={status}
-      statusLabel={statusLabel}
-      heading={title}
-      meta={
-        <>
-          {/* On a phone the band keeps one line (title and age): the body already says what is asked ("Asks:", "Approve:"). */}
-          <span className="dshx:@max-pane-narrow:hidden">{InboxView.sourceLabel(item.source)}</span>
-          {referencedThreadId === null ? null : (
-            <button
-              type="button"
-              className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline dshx:pointer-coarse:min-h-11"
-              onClick={() => props.onOpenThread(referencedThreadId)}
-            >
-              <MessagesSquareIcon aria-hidden className="dshx:size-3" />
-              {t('openThread')}
-            </button>
-          )}
-          <span>{InboxView.relativeAge(item.openedAt, props.now)}</span>
-          {item.occurrences > 1 ? <Badge variant="outline">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
-          {item.resolvedAt !== null ? <Badge variant="secondary">{t('resolved')}</Badge> : null}
-          {props.view === 'snoozed' ? (
-            <Badge variant="outline">
-              {item.snoozeUntilChange ? t('snoozedUntilChange') : `${t('snoozedUntil')} ${new Date(item.snoozedUntil ?? 0).toLocaleString()}`}
-            </Badge>
-          ) : null}
-        </>
-      }
-    >
-      {reason === null && text.detail === null ? null : (
+  /** The card's verbs: a row under its body, or (`inline`, a compact Failed item) the band's trailing seat. */
+  const actions = (inline: boolean): JSX.Element => (
         <div
-          data-inbox-card-body=""
-          className={cn(
-            'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:pt-2',
-            InboxView.BODY_INSET,
-            answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
-            props.actionRow === false && 'dshx:pb-3',
-          )}
+          data-inbox-row-actions={inline ? 'band' : ''}
+          className={cn('dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2', !inline && cn('dshx:px-3 dshx:pt-2.5 dshx:pb-3', InboxView.BODY_INSET))}
         >
-          {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
-          {text.detail === null ? null : (
-            <span
-              className={cn(
-                clamped && 'dshx:line-clamp-2',
-                'dshx:break-words',
-                answerable && 'dshx:text-xs dshx:text-muted-foreground',
-                InboxView.TEXT_MEASURE,
-              )}
-            >
-              {text.detail}
-            </span>
-          )}
-        </div>
-      )}
-      {props.actionRow === false ? null : (
-        <div data-inbox-row-actions="" className={cn('dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2.5 dshx:pb-3', InboxView.BODY_INSET)}>
           {answerable
             ? [
                 ...item.choices.map((choice, index) => (
@@ -415,7 +346,7 @@ const InboxRow = (props: {
           {doneable || snoozable || quickReplies.length > 0 || mutable ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="ghost" className={cn('dshx:pointer-coarse:size-11', InboxView.BAND_MENU)} aria-label={t('more')} disabled={props.busy}>
+                <Button size="sm" variant="ghost" className={cn('dshx:pointer-coarse:size-11', !inline && InboxView.BAND_MENU)} aria-label={t('more')} disabled={props.busy}>
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>
@@ -461,7 +392,87 @@ const InboxRow = (props: {
             </DropdownMenu>
           ) : null}
         </div>
+  )
+  const row = (
+    <EntityRow
+      role="listitem"
+      ref={props.rowRef}
+      {...(phone ? { 'data-row-gestures': '', ...gestures.handlers } : {})}
+      style={gestures.offset === 0 ? undefined : { transform: `translateX(${String(gestures.offset)}px)` }}
+      tabIndex={-1}
+      onFocus={event => {
+        if (event.target === event.currentTarget) props.onFocusRow?.()
+      }}
+      selected={props.selected === true}
+      data-cursor={props.cursor === true ? '' : undefined}
+      className={cn(
+        // The card draws the surface (InboxView.CARD); the row fills it edge to edge, so the head band is flush with its top.
+        'dshx:rounded-none dshx:bg-card dshx:scroll-my-2 dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:data-[cursor]:bg-muted/50',
+        // The card menu is positioned in the head band on a narrow pane (InboxView.BAND_MENU).
+        'dshx:relative',
+        // A compact Failed row carries its menu in the trailing seat, so only a full card keeps the corner free.
+        !compact && InboxView.CARD_HEAD,
+        phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
+        InboxView.headerBand(status),
       )}
+      data-attention-item={item.id}
+      data-severity={item.severity}
+      status={status}
+      statusLabel={statusLabel}
+      heading={<span className={InboxView.TITLE}>{title}</span>}
+      trailing={compact ? actions(true) : undefined}
+      meta={
+        <>
+          {/* On a phone the band keeps one line (title and age): the body says what is asked ("Asks:", or an approval's command). */}
+          <span className="dshx:@max-pane-narrow:hidden">{InboxView.sourceLabel(item.source)}</span>
+          {referencedThreadId === null ? null : (
+            <button
+              type="button"
+              className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline dshx:pointer-coarse:min-h-11"
+              onClick={() => props.onOpenThread(referencedThreadId)}
+            >
+              <MessagesSquareIcon aria-hidden className="dshx:size-3" />
+              {t('openThread')}
+            </button>
+          )}
+          <span>{InboxView.relativeAge(item.openedAt, props.now)}</span>
+          {item.occurrences > 1 ? <Badge variant="outline">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
+          {item.resolvedAt !== null ? <Badge variant="secondary">{t('resolved')}</Badge> : null}
+          {props.view === 'snoozed' ? (
+            <Badge variant="outline">
+              {item.snoozeUntilChange ? t('snoozedUntilChange') : `${t('snoozedUntil')} ${new Date(item.snoozedUntil ?? 0).toLocaleString()}`}
+            </Badge>
+          ) : null}
+        </>
+      }
+    >
+      {reason === null && card.detail === null ? null : (
+        <div
+          data-inbox-card-body=""
+          className={cn(
+            'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:pt-2',
+            InboxView.BODY_INSET,
+            answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
+            props.actionRow === false && 'dshx:pb-3',
+          )}
+        >
+          {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
+          {card.detail === null ? null : (
+            <span
+              className={cn(
+                clamped && 'dshx:line-clamp-2',
+                'dshx:break-words',
+                answerable && 'dshx:text-xs dshx:text-muted-foreground',
+                card.command && InboxView.COMMAND,
+                InboxView.TEXT_MEASURE,
+              )}
+            >
+              {card.detail}
+            </span>
+          )}
+        </div>
+      )}
+      {compact || props.actionRow === false ? null : actions(false)}
       {/* Land rebases the thread's work onto the bookmark and moves it: say what lands before it runs (never one click). */}
       <AlertDialog open={confirmingLand} onOpenChange={setConfirmingLand}>
         <AlertDialogContent className="dshx-root">

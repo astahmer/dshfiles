@@ -33,11 +33,11 @@ describe('an Inbox card on a phone (round five C3, council round 3)', () => {
   })
 
   it('puts the card menu in the head band', () => {
-    expect(InboxView.BAND_MENU).toBe('dshx:@max-pane-narrow:absolute dshx:@max-pane-narrow:top-0 dshx:@max-pane-narrow:right-1')
+    expect(InboxView.BAND_MENU).toBe('dshx:absolute dshx:top-1 dshx:right-1 dshx:@max-pane-narrow:top-0')
     expect(row).toMatch(/aria-label=\{t\('more'\)\}[^>]*\n?[^>]*InboxView\.BAND_MENU|InboxView\.BAND_MENU[^>]*aria-label=\{t\('more'\)\}/u)
     // The head is 44pt tall with room for it, so a long title never runs under the menu.
-    expect(InboxView.PHONE_HEAD).toBe('dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pane-narrow:[&>div:first-child]:pr-12')
-    expect(row).toContain('InboxView.PHONE_HEAD')
+    expect(InboxView.CARD_HEAD).toBe('dshx:[&>div:first-child]:pr-12 dshx:@max-pane-narrow:[&>div:first-child]:py-3')
+    expect(row).toContain('InboxView.CARD_HEAD')
   })
 
   it('wraps a long answer inside its 44pt row instead of truncating it', () => {

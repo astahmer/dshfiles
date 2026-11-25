@@ -80,11 +80,57 @@ const CARD = 'dshx:relative dshx:overflow-hidden dshx:rounded-lg dshx:border dsh
  */
 const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-4'
 
-/** On a phone the card's menu sits in its head band's trailing corner, a 44pt target, not on the row of verbs. */
-const BAND_MENU = 'dshx:@max-pane-narrow:absolute dshx:@max-pane-narrow:top-0 dshx:@max-pane-narrow:right-1'
+/**
+ * The card's menu sits in its head band's trailing corner, not on the row of verbs: centred in the 36px band on a wide
+ * pane (council round 4, C3), a 44pt target flush with the 44pt band on a phone.
+ */
+const BAND_MENU = 'dshx:absolute dshx:top-1 dshx:right-1 dshx:@max-pane-narrow:top-0'
 
-/** The phone head band is 44pt tall and keeps the menu's corner free. */
-const PHONE_HEAD = 'dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pane-narrow:[&>div:first-child]:pr-12'
+/** The head band keeps the menu's corner free at every width, and is 44pt tall on a phone. */
+const CARD_HEAD = 'dshx:[&>div:first-child]:pr-12 dshx:@max-pane-narrow:[&>div:first-child]:py-3'
+
+/** A card's title at the kit's contextual heading step, 15/20 at 600 (council round 4, A4/C3). */
+const TITLE = 'dshx:text-heading'
+
+/** A command an approval would run: 12/16 secondary mono under the title. */
+const COMMAND = 'dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-muted-foreground'
+
+const APPROVAL_SOURCE = 'thread-sidebar.approval'
+const APPROVE_LEAD_IN = /^Approve:\s*/u
+const FILLER = new Set(['a', 'an', 'the', 'to', 'of'])
+const wordsOf = (text: string): string[] =>
+  text
+    .toLowerCase()
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter(word => word !== '' && !FILLER.has(word))
+
+/**
+ * What a card prints under its band (council round 4, C3). An approval says its title once: its "Approve: <what>" line
+ * goes when <what> only restates the title (the band, its type and its Review verb already say approve), and otherwise
+ * keeps <what> without the lead-in; its command reads as a command (`command`, drawn in COMMAND). Others are unchanged.
+ */
+export interface InboxCardText {
+  /** The line under the band, or null when the band already says it. */
+  readonly reason: string | null
+  readonly detail: string | null
+  /** The detail is a command an approval would run. */
+  readonly command: boolean
+}
+
+const cardText = (
+  item: { readonly source: string; readonly reason: string | null; readonly detail: string | null },
+  title: string,
+): InboxCardText => {
+  if (item.source !== APPROVAL_SOURCE) return { reason: item.reason, detail: item.detail, command: false }
+  const subject = item.reason?.replace(APPROVE_LEAD_IN, '').trim() ?? ''
+  const titleWords = new Set(wordsOf(title))
+  const restates = subject === '' || wordsOf(subject).every(word => titleWords.has(word))
+  return { reason: restates ? null : subject, detail: item.detail, command: item.detail !== null }
+}
+
+/** A Failed item with nothing to say under its band is one row: its title and its recovery verb, no empty body. */
+const compact = (status: WorkStatus, text: { readonly reason: string | null; readonly detail: string | null }): boolean =>
+  status === 'failed' && text.reason === null && text.detail === null
 
 /**
  * The title's counts, one StatusCount per status present (◆2 ✕1): the Needs-you view holds blocking items (Needs you)
@@ -242,7 +288,11 @@ export class InboxView {
   static readonly CARD = CARD
   static readonly BODY_INSET = BODY_INSET
   static readonly BAND_MENU = BAND_MENU
-  static readonly PHONE_HEAD = PHONE_HEAD
+  static readonly CARD_HEAD = CARD_HEAD
+  static readonly TITLE = TITLE
+  static readonly COMMAND = COMMAND
+  static readonly cardText = cardText
+  static readonly compact = compact
   static readonly titleCounts = titleCounts
   static readonly PHONE_BAR = PHONE_BAR
   static readonly bodyReason = bodyReason
