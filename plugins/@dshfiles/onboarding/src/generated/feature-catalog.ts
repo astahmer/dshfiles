@@ -2268,10 +2268,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Agent toolkit\"",
+          "text": "expect heading \"Capabilities\"",
           "action": "expect",
           "by": "heading",
-          "name": "Agent toolkit",
+          "name": "Capabilities",
           "value": null
         },
         {
@@ -2319,10 +2319,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Agent toolkit\"",
+          "text": "expect heading \"Capabilities\"",
           "action": "expect",
           "by": "heading",
-          "name": "Agent toolkit",
+          "name": "Capabilities",
           "value": null
         },
         {
@@ -2400,10 +2400,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Agent toolkit\"",
+          "text": "expect heading \"Capabilities\"",
           "action": "expect",
           "by": "heading",
-          "name": "Agent toolkit",
+          "name": "Capabilities",
           "value": null
         },
         {
@@ -5222,10 +5222,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click text \"b:#1\"",
+          "text": "click article \"Item b:#1\" at 8,8",
           "action": "click",
-          "by": "text",
-          "name": "b:#1",
+          "by": "article",
+          "name": "Item b:#1",
           "value": null
         },
         {
@@ -12522,10 +12522,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"main..@\"",
+          "text": "expect text \"since main\"",
           "action": "expect",
           "by": "text",
-          "name": "main..@",
+          "name": "since main",
           "value": null
         },
         {
@@ -29395,10 +29395,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect heading \"Whiteboards\"",
+          "text": "expect heading \"Whiteboard\"",
           "action": "expect",
           "by": "heading",
-          "name": "Whiteboards",
+          "name": "Whiteboard",
           "value": null
         }
       ],
