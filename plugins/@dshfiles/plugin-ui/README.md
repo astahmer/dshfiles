@@ -152,8 +152,10 @@ active item's icon seat; the label stays ink (600 when active). The `text-`/`bg-
 
 **Attention washes.** A row that waits on you outranks a selected one: a Needs-you row takes `bg-wash-needs-you`
 (`--dshx-wash-needs-you`, accent hue, light `oklch(0.94 0.035 h)`, dark `oklch(0.29 0.045 h)`) and a Failed row
-`bg-wash-failed` (`--dshx-wash-failed`, hue 25, light `oklch(0.95 0.025 25)`, dark `oklch(0.28 0.04 25)`). Ink,
-secondary and faint text and the status glyphs hold AA on both (`tests/attention-wash.test.ts`).
+`bg-wash-failed` (`--dshx-wash-failed`, hue 25, light `oklch(0.95 0.025 25)`, dark `oklch(0.255 0.032 25)`). A
+full-width head band (an Inbox card's) takes `bg-wash-needs-you-band` instead: the same in light, calmer in dark
+(`oklch(0.29 0.035 h)`). Ink, secondary and faint text and the status glyphs hold AA on all three
+(`tests/attention-wash.test.ts`).
 
 **Counts that name a status.** `StatusCount` (`components/work-status`) is a pill with the status glyph at 10px
 (`StatusGlyph size="small"`) and a tabular number: `<StatusCount status="needs-you" count={3} />`. Needs you and Failed

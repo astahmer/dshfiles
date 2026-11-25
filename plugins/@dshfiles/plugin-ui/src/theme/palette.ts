@@ -58,6 +58,11 @@ export interface Palette {
    * (danger hue). Opaque and stronger than `selectedWash`, so what waits on you outranks what you selected.
    */
   readonly needsYouWash: Oklch
+  /**
+   * The Needs-you wash for a full-width band (council round 3 A2): an Inbox card's head band spans the list, so in dark
+   * it drops to chroma 0.035 where a row keeps 0.045. Light is already at 0.035 and the band equals the row wash.
+   */
+  readonly needsYouBandWash: Oklch
   readonly failedWash: Oklch
 }
 
@@ -125,7 +130,9 @@ function palette(input: PaletteInput): Palette {
     // Neutral (council round 3 A1): the marker or the card's edge carries the accent, not the fill.
     selectedWash: dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 },
     needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
-    failedWash: dark ? { l: 0.28, c: 0.04, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
+    needsYouBandWash: dark ? { l: 0.29, c: 0.035, h: accentHue } : { l: 0.94, c: 0.035, h: accentHue },
+    // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
+    failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.95, c: 0.025, h: STATUS_HUES.danger },
   }
 }
 

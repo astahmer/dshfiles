@@ -207,6 +207,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-tone-accent-on-solid', PaletteMath.toCss(p.accent.onSolid))
   push('--dshx-selected-wash', PaletteMath.toCss(p.selectedWash))
   push('--dshx-wash-needs-you', PaletteMath.toCss(p.needsYouWash))
+  push('--dshx-wash-needs-you-band', PaletteMath.toCss(p.needsYouBandWash))
   push('--dshx-wash-failed', PaletteMath.toCss(p.failedWash))
   for (const key of ['success', 'warning', 'danger', 'info'] as const) {
     push(`--dshx-tone-${key}`, PaletteMath.toCss(p[key].fg))

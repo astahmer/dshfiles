@@ -59,7 +59,7 @@ describe('palette', () => {
   it.each(schemes)('keeps faint text at AA on bg, panel, raised and every row wash (%s, round five A3)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     const faint = p.neutral[8]!
-    const under = { bg: p.neutral[0]!, panel: p.neutral[1]!, raised: p.neutral[2]!, selected: p.selectedWash, needsYou: p.needsYouWash, failed: p.failedWash }
+    const under = { bg: p.neutral[0]!, panel: p.neutral[1]!, raised: p.neutral[2]!, selected: p.selectedWash, needsYou: p.needsYouWash, needsYouBand: p.needsYouBandWash, failed: p.failedWash }
     for (const [surface, color] of Object.entries(under)) expect(PaletteMath.contrastRatio(faint, color), `faint on ${surface}`).toBeGreaterThanOrEqual(4.5)
     expect(faint.l).toBe(scheme === 'light' ? 0.52 : 0.66)
     // Still a step below secondary text.
