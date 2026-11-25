@@ -41,7 +41,7 @@
         "click tab \"Land\"",
         "click button \"Review\"",
         "expect heading \"Review\"",
-        "expect text \"main..@\"",
+        "expect text \"since main\"",
         "expect text \"1 file\"",
         "expect text \"seeded-work.md*\"",
         "expect text \"Docs\"",

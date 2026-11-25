@@ -24,6 +24,7 @@ import { orderReviewFiles } from './file-importance.js'
 import { useRangeViewedMarks } from './viewed-marks.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import { reviewWithHistoryFallback } from './review-source.js'
+import { ReviewHeader } from './review-header.js'
 import type { SessionFocus } from './session-focus.js'
 
 /** Bring a thread on screen and open its Changes facet; false when it cannot. */
@@ -128,6 +129,13 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         ? // A thread workspace is registered as "sample · thread-e4fde2"; the label names its project and says it is the
           // thread's own workspace, never the folder (b:212a).
           `${selectedProject.title.split(' · ')[0]?.trim() || selectedProject.title} · Own workspace`
+        : selectedProject.title
+  // The thing the empty state names: the project, the thread's own workspace, or the folder.
+  const reviewTarget =
+    selectedProject === undefined
+      ? (reviewPath.split('/').filter(Boolean).at(-1) ?? reviewPath)
+      : selectedProject.isJjWorkspace === true
+        ? "this thread's workspace"
         : selectedProject.title
 
   // An empty base field leaves the base to the Host: the project's main branch (chosen, declared or detected), else
@@ -305,8 +313,8 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         description="Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers."
         meta={
           result?.status === 'ok' ? (
-            <Badge variant="secondary" className="dshx:font-mono dshx:text-2xs">
-              {result.range}
+            <Badge variant="secondary" className="dshx:text-2xs">
+              {ReviewHeader.rangeLabel(result.range)}
             </Badge>
           ) : undefined
         }
@@ -372,7 +380,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
             className="dshx:w-48 dshx:max-w-full dshx:font-mono!"
           />
         </div>
-        {result?.status === 'ok' ? (
+        {result?.status === 'ok' && ReviewHeader.showStats(result.fileCount) ? (
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <Stat label={result.fileCount === 1 ? '1 file' : `${result.fileCount} files`} />
             <Stat label={`+${result.additions}`} tone="add" />
@@ -396,7 +404,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         ) : null}
         {result?.status === 'ok' && result.fileCount === 0 ? (
           <div className={SURFACE}>
-            <EmptyState>This thread has no changes since {result.base} yet.</EmptyState>
+            <EmptyState>{ReviewHeader.emptyText({ target: reviewTarget, base: result.base })}</EmptyState>
           </div>
         ) : null}
 
