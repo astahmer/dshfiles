@@ -94,8 +94,8 @@
   box-shadow: none;
 }
 
-/* Tab chrome: the selected tab carries an accent top edge (muted outside the focused group) on the base
- * background. Close buttons stay visible on every tab, pinned tabs excepted. */
+/* Tab chrome: the selected tab carries a top edge (muted outside the focused group) on the base background. Close
+ * buttons stay visible on every tab, pinned tabs excepted. */
 .dshfiles-workbench-theme .dv-tabs-container > .dv-tab.dv-active-tab::before {
   content: '';
   position: absolute;
@@ -107,9 +107,10 @@
   background-color: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
 }
 
-/* Selection in the focused group is the one accent the chrome carries. */
+/* Selection in the focused group is marked in ink (council round 6): indigo means attention only, as the kit's
+ * selected marker. */
 .dshfiles-workbench-theme .dv-groupview.dv-active-group > .dv-tabs-and-actions-container .dv-tabs-container > .dv-tab.dv-active-tab::before {
-  background-color: var(--dshx-tone-accent, var(--dsw-alias-state-business-primary));
+  background-color: var(--dsw-alias-label-primary);
 }
 
 /* A scrolled strip has no scrollbar: the edge that hides tabs fades out, so a cut-off title reads as "more this way"

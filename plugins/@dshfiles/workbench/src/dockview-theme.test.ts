@@ -11,6 +11,12 @@ describe('the tab chrome (round five T5)', () => {
     expect(css).toMatch(/--dv-activegroup-visiblepanel-tab-background-color: var\(--dshx-tone-bg, /u)
   })
 
+  it('marks the selected tab in ink, never the attention indigo (council round 6: indigo means attention only)', () => {
+    const marker = /\.dv-active-group > \.dv-tabs-and-actions-container \.dv-tabs-container > \.dv-tab\.dv-active-tab::before \{\s*background-color: ([^;]+);/u.exec(css)
+    expect(marker?.[1]).toBe('var(--dsw-alias-label-primary)')
+    expect(css).not.toMatch(/dv-active-tab::before \{[^}]*tone-accent/u)
+  })
+
   it('leaves the horizontal inset to the tab content, so every tab starts 12px in', () => {
     expect(css).toMatch(/\.dshfiles-workbench-theme \.dv-tabs-container > \.dv-tab \{\s*padding-inline: 0;/u)
   })
