@@ -20,6 +20,10 @@
     "./tool-visibility": {
       "types": "./src/tool-visibility.ts",
       "default": "./dist/tool-visibility.js"
+    },
+    "./access": {
+      "types": "./src/access.ts",
+      "default": "./dist/access.js"
     }
   },
   "scripts": {
