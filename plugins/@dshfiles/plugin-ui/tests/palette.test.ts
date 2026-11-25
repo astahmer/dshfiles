@@ -43,9 +43,25 @@ describe('palette', () => {
   })
 
   it('matches the token spec table for the anchor steps', () => {
-    expect(PaletteMath.toHex(PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' }).neutral[0]!)).toBe('#110e0b')
-    expect(PaletteMath.toHex(PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' }).neutral[10]!)).toBe('#f3efed')
+    expect(PaletteMath.toHex(PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' }).neutral[0]!)).toBe('#15120f')
+    expect(PaletteMath.toHex(PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' }).neutral[10]!)).toBe('#eae7e4')
     expect(PaletteMath.palette({ ...WARM_STONE, scheme: 'light' }).neutral[0]!.l).toBe(0.992)
+  })
+
+  it('spreads the surface steps wider, mostly in dark (round five K1)', () => {
+    const ls = (scheme: Scheme) => PaletteMath.palette({ ...WARM_STONE, scheme }).neutral.map(color => color.l)
+    expect(ls('dark').slice(0, 6)).toEqual([0.185, 0.21, 0.245, 0.27, 0.295, 0.335])
+    expect(ls('dark')[10]).toBe(0.93)
+    expect(ls('light').slice(0, 3)).toEqual([0.992, 0.962, 0.935])
+    for (const color of PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' }).neutral.slice(0, 7)) expect(color).toMatchObject({ c: 0.007, h: 65 })
+  })
+
+  it('keeps faint text at AA where it is read: on bg in light, on raised in dark (round five K1)', () => {
+    const light = PaletteMath.palette({ ...WARM_STONE, scheme: 'light' })
+    const dark = PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' })
+    expect(PaletteMath.contrastRatio(light.neutral[8]!, light.neutral[0]!)).toBeGreaterThanOrEqual(4.5)
+    expect(light.neutral[8]!.l).toBeCloseTo(0.55, 2)
+    for (const step of [0, 1, 2]) expect(PaletteMath.contrastRatio(dark.neutral[8]!, dark.neutral[step]!), `dark faint on ${step}`).toBeGreaterThanOrEqual(4.5)
   })
 
   it('spreads borders and text further at a higher contrast without moving the fills', () => {
