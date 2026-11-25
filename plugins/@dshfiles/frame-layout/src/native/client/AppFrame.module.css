@@ -411,7 +411,9 @@
   line-height: 16px;
   font-variant-numeric: tabular-nums;
   color: var(--dsw-alias-label-secondary, currentColor);
-  background: var(--dshx-tone-panel, var(--dsw-alias-bg-base));
+  /* Council round 6 (A4): the strip continues the nav column it runs under, so it takes the nav surface (lifted in
+     dark), not the panel tone it used to share with it. */
+  background: var(--dshx-surface-nav, var(--dshx-tone-panel, var(--dsw-alias-bg-base)));
   border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l3));
   z-index: 12;
 }
@@ -687,7 +689,7 @@
     max-width: min(80vw, 320px);
     height: 24px;
     padding: 0 12px;
-    background: var(--dshx-tone-panel, var(--dsw-alias-bg-base));
+    background: var(--dshx-surface-nav, var(--dshx-tone-panel, var(--dsw-alias-bg-base)));
     color: var(--dsw-alias-label-secondary, currentColor);
   }
 
