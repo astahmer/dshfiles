@@ -1,5 +1,4 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { SlidingSegments } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { useState } from 'react'
 import { UsageFormattingModel } from './format.js'
 import type { ChartQuery, ChartView } from './api.js'
@@ -152,8 +151,15 @@ export const UsageBreakdownTable = (props: {
 
 const calendarClasses = ['dshx:bg-muted', 'dshx:bg-data-1/25', 'dshx:bg-data-1/45', 'dshx:bg-data-1/70', 'dshx:bg-data-1'] as const
 
-export const UsageCalendar = (props: { readonly view: ChartView; readonly range: { readonly from: number; readonly to: number } }): JSX.Element => {
-  const [metric, setMetric] = useState<CalendarMetric>('tokens')
+const calendarMetricLabels = { tokens: 'Tokens', cost: 'Estimated cost', requests: 'Requests' } satisfies Record<CalendarMetric, string>
+
+/** The daily heatmap of the measure the chart above shows: the page keeps one metric switch (council round 2, D1). */
+export const UsageCalendar = (props: {
+  readonly view: ChartView
+  readonly metric: CalendarMetric
+  readonly range: { readonly from: number; readonly to: number }
+}): JSX.Element => {
+  const metric = props.metric
   const grouped = new Map<number, { tokens: number; requests: number; cost: number; missingUsage: number | null; unpriced: number | null }>()
   for (const bucket of props.view.buckets) {
     const day = grouped.get(bucket.start) ?? { tokens: 0, requests: 0, cost: 0, missingUsage: 0, unpriced: 0 }
@@ -184,18 +190,9 @@ export const UsageCalendar = (props: { readonly view: ChartView; readonly range:
   const suffix = metric === 'cost' ? 'estimated USD' : metric === 'tokens' ? 'tokens' : 'requests'
   return (
     <section className="dshx:border-t dshx:border-border dshx:pt-4">
-      <header className="dshx:mb-2 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
+      <header className="dshx:mb-2 dshx:flex dshx:flex-wrap dshx:items-baseline dshx:gap-2">
         <h3 className="dshx:text-sm dshx:font-semibold">Daily calendar</h3>
-        <SlidingSegments
-          aria-label="Calendar metric"
-          options={[
-            { value: 'tokens', label: 'Tokens' },
-            { value: 'cost', label: 'Cost' },
-            { value: 'requests', label: 'Requests' },
-          ]}
-          value={metric}
-          onValueChange={setMetric}
-        />
+        <span className="dshx:text-xs dshx:text-muted-foreground">{calendarMetricLabels[metric]}</span>
       </header>
       <div className="dshx:overflow-x-auto">
         <div role="img" aria-label={`Daily ${suffix} over ${days.length} days`} className="dshx:grid dshx:w-max dshx:grid-flow-col dshx:grid-rows-7 dshx:gap-1">

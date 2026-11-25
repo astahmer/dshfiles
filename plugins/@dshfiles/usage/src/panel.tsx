@@ -3,6 +3,8 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { Page } from '@dshfiles/plugin-ui/components/page'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -40,9 +42,15 @@ const PRESET_OPTIONS: readonly SlidingSegmentOption<(typeof PRESETS)[number]>[] 
   { value: 'custom', label: 'Custom' },
 ]
 
-const BUCKET_OPTIONS: readonly SlidingSegmentOption<'hour' | 'day'>[] = [
-  { value: 'hour', label: 'Hourly' },
-  { value: 'day', label: 'Daily' },
+const BUCKETS = ['hour', 'day'] as const
+const BUCKET_LABELS = { hour: 'Hourly', day: 'Daily' } satisfies Record<(typeof BUCKETS)[number], string>
+
+/** The page's sections: underline tabs, so the range control below is the page's one segmented track. */
+const USAGE_TAB_ITEMS: readonly { readonly value: Preferences['tab']; readonly label: string }[] = [
+  { value: 'charts', label: 'Cost' },
+  { value: 'quota', label: 'Quota' },
+  { value: 'log', label: 'Requests' },
+  { value: 'activity', label: 'Tools' },
 ]
 
 /** A stored view preference keeps the value it had when one field is stale, the rule `.catch(...)` carried. */
@@ -227,148 +235,173 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
       actions={[
         { id: 'reindex', label: 'Re-index thread logs', icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() },
       ]}
-      tabs={{
-        label: 'Usage views',
-        value: preferences.tab,
-        onValueChange: value => update({ tab: USAGE_TABS.find(tab => tab === value) ?? 'charts' }),
-        items: [
-          { value: 'charts', label: 'Cost' },
-          { value: 'quota', label: 'Quota' },
-          { value: 'log', label: 'Requests' },
-          { value: 'activity', label: 'Tools' },
-        ],
-      }}
     >
-      {[indexError, refreshError].map(message =>
-        message === null ? null : (
-          <Alert key={message} variant="destructive">
-            <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-              <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
-              <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
-                Retry
-              </Button>
-            </AlertDescription>
-          </Alert>
-        ),
-      )}
-
-      {preferences.tab === 'quota' ? (
-        <UsageQuota.Tab panelId={props.panelId} />
-      ) : (
-        <>
-          <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto dshx:@max-pane-narrow:pb-0.5" role="group" aria-label="Filters">
-            <SlidingSegments
-              aria-label="Time range"
-              options={PRESET_OPTIONS}
-              value={preferences.preset}
-              onValueChange={preset =>
-                update({
-                  preset,
-                  bucket: preset === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
-                  ...(preset === 'custom' &&
-                    preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
-                })
-              }
-            />
-            {preferences.preset === 'custom' ? (
-              <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs">
-                <Input
-                  type="date"
-                  aria-label="From date"
-                  className="dshx:h-7 dshx:w-36"
-                  value={preferences.customFrom}
-                  onChange={event => update({ customFrom: event.target.value })}
-                />
-                <span aria-hidden>→</span>
-                <Input
-                  type="date"
-                  aria-label="To date"
-                  className="dshx:h-7 dshx:w-36"
-                  value={preferences.customTo}
-                  onChange={event => update({ customTo: event.target.value })}
-                />
-              </span>
-            ) : null}
-            <SlidingSegments aria-label="Group by time" options={BUCKET_OPTIONS} value={preferences.bucket} onValueChange={bucket => update({ bucket })} />
-            {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" aria-label={`Purpose: ${purposeSummary}`}>
-                  <span className="dshx:text-muted-foreground">Purpose:</span>
-                  {purposeSummary}
-                  <ChevronDownIcon aria-hidden />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="dshx-root">
-                <DropdownMenuCheckboxItem checked={purposes === undefined} onSelect={event => event.preventDefault()} onCheckedChange={() => update({ purposes: [] })}>
-                  All
-                </DropdownMenuCheckboxItem>
-                <DropdownMenuSeparator />
-                {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
-                  <DropdownMenuCheckboxItem
-                    key={purpose}
-                    checked={purposes?.includes(purpose) ?? false}
-                    onSelect={event => event.preventDefault()}
-                    onCheckedChange={checked => togglePurpose(purpose, checked)}
-                  >
-                    {UsageFormattingModel.purposeLabels[purpose]}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-
-          {preferences.tab === 'log' ? (
-            <>
-              {thread === null ? null : (
-                <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" role="status">
-                  <span className="dshx:min-w-0 dshx:truncate">
-                    Thread: <span className="dshx:font-medium">{thread.label}</span>
-                  </span>
-                  <Button size="xs" variant="ghost" onClick={() => state.setThread(null)}>
-                    Show every thread
+      <Tabs
+        value={preferences.tab}
+        onValueChange={value => update({ tab: USAGE_TABS.find(tab => tab === value) ?? 'charts' })}
+        className="dshx:min-w-0 dshx:gap-4"
+      >
+        <div className="dshx:min-w-0 dshx:overflow-x-auto dshx:border-b dshx:border-border">
+          <TabsList variant="line" aria-label="Usage views" className="dshx:h-9 dshx:gap-5 dshx:p-0">
+            {USAGE_TAB_ITEMS.map(tab => (
+              <TabsTrigger key={tab.value} value={tab.value} className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:px-0 dshx:after:bottom-[-1px]!">
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+        <TabsContent value={preferences.tab} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">
+          {[indexError, refreshError].map(message =>
+            message === null ? null : (
+              <Alert key={message} variant="destructive">
+                <AlertDescription className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+                  <span className="dshx:min-w-0 dshx:flex-1">{message}</span>
+                  <Button variant="outline" size="sm" disabled={refresh.isPending} onClick={() => refresh.mutate()}>
+                    Retry
                   </Button>
-                </div>
-              )}
-              <RequestLog
-                range={range}
-                purposes={purposes}
-                search={logSearch}
-                onSearch={setLogSearch}
-                openThread={props.openThread}
-                {...(thread === null ? {} : { sessionId: thread.sessionId })}
-              />
-            </>
-          ) : preferences.tab === 'charts' ? (
-            <UsageCharts
-              range={range}
-              purposes={purposes}
-              bucket={preferences.bucket}
-              groupBy={preferences.groupBy}
-              onGroupBy={groupBy => update({ groupBy })}
-              pricingNote={`List-price estimate from the models.dev price catalog (${
-                status?.pricingFetchedAt == null
-                  ? 'no catalog cached yet'
-                  : `updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)}`
-              }). Subscription traffic is priced as if it were metered.`}
-              onShowRequests={(search, groupBy) => {
-                if (groupBy === 'purpose') {
-                  const purpose = Schema.decodeUnknownOption(purposeSchema)(search)
-                  if (Option.isNone(purpose)) return
-                  setLogSearch('')
-                  update({ tab: 'log', purposes: [purpose.value] })
-                  return
-                }
-                setLogSearch(search)
-                update({ tab: 'log' })
-              }}
-              openThread={props.openThread}
-            />
-          ) : (
-            <UsageToolsTab range={range} bucket={preferences.bucket} />
+                </AlertDescription>
+              </Alert>
+            ),
           )}
-        </>
-      )}
+
+          {preferences.tab === 'quota' ? (
+            <UsageQuota.Tab panelId={props.panelId} />
+          ) : (
+            <>
+              <div
+                className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto dshx:@max-pane-narrow:pb-0.5"
+                role="group"
+                aria-label="Filters"
+              >
+                <SlidingSegments
+                  aria-label="Time range"
+                  options={PRESET_OPTIONS}
+                  value={preferences.preset}
+                  onValueChange={preset =>
+                    update({
+                      preset,
+                      bucket: preset === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+                      ...(preset === 'custom' &&
+                        preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
+                    })
+                  }
+                />
+                {preferences.preset === 'custom' ? (
+                  <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs">
+                    <Input
+                      type="date"
+                      aria-label="From date"
+                      className="dshx:h-7 dshx:w-36"
+                      value={preferences.customFrom}
+                      onChange={event => update({ customFrom: event.target.value })}
+                    />
+                    <span aria-hidden>→</span>
+                    <Input
+                      type="date"
+                      aria-label="To date"
+                      className="dshx:h-7 dshx:w-36"
+                      value={preferences.customTo}
+                      onChange={event => update({ customTo: event.target.value })}
+                    />
+                  </span>
+                ) : null}
+                <Select value={preferences.bucket} onValueChange={value => update({ bucket: BUCKETS.find(bucket => bucket === value) ?? 'day' })}>
+                  <SelectTrigger size="sm" aria-label="Group by time" className="dshx:w-28">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="dshx-root">
+                    {BUCKETS.map(bucket => (
+                      <SelectItem key={bucket} value={bucket}>
+                        {BUCKET_LABELS[bucket]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" aria-label={`Purpose: ${purposeSummary}`}>
+                      <span className="dshx:text-muted-foreground">Purpose:</span>
+                      {purposeSummary}
+                      <ChevronDownIcon aria-hidden />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="dshx-root">
+                    <DropdownMenuCheckboxItem
+                      checked={purposes === undefined}
+                      onSelect={event => event.preventDefault()}
+                      onCheckedChange={() => update({ purposes: [] })}
+                    >
+                      All
+                    </DropdownMenuCheckboxItem>
+                    <DropdownMenuSeparator />
+                    {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
+                      <DropdownMenuCheckboxItem
+                        key={purpose}
+                        checked={purposes?.includes(purpose) ?? false}
+                        onSelect={event => event.preventDefault()}
+                        onCheckedChange={checked => togglePurpose(purpose, checked)}
+                      >
+                        {UsageFormattingModel.purposeLabels[purpose]}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+
+              {preferences.tab === 'log' ? (
+                <>
+                  {thread === null ? null : (
+                    <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs" role="status">
+                      <span className="dshx:min-w-0 dshx:truncate">
+                        Thread: <span className="dshx:font-medium">{thread.label}</span>
+                      </span>
+                      <Button size="xs" variant="ghost" onClick={() => state.setThread(null)}>
+                        Show every thread
+                      </Button>
+                    </div>
+                  )}
+                  <RequestLog
+                    range={range}
+                    purposes={purposes}
+                    search={logSearch}
+                    onSearch={setLogSearch}
+                    openThread={props.openThread}
+                    {...(thread === null ? {} : { sessionId: thread.sessionId })}
+                  />
+                </>
+              ) : preferences.tab === 'charts' ? (
+                <UsageCharts
+                  range={range}
+                  purposes={purposes}
+                  bucket={preferences.bucket}
+                  groupBy={preferences.groupBy}
+                  onGroupBy={groupBy => update({ groupBy })}
+                  pricingNote={`List-price estimate from the models.dev price catalog (${
+                    status?.pricingFetchedAt == null
+                      ? 'no catalog cached yet'
+                      : `updated ${UsageFormattingModel.formatAgo(status.pricingFetchedAt, now, relativeTime)}`
+                  }). Subscription traffic is priced as if it were metered.`}
+                  onShowRequests={(search, groupBy) => {
+                    if (groupBy === 'purpose') {
+                      const purpose = Schema.decodeUnknownOption(purposeSchema)(search)
+                      if (Option.isNone(purpose)) return
+                      setLogSearch('')
+                      update({ tab: 'log', purposes: [purpose.value] })
+                      return
+                    }
+                    setLogSearch(search)
+                    update({ tab: 'log' })
+                  }}
+                  openThread={props.openThread}
+                />
+              ) : (
+                <UsageToolsTab range={range} bucket={preferences.bucket} />
+              )}
+            </>
+          )}
+        </TabsContent>
+      </Tabs>
     </Page>
   )
 }

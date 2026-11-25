@@ -18,16 +18,9 @@ const DIMENSIONS = [
   { id: 'purpose', label: 'Purposes', icon: <TargetIcon aria-hidden /> },
 ] as const satisfies readonly { readonly id: ChartQuery['groupBy']; readonly label: string; readonly icon: ReactNode }[]
 
-const METRICS = [
-  { value: 'cost', label: 'Cost' },
-  { value: 'tokens', label: 'Tokens' },
-  { value: 'requests', label: 'Requests' },
-] as const satisfies readonly { readonly value: SpendMetric; readonly label: string }[]
-
 const purposeLabels = new Map<string, string>(Object.entries(UsageFormattingModel.purposeLabels))
 
 const isGroupBy = (value: string): value is ChartQuery['groupBy'] => DIMENSIONS.some(dimension => dimension.id === value)
-const isMetric = (value: string): value is SpendMetric => METRICS.some(metric => metric.value === value)
 
 const amountOf = (row: { readonly cost: number; readonly tokens: number; readonly requests: number }, metric: SpendMetric): number =>
   metric === 'cost' ? row.cost : metric === 'tokens' ? row.tokens : row.requests
@@ -85,14 +78,23 @@ export const spendDimensions = (input: {
 
 const formatDay = (at: number): string => new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 
+/**
+ * The kit SpendMap's radial tick gauge reads as decoration on a range with no cap: hide its drawing and keep the total as
+ * a plain value where the connectors start (council round 2, D1). Follow-up: a kit prop for a gauge-less root.
+ */
+const PLAIN_TOTAL =
+  'dshx:[&_[data-node-anchor=root]_svg]:hidden dshx:[&_[data-node-anchor=root]>div]:size-auto dshx:[&_[data-node-anchor=root]>div>div]:static dshx:[&_[data-node-anchor=root]>div>div]:px-1'
+
 export const UsageSpendMap = (props: {
   readonly view: ChartView
+  /** The chart's measure: the page has one metric switch, on the chart card. */
+  readonly metric: SpendMetric
   readonly range: { readonly from: number; readonly to: number }
   readonly groupBy: ChartQuery['groupBy']
   readonly onGroupBy: (groupBy: ChartQuery['groupBy']) => void
   readonly onShowRequests: (search: string, groupBy: ChartQuery['groupBy']) => void
 }): JSX.Element => {
-  const [metric, setMetric] = useState<SpendMetric>('cost')
+  const metric = props.metric
   const [leafId, setLeafId] = useState<string | null>(null)
   const dimensions = spendDimensions({ view: props.view, metric, groupBy: props.groupBy })
   const dimension = dimensions.find(entry => entry.id === props.groupBy) ?? dimensions[0]
@@ -106,6 +108,7 @@ export const UsageSpendMap = (props: {
   return (
     <SpendMap
       data-usage-spend-map
+      className={PLAIN_TOTAL}
       detailPeriod="this range"
       dimensionId={dimension?.id ?? props.groupBy}
       dimensions={dimensions}
@@ -119,16 +122,11 @@ export const UsageSpendMap = (props: {
       format={formatterFor(metric)}
       heading="Where it went"
       leafId={leaf?.id ?? null}
-      metric={metric}
-      metrics={METRICS}
       onDimensionChange={id => {
         if (isGroupBy(id)) props.onGroupBy(id)
         setLeafId(null)
       }}
       onLeafChange={setLeafId}
-      onMetricChange={value => {
-        if (isMetric(value)) setMetric(value)
-      }}
       owner={props.view.appliedProvider ?? 'All accounts'}
       period={period}
       total={total}

@@ -21,7 +21,10 @@ describe('Usage page copy', () => {
 describe('Usage filters on a phone', () => {
   it('scrolls the filter row sideways in a narrow pane instead of wrapping it into rows', () => {
     const panel = readFileSync(new URL('panel.tsx', import.meta.url), 'utf8')
-    const row = panel.split('\n').find(line => line.includes('aria-label="Filters"')) ?? ''
+    const lines = panel.split('\n')
+    const at = lines.findIndex(line => line.includes('aria-label="Filters"'))
+    // The row's opening tag: its class sits a few lines above the label once the formatter splits the props.
+    const row = lines.slice(Math.max(0, at - 3), at + 1).join('\n')
     expect(row).toContain('dshx:@max-pane-narrow:flex-nowrap')
     expect(row).toContain('dshx:@max-pane-narrow:overflow-x-auto')
   })

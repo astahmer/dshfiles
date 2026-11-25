@@ -1,6 +1,7 @@
 import { Chart, ChartFrame, barY, colorLegend, defineChart, lineY, scaleBand, scaleLinear, scalePoint, text, tooltip } from '@dshfiles/plugin-ui/chart'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -28,7 +29,7 @@ const TREND_METRICS: readonly SlidingSegmentOption<'cost' | 'tokens' | 'requests
   { value: 'requests', label: 'Requests' },
 ]
 
-const GROUP_BY_OPTIONS: readonly SlidingSegmentOption<ChartQuery['groupBy']>[] = [
+const GROUP_BY_OPTIONS: readonly { readonly value: ChartQuery['groupBy']; readonly label: string }[] = [
   { value: 'model', label: 'Model' },
   { value: 'provider', label: 'Provider / account' },
   { value: 'project', label: 'Project' },
@@ -206,34 +207,43 @@ export const UsageCharts = (props: {
     const trendTotal = singleBucketTotal(trendRows, row => row.value)
     const trendLabel = trendTotal === null ? [] : [{ label: trendTotal.label, value: trendTotal.total, text: formatTrend(trendTotal.total) }]
     return defineChart({
-        marks: [
-          barY(trendRows, { x: 'label', y: 'value', color: 'key', ...BAR_GEOMETRY }),
-          text(trendLabel, { x: 'label', y: 'value', text: 'text', dy: -8, anchor: 'middle', fontSize: 11, fontWeight: 600, fill: 'var(--dsw-alias-label-primary)' }),
-        ],
-        scales: {
-          x: xAxis,
-          y: {
-            scale: scaleLinear,
-            grid: CHART_GRID,
-            axis: {
-              ticks: {
-                count: 4,
-                format: value => formatTrend(Number(value)),
-              },
+      marks: [
+        barY(trendRows, { x: 'label', y: 'value', color: 'key', ...BAR_GEOMETRY }),
+        text(trendLabel, {
+          x: 'label',
+          y: 'value',
+          text: 'text',
+          dy: -8,
+          anchor: 'middle',
+          fontSize: 11,
+          fontWeight: 600,
+          fill: 'var(--dsw-alias-label-primary)',
+        }),
+      ],
+      scales: {
+        x: xAxis,
+        y: {
+          scale: scaleLinear,
+          grid: CHART_GRID,
+          axis: {
+            ticks: {
+              count: 4,
+              format: value => formatTrend(Number(value)),
             },
           },
         },
-        color: {
-          domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
-          range: [...DATA_SERIES],
-          legend: colorLegend({ placement: 'bottom' }),
-        },
-        tooltip: {
-          use: tooltip,
-          format: point =>
-            `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${'key' in point.datum ? `${point.datum.key}: ` : ''}${formatTrend(point.datum.value)}`,
-        },
-      })
+      },
+      color: {
+        domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
+        range: [...DATA_SERIES],
+        legend: colorLegend({ placement: 'bottom' }),
+      },
+      tooltip: {
+        use: tooltip,
+        format: point =>
+          `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${'key' in point.datum ? `${point.datum.key}: ` : ''}${formatTrend(point.datum.value)}`,
+      },
+    })
   }, [trendRows, trendMetric, xAxis, view?.keys, props.groupBy, props.bucket, props.range.from, props.range.to])
   const tokenChart = useMemo(
     () =>
@@ -256,7 +266,10 @@ export const UsageCharts = (props: {
     () =>
       defineChart({
         marks: [lineY(series.cache, { x: 'label', y: 'percent', points: true, strokeWidth: 1.5 })],
-        scales: { x: pointAxis, y: { scale: scaleLinear().domain([0, 100]), grid: CHART_GRID, axis: { ticks: { count: 5, format: value => `${String(value)}%` } } } },
+        scales: {
+          x: pointAxis,
+          y: { scale: scaleLinear().domain([0, 100]), grid: CHART_GRID, axis: { ticks: { count: 5, format: value => `${String(value)}%` } } },
+        },
         tooltip: {
           use: tooltip,
           format: point =>
@@ -336,9 +349,22 @@ export const UsageCharts = (props: {
         title={`${trendMetric === 'cost' ? 'Cost' : trendMetric === 'tokens' ? 'Tokens' : 'Requests'} over time`}
         description={trendMetric === 'cost' ? 'List-price estimate, grouped by the selected dimension.' : 'Recorded usage, grouped by the selected dimension.'}
       >
+        {/* The page's one metric switch: "Where it went" and the daily calendar follow it (council round 2, D1). */}
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
           <SlidingSegments aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
-          <SlidingSegments aria-label="Stack cost by" options={GROUP_BY_OPTIONS} value={props.groupBy} onValueChange={props.onGroupBy} className="dshx:self-start" />
+          <Select value={props.groupBy} onValueChange={value => props.onGroupBy(GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model')}>
+            <SelectTrigger size="sm" aria-label="Group by" className="dshx:justify-start dshx:gap-1.5">
+              <span className="dshx:text-muted-foreground">By</span>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="dshx-root" align="end">
+              {GROUP_BY_OPTIONS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         <Chart
           ariaLabel={`${trendMetric} over time`}
@@ -350,10 +376,17 @@ export const UsageCharts = (props: {
 
       {/* "$0.00 / 0%" says nothing: the map waits for a range that cost something. */}
       {view.summary.cost > 0 ? (
-        <UsageSpendMap view={view} range={props.range} groupBy={props.groupBy} onGroupBy={props.onGroupBy} onShowRequests={props.onShowRequests} />
+        <UsageSpendMap
+          view={view}
+          metric={trendMetric}
+          range={props.range}
+          groupBy={props.groupBy}
+          onGroupBy={props.onGroupBy}
+          onShowRequests={props.onShowRequests}
+        />
       ) : null}
       <UsageBreakdownTable view={view} groupBy={props.groupBy} onShowRequests={props.onShowRequests} />
-      <UsageCalendar view={view} range={props.range} />
+      <UsageCalendar view={view} metric={trendMetric} range={props.range} />
 
       <div className="dshx:grid dshx:gap-3 dshx:@min-[64rem]:grid-cols-2">
         <Panel title="Tokens" description="Uncached input, cache reads, cache writes and output.">

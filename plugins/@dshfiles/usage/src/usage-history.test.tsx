@@ -85,12 +85,16 @@ describe('usage history views', () => {
     expect(markup).toContain('Codex-Alex')
   })
 
-  it('renders daily cells for a year range with switchable metric controls', () => {
+  it('renders daily cells for a year range in the measure the chart shows, with no switch of its own', () => {
     const from = new Date(2026, 0, 1).getTime()
-    const markup = renderToStaticMarkup(<UsageCalendar view={view} range={{ from, to: from + 365 * 86_400_000 }} />)
+    const markup = renderToStaticMarkup(<UsageCalendar view={view} metric="tokens" range={{ from, to: from + 365 * 86_400_000 }} />)
     expect(markup).toContain('Daily calendar')
-    expect(markup).toContain('Calendar metric')
+    expect(markup).not.toContain('Calendar metric')
+    expect(markup).toContain('>Tokens</span>')
     expect(markup).toContain('Daily tokens over 365 days')
+    expect(renderToStaticMarkup(<UsageCalendar view={view} metric="requests" range={{ from, to: from + 365 * 86_400_000 }} />)).toContain(
+      'Daily requests over 365 days',
+    )
     expect((markup.match(/aria-label="[A-Za-z]+, [A-Za-z]+ \d+, \d{4}: /gu) ?? []).length).toBeGreaterThan(350)
   })
 })
