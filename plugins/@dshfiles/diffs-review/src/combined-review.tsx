@@ -1,5 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
@@ -43,12 +44,7 @@ const filesOf = (revision: RevisionReview): readonly RevisionFile[] => revision.
 
 const subject = (revision: RevisionReview): string => (revision.description.length === 0 ? '(no description)' : revision.description)
 
-const Counts = (props: { readonly added: number; readonly deleted: number }): JSX.Element => (
-  <>
-    <span className="dshx:font-mono dshx:text-xs dshx:tabular-nums dshx:text-success">+{props.added}</span>
-    <span className="dshx:font-mono dshx:text-xs dshx:tabular-nums dshx:text-destructive">−{props.deleted}</span>
-  </>
-)
+const Counts = (props: { readonly added: number; readonly deleted: number }): JSX.Element => <DiffStat added={props.added} removed={props.deleted} />
 
 /**
  * Several revisions reviewed in one panel. A selection may have gaps, and `jj diff` has no answer across a gap, so each

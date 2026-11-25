@@ -3,6 +3,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import { Composer, useApi, useContract, usePlugin } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
@@ -75,15 +76,8 @@ const scrollToHunk = (input: { readonly root: Element | null; readonly path: str
   )
 }
 
-const Stat = (props: { readonly children: ReactNode; readonly tone?: 'add' | 'del' }): JSX.Element => (
-  <span
-    className={cn(
-      'dshx:font-mono dshx:text-xs dshx:tabular-nums',
-      props.tone === 'add' ? 'dshx:text-success' : props.tone === 'del' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
-    )}
-  >
-    {props.children}
-  </span>
+const Stat = (props: { readonly children: ReactNode }): JSX.Element => (
+  <span className="dshx:font-mono dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{props.children}</span>
 )
 
 const useThreadSummary = (sessions: ISessions, sessionId: string | undefined) => {
@@ -531,8 +525,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
         <>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2" data-testid="changes-summary">
             <Stat>{diff.files.length === 1 ? '1 file' : `${String(diff.files.length)} files`}</Stat>
-            <Stat tone="add">+{additions}</Stat>
-            <Stat tone="del">−{deletions}</Stat>
+            <DiffStat added={additions} removed={deletions} />
             <Stat>
               {viewedCount}/{diff.files.length} viewed
             </Stat>
@@ -594,8 +587,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
                   >
                     {file.display}
                   </button>
-                  <Stat tone="add">+{file.added}</Stat>
-                  <Stat tone="del">−{file.deleted}</Stat>
+                  <DiffStat added={file.added} removed={file.deleted} />
                 </li>
               )
             })}

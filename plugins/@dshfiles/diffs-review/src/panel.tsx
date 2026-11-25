@@ -1,6 +1,7 @@
 import type { ISessions } from '@deepseek-ai/dsh-api-session-controller/client'
 import { useApi } from '@dshfiles/dshx/client'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
+import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
@@ -46,16 +47,7 @@ const HINT = 'dshx:text-xs dshx:text-muted-foreground'
 const SURFACE = 'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card'
 
 /** A counter in the UI sans with tabular figures: these are numbers to compare, not text to copy verbatim. */
-const Stat = (props: { readonly label: string; readonly tone?: 'add' | 'del' }): ReactNode => (
-  <span
-    className={cn(
-      'dshx:text-xs dshx:tabular-nums',
-      props.tone === 'add' ? 'dshx:text-success' : props.tone === 'del' ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
-    )}
-  >
-    {props.label}
-  </span>
-)
+const Stat = (props: { readonly label: string }): ReactNode => <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{props.label}</span>
 
 /** The page's combined review, for revisions selected in a graph no thread on screen belongs to. */
 const CombinedReviewPage = (props: { readonly workspacePath: string; readonly revisions: readonly string[] }): ReactNode => (
@@ -299,6 +291,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
   return (
     <div className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:overflow-y-auto">
       <Page
+        width="full"
         heading="Review"
         description="Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers."
         meta={
@@ -374,8 +367,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         {result?.status === 'ok' && ReviewHeader.showStats(result.fileCount) ? (
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
             <Stat label={result.fileCount === 1 ? '1 file' : `${result.fileCount} files`} />
-            <Stat label={`+${result.additions}`} tone="add" />
-            <Stat label={`−${result.deletions}`} tone="del" />
+            <DiffStat added={result.additions} removed={result.deletions} />
             <Stat label={`${totalReviewed}/${result.fileCount} reviewed`} />
             <Progress value={progress} className={ReviewLook.PROGRESS} />
           </div>
