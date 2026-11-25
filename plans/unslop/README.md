@@ -30,6 +30,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 1 (round-0 shots) | 6.5 | 6.5 | 7.5 | GLM 6.5 (non-blocking): coloured pixels cover 0.03–0.5 % of 12 of 14 screens |
 | 2 (round-1 shots) | 7.5 | 7.5 | 8 | GLM 7.5: the round-1 fixes are in the pixels; Needs-you washes too faint to see |
 | 3 (round-2 shots) | 7.5 | 8 | 8.5 | colour now reads; consistency (chrome, widths, controls) and phone space remain |
+| 4 (round-3 shots) | 8 | 8 | 8.5 | one system now; phone transcript clip, two Settings layouts, rail surface, muddy tones remain |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -95,8 +96,15 @@ status button in the Threads bar); D 15 revisions `vkxupnzr` … `kktmpwmz` (Usa
 flows in series colours; Backlog underline tabs and a 920 px lane; AI accounts Models without the form; Plugins in a
 920 px lane with tones by name; one +N −M everywhere including PatchView; the scratch seed's wizard race). The lead
 removed four lint findings lane B left in two tests. Follow-ups: `--text-display` and the container-query tiers are rem;
-the captures render the whole UI at about 0.77 scale (cause not traced); native Bash and dock rows lack kind glyphs;
+native Bash and dock rows lack kind glyphs;
 deliverables ReviewTab and jujutsu still draw old diff counts.
+
+Round 4 findings, merged in `.cache/unslop-audit/r5/council/round-4-fixes.md` (captures are 2×: CSS px = shot px ÷ 2; an
+earlier 0.77 scale claim was wrong): the phone transcript is clipped above the dock and the jump button covers text;
+Settings has two layouts (in-page list on General, side column elsewhere), now one side column; the rail surface
+changes tone when the column folds; olive and brown rail tones read muddy; the Inbox badge is an ink blob over its
+glyph; plus Inbox card order, transcript rhythm, Usage colour consistency, AI accounts tabs, Review action weight,
+Backlog tag stability and Plugins row heights. Lanes A kit, B navigation/Settings, C transcript/Inbox/phone, D pages.
 
 ## Round four
 
