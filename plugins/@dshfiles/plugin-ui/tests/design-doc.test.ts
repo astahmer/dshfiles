@@ -113,4 +113,26 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     // Retired by this pass: the rail's tones are no longer borrowed from the identity ramp.
     expect(design).not.toContain('Threads identity-7, Inbox 2')
   })
+
+  it('records the fifth council pass: two frames, one control height, surface roles, active-tab tone, phone Settings drill-down (council round 5 A7)', () => {
+    for (const text of [
+      '**Two page frames, not four widths.**',
+      '**One control height.**',
+      '`--dshx-control-h`',
+      "  control-h: '32px'",
+      '**Two surface roles**',
+      '`dshx:surface-nav`',
+      '**Active destination tab.**',
+      '`text-nav-<id>`',
+      '**Phone Settings is a drill-down.**',
+      '`DisclosureTrigger`',
+      '`dshx:disclosure`',
+      '`@dshfiles/plugin-ui/lib/format-clock-time`',
+      '`formatClockTime`',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: the 920px lane and 28px buttons beside 32px fields.
+    expect(design).not.toContain('920px lane')
+    expect(design).not.toMatch(/button-(primary|outline):\n(?:    .*\n)*?    height: '28px'/u)
+  })
 })

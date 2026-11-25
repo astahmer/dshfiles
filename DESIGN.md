@@ -83,6 +83,8 @@ rounded:
 height:
   control-compact: '24px'
   control: '28px'
+  # The one control height (council round 5 A1): fields, selects, the segmented root, default buttons; 44px coarse.
+  control-h: '32px'
   row: '32px'
   bar: '36px'
   touch: '44px'
@@ -106,20 +108,20 @@ components:
   button-primary:
     backgroundColor: '{colors.ink}'
     textColor: '{colors.paper}'
-    rounded: '{rounded.md}'
-    height: '28px'
-    padding: '0 10px'
+    rounded: '{rounded.lg}'
+    height: '32px'
+    padding: '0 12px'
   button-outline:
     backgroundColor: '{colors.paper}'
     textColor: '{colors.ink}'
-    rounded: '{rounded.md}'
-    height: '28px'
-    padding: '0 10px'
+    rounded: '{rounded.lg}'
+    height: '32px'
+    padding: '0 12px'
   button-destructive:
     backgroundColor: '{colors.danger-red}'
     textColor: '{colors.paper}'
-    rounded: '{rounded.md}'
-    height: '28px'
+    rounded: '{rounded.lg}'
+    height: '32px'
   select:
     backgroundColor: '{colors.paper}'
     textColor: '{colors.ink}'
@@ -152,7 +154,7 @@ components:
     backgroundColor: '{colors.wash-failed}'
   button-attention:
     textColor: '{colors.signal-indigo}'
-    rounded: '{rounded.md}'
+    rounded: '{rounded.lg}'
     height: '24px'
     padding: '0 8px'
   chip-muted:
@@ -328,7 +330,10 @@ work on any surface.
     3:1 on bg, panel, raised and its own 14% tile, the ink label AA on that tile. The phone tab bar uses the same tones.
     **Rail surface.** The rail is one surface in every state: the panel step (`--dsw-specific-sidebar-fill`) beside a
     page on bg, whichever destination is open, whether its side column is open or folded. A destination never repaints
-    the rail.
+    the rail. **Active destination tab.** The active main tab of a destination page (Inbox, Backlog, Usage, Review,
+    Settings, Plugins…) draws the destination's glyph in its nav tone (`text-nav-<id>`, or `nav-tone-<id>` with
+    `text-nav-tone`); the label stays ink and the tab takes no tile or tint. A thread tab keeps its `ProjectMark`.
+    Settings navigation items carry a 16px muted glyph, and the phone Settings root list a 28px identity tile.
 
 Use semantic tokens only, never raw hex in plugin code. The exceptions are brand artwork
 (`ai-accounts/src/account-labels.ts`, `model-effort-picker/src/brand-marks.ts`) and a project colour the user
@@ -379,6 +384,11 @@ zero-padded after minutes and minutes after hours, so a ticking clock keeps its 
 `LiveElapsed`, which shares one timer for the page. A finished step under one second shows no duration, and a turn's
 total is said once, by its "Worked for" header. `m:ss` and `2 min 5 s` are retired.
 
+A time of day is `formatClockTime(at, { seconds? })` from `@dshfiles/plugin-ui/lib/format-clock-time`: the locale's
+12/24 h choice, printed one way everywhere — `15:45` and `09:05` in a 24-hour locale (the transcript's turn time),
+`3:45 PM` in a 12-hour one, never `24:00`. No plugin calls `toLocaleTimeString` with its own options, so one instant
+never shows two ways on one screen.
+
 ### Density
 
 Two densities, switched by pointer and width, never by user agent (`plugin-ui/src/styles.css`):
@@ -389,6 +399,13 @@ Two densities, switched by pointer and width, never by user agent (`plugin-ui/sr
 | `--dshx-density-text-meta` / `-min` | 12 / 11px         | 13 / 12px (phone width, a sideways phone, or `@max-pane-narrow`) |
 | `--dshx-density-text-input`         | 13px              | 16px (every coarse pointer: no Safari zoom)   |
 | `--dshx-density-target`             | 28px              | 44px (every coarse pointer)                   |
+| `--dshx-control-h`                  | 32px              | 44px (every coarse pointer)                   |
+
+**One control height.** `--dshx-control-h` (`dshx:h-control-h`) sizes every control that sits in a row with others:
+`Input`, `InputGroup`, `Combobox`, the default `Select` trigger (and `select-look`), the segmented `TabsList` root with
+its items inset 3px, and default-size `Button`s, so `Page` header actions. All take one radius, 8px
+(`--dsw-radius-md`, `rounded-lg`); every `Button` size shares it. `size="sm"` (28px) is for a dense row or toolbar,
+never beside a field.
 
 Safe areas: `--dshx-safe-top|right|bottom|left` (`env(safe-area-inset-*)`) on the phone top bar, tab bar, composer and
 sheets. Kit buttons, toggles and menu rows already get 44px hit areas on a coarse pointer.
@@ -398,6 +415,11 @@ The phone shell (top bar and tab bar instead of the desktop rail) follows one ru
 A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not on width alone. Status lives
 in a 44px top-bar status button on Threads and Inbox that opens the status sheet (with the usage ring); there is no
 permanent band above the tab bar, and a strip returns only for an actionable condition (quota low, disconnected).
+
+**Phone Settings is a drill-down.** The Settings root is a grouped list: 44px rows, each with a 28px identity tile, its
+name and a trailing chevron; the first group sits 16px under the header. A category page shows only its fields, 16px
+apart, under a Back control and the category name; there is no category dropdown on the page. Modified moves into
+the search field's filter or the ⋯ menu, never the toolbar.
 
 **Phone dock.** On a phone the transcript scroller ends above the dock (composer and its docked rows), never under
 it: a 24px fade at its bottom edge instead of a hard clip line through text, and bottom padding that clears the last
@@ -696,8 +718,10 @@ translate DSH's built-in parts only.
   ([plan §3](docs/ade-ux/README.md#glossary-enforced-in-copy)). `node --run check:copy` ratchets banned terms.
 - **Do** write Retry (not Try again), the ellipsis character (not three dots), and an error that says what to do next
   instead of ending in the raw cause (`Could not save: {message}`).
-- **Do** format every duration with `formatElapsed` or `formatDurationMs`, and take a thread's status from the
-  thread list's projection.
+- **Do** format every duration with `formatElapsed` or `formatDurationMs`, every time of day with `formatClockTime`,
+  and take a thread's status from the thread list's projection.
+- **Do** draw every disclosure with the kit chevron: `DisclosureTrigger` inside a `Collapsible`, or `dshx:disclosure`
+  on a `<details>`. **Don't** show the native ▶ marker.
 - **Don't** give Working a hue, colour a row for being healthy beyond its one dot, or add a second attention colour.
 - **Don't** put plugin names in labels ("pulls.review: Reviews", "Thread Sidebar: Navigation").
 - **Don't** use an indigo or blue primary button, an indigo selection fill, an icon tile in a page header, a
