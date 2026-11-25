@@ -562,6 +562,7 @@
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\"",
+        "click button \"Advanced: Main tabs\"",
         "click radio \"JSON\"",
         "expect tab \"Overrides\""
       ],
@@ -573,6 +574,7 @@
         "fill spinbutton \"Max tabs\" \"8\"",
         "press Enter",
         "expect button \"Reset to default\"",
+        "click button \"Advanced: Main tabs\"",
         "click radio \"JSON\"",
         "expect tab \"Overrides\""
       ],
@@ -696,13 +698,14 @@
       "id": "plugin-enablement-tools",
       "title": "List and switch plugin entries, from Settings or an Agent",
       "summary": "Turn a plugin on or off from its settings page, and the agent can do the same when you ask.",
-      "details": "Each plugin settings page ends with Plugin details, a closed fold holding its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for every entry; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
-      "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "click button \"Layout\"", "click button \"Plugin details: Main tabs\"", "expect switch \"Plugin enabled\""],
+      "details": "Each plugin settings page ends with an Advanced fold (after its advanced settings) holding the Form | JSON switch and Plugin details, a closed fold with its Loader entry: the bundle that declares the row, the bundles that reconfigure it, a Plugin enabled switch, a change waiting for a restart, and a note when pnpm profile:sync restores the row from the seed. plugin_inventory lists the same for every entry; plugin_set_enabled enables or disables one through the plugin manager and relays its verdict: applied live, waiting for a user restart (with the reason), or overridden by a higher-priority layer. It never restarts DSH; the opposite value reverses it.",
+      "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "click button \"Layout\"", "click button \"Advanced: Main tabs\"", "click button \"Plugin details: Main tabs\"", "expect switch \"Plugin enabled\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Settings Accounts, tools, secrets and plugins.\"",
         "click combobox \"Sections\"",
         "click option \"Layout\"",
+        "click button \"Advanced: Main tabs\"",
         "click button \"Plugin details: Main tabs\"",
         "expect switch \"Plugin enabled\""
       ],

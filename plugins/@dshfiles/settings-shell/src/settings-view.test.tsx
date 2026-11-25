@@ -115,6 +115,14 @@ describe('settings view: one title per entry', () => {
   const entry = (view: { readonly host: HTMLElement }): HTMLElement | null => view.host.querySelector('[data-settings-entry]')
   const shown = (element: Element | null | undefined): boolean => element instanceof HTMLElement && element.style.display !== 'none'
 
+  it('titles every entry with the one 13px section heading', () => {
+    const view = mount({ activeId: 'appearance' })
+    const heading = entry(view)?.querySelector('h2')
+    expect(heading?.className).toContain('dshx:text-sm')
+    expect(heading?.className).not.toContain('dshx:text-title')
+    view.unmount()
+  })
+
   it('titles the entry with its own name and no group eyebrow above it', () => {
     const view = mount({ activeId: 'appearance' })
     const header = entry(view)?.querySelector('header')

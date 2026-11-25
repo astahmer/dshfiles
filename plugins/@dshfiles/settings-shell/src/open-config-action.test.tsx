@@ -4,7 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { describe, expect, it, vi } from 'vitest'
 import type { SettingsDocumentState } from './native/document-action.js'
 import type { ShellTranslate } from './native/locales.js'
-import { OpenConfigAction, type ConfigFileOpeners } from './open-config-action.js'
+import { OpenConfigAction, pathEnd, type ConfigFileOpeners } from './open-config-action.js'
 
 const createController = (onNativeOpen: () => void) => {
   const state: SettingsDocumentState = { status: 'ready', opening: false, error: null }
@@ -57,6 +57,28 @@ describe('OpenConfigAction', () => {
 
       expect(openDefault).toHaveBeenCalledWith('/profile/cordis.patch.yml')
       expect(nativeOpenCount).toBe(0)
+    } finally {
+      await act(async () => root.unmount())
+      container.remove()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('shows the path in a tooltip, never in a native title, and only its end', async () => {
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(<OpenConfigAction controller={createController(() => {})} openers={createOpeners(async () => true)} t={translate} />)
+      })
+      await act(async () => {
+        await Promise.resolve()
+      })
+      expect(container.querySelectorAll('[title]')).toHaveLength(0)
+      expect(pathEnd('/private/var/folders/3k/T/dshx-boot/home/.dsh/profiles/web/cordis.patch.yml')).toBe('…/profiles/web/cordis.patch.yml')
+      expect(pathEnd('/profile/cordis.patch.yml')).toBe('/profile/cordis.patch.yml')
     } finally {
       await act(async () => root.unmount())
       container.remove()

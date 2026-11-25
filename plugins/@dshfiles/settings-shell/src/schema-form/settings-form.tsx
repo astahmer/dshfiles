@@ -231,6 +231,9 @@ const NumberInput = (props: {
           className="dshx:text-right dshx:font-mono! dshx:tabular-nums"
           disabled={props.disabled}
           inputMode="decimal"
+          // Chromium draws a number field's decimals in the field's language: without one it follows the browser (0,8 in
+          // an English interface on a French system).
+          lang={props.t('form.numberLocale')}
           max={shownBound(control.max)}
           min={shownBound(control.min)}
           onBlur={draft.onCommit}
@@ -677,6 +680,10 @@ export const SettingsForm = (props: {
   readonly t: ShellTranslate
   readonly highlight?: string
   readonly focusPath?: readonly string[]
+  /** Drawn at the end of the Advanced fold, after the advanced settings: the page's JSON switch and Plugin details. */
+  readonly advancedExtra?: ReactNode
+  /** The page the fold belongs to, for its accessible name ("Advanced: Main tabs") on an entry of several pages. */
+  readonly advancedOf?: string
 }): JSX.Element => {
   const snapshot = useConfigFormSnapshot(props.form)
   const values = Option.getOrUndefined(Schema.decodeUnknownOption(jsonValueSchema)(snapshot.value))
@@ -753,30 +760,42 @@ export const SettingsForm = (props: {
         </Fragment>
       )
     })
-  if (values === undefined) return <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace} />
+  const advancedLabel = advanced.length > 0 ? props.t('form.advanced', { count: advanced.length }) : props.t('form.advancedPlain')
+  const advancedFold =
+    advanced.length > 0 || props.advancedExtra !== undefined ? (
+      <Collapsible className="dshx:flex dshx:flex-col" onOpenChange={setAdvancedOpen} open={advancedShown}>
+        <CollapsibleTrigger asChild>
+          <Button
+            aria-label={props.advancedOf === undefined ? undefined : props.t('form.advancedOf', { page: props.advancedOf })}
+            className="dshx:-ml-2 dshx:mt-1 dshx:self-start dshx:text-muted-foreground"
+            data-settings-advanced=""
+            size="sm"
+            type="button"
+            variant="ghost"
+          >
+            <ChevronRightIcon className={cn('dshx:transition-transform', advancedShown && 'dshx:rotate-90')} />
+            {advancedLabel}
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="dshx:flex dshx:flex-col">
+          {rows(advanced)}
+          {props.advancedExtra}
+        </CollapsibleContent>
+      </Collapsible>
+    ) : null
+  if (values === undefined)
+    return (
+      <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
+        {advancedFold}
+      </div>
+    )
   return (
     <TooltipProvider delayDuration={KEY_TOOLTIP_DELAY_MS}>
       <div className="dshx:flex dshx:flex-col" data-settings-namespace={props.namespace}>
         {snapshot.status === 'unavailable' && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.unavailable')}</p>}
         {snapshot.status === 'ready' && !snapshot.writable && <p className="dshx:py-2 dshx:text-sm dshx:text-muted-foreground">{props.t('form.readOnly')}</p>}
         {rows(everyday)}
-        {advanced.length > 0 && (
-          <Collapsible className="dshx:flex dshx:flex-col" onOpenChange={setAdvancedOpen} open={advancedShown}>
-            <CollapsibleTrigger asChild>
-              <Button
-                className="dshx:-ml-2 dshx:mt-1 dshx:self-start dshx:text-muted-foreground"
-                data-settings-advanced=""
-                size="sm"
-                type="button"
-                variant="ghost"
-              >
-                <ChevronRightIcon className={cn('dshx:transition-transform', advancedShown && 'dshx:rotate-90')} />
-                {props.t('form.advanced', { count: advanced.length })}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="dshx:flex dshx:flex-col">{rows(advanced)}</CollapsibleContent>
-          </Collapsible>
-        )}
+        {advancedFold}
       </div>
     </TooltipProvider>
   )

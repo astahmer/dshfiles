@@ -7,6 +7,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ClipboardCopyIcon, CodeIcon, FolderOpenIcon, LoaderIcon } from '@dshfiles/plugin-ui/icons'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import type { ShellTranslate } from './native/locales.js'
@@ -16,6 +17,12 @@ import { openConfigMachine, type ConfigFileOpeners, type SettingsDocumentControl
 export type { ConfigFileOpeners } from './open-config-machine.js'
 
 const isMac = (): boolean => /Mac/u.test(navigator.platform)
+
+/** The end of a path, the part that tells files apart: `…/profiles/web/cordis.patch.yml`, never the home or temp prefix. */
+export const pathEnd = (path: string): string => {
+  const parts = path.split(/[\\/]/u).filter(part => part !== '')
+  return parts.length <= 3 ? path : `…/${parts.slice(-3).join('/')}`
+}
 
 /**
  * Existing documents open through the Session path opener's configured default; the native Host action remains the
@@ -42,9 +49,10 @@ export const OpenConfigAction = (props: {
   const errorText = feedback?.kind === 'error' ? t(feedback.key) : state.error === null ? null : t('openDocument.error')
 
   return (
+    <TooltipProvider>
     <div className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
       {errorText !== null && (
-        <span className="dshx:max-w-[200px] dshx:truncate dshx:text-xs dshx:leading-[18px] dshx:text-destructive" role="alert" title={errorText}>
+        <span className="dshx:text-xs dshx:leading-[18px] dshx:text-destructive" role="alert">
           {errorText}
         </span>
       )}
@@ -53,23 +61,28 @@ export const OpenConfigAction = (props: {
           {t('config.copied')}
         </span>
       )}
-      <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs">
-        <button
-          className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60"
-          disabled={state.opening || busy}
-          onClick={() => send({ type: 'primary' })}
-          title={path ?? undefined}
-          type="button"
-        >
-          <CodeIcon aria-hidden="true" className="dshx:hidden dshx:size-3.5 dshx:@max-pane-compact:block" />
-          <span className="dshx:@max-pane-compact:sr-only">{t('openDocument')}</span>
-        </button>
+      {/* No overflow clip on the split button: it would cut the kit's 44px touch hit area of both halves. */}
+      <div className="dshx:inline-flex dshx:h-7 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              className="dshx:inline-flex dshx:cursor-pointer dshx:items-center dshx:rounded-l-md dshx:border-none dshx:bg-transparent dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground dshx:hover:bg-accent dshx:disabled:cursor-default dshx:disabled:opacity-60"
+              disabled={state.opening || busy}
+              onClick={() => send({ type: 'primary' })}
+              type="button"
+            >
+              <CodeIcon aria-hidden="true" className="dshx:hidden dshx:size-3.5 dshx:@max-pane-compact:block" />
+              <span className="dshx:@max-pane-compact:sr-only">{t('openDocument')}</span>
+            </button>
+          </TooltipTrigger>
+          {path !== null && <TooltipContent>{pathEnd(path)}</TooltipContent>}
+        </Tooltip>
         {path !== null && (
           <DropdownMenu onOpenChange={open => open && send({ type: 'menu.open' })}>
             <DropdownMenuTrigger asChild>
               <button
                 aria-label={t('config.more')}
-                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
+                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-r-md dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground"
                 type="button"
               >
                 <ChevronDownIcon className="dshx:size-3.5" />
@@ -117,5 +130,6 @@ export const OpenConfigAction = (props: {
         )}
       </div>
     </div>
+    </TooltipProvider>
   )
 }

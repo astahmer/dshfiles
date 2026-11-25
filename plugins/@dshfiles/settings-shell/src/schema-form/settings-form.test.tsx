@@ -230,6 +230,11 @@ describe('machine values', () => {
     expect(row('maxRequestFilesBytes')?.querySelector('[role="alert"]')?.textContent).toBe('form.invalidNumber {"min":1,"max":"∞"}')
   })
 
+  it('formats a number field in the interface language, not the browser one (0.8, never 0,8)', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot)} namespace="example" t={t} />))
+    expect(numberField('streamIdleTimeoutMs')?.getAttribute('lang')).toBe('form.numberLocale')
+  })
+
   it('says nothing about the source of a value whose schema declares no default', async () => {
     await act(async () => root.render(<SettingsForm fields={fields} form={formOf(snapshot)} namespace="example" t={t} />))
     expect(row('baseURL')?.querySelector('[data-setting-source]')).toBeNull()

@@ -240,6 +240,11 @@ Then('Max tabs is back to {int} and no longer marked modified', async ({ page }:
 
 const mainTabsPage = (page: Page) => page.getByRole('region', { name: 'Main tabs', exact: true })
 const jsonEditor = (page: Page) => mainTabsPage(page).locator('[data-settings-json] textarea')
+/** The page's Advanced fold holds its JSON view switch and Plugin details, after the advanced settings. */
+const mainTabsAdvanced = (page: Page) => mainTabsPage(page).getByRole('button', { name: 'Advanced: Main tabs', exact: true })
+const openMainTabsAdvanced = async (page: Page): Promise<void> => {
+  if ((await mainTabsAdvanced(page).getAttribute('aria-expanded')) !== 'true') await mainTabsAdvanced(page).click()
+}
 const jsonDocumentSchema = Schema.fromJsonString(Schema.Record(Schema.String, Schema.Json))
 
 Then('the Max tabs row says it is an override that inherits {int}', async ({ page }: { page: Page }, value: number) => {
@@ -252,6 +257,7 @@ Then('the Max tabs row says it is an override that inherits {int}', async ({ pag
 })
 
 When('the Main tabs page is shown as JSON', async ({ page }: { page: Page }) => {
+  await openMainTabsAdvanced(page)
   await mainTabsPage(page).getByRole('radio', { name: 'JSON', exact: true }).click()
   await expect(jsonEditor(page)).toBeVisible()
 })
@@ -293,7 +299,8 @@ Then('the form shows Max tabs {int} marked modified', async ({ page }: { page: P
 Then('the page names its plugin entry, its bundle and a plugin switch', async ({ page }: { page: Page }) => {
   const entry = mainTabsPage(page).locator('[data-plugin-entry$=":dshfiles-main-tabs"]')
   await recordAssertion(page, 'settings-shell-plugin-entry-card', async () => {
-    // The entry is plumbing: it sits behind Plugin details, after the page's settings.
+    // The entry is plumbing: it sits behind Advanced › Plugin details, after the page's settings.
+    await openMainTabsAdvanced(page)
     await mainTabsPage(page).getByRole('button', { name: 'Plugin details: Main tabs', exact: true }).click()
     await expect(entry).toContainText('dshfiles-main-tabs')
     await expect(entry).toContainText('from @dshfiles/main-tabs')
@@ -361,6 +368,8 @@ When('the Main tabs page is found and opened with the keyboard', async ({ page }
 })
 
 When('the JSON view is chosen and an override is saved with the keyboard', async ({ page }: { page: Page }) => {
+  await tabTo(page, mainTabsAdvanced(page))
+  await page.keyboard.press('Enter')
   await tabTo(page, mainTabsPage(page).getByRole('radio', { name: 'Form', exact: true }))
   await page.keyboard.press('ArrowRight')
   // Radix roving focus moves focus on the next task: Enter before it lands would press Form again.

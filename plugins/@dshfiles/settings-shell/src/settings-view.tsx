@@ -8,6 +8,7 @@ import { ArrowUpRightIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
+import { SECTION_TITLE_CLASS } from './section-title.js'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
@@ -293,7 +294,7 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
       {ownHeading && (
         // In a narrow pane the Sections select right above names the entry, so the title is not printed a second time.
         <header className="dshx:@max-pane-compact:sr-only">
-          <h2 className="dshx:m-0 dshx:text-title dshx:font-semibold dshx:text-foreground">{entry.label}</h2>
+          <h2 className={SECTION_TITLE_CLASS}>{entry.label}</h2>
         </header>
       )}
       {link !== undefined && (
@@ -315,7 +316,7 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
       {entry.sectionLabel !== undefined && pages}
       {entry.sectionId !== undefined && (
         <div className="dshx:flex dshx:flex-col dshx:gap-1" data-settings-section={entry.sectionId}>
-          {entry.sectionLabel !== undefined && <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{entry.sectionLabel}</h3>}
+          {entry.sectionLabel !== undefined && <h3 className={SECTION_TITLE_CLASS}>{entry.sectionLabel}</h3>}
           <div ref={section}>{props.renderSlot('settings.section', sectionOwnerWithTarget(props), { only: entry.sectionId })}</div>
         </div>
       )}

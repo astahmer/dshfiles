@@ -70,10 +70,17 @@ const show = async (input: { readonly visible: boolean; readonly focusPath?: rea
 }
 
 const jsonEditor = (): HTMLTextAreaElement | null => container.querySelector('[data-settings-json] textarea')
+const viewButton = (name: string): HTMLButtonElement | undefined =>
+  [...container.querySelectorAll<HTMLButtonElement>('button')].find(button => button.textContent === name && button.closest('[hidden]') === null)
+const openAdvanced = async (): Promise<void> => {
+  const trigger = container.querySelector<HTMLButtonElement>('[data-settings-advanced]')
+  if (trigger?.getAttribute('aria-expanded') !== 'true') await act(async () => trigger?.click())
+}
 
 describe('plugin settings page', () => {
   it('reopens a field from search in the JSON view it left, with the key selected', async () => {
     await show({ visible: true })
+    await openAdvanced()
     const json = [...container.querySelectorAll('button')].find(button => button.textContent === 'view.json')
     await act(async () => json?.click())
     expect(jsonEditor()?.closest('[hidden]')).toBeNull()
@@ -95,5 +102,38 @@ describe('plugin settings page', () => {
     await show({ visible: true, focusPath: ['dense'] })
     expect(jsonEditor()).toBeNull()
     expect(container.querySelector('[data-settings-namespace]')?.closest('[hidden]')).toBeNull()
+  })
+
+  it('keeps the JSON view and Plugin details under Advanced, after the settings', async () => {
+    await act(async () =>
+      root.render(
+        <PageViewMemoryProvider>
+          <PluginSettingsPageView entry={<div data-entry-card="">entry</div>} form={form} page={page} t={t} />
+        </PageViewMemoryProvider>,
+      ),
+    )
+    expect(viewButton('view.json')).toBeUndefined()
+    expect(container.querySelector('[data-entry-card]')).toBeNull()
+    const trigger = container.querySelector<HTMLButtonElement>('[data-settings-advanced]')
+    expect(trigger?.getAttribute('aria-label')).toBe('form.advancedOf')
+    await openAdvanced()
+    expect(viewButton('view.json')).toBeDefined()
+    expect(container.querySelector('[data-entry-card]')).not.toBeNull()
+  })
+
+  it('moves focus with the view switch, so it never falls to body', async () => {
+    await show({ visible: true })
+    await openAdvanced()
+    viewButton('view.json')?.focus()
+    await act(async () => viewButton('view.json')?.click())
+    expect(document.activeElement).toBe(viewButton('view.json'))
+    await act(async () => viewButton('view.form')?.click())
+    expect(document.activeElement).toBe(viewButton('view.form'))
+  })
+
+  it('titles the page with the one 13px section heading', async () => {
+    await show({ visible: true })
+    expect(container.querySelector('h2')?.className).toContain('dshx:text-sm')
+    expect(container.querySelector('h2')?.className).not.toContain('dshx:text-title')
   })
 })
