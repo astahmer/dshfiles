@@ -69,6 +69,8 @@ export interface ThreadStatusInput {
   /** The sidebar's own attention labels for this thread (not its children). */
   readonly labels: readonly ThreadAttentionLabel[]
   readonly inbox: InboxThreadSignal | undefined
+  /** What the thread waits on, when the list knows it and no inbox item says it (`Approve: git push --force…`). */
+  readonly waitingDetail?: string | undefined
   /** Set while the thread's last finished turn is a failed one, read or not. */
   readonly failedTurn?: FailedTurnSignal | undefined
   /**
@@ -120,7 +122,7 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
     const fromInbox = inbox?.severity === 'blocking'
     return {
       status: 'needs-you',
-      detail: fromInbox ? inbox.reason : undefined,
+      detail: fromInbox ? inbox.reason : input.waitingDetail,
       verb: (fromInbox ? inbox.verb : undefined) ?? (needsLabel === undefined ? undefined : LABEL_VERB[needsLabel]),
       itemId: fromInbox ? inbox.itemId : undefined,
       since: fromInbox ? inbox.openedAt : input.activityAt,

@@ -10,6 +10,7 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
 import { DraftsSection } from './drafts-section.js'
+import { ApprovalDetail } from './approval-detail.js'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { isListedUnsentThread, presentUnsentRows } from './unsent-threads.js'
 import { HostSnapshotsModel } from './snapshots.js'
@@ -169,7 +170,7 @@ import {
 } from './organization.js'
 import { ThreadAttentionPresentationModel, type ThreadAttentionLabel } from './attention-presentation.js'
 import { SidebarPreferencesModel, attentionColorSchema } from './preferences.js'
-import { selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
+import { selectApprovalNeededRows, selectInputNeededRows, selectTurnFinishedRows } from './attention-rows.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
 import { useSidebarState } from './sidebar-state.js'
@@ -3888,34 +3889,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     useMemo(() => new Set(needsInputRows.map(session => session.id)), [needsInputRows]),
     StableValueModel.sameSet,
   )
+  // The open thread included: an approval it waits on is Needs you on every surface (unslop round four, D3).
   const approvalNeededRows = useMemo(
     () =>
-      attentionSessions
-        .filter(session => {
-          const kind = sessionStatus.get(session.id)?.pendingInteraction?.kind
-          return (
-            !session.blank &&
-            session.id !== selectedSession?.id &&
-            (kind === 'approval' || kind === 'plan-review') &&
-            !mutedSessionIds.has(session.id) &&
-            !archivedSessionIds.has(session.id) &&
-            !settledSessionIds.has(session.id) &&
-            (activeWorkspaceFilter === null ||
-              (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === activeWorkspaceFilter)
-          )
-        })
-        .sort((left, right) => right.updatedAt - left.updatedAt),
-    [
-      archivedSessionIds,
-      settledSessionIds,
-      attentionSessions,
-      mutedSessionIds,
-      activeWorkspaceFilter,
-      selectedSession?.id,
-      sessionState.byId,
-      sessionStatus,
-      workspaceBySession,
-    ],
+      selectApprovalNeededRows({
+        sessions: attentionSessions,
+        pendingInteractionKindFor: sessionId => sessionStatus.get(sessionId)?.pendingInteraction?.kind,
+        mutedSessionIds,
+        archivedSessionIds,
+        settledSessionIds,
+        matchesWorkspace: session =>
+          activeWorkspaceFilter === null ||
+          (SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession) ?? '') === activeWorkspaceFilter,
+      }),
+    [archivedSessionIds, settledSessionIds, attentionSessions, mutedSessionIds, activeWorkspaceFilter, sessionState.byId, sessionStatus, workspaceBySession],
   )
   const approvalNeededIds = useStableValue(
     useMemo(() => new Set(approvalNeededRows.map(session => session.id)), [approvalNeededRows]),
@@ -4018,6 +4005,22 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }),
     [tSidebar],
   )
+  // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
+  const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
+  const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
+  // What an approval asks, for the row's detail line: the command its live step names (`Approve: git push --force…`).
+  const waitingDetailById = useMemo(() => {
+    const details = new Map<SessionSummary['id'], string>()
+    for (const session of approvalNeededRows) {
+      const interaction = sessionStatus.get(session.id)?.pendingInteraction
+      const detail = ApprovalDetail.of(
+        { kind: interaction?.kind, step: liveTurns.get(session.id)?.step, reason: ApprovalDetail.reasonOf(interaction) },
+        subject => tSidebar('threadSidebarApproveDetail', { command: subject }),
+      )
+      if (detail !== undefined) details.set(session.id, detail)
+    }
+    return details
+  }, [approvalNeededRows, liveTurns, sessionStatus, tSidebar])
   const childStatusById = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
     if (!statusGlyphs) return statuses
@@ -4074,6 +4077,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             unread: attention.records.has(entry.session.id),
             labels: attentionLabelsBySession.get(entry.session.id) ?? [],
             inbox: inbox.signals.get(entry.session.id),
+            waitingDetail: waitingDetailById.get(entry.session.id),
             failedTurn: failedTurn === undefined ? undefined : { at: failedTurn.failedAt, reason: failedTurn.reason },
             stoppedTurn: ThreadStatusModel.stoppedTurnOf(attention.records.get(entry.session.id)),
             unlanded: jjThreadBySession.get(entry.session.id)?.unlanded.length,
@@ -4098,6 +4102,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     jjThreadBySession,
     now,
     pinnedSessionIds,
+    waitingDetailById,
     preferences.settledAt,
     sectionEntries,
     settledSessionIds,
@@ -4150,9 +4155,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }),
     [childThreadEntries, detachedThreadEntries, projectedWorkingCount, projectedWorkingIds, sectionEntries],
   )
-  // One Host read every 3 s for every working row's step and start, only while one runs (polish pass b:r4et).
-  const runningRowIds = useMemo(() => sectionEntries.filter(entry => entry.session.running).map(entry => entry.session.id), [sectionEntries])
-  const liveTurns = useLiveTurns(runningRowIds, sessionState.phase === 'ready')
   // Background jobs per thread for the rows' muted chip; a job never makes its thread Working.
   const runningJobs = RunningJobsModel.useCounts(sessionState.phase === 'ready')
   const transitionClock = useRef(ThreadStatusModel.createTransitionClock())
