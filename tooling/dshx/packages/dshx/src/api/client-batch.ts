@@ -73,8 +73,12 @@ const createApiBatcher = (options: BatcherOptions): ApiBatcher => {
 
   const answer = (entry: Entry, line: BatchLine): void => {
     if ('result' in line) return settle(entry, { result: line.result })
-    // The per-channel route answers an unregistered owner with HTTP 404; keep that error shape for the caller.
-    if (line.status === 404) return settle(entry, { cause: new Error(`transport failure for /api/${entry.call.endpoint}: HTTP 404`) })
+    // The per-channel route answers an unregistered owner with HTTP 404; keep that error shape for the caller, and carry
+    // the status and endpoint as fields so the client reads them instead of the text.
+    if (line.status === 404) {
+      const cause = Object.assign(new Error(`transport failure for /api/${entry.call.endpoint}: HTTP 404`), { status: 404, endpoint: entry.call.endpoint })
+      return settle(entry, { cause })
+    }
     sendAlone(entry)
   }
 

@@ -168,6 +168,7 @@ function createApiClient<
     const rpc = connection?.rpc
     if (rpc?.call === undefined) throw ApiProtocolModel.error('unavailable', 'The DSH Connection provider is unavailable.', contract.id, name, true)
     const span = browserCallSpan(contract.owner ?? packageId, contract.id, name)
+    const endpoint = `${channel.slice(1)}/${name}`
     try {
       ApiProtocolModel.throwIfAborted(options?.signal, contract.id, name)
       if (contract.methods[name] === undefined) throw ApiProtocolModel.error('contract', `Unknown API method ${name}.`, contract.id, name, false)
@@ -178,7 +179,6 @@ function createApiClient<
         span?.context === undefined
           ? { version: contract.version, input: payload }
           : { version: contract.version, input: payload, [TraceparentModel.envelopeField]: TraceparentModel.format(span.context) }
-      const endpoint = `${channel.slice(1)}/${name}`
       const result = isReadOnly(contract.methods[name])
         ? await coalesce(
             inflightCalls(rpc),
@@ -208,9 +208,9 @@ function createApiClient<
       if (options?.signal?.aborted) throw ApiProtocolModel.aborted(contract.id, name, cause)
       if (cause instanceof ContractViolation) throw ApiProtocolModel.error('contract', cause.message, contract.id, name, false, cause)
       // Connection answers a route nobody registered with HTTP 404: the owning plugin is not loaded.
-      if (cause instanceof Error && /\bHTTP 404$/.test(cause.message))
-        throw ApiProtocolModel.ownerMissing(contract.owner ?? packageId, contract.id, name, cause)
-      throw ApiProtocolModel.error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause)
+      const facts = ApiProtocolModel.transportFacts(cause, endpoint)
+      if (facts.status === 404) throw ApiProtocolModel.ownerMissing(contract.owner ?? packageId, contract.id, name, cause, facts)
+      throw ApiProtocolModel.error('transport', cause instanceof Error ? cause.message : String(cause), contract.id, name, true, cause, undefined, facts)
     } finally {
       span?.end()
     }

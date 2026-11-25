@@ -310,6 +310,24 @@ describe('API registry', () => {
     const result = await client.safe.status({})
     expect(!result.ok && isApiOwnerMissing(result.error)).toBe(true)
     expect(!result.ok && result.error.message).toBe('@test/threads is not loaded, so threads.status is unavailable.')
+    expect(!result.ok && { status: result.error.status, endpoint: result.error.endpoint }).toEqual({ status: 404, endpoint: 'dshx-1565bdb4/status' })
+  })
+
+  it('carries the HTTP status and endpoint of a transport failure as fields, so no caller parses the message', async () => {
+    const failing = (message: string) =>
+      ApiRuntimeModel.createClient({ get: name => (name === 'connection' ? { rpc: { call: vi.fn(async () => Promise.reject(new Error(message))) } } : undefined) }, threads, '@test/caller')
+    const http = await failing('transport failure for /api/test/threads/threads/status: HTTP 500').safe.status({})
+    expect(!http.ok && { kind: http.error.kind, status: http.error.status, endpoint: http.error.endpoint }).toEqual({
+      kind: 'transport',
+      status: 500,
+      endpoint: 'dshx-1565bdb4/status',
+    })
+    const network = await failing('Failed to fetch').safe.status({})
+    expect(!network.ok && { kind: network.error.kind, status: network.error.status, endpoint: network.error.endpoint }).toEqual({
+      kind: 'transport',
+      status: undefined,
+      endpoint: 'dshx-1565bdb4/status',
+    })
   })
 })
 
