@@ -40,9 +40,9 @@ describe('Review header and file toolbar (council round 4, D3)', () => {
     expect(body).toContain('All files reviewed')
   })
 
-  it("draws each file's Reviewed control as a bounded 32 px box on the file row", () => {
+  it("draws each file's Reviewed control as one 32 px target on the file row, the checkbox its only edge (round 7, D4)", () => {
     expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:h-8')
-    expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:border')
+    expect(ReviewLook.REVIEWED_TOGGLE).not.toContain('dshx:border')
     expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:rounded-md')
     expect(ReviewLook.REVIEWED_TOGGLE).toContain('dshx:pointer-coarse:h-11')
     expect(panel).toMatch(/<label className=\{ReviewLook\.REVIEWED_TOGGLE\}>/u)

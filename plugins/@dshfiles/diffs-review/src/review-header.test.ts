@@ -70,9 +70,20 @@ describe('the Review page controls (council round 5, D3)', () => {
     expect(base).not.toContain('dshx:h-8')
     const picker = panel.slice(
       panel.indexOf('aria-label="Choose project or workspace"'),
-      panel.indexOf('>', panel.indexOf('variant="outline"', panel.indexOf('aria-label="Choose project or workspace"'))),
+      panel.indexOf('>', panel.indexOf('variant=', panel.indexOf('aria-label="Choose project or workspace"'))),
     )
     expect(picker).not.toContain('size="sm"')
+  })
+
+  it('draws the project picker, which shows a value, in the field look of the Base field beside it (council round 7, D4 / A4)', () => {
+    const picker = panel.slice(
+      panel.indexOf('aria-label="Choose project or workspace"'),
+      panel.indexOf('</Button>', panel.indexOf('aria-label="Choose project or workspace"')),
+    )
+    expect(picker).toContain('variant="field"')
+    expect(picker).not.toContain('variant="outline"')
+    expect(picker).not.toContain('dshx:justify-between')
+    expect(picker).not.toContain('dshx:font-normal')
   })
 
   it('shows no review counter or bar for a single file: its header control is the whole review state', () => {
@@ -106,12 +117,15 @@ describe('the Review file header (council round 6, D2)', () => {
     )
   })
 
-  it("draws Mark reviewed on the fields' 3:1 boundary with a full-ink label", () => {
+  it("draws Mark reviewed with one edge, the checkbox's 3:1 boundary, and a full-ink label (council round 7, D4)", () => {
     const toggle = /REVIEWED_TOGGLE =\s*'([^']*)'/u.exec(look)?.[1] ?? ''
-    expect(toggle).toContain('dshx:border-field-border')
+    // No box around the checkbox: the field edge inside a field edge read as two controls.
+    expect(toggle.split(' ').filter(name => name === 'dshx:border' || name.startsWith('dshx:border-'))).toEqual([])
     expect(toggle).toContain('dshx:text-foreground')
     expect(toggle).not.toContain('dshx:text-muted-foreground')
-    expect(toggle).not.toContain('dshx:border-border')
+    // Still one 32 px target with a hover wash (44 px under a coarse pointer).
+    for (const look of ['dshx:h-8', 'dshx:hover:bg-accent', 'dshx:pointer-coarse:h-11']) expect(toggle).toContain(look)
+    expect(panel).toMatch(/<label className=\{ReviewLook\.REVIEWED_TOGGLE\}>\s*<Checkbox/u)
   })
 })
 

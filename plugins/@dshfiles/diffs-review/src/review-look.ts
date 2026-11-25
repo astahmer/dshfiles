@@ -11,9 +11,11 @@ export class ReviewLook {
   static readonly PROGRESS = 'dshx:h-1 dshx:w-32 dshx:flex-none'
 
   /**
-   * A file's Reviewed control: checkbox and word in one bounded 32 px box (44 px under a coarse pointer, council round 4,
-   * D3), on the fields' 3:1 boundary with its label in full ink, so it reads as a control (council round 6, D2).
+   * A file's Reviewed control: checkbox and word in one 32 px target (44 px under a coarse pointer, council round 4, D3)
+   * with its label in full ink (council round 6, D2). One edge only: the checkbox's own 3:1 boundary, no box around it,
+   * since a field edge inside a field edge read as two controls; the hover wash shows the whole target (council round
+   * 7, D4).
    */
   static readonly REVIEWED_TOGGLE =
-    'dshx:inline-flex dshx:h-8 dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-field-border dshx:bg-background dshx:px-2.5 dshx:text-xs dshx:font-medium dshx:text-foreground dshx:transition-colors dshx:hover:bg-accent dshx:pointer-coarse:h-11'
+    'dshx:inline-flex dshx:h-8 dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-foreground dshx:transition-colors dshx:hover:bg-accent dshx:pointer-coarse:h-11'
 }

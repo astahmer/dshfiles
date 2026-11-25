@@ -337,12 +337,13 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         className="dshx:shrink-0"
       >
         <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+          {/* It shows a value, so it takes the field look of the Base field beside it (council round 7, D4 / A4). */}
           <Button
             aria-label="Choose project or workspace"
-            className="dshx:min-w-48 dshx:max-w-full dshx:shrink dshx:justify-between dshx:font-normal"
+            className="dshx:min-w-48 dshx:max-w-full dshx:shrink"
             onClick={() => setPickerOpen(true)}
             type="button"
-            variant="outline"
+            variant="field"
           >
             {pickerProjectName === undefined ? null : <ProjectMark name={pickerProjectName} size="dense" />}
             <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{pickerLabel}</span>
