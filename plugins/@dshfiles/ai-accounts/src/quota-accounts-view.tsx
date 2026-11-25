@@ -61,9 +61,6 @@ export const QuotaAccountsView = (props: {
           {refreshing ? <Spinner className="dshx:size-3.5" /> : <RefreshCwIcon aria-hidden />}
           Refresh quota
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => props.onOpenHistory(selectedId)}>
-          Quota history
-        </Button>
         <Button size="sm" variant="ghost" onClick={props.onOpenAccounts}>
           Manage accounts
         </Button>

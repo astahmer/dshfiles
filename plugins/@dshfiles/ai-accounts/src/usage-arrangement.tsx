@@ -38,7 +38,7 @@ export const useUsageLayout = () => {
   const arrangementError = (): string | null => {
     if (reorder.isError) return `Could not change account priority: ${errorMessage(reorder.error, 'Update DSH and restart it, then retry.')}`
     if (preference.isError) return errorMessage(preference.error, 'Could not save display preference.')
-    if (fileQuery.isError) return 'Account priority did not load. Retry once DSH is reachable.'
+    if (fileQuery.isError) return 'Account order did not load.'
     return null
   }
   return {
@@ -46,6 +46,8 @@ export const useUsageLayout = () => {
     pending,
     ready: fileQuery.data !== undefined && !fileQuery.isError,
     error: arrangementError(),
+    /** Read the account order again after it failed to load; null while there is nothing to retry. */
+    retry: fileQuery.isError ? (): void => void fileQuery.refetch() : null,
     movingId: reorder.variables?.instanceId ?? null,
     neighborIndex: (shownIds: readonly string[], id: string, direction: -1 | 1): number => AccountOrderModel.neighborIndex(accounts, shownIds, id, direction),
     hide: (id: string): void => saveHidden([...hiddenUsageAccounts.filter(hidden => hidden !== id), id]),

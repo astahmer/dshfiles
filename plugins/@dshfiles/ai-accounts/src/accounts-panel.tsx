@@ -3,10 +3,14 @@ import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { PlusIcon } from '@dshfiles/plugin-ui/icons'
+import { useApi } from '@dshfiles/dshx/client'
+import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import { AccountDetail } from './account-detail.js'
-import { filterPageAccounts } from './account-page-model.js'
+import { accountsPageCount, filterPageAccounts } from './account-page-model.js'
 import { AccountRail } from './account-rail.js'
+import { aiAccountsQueries } from './accounts-queries.js'
+import { aiAccountsApi } from './api.js'
 import { AccountsToolbar } from './accounts-toolbar.js'
 import { QuotaContinuations } from './quota-continuations.js'
 import { useAccountsPanelState } from './use-accounts-panel-state.js'
@@ -24,6 +28,8 @@ export const AccountsPanel = (props: {
   readonly folderPicker: WorkspacePickerPorts
 }): JSX.Element => {
   const state = useAccountsPanelState(props.credentialSetup)
+  // The built-in providers listed under the accounts share this query (one request), so the heading counts them too.
+  const nativeProviders = useQuery(aiAccountsQueries.nativeProviders(useApi(aiAccountsApi)))
   const [search, setSearch] = useState('')
   const [section, setSection] = useState<AccountSection>('models')
   const [nativeEntry, setNativeEntry] = useState<string | null>(null)
@@ -71,7 +77,7 @@ export const AccountsPanel = (props: {
         className="dshx:bg-muted/10"
         heading="AI accounts"
         description="Manage your accounts and model settings."
-        count={state.file.accounts.length}
+        count={accountsPageCount({ accounts: state.file.accounts, native: nativeProviders.data })}
         primaryAction={{ id: 'add-account', label: 'Add account', icon: <PlusIcon aria-hidden />, onSelect: addAccount }}
       >
         <div className="dshx:mx-auto dshx:grid dshx:w-full dshx:max-w-[1680px] dshx:grid-cols-[minmax(300px,36%)_minmax(0,1fr)] dshx:items-start dshx:gap-6 dshx:@max-pane-compact:grid-cols-1 dshx:@max-pane-narrow:gap-4">

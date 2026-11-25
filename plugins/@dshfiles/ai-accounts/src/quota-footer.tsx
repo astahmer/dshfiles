@@ -1,3 +1,4 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { relativeTime } from '@deepseek-ai/dsh-client-ui-primitives'
 import { useApi } from '@dshfiles/dshx/client'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
@@ -382,6 +383,11 @@ const QuotaStripBody = (props: QuotaSurfaceProps): JSX.Element => {
             {arrangement.error === null ? null : (
               <p className="dshx:w-full dshx:text-xs dshx:text-destructive" role="alert">
                 {arrangement.error}
+                {arrangement.retry === null ? null : (
+                  <Button className="dshx:ml-1 dshx:h-auto dshx:p-0 dshx:text-xs" onClick={arrangement.retry} size="xs" type="button" variant="link">
+                    Retry
+                  </Button>
+                )}
               </p>
             )}
           </div>

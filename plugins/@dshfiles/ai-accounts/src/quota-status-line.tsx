@@ -1,3 +1,4 @@
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Popover, PopoverAnchor } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -582,6 +583,11 @@ export const QuotaStatusLine = (props: QuotaStatusLineProps): JSX.Element | null
             {arrangement.error === null ? null : (
               <span className="dshx:text-xs dshx:text-destructive" role="alert">
                 {arrangement.error}
+                {arrangement.retry === null ? null : (
+                  <Button className="dshx:ml-1 dshx:h-auto dshx:p-0 dshx:text-xs" onClick={arrangement.retry} size="xs" type="button" variant="link">
+                    Retry
+                  </Button>
+                )}
               </span>
             )}
           </span>
