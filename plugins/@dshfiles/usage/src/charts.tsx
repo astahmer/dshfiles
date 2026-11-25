@@ -358,7 +358,10 @@ export const UsageCharts = (props: {
         />
       </Panel>
 
-      <UsageSpendMap view={view} range={props.range} groupBy={props.groupBy} onGroupBy={props.onGroupBy} onShowRequests={props.onShowRequests} />
+      {/* "$0.00 / 0%" says nothing: the map waits for a range that cost something. */}
+      {view.summary.cost > 0 ? (
+        <UsageSpendMap view={view} range={props.range} groupBy={props.groupBy} onGroupBy={props.onGroupBy} onShowRequests={props.onShowRequests} />
+      ) : null}
       <UsageBreakdownTable view={view} groupBy={props.groupBy} onShowRequests={props.onShowRequests} />
       <UsageCalendar view={view} range={props.range} />
 

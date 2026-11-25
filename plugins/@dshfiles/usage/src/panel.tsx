@@ -23,6 +23,9 @@ import { RequestLog } from './request-log.js'
 import { UsageToolsTab } from './tools-tab.js'
 import { UsageQuota } from './quota-tab.js'
 
+/** The Purpose filter's "All" item: no purpose filter. */
+const ALL_PURPOSES = '__all__'
+
 const PRESETS = ['today', '7d', '30d', '365d', 'custom'] as const
 
 /** A stored view preference keeps the value it had when one field is stale, the rule `.catch(...)` carried. */
@@ -173,11 +176,14 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
   const range = rangeOf(preferences, now)
   const purposes = preferences.purposes.length === 0 ? undefined : preferences.purposes
   const status = statusQuery.data
-  const togglePurpose = (purpose: RequestPurpose): void => {
-    const current = new Set(preferences.purposes)
-    if (current.has(purpose)) current.delete(purpose)
-    else current.add(purpose)
-    update({ purposes: UsageFoldModel.REQUEST_PURPOSES.filter(item => current.has(item)) })
+  /** The Purpose ToggleGroup's next value: picking All clears the others, picking a purpose drops All. */
+  const choosePurposes = (values: readonly string[]): void => {
+    const chosen = new Set(values)
+    if (chosen.has(ALL_PURPOSES) && purposes !== undefined) {
+      update({ purposes: [] })
+      return
+    }
+    update({ purposes: UsageFoldModel.REQUEST_PURPOSES.filter((item: RequestPurpose) => chosen.has(item)) })
   }
 
   const indexState =
@@ -289,27 +295,24 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
             </ToggleGroup>
           </div>
 
-          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-x-auto" role="group" aria-label="Purpose">
-            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">Purpose</span>
-            <Button
-              size="xs"
-              variant={purposes === undefined ? 'secondary' : 'ghost'}
-              aria-pressed={purposes === undefined}
-              onClick={() => update({ purposes: [] })}
+          <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-x-auto">
+            <span aria-hidden className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">Purpose</span>
+            {/* The same ToggleGroup as the range and grouping filters (DESIGN.md › Tabs — one style). */}
+            <ToggleGroup
+              type="multiple"
+              variant="outline"
+              size="sm"
+              aria-label="Purpose"
+              value={purposes === undefined ? [ALL_PURPOSES] : [...preferences.purposes]}
+              onValueChange={choosePurposes}
             >
-              All
-            </Button>
-            {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
-              <Button
-                key={purpose}
-                size="xs"
-                variant={preferences.purposes.includes(purpose) ? 'secondary' : 'ghost'}
-                aria-pressed={preferences.purposes.includes(purpose)}
-                onClick={() => togglePurpose(purpose)}
-              >
-                {UsageFormattingModel.purposeLabels[purpose]}
-              </Button>
-            ))}
+              <ToggleGroupItem value={ALL_PURPOSES}>All</ToggleGroupItem>
+              {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
+                <ToggleGroupItem key={purpose} value={purpose} className="dshx:flex-none">
+                  {UsageFormattingModel.purposeLabels[purpose]}
+                </ToggleGroupItem>
+              ))}
+            </ToggleGroup>
           </div>
 
           {preferences.tab === 'log' ? (

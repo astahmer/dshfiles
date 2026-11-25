@@ -21,7 +21,9 @@ describe('Usage page copy', () => {
 describe('Usage filters on a phone', () => {
   it('scrolls the Purpose chips sideways instead of wrapping them into rows', () => {
     const panel = readFileSync(new URL('panel.tsx', import.meta.url), 'utf8')
-    const row = panel.split('\n').find(line => line.includes('aria-label="Purpose"')) ?? ''
+    // The row that scrolls is the wrapper right above the "Purpose" label; the ToggleGroup inside it names the group.
+    const lines = panel.split('\n')
+    const row = lines[lines.findIndex(line => line.includes('>Purpose</span>')) - 1] ?? ''
     expect(row).toContain('dshx:overflow-x-auto')
     expect(row).not.toContain('dshx:flex-wrap')
   })
