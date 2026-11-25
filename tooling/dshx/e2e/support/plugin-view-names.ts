@@ -159,11 +159,39 @@ const destinationTabs = (page: Page): Locator => page.getByRole('tablist', { nam
 const sectionButton = (page: Page, location: RailLocation): Locator =>
   page.getByRole('navigation', { name: `${location.destination} pages`, exact: true }).getByRole('button', { name: location.section, exact: true })
 
+/**
+ * Show a destination's list from its rail tab. Settings opens its page with that click and a one-page destination opens
+ * its page, and then the column folds to the rail while the page shows (round five B1, B2). Settings' own rail item
+ * opens its list again; a folded one-page destination already shows the page it lists. Resolves false in that case.
+ */
+const showDestinationList = async (page: Page, destination: string): Promise<boolean> => {
+  const tab = destinationTabs(page).getByRole('tab', { name: destination, exact: true })
+  // A column that folds or opens moves between the frame's columns for one frame and animates its width: a click in
+  // that window is lost, so wait until the frame settles.
+  const settled = async (): Promise<void> => page.locator('[data-animating]').waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
+  const folded = page.locator('nav[data-stage-folded]')
+  const wasFolded = await folded.isVisible()
+  await tab.click()
+  if (wasFolded) {
+    // Leaving a folded destination opens the column again.
+    await folded.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => undefined)
+    await settled()
+  }
+  await folded.waitFor({ state: 'visible', timeout: 1_500 }).catch(() => undefined)
+  if (!(await folded.isVisible())) return true
+  await settled()
+  if (destination !== 'Settings') return false
+  await tab.click()
+  await folded.waitFor({ state: 'detached' })
+  await settled()
+  return true
+}
+
 /** Open a merged page's location: the first candidate whose section is listed, then its tab and view when present. */
 const openAlternative = async (page: Page, candidates: readonly RailLocation[]): Promise<void> => {
   const first = candidates[0]
   if (first === undefined) return
-  await destinationTabs(page).getByRole('tab', { name: first.destination, exact: true }).click()
+  if (!(await showDestinationList(page, first.destination))) return
   const any = candidates.map(candidate => sectionButton(page, candidate)).reduce((left, right) => left.or(right))
   await any.first().waitFor({ state: 'visible' })
   for (const candidate of candidates) {
@@ -237,7 +265,7 @@ export const openGlobalPanel = async (page: Page, fixtureName: string): Promise<
   }
   const rail = railLocations.get(reusableViewName(fixtureName))
   if (rail !== undefined && (await destinationTabs(page).isVisible())) {
-    await destinationTabs(page).getByRole('tab', { name: rail.destination, exact: true }).click()
+    if (!(await showDestinationList(page, rail.destination))) return
     // The Threads pages (Board) are items of the thread list's Filter menu since productivity pass Q5 (T5.3).
     if (rail.destination === 'Threads') {
       await ThreadListFilter.clickItem(page, page.getByRole('region', { name: 'Threads', exact: true }), rail.section)

@@ -63,6 +63,16 @@ const openThroughRail = async (page: Page, timeoutMs: number, target: { readonly
   const tab = page.getByRole('tablist', { name: 'Destinations', exact: true }).getByRole('tab', { name: target.destination, exact: true })
   if (!(await tab.isVisible())) return false
   await tab.click({ timeout: timeoutMs })
+  // Settings opens its page with that click, and the column folds to the rail while the page shows; its own rail item
+  // opens the list again (round five B1).
+  const folded = page.locator('nav[data-stage-folded]')
+  await folded.waitFor({ state: 'visible', timeout: 1_500 }).catch(() => undefined)
+  if (await folded.isVisible()) {
+    await tab.click({ timeout: timeoutMs })
+    await folded.waitFor({ state: 'detached', timeout: timeoutMs })
+    // The opening column animates its width and moves between the frame's columns: a click before it settles is lost.
+    await page.locator('[data-animating]').waitFor({ state: 'detached', timeout: timeoutMs }).catch(() => undefined)
+  }
   await page
     .getByRole('navigation', { name: `${target.destination} pages`, exact: true })
     .getByRole('button', { name: target.section, exact: true })
