@@ -3,7 +3,7 @@ import { defineLocale } from '@dshfiles/dshx/client'
 export const AGENT_TOOLKIT_LOCALE_NAMESPACE = 'dshfiles.agent-toolkit'
 
 const en = {
-  title: 'Agent toolkit',
+  title: 'Capabilities',
   viewCapabilities: 'Capabilities',
   subtitle: 'Everything the agent can use in this thread: tools, plugins, MCP servers, skills and memory.',
   paletteOpen: 'Open the agent toolkit',

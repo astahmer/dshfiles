@@ -10,7 +10,7 @@
       "reach": [
         "click tab \"Agents\"",
         "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
+        "expect heading \"Capabilities\"",
         "expect region \"Tools (*\"",
         "click radio \"Plugins\"",
         "expect region \"Plugins (*\""
@@ -19,7 +19,7 @@
         "click button \"More\"",
         "click button \"Agents Configured agents and their messages.\"",
         "click button \"Capabilities\"",
-        "expect heading \"Agent toolkit\"",
+        "expect heading \"Capabilities\"",
         "expect region \"Tools (*\"",
         "click radio \"Plugins\"",
         "expect region \"Plugins (*\""
@@ -146,7 +146,7 @@
         "press Enter",
         "click button \"Open command palette\"",
         "click option \"Open the agent toolkit*\"",
-        "expect heading \"Agent toolkit\"",
+        "expect heading \"Capabilities\"",
         "expect combobox \"Thread\""
       ],
       "surfaces": ["client"],

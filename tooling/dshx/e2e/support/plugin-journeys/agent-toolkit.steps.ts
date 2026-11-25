@@ -10,7 +10,7 @@ const section = (page: Page, name: RegExp) => toolkit(page).getByRole('region', 
 
 When('the Agent toolkit is opened from the sidebar', async ({ page }: { page: Page }) => {
   await openGlobalPanel(page, 'Agent Toolkit: Capabilities')
-  await expect(toolkit(page).getByRole('heading', { name: 'Agent toolkit', exact: true })).toBeVisible()
+  await expect(toolkit(page).getByRole('heading', { name: 'Capabilities', exact: true })).toBeVisible()
 })
 
 Then(
@@ -88,7 +88,7 @@ When('the Agent toolkit is opened from the command palette', async ({ page }: { 
 
 Then('the Agent toolkit is about the thread {string}', async ({ page }: { page: Page }, title: string) => {
   await recordAssertion(page, 'agent-toolkit-opens-about-the-thread', async () => {
-    await expect(toolkit(page).getByRole('heading', { name: 'Agent toolkit', exact: true })).toBeVisible()
+    await expect(toolkit(page).getByRole('heading', { name: 'Capabilities', exact: true })).toBeVisible()
     await expect(toolkit(page).getByRole('combobox', { name: 'Thread', exact: true })).toContainText(title)
   })
   await finishJourneyAssertions(page)
