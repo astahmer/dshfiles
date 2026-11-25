@@ -333,7 +333,7 @@ describe('tool-search per-agent tool access', () => {
     expect(result.requests.every(request => !request.tools.includes('Write text content to a file'))).toBe(true)
     expect(result.requests[1]?.lastMessage).not.toContain('## write_file')
     expect(result.requests[1]?.lastMessage).toContain('disabled for this thread: write_file')
-    expect(result.requests[2]?.lastMessage).toContain('tool_call cannot call write_file is disabled for this thread, whose tools come from @reviewer')
+    expect(result.requests[2]?.lastMessage).toContain('tool_call refused: write_file is disabled for this thread, whose tools come from @reviewer')
     expect(result.requests[2]?.lastMessage).toContain('Change it in the Agents panel')
     expect(result.requests[3]?.lastMessage).toContain('write_file is disabled for this thread, whose tools come from @reviewer')
   })

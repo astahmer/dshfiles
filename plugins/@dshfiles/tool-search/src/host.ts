@@ -546,7 +546,7 @@ class ToolSearch extends Context.Service<
               reserved: new Set([TOOL_SEARCH_NAME, TOOL_CALL_NAME]),
               refuse: name => {
                 const reason = refusal(state, name)
-                return reason === undefined ? undefined : `tool_call cannot call ${reason}`
+                return reason === undefined ? undefined : `tool_call refused: ${reason}`
               },
             })
             yield* Effect.acquireRelease(
