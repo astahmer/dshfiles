@@ -134,15 +134,14 @@ describe('DestinationShell', () => {
     expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy()
   })
 
-  it('keeps a page description to one line under its row (round five T4)', () => {
+  it('lists page names only, under one line that describes the destination (round five B1)', () => {
     setPhone(false)
     renderShell()
     fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
     const usage = screen.getByRole('button', { name: 'Usage' })
-    const description = document.getElementById(usage.getAttribute('aria-describedby') ?? '')
-    expect(description?.textContent).toBe('Cost, quota, requests and tools.')
-    expect(description?.className).toContain('dshx:line-clamp-1')
-    expect(description?.className).not.toContain('dshx:line-clamp-2')
+    expect(usage.getAttribute('aria-describedby')).toBeNull()
+    expect(usage.textContent).toBe('Usage')
+    expect(document.querySelectorAll('[data-destination-index="observe"] header p')).toHaveLength(1)
   })
 
   it('marks the active rail item and the open page with the selected wash and an accent icon (round five T3)', () => {
@@ -151,30 +150,111 @@ describe('DestinationShell', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Observe' }))
     const tab = screen.getByRole('tab', { name: 'Observe' })
     expect(tab.className).toContain('dshx:bg-selected-wash')
+    // The quieter selection (round five A1): the wash plus its leading marker, the label at 550.
+    expect(tab.className).toContain('dshx:selected-marker')
+    expect(within(tab).getByText('Observe').className).toContain('dshx:font-selected')
     expect(tab.className).toContain('dshx:text-foreground')
     expect(tab.className).not.toMatch(/(^| )dshx:bg-accent( |$)/u)
     expect(tab.querySelector('[data-rail-icon]')?.className).toContain('dshx:text-control-on')
     expect(screen.getByRole('tab', { name: 'Threads' }).querySelector('[data-rail-icon]')?.className).not.toContain('dshx:text-control-on')
     const usage = screen.getByRole('button', { name: 'Usage' })
     expect(usage.className).toContain('dshx:bg-selected-wash')
+    expect(usage.className).toContain('dshx:selected-marker')
     expect(usage.querySelector('[data-section-icon]')?.className).toContain('dshx:text-control-on')
     const traces = screen.getByRole('button', { name: 'Traces' })
     expect(traces.className).not.toContain('dshx:bg-selected-wash')
   })
 
-  it('shows one Settings navigation: with the Settings page on stage its list drops the descriptions (round five T4)', () => {
+  it('shows one Settings navigation: the Settings page on stage folds the column to the rail (round five B1)', () => {
     setPhone(false)
     DestinationSelection.set('settings')
-    renderShell({ activePanelId: 'dshfiles-settings' })
-    const all = screen.getByRole('button', { name: 'All settings' })
-    expect(all.getAttribute('aria-current')).toBe('page')
-    expect(all.getAttribute('aria-describedby')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Plugins' }).getAttribute('aria-describedby')).toBeNull()
-    expect(document.querySelector('[data-destination-index="settings"] header p')).toBeNull()
-    cleanup()
+    const shell = props({ activePanelId: 'dshfiles-settings' })
+    const view = render(
+      <TooltipProvider>
+        <DestinationShell {...shell} />
+      </TooltipProvider>,
+    )
+    // The page draws its own category list: the column folds to the rail.
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    const draw = (overrides: Partial<DestinationShellProps>): void =>
+      view.rerender(
+        <TooltipProvider>
+          <DestinationShell {...shell} {...overrides} />
+        </TooltipProvider>,
+      )
+    draw({ collapsed: true })
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('navigation', { name: 'Settings pages' })).toBeNull()
+    // Folded by the stage, the rail keeps its Settings item active.
+    const settings = screen.getByRole('tab', { name: 'Settings' })
+    expect(settings.getAttribute('aria-selected')).toBe('true')
+    expect(settings.className).toContain('dshx:selected-marker')
+    expect(document.querySelector('[data-stage-folded]')).not.toBeNull()
+    // The page leaves the stage: the column this folded opens again.
+    draw({ collapsed: true, activePanelId: null })
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(2)
+  })
+
+  it('opens the folded list again from its own rail item, so the other Settings pages stay one click away', () => {
+    setPhone(false)
     DestinationSelection.set('settings')
-    renderShell({ activePanelId: 'plugins' })
-    expect(screen.getByRole('button', { name: 'All settings' }).getAttribute('aria-describedby')).not.toBeNull()
+    const shell = props({ activePanelId: 'dshfiles-settings' })
+    const view = render(
+      <TooltipProvider>
+        <DestinationShell {...shell} />
+      </TooltipProvider>,
+    )
+    // Folded by the stage, not by hand.
+    view.rerender(
+      <TooltipProvider>
+        <DestinationShell {...shell} collapsed />
+      </TooltipProvider>,
+    )
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves a column the person collapsed or opened by hand as they left it', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const collapsedByHand = renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    expect(collapsedByHand.toggleSidebar).not.toHaveBeenCalled()
+    cleanup()
+    localStorage.clear()
+    DestinationSelection.set('settings')
+    const shell = props({ activePanelId: 'dshfiles-settings' })
+    const view = render(
+      <TooltipProvider>
+        <DestinationShell {...shell} />
+      </TooltipProvider>,
+    )
+    const draw = (overrides: Partial<DestinationShellProps>): void =>
+      view.rerender(
+        <TooltipProvider>
+          <DestinationShell {...shell} {...overrides} />
+        </TooltipProvider>,
+      )
+    draw({ collapsed: true })
+    // Opened by hand while Settings shows: it stays open, listing the other Settings pages.
+    draw({ collapsed: false })
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    expect(screen.getByRole('button', { name: 'All settings' }).getAttribute('aria-current')).toBe('page')
+    expect(screen.getByRole('button', { name: 'Plugins' }).getAttribute('aria-describedby')).toBeNull()
+  })
+
+  it('folds the column while the page of a one-page destination is on stage (round five B2)', () => {
+    setPhone(false)
+    DestinationSelection.set('inbox')
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    const shell = renderShell({ panels: inboxPanels, activePanelId: 'attention-inbox' })
+    expect(shell.toggleSidebar).toHaveBeenCalledTimes(1)
+    cleanup()
+    localStorage.clear()
+    // Observe lists several pages: its list stays.
+    DestinationSelection.set('observe')
+    const observe = renderShell({ activePanelId: 'dshfiles-usage' })
+    expect(observe.toggleSidebar).not.toHaveBeenCalled()
   })
 
   it('lists the Settings pages without a layout switch: one sidebar layout (b:952m)', () => {

@@ -51,6 +51,7 @@ import { runStackMotion } from './stack-motion.js'
 import { clearThreadUrl, pageLoadThreadRoute } from './thread-url.js'
 import { PhoneRailActions, RailActionGroup, type RailAction } from './rail-actions.js'
 import { PhoneDrawer } from './phone-drawer.js'
+import { StageFold, type StageFoldState } from './stage-fold.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 
 const ICONS = {
@@ -189,6 +190,39 @@ export interface DestinationShellProps {
 
 const NO_RAIL_ACTIONS: readonly RailAction[] = []
 
+/** "The column is folded because the stage page asked": the frame persists the collapse, so this persists too. */
+const stageFoldMarker = createStoredValue({ key: 'dshfiles.thread-sidebar.stage-fold.v1', schema: Schema.Boolean, fallback: false })
+
+/**
+ * Folds the left column to its rail while the stage shows a page its list would only repeat (`StageFold`), and opens it
+ * again when the page leaves. True while folded this way: the rail then keeps its labels and its active item.
+ */
+const useStageFold = (wants: boolean, collapsed: boolean, toggle: () => void, enabled: boolean): boolean => {
+  // Read once per mount, from storage itself: another tab or an earlier mount may have changed the marker.
+  const [initial] = useState((): StageFoldState => {
+    stageFoldMarker.reload()
+    return { folded: stageFoldMarker.get(), userOpened: false }
+  })
+  const state = useRef<StageFoldState>(initial)
+  const [folded, setFolded] = useState(initial.folded)
+  // Steps run on a change of the page or of the column only: a new toggle identity alone must not read the column it
+  // just asked to fold, still open in this render, as one the person opened by hand.
+  const toggleRef = useRef(toggle)
+  toggleRef.current = toggle
+  useEffect(() => {
+    if (!enabled) return
+    const { next, toggle: flip } = StageFold.step(state.current, { wants, collapsed })
+    if (next.folded !== state.current.folded) {
+      if (next.folded) stageFoldMarker.set(true)
+      else stageFoldMarker.remove()
+    }
+    state.current = next
+    setFolded(next.folded)
+    if (flip) toggleRef.current()
+  }, [wants, collapsed, enabled])
+  return enabled && wants && collapsed && folded
+}
+
 const setStoredDestination = (next: string): void => void storedDestination.set(next)
 
 /** The stored destination, for a test or a command that resets the column to Threads. */
@@ -318,8 +352,8 @@ const RailButton = (props: {
       className={cn(
         'dshx:flex dshx:w-full dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:px-0 dshx:py-1.5 dshx:text-muted-foreground dshx:outline-none dshx:transition-colors',
         'dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-        // The active item at the tint rung (round five T3): the selected wash, ink label, accent icon.
-        props.active && 'dshx:bg-selected-wash dshx:text-foreground dshx:hover:bg-selected-wash',
+        // The active item (round five T3, A1): the quiet selected wash with its leading marker, ink label, accent icon.
+        props.active && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
         dropping && 'dshx:ring-2 dshx:ring-ring',
       )}
     >
@@ -331,7 +365,9 @@ const RailButton = (props: {
         {props.icon}
       </span>
       {props.showLabel ? (
-        <span className="dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-tight">{props.folder.label}</span>
+        <span className={cn('dshx:max-w-full dshx:truncate dshx:text-2xs dshx:leading-tight dshx:tracking-tight', props.active && 'dshx:font-selected')}>
+          {props.folder.label}
+        </span>
       ) : null}
     </button>
   )
@@ -429,8 +465,8 @@ const SectionButton = (props: {
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
           // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
           SECTION_ROW_BADGE_ROOM,
-          // The open page at the tint rung (round five T3): the selected wash with an accent icon; the label stays ink.
-          props.selected && 'dshx:bg-selected-wash dshx:text-foreground dshx:hover:bg-selected-wash',
+          // The open page (round five T3, A1): the quiet selected wash and its leading marker, an accent icon, ink label.
+          props.selected && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
         )}
       >
         {props.icon === undefined || props.icon === null ? null : (
@@ -447,7 +483,7 @@ const SectionButton = (props: {
           </span>
         )}
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-          <span className={cn('dshx:truncate dshx:text-sm', props.selected && 'dshx:font-medium')}>{props.label}</span>
+          <span className={cn('dshx:truncate dshx:text-sm', props.selected && 'dshx:font-selected')}>{props.label}</span>
           {props.description === undefined ? null : (
             // One line at most (round five T4): the row is a destination, the page itself says the rest.
             <span id={descriptionId} className="dshx:line-clamp-1 dshx:text-xs dshx:text-muted-foreground">
@@ -514,12 +550,13 @@ const FolderIndex = (props: {
   const mapped = folder.entries.filter(entry => !other(entry) && entry.developer !== true)
   const unmapped = folder.entries.filter(entry => other(entry) && entry.developer !== true)
   const settings = folder.id === 'settings' ? props.openSettings : null
-  // Settings shows one navigation (round five T4): with its page on stage, whose own category list leads, this list
-  // drops its descriptions and reads as a plain list of the other Settings pages.
+  // With the Settings page on stage the column folds to the rail (round five B1); opened by hand, this list drops its
+  // header line and reads as a plain list of the other Settings pages.
   const settingsOnStage = folder.id === 'settings' && props.activePanelId === SETTINGS_PANEL_ID
   const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
   const missingPage = Destinations.expectedPageOf(folder.id)
-  const rows = (entries: readonly ResolvedEntry[], descriptions = true): JSX.Element => (
+  // Rows are names only (round five B1): the header's one line describes the destination, each page says the rest.
+  const rows = (entries: readonly ResolvedEntry[]): JSX.Element => (
     <EntryRows
       folder={folder}
       entries={entries}
@@ -527,7 +564,7 @@ const FolderIndex = (props: {
       openEntry={props.openEntry}
       renderPanelIcon={props.renderPanelIcon}
       folderUi={folderUi}
-      descriptions={descriptions}
+      descriptions={false}
     />
   )
   return (
@@ -570,27 +607,22 @@ const FolderIndex = (props: {
         ) : (
           <nav aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col dshx:gap-0.5">
             {settings === null ? null : (
-              <SectionButton
-                label="All settings"
-                description={settingsOnStage ? undefined : 'Appearance, models, agents, tools and more.'}
-                selected={settingsOnStage}
-                onSelect={settings}
-              />
+              <SectionButton label="All settings" selected={settingsOnStage} onSelect={settings} />
             )}
-            {rows(mapped, !settingsOnStage)}
+            {rows(mapped)}
             {folderUi === undefined || resolved === undefined || props.phone === true ? null : <AddPanelButton folder={resolved} ui={folderUi} />}
           </nav>
         )}
         {unmapped.length === 0 ? null : (
           <section className="dshx:mt-3" aria-label="Other pages">
             <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Other pages</h3>
-            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(unmapped, false)}</div>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(unmapped)}</div>
           </section>
         )}
         {developer.length === 0 ? null : (
           <section className="dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3" aria-label="Developer" data-destination-group="developer">
             <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Developer</h3>
-            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer, !settingsOnStage)}</div>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer)}</div>
           </section>
         )}
       </div>
@@ -733,6 +765,21 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
   const folder = railFolders.find(candidate => candidate.id === destinationId) ?? railFolders[0]
   // The phone shell and the top bar keep the eight destinations: user folders live in More's tree there.
   const destination = destinations.find(candidate => candidate.id === destinationId) ?? destinations[0]
+  // One navigation (round five B1, B2): Settings and a one-page destination fold the column to the rail while their
+  // page is on the stage. A phone has no column beside the stage.
+  const stageFolded = useStageFold(
+    folder !== undefined &&
+      StageFold.wants({
+        folderId: folder.id,
+        builtIn: folder.builtIn,
+        activePanelId: props.activePanelId,
+        settingsPanelId: SETTINGS_PANEL_ID,
+        solePanelId: soleEntry(folder),
+      }),
+    collapsed,
+    toggleSidebar,
+    !phone,
+  )
   if (folder === undefined || destination === undefined) return <></>
   const openSection = (panelId: string, surface: NavigationRecord['surface'] = 'index'): void => {
     props.selectPanel(panelId)
@@ -761,13 +808,20 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     )
   }
   const choose = (next: RailFolder, surface: NavigationRecord['surface'] = 'rail', openFirst = false): void => {
-    // Collapsed, a folder of pages opens a flyout of its rows instead of the whole column (b:952m).
-    if (props.collapsed && folderUi !== undefined && next.id !== 'threads' && next.id !== 'settings' && next.entries.length > 0 && !openFirst) {
+    // Collapsed, a folder of pages opens a flyout of its rows instead of the whole column (b:952m). A column the stage
+    // folded behaves as open: the next destination's page decides whether it stays folded.
+    const handCollapsed = props.collapsed && !stageFolded
+    // The folded destination's own item again opens its list: Settings' other pages stay one click away.
+    if (stageFolded && next.id === folder.id) {
+      props.toggleSidebar()
+      return
+    }
+    if (handCollapsed && folderUi !== undefined && next.id !== 'threads' && next.id !== 'settings' && next.entries.length > 0 && !openFirst) {
       setFlyout(current => (current === next.id ? null : next.id))
       return
     }
     setDestination(next.id)
-    if (props.collapsed) props.toggleSidebar()
+    if (handCollapsed) props.toggleSidebar()
     // G then a key opens the destination's first page too: a keyboard user has no index to click through.
     const firstPage = next.entries.find(entry => entry.kind === 'page')?.viewId
     const sole = soleEntry(next) ?? (openFirst && next.id !== 'threads' && next.id !== 'settings' ? firstPage : undefined)
@@ -784,8 +838,11 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
     }
   }
   chooseRef.current = choose
+  // Folded by the stage, the rail keeps its item active (round five B1); like any collapsed rail it is icons with
+  // tooltips, since the collapsed column is too narrow for "Knowledge".
+  const railOpen = !props.collapsed || stageFolded
   const railButton = (candidate: RailFolder): JSX.Element => {
-    const active = !props.collapsed && candidate.id === folder.id
+    const active = railOpen && candidate.id === folder.id
     const button = (
       <RailButton
         key={candidate.id}
@@ -798,7 +855,7 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
         onDropView={folderUi === undefined || candidate.id === 'threads' ? undefined : viewId => folderUi.actions.movePanel(viewId, candidate.id)}
       />
     )
-    if (!props.collapsed || folderUi === undefined) return button
+    if (!props.collapsed || stageFolded || folderUi === undefined) return button
     return (
       <Popover key={candidate.id} open={flyout === candidate.id} onOpenChange={open => setFlyout(open ? candidate.id : null)}>
         <PopoverAnchor asChild>
@@ -835,6 +892,7 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
           // widening the rail (productivity pass Q5, T5.3).
           props.collapsed ? 'dshx:w-full dshx:px-2' : 'dshx:w-16 dshx:px-0.5',
         )}
+        data-stage-folded={stageFolded ? '' : undefined}
       >
         {/* Expanded, New thread sits in the header row; collapsed, the rail keeps it reachable. */}
         {props.collapsed && props.showNewThread ? (
