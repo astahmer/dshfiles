@@ -56,6 +56,9 @@ import { UnreadLandingRow, type UnreadLandingRowInjected } from './settings/Unre
 import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
 import { PerformanceUsagePolicy } from './performance-usage.ts'
 import { ImageGalleryScopePolicy } from './image-gallery-scope.ts'
+import { AnnotationMarksPolicy, AnnotationQuickCommentPolicy } from './annotation-preferences.ts'
+import { AnnotationMarksRow, type AnnotationMarksRowInjected } from './settings/AnnotationMarksRow.tsx'
+import { AnnotationQuickCommentRow, type AnnotationQuickCommentRowInjected } from './settings/AnnotationQuickCommentRow.tsx'
 import { SeenAnswers, UnreadLandingPolicy } from './unread-landing.ts'
 import { useTurnDataValue } from './chat/use-turn-data.ts'
 import { bindDisclosure } from './chat/use-disclosure.ts'
@@ -187,7 +190,16 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   const imageGalleryScope = new ImageGalleryScopePolicy(chatSettings)
   const unreadLanding = new UnreadLandingPolicy(chatSettings)
-  ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose(); imageGalleryScope.dispose(); unreadLanding.dispose() })
+  const annotationMarks = new AnnotationMarksPolicy(chatSettings)
+  const annotationQuickComment = new AnnotationQuickCommentPolicy(chatSettings)
+  ctx.effect(() => () => {
+    transcriptView.dispose()
+    performancePolicy.dispose()
+    imageGalleryScope.dispose()
+    unreadLanding.dispose()
+    annotationMarks.dispose()
+    annotationQuickComment.dispose()
+  })
   const performanceUsage = performancePolicy.mode
   registerChatNodeRenderers(ctx, performanceUsage, presentation, decorate)
   ctx.slots.registerFactory({
@@ -216,6 +228,28 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       setUnreadLanding: landing => { unreadLanding.setLanding(landing) },
     }),
   }, UnreadLandingRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'annotation-marks',
+    order: 20,
+    locale: NS,
+    inject: (): AnnotationMarksRowInjected => ({
+      hooks: { annotationMarks: annotationMarks.marks },
+      setAnnotationMarks: marks => { annotationMarks.setMarks(marks) },
+    }),
+  }, AnnotationMarksRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'annotation-quick-comment',
+    order: 21,
+    locale: NS,
+    inject: (): AnnotationQuickCommentRowInjected => ({
+      hooks: { annotationQuickComment: annotationQuickComment.quickComment },
+      setAnnotationQuickComment: choice => { annotationQuickComment.setQuickComment(choice) },
+    }),
+  }, AnnotationQuickCommentRow))
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -294,6 +328,8 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           interactionIds: ctx.uiConversation.interactions,
           imageGalleryScope: imageGalleryScope.scope,
           unreadLanding: unreadLanding.landing,
+          annotationMarks: annotationMarks.marks,
+          annotationQuickComment: annotationQuickComment.quickComment,
         }
         if (binding === undefined) return detachedView(hooks, ctx.fileDrag.actions)
         const session = binding.session

@@ -29,6 +29,7 @@ import type { ConnectionStateSource } from '@deepseek-ai/dsh-client-connection/c
 import type { FileDragActions, MarkdownDelegateFenceInfo, MarkdownFileMentions, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ContextMenuTriggerProps } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import type { ChatKey } from '../locale.ts'
+import type { AnnotationMarks, AnnotationQuickComment } from '../../chat-settings.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: the Session-scope access Hook (`useAccess`) the Chat entries read.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -347,6 +348,10 @@ export interface ChatViewInjected {
     imageGalleryScope: ObservableSnapshot<ImageGalleryScope>
     /** Where opening a thread with an unseen final answer lands. */
     unreadLanding: ObservableSnapshot<UnreadLanding>
+    /** Inline shape of the draft's annotations in the transcript. */
+    annotationMarks: ObservableSnapshot<AnnotationMarks>
+    /** Whether Annotate asks for the comment at the selection. */
+    annotationQuickComment: ObservableSnapshot<AnnotationQuickComment>
   }
   keyedHooks: {
     /** Resolve the stable source for one Chat Node key. */

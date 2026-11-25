@@ -441,6 +441,9 @@
   position: absolute;
   /* Remain below the sticky composer while scroll placement catches up. */
   z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   visibility: hidden;
   margin: 0;
   width: max-content;
@@ -467,7 +470,5 @@
 }
 
 .column > .textInteraction[data-touch] {
-  display: flex;
-  align-items: center;
   gap: 8px;
 }

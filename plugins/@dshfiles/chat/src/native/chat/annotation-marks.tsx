@@ -80,7 +80,7 @@ const useAnnotationLayout = (input: {
       const column = boxOf(container.getBoundingClientRect())
       const scrollport = scrollportOf(container).getBoundingClientRect()
       const composer = container.closest('[data-conversation-scroll]')?.querySelector<HTMLElement>('[data-composer-seat]')
-      const composerTop = composer === undefined ? window.innerHeight : composer.getBoundingClientRect().top
+      const composerTop = composer == null ? window.innerHeight : composer.getBoundingClientRect().top
       const band = {
         top: Math.max(0, scrollport.top),
         bottom: Math.min(window.innerHeight, composerTop > 0 ? composerTop : window.innerHeight),

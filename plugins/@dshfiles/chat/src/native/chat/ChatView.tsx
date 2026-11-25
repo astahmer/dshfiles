@@ -22,6 +22,7 @@ import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { markdownLabels } from '../markdown-labels.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { AnnotateSelection } from './AnnotateSelection.tsx'
+import { AnnotationMarks } from './annotation-marks.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
@@ -85,8 +86,12 @@ export function ChatView({
   sessionId, openFile, openExternalLink, resolveFilePath, useContextMenu,
   loadOlder, consumeOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt,
   usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag, viewRequest, completeViewRequest, openView,
+  useAnnotationMarks, useAnnotationQuickComment,
 }: ChatViewSlotProps) {
+  const annotationMarks = useAnnotationMarks(value => value)
+  const annotationQuickComment = useAnnotationQuickComment(value => value)
   const { getTriggerProps } = useContextMenu()
+
   const getMarkdownTriggerProps = useCallback((target: MarkdownMenuTarget) => getTriggerProps(() => {
     switch (target.kind) {
       case 'file': return { kind: 'file', value: { sessionId, path: resolveFilePath(target.path),
@@ -562,7 +567,9 @@ export function ChatView({
   return (
     <div ref={frameRef} className={css.frame}>
       <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t}
+        quickComment={annotationQuickComment}
         actionRow={textInteraction.active?.trigger === 'selection' ? interactionSurface : null} />
+      <AnnotationMarks sessionId={sessionId} containerRef={scroll.columnRef} mode={annotationMarks} t={t} />
       {scroll.initialized && (
         <TurnNavigator
           items={shownRailItems}
