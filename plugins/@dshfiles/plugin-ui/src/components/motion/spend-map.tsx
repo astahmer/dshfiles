@@ -24,6 +24,11 @@ export interface SpendLeaf {
   /** Monthly cap for the detail bar. */
   readonly cap?: number
   readonly projected?: number
+  /**
+   * A CSS colour that keys this entry to a series drawn elsewhere (a chart's `var(--dshx-data-N)`): its ribbon, end
+   * dots and letter seat take it. Without one the entry stays in neutral ink.
+   */
+  readonly color?: string
 }
 
 export interface SpendDimension {
@@ -55,6 +60,8 @@ export interface SpendMapProps extends Omit<React.HTMLAttributes<HTMLElement>, '
   /** The selected entry's period, after its name; defaults to "month to date". */
   readonly detailPeriod?: string
   readonly footer?: React.ReactNode
+  /** `framed` (default) sets the map in an inner bordered box; `flush` draws it straight on the card. */
+  readonly inset?: 'framed' | 'flush'
 }
 
 const noLeaves: readonly SpendLeaf[] = []
@@ -86,6 +93,7 @@ export function SpendMap({
   format = formatMoney,
   detailPeriod = 'month to date',
   footer,
+  inset = 'framed',
   className,
   ...props
 }: SpendMapProps) {
@@ -103,6 +111,13 @@ export function SpendMap({
   )
   const layout = useNodeLinks(mapRef, links, [dimension?.id, leaves.length])
   const activeLinks = [`root:${dimension?.id}`, `leaf:${dimension?.id}:${leaf?.id}`]
+  const linkColors = new Map<string, string>(
+    leaves.flatMap(entry => (entry.color === undefined ? [] : [[`leaf:${dimension?.id}:${entry.id}`, entry.color] as const])),
+  )
+  const linkStyle = (id: string): React.CSSProperties | undefined => {
+    const color = linkColors.get(id)
+    return color === undefined ? undefined : { color }
+  }
 
   const leavesRef = React.useRef<HTMLDivElement>(null)
   useEnter(leavesRef, 'slideInLeft', { children: true, stagger: staggers.base, delay: 0.12 }, dimension?.id)
@@ -127,7 +142,14 @@ export function SpendMap({
       </header>
 
       {/* The map scrolls inside its own box when even the narrow layout cannot fit; it never widens the card. */}
-      <div className="dshx:mx-2.5 dshx:overflow-x-auto dshx:overflow-y-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-background dshx:[scrollbar-width:thin]">
+      <div
+        data-spend-map-inset={inset}
+        className={
+          inset === 'flush'
+            ? 'dshx:overflow-x-auto dshx:overflow-y-hidden dshx:[scrollbar-width:thin]'
+            : 'dshx:mx-2.5 dshx:overflow-x-auto dshx:overflow-y-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-background dshx:[scrollbar-width:thin]'
+        }
+      >
         <div
           ref={mapRef}
           className="dshx:relative dshx:flex dshx:min-w-fit dshx:items-center dshx:gap-7 dshx:p-4 dshx:@max-pane-compact:gap-5 dshx:@max-pane-narrow:gap-4 dshx:@max-pane-narrow:p-3"
@@ -140,28 +162,30 @@ export function SpendMap({
           >
             <g className="dshx:text-border">
               {links.map(link => (
-                <DrawnPath
-                  key={link.id}
-                  d={layout.paths.get(link.id) ?? ''}
-                  drawKey={link.id}
-                  delay={link.id.startsWith('leaf:') ? 0.05 : 0}
-                  stroke="currentColor"
-                  strokeWidth={1}
-                />
+                <g key={link.id} data-spend-link={link.id} style={linkStyle(link.id)}>
+                  <DrawnPath
+                    d={layout.paths.get(link.id) ?? ''}
+                    drawKey={link.id}
+                    delay={link.id.startsWith('leaf:') ? 0.05 : 0}
+                    stroke="currentColor"
+                    strokeWidth={1}
+                  />
+                </g>
               ))}
             </g>
             {/* The selected route is a second, darker stroke that mounts (and so draws) on each new selection. */}
             <g className="dshx:text-foreground">
               {activeLinks.map(id => (
-                <DrawnPath
-                  key={id}
-                  d={layout.paths.get(id) ?? ''}
-                  drawKey={id}
-                  delay={0.08}
-                  duration={durations.slow}
-                  stroke="currentColor"
-                  strokeWidth={1.5}
-                />
+                <g key={id} style={linkStyle(id)}>
+                  <DrawnPath
+                    d={layout.paths.get(id) ?? ''}
+                    drawKey={id}
+                    delay={0.08}
+                    duration={durations.slow}
+                    stroke="currentColor"
+                    strokeWidth={linkColors.has(id) ? 2 : 1.5}
+                  />
+                </g>
               ))}
             </g>
             {links.map(link => {
@@ -169,7 +193,11 @@ export function SpendMap({
               if (ends === undefined) return null
               const active = activeLinks.includes(link.id)
               return (
-                <g key={link.id} className={cn('dshx:transition-colors dshx:duration-300', active ? 'dshx:text-foreground' : 'dshx:text-border')}>
+                <g
+                  key={link.id}
+                  style={linkStyle(link.id)}
+                  className={cn('dshx:transition-colors dshx:duration-300', active ? 'dshx:text-foreground' : 'dshx:text-border')}
+                >
                   <circle cx={ends[0]} cy={ends[1]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
                   <circle cx={ends[2]} cy={ends[3]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
                 </g>
@@ -403,7 +431,12 @@ function LeafCard({
         selected ? 'dshx:border-foreground/25 dshx:bg-muted dshx:shadow-sm' : 'dshx:border-border dshx:bg-card dshx:hover:bg-accent/50',
       )}
     >
-      <span className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:[&_svg]:size-3.5">
+      <span
+        className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:[&_svg]:size-3.5"
+        // The seat keys the entry to its series: a 14 % tint behind ink text (AA on both schemes) and a border in the
+        // series colour, which the data ramp holds at 3:1 against every surface.
+        style={leaf.color === undefined ? undefined : { borderColor: leaf.color, backgroundColor: `color-mix(in oklab, ${leaf.color} 14%, transparent)` }}
+      >
         {leaf.icon ?? leaf.label.slice(0, 1)}
       </span>
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
