@@ -31,11 +31,31 @@ describe('the composer card edge (council round 11 C3)', () => {
     expect(focus).not.toContain('accent')
   })
 
-  it('gives the desktop live work dock on its top the same edge, so dock and card are one outlined object', () => {
+})
+
+describe('the dock around the card stays quiet (council round 12 C1)', () => {
+  // Only the editable card keeps the 3:1 field edge; the dock's outline and the dividers inside it are `border-l2`
+  // (#dedcda light, #2f2c29 dark), so the line between a jobs dock and a subagents dock (the second dock's top border)
+  // is no longer a 3.3:1 rule.
+  const L2 = 'border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));'
+
+  it('outlines the desktop live work dock in border-l2, never the field edge', () => {
     const desk = `:global(html:not([data-shell-phone-nav])) .composerStack > ${DOCK} > :global([data-dshfiles-live-preview-dock])`
-    expect(rule(root, desk)).toContain('border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));')
+    expect(rule(root, desk)).toContain(L2)
+    expect(rule(root, desk)).not.toContain('--dshx-field-border')
     // Its rows keep their quiet hairline dividers.
     expect(rule(root, `${desk} > * + *`)).toContain('border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));')
+  })
+
+  it('outlines the phone Live work strip in border-l2, leaving the card ring as the one 3:1 edge', () => {
+    const attached = `:global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+    const strip = rule(root, `${attached} > .dockHead:has(> [data-live-work-summary])`)
+    expect(strip).toContain(L2)
+    expect(strip).not.toContain('--dshx-field-border')
+  })
+
+  it('leaves no field edge anywhere in the conversation root outside the card', () => {
+    expect(root).not.toContain('--dshx-field-border')
   })
 })
 

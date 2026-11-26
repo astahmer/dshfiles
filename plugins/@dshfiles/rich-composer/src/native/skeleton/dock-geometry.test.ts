@@ -91,8 +91,8 @@ describe('the desktop live work dock (round six C2)', () => {
     // Council round 8 C3: the composer card's own fill and radius, so the dock reads as the composer's top.
     expect(surface).toMatch(/background: var\(--dsw-specific-input-major\);/)
     expect(surface).toMatch(/border-radius: var\(--dsw-radius-lg\);/)
-    // Council round 11 C3: the composer card's 3:1 field edge (composer-edge.test.ts).
-    expect(surface).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
+    // Council round 12 C1: a border-l2 outline; only the card keeps the 3:1 field edge (composer-edge.test.ts).
+    expect(surface).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
     // Council round 7 C6: the composer draws its hairline as a 1px ring outside its box, so the dock's border box is 1px
     // wider on each side to share the composer's exact edges (it sat 1px inside them).
     expect(surface).toMatch(/width: calc\(100% - var\(--dsh-composer-side-clearance, 0px\) \* 2 \+ 2px\);/)
