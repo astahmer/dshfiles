@@ -25,6 +25,9 @@ colors:
   prompt-fill: '#ecf5fa'
   wash-needs-you: '#e1e9ff'
   wash-failed: '#ffe4e1'
+  # The evidence well (council round 16 A1): an Inbox card body's quoted command, and its red-soft error variant.
+  evidence-well: '#f0eeec'
+  evidence-well-danger: '#ffedeb'
   label-faint: '#6a6967'
   label-secondary: '#646362'
   signal-indigo: '#3b5bd4'
@@ -48,6 +51,8 @@ colors:
   wash-needs-you-dark: '#232a42'
   wash-needs-you-band-dark: '#242b3d'
   wash-failed-dark: '#311d1b'
+  evidence-well-dark: '#211f1c'
+  evidence-well-danger-dark: '#311e1d'
   primary: '#312d29'
   primary-dark: '#dad7d3'
   surface-dialog-dark: '#292624'
@@ -404,6 +409,9 @@ work on any surface.
     brand mark wherever a model or provider is named, a `ProjectMark` wherever a project is named, each theme's real
     swatch in the appearance cards, identity tones on the core Plugins icon tiles, a `StatusCount` on the Inbox title.
     No tinted page headers, panels, primary buttons or coloured section backgrounds.
+    **Colour restraint (owner decision, council round 16).** Colour stays on status washes, project and provider
+    marks, nav and Settings group tones, tags and charts: no tinted surfaces, heroes or empty states. A council asking
+    for a tinted hero or empty-state fill is answered with this decision, not a new tint.
 11. **Navigation identity.** Each rail destination draws its glyph in its own identity tone, glyph only, and the
     active one adds a 14% tile of that tone behind the glyph with its ink label at 600; the label never takes the
     tone. `nav-tone-<id>` on the item, `text-nav-tone` on its icon and `bg-nav-tile` on the active seat
@@ -545,12 +553,23 @@ surface.
 
 **Desktop Inbox head** (council round 15). A desktop card's head takes two lines, as on the phone: line 1 is the status
 glyph, the title at 15/20, then the verbs and ⋯ on the trailing edge; line 2 is the `AttentionMeta` line at 12/16 under
-the title, with no separator dot before the mark (the mark leads the line). Its verbs are one style: Review and Open
-thread are the same 28px band-tinted pill (`Button band`, the attention tint), never a pill beside a bare text link.
+the title, with no separator dot before the mark (the mark leads the line). Review is the same 28px band-tinted pill
+(`Button band`, the attention tint; the danger pair on a failed card) on approval and failed cards, never a pill beside
+a bare text link. **The answer is the strongest control.** On a question card the answer options are the strongest
+controls on the card; its Open thread is a quiet unfilled secondary (`Button` `variant="ghost"`, secondary ink, a
+trailing ↗), never a band pill competing with the answers (council round 16). On the phone Review's visible height is
+44pt with 8pt clear above it.
 
-**Failed card reason.** A failed card has a body: one reason line under the title, `Error: <first line>`, mono 12/18
-in a red-soft well (light about `oklch(0.96 0.02 25)`, dark about `oklch(0.26 0.03 25)`, text AA on it), desktop and
-phone. On the phone its Review becomes the same full-width 44px footer button as the approval card's (red-tinted) with
+**Evidence well.** What an Inbox card body quotes sits in one well, desktop and phone (council round 16): `EvidenceWell`
+(`@dshfiles/plugin-ui/components/ui/evidence-well`, `tone="neutral"` or `"danger"`, a `label`), or `dshx:evidence-well`
+on a block (`data-tone="danger"`, a `data-evidence-label` span). The full measure of the body, padding 8/12, radius 6,
+mono 12/18 that wraps; the neutral fill `oklch(0.95 0.004 70)` / dark `oklch(0.24 0.006 70)` for "Runs: <command>", the
+red-soft `oklch(0.96 0.02 25)` / dark `oklch(0.26 0.03 25)` for an error line. The label is secondary ink, or the
+danger tone in a danger well; ink, secondary and danger text hold AA on both fills (`plugin-ui/tests/evidence-well`).
+It is plainly not a button: no control height, no border, no shadow, the text flush to its start.
+
+**Failed card reason.** A failed card's body is its provider error line, `Error: <first line>`, mono 12/18 in the
+danger evidence well, desktop and phone; with none, no well (the meta line already says Turn failed). On the phone its Review becomes the same full-width 44px footer button as the approval card's (red-tinted) with
 only ⋯ in the head, when at 390×664 the failed card's title, reason and Review all show with at least 8px clear above
 the tab bar; otherwise it keeps the head pill and adds only the reason line.
 
@@ -624,9 +643,12 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 - **Composer send.** The send arrow sits in a 28px circle (32px on a phone): the raised fill with a faint glyph while
   there is nothing to send, the ink fill with the inverse glyph once it can send (council round 13). It is the one
   filled mark in the composer bar.
-- **New thread chips: one style.** Resume, Inbox and the starters under the new-thread composer share one chip:
-  32px tall, radius 8, the raised fill, no border, 12px side padding, 8px apart. Resume and Inbox come first, then a
-  1 × 16px divider, then the starters (council round 13).
+- **New thread: a place to write.** The new-thread composer reads as a field first (council round 16). **One location
+  control.** The host ("Local") and the working location ("In the project") are one control, which shows extra detail
+  only when either differs from the default; permission and model stay visible beside it. The empty writing area is
+  8–12px taller than round 15's. Under it, Resume and Inbox keep one chip:
+  32px tall, radius 8, the raised fill, no border, 12px side padding, 8px apart (council round 13); a 1 × 16px
+  divider follows, then the starters as lighter text-and-icon actions: no fill, secondary ink, the icon in its tone.
 - **One Settings navigation.** While any Settings page is on stage (General or another), the side column stays open
   and lists, once each, the preference categories (General, Appearance, Keyboard shortcuts, Thread list, Layout,
   Composer, Transcript, Editor, Models & accounts…, grouped) and the Settings pages (AI accounts, MCP servers,
@@ -866,6 +888,10 @@ card with hairline dividers. In narrow panes meta wraps under the title and trai
 A selected row takes `bg-selected-wash` and the `selected-marker`, with its title at 550; a row that leads with its
 status glyph draws no pill (council round 11 A1), only the wash, the 550 title and, as the list's current item, the
 `selected-edge` (council round 12 A1); a Needs-you or Failed row holds its attention wash instead.
+**One palette row grammar.** Every thread row in the command palette reads like a thread-list row (council round 16):
+its rail is its `StatusGlyph`, and line 2 is always `AttentionMeta`, `[mark] project · word · age`, the word one of
+Working, Ready, Idle, Approval, Question, Turn failed. There is no status tail at the row's end and no project tile in
+the rail: the mark lives on line 2.
 **Child rows.** A row that belongs to the row above it (a subagent under its thread, a Settings entry under its
 group, such as AI accounts settings under AI accounts) carries a child line in a 16px seat in the parent's glyph
 column: the thread list's tree line, or a leading elbow (↳, faint ink) where a list has none (council round 14). It

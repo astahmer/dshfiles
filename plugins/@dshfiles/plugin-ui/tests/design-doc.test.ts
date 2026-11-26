@@ -333,7 +333,7 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       'a row with a place tile',
       '**Composer send.**',
       'a 28px circle (32px on a phone)',
-      '**New thread chips: one style.**',
+      // Council round 16 kept the chip for Resume and Inbox and made the starters lighter actions.
       '32px tall, radius 8, the raised fill, no border',
       '**Bar text buttons.**',
       '`Button variant="bar"`',
@@ -383,7 +383,8 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       'only the text parts clip',
       '**Desktop Inbox head**',
       'no separator dot before the mark',
-      'Review and Open thread are the same 28px band-tinted pill',
+      // Council round 16 kept the band-tinted pill for Review only; a question card's Open thread went quiet.
+      'the same 28px band-tinted pill',
       '**Failed card reason.**',
       '`Error: <first line>`, mono 12/18',
       'at least 8px clear above the tab bar',
@@ -401,5 +402,40 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     // Retired by this pass: the mark in the glyph's 16px column; the tab tally on the phone only.
     expect(prose).not.toContain("the mark hangs in the status glyph's 16px column")
     expect(prose).not.toContain('`PageTab` `statusCounts`, phone shell only')
+  })
+
+  it('records the sixteenth council pass: colour restraint, the evidence well, one palette row grammar, the quiet question verb, one location control (council round 16 A3)', () => {
+    const prose = design.replace(/\s+/gu, ' ')
+    for (const text of [
+      '**Colour restraint (owner decision, council round 16).**',
+      'no tinted surfaces, heroes or empty states',
+      '**Evidence well.**',
+      '`EvidenceWell`',
+      '`dshx:evidence-well`',
+      'components/ui/evidence-well',
+      'padding 8/12, radius 6',
+      '`oklch(0.95 0.004 70)`',
+      '`oklch(0.24 0.006 70)`',
+      'plainly not a button',
+      "evidence-well: '#f0eeec'",
+      "evidence-well-dark: '#211f1c'",
+      "evidence-well-danger: '#ffedeb'",
+      "evidence-well-danger-dark: '#311e1d'",
+      'with none, no well',
+      '**One palette row grammar.**',
+      'Working, Ready, Idle, Approval, Question, Turn failed',
+      'no status tail',
+      'no project tile in the rail',
+      '**The answer is the strongest control.**',
+      'a quiet unfilled secondary',
+      '**One location control.**',
+      'only when either differs from the default',
+      'lighter text-and-icon actions',
+    ])
+      expect(prose, text).toContain(text)
+    // Retired by this pass: Open thread as a band pill on every card; the starters sharing the Resume chip.
+    expect(prose).not.toContain('Review and Open thread are the same 28px band-tinted pill')
+    expect(prose).not.toContain('Resume, Inbox and the starters under the new-thread composer share one chip')
+    expect(prose).not.toContain('in a red-soft well (light about')
   })
 })
