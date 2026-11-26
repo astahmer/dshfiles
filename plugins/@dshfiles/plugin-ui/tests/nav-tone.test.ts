@@ -8,7 +8,13 @@ const roles = readFileSync(join(process.cwd(), 'src/color-roles.css'), 'utf8')
 const schemes: readonly Scheme[] = ['light', 'dark']
 
 /** The rail's destinations in order (thread-sidebar `DESTINATION_IDS`). */
-const DESTINATIONS = ['threads', 'inbox', 'land', 'work', 'agents', 'observe', 'knowledge'] as const
+const RAIL = ['threads', 'inbox', 'land', 'work', 'agents', 'observe', 'knowledge'] as const
+/** Inbox is the attention destination: its glyph is neutral and its indigo AttentionBadge carries the colour (round 8). */
+const NEUTRAL = ['inbox', 'settings'] as const
+/** The destinations drawn in their own tone. */
+const DESTINATIONS = RAIL.filter(destination => destination !== 'inbox')
+/** Council round 8 A4: the six tones as far apart as the status bands allow. */
+const HUES = { threads: 235, land: 180, work: 52, observe: 118, knowledge: 305, agents: 350 } as const
 /** Status hues no nav tone may sit within 25° of: danger, warning, success, the accent. */
 const STATUS_HUES = { red: 25, amber: 80, green: 150, indigo: 270 } as const
 
@@ -49,9 +55,13 @@ const tile = (tone: Oklch, under: Oklch, alpha = 0.14): Oklch => {
 }
 
 describe('navigation identity tones (council round 4 A1)', () => {
-  it('gives every rail destination its own tone on body so dark follows, Settings neutral', () => {
+  it('gives every rail destination its own tone on body so dark follows, Inbox and Settings neutral', () => {
     for (const scheme of schemes) for (const destination of DESTINATIONS) expect(navTone(scheme, destination).h, `${scheme} ${destination}`).not.toBeNaN()
-    expect(body('  body')).toContain('--dshx-nav-tone-settings: var(--dsw-alias-label-secondary);')
+    for (const destination of NEUTRAL) {
+      expect(body('  body')).toContain(`--dshx-nav-tone-${destination}: var(--dsw-alias-label-secondary);`)
+      // The secondary ink flips with the scheme by itself; a dark override would pin a tone again.
+      expect(body('  body[data-ds-dark-theme]')).not.toContain(`--dshx-nav-tone-${destination}:`)
+    }
     expect(roles).not.toMatch(/--dshx-nav-tone-[\w-]+: var\(--dsw-alias-state-/u)
     // The same hue in both schemes, so a destination keeps its colour when the scheme flips.
     for (const destination of DESTINATIONS) expect(navTone('dark', destination).h).toBe(navTone('light', destination).h)
@@ -70,15 +80,16 @@ describe('navigation identity tones (council round 4 A1)', () => {
     }
   })
 
-  it('keeps every hue 25° from the status hues, Threads at most 235 and 30° from Land', () => {
+  it('spreads the six hues at least 40° apart, each 25° from the status hues (council round 8 A4)', () => {
+    for (const destination of DESTINATIONS) expect(navTone('light', destination).h, destination).toBe(HUES[destination])
+    for (const [i, a] of DESTINATIONS.entries())
+      for (const b of DESTINATIONS.slice(i + 1)) expect(hueDistance(navTone('light', a).h, navTone('light', b).h), `${a} vs ${b}`).toBeGreaterThanOrEqual(40)
     for (const destination of DESTINATIONS)
       for (const [status, hue] of Object.entries(STATUS_HUES))
         expect(hueDistance(navTone('light', destination).h, hue), `${destination} vs ${status}`).toBeGreaterThanOrEqual(25)
-    expect(navTone('light', 'threads').h).toBeLessThanOrEqual(235)
-    expect(hueDistance(navTone('light', 'threads').h, navTone('light', 'land').h)).toBeGreaterThanOrEqual(30)
   })
 
-  it.each(schemes)('spreads the seven tones apart and away from the accent and status colours (%s)', scheme => {
+  it.each(schemes)('spreads the six tones apart and away from the accent and status colours (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     const status = { accent: p.accent.fg, success: p.success.fg, warning: p.warning.fg, danger: p.danger.fg }
     const tones = DESTINATIONS.map(destination => navTone(scheme, destination))
@@ -89,7 +100,7 @@ describe('navigation identity tones (council round 4 A1)', () => {
   })
 
   it('exposes each tone as a colour and as utilities for a tinted glyph and a 14% active tile', () => {
-    for (const destination of [...DESTINATIONS, 'settings']) {
+    for (const destination of [...RAIL, 'settings']) {
       expect(roles).toContain(`--color-nav-${destination}: var(--dshx-nav-tone-${destination});`)
       expect(roles).toMatch(new RegExp(`@utility nav-tone-${destination} \\{\\s*--dshx-nav-tone: var\\(--dshx-nav-tone-${destination}\\);\\s*\\}`, 'u'))
     }
@@ -108,6 +119,12 @@ describe('navigation identity tones (council round 4 A1)', () => {
         // The ink label beside it stays AA on the tile.
         expect(PaletteMath.contrastRatio(p.neutral[10]!, tile(tone, surface)), `ink on ${destination} tile`).toBeGreaterThanOrEqual(4.5)
       }
+    }
+    // The neutral glyphs are the secondary ink (step 9).
+    for (const step of [0, 1, 2]) {
+      const surface = p.neutral[step]!
+      expect(PaletteMath.contrastRatio(p.neutral[9]!, surface), `neutral on step ${step}`).toBeGreaterThanOrEqual(3)
+      expect(PaletteMath.contrastRatio(p.neutral[9]!, tile(p.neutral[9]!, surface)), `neutral on its tile over step ${step}`).toBeGreaterThanOrEqual(3)
     }
   })
 })

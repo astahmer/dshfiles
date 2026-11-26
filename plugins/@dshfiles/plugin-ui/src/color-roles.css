@@ -230,20 +230,21 @@
   /* On body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing). */
   body {
     /*
-     * The rail destinations' own tones (council round 4 A1), declared on body so dark follows. Every hue keeps 25° from
-     * the status hues (red 25, amber 80, green 150, indigo 270), and the seven sit as far apart as the gaps allow:
-     * Threads cyan-blue 220, Land teal 177 (43° from Threads), Work orange 52, Observe lime 118, Inbox violet 297,
-     * Knowledge magenta 324, Agents rose 351; closest pair ΔE 0.061. Chroma 0.14 in light (light L 0.52–0.56), 0.13 in
-     * dark (L 0.78); teal and cyan stop at the sRGB edge (about 0.105 at L 0.56), as vivid as those hues get. Glyph 3:1
-     * and ink AA on the 14% tile over bg, panel and raised (tests/nav-tone.test.ts). Settings is neutral.
+     * The rail destinations' own tones (council round 4 A1; hues re-spread in council round 8 A4), declared on body so
+     * dark follows. Every hue keeps 25° from the status hues (red 25, amber 80, green 150, indigo 270) and 40° from every
+     * other: Work orange 52, Observe lime 118, Land teal 180, Threads blue 235, Knowledge violet 305, Agents rose 350.
+     * Inbox is the attention destination: its glyph is the secondary ink like Settings, and its indigo AttentionBadge
+     * carries the colour. Chroma 0.14 in light (L 0.52–0.56), 0.13 in dark (L 0.78); teal and blue stop at the sRGB
+     * edge in light (about 0.10 and 0.12 at L 0.56), as vivid as those hues get. Glyph 3:1 and ink AA on the 14% tile
+     * over bg, panel and raised (tests/nav-tone.test.ts).
      */
-    --dshx-nav-tone-threads: oklch(0.56 0.102 220);
-    --dshx-nav-tone-inbox: oklch(0.52 0.14 297);
-    --dshx-nav-tone-land: oklch(0.56 0.104 177);
+    --dshx-nav-tone-threads: oklch(0.56 0.124 235);
+    --dshx-nav-tone-inbox: var(--dsw-alias-label-secondary);
+    --dshx-nav-tone-land: oklch(0.56 0.102 180);
     --dshx-nav-tone-work: oklch(0.54 0.14 52);
-    --dshx-nav-tone-agents: oklch(0.52 0.14 351);
+    --dshx-nav-tone-agents: oklch(0.52 0.14 350);
     --dshx-nav-tone-observe: oklch(0.55 0.125 118);
-    --dshx-nav-tone-knowledge: oklch(0.52 0.14 324);
+    --dshx-nav-tone-knowledge: oklch(0.52 0.14 305);
     --dshx-nav-tone-settings: var(--dsw-alias-label-secondary);
     --dshx-destructive-solid: var(--dsw-alias-state-error-primary);
     --dshx-attention-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary));
@@ -266,13 +267,12 @@
     --dshx-data-4: oklch(0.7 0.11 340);
     --dshx-data-5: oklch(0.7 0.11 110);
     --dshx-data-6: oklch(0.7 0.11 225);
-    --dshx-nav-tone-threads: oklch(0.78 0.13 220);
-    --dshx-nav-tone-inbox: oklch(0.78 0.13 297);
-    --dshx-nav-tone-land: oklch(0.78 0.13 177);
+    --dshx-nav-tone-threads: oklch(0.78 0.13 235);
+    --dshx-nav-tone-land: oklch(0.78 0.13 180);
     --dshx-nav-tone-work: oklch(0.78 0.13 52);
-    --dshx-nav-tone-agents: oklch(0.78 0.13 351);
+    --dshx-nav-tone-agents: oklch(0.78 0.13 350);
     --dshx-nav-tone-observe: oklch(0.78 0.13 118);
-    --dshx-nav-tone-knowledge: oklch(0.78 0.13 324);
+    --dshx-nav-tone-knowledge: oklch(0.78 0.13 305);
     --dshx-scrim: rgb(0 0 0 / 0.5);
     /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
     --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
