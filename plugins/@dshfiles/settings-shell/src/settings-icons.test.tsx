@@ -160,3 +160,18 @@ describe('SettingsToneMark (council round 8 B4)', () => {
     expect(markup).toContain('data-own-icon')
   })
 })
+
+describe('SettingsIcons.pagePlaces (round nine B2)', () => {
+  it('gives each Settings page with its own tab the glyph and tone its Settings row carries', () => {
+    const places = new Map(SettingsIcons.pagePlaces().map(place => [place.panelId, place]))
+    expect(places.get('ai-accounts')?.tone).toBe('var(--dshx-identity-2)')
+    expect(places.get('ai-accounts')?.glyph).toBe(SettingsIcons.glyphOf({ label: 'AI accounts', group: 'models' }))
+    expect(places.get('plugins')?.tone).toBe('var(--dshx-identity-1)')
+    expect(places.get('plugins')?.glyph).not.toBe(SettingsIcons.glyphOf({ label: 'Settings', group: 'general' }))
+  })
+
+  it('is provided to the tab strips from the client entry', () => {
+    const client = readFileSync(new URL('client.tsx', import.meta.url), 'utf8')
+    expect(client).toContain('for (const place of SettingsIcons.pagePlaces()) metadata?.plugin?.add(TabPlaceGlyphs, place)')
+  })
+})

@@ -9,6 +9,20 @@ import { createWorkbenchTab, WorkbenchNewTabButton } from './workbench-tab.js'
 import { TabRows } from './tab-row-visibility.js'
 import { TabReveal } from './tab-reveal.js'
 
+// Round nine B2: the pages that name themselves on their tab (settings-shell provides them through TabPlaceGlyphs).
+const registry = vi.hoisted(() => {
+  const places: Array<{ readonly panelId: string; readonly glyph: () => JSX.Element; readonly tone: string }> = []
+  return { places }
+})
+vi.mock('@dshfiles/dshx/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@dshfiles/dshx/client')>()
+  return {
+    ...actual,
+    useRegistry: (token: Parameters<typeof actual.useRegistry>[0]) =>
+      token.id === '@dshfiles/workbench.tab-place-glyph' ? registry.places : actual.useRegistry(token),
+  }
+})
+
 beforeAll(() => {
   globalThis.ResizeObserver ??= class {
     observe(): void {}
@@ -186,8 +200,37 @@ describe('workbench semantic tab chrome', () => {
     // Tertiary on a background tab; the tone only where Dockview marks the tab active. The label stays ink.
     expect(glyph?.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
     expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:text-nav-tone')
+    // Round nine B2: the active tab's glyph on its tone's 14% tile.
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:bg-nav-tile')
     expect(glyph?.querySelector('svg')?.getAttribute('width')).toBe('14')
+    expect(glyph?.getAttribute('data-tab-place')).toBeNull()
     expect((glyph?.compareDocumentPosition(screen.getByText('Registered title')) ?? 0) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('names a page with its own place glyph by that glyph in its tone, not its destination\'s (round nine B2)', () => {
+    registry.places = [{ panelId: 'ai-accounts', glyph: () => <svg data-testid="leaf" />, tone: 'var(--dshx-identity-2)' }]
+    fixture({
+      tab: {
+        id: 'panel:ai-accounts',
+        kind: 'panel',
+        panelId: 'ai-accounts',
+        destination: { id: 'settings', icon: 'settings' },
+        target: { kind: 'panel', panelId: 'ai-accounts' },
+        title: 'AI accounts',
+        active: true,
+        pinned: false,
+        preview: false,
+        available: true,
+        status: null,
+      },
+    })
+    const glyph = document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(glyph?.getAttribute('data-tab-place')).toBe('ai-accounts')
+    expect(glyph?.querySelector('[data-testid="leaf"]')).not.toBeNull()
+    expect(glyph?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dshx-identity-2)')
+    expect(glyph?.className).not.toContain('dshx:nav-tone-settings')
+    expect(glyph?.className).toContain('dshx:in-[.dv-active-tab]:bg-nav-tile')
+    registry.places = []
   })
 
   it('seats the compose glyph in the Threads tone on a new thread tab, which has no status and no project yet (council round 6 B6)', () => {

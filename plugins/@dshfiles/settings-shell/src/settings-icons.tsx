@@ -70,6 +70,7 @@ import {
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PAGE_LINKS } from './settings-groups.js'
 import { createElement, type CSSProperties, type ReactNode } from 'react'
 
 /** A category's group, as Settings groups its entries. */
@@ -287,7 +288,15 @@ export const SettingsToneMark = (props: { readonly group: string; readonly child
   </span>
 )
 
+/**
+ * The Settings pages that have their own stage tab (AI accounts, Plugins, Secrets…), each with the glyph and tone its
+ * row carries in the Settings column, so its tab names the page rather than repeating the Settings gear (round nine B2).
+ */
+const pagePlaces = (): ReadonlyArray<{ readonly panelId: string; readonly glyph: LucideIcon; readonly tone: string }> =>
+  PAGE_LINKS.map(page => ({ panelId: page.panelId, glyph: glyphOf(page), tone: toneOf(page.group) }))
+
 export class SettingsIcons {
   static readonly glyphOf = glyphOf
   static readonly toneOf = toneOf
+  static readonly pagePlaces = pagePlaces
 }

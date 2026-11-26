@@ -11,6 +11,20 @@ import type { CloseButtonPosition } from '@dshfiles/workbench/tabs'
 import { SETTLE_THREAD_EVENT } from './settle-request.js'
 import type { TabsEvent } from './tabs-machine.js'
 
+// Round nine B2: the pages that name themselves on their tab (settings-shell provides them through TabPlaceGlyphs).
+const registry = vi.hoisted(() => {
+  const places: Array<{ readonly panelId: string; readonly glyph: () => JSX.Element; readonly tone: string }> = []
+  return { places }
+})
+vi.mock('@dshfiles/dshx/client', async importOriginal => {
+  const actual = await importOriginal<typeof import('@dshfiles/dshx/client')>()
+  return {
+    ...actual,
+    useRegistry: (token: Parameters<typeof actual.useRegistry>[0]) =>
+      token.id === '@dshfiles/workbench.tab-place-glyph' ? registry.places : actual.useRegistry(token),
+  }
+})
+
 const labels = {
   mentionThread: '@Mention thread',
   settleThread: 'Settle thread',
@@ -198,9 +212,34 @@ describe('TabStrip layout', () => {
     unmount()
     mount(undefined, undefined, pages.map(tab => (tab.kind === 'panel' ? { ...tab, active: true } : tab)))
     expect(glyph()?.className).toContain('dshx:text-nav-tone')
+    // Round nine B2: the active tab's glyph sits on its tone's 14% tile, a 20px seat on the 16px footprint.
+    expect(glyph()?.className).toContain('dshx:bg-nav-tile')
+    expect(glyph()?.className).toContain('dshx:size-5 dshx:-m-0.5')
     // The title stays ink; the thread tab keeps no destination glyph.
     expect(screen.getByText('Workbench').className).not.toContain('nav-tone')
     expect(document.querySelectorAll('[data-tab-destination]')).toHaveLength(1)
+  })
+
+  it('shows a page\'s own place glyph in its tone, on its tile while active, instead of its destination\'s (round nine B2)', () => {
+    registry.places = [{ panelId: 'ai-accounts', glyph: () => <svg data-testid="leaf" />, tone: 'var(--dshx-identity-2)' }]
+    const leaf = (panelId: string, active: boolean) =>
+      tabs.map(tab =>
+        tab.kind === 'panel' ? { ...tab, panelId, active, destination: { id: 'settings', icon: 'settings' } as const } : { ...tab, active: !active },
+      )
+    const { unmount } = mount(undefined, undefined, leaf('ai-accounts', true))
+    const mark = (): HTMLElement | null => document.querySelector<HTMLElement>('[data-tab-destination]')
+    expect(mark()?.getAttribute('data-tab-place')).toBe('ai-accounts')
+    expect(mark()?.querySelector('[data-testid="leaf"]')).not.toBeNull()
+    expect(mark()?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dshx-identity-2)')
+    expect(mark()?.className).not.toContain('dshx:nav-tone-settings')
+    expect(mark()?.className).toContain('dshx:bg-nav-tile')
+    unmount()
+    // A page without one keeps its destination's glyph.
+    mount(undefined, undefined, leaf('dshfiles-settings', false))
+    expect(mark()?.getAttribute('data-tab-place')).toBeNull()
+    expect(mark()?.className).toContain('dshx:nav-tone-settings')
+    expect(mark()?.className).not.toContain('dshx:bg-nav-tile')
+    registry.places = []
   })
 
   it('marks a preview tab with a muted title instead of italics', () => {

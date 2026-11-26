@@ -1,6 +1,8 @@
 import { StatusGlyph, workStatusLabels, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ActivityIcon, BotIcon, GitMergeIcon, InboxIcon, LibraryIcon, ListTodoIcon, MessagesSquareIcon, SettingsIcon, SquarePenIcon, type LucideIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { placeToneStyle } from '@dshfiles/plugin-ui/components/ui/place-glyph'
+import { defineRegistry, useRegistry } from '@dshfiles/dshx/client'
 import type { TabDestination, TabDestinationIcon, TabDestinationId, TabStatus } from './tabs.js'
 
 /**
@@ -57,27 +59,50 @@ const DESTINATION_TONES = {
 } as const satisfies Record<TabDestinationId, string>
 
 /**
- * A page tab's destination glyph (round five B4): 14px in a 16px seat before the title, tertiary ink on a background tab
- * and the destination's nav tone on the tab on screen; the label stays ink. Every page tab draws it, so activating one
- * never moves its title. Decorative: the title names the page.
+ * A page's own glyph for its tab (round nine B2): a page that sits under a destination but is a place of its own (AI
+ * accounts and Plugins under Settings) names itself with the glyph and tone its row carries in that destination's list,
+ * not the destination's glyph. The plugin that owns that list provides the entries (settings-shell for Settings pages);
+ * both tab strips read them. Tone: any CSS colour.
+ */
+export interface TabPlaceGlyph {
+  readonly panelId: string
+  readonly glyph: LucideIcon
+  readonly tone: string
+}
+export const TabPlaceGlyphs = defineRegistry<TabPlaceGlyph>('@dshfiles/workbench.tab-place-glyph')
+
+/** The 20px seat on a 16px footprint (negative margins), so the active tab's tile never moves its title. */
+const TAB_PLACE_SEAT = 'dshx:flex dshx:size-5 dshx:-m-0.5 dshx:flex-none dshx:items-center dshx:justify-center dshx:rounded-md'
+
+/**
+ * A page tab's destination glyph (round five B4): 14px before the title, tertiary ink on a background tab and the
+ * destination's nav tone on the tab on screen, on that tone's 14% tile (round nine B2, the rail's selected place); the
+ * label stays ink. A page with its own place glyph (`TabPlaceGlyphs`) shows that one, in its tone. Every page tab draws
+ * it, so activating one never moves its title. Decorative: the title names the page.
  */
 export const TabDestinationGlyph = (props: {
   readonly destination: TabDestination
+  /** The page the tab shows: a page with its own place glyph draws that instead of its destination's. */
+  readonly panelId?: string | undefined
   /** The tab on screen; omit when the strip marks it with CSS and pass `activeClassName` instead. */
   readonly active?: boolean
   /** Classes that turn the tone on from the strip's own active marker (`dshx:in-[.dv-active-tab]:text-nav-tone`). */
   readonly activeClassName?: string
 }): JSX.Element => {
-  const Glyph = DESTINATION_GLYPHS[props.destination.icon]
+  const places = useRegistry(TabPlaceGlyphs)
+  const place = props.panelId === undefined ? undefined : places.findLast(candidate => candidate.panelId === props.panelId)
+  const Glyph = place?.glyph ?? DESTINATION_GLYPHS[props.destination.icon]
   return (
     <span
       aria-hidden="true"
       data-tab-destination={props.destination.id}
+      data-tab-place={place === undefined ? undefined : place.panelId}
       data-active={props.active === true ? '' : undefined}
+      style={place === undefined ? undefined : placeToneStyle(place.tone)}
       className={cn(
-        'dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center',
-        DESTINATION_TONES[props.destination.id],
-        props.active === true ? 'dshx:text-nav-tone' : 'dshx:text-(--dsw-alias-label-tertiary)',
+        TAB_PLACE_SEAT,
+        place === undefined ? DESTINATION_TONES[props.destination.id] : undefined,
+        props.active === true ? 'dshx:bg-nav-tile dshx:text-nav-tone' : 'dshx:text-(--dsw-alias-label-tertiary)',
         props.activeClassName,
       )}
     >

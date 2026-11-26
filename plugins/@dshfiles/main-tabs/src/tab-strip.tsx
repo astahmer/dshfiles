@@ -371,8 +371,9 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
                           {tab.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? (project === undefined ? <TabComposeGlyph active={tab.active} /> : null) : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : null}
                           {tab.kind === 'panel' && tab.destination !== undefined ? (
-                            // A page names its destination with the rail glyph, in its nav tone while active (round five B4).
-                            <TabDestinationGlyph destination={tab.destination} active={tab.active} />
+                            // A page names its destination with the rail glyph, in its nav tone on its tile while active
+                            // (round five B4, round nine B2); a page with its own place glyph (AI accounts, Plugins) shows that one.
+                            <TabDestinationGlyph destination={tab.destination} panelId={tab.panelId} active={tab.active} />
                           ) : null}
                           {project === undefined ? null : (
                             // The project's tile (round five T5); the tab's spoken name and tooltip carry its name.

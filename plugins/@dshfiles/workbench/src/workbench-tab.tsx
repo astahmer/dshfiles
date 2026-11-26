@@ -134,7 +134,7 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
             {closeButtonPosition === 'left' ? closeButton : null}
             {tab?.kind === 'panel' && tab.destination !== undefined ? (
               // A page names its destination with the rail glyph; the tab on screen takes its nav tone (round five B4).
-              <TabDestinationGlyph destination={tab.destination} activeClassName="dshx:in-[.dv-active-tab]:text-nav-tone" />
+              <TabDestinationGlyph destination={tab.destination} panelId={tab.panelId} activeClassName="dshx:in-[.dv-active-tab]:bg-nav-tile dshx:in-[.dv-active-tab]:text-nav-tone" />
             ) : null}
             {project === undefined ? null : (
               // The tile names the project: the tab has no tooltip, and the title beside it is the thread's.

@@ -26,6 +26,7 @@ import {
 import type { MainPanelId } from '@deepseek-ai/dsh-client-ui-layout/client'
 import { PaletteActions, type PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
+import { TabPlaceGlyphs } from '@dshfiles/workbench/tab-status'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
@@ -66,6 +67,7 @@ import { SettingsTab, type PluginPageHeading, type SectionRow, type SettingsView
 import { shellMachine, type FieldTarget } from './shell-machine.js'
 import { TAB_STRIP_SLOTS, tabStripLoaded } from './tab-strip.js'
 import { PORTED_FROM } from './upstream.js'
+import { SettingsIcons } from './settings-icons.js'
 import {
   createSettingsHubRouter,
   createSettingsWorkbenchHub,
@@ -152,6 +154,8 @@ export default defineClient({
   inject: ['slots', 'connection', 'remote', 'remote.settings', 'remote.session', 'configForms', 'shortcuts', 'sessions', 'layout', 'modules', 'remoteAccess'],
   setup(ctx, decorate, metadata) {
     const t = ctx.locale.bind(SHELL_LOCALE_NAMESPACE)
+    // A Settings page with its own tab names itself there with its Settings row's glyph and tone (round nine B2).
+    for (const place of SettingsIcons.pagePlaces()) metadata?.plugin?.add(TabPlaceGlyphs, place)
     // A newer DSH release is a quiet banner after the General rows, not a preference row (visual refresh T4.4); it
     // arrives after the first paint, so it sits where it moves nothing (round three item 30).
     const ReleaseBanner = decorate((props: { readonly t: ShellTranslate }) => (
