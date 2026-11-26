@@ -147,7 +147,10 @@ const CARD_HEAD =
   ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
   // Council round 14 C1: the meta grows to the rest of its line (or wraps to a line of its own), so the kit's
   // AttentionMeta measures the room it really has; a shrink-to-content box would keep it at its last drop step.
-  ' dshx:[&_[data-slot=entity-row-meta]]:flex-auto'
+  ' dshx:[&_[data-slot=entity-row-meta]]:flex-auto' +
+  // Council round 15 C1: a desktop head is two lines as on a phone, 6px above and below (6 + 20 + 2 + 16 + 6 = 50px),
+  // its verb and ⋯ centred on both lines (a phone's seat stays level with the title, above).
+  ' dshx:[&>div:first-child]:py-1.5 dshx:[&_[data-slot=entity-row-trailing]]:self-center'
 
 /**
  * The muted "·" before a head part after the title (council round 8 C2): 4px each side since council round 14 C1, as
@@ -166,15 +169,16 @@ const HEAD_META = 'dshx:@max-pane-narrow:leading-4.5'
 const HEAD_PART = 'dshx:inline-flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap'
 
 /**
- * Every card head on a compact pane is the same two lines (council round 9 C1, all seats). Line 1: glyph · the full
- * title, wrapping, never cut for metadata · the seat (a bodyless Failed card's verb, then ⋯). Line 2: the project's
- * mark and name · kind · age at 13/400 muted (the kit's meta step on a touch screen), never opening on a separator.
- * Council round 14 C1: the name shows whole; AttentionMeta drops the age, then the name, when the line runs out.
+ * Every card head is the same two lines (council round 9 C1 on a compact pane; council round 15 C1 on every width).
+ * Line 1: glyph · the full title, wrapping, never cut for metadata · the seat (a bodyless Failed card's verb, then ⋯).
+ * Line 2: the project's mark and name · kind · age, muted, 12/16 on a wide pane and 13/18 on a touch screen (the kit's
+ * meta step), never opening on a separator. Council round 14 C1: the name shows whole; AttentionMeta drops the age,
+ * then the name, when the line runs out.
  */
 const HEAD_TWO_LINES =
-  'dshx:@max-pane-narrow:[&_span:has(>[data-slot=entity-row-title])]:gap-y-0.5' +
-  ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:basis-full dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:leading-4.5' +
-  ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]>[data-inbox-head-part]:first-child>[data-inbox-head-sep]]:hidden' +
+  'dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-y-0.5' +
+  ' dshx:[&_[data-slot=entity-row-meta]]:basis-full dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:leading-4.5' +
+  ' dshx:[&_[data-slot=entity-row-meta]>[data-inbox-head-part]:first-child>[data-inbox-head-sep]]:hidden' +
   // A Failed card's verb meets its ⋯: both are 44pt seats, so no gap between them.
   ' dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0'
 

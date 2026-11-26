@@ -40,11 +40,12 @@ describe('the phone approval card (council round 13 C1)', () => {
 })
 
 describe('the desktop question card (council round 13 C2)', () => {
-  it('offers a quiet Open in its head seat, so the verb column has no hole', () => {
-    const at = panel.indexOf('data-inbox-open-quiet=""')
+  it('offers Open in its head seat, so the verb column has no hole', () => {
+    const at = panel.indexOf('data-inbox-open-head=""')
     expect(at).toBeGreaterThan(-1)
     const button = panel.slice(panel.lastIndexOf('<Button', at), panel.indexOf('</Button>', at))
-    expect(button).toContain('variant="ghost"')
+    // Council round 15 C1: the band-tinted pill Review is, not a quiet ghost (inbox-round15.test.ts).
+    expect(button).toContain('band={InboxView.onBand(status)}')
     // Council round 14 C3: it reads its open label ("Open thread") in words (inbox-round14.test.ts).
     expect(button).toContain('{openLabel}')
     // Only in the head (a desktop), only for a card whose answers are its verbs.

@@ -14,7 +14,8 @@ describe('the phone Inbox head (council round 9 C1)', () => {
     expect(row).not.toContain('HEAD_META_UNDER')
     expect(row).not.toContain('COMPACT_SEAT')
     expect(InboxView.HEAD_TWO_LINES).not.toContain('truncate')
-    expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:basis-full')
+    // Council round 15 C1: on every width, a desktop head too.
+    expect(InboxView.HEAD_TWO_LINES).toContain('dshx:[&_[data-slot=entity-row-meta]]:basis-full')
     // The kit's meta step (text-xs) is 13px on a touch screen: no larger step.
     expect(InboxView.HEAD_TWO_LINES).not.toContain('text-sm')
     expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:leading-4.5')

@@ -12,8 +12,9 @@ describe('the Inbox title (round five C3, council round 3)', () => {
     expect(InboxView.titleCounts({ needsYou: 2, blocking: 2 })).toEqual({ 'needs-you': 2, failed: 0 })
     expect(InboxView.titleCounts({ needsYou: 1, blocking: 0 })).toEqual({ 'needs-you': 0, failed: 1 })
     expect(InboxView.titleCounts(undefined)).toEqual({})
-    // The kit Page draws one StatusCount per status present (A5).
-    expect(panel).toMatch(/statusCounts=\{InboxView\.titleCounts\(counts\)\}/u)
+    // Council round 15 C1: the Needs you tab draws them (the page title no longer repeats them).
+    expect(panel).toContain('statusCounts: InboxView.titleCounts(counts)')
+    expect(panel).not.toMatch(/statusCounts=\{InboxView\.titleCounts\(counts\)\}/u)
   })
 
   it("ends Start triage and the page menu at the list's trailing edge, not the window's", () => {

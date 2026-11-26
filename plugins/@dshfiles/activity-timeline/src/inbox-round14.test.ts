@@ -52,12 +52,12 @@ describe('the card head\'s meta line (council round 14 C1)', () => {
 })
 
 describe('the desktop question card\'s quiet verb (council round 14 C3)', () => {
-  it('reads "Open thread" (its open label) with a 12px arrow after it', () => {
-    const at = panel.indexOf('data-inbox-open-quiet=""')
+  it('reads "Open thread" (its open label); council round 15 C1 drops its arrow, as Review has none', () => {
+    const at = panel.indexOf('data-inbox-open-head=""')
     const button = panel.slice(panel.lastIndexOf('<Button', at), panel.indexOf('</Button>', at))
     expect(button).toContain('{openLabel}')
     expect(button).not.toContain("{t('open')}")
-    expect(button).toMatch(/\{openLabel\}<\/span>\s*<ArrowRightIcon aria-hidden className="dshx:size-3" \/>\s*$/u)
+    expect(button).not.toContain('ArrowRightIcon')
   })
 })
 

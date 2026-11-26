@@ -34,7 +34,7 @@ import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { ArrowRightIcon, BellIcon, CheckIcon, ClockIcon, EllipsisIcon, InboxIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, InboxIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -296,19 +296,19 @@ const InboxRow = (props: {
               {t('review')}
             </Button>
           ) : null}
-          {/* A question's answers are its verbs; on a desktop its head still seats a quiet Open (council round 13 C2), so
-              the verb column down the list has no hole. Council round 14 C3: it names where it goes, "Open thread" with a
-              12px arrow. */}
+          {/* A question's answers are its verbs; on a desktop its head still seats Open (council round 13 C2), so the verb
+              column down the list has no hole. Council round 14 C3: it names where it goes, "Open thread". Council round
+              15 C1: the same 28px band-tinted pill as Review, so the Inbox's verbs read in one style. */}
           {place === 'head' && openable && answerable ? (
             <Button
               size="sm"
-              variant="ghost"
-              data-inbox-open-quiet=""
-              className={cn('dshx:max-w-full dshx:text-muted-foreground dshx:hover:text-foreground', INBOX_CHIP, size, InboxView.SHORT_VERB)}
+              variant={InboxView.headVariant(status)}
+              band={InboxView.onBand(status)}
+              data-inbox-open-head=""
+              className={cn('dshx:max-w-full', INBOX_CHIP, size, InboxView.SHORT_VERB)}
               onClick={() => props.onOpen(item)}
             >
               <span className="dshx:truncate">{openLabel}</span>
-              <ArrowRightIcon aria-hidden className="dshx:size-3" />
             </Button>
           ) : null}
           {openable && !answerable ? (
@@ -1444,8 +1444,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       mark={<InboxIcon />}
       markTone="inbox"
       heading={t('title')}
-      // One StatusCount per status present beside the title (◆2 ✕1, round five C3; the kit Page draws them, A5).
-      statusCounts={InboxView.titleCounts(counts)}
+      // Council round 15 C1: no tally beside the title; the Needs you tab holds it (◆ 2 · ✕ 1) and the rail its badge.
       // On a phone the top bar names the page (its own h1) and holds its actions (InboxPhoneBar), so the page header
       // goes and the segmented control leads the page.
       description={<span className="dshx:in-data-shell-phone-nav:hidden">{t('subtitle')}</span>}
