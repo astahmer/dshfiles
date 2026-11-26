@@ -1474,11 +1474,13 @@ button.crumbEditable {
 
   /* Council round 22, item 5: the subagent rows are one card with 1px dividers, as on desktop (each row was its own
      outlined card), on the composer's fill with its field edge. Council round 23, item 5: the list shows two whole rows
-     (thread-sidebar's two-line row is 54px) and the third row's title (its divider, 8px padding, 20px title and 2px
-     gap), so a row peeks and says the list scrolls; rows snap to whole positions, so a model line never shows at the
-     top without its title. */
+     (thread-sidebar's two-line row is 54px); rows snap to whole positions, so a model line never shows at the top
+     without its title. Council round 24, item 4: the 8px under them is the next row's divider and padding (at the end,
+     the row above's bottom padding), never text; a 31px title peek there left a blank half-row under the last row at
+     the scroll end, and resting that row on the bottom edge instead would have cut a model line from its title at the
+     top. The edge fades (below) say the list scrolls. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
-    max-height: calc(2 * 54px + 1px + 31px + 2px);
+    max-height: calc(2 * 54px + 1px + 8px + 2px);
     scroll-snap-type: y mandatory;
     background: var(--dsw-specific-input-major);
     border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
@@ -1522,11 +1524,9 @@ button.crumbEditable {
     scroll-snap-align: start;
   }
 
-  /* The scroll range ends on a row's start: the last of three or more rows ends with the peek's room (140px visible
-     minus two 55px rows), so the last snap position shows the last two rows whole over a blank peek instead of a
-     model line cut from its title at the top (17b). Fewer rows never scroll and keep no blank. */
-  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global(section[data-dshfiles-live-preview]:nth-of-type(n + 3):last-of-type) {
-    padding-bottom: 30px;
+  /* The scroll range ends with the last row on the frame's bottom edge (council round 24, item 4): no spacer under it. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global(section[data-dshfiles-live-preview]:last-of-type) {
+    scroll-snap-align: end;
   }
 
   /* Between rows only: a row after the (hidden or sticky) fold row takes the plate's hairline instead. */
@@ -1545,7 +1545,7 @@ button.crumbEditable {
   }
 
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
-    max-height: calc(44px + 2 * 54px + 1px + 31px + 2px);
+    max-height: calc(44px + 2 * 54px + 1px + 8px + 2px);
     scroll-padding-top: 44px;
   }
 
@@ -1626,13 +1626,13 @@ button.crumbEditable {
     border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
   }
 
-  /* No card edges of their own: 140px of rows, plus the plate beside running jobs (and the divider above it there). */
+  /* No card edges of their own: 117px of rows, plus the plate beside running jobs (and the divider above it there). */
   :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
-    max-height: calc(2 * 54px + 1px + 31px);
+    max-height: calc(2 * 54px + 1px + 8px);
   }
 
   :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
-    max-height: calc(44px + 2 * 54px + 1px + 31px + 1px);
+    max-height: calc(44px + 2 * 54px + 1px + 8px + 1px);
   }
 
   /* A running job's row and fold row lie on the section too, instead of drawing a card inside it. */

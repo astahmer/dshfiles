@@ -291,7 +291,7 @@ describe('one header for live subagents on a phone (council round 22, item 5)', 
     expect(only).toMatch(/display:\s*none/)
   })
 
-  it('draws the rows as one card with 1px dividers, capped near 3.5 rows so one row peeks', () => {
+  it('draws the rows as one card with 1px dividers, capped so the list scrolls', () => {
     const card = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}`)
     expect(card).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
     expect(card).toMatch(/border-radius: var\(--dsw-radius-lg\);/)
@@ -395,20 +395,53 @@ describe('the open phone dock is the composer card\'s top section (council round
     expect(ruleIn(NARROW, `${open} > ${DOCK} > ${LIVE} + ${LIVE}`)).toMatch(/border-top: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
   })
 
-  it('shows two whole rows and the next row\'s title, snapping to whole rows so a model line never shows without its title', () => {
-    // 54px two-line rows: two rows, their divider, then the third row's divider, 8px padding, 20px title and 2px gap.
-    expect(ruleIn(NARROW, `${open} > ${DOCK} > ${SUBAGENTS}`)).toMatch(/max-height: calc\(2 \* 54px \+ 1px \+ 31px\);/)
+  it('shows two whole rows over the next row\'s padding, snapping to whole rows so a model line never shows without its title', () => {
+    // 54px two-line rows: two rows, their divider, then 8px (the next row's divider and padding, or at the end the row
+    // above's bottom padding). Council round 24, item 4: the 31px title peek forced a blank half-row at the scroll end.
+    expect(ruleIn(NARROW, `${open} > ${DOCK} > ${SUBAGENTS}`)).toMatch(/max-height: calc\(2 \* 54px \+ 1px \+ 8px\);/)
     const card = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}`)
-    expect(card).toMatch(/max-height: calc\(2 \* 54px \+ 1px \+ 31px \+ 2px\);/)
+    expect(card).toMatch(/max-height: calc\(2 \* 54px \+ 1px \+ 8px \+ 2px\);/)
     expect(card).toMatch(/scroll-snap-type: y mandatory;/)
     expect(ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global([data-dshfiles-live-preview])`)).toMatch(/scroll-snap-align: start;/)
-    // The last snap position puts the last two rows whole at the top: the last of three or more rows ends with the
-    // peek's 30px (140px visible minus two 55px rows), so the scroll range ends on a row's start.
-    expect(ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global(section[data-dshfiles-live-preview]:nth-of-type(n + 3):last-of-type)`)).toMatch(/padding-bottom: 30px;/)
     // Beside running jobs the sticky 44px fold plate sits over the top: snap below it.
     const beside = ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}`)
-    expect(beside).toMatch(/max-height: calc\(44px \+ 2 \* 54px \+ 1px \+ 31px \+ 2px\);/)
+    expect(beside).toMatch(/max-height: calc\(44px \+ 2 \* 54px \+ 1px \+ 8px \+ 2px\);/)
     expect(beside).toMatch(/scroll-padding-top: 44px;/)
+    expect(ruleIn(NARROW, `${open} > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}`)).toMatch(/max-height: calc\(44px \+ 2 \* 54px \+ 1px \+ 8px \+ 1px\);/)
     expect(css).not.toMatch(/3\.5 \* 54px/)
+  })
+
+  it('rests the last row on the frame\'s bottom edge at the scroll end, and no snap position cuts a row\'s text (council round 24, item 4)', () => {
+    // The last row carried a 30px spacer, so the end position showed a blank half-row under it (17b).
+    expect(css).not.toMatch(/nth-of-type\(n \+ 3\):last-of-type/)
+    const last = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global(section[data-dshfiles-live-preview]:last-of-type)`)
+    expect(last).toMatch(/scroll-snap-align: end;/)
+    // Lay the open frame out: a row is 8px padding, a 20px title, a 2px gap, a 16px model line and 8px padding; every
+    // row after the first adds its 1px divider on top.
+    const frame = /max-height: calc\(([^;]*)\);/u.exec(ruleIn(NARROW, `${open} > ${DOCK} > ${SUBAGENTS}`))?.[1] ?? ''
+    const height = frame.split('+').reduce((sum, term) => sum + term.split('*').reduce((product, factor) => product * Number.parseFloat(factor), 1), 0)
+    expect(height).toBe(117)
+    for (const count of [3, 4, 6]) {
+      const rows = Array.from({ length: count }, (_, index) => {
+        const start = index === 0 ? 0 : 54 + (index - 1) * 55
+        const top = index === 0 ? start : start + 1
+        return { start, title: [top + 8, top + 28] as const, model: [top + 30, top + 46] as const, end: top + 54 }
+      })
+      const max = rows.at(-1)!.end - height
+      // Each row's start, clamped into the range, and the range's end (the last row's `end` snap).
+      const positions = [...new Set([...rows.map(row => Math.min(row.start, max)), max])]
+      for (const scroll of positions) {
+        const [from, to] = [scroll, scroll + height]
+        for (const row of rows) {
+          const shows = (line: readonly [number, number]): boolean => line[0] < to && line[1] > from
+          const whole = (line: readonly [number, number]): boolean => line[0] >= from && line[1] <= to
+          // No line of text is cut by an edge, and no model line shows without its title.
+          for (const line of [row.title, row.model]) if (shows(line)) expect(whole(line), `${count} rows at ${scroll}px`).toBe(true)
+          if (shows(row.model)) expect(shows(row.title), `${count} rows at ${scroll}px`).toBe(true)
+        }
+      }
+      // At the end the last row's bottom is the frame's bottom: no blank under it.
+      expect(rows.at(-1)!.end - max).toBe(height)
+    }
   })
 })
