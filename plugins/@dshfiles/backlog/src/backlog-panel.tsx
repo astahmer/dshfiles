@@ -7,7 +7,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { BacklogSettingsSheet } from './backlog-settings-sheet.js'
-import { BacklogViewSwitch, FilterMenu, ViewMenu } from './backlog-toolbar.js'
+import { BacklogViewSwitch, FilterMenu, ToolbarDivider, ViewMenu } from './backlog-toolbar.js'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
@@ -591,9 +591,10 @@ export const BacklogPanel = (props: {
             className="dshx:flex dshx:h-9 dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-2 dshx:border-b dshx:border-border dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:flex-wrap dshx:@max-pane-narrow:border-b-0"
           >
             <BacklogViewSwitch view={view} onSelect={switchView} modifierHeld={modifierHeld} />
+            <ToolbarDivider />
             <Tooltip>
               <TooltipTrigger asChild>
-                <label className="dshx:ml-auto dshx:flex dshx:h-control-h dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-field-border dshx:bg-background dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-ring dshx:focus-within:ring-[3px] dshx:focus-within:ring-ring/50 dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:h-touch dshx:@max-pane-narrow:basis-full">
+                <label className="dshx:flex dshx:h-control-h dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-field-border dshx:bg-background dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-ring dshx:focus-within:ring-[3px] dshx:focus-within:ring-ring/50 dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:h-touch dshx:@max-pane-narrow:basis-full">
                   <SearchIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
                   <input
                     ref={searchInput}

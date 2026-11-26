@@ -3,7 +3,7 @@ import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeAll, expect, test } from 'vitest'
-import { BacklogViewSwitch, FilterMenu, ViewMenu } from './backlog-toolbar.js'
+import { BacklogViewSwitch, FilterMenu, ToolbarDivider, ViewMenu } from './backlog-toolbar.js'
 
 let root: Root | undefined
 let host: HTMLElement | undefined
@@ -63,16 +63,17 @@ test('the toolbar folds project scope, sort, agent items and saved views into on
   )
   expect(byName('combobox', 'Filter by project')).toBeUndefined()
   const trigger = byName('button', 'Backlog view options')
-  // Filter-row grammar (council round 8, D2): beside the search field, the triggers that show a value (the project
-  // scope, the active filter count) take the field variant at the search field's control height (council round 9, A4),
-  // drawn as the kit's quiet trigger: filled, the 3:1 edge on hover (council round 10, A1).
+  // One secondary look beside a search field (council round 18, D3): the kit's quiet secondary at the search field's
+  // control height and the compact toolbar type: the trigger fill and hairline, the label in secondary ink, no
+  // per-state ink of its own.
   for (const control of [trigger, byName('button', 'Filter')]) {
-    expect(control?.dataset.variant).toBe('field')
+    expect(control?.dataset.variant).toBe('quiet')
     expect(control?.dataset.size).toBe('field')
     expect(control?.className).toContain('dshx:bg-trigger-fill')
     expect(control?.className).toContain('dshx:not-disabled:hover:border-field-border')
     expect(control?.className).toContain('dshx:h-(--dshx-control-h)')
     expect(control?.className).not.toContain('dshx:h-7')
+    expect(control?.className).not.toContain('dshx:text-foreground ')
   }
   act(() => trigger?.click())
   expect(byName('combobox', 'Filter by project')).toBeDefined()
@@ -80,6 +81,20 @@ test('the toolbar folds project scope, sort, agent items and saved views into on
   const agentItems = [...document.querySelectorAll('button')].find(button => button.textContent?.startsWith('Hide agent items') === true)
   expect(agentItems?.getAttribute('aria-pressed')).toBe('true')
   expect([...document.querySelectorAll('button')].some(button => button.textContent?.startsWith('Saved views') === true)).toBe(true)
+})
+
+test('a 16 px neutral rule sits before the search field with 12 px on each side (council round 18, D3)', () => {
+  render(<ToolbarDivider />)
+  const seat = document.querySelector<HTMLElement>('[data-toolbar-divider]')
+  // The row's gap is 8 px: 4 px of padding each side makes 12 px; the seat takes the free space, so search keeps its edge.
+  expect(seat?.getAttribute('aria-hidden')).toBe('true')
+  expect(seat?.className).toContain('dshx:ml-auto')
+  expect(seat?.className).toContain('dshx:px-1')
+  expect(seat?.className).toContain('dshx:@max-pane-narrow:hidden')
+  const rule = seat?.firstElementChild
+  expect(rule?.className).toContain('dshx:h-4')
+  expect(rule?.className).toContain('dshx:w-px')
+  expect(rule?.className).toContain('dshx:bg-border')
 })
 
 test('the seven views are underline tabs, not a segmented track (council round 3, D2)', () => {

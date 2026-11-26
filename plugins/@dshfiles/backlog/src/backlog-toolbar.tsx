@@ -165,6 +165,16 @@ export const BacklogViewSwitch = (props: { readonly view: View; readonly onSelec
   )
 }
 
+/**
+ * The neutral rule between the view tabs and the search field (council round 18, D3): 16 px tall, 12 px clear on each
+ * side (the row's 8 px gap plus 4 px), pushed to the search field's edge. Gone on a phone, where search takes its own row.
+ */
+export const ToolbarDivider = (): JSX.Element => (
+  <span aria-hidden data-toolbar-divider className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:px-1 dshx:@max-pane-narrow:hidden">
+    <span className="dshx:h-4 dshx:w-px dshx:bg-border" />
+  </span>
+)
+
 /** A view's status filter, shown as the Filter menu's first group where the view has no status row of its own. */
 export interface StatusFilter {
   readonly counts: Record<BacklogStatus, number>
@@ -186,8 +196,8 @@ export const FilterMenu = (props: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        {/* It shows a value (the active count) beside the search field: the field look (council round 8, D2). */}
-        <Button type="button" variant="field" size="field" aria-label="Filter" className={active > 0 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground'}>
+        {/* An action beside the search field: the kit's quiet secondary, the one look of that seat (council round 18, D3). */}
+        <Button type="button" variant="quiet" size="field" aria-label="Filter">
           <ListFilterIcon aria-hidden />
           <span className="dshx:@max-pane-narrow:sr-only">Filter</span>
           {active > 0 ? <span className="dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">{active}</span> : null}
@@ -383,14 +393,8 @@ export const ViewMenu = (props: {
 }): JSX.Element => (
   <Popover>
     <PopoverTrigger asChild>
-      {/* It shows a value (the project scope) beside the search field: the field look (council round 8, D2). */}
-      <Button
-        type="button"
-        variant="field"
-        size="field"
-        aria-label="Backlog view options"
-        className={cn('dshx:max-w-56', props.projects.length === 0 ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}
-      >
+      {/* An action beside the search field: the kit's quiet secondary, the one look of that seat (council round 18, D3). */}
+      <Button type="button" variant="quiet" size="field" aria-label="Backlog view options" className="dshx:max-w-56">
         View
         {props.projects.length === 0 ? null : (
           <span className="dshx:min-w-0 dshx:truncate dshx:font-normal dshx:text-muted-foreground">· {projectLabel(props.projects)}</span>
