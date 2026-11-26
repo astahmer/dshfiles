@@ -141,9 +141,11 @@ const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-[11px]'
 /**
  * The verb a card asks for sits in its head row, trailing, before the menu (round five C4, council round 5): 28px on a
  * wide pane, pulled 4px into the row's padding so the 36px band keeps its height. Council round 14 C2: on a touch
- * screen it is drawn 44pt tall (round 12's 28px read as a small target), centred in the head band by HEAD_SEAT_VERB.
+ * screen it keeps a 44pt target, centred in the head band by HEAD_SEAT_VERB. Council round 19 C1: it is drawn 36pt
+ * tall, so the 52pt head has 8pt around it; a pseudo-element 4pt above and below keeps the 44pt hit area.
  */
-const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
+const HEAD_VERB =
+  'dshx:h-7 dshx:pointer-coarse:h-9 dshx:pointer-coarse:relative dshx:pointer-coarse:before:absolute dshx:pointer-coarse:before:inset-x-0 dshx:pointer-coarse:before:-inset-y-1'
 
 /**
  * The head row's trailing seat (the menu, and on a wide pane the verbs) is an ordinary part of the row at every width.
@@ -451,6 +453,22 @@ const relativeAge = (at: number, now: number): string => {
   return `${String(Math.round(hours / 24))} d ago`
 }
 
+/** The same buckets as relativeAge, compact ("3m", the thread list's form), for a touch screen's card head. */
+const compactAge = (at: number, now: number): string => {
+  const seconds = Math.max(0, Math.round((now - at) / 1000))
+  if (seconds < 60) return 'now'
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${String(minutes)}m`
+  const hours = Math.round(minutes / 60)
+  return hours < 24 ? `${String(hours)}h` : `${String(Math.round(hours / 24))}d`
+}
+
+/**
+ * A card head's age (council round 19 C1): compact on a touch screen, so every phone card's line 2 reads `[mark]
+ * project · kind · age` beside its head pill instead of the age dropping out; a desktop card keeps "3 min ago".
+ */
+const headAge = (at: number, now: number, compact: boolean): string => (compact ? compactAge(at, now) : relativeAge(at, now))
+
 /** Which open control a row offers: review a finished turn, open a thread, or open a provider-owned page. */
 export type InboxOpenAction = 'review' | 'approval' | 'thread' | 'subject'
 
@@ -619,6 +637,7 @@ export class InboxView {
   static readonly failureWell = failureWell
   static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge
+  static readonly headAge = headAge
   static readonly undoOf = undoOf
   static readonly resumableIds = resumableIds
 }

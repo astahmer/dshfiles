@@ -475,7 +475,10 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     const prose = design.replace(/\s+/gu, ' ')
     for (const text of [
       '**Phone card actions**',
-      'puts its 44pt Review pill in the card head beside ⋯',
+      'puts its Review pill in the card head beside ⋯',
+      // Council round 19 C1: drawn 36pt with a 44pt hit area, and one meta grammar with a compact age.
+      'drawn 36pt tall with a 44pt hit area',
+      '`[mark] project · kind · age`',
       'the pill never moves to a footer',
       'at least 8pt clear',
       '**Secondary beside search**',

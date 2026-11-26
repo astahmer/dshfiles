@@ -586,11 +586,13 @@ own width drew three). A phone is narrower than the measure, so its body runs th
 danger evidence well, desktop and phone; with none, no well (the meta line already says Turn failed).
 
 **Phone card actions** (council round 18, one pattern). On a phone (coarse pointer, phone shell) every card with a
-single verb, approval and failed alike, puts its 44pt Review pill in the card head beside ⋯; no card has a full-width
-foot row (a footer Review was tried twice and does not fit). A long title wraps beside the pill, two lines at most; the
-pill never moves to a footer. A question card keeps its answers in the body. Acceptance, measured at 390×664 in the
-rendered shot: the failed card's title, meta line and Review all sit above the tab bar with at least 8pt clear, in both
-schemes.
+single verb, approval and failed alike, puts its Review pill in the card head beside ⋯; no card has a full-width
+foot row (a footer Review was tried twice and does not fit). The pill is drawn 36pt tall with a 44pt hit area (a
+pseudo-element 4pt above and below), so the 52pt head has 8pt around it (council round 19). A long title wraps beside
+the pill, two lines at most; the pill never moves to a footer. Every card's line 2 reads `[mark] project · kind · age`
+with a compact age (`3m`), so the age fits beside the pill. A question card keeps its answers in the body. Acceptance,
+measured at 390×664 in the rendered shot: the failed card's title, meta line and Review all sit above the tab bar with
+at least 8pt clear, in both schemes.
 
 **Phone dock.** On a phone the transcript scroller ends above the dock (composer and its docked rows), never under
 it: a fade one line-height tall (28px) ending exactly at the top edge of the dock's first card, so no line is half

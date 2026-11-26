@@ -576,7 +576,7 @@ const InboxRow = (props: {
             className={InboxView.HEAD_META}
             project={head.project}
             kind={head.kind}
-            age={InboxView.relativeAge(item.openedAt, props.now)}
+            age={InboxView.headAge(item.openedAt, props.now, phone)}
           />
           {referencedThreadId === null ? null : (
             <span data-inbox-head-part="thread" className={InboxView.HEAD_PART}>

@@ -14,12 +14,12 @@ describe('the Inbox page (council round 7 C1)', () => {
 
   it('prints every card head in one order: title, project, kind, time', () => {
     // Council round 14 C1: the kit's AttentionMeta draws project, kind and age in that order.
-    const meta = row.slice(row.indexOf('meta={'), row.indexOf('InboxView.relativeAge(item.openedAt, props.now)') + 50)
+    const meta = row.slice(row.indexOf('meta={'), row.indexOf('InboxView.headAge(item.openedAt, props.now, phone)') + 50)
     const projectAt = meta.indexOf('project={head.project}')
     const kindAt = meta.indexOf('kind={head.kind}')
     expect(projectAt).toBeGreaterThan(-1)
     expect(kindAt).toBeGreaterThan(projectAt)
-    expect(meta.indexOf('age={InboxView.relativeAge')).toBeGreaterThan(kindAt)
+    expect(meta.indexOf('age={InboxView.headAge')).toBeGreaterThan(kindAt)
     // Every thread card knows its project, not only a finished turn's.
     expect(row).toMatch(/const project = item\.subject\.kind === 'session' \? props\.projectOf\(item\.subject\.id\) : undefined/u)
   })

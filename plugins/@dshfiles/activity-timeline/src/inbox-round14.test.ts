@@ -8,9 +8,11 @@ import { INBOX_CHIP } from './triage-stage.js'
 const panel = readFileSync(new URL('./inbox-panel.tsx', import.meta.url), 'utf8')
 
 describe('the phone failed card\'s Review (council round 14 C2)', () => {
-  it('is drawn 44pt tall on a touch screen, 28px on a desktop', () => {
+  it('keeps a 44pt target on a touch screen, 28px on a desktop', () => {
     const merged = cn(INBOX_CHIP, cn('dshx:shrink', InboxView.HEAD_VERB))
-    expect(merged).toContain('dshx:pointer-coarse:h-11')
+    // Council round 19 C1: drawn 36pt with a 4pt hit slop above and below (inbox-round19.test.ts).
+    expect(merged).toContain('dshx:pointer-coarse:h-9')
+    expect(merged).toContain('dshx:pointer-coarse:before:-inset-y-1')
     expect(merged).not.toContain('pointer-coarse:h-7')
     expect(merged).toContain('dshx:h-7')
   })
@@ -37,7 +39,7 @@ describe('the card head\'s meta line (council round 14 C1)', () => {
   })
 
   it('draws ProjectMark project · kind · age with the kit\'s AttentionMeta, desktop and phone alike', () => {
-    expect(meta).toMatch(/<AttentionMeta\s[^>]*project=\{head\.project\}\s+kind=\{head\.kind\}\s+age=\{InboxView\.relativeAge\(item\.openedAt, props\.now\)\}/u)
+    expect(meta).toMatch(/<AttentionMeta\s[^>]*project=\{head\.project\}\s+kind=\{head\.kind\}\s+age=\{InboxView\.headAge\(item\.openedAt, props\.now, phone\)\}/u)
     // Its own mark, name, kind and age parts are gone: one formatter, no phone-only short kind, no hidden name.
     for (const gone of ['<ProjectMark', 'data-inbox-project-name', 'data-inbox-kind-short', 'data-inbox-kind-long', 'data-inbox-age', 'head.shortKind']) expect(meta).not.toContain(gone)
     expect(InboxView.HEAD_TWO_LINES).not.toContain('data-inbox-project-name')
