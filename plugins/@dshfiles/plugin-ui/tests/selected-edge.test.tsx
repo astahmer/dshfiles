@@ -31,12 +31,23 @@ describe('selected edge (council round 12 A1)', () => {
     for (const [surface, wash] of Object.entries(washes(scheme))) expect(PaletteMath.contrastRatio(selectedEdge, wash), surface).toBeGreaterThanOrEqual(3)
   })
 
-  it.each(schemes)('is a neutral warm grey near the council value, never the accent (%s)', scheme => {
+  it.each(schemes)('is a neutral warm grey at the council value, never the accent (%s)', scheme => {
     const { selectedEdge, accent } = PaletteMath.palette({ ...WARM_STONE, scheme })
     expect(selectedEdge.c).toBeLessThan(0.02)
     expect(selectedEdge).not.toEqual(accent.fg)
-    // Council: #817a73 in dark (kept within one step); light moves from #a39b93 (2.26:1) to the first value at 3:1.
-    expect(PaletteMath.toHex(selectedEdge)).toBe(scheme === 'light' ? '#88827d' : '#7f7974')
+    // Council round 14 A2: oklch(0.50 0.01 65) light, oklch(0.68 0.01 65) dark.
+    expect(selectedEdge).toEqual({ l: scheme === 'light' ? 0.5 : 0.68, c: 0.01, h: 65 })
+  })
+
+  it.each(schemes)('is its own edge, stronger than a resting text field on the same wash and surfaces (council round 14 A2, %s)', scheme => {
+    for (const input of [WARM_STONE, { ...WARM_STONE, contrast: 0.8 }, { ...WARM_STONE, contrast: 1.3 }, { hue: 250, chroma: 0, accentHue: 150, contrast: 1 }]) {
+      const palette = PaletteMath.palette({ ...input, scheme })
+      const { selectedEdge, fieldBorder, neutral } = palette
+      // A selected row never matches a resting field: at least 0.08 L apart, on the far side from the surface.
+      expect(scheme === 'light' ? fieldBorder.l - selectedEdge.l : selectedEdge.l - fieldBorder.l, JSON.stringify(input)).toBeGreaterThanOrEqual(0.08)
+      for (const back of [...Object.values(washes(scheme, input)), neutral[0]!])
+        expect(PaletteMath.contrastRatio(selectedEdge, back), JSON.stringify(input)).toBeGreaterThan(PaletteMath.contrastRatio(fieldBorder, back))
+    }
   })
 
   it.each(schemes)('keeps 3:1 for other grey presets and contrast settings (%s)', scheme => {
@@ -51,10 +62,10 @@ describe('selected edge (council round 12 A1)', () => {
   })
 
   it('is emitted in both theme blocks and the generated sheet', () => {
-    expect(ThemeCss.blockDeclarations(WARM_STONE, 'light').join('\n')).toContain('--dshx-selected-edge: oklch(0.61 0.01 65);')
-    expect(ThemeCss.blockDeclarations(WARM_STONE, 'dark').join('\n')).toContain('--dshx-selected-edge: oklch(0.58 0.01 65);')
-    expect(generated).toContain('--dshx-selected-edge: oklch(0.61 0.01 65);')
-    expect(generated).toContain('--dshx-selected-edge: oklch(0.58 0.01 65);')
+    expect(ThemeCss.blockDeclarations(WARM_STONE, 'light').join('\n')).toContain('--dshx-selected-edge: oklch(0.5 0.01 65);')
+    expect(ThemeCss.blockDeclarations(WARM_STONE, 'dark').join('\n')).toContain('--dshx-selected-edge: oklch(0.68 0.01 65);')
+    expect(generated).toContain('--dshx-selected-edge: oklch(0.5 0.01 65);')
+    expect(generated).toContain('--dshx-selected-edge: oklch(0.68 0.01 65);')
   })
 
   it('compiles to a 1px inset edge that moves nothing, exported as SELECTED_EDGE', async () => {

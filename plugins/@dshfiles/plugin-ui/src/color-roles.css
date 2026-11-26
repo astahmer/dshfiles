@@ -169,7 +169,7 @@
  * The selected edge (council round 12 A1): `dshx:selected-edge` beside `bg-selected-wash` on a selected row that leads
  * with a glyph, tile or mark, where `selected-marker` draws no pill (the current thread row, an account row). The wash
  * alone measured 1.10:1 off the dark page, so a neutral 1px inset edge (`--dshx-selected-edge`, generated: light
- * #88827D, dark #7F7974) outlines it, 3:1 against the wash on the page, the nav column and a dialog (tests/selected-edge).
+ * #67625D, dark #9D9792; its own value, darker than the field edge since council round 14 A2) outlines it, 3:1 against the wash on the page, the nav column and a dialog (tests/selected-edge).
  * An inset shadow, so it moves nothing and follows the row's radius; focus keeps the kit outline. Plain-text rows keep
  * the pill and take no edge; a Needs-you or Failed row keeps its attention wash and its pill (`MARKER_KEEP`).
  */

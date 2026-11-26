@@ -305,8 +305,9 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     for (const text of [
       '**Selected edge.**',
       '`SELECTED_EDGE`',
-      "  selected-edge: '#88827d'",
-      "  selected-edge-dark: '#7f7974'",
+      "  selected-edge: '#67625d'",
+      "  selected-edge-dark: '#9d9792'",
+      '**Selected edge is not the field edge.**',
       '**Verbs on a head band**',
       '`Button band`: 20% at rest, 26% on hover, 32% pressed',
       '`control-on-dense`, `oklch(0.50 0.01 65)`',

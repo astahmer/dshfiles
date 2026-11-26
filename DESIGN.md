@@ -15,8 +15,9 @@ colors:
   # The quiet trigger's fill as it paints on the page (council round 10 A1: the ink at 5%; 5.2% dark).
   trigger-fill: '#f3f1ef'
   selected-wash: '#ebe9e6'
-  # A glyph-leading selected row's 1px inset edge (council round 12 A1), 3:1 on the wash.
-  selected-edge: '#88827d'
+  # A glyph-leading selected row's 1px inset edge (council round 12 A1), its own value darker than the field edge
+  # (council round 14 A2), 3:1 on the wash.
+  selected-edge: '#67625d'
   # The dense checkbox's checked fill in light (council round 12 A3).
   control-on-dense: '#67625d'
   prompt-fill: '#ecf5fa'
@@ -40,7 +41,7 @@ colors:
   segment-thumb-dark: '#302c28'
   label-secondary-dark: '#a7a4a1'
   selected-wash-dark: '#2a2725'
-  selected-edge-dark: '#7f7974'
+  selected-edge-dark: '#9d9792'
   prompt-fill-dark: '#1a252a'
   wash-needs-you-dark: '#232a42'
   wash-needs-you-band-dark: '#242b3d'
@@ -340,9 +341,12 @@ work on any surface.
    is a glyph, tile or mark draws none either (a status glyph, a project tile, a provider or model mark: the pill sat
    3–5px from it and crowded the leading column); the wash and the 550 title carry the selection, as in Linear and
    Things. **Selected edge.** Such a row adds `selected-edge` beside its wash (council round 12 A1; `SELECTED_EDGE` in
-   `components/selection`): a neutral 1px inset edge, `--dshx-selected-edge` (light `#88827d`, dark `#7f7974`; the
-   council's `#a39b93` held only 2.26:1 on the light wash), 3:1 against the wash on the page, the nav column and a
-   dialog, because the wash alone sits about 1.1:1 off the dark page. An inset shadow, so it moves nothing. **Selected edge only where it is needed.** The current
+   `components/selection`): a neutral 1px inset edge, `--dshx-selected-edge` (light `#67625d` oklch(0.50 0.01 65), dark `#9d9792`
+   oklch(0.68 0.01 65); about 5:1 on the wash), at least 3:1 against the wash on the page, the nav column and a
+   dialog, because the wash alone sits about 1.1:1 off the dark page. **Selected edge is not the field edge.** Since
+   council round 14 A2 it is its own token, a clear step past `--dshx-field-border` (`#88827d` / `#76706c`, about 3.1:1
+   on the wash), so a selected row never reads as a resting text field; text fields keep their 3:1 resting edge
+   (tests/selected-edge). An inset shadow, so it moves nothing. **Selected edge only where it is needed.** The current
    thread row, an account row and the palette's active result take it (council round 13); a row with a place tile (the
    Settings column, the Backlog, Usage and Review rows of the side columns) does not: its tile, wash and 550 title
    already carry the selection. A pill row never does. The kit finds its own leading

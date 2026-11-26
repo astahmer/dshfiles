@@ -56,8 +56,9 @@ export interface Palette {
   /**
    * The selected edge (council round 12 A1): a neutral 1px inset edge on top of the wash, for a selected row that leads
    * with a glyph, tile or mark and so draws no `selected-marker` pill (`dshx:selected-edge`). 3:1 against the wash on the
-   * page, the nav column and a dialog (dark dialogs lift the wash to L 0.30): light oklch(0.61 0.01 65) #88827D (the
-   * council's #A39B93 held 2.26:1), dark oklch(0.58 0.01 65) #7F7974 (the council's #817A73 within one step).
+   * page, the nav column and a dialog (dark dialogs lift the wash to L 0.30). Council round 14 A2: its own value, darker
+   * than the field edge so a selected row never reads as a resting text field: light oklch(0.50 0.01 65), dark
+   * oklch(0.68 0.01 65).
    */
   readonly selectedEdge: Oklch
   /**
@@ -141,8 +142,11 @@ const STATUS_HUES = { success: 150, warning: 80, danger: 25 } as const
  */
 const TRIGGER_FILL_ALPHA = { light: 0.05, dark: 0.052 } as const
 
-/** Where the selected edge starts before it is fitted to 3:1 on the wash (council round 12 A1). */
-const SELECTED_EDGE_L = { light: 0.61, dark: 0.58 } as const
+/**
+ * Where the selected edge starts before it is fitted to 3:1 on the wash (council round 12 A1). Council round 14 A2: its
+ * own value, a clear step past the field edge (light 0.61, dark 0.55), so a selected row never matches a resting field.
+ */
+const SELECTED_EDGE_L = { light: 0.5, dark: 0.68 } as const
 
 /** Default warm-stone input (D1). */
 export const WARM_STONE = { hue: 65, chroma: 0.007, accentHue: 270, contrast: 1 } as const
