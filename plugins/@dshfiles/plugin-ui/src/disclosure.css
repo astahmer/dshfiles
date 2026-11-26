@@ -39,3 +39,52 @@
     }
   }
 }
+
+/*
+ * The disclosure link (council round 15 A3; DESIGN.md › Components): a text control that opens more of the same place
+ * ("More font settings") reads as a link, not a label. The link token (`--dsw-alias-link`, the accent indigo, AA on the
+ * page and nav surfaces in both schemes), 13/18 at 500, no underline at rest (one under the pointer), and a 12px
+ * chevron 4px after the text in the same ink, turned half a turn while open (`aria-expanded="true"` or
+ * `data-state="open"`), still under reduced motion. 44px tall on a coarse pointer. `DisclosureLink`
+ * (components/ui/disclosure-link) draws it; a core control takes `dshx:disclosure-link` with its own label.
+ */
+@utility disclosure-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dsw-alias-link, var(--dsw-alias-state-business-primary));
+  font-size: var(--dshx-density-text-ui, 13px);
+  line-height: 18px;
+  font-weight: 500;
+  text-decoration: none;
+  text-underline-offset: 4px;
+  cursor: pointer;
+  &::after {
+    content: '';
+    flex: none;
+    width: 12px;
+    height: 12px;
+    background-color: currentColor;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E")
+      center / 12px 12px no-repeat;
+    transition: rotate var(--dshx-duration-fade) var(--dshx-motion-ease-enter);
+  }
+  &:is([aria-expanded='true'], [data-state='open'])::after {
+    rotate: 180deg;
+  }
+  &:hover {
+    text-decoration: underline;
+  }
+  @media (pointer: coarse) {
+    min-height: 44px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &::after {
+      transition: none;
+    }
+  }
+}

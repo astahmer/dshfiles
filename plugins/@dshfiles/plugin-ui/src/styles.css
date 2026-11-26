@@ -779,6 +779,7 @@
     [data-slot='toggle'],
     [data-slot='toggle-group-item'],
     [data-slot='radio-group-item'],
+    [data-slot='disclosure-link'],
     [data-slot$='-trigger']
   ):focus-visible:not([aria-invalid='true']):not([role^='menuitem'], [role='option'], [data-slot$='-content']) {
   outline: 2px solid var(--dsw-alias-state-business-primary);
