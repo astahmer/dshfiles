@@ -1484,6 +1484,32 @@ button.crumbEditable {
     background: var(--dsw-specific-input-major);
   }
 
+  /* Council round 22, item 6 (17b): scrolled, the card's edges sliced a row's text in full ink. An 8px fade sticks to
+     each scroll edge, over the rows and under the fold plate; it takes no room, and at rest it lies over the first and
+     last rows' empty 8px padding, so only text scrolling past an edge dissolves (and the peeking row fades out). */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before,
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+    position: sticky;
+    z-index: 2;
+    display: block;
+    flex: none;
+    height: 8px;
+    content: '';
+    pointer-events: none;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before {
+    top: 0;
+    margin-bottom: -8px;
+    background: linear-gradient(180deg, var(--dsw-specific-input-major), color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+    bottom: 0;
+    margin-top: -8px;
+    background: linear-gradient(0deg, var(--dsw-specific-input-major), color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+  }
+
   /* Between rows only: a row after the (hidden or sticky) fold row takes the plate's hairline instead. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview]) ~ :global([data-dshfiles-live-preview]) {
     border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));

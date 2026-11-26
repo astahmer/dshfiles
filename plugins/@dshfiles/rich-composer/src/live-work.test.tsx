@@ -298,6 +298,23 @@ describe('one header for live subagents on a phone (council round 22, item 5)', 
     expect(cap).toMatch(/max-height: calc\(44px \+ 3\.5 \* 54px \+ 3px \+ 2px\);/)
   })
 
+  it('fades rows out over 8px at the card\'s scroll edges, so no row text rests cut by its top or bottom (17b, item 6)', () => {
+    // Scrolled to its end, the card's top edge sliced the third row's model line in full ink.
+    const edges = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::before,\n  ${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::after`)
+    expect(edges).toMatch(/position: sticky;/)
+    expect(edges).toMatch(/height: 8px;/)
+    expect(edges).toMatch(/pointer-events: none;/)
+    const top = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::before`)
+    expect(top).toMatch(/top: 0;/)
+    // No room of its own: at rest it lies over the first row's empty 8px top padding.
+    expect(top).toMatch(/margin-bottom: -8px;/)
+    expect(top).toMatch(/linear-gradient\(180deg, var\(--dsw-specific-input-major\), color-mix\(in srgb, var\(--dsw-specific-input-major\) 0%, transparent\)\)/)
+    const bottom = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::after`)
+    expect(bottom).toMatch(/bottom: 0;/)
+    expect(bottom).toMatch(/margin-top: -8px;/)
+    expect(bottom).toMatch(/linear-gradient\(0deg, var\(--dsw-specific-input-major\), color-mix\(in srgb, var\(--dsw-specific-input-major\) 0%, transparent\)\)/)
+  })
+
   it('keeps the fold row beside running jobs, and its closed state hides the rows behind it', () => {
     const closed = ruleIn(
       NARROW,
