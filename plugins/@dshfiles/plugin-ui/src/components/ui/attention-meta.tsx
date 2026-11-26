@@ -19,10 +19,18 @@ export const ATTENTION_KIND_LABEL = {
 export const ATTENTION_META_NAME_MIN = 8
 
 /**
- * What the line still shows, in drop order: everything; without the age; without the project's name (its mark stays).
- * Past the last step the kind truncates.
+ * What the line still shows, in drop order. `keep="kind"`: everything; without the age; without the project's name (its
+ * mark stays; past it the kind truncates). `keep="name"`: everything; without the age; without the kind (the name
+ * truncates to its floor); the mark alone.
  */
-export type AttentionMetaStep = 'full' | 'no-age' | 'no-name'
+export type AttentionMetaStep = 'full' | 'no-age' | 'no-name' | 'no-kind' | 'mark'
+
+/**
+ * Which word outlasts the other when the line runs short. `kind` (the default): the name goes before the kind (an Inbox
+ * card). `name`: the kind goes before the name, where the row already says the kind with its status glyph and its verb
+ * (the desktop thread list).
+ */
+export type AttentionMetaKeep = 'kind' | 'name'
 
 /** The measured parts of one line, in CSS px. Absent parts are 0. */
 export interface AttentionMetaWidths {
@@ -40,6 +48,8 @@ export interface AttentionMetaWidths {
   readonly sep: number
   /** The mark hangs in a rail: with the name gone, the kind follows the rail without a separator. */
   readonly rail: boolean
+  /** Which word outlasts the other; `kind` when left out. */
+  readonly keep?: AttentionMetaKeep | undefined
 }
 
 /** Sub-pixel rounding slack, so a part that fits exactly is not dropped. */
@@ -47,16 +57,23 @@ const FIT_SLACK = 0.5
 
 /**
  * The drop order (council round 14): the age goes first, then the name truncates down to eight characters, then the
- * name goes and the mark alone names the project. Pure, so each step is testable without layout.
+ * name goes and the mark alone names the project. With `keep: 'name'` the kind goes right after the age, then the name
+ * truncates to its floor, then only the mark is left. Pure, so each step is testable without layout.
  */
 export const attentionMetaStep = (widths: AttentionMetaWidths): AttentionMetaStep => {
-  const { available, lead, name, nameMin, kind, age, sep, rail } = widths
+  const { available, lead, name, nameMin, kind, age, sep, rail, keep = 'kind' } = widths
   const fits = (width: number): boolean => width <= available + FIT_SLACK
   const kindAfter = (nameShown: boolean): number => (kind === 0 ? 0 : kind + (nameShown || (lead > 0 && !rail) ? sep : 0))
   const ageAfter = age === 0 ? 0 : age + sep
   const withName = (nameWidth: number): number => lead + nameWidth + kindAfter(name > 0)
   if (fits(withName(name) + ageAfter)) return 'full'
   if (name === 0) return 'no-age'
+  if (keep === 'name') {
+    if (fits(withName(name))) return 'no-age'
+    const nameFits = fits(lead + Math.min(name, nameMin))
+    if (kind === 0) return nameFits ? 'no-age' : 'no-name'
+    return nameFits ? 'no-kind' : 'mark'
+  }
   if (fits(withName(Math.min(name, nameMin)))) return 'no-age'
   return 'no-name'
 }
@@ -110,6 +127,12 @@ export interface AttentionMetaProps extends Omit<React.ComponentPropsWithoutRef<
   readonly mark?: (Omit<ProjectMarkProps, 'name' | 'size' | 'decorative'> & { readonly [data: `data-${string}`]: string | undefined }) | undefined
   /** Extra classes for the kind (a status ink, a weight). */
   readonly kindClassName?: string | undefined
+  /**
+   * Which word outlasts the other when the line runs short. `kind` (default): age, then name. `name`: age, then the kind,
+   * then the name truncates to its eight-character floor, then only the mark is left; for a row whose status glyph and
+   * verb already say the kind (the desktop thread list).
+   */
+  readonly keep?: AttentionMetaKeep | undefined
 }
 
 const PART = 'data-measure-part'
@@ -126,11 +149,11 @@ const Separator = (): JSX.Element => (
  * The attention meta line (council round 14 A1): `ProjectMark project · kind · age`, one formatter for the thread list,
  * the Inbox and the phone. It measures itself: when the line runs out of room the age goes first, then the project's
  * name truncates, and once fewer than eight of its characters would show, the name goes and the mark alone names the
- * project (the dropped words stay for assistive tech). The line takes its width from its parent (`flex-1`); 12/16 muted
- * by default.
+ * project (the dropped words stay for assistive tech). With `keep="name"` the kind goes right after the age instead.
+ * The line takes its width from its parent (`flex-1`); 12/16 muted by default.
  */
 export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProps>(function AttentionMeta(
-  { project, kind, age, markSeat = 'inline', mark, kindClassName, className, ...props },
+  { project, kind, age, markSeat = 'inline', mark, kindClassName, keep = 'kind', className, ...props },
   forwardedRef,
 ) {
   const rail = markSeat === 'rail'
@@ -168,9 +191,10 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
       age: ageText === undefined ? 0 : part('age'),
       sep: part('sep'),
       rail,
+      keep,
     })
     setStep(current => (current === next ? current : next))
-  }, [name, kindText, ageText, rail])
+  }, [name, kindText, ageText, rail, keep])
 
   React.useLayoutEffect(() => {
     measure()
@@ -181,7 +205,8 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
     return ResizeWatch.observe([line, parts], measure)
   }, [measure, kindClassName])
 
-  const nameShown = name !== undefined && step !== 'no-name'
+  const nameShown = name !== undefined && step !== 'no-name' && step !== 'mark'
+  const kindShown = kindText !== undefined && step !== 'no-kind' && step !== 'mark'
   const ageShown = ageText !== undefined && step === 'full'
   const markElement =
     name === undefined ? null : <ProjectMark {...mark} ref={rail ? undefined : lead} name={name} size="dense" data-attention-meta-part="mark" />
@@ -216,15 +241,17 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
           {name}
         </span>
       ) : (
-        <span className="dshx:sr-only">{rail ? `${name}, ` : name}</span>
+        <span className="dshx:sr-only">{rail || !kindShown ? `${name}, ` : name}</span>
       )}
-      {kindText === undefined ? null : (
+      {kindText === undefined ? null : kindShown ? (
         <>
           {nameShown || (name !== undefined && !rail) ? <Separator /> : null}
           <span data-attention-meta-part="kind" className={cn(kindClass, nameShown ? 'dshx:shrink-0' : 'dshx:min-w-0 dshx:truncate')}>
             {kindText}
           </span>
         </>
+      ) : (
+        <span className="dshx:sr-only">{nameShown ? `, ${kindText}` : kindText}</span>
       )}
       {ageText === undefined ? null : ageShown ? (
         <>

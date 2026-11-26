@@ -91,6 +91,29 @@ describe('attentionMetaStep', () => {
   it('without a project, only the age can go', () => {
     expect(attentionMetaStep({ ...widths, lead: 0, name: 0, nameMin: 0, available: 20 })).toBe('no-age')
   })
+
+  describe('keep: name', () => {
+    const named = { ...widths, keep: 'name' } as const
+    it('drops the age first, as by default', () => {
+      expect(attentionMetaStep({ ...named, available: 166 })).toBe('full')
+      expect(attentionMetaStep({ ...named, available: 142 })).toBe('no-age')
+    })
+    it('then drops the kind with its separator, keeping the name whole', () => {
+      expect(attentionMetaStep({ ...named, available: 141 })).toBe('no-kind')
+      expect(attentionMetaStep({ ...named, available: 82 })).toBe('no-kind')
+    })
+    it('then lets the name truncate to its eight-character floor', () => {
+      expect(attentionMetaStep({ ...named, available: 70 })).toBe('no-kind')
+    })
+    it('then leaves the mark alone', () => {
+      expect(attentionMetaStep({ ...named, available: 69 })).toBe('mark')
+    })
+    it('without a kind, truncates and then drops the name', () => {
+      expect(attentionMetaStep({ ...named, kind: 0, age: 0, available: 82 })).toBe('full')
+      expect(attentionMetaStep({ ...named, kind: 0, age: 0, available: 70 })).toBe('no-age')
+      expect(attentionMetaStep({ ...named, kind: 0, age: 0, available: 69 })).toBe('no-name')
+    })
+  })
 })
 
 describe('AttentionMeta', () => {
@@ -164,6 +187,24 @@ describe('AttentionMeta', () => {
     expect(root.dataset['step']).toBe('no-name')
     expect(shown(root)).toBe('rail kind')
     expect(root.querySelector('[data-attention-meta-part="kind"]')?.className).toContain('dshx:truncate')
+  })
+
+  it('with keep="name" drops the kind before the name, then leaves the mark alone, keeping both words for assistive tech', () => {
+    // In the rail: seat 16, "billing-api" 66, "· Approval" 60.
+    const view = render(<AttentionMeta markSeat="rail" keep="name" project="billing-api" kind={ATTENTION_KIND_LABEL.approval} />)
+    const root = view.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!
+    expect(root.dataset['step']).toBe('full')
+    expect(shown(root)).toBe('rail name sep kind')
+    resize(100)
+    expect(root.dataset['step']).toBe('no-kind')
+    expect(shown(root)).toBe('rail name')
+    expect(root.querySelector('[data-attention-meta-part="name"]')?.textContent).toBe('billing-api')
+    expect([...root.querySelectorAll('.dshx\\:sr-only')].map(node => node.textContent)).toContain(', Approval')
+    resize(69)
+    expect(root.dataset['step']).toBe('mark')
+    expect(shown(root)).toBe('rail')
+    expect(root.querySelector('[data-attention-meta-part="mark"]')).not.toBeNull()
+    expect([...root.querySelectorAll('.dshx\\:sr-only')].map(node => node.textContent)).toEqual(['billing-api, ', 'Approval'])
   })
 
   it('is the 12/16 muted meta step, and takes its width from its parent', () => {
