@@ -98,3 +98,60 @@ describe('Button tint variants (round five K3)', () => {
     }
   })
 })
+
+describe('Button text variants (council round 8 A1)', () => {
+  const textClasses = (variant: 'attention-text' | 'danger-text'): readonly string[] => buttonVariants({ variant }).split(/\s+/)
+  const textAlphas = (variant: 'attention-text' | 'danger-text', status: string): readonly number[] =>
+    textClasses(variant).flatMap(name => {
+      const match = name.match(new RegExp(`^dshx:(hover:|active:)bg-status-${status}/(\\d+)$`))
+      return match ? [Number(match[2]) / 100] : []
+    })
+
+  it('draws the foreground as text on a transparent fill, the tint only on hover and press', () => {
+    render(
+      <>
+        <Button variant="attention-text">Answer</Button>
+        <Button variant="danger-text">Retry</Button>
+      </>,
+    )
+    expect(screen.getByRole('button', { name: 'Answer' }).getAttribute('data-variant')).toBe('attention-text')
+    for (const [variant, status, fg] of [
+      ['attention-text', 'needs-you', 'dshx:text-attention-foreground'],
+      ['danger-text', 'failed', 'dshx:text-danger-tint-foreground'],
+    ] as const) {
+      const names = textClasses(variant)
+      expect(names, variant).toEqual(expect.arrayContaining(['dshx:bg-transparent', fg, `dshx:hover:bg-status-${status}/12`, `dshx:active:bg-status-${status}/18`]))
+      // No fill at rest and no border: the row's wash is the one layer of colour.
+      expect(names.filter(name => /^dshx:(?:dark:)?bg-status-/.test(name)), variant).toEqual([])
+      expect(names.filter(name => /^dshx:(?:dark:)?border(?:$|-)/.test(name)), variant).toEqual([])
+    }
+  })
+
+  it('keeps the height and hit area of `attention` at every size', () => {
+    for (const size of ['default', 'xs', 'sm', 'lg'] as const) {
+      const box = (variant: 'attention' | 'attention-text' | 'danger-text'): readonly string[] =>
+        buttonVariants({ variant, size })
+          .split(/\s+/)
+          .filter(name => /^dshx:(?:has-\[>svg\]:)?(?:h|px|py|size|gap)-/.test(name))
+      expect(box('attention-text'), size).toEqual(box('attention'))
+      expect(box('danger-text'), size).toEqual(box('attention'))
+    }
+  })
+
+  it.each(schemes)('holds AA text at rest, on hover and pressed over its row wash and the plain surfaces (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const pairs = [
+      { variant: 'attention-text', status: 'business', name: 'attention', fg: p.accent.fg, css: 'needs-you', wash: p.needsYouWash },
+      { variant: 'danger-text', status: 'error', name: 'danger-tint', fg: p.danger.fg, css: 'failed', wash: p.failedWash },
+    ] as const
+    for (const pair of pairs) {
+      const text = mixOklab(pair.fg, p.neutral[10]!, inkShare(pair.name, pair.status))
+      const alphas = [0, ...textAlphas(pair.variant, pair.css)]
+      expect(alphas, pair.variant).toHaveLength(3)
+      const unders = { wash: pair.wash, ...Object.fromEntries(Object.entries(surfaces).map(([name, step]) => [name, p.neutral[step]!])) }
+      for (const alpha of alphas)
+        for (const [surface, under] of Object.entries(unders))
+          expect(PaletteMath.contrastRatio(text, composite(under, pair.fg, alpha)), `${pair.variant} at ${alpha} over ${surface}`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+})

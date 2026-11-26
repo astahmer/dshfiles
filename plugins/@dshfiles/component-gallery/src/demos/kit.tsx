@@ -240,7 +240,7 @@ export const kitDemos: readonly GalleryDemo[] = [
   {
     id: 'kit-button',
     title: 'Button',
-    description: 'One black primary per page; outline in headers, ghost in rows, the attention tint on a row verb that waits on you.',
+    description: 'One black primary per page; outline in headers, ghost in rows, the attention tint on a row verb that waits on you, its text rung on a row that already carries a wash.',
     source: "import { Button } from '@dshfiles/plugin-ui/components/ui/button'",
     static: true,
     render: () => (
@@ -260,6 +260,12 @@ export const kitDemos: readonly GalleryDemo[] = [
         </Button>
         <Button size="xs" variant="danger-tint">
           Retry
+        </Button>
+        <Button size="xs" variant="attention-text">
+          Answer
+        </Button>
+        <Button size="xs" variant="danger-text">
+          Open
         </Button>
         <Button size="sm" variant="outline">
           Small

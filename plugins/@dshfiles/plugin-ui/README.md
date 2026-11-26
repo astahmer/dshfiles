@@ -132,6 +132,12 @@ text is the status colour pulled 30% toward the ink, so it holds AA on its own t
 that is not a button uses the same pair: `bg-attention-tint text-attention-foreground`, `bg-danger-tint
 text-danger-tint-foreground`. Neither is a page primary: that stays the one ink button.
 
+On a row that already carries an attention wash (a Needs-you or Failed thread row), the verb is the text rung,
+`variant="attention-text"` or `variant="danger-text"`: the same foreground on a transparent fill, the 12% tint only on
+hover and 18% pressed, so the row shows one layer of colour. Same sizes and hit area as `attention`; AA at rest, hover and
+press over the row wash and every surface (`tests/button-tint.test.tsx`). Inbox CTAs (card heads, phone full-width verbs)
+keep the filled tint.
+
 **Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
 filter, a project picker) is `Button` `variant="field"`: the `SelectTrigger` look (`fieldLook`: field boundary, page fill,
 8px), the value in ink at 400, its chevron in secondary ink, no hover fill. A filter row then shows one field edge:

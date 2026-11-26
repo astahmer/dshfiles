@@ -35,6 +35,14 @@ const buttonVariants = cva(
         /** The same tint rung in the danger pair, for a failed row's recovery verb (Retry, Open). */
         'danger-tint': 'dshx:bg-status-failed/12 dshx:text-danger-tint-foreground dshx:hover:bg-status-failed/18 dshx:active:bg-status-failed/24',
         /*
+         * The same verbs on a row that already carries an attention wash (council round 8 A1: one layer of colour): the
+         * foreground as text on a transparent fill, the 12% tint only on hover and 18% pressed. Same sizes, so the
+         * height and hit area match `attention`.
+         */
+        'attention-text':
+          'dshx:bg-transparent dshx:text-attention-foreground dshx:hover:bg-status-needs-you/12 dshx:active:bg-status-needs-you/18',
+        'danger-text': 'dshx:bg-transparent dshx:text-danger-tint-foreground dshx:hover:bg-status-failed/12 dshx:active:bg-status-failed/18',
+        /*
          * A popover trigger that shows a value, not an action (council round 7 A4: a date range, a purpose, a project
          * picker): the field look of `SelectTrigger` (field boundary, page fill, 8px), the value in ink at the body weight
          * and its chevron in secondary ink, so a filter row never mixes the field edge with the quiet button edge. No
