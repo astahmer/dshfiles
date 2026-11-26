@@ -772,10 +772,11 @@ describe('DestinationShell', () => {
     expect(search.parentElement?.className).toContain('dshx:gap-2')
     expect(search.parentElement?.className).toContain('dshx:pb-1.5')
     expect(ListHeaderExtras.get().scopeSlot).toBe(seat)
-    // The toolbar band measures 48px (council round 11 B2): the list starts 4px under the top bar's rule when it leads
-    // with this row, instead of the 12px other lists keep.
+    // The search stands 8pt under the top bar's rule, as Inbox's and Settings' first controls do (council round 19 B4;
+    // 4pt read as pressed against it), instead of the 12px other lists keep.
     expect(search.parentElement?.hasAttribute('data-threads-toolbar')).toBe(true)
-    expect(list?.className).toContain('dshx:has-[[data-threads-toolbar]]:pt-1')
+    expect(list?.className).toContain('dshx:has-[[data-threads-toolbar]]:pt-2')
+    expect(list?.className).not.toContain('dshx:has-[[data-threads-toolbar]]:pt-1')
     cleanup()
     // A desktop column keeps the list's own project and Filter row: no seat.
     setPhone(false)

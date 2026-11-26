@@ -1948,8 +1948,9 @@ const PhoneNavigation = (
             // (council round 18 B2.1): Threads sits on the stage as Inbox and Settings do, and the list's own sidebar
             // fills (its root, sticky group headers, a swiped row's backing) resolve to that canvas here.
             'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:surface-stage dshx:[--dsw-specific-sidebar-fill:var(--dshx-surface-stage)] dshx:pt-3 dshx:text-foreground',
-            // The Threads toolbar band measures 48px (council round 11 B2): 4px under the rule, then the 44px search row.
-            'dshx:has-[[data-threads-toolbar]]:pt-1',
+            // The Threads toolbar band (council round 11 B2): the 44px search row 8px under the rule, the inset Inbox's
+            // and Settings' first controls keep (council round 19 B4).
+            'dshx:has-[[data-threads-toolbar]]:pt-2',
             // The frame's status pill row (44px, just above the tab bar) stays visible under a full-screen list: the list
             // ends above it whenever the frame draws it (round five, lane C asked), and covers it while the keyboard is up.
             'dshx:[html:not([data-phone-keyboard]):has([data-status-strip=compact])_&]:[--phone-list-status-room:44px]',
