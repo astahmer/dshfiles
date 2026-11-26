@@ -54,12 +54,29 @@ describe('dense checkbox ink (council round 12 A3)', () => {
     expect(classes(box)).not.toContain('dshx:data-[state=checked]:border-control-on')
   })
 
-  it('is oklch(0.50 0.01 65) in light, from the ink\'s own hue (council round 13 A1); dark keeps the dark on state', () => {
+  it('is oklch(0.50 0.01 65) in light, from the ink\'s own hue (council round 13 A1)', () => {
     expect(roles).toContain('--color-control-on-dense: var(--dshx-control-on-dense, var(--dshx-control-on, var(--dsw-alias-label-primary)));')
     expect(block('  body')).toContain('--dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.5 calc(c * 4) h);')
-    expect(block('  body[data-ds-dark-theme]')).toContain('--dshx-control-on-dense: var(--dshx-control-on);')
     const ink = PaletteMath.palette({ ...WARM_STONE, scheme: 'light' }).neutral[10]!
     expect({ l: 0.5, c: Number((ink.c * 4).toFixed(4)), h: ink.h }).toEqual({ l: 0.5, c: 0.01, h: 65 })
+  })
+
+  it('is oklch(0.68 0.008 65) in dark, from the ink\'s own hue, under the dark tick (council round 14 A3)', () => {
+    expect(block('  body[data-ds-dark-theme]')).toContain('--dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.68 calc(c * 1.6) h);')
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' })
+    const ink = p.neutral[10]!
+    const fill = { l: 0.68, c: Number((ink.c * 1.6).toFixed(4)), h: ink.h }
+    expect(fill).toEqual({ l: 0.68, c: 0.008, h: 65 })
+    // The box holds 3:1 on every dark surface it sits on, a dialog's lifted fill included.
+    for (const [surface, under] of Object.entries({ bg: p.neutral[0]!, panel: p.neutral[1]!, raised: p.neutral[2]!, selected: p.selectedWash, nav: p.navSurface, dialog: { l: 0.3, c: 0.006, h: 60 } }))
+      expect(PaletteMath.contrastRatio(fill, under), `fill on ${surface}`).toBeGreaterThanOrEqual(3)
+    // The tick is the dark inverse ink (`control-on-foreground`, step 0), 4.5:1 on the fill.
+    const box = render(<Checkbox aria-label="Show gpt-6-luna in the picker" size="sm" checked />).getByRole('checkbox')
+    expect(classes(box)).toContain('dshx:data-[state=checked]:text-control-on-foreground')
+    // The dark variant of the default fill outranks a plain one, so the dense box names its own dark fill.
+    expect(classes(box)).toContain('dshx:dark:data-[state=checked]:bg-control-on-dense')
+    expect(classes(box)).not.toContain('dshx:dark:data-[state=checked]:bg-control-on')
+    expect(PaletteMath.contrastRatio(p.neutral[0]!, fill), 'tick on the fill').toBeGreaterThanOrEqual(4.5)
   })
 
   it('holds the fill at 3:1 on bg, panel, raised, nav and the selection wash and the white tick at 4.5:1 on it (light)', () => {

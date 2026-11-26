@@ -20,6 +20,8 @@ colors:
   selected-edge: '#67625d'
   # The dense checkbox's checked fill in light (council round 12 A3).
   control-on-dense: '#67625d'
+  # The dense checkbox's checked fill in dark (council round 14 A3).
+  control-on-dense-dark: '#9c9793'
   prompt-fill: '#ecf5fa'
   wash-needs-you: '#e1e9ff'
   wash-failed: '#ffe4e1'
@@ -743,7 +745,9 @@ edges use it too. A checkbox column in a dense table (AI accounts' "Show model")
 round 11 A5): the same 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke, no shadow; in light its
 checked fill is `control-on-dense`, `oklch(0.50 0.01 65)` (`#67625d`, council round 13 A1; 0.38 in round 12) with a
 white tick, so a column of checked boxes reads as light marks, not dark squares (3:1 on bg, nav, raised and the selected
-wash, the tick 4.5:1 on it); dark keeps the on state. Dividers and card hairlines stay `border-border`, subtle. **Quiet triggers** (council round 10 A1).
+wash, the tick 4.5:1 on it). In dark it is `oklch(0.68 0.008 65)` (`#9c9793`, council round 14 A3) under the dark
+inverse-ink tick, below the 0.82 on state so the column stops glaring (the box 4.7:1 on a dialog and more elsewhere,
+the tick 6.5:1). Dividers and card hairlines stay `border-border`, subtle. **Quiet triggers** (council round 10 A1).
 A control that opens a list and shows a value, the `Select` and `Combobox` triggers, `Button` `variant="field"` and the
 `select-look` utility (a Host select the kit does not draw), shares `triggerLook`: a filled chip, `bg-trigger-fill`
 (the ink at 5%, 5.2% dark, so `#f3f1ef` / `#201d1a` on the page and one visible step on a panel, the nav column, raised

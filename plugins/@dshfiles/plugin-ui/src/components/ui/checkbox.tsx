@@ -9,7 +9,7 @@ import { Checkbox as CheckboxPrimitive } from 'radix-ui'
  * checked boxes reads as small crisp marks. `default` keeps the 14px tick and the shadow. The dense box fills at
  * `control-on-dense`: oklch(0.50 0.01 65) in light since council round 13 A1 (was 0.38), well off the near-black ink so
  * a column of checked boxes stops reading as dark squares, with a white tick (still 3:1 on every surface, the tick
- * 4.5:1 on it); dark is unchanged.
+ * 4.5:1 on it). In dark it is oklch(0.68 0.008 65) under the dark tick since council round 14 A3 (was the 0.82 on state).
  */
 function Checkbox({ className, size = 'default', ...props }: React.ComponentProps<typeof CheckboxPrimitive.Root> & { readonly size?: 'default' | 'sm' }) {
   const dense = size === 'sm'
@@ -20,7 +20,8 @@ function Checkbox({ className, size = 'default', ...props }: React.ComponentProp
       className={cn(
         'dshx:peer dshx:size-4 dshx:shrink-0 dshx:rounded-sm dshx:border dshx:border-field-border dshx:transition-[background-color,border-color,box-shadow] dshx:duration-(--dshx-duration-fade) dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:data-[state=checked]:border-control-on dshx:data-[state=checked]:bg-control-on dshx:data-[state=checked]:text-control-on-foreground dshx:dark:bg-input/30 dshx:dark:aria-invalid:ring-destructive/40 dshx:dark:data-[state=checked]:bg-control-on',
         !dense && 'dshx:shadow-xs',
-        dense && 'dshx:data-[state=checked]:border-control-on-dense dshx:data-[state=checked]:bg-control-on-dense',
+        dense &&
+          'dshx:data-[state=checked]:border-control-on-dense dshx:data-[state=checked]:bg-control-on-dense dshx:dark:data-[state=checked]:bg-control-on-dense',
         className,
       )}
       {...props}

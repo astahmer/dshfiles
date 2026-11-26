@@ -413,7 +413,12 @@
      */
     --dshx-control-on: oklch(from var(--dsw-alias-label-primary) 0.82 c h);
     --dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);
-    --dshx-control-on-dense: var(--dshx-control-on);
+    /*
+     * `Checkbox size="sm"` in dark (council round 14 A3): oklch(0.68 0.008 65) on warm stone, below the 0.82 on state so
+     * a column of checked boxes stops glaring, under the dark inverse-ink tick (6.5:1); the fill holds 4.7:1 on a dialog
+     * and more on every other surface (tests/checkbox-size).
+     */
+    --dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.68 calc(c * 1.6) h);
     /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
     --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
     /* A band verb's text (council round 12 A2): half ink in dark, where a 32% fill lifts the band toward the text. */
