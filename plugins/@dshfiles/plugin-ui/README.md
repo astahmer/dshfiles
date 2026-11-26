@@ -161,8 +161,11 @@ override a Combobox trigger's height.
 **Selection: the selected wash and marker.** A selection is a neutral wash: `bg-selected-wash`
 (`--dshx-selected-wash`, a warm grey step with no accent hue: light `oklch(0.935 0.004 80)`, dark
 `oklch(0.275 0.006 60)`) with ink text (`text-foreground`), so indigo means attention only. A selected list row, nav
-item or palette row adds `selected-marker`, a 2px ink bar (`--dsw-alias-label-primary`) inset on the leading edge (an
-inset shadow, so it follows a rounded row), and its title at `font-selected` (550). The active underline tab draws a
+item or palette row adds `selected-marker`, a straight 3 x 16px ink pill (`--dsw-alias-label-primary`, radius full) 3px
+from the leading edge and centred on the row's height (council round 10 A2: background layers, so it needs no
+positioned row and never bends with a rounded corner), and its title at `font-selected` (550). A row whose `place-seat`
+tile already shows the selection (`PlaceGlyph` in a selected row) draws no marker; a seat with `data-selected="false"`
+gives it back. The active underline tab draws a
 2px ink bar too (council round 7 A1), like the window tab strip; the checked switch, checkbox and radio fill
 `control-on`, the ink, with the tick or knob in `control-on-foreground`. Indigo is attention, the focus ring and links. The kit applies wash and marker to the selected
 `EntityRow` and the highlighted `CommandItem`, and the wash alone to a pressed `Toggle`/`ToggleGroupItem`; use the same

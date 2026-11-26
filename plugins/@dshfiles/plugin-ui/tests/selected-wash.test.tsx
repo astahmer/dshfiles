@@ -87,11 +87,20 @@ describe('selected wash (round five K2, quieter in A1, neutral in council round 
     expect(toggle.join(' ')).not.toContain('data-[state=on]:bg-accent')
   })
 
-  it('marks a selection without colour: a 2px ink bar inset on the leading edge, and 550 text', () => {
-    const marker = /@utility selected-marker\s*\{([^}]*)\}/u.exec(roles)?.[1] ?? ''
-    // Indigo means attention only (council round 6 A1): the bar is the ink, never the accent.
-    expect(marker).toContain('box-shadow: inset 2px 0 0 var(--dsw-alias-label-primary);')
+  it('marks a selection without colour: a straight 3 x 16px ink pill 3px from the leading edge, and 550 text', () => {
+    const marker = /@utility selected-marker\s*\{([\s\S]*?)\n\}/u.exec(roles)?.[1] ?? ''
+    // Council round 10 A2: never an inset shadow, which bends with the row's rounded corner.
+    expect(marker).not.toMatch(/box-shadow/u)
+    // A 3 x 13 body and two 3px round caps centred 6.5px above and below the middle: 16px tall, radius full, 3px in.
+    expect(marker).toMatch(/background-size:\s*3px 13px,\s*3px 3px,\s*3px 3px;/u)
+    expect(marker).toMatch(/background-position:\s*3px 50%,\s*3px calc\(50% - 6\.5px\),\s*3px calc\(50% \+ 6\.5px\);/u)
+    expect(marker).toContain('background-repeat: no-repeat;')
+    expect(marker.match(/radial-gradient\(circle closest-side, var\(--dsw-alias-label-primary\)/gu)).toHaveLength(2)
+    // Indigo means attention only (council round 6 A1): the pill is the ink, never the accent.
+    expect(marker).toContain('linear-gradient(var(--dsw-alias-label-primary), var(--dsw-alias-label-primary))')
     expect(marker).not.toContain('business')
+    // Where a place glyph's tile already shows the selection, no marker (a seat may opt out with data-selected=false).
+    expect(marker).toContain(`&:not(:has([class*='place-seat']:not([data-selected='false'])))`)
     expect(roles).toContain('--font-weight-selected: 550;')
     // An unselected row draws neither.
     const view = render(<EntityRow heading="Fix invoice tax rounding" onSelect={() => undefined} />)

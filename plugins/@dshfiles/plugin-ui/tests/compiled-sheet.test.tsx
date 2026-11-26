@@ -54,3 +54,18 @@ describe('Toggle label', () => {
     expect(rule(compiler.build(classes), 'dshx:leading-none')).toContain('line-height: 1;')
   })
 })
+
+describe('selection marker in the compiled sheet (council round 10 A2)', () => {
+  it('compiles under a group variant as a pill that skips rows whose place tile shows the selection', () => {
+    const name = 'dshx:group-data-[selected=true]/row:selected-marker'
+    const sheet = compiler.build([name, 'dshx:selected-marker'])
+    for (const selector of [escape('dshx:selected-marker'), escape(name)]) {
+      const at = sheet.indexOf(`.${selector}`)
+      expect(at, selector).toBeGreaterThanOrEqual(0)
+      const body = sheet.slice(at, sheet.indexOf('}', at))
+      expect(body).toMatch(/:not\(:has\(\[class\*='place-seat'\]:not\(\[data-selected='false'\]\)\)\)/u)
+      expect(body).toContain('background-size: 3px 13px, 3px 3px, 3px 3px;')
+      expect(body).not.toContain('box-shadow')
+    }
+  })
+})
