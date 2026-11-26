@@ -128,6 +128,12 @@ export interface AttentionMetaProps extends Omit<React.ComponentPropsWithoutRef<
   readonly markSeat?: 'inline' | 'rail' | undefined
   /** How the mark is painted: the owner's `tone`, `color` and `palette`, plus any data attribute. */
   readonly mark?: (Omit<ProjectMarkProps, 'name' | 'size' | 'decorative'> & { readonly [data: `data-${string}`]: string | undefined }) | undefined
+  /**
+   * The kind drawn richer than its words, in place of `kind` on screen and in the measure (a children count whose
+   * failed clause carries its cross and ink, council round 23 item 2). `kind` stays required for it: assistive tech
+   * hears `kind` when the kind is dropped.
+   */
+  readonly kindContent?: React.ReactNode
   /** Extra classes for the kind (a status ink, a weight). */
   readonly kindClassName?: string | undefined
   /**
@@ -163,7 +169,7 @@ const Separator = (): JSX.Element => (
  * truncate): the line never cuts the mark inside a tinted or bordered row (council round 15 A1).
  */
 export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProps>(function AttentionMeta(
-  { project, kind, age, markSeat = 'inline', mark, kindClassName, kindMark, keep = 'kind', className, ...props },
+  { project, kind, kindContent, age, markSeat = 'inline', mark, kindClassName, kindMark, keep = 'kind', className, ...props },
   forwardedRef,
 ) {
   const rail = markSeat === 'rail'
@@ -213,7 +219,7 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
     if (line === null || parts === null) return undefined
     // The layer resizes when the web font arrives; the line when its column does.
     return ResizeWatch.observe([line, parts], measure)
-  }, [measure, kindClassName])
+  }, [measure, kindClassName, kindContent])
 
   const nameShown = name !== undefined && step !== 'no-name' && step !== 'mark'
   const kindShown = kindText !== undefined && step !== 'no-kind' && step !== 'mark'
@@ -264,11 +270,11 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
           {nameShown || (name !== undefined && !rail) ? <Separator /> : null}
           <span data-attention-meta-part="kind" className={cn(kindClass, nameShown ? 'dshx:shrink-0' : 'dshx:min-w-0 dshx:truncate')}>
             {kindGlyph === null ? (
-              kindText
+              (kindContent ?? kindText)
             ) : (
               <>
                 {kindGlyph}
-                <span className="dshx:min-w-0 dshx:truncate">{kindText}</span>
+                <span className="dshx:min-w-0 dshx:truncate">{kindContent ?? kindText}</span>
               </>
             )}
           </span>
@@ -303,7 +309,7 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
           {kindText === undefined ? null : (
             <span data-measure-part="kind" className={cn(kindClass, 'dshx:shrink-0')}>
               {kindGlyph}
-              {kindText}
+              {kindContent ?? kindText}
             </span>
           )}
           {ageText === undefined ? null : (

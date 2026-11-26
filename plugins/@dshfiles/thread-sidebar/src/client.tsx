@@ -56,7 +56,8 @@ import { IconPinFillRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-p
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
-import { workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
+import { WORK_COUNT_SEPARATOR, workCountLabel, workCountParts } from '@dshfiles/plugin-ui/lib/work-count'
+import { WorkCountText } from '@dshfiles/plugin-ui/components/work-count'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { LEADING_GLYPH_ATTRIBUTE, MARKER_KEEP } from '@dshfiles/plugin-ui/components/selection'
 import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
@@ -885,6 +886,8 @@ const ChildThreadList = (props: {
           ? (childStatus.detail ?? t(workStatusLabelKeys.failed))
           : t(workStatusLabelKeys[childStatus.status])
     const lineOneWord = route === undefined && stateWord !== undefined
+    // "Turn failed" reads in the failed ink, as the parent's failed count does (council round 23, item 2).
+    const stateInk = childStatus?.status === 'failed' ? 'dshx:text-destructive' : undefined
     return (
       <li key={child.id}>
         <button
@@ -939,7 +942,11 @@ const ChildThreadList = (props: {
           >
             {subagentRowTitle(child)}
           </span>
-          {!lineOneWord ? null : <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{stateWord}</span>}
+          {!lineOneWord ? null : (
+            <span className={cn('dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground', stateInk)} data-thread-child-state="">
+              {stateWord}
+            </span>
+          )}
           {attentionLabel === undefined ? null : (
             <span
               className={cn(
@@ -963,7 +970,7 @@ const ChildThreadList = (props: {
                   <span aria-hidden="true" className="dshx:shrink-0">
                     ·
                   </span>
-                  <span className="dshx:shrink-0 dshx:whitespace-nowrap" data-thread-child-state="">
+                  <span className={cn('dshx:shrink-0 dshx:whitespace-nowrap', stateInk)} data-thread-child-state="">
                     {stateWord}
                   </span>
                 </>
@@ -1606,6 +1613,20 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   // round 14 B1): `[mark] project · kind`, the mark on the rail under the status glyph, the name whole or dropped,
   // never cut to a stub. Without the project preference the mark keeps its own seat and the line names only the kind.
   const metaKind = liveStep === undefined ? (attentionKind ?? statusDetail) : undefined
+  // A children count draws its failed clause with the cross and the failed ink, as every surface does (council round
+  // 23, item 2): `[BA] billing-api · 6 working · ✕ 1 failed`.
+  const countParts = workStatus?.childCounts === undefined ? undefined : workCountParts(workStatus.childCounts, subagentCountWords(t))
+  const metaCount = metaKind !== undefined && metaKind === workStatus?.detail && countParts !== undefined ? <WorkCountText parts={countParts} /> : undefined
+  // A running parent's count keeps the shimmer on its routine clauses; the failed clause follows in its own ink.
+  const liveCount = liveStep !== undefined && liveStep === workStatus?.detail ? countParts : undefined
+  const liveProblems = liveCount?.filter(part => part.tone !== 'plain') ?? []
+  const liveStepText =
+    liveCount === undefined || liveProblems.length === 0
+      ? liveStep
+      : liveCount
+          .filter(part => part.tone === 'plain')
+          .map(part => part.text)
+          .join(WORK_COUNT_SEPARATOR)
   const metaRail = metaKind !== undefined && showProject
   // A desktop attention row keeps the project's name before the kind: its status glyph and its verb already say the
   // kind, and the sidebar is too narrow for both beside the verb. The phone list has room for both, and a working
@@ -2042,6 +2063,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       markSeat={metaRail ? 'rail' : 'inline'}
                       project={metaRail ? props.workspaceTitle : undefined}
                       kind={metaKind}
+                      kindContent={metaCount}
                       keep={metaKeep}
                       data-keep={metaKeep}
                       mark={{
@@ -2052,12 +2074,13 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       }}
                     />
                   )}
-                  {liveStep === undefined ? null : (
+                  {liveStepText === undefined ? null : (
                     <LiveActivityLine
                       active={nearViewport}
                       // With the time column off, the clock stays beside the step.
                       startedAt={rowStyle.time ? undefined : liveStartedAt}
-                      step={liveStep}
+                      step={liveStepText}
+                      after={liveProblems.length === 0 ? undefined : <WorkCountText leadingSeparator parts={liveProblems} className="dshx:-ml-1 dshx:shrink-0" />}
                       className="dshx:min-w-0 dshx:flex-1"
                     />
                   )}

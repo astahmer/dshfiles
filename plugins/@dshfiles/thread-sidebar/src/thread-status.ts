@@ -105,6 +105,11 @@ export interface ThreadStatus {
   readonly group: ThreadStatusGroup
   /** Short detail beside the title: why it needs you, or what the subagents are doing. */
   readonly detail: string | undefined
+  /**
+   * The children the detail counts when it is the count formula (`6 working · 1 failed`), so a row can draw the failed
+   * clause with its cross and ink (council round 23, item 2); absent for any other detail.
+   */
+  readonly childCounts?: { readonly working: number; readonly failed: number } | undefined
   /** The one inline verb the row offers, when it needs you. */
   readonly verb: RowInlineVerb | undefined
   /** The inbox item the verb acts on, when the verb came from the inbox. */
@@ -234,15 +239,18 @@ const statusOf = (
       since: Math.max(...failed.map(child => child.since)),
     }
   } else if ((own.status === 'idle' || own.status === 'ready') && working.length > 0) {
+    const childCounts = { working: working.length, failed: failedChildren }
     rolled = {
       status: 'working',
-      detail: copy.childrenWorking({ working: working.length, failed: failedChildren }),
+      detail: copy.childrenWorking(childCounts),
+      childCounts,
       verb: undefined,
       itemId: undefined,
       since: own.since,
     }
   } else if (own.status === 'working' && working.length > 0 && own.detail === undefined) {
-    rolled = { ...own, detail: copy.childrenWorking({ working: working.length, failed: failedChildren }) }
+    const childCounts = { working: working.length, failed: failedChildren }
+    rolled = { ...own, detail: copy.childrenWorking(childCounts), childCounts }
   }
   return { ...rolled, group: input.draft === true && !input.pinned ? 'draft' : groupOf(rolled.status, input.pinned) }
 }

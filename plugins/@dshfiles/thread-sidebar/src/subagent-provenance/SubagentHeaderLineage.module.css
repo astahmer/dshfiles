@@ -96,10 +96,6 @@
 }
 
 /* The chip's failed clause (`6 working · 1 failed`) in the transcript group's failed ink (council round 22, item 3). */
-.countFailed {
-  color: var(--dsw-alias-state-error-primary);
-}
-
 .switcherTrigger:hover,
 .switcherTrigger:focus-visible {
   color: var(--dsw-alias-label-primary);

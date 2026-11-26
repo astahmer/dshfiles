@@ -7,6 +7,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Tooltip as NativeTooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
+import { WorkCountText } from '@dshfiles/plugin-ui/components/work-count'
 import { StatusGlyph, type StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
@@ -648,14 +649,8 @@ function CatalogDropdown({
               </span>
             )}
             <span className={css.count}>
-              {countParts.length === 0
-                ? countLabel
-                : countParts.map((part, index) => (
-                    <span key={part.key} className={part.tone === 'failed' ? css.countFailed : undefined}>
-                      {index === 0 ? '' : WORK_COUNT_SEPARATOR}
-                      {part.text}
-                    </span>
-                  ))}
+              {/* The failed clause leads with its cross in the failed ink, as on every surface (council round 23, item 2). */}
+              {countParts.length === 0 ? countLabel : <WorkCountText parts={countParts} />}
             </span>
           </>
         )}

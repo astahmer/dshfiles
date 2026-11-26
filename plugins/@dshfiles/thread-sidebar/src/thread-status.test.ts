@@ -196,7 +196,7 @@ describe('thread status', () => {
     expect(ThreadStatusModel.statusOf(input({ running: true }), [failedChild], COPY)).toMatchObject({ status: 'failed', detail: '1 subagent failed', itemId: 'c' })
     expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild], COPY)).toMatchObject({ status: 'working', detail: '1 working' })
     // The one count formula (council round 22, item 3): a child whose own turn failed is named, never lifted.
-    expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild, workingChild], COPY, 1)).toMatchObject({ status: 'working', detail: '2 working · 1 failed' })
+    expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild, workingChild], COPY, 1)).toMatchObject({ status: 'working', detail: '2 working · 1 failed', childCounts: { working: 2, failed: 1 } })
     expect(ThreadStatusModel.statusOf(input({ running: true }), [workingChild], COPY, 2)).toMatchObject({ status: 'working', detail: '1 working · 2 failed' })
     // A parent that already needs you keeps its own reason.
     expect(ThreadStatusModel.statusOf(input({ labels: ['threadSidebarApprovalNeeded'] }), [failedChild]).verb).toBe('Approve')

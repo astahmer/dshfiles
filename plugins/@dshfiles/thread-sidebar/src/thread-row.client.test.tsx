@@ -532,6 +532,57 @@ describe('a subagent row under its parent', () => {
     expect(working?.textContent).toBe('gpt-6-luna')
   })
 
+  it('says "Turn failed" in the failed ink on either line, and Needs you in the muted one (council round 23, item 2)', async () => {
+    const routed = rowSession({
+      id: SessionId('child-routed'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/claude-sonnet-5-5', subagent: { mode: 'continuable', label: 'Diff', seq: SessionSeq(3) } },
+    })
+    const unrouted = rowSession({ id: SessionId('child-unrouted'), parentId: SessionId('s1'), origin: 'subagent' })
+    const asking = rowSession({
+      id: SessionId('child-asking'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna', subagent: { mode: 'continuable', label: 'Ask', seq: SessionSeq(4) } },
+    })
+    const row = await renderRow({
+      childThreads: [routed, unrouted, asking],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+      childStatuses: new Map([
+        [routed.id, rowStatus({ status: 'failed', detail: 'Turn failed' })],
+        [unrouted.id, rowStatus({ status: 'failed', detail: 'Turn failed' })],
+        [asking.id, rowStatus({ status: 'needs-you' })],
+      ]),
+    })
+    const word = (id: string): HTMLElement | null => row.querySelector<HTMLElement>(`ul [data-thread-id="${id}"] [data-thread-child-state]`)
+    const words = [word('child-routed'), word('child-unrouted'), word('child-asking')]
+    expect(words.map(state => state?.textContent)).toEqual(['Turn failed', 'Turn failed', 'threadSidebarStateNeedsYou'])
+    expect(words.map(state => state?.className.includes('dshx:text-destructive'))).toEqual([true, true, false])
+    expect(words[1]?.className).not.toContain('dshx:text-muted-foreground')
+  })
+
+  it('draws a parent\'s failed child count with its cross in the failed ink, finished or running (council round 23, item 2)', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const workStatus = rowStatus({ status: 'working', detail: '6 working · 1 failed', childCounts: { working: 6, failed: 1 } })
+    for (const running of [false, true]) {
+      const row = await renderRow({ session: rowSession({ running }), childThreads: [child], workStatus })
+      const line = row.querySelector<HTMLElement>('[data-thread-where]')
+      const onScreen = (selector: string): HTMLElement[] =>
+        Array.from(line?.querySelectorAll<HTMLElement>(selector) ?? []).filter(part => part.closest('[data-attention-meta-measure]') === null)
+      const failed = onScreen('[data-work-count-tone="failed"]')
+      expect(failed.map(part => part.textContent)).toEqual(['threadSidebarFailedCount'])
+      expect(failed[0]?.className).toContain('dshx:text-destructive')
+      expect(failed[0]?.firstElementChild?.getAttribute('data-status')).toBe('failed')
+      // The working clause keeps the line's ink (and, running, the shimmer).
+      expect(line?.textContent).toContain('threadSidebarWorkingCount')
+      expect(onScreen('[data-work-count-tone="plain"] [data-status]')).toEqual([])
+      cleanup()
+    }
+  })
+
   it('starts an unknown-family model on the same edge as a marked one: an empty 16 px seat (round 21 D5)', async () => {
     const child = rowSession({
       id: SessionId('child-unknown'),

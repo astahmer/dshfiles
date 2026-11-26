@@ -311,12 +311,15 @@ describe('SubagentHeaderLineage route provenance', () => {
     expect(row.textContent).toContain('1m 05s')
   })
 
-  it('reads `N working · M failed` with the failed clause in failed ink (council round 22, item 3)', () => {
+  it('reads `N working · ✕ M failed`: the failed clause leads with its cross, in failed ink (council round 23, item 2)', () => {
     const state = sessionListWithRunningSubagents()
     failedTurns.set('child-3', { sessionId: 'child-3', failedAt: 1, reason: 'error' })
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(state)} />)
     const trigger = screen.getByRole('button', { name: '2 working · 1 failed' })
-    const failed = [...trigger.querySelectorAll('span')].find(span => span.textContent === ' · 1 failed')
-    expect(failed?.className).toMatch(/countFailed/)
+    const failed = trigger.querySelector('[data-work-count-tone="failed"]')
+    expect(failed?.textContent).toBe('1 failed')
+    expect(failed?.className).toContain('dshx:text-destructive')
+    expect(failed?.firstElementChild?.getAttribute('data-status')).toBe('failed')
+    expect(trigger.querySelector('[data-work-count-tone="plain"]')?.textContent).toBe('2 working')
   })
 })

@@ -3,7 +3,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useQuery } from '@dshfiles/plugin-ui/query'
-import { memo, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { threadSidebarLiveTurnsApi } from './live-turns-api.js'
 
 /**
@@ -34,7 +34,14 @@ const shimmerDelay = (): string => `-${String(Math.round(('performance' in globa
  * spinner glyph says Working; the shimmer only shows it is live.
  */
 export const LiveActivityLine = memo(
-  (props: { readonly step: string; readonly startedAt: number | undefined; readonly active: boolean; readonly className?: string }): JSX.Element => {
+  (props: {
+    readonly step: string
+    readonly startedAt: number | undefined
+    readonly active: boolean
+    readonly className?: string
+    /** Drawn after the step without the shimmer, before the clock: a children count's failed clause in its own ink. */
+    readonly after?: ReactNode
+  }): JSX.Element => {
     const phase = useMemo((): CSSProperties & { readonly '--dshx-live-shimmer-delay': string } => ({ '--dshx-live-shimmer-delay': shimmerDelay() }), [])
     return (
       <span className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1', props.className)} data-live-activity="">
@@ -44,6 +51,7 @@ export const LiveActivityLine = memo(
             <span className="dshx-live-shimmer-copy" data-text={props.step} />
           </span>
         </span>
+        {props.after}
         {props.startedAt === undefined ? null : (
           <>
             <span aria-hidden="true" data-live-elapsed-separator="">
