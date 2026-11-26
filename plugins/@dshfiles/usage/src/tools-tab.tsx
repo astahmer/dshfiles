@@ -1,4 +1,4 @@
-import { Chart, barX, barY, colorLegend, defineChart, scaleBand, scaleLinear, tooltip } from '@dshfiles/plugin-ui/chart'
+import { Chart, barX, barY, colorLegend, defineChart, scaleBand, tooltip } from '@dshfiles/plugin-ui/chart'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SlidingSegments } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
@@ -9,7 +9,7 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { usageApi, type ActivityReport } from './api.js'
 import { UsageBucketsModel } from './buckets.js'
 import { UsageFormattingModel } from './format.js'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID } from './chart-geometry.js'
+import { BAND_PADDING, BAR_GEOMETRY, VALUE_SCALE } from './chart-geometry.js'
 import { DATA_SERIES } from './data-series.js'
 
 const TOOL_CATEGORIES = ['tool', 'skill', 'api', 'plugin', 'mcp', 'other'] as const
@@ -144,7 +144,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
         marks: [barY(timelineRows, { x: 'label', y: 'calls', color: 'category', ...BAR_GEOMETRY })],
         scales: {
           x: xAxis,
-          y: { scale: scaleLinear, grid: CHART_GRID, axis: { ticks: { count: 4 } } },
+          y: { ...VALUE_SCALE, axis: { ticks: { count: 4 } } },
         },
         color: { domain: categories.map(category => CATEGORY_LABELS[category]), range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
@@ -161,8 +161,7 @@ export const UsageToolsTab = (props: { readonly range: { readonly from: number; 
         marks: [barX(rankedRows, { x: 'value', y: 'name', color: 'category' })],
         scales: {
           x: {
-            scale: scaleLinear,
-            grid: CHART_GRID,
+            ...VALUE_SCALE,
             axis: {
               ticks: {
                 count: 4,

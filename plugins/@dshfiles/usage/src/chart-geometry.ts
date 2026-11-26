@@ -1,3 +1,5 @@
+import { scaleLinear } from '@dshfiles/plugin-ui/chart'
+
 /**
  * Bar geometry shared by the Usage bar charts. A band scale gives one bucket the whole plot, so a range with one
  * occupied day drew a full-width slab: bars stop at 44 px, fill about 85 % of their band and round their top end only.
@@ -8,6 +10,12 @@ export const BAR_GEOMETRY = { maxThickness: 44, radius: { end: 3, stack: 'outer'
 
 /** Gridlines in the hairline border at half strength, so they sit behind the bars. */
 export const CHART_GRID = { stroke: 'var(--dsw-alias-border-l2)', strokeOpacity: 0.5 }
+
+/**
+ * A value axis whose domain comes from the marks, rounded up to the next tick: the tallest bar sits under a labelled
+ * gridline (55K under a 60K top tick) instead of touching the plot's ceiling (council round 13, D1).
+ */
+export const VALUE_SCALE = { scale: scaleLinear, nice: true, grid: CHART_GRID } as const
 
 /**
  * The one bucket that holds a value, with its total; `null` when none or several do. A lone bar has no neighbour to

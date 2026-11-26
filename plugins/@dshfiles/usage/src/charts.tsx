@@ -4,7 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, singleBucketTotal, trendRows as buildTrendRows } from './chart-geometry.js'
+import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, trendRows as buildTrendRows } from './chart-geometry.js'
 import { DATA_SERIES, FAILED_SERIES } from './data-series.js'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -222,8 +222,7 @@ export const UsageCharts = (props: {
       scales: {
         x: xAxis,
         y: {
-          scale: scaleLinear,
-          grid: CHART_GRID,
+          ...VALUE_SCALE,
           axis: {
             ticks: {
               count: 4,
@@ -249,7 +248,7 @@ export const UsageCharts = (props: {
         marks: [barY(series.tokens, { x: 'label', y: 'tokens', color: 'kind', ...BAR_GEOMETRY })],
         scales: {
           x: xAxis,
-          y: { scale: scaleLinear, grid: CHART_GRID, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCount(Number(value)) } } },
+          y: { ...VALUE_SCALE, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatCount(Number(value)) } } },
         },
         color: { domain: [...TOKEN_KINDS], range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
@@ -280,7 +279,7 @@ export const UsageCharts = (props: {
     () =>
       defineChart({
         marks: [barY(series.requests, { x: 'label', y: 'count', color: 'outcome', ...BAR_GEOMETRY })],
-        scales: { x: xAxis, y: { scale: scaleLinear, grid: CHART_GRID, axis: { ticks: { count: 4 } } } },
+        scales: { x: xAxis, y: { ...VALUE_SCALE, axis: { ticks: { count: 4 } } } },
         color: { domain: ['Succeeded or aborted', 'Failed'], range: [DATA_SERIES[0], FAILED_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {
           use: tooltip,
@@ -296,7 +295,7 @@ export const UsageCharts = (props: {
         marks: [lineY(series.latency, { x: 'label', y: 'ms', z: 'metric', color: 'metric', points: true, strokeWidth: 1.5 })],
         scales: {
           x: pointAxis,
-          y: { scale: scaleLinear, grid: CHART_GRID, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatDuration(Number(value)) } } },
+          y: { ...VALUE_SCALE, axis: { ticks: { count: 4, format: value => UsageFormattingModel.formatDuration(Number(value)) } } },
         },
         color: { domain: ['TTFT p50', 'TTFT p90', 'Duration p50', 'Duration p90'], range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
         tooltip: {

@@ -1,8 +1,31 @@
+import { barY, createChartScene, defineChart, renderChartSvg, scaleBand } from '@dshfiles/plugin-ui/chart'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, singleBucketTotal, trendRows } from './chart-geometry.js'
+import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, trendRows } from './chart-geometry.js'
 
 const read = (name: string): string => readFileSync(new URL(name, import.meta.url), 'utf8')
+
+describe('Usage value axes (council round 13, D1)', () => {
+  const tickLabels = (peak: number): string[] => {
+    const definition = defineChart({
+      marks: [barY([{ label: 'a', value: 0 }, { label: 'b', value: peak }], { x: 'label', y: 'value', ...BAR_GEOMETRY })],
+      scales: { x: { scale: () => scaleBand<string>().domain(['a', 'b']) }, y: { ...VALUE_SCALE, axis: { ticks: { count: 4 } } } },
+    })
+    const svg = renderChartSvg(createChartScene(definition, { width: 600, height: 190 }), { ariaLabel: 'Tokens over time' })
+    return [...svg.matchAll(/>(\d+)</gu)].map(match => match[1] ?? '')
+  }
+  it('rounds the top of the domain up to a tick, so a 55K bar sits under 60K instead of touching the ceiling', () => {
+    expect(tickLabels(55_000).at(-1)).toBe('60000')
+    expect(tickLabels(16).at(-1)).toBe('20')
+  })
+  it('gives every inferred value axis in Usage a rounded domain', () => {
+    for (const name of ['charts.tsx', 'tools-tab.tsx', 'account-usage-dashboard.tsx']) {
+      const source = read(name)
+      // A bare factory infers its domain from the data; it must round it, or take VALUE_SCALE.
+      for (const axis of source.matchAll(/\{[^{}]*scale: scaleLinear,[^{}]*/gu)) expect(axis[0], name).toMatch(/nice: true/u)
+    }
+  })
+})
 
 describe('Usage bar geometry (round five P1)', () => {
   it('caps a bar at 40–48 px with a 3–4 px top radius, so a single bucket cannot span the plot', () => {
