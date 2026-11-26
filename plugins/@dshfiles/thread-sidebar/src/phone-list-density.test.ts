@@ -19,7 +19,8 @@ describe('phone thread list density (round five B1)', () => {
   })
 
   it('lays a phone row out as two rows 6px apart, at least 52pt tall, so the first Ready row shows above the tab bar', () => {
-    expect(client).toContain("'dshx:pointer-coarse:min-h-13 dshx:pointer-coarse:justify-center dshx:pointer-coarse:gap-1.5 dshx:pointer-coarse:py-1'")
+    // Council round 18 B1.3: 6px padding, so an 18px title, 6px and a 16px line 2 fill the 52pt exactly.
+    expect(client).toContain("'dshx:pointer-coarse:min-h-13 dshx:pointer-coarse:justify-center dshx:pointer-coarse:gap-1.5 dshx:pointer-coarse:py-1.5'")
     expect(client).not.toContain('dshx:pointer-coarse:min-h-14')
   })
 
@@ -31,9 +32,10 @@ describe('phone thread list density (round five B1)', () => {
   })
 
   it('seats a 28px verb in the second row, never against the time on the first', () => {
-    // Row 2 is at least the verb's height; the verb sits on the row's bottom padding, so it fills row 2 exactly.
-    expect(client).toContain("verbSeat === 'meta' && 'dshx:pointer-coarse:min-h-7'")
-    expect(client).toContain("'dshx:pointer-coarse:bottom-1',")
+    // Council round 18 B1.3: row 2 stays 16px (one pitch on every row); the 28px verb centres on it from the row's bottom.
+    expect(client).not.toContain("verbSeat === 'meta' && 'dshx:pointer-coarse:min-h-7'")
+    expect(client).toContain("'dshx:pointer-coarse:h-4 dshx:pointer-coarse:text-xs/4'")
+    expect(client).toContain("'dshx:pointer-coarse:bottom-0',")
     // Its label ends at the time column (round nine B5); beside a subagent counter the counter ends the line.
     expect(client).toContain("childCount > 0 ? 'dshx:pointer-coarse:right-11' : 'dshx:pointer-coarse:right-9'")
     expect(client).toContain("className=\"dshx:z-10 dshx:h-6 dshx:px-2 dshx:pointer-coarse:h-7\"")

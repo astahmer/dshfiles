@@ -65,6 +65,19 @@ describe('ThreadGroupHeader', () => {
     expect(header.startProjectSession).toHaveBeenCalledOnce()
   })
 
+  it('seats the touch chevron in a 44pt column that ends on the row edge, on the row ⋯ axis (council round 18 B1.3)', () => {
+    const header = mount({ status: 'working' })
+    const seat = header.container.querySelector<HTMLElement>('[data-group-chevron]')
+    expect(seat?.className).toContain('dshx:pointer-coarse:phone:w-11')
+    expect(seat?.className).toContain('dshx:pointer-coarse:phone:justify-center')
+    // The phone header pads 12px; the seat reaches through it to the row edge.
+    expect(seat?.className).toContain('dshx:pointer-coarse:phone:-mr-3')
+    cleanup()
+    // A trailing control (the project's +) keeps the edge: the chevron stays inside the padding beside it.
+    const project = mount({ status: 'working', projectId: 'p' })
+    expect(project.container.querySelector<HTMLElement>('[data-group-chevron]')?.className).not.toContain('-mr-3')
+  })
+
   it('uses a focusable native button and accepts keyboard-origin clicks independently', () => {
     const header = mount({ projectId: 'keyboard-project' })
     const create = screen.getByRole('button', { name: 'New thread in Shared project' })

@@ -74,6 +74,8 @@ export const ThreadGroupHeader = ({
 }: ThreadGroupHeaderProps) => {
   const tinted = statusCounts !== undefined && statusCounts.needsYou + statusCounts.failed > 0
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
+  // Nothing after the toggle: its chevron may take the row's trailing edge.
+  const lastOnRow = projectId === undefined && (action === undefined || action === null)
   return (
     <div className={cn(className, 'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-2.5 dshx:pointer-coarse:h-7 dshx:phone:px-3')}>
       <button
@@ -106,7 +108,16 @@ export const ThreadGroupHeader = ({
           <span className="dshx:shrink-0 dshx:font-normal dshx:tabular-nums dshx:text-(--dsw-alias-label-tertiary)">({count})</span>
         )}
         <span className="dshx:flex-1" aria-hidden="true" />
-        <span className="dshx:inline-flex dshx:shrink-0 dshx:opacity-60 dshx:group-hover/header:opacity-100" aria-hidden="true">
+        {/* Phone (council round 18 B1.3): a 44pt seat ending on the row edge, so the chevron stands on the row ⋯ axis
+            (x ≈ 349 at 390pt) instead of 6pt beside it. */}
+        <span
+          className={cn(
+            'dshx:inline-flex dshx:shrink-0 dshx:opacity-60 dshx:group-hover/header:opacity-100 dshx:pointer-coarse:phone:w-11 dshx:pointer-coarse:phone:justify-center',
+            lastOnRow && 'dshx:pointer-coarse:phone:-mr-3',
+          )}
+          data-group-chevron=""
+          aria-hidden="true"
+        >
           {collapsed ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />}
         </span>
       </button>

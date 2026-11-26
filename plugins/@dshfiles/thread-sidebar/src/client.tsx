@@ -877,7 +877,8 @@ const ChildThreadList = (props: {
             'dshx:data-[selected=true]:bg-accent',
             'dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
             // Two lines: line 1 keeps the row's height, line 2 its 16px, 2px apart from the row's edges.
-            route !== undefined && 'dshx:h-auto dshx:flex-col dshx:items-stretch dshx:gap-0 dshx:py-0.5',
+            // Touch: 1px between them puts line 2 on the parent rows' 23pt title-to-meta pitch (council round 18 B1.3).
+            route !== undefined && 'dshx:h-auto dshx:flex-col dshx:items-stretch dshx:gap-0 dshx:py-0.5 dshx:pointer-coarse:gap-px',
           )}
           data-thread-id={child.id}
           data-thread-main-action=""
@@ -889,7 +890,8 @@ const ChildThreadList = (props: {
           onDoubleClick={() => keepThreadTab(child.id)}
         >
           <span
-            className={cn('dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2', compact ? 'dshx:h-6' : 'dshx:h-7')}
+            // Touch: 28px whatever the density, so line 2 lands on the parent rows' 23pt pitch (council round 18 B1.3).
+            className={cn('dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2', compact ? 'dshx:h-6' : 'dshx:h-7', 'dshx:pointer-coarse:h-7')}
             data-thread-child-head=""
           >
           <span className="dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center" data-thread-child-lead="">
@@ -1847,7 +1849,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 'dshx:phone:pl-3',
                 // Phone rows are a two-row grid (round five B1): [title | time ⋯] over [subtitle | verb], 6px apart, at
                 // least 52pt tall, whatever the density preference, so the first Ready row shows above the tab bar.
-                'dshx:pointer-coarse:min-h-13 dshx:pointer-coarse:justify-center dshx:pointer-coarse:gap-1.5 dshx:pointer-coarse:py-1',
+                // Council round 18 B1.3: one pitch on every row, an 18px title line, 6px and a 16px line 2 (23pt centre to
+                // centre); 6px padding fills the 52pt exactly, so line 2's centre is 14px above every row's bottom.
+                'dshx:pointer-coarse:min-h-13 dshx:pointer-coarse:justify-center dshx:pointer-coarse:gap-1.5 dshx:pointer-coarse:py-1.5',
                 // Touch: the row's actions menu button takes the top-right corner's column.
                 'dshx:pointer-coarse:pr-11',
                 'dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
@@ -1921,7 +1925,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       'dshx:min-w-0 dshx:flex-1 dshx:text-foreground',
                       wrapTitle
                         ? 'dshx:line-clamp-2 dshx:text-sm/[18px] dshx:font-[550] dshx:break-words'
-                        : cn('dshx:truncate', compact ? 'dshx:text-sm' : 'dshx:text-base'),
+                        : cn('dshx:truncate dshx:pointer-coarse:leading-[18px]', compact ? 'dshx:text-sm' : 'dshx:text-base'),
                       // Dark cockpit: in the status list only Ready rows are bold and Done rows are muted.
                       (workStatus === undefined ? unread : workStatus.status === 'ready') ? 'dshx:font-semibold' : 'dshx:group-data-[selected=true]/row:font-selected',
                       workStatus?.status === 'done' && 'dshx:text-muted-foreground',
@@ -1981,9 +1985,11 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
                     // Room for the subagent counter at this line's end; the verb beside it holds its own width through
                     // the invisible copy at the line's end (council round 14 B1).
-                    childCount > 0 && (childCounterShown ? (verbSeat === 'meta' ? 'dshx:pr-18' : 'dshx:pr-16') : 'dshx:pr-8'),
-                    // Touch: row 2 is at least the 28px verb it carries (round five B1).
-                    verbSeat === 'meta' && 'dshx:pointer-coarse:min-h-7',
+                    // Touch: the chevron alone is a 44pt toggle in the time column (council round 18 B1.3).
+                    childCount > 0 && (childCounterShown ? (verbSeat === 'meta' ? 'dshx:pr-18' : 'dshx:pr-16') : 'dshx:pr-8 dshx:pointer-coarse:pr-11'),
+                    // Touch: line 2 is 16px on every row (council round 18 B1.3), so every row keeps one title-to-meta
+                    // pitch; the 28px verb centres on it from outside instead of stretching it to 28px.
+                    'dshx:pointer-coarse:h-4 dshx:pointer-coarse:text-xs/4',
                   )}
                   data-thread-where=""
                 >
@@ -2101,14 +2107,16 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 'dshx:absolute dshx:flex dshx:items-center dshx:gap-1',
                 compact ? 'dshx:right-0' : 'dshx:right-0.5',
                 verbSeat !== 'meta' || props.renaming
-                  ? // Touch: a chevron alone stays centred under the row menu button.
-                    'dshx:bottom-1 dshx:pointer-coarse:right-1.5'
+                  ? // Touch: a chevron alone leaves the row menu's column (council round 18 B1.3: the two stacked in one
+                    // 44pt square); it ends the time column on line 2, where a verb sits, centred on that line.
+                    'dshx:bottom-1 dshx:pointer-coarse:right-11 dshx:pointer-coarse:bottom-0'
                   : // Touch: the verb's label ends where the time above it does (round nine B5: its 8px padding reaches into
-                    // the row menu's column), and stands on the row's 4px bottom padding, so it fills row 2 and never meets
-                    // the time (round five B1). Beside a subagent counter the counter ends the line, left of that column.
+                    // the row menu's column), and its 28px centres on line 2 (14px above the row's bottom, council round
+                    // 18 B1.3), so it never meets the time (round five B1). Beside a subagent counter the counter ends the
+                    // line, left of that column.
                     cn(
                       compact ? 'dshx:bottom-0.5' : 'dshx:bottom-1.5',
-                      'dshx:pointer-coarse:bottom-1',
+                      'dshx:pointer-coarse:bottom-0',
                       childCount > 0 ? 'dshx:pointer-coarse:right-11' : 'dshx:pointer-coarse:right-9',
                     ),
               )}
@@ -2119,7 +2127,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               type="button"
               data-thread-children-toggle=""
               // 24 px tall, the chevron in its own 24 px seat; the kit gives a raw button its 44 px hit area on touch.
-              className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pl-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50"
+              // Touch (council round 18 B1.3): 28px like the verb and at least 44pt wide, so its hit area ends where the
+              // row menu's column starts instead of reaching into it.
+              className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pl-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:pointer-coarse:h-7 dshx:pointer-coarse:min-w-11 dshx:pointer-coarse:justify-end"
               aria-expanded={props.childrenOpen}
               aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
               onClick={() => props.actions.toggleChildren(session.id, props.childrenOpen)}
@@ -2147,7 +2157,13 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               ) : null}
               {childCounterShown ? <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span> : null}
               {/* A real chevron in a 24 px seat (round five B3), not a 12 px caret: it turns over when the sub-rows open. */}
-              <span className="dshx:inline-flex dshx:size-6 dshx:items-center dshx:justify-center" data-children-chevron="" aria-hidden="true">
+              {/* Touch: the seat reaches 8px past the toggle so the glyph (4px seat inset, 4px of its own) ends on the time's
+                  edge; drawn only, so the overhang takes no taps from the row menu beside it. */}
+              <span
+                className="dshx:pointer-events-none dshx:inline-flex dshx:size-6 dshx:items-center dshx:justify-center dshx:pointer-coarse:-mr-2"
+                data-children-chevron=""
+                aria-hidden="true"
+              >
                 <ChevronDownIcon
                   className={cn('dshx:size-4 dshx:transition-transform dshx:duration-(--dshx-duration-hover)', props.childrenOpen && 'dshx:rotate-180')}
                   strokeWidth={1.5}
@@ -2214,8 +2230,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               aria-label={t('threadSidebarContextMenu')}
               aria-haspopup="menu"
               // The row's only menu on a phone, so it stays; in the tertiary ink it no longer reads as row content
-              // beside the age (council round 17 B1.2).
-              className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-(--dsw-alias-label-tertiary) dshx:pointer-coarse:inline-flex"
+              // beside the age (council round 17 B1.2). Council round 18 B1.3: a 44pt seat flush with the row's edge (its
+              // hit area no longer overflows the row), its glyph on one axis down the list, centred on line 1.
+              className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-(--dsw-alias-label-tertiary) dshx:pointer-coarse:inline-flex dshx:pointer-coarse:top-px dshx:pointer-coarse:right-0 dshx:pointer-coarse:w-11"
               onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
             >
               <OverflowGlyph />

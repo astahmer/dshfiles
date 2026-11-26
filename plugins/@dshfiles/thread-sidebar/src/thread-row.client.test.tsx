@@ -274,10 +274,10 @@ describe('the trailing column and the phone row (council round 17 B1.2)', () => 
     expect(classOf(compact, '[data-thread-main-action]')).toContain('dshx:px-2')
     expect(classOf(compact, '[data-thread-row-end]').split(' ')).toContain('dshx:right-0')
     cleanup()
-    // A chevron alone keeps its touch seat under the row menu button.
+    // A chevron alone ends the time column on touch, out of the row menu's column (council round 18 B1.3).
     const plain = await renderRow({ childThreads: children, workStatus: rowStatus({ status: 'idle' }), rowStyle: comfortable })
     expect(classOf(plain, '[data-thread-row-end]')).toContain('dshx:right-0.5')
-    expect(classOf(plain, '[data-thread-row-end]')).toContain('dshx:pointer-coarse:right-1.5')
+    expect(classOf(plain, '[data-thread-row-end]')).toContain('dshx:pointer-coarse:right-11')
   })
 
   it('draws the touch row menu ⋯ in the tertiary ink at 16px', async () => {
@@ -530,5 +530,79 @@ describe('a subagent row under its parent', () => {
     // Without a word, line 2 is the model alone: no dangling separator.
     const working = row.querySelector<HTMLElement>('ul [data-thread-child-meta]')
     expect(working?.textContent).toBe('gpt-6-luna')
+  })
+})
+
+describe('the phone list (council round 18 B1.3)', () => {
+  const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent', running: true }))
+  const waiting = { childThreads: children, workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) }
+  const classOf = (row: HTMLElement, selector: string): string => row.querySelector<HTMLElement>(selector)?.className ?? ''
+
+  it('seats the row ⋯ in a 44pt column flush with the row edge, centred on line 1', async () => {
+    const row = await renderRow()
+    const menu = classOf(row, '[data-testid="thread-row-menu"]')
+    // 44pt wide from the row's edge: its glyph centre sits 22pt in (x ≈ 349 at 390pt), and its hit area ends on the row.
+    expect(menu).toContain('dshx:pointer-coarse:right-0')
+    expect(menu).toContain('dshx:pointer-coarse:w-11')
+    // Line 1 is the row's 6px padding and an 18px line: a 28px button 1px down centres on it.
+    expect(menu).toContain('dshx:pointer-coarse:top-px')
+  })
+
+  it('moves the expand chevron out of the ⋯ column into line 2\'s time column', async () => {
+    const row = await renderRow(waiting)
+    const end = classOf(row, '[data-thread-row-end]')
+    expect(end).toContain('dshx:pointer-coarse:right-11')
+    expect(end).not.toContain('dshx:pointer-coarse:right-1.5')
+    // A 44pt toggle that ends where the ⋯ column starts, so the two hit areas never share a square.
+    const toggle = classOf(row, '[data-thread-children-toggle]')
+    expect(toggle).toContain('dshx:pointer-coarse:min-w-11')
+    expect(toggle).toContain('dshx:pointer-coarse:justify-end')
+    // The glyph ends on the time's edge: its seat reaches 8px past the toggle (its own 4px inset and the glyph's),
+    // drawn only, so the overhang takes no taps.
+    const seat = classOf(row, '[data-children-chevron]')
+    expect(seat).toContain('dshx:pointer-coarse:-mr-2')
+    expect(seat).toContain('dshx:pointer-events-none')
+    // Line 2 keeps the toggle's 44pt clear of its words.
+    expect(classOf(row, '[data-thread-where]')).toContain('dshx:pointer-coarse:pr-11')
+  })
+
+  it('gives every row one title-to-meta pitch: an 18px title line, 6px, a 16px line 2', async () => {
+    for (const props of [
+      {},
+      waiting,
+      { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: Which layout?' }) },
+      { workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) },
+    ]) {
+      const row = await renderRow(props)
+      const button = classOf(row, '[data-thread-main-action]')
+      expect(button).toContain('dshx:pointer-coarse:py-1.5')
+      expect(button).toContain('dshx:pointer-coarse:gap-1.5')
+      const title = classOf(row, '[data-thread-title]')
+      expect(title.includes('dshx:text-sm/[18px]') || title.includes('dshx:pointer-coarse:leading-[18px]')).toBe(true)
+      const where = classOf(row, '[data-thread-where]')
+      expect(where).toContain('dshx:pointer-coarse:h-4')
+      expect(where).toContain('dshx:pointer-coarse:text-xs/4')
+      // The verb no longer stretches line 2 to 28px: it centres on the 16px line instead.
+      expect(where).not.toContain('dshx:pointer-coarse:min-h-7')
+      const end = row.querySelector<HTMLElement>('[data-thread-row-end]')
+      if (end !== null) expect(end.className).toContain('dshx:pointer-coarse:bottom-0')
+      cleanup()
+    }
+  })
+
+  it('keeps a subagent child row on the same pitch: a 28px line 1 and 1px to its 16px line 2', async () => {
+    const child = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna', subagent: { mode: 'continuable', label: 'Audit', seq: SessionSeq(3) } },
+    })
+    for (const density of ['compact', 'comfortable'] as const) {
+      const row = await renderRow({ childThreads: [child], childrenOpen: true, allChildrenShown: true, rowStyle: { ...rowProps().rowStyle, time: false, density } })
+      expect(classOf(row, 'ul [data-thread-main-action]')).toContain('dshx:pointer-coarse:gap-px')
+      // A compact list's 24px head measured a 21pt pitch at 390pt: on touch the head is 28px whatever the density.
+      expect(classOf(row, 'ul [data-thread-child-head]')).toContain('dshx:pointer-coarse:h-7')
+      cleanup()
+    }
   })
 })
