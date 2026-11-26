@@ -205,6 +205,17 @@ Round 10 findings, merged in `.cache/unslop-audit/r5/council/round-10-fixes.md`:
 on text fields only; a one-row phone thread-list toolbar; a clean phone dock edge with an ArrowDown jump; a straight pill
 selection marker, none where a place tile shows selection; the Review icon regression; a status tally on the phone
 Inbox's Needs you; a 640 px palette; one Usage breakdown dimension; quieter AI accounts controls; Backlog's status button.
+All four lanes done: A kit 13 revisions `wvssxomp` … `xplsqvvn` (quiet filled triggers with the 3:1 edge on text
+fields only, a straight 3×16 selection pill skipped beside a place tile, one segment thumb in both schemes, a compact
+phone tab tally, one Kbd chip, 18/600 settings headings, calmer dark diffs with lifted changed words, 12 px chart text,
+DESIGN.md); B 9 revisions `lmnlnkss` … `kuxoykot` (one-row phone toolbar with a scope button, side-column glyphs sized by
+their seat with Review on the Land glyph, smaller theme cards, a Preferences head, a 640 px palette with kit Kbd chips);
+C 6 revisions `rnzslnom` … `omlyxyvu` (28 px phone dock fade, a round ArrowDown jump, a 76 px composer, the Needs you
+tally, a framed 44 px Triage icon, tighter card heads, one composer chip ink); D 7 revisions `wylnxqnk` … `vlsuqlww`
+(Plugins switches on the title line, Backlog ring status button, one AI accounts inherit caption, SpendMap segments
+picker and Usage's one-dimension breakdown). Review's Compare against keeps its edge: it is a typed field.
+Follow-ups: thread-sidebar `host.test.ts` fails 2 tests in isolation on the round base too (pre-existing); the phone
+Triage icon has no visible label on touch; Usage has two grouping controls (toolbar By and Breakdown by).
 
 ## Round four
 
