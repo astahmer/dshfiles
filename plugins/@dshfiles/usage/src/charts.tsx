@@ -4,7 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, trendRows as buildTrendRows } from './chart-geometry.js'
+import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, trendChartHeight, trendRows as buildTrendRows } from './chart-geometry.js'
 import { DATA_SERIES, FAILED_SERIES } from './data-series.js'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -22,8 +22,6 @@ import { TrendKey } from './trend-key.js'
 
 const DAY_MS = UsageBucketsModel.DAY_MS
 const CHART_HEIGHT = 220
-/** The overview's one trend chart, about 190 px at a 1124 px pane: tall enough to read, short enough to keep "Where it went" in view (council round 7, D3). */
-const TREND_CHART_HEIGHT = 190
 
 const TOKEN_KINDS = ['Input', 'Cache read', 'Cache write', 'Output'] as const
 
@@ -363,7 +361,7 @@ export const UsageCharts = (props: {
           ariaLabel={`${trendMetric} over time`}
           ariaDescription={`${trendMetric} per ${props.bucket}, grouped by ${props.groupBy}.`}
           definition={trendChart}
-          height={TREND_CHART_HEIGHT}
+          height={trendChartHeight(trendRows)}
         />
       </ChartFrame>
 

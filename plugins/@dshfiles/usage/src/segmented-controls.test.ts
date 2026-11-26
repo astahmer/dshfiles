@@ -163,8 +163,9 @@ describe('Usage overview chart (council round 7, D3)', () => {
     expect(header).toContain('Usage over time')
     expect(header).not.toContain('grouped by the selected dimension')
     expect(header).toContain('trendCaption(')
-    expect(charts).toMatch(/const TREND_CHART_HEIGHT = 190\b/u)
-    expect(charts).toMatch(/definition=\{trendChart\}\s*height=\{TREND_CHART_HEIGHT\}/u)
+    // 190 px once three buckets hold data; the sparse height below that (council round 18, D2; chart-geometry.test.ts).
+    expect(read('chart-geometry.ts')).toMatch(/export const TREND_CHART_HEIGHT = 190\b/u)
+    expect(charts).toMatch(/definition=\{trendChart\}\s*height=\{trendChartHeight\(trendRows\)\}/u)
   })
   it('captions the bucket and the grouping as one short line', () => {
     expect(trendCaption({ bucket: 'day', groupBy: 'model', metric: 'tokens' })).toBe('Daily · by model')

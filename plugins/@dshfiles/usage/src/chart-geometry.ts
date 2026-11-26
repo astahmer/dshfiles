@@ -34,6 +34,18 @@ export const singleBucketTotal = <Row extends { readonly label: string }>(
   return only === undefined || rest.length > 0 ? null : { label: only[0], total: only[1] }
 }
 
+/** The overview's trend chart, about 190 px at a 1124 px pane: tall enough to read, short enough to keep "Where it went" in view (council round 7, D3). */
+export const TREND_CHART_HEIGHT = 190
+/**
+ * The trend chart while fewer than three buckets hold data (council round 18, D2): one or two bars compare nothing, so
+ * the plot stays under 220 device px at 2× (about 108 css px of plot) instead of a tall empty field around a lone bar.
+ */
+export const SPARSE_TREND_CHART_HEIGHT = 140
+
+/** The trend chart's height for its rows: the sparse height while fewer than three buckets hold a value. */
+export const trendChartHeight = (rows: readonly { readonly label: string; readonly value: number }[]): number =>
+  new Set(rows.flatMap(row => (row.value > 0 ? [row.label] : []))).size < 3 ? SPARSE_TREND_CHART_HEIGHT : TREND_CHART_HEIGHT
+
 export type TrendMetric = 'cost' | 'tokens' | 'requests'
 
 interface TrendBucket {

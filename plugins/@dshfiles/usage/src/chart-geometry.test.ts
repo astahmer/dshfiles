@@ -1,7 +1,17 @@
 import { barY, createChartScene, defineChart, renderChartSvg, scaleBand } from '@dshfiles/plugin-ui/chart'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, trendRows } from './chart-geometry.js'
+import {
+  BAND_PADDING,
+  BAR_GEOMETRY,
+  CHART_GRID,
+  SPARSE_TREND_CHART_HEIGHT,
+  TREND_CHART_HEIGHT,
+  VALUE_SCALE,
+  singleBucketTotal,
+  trendChartHeight,
+  trendRows,
+} from './chart-geometry.js'
 
 const read = (name: string): string => readFileSync(new URL(name, import.meta.url), 'utf8')
 
@@ -66,6 +76,26 @@ describe('Usage value label', () => {
   })
   it('puts the label on the trend chart', () => {
     expect(read('charts.tsx')).toMatch(/text\(\s*trendLabel/u)
+  })
+})
+
+describe('Usage trend chart height (council round 18, D2)', () => {
+  const plot = (labels: readonly string[]) => labels.map(label => ({ label, value: 5 }))
+  const devicePlot = (height: number): number => {
+    const definition = defineChart({
+      marks: [barY([{ label: 'a', value: 55_000 }], { x: 'label', y: 'value', ...BAR_GEOMETRY })],
+      scales: { x: { scale: () => scaleBand<string>().domain(['a']) }, y: { ...VALUE_SCALE, axis: { ticks: { count: 4 } } } },
+    })
+    const scene = createChartScene(definition, { width: 1100, height })
+    return 2 * scene.chart.height
+  }
+  it('keeps the plot under 220 device px at 2× while fewer than three buckets hold data', () => {
+    expect(trendChartHeight([...plot(['a', 'b']), { label: 'c', value: 0 }])).toBe(SPARSE_TREND_CHART_HEIGHT)
+    expect(devicePlot(trendChartHeight(plot(['a'])))).toBeLessThanOrEqual(220)
+  })
+  it('keeps the readable height once three buckets hold data', () => {
+    expect(trendChartHeight(plot(['a', 'b', 'c']))).toBe(TREND_CHART_HEIGHT)
+    expect(read('charts.tsx')).toContain('height={trendChartHeight(trendRows)}')
   })
 })
 
