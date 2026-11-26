@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArrowUpRightIcon, BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { WORK_COUNT_SEPARATOR, workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
 import { useState, useSyncExternalStore } from 'react'
 import { launchOrdered } from '../thread-children.js'
 import { ToolSteps } from '../tool-steps.js'
@@ -183,7 +184,10 @@ export const SubagentPreviewDock = (
     readonly sessionId: string
     readonly preview: SubagentPreviewBindings
     readonly runCards: boolean
-    /** The fold row's one phrase, "4 subagents working", from this plugin's table: never a count beside a word from another. */
+    /**
+     * The fold row's one phrase under the phone's Live work header, "4 subagents working", from this plugin's table: never
+     * a count beside a word from another. A wide pane heads the fold "Live work · 4 working" itself.
+     */
     readonly foldLabel?: (count: number) => string
   },
 ): JSX.Element | null => {
@@ -207,6 +211,13 @@ export const SubagentPreviewDock = (
   if (working === '') return null
   const list = working.split(ID_SEPARATOR)
   const folded = list.length > MAX_OPEN_ROWS
+  const t = props.preview.t
+  // Council round 23, item 3: the desktop fold reads "Live work · 6 working", the kit's one count formula (the dock
+  // lists working children only, so its failed clause is always empty).
+  const count = workCountLabel(
+    { working: list.length },
+    { working: value => t('threadSidebarWorkingCount', { count: value }), failed: value => t('threadSidebarFailedCount', { count: value }) },
+  )
   return (
     <div
       aria-label={props.preview.t('subagentPreviewDock')}
@@ -224,8 +235,19 @@ export const SubagentPreviewDock = (
         >
           <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', expanded && 'dshx:rotate-90')} />
           <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.foldLabel?.(list.length) ?? String(list.length)}</span>
-          <StatusGlyph status="working" decorative />
+          {/* Under the phone's Live work header (beside running jobs) the fold names its subagents; the first span holds
+              the count rich-composer's Live work reads. No trailing ring: each row leads with its own (item 3). */}
+          {underLiveWork ? (
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.foldLabel?.(list.length) ?? String(list.length)}</span>
+          ) : (
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+              <span className="dshx:font-medium dshx:text-foreground">{t('subagentDockTitle')}</span>
+              <span className="dshx:text-muted-foreground" data-subagent-dock-count="">
+                {WORK_COUNT_SEPARATOR}
+                {count}
+              </span>
+            </span>
+          )}
         </button>
       ) : null}
       {/* Under the phone's Live work fold the rows stay mounted: the composer hides this fold row while Live work holds

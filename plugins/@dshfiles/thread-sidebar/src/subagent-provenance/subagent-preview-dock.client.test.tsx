@@ -324,13 +324,38 @@ describe('SubagentPreviewDock', () => {
     expect(document.querySelector('[data-live-elapsed]')).toBeNull()
   })
 
-  it('says the fold in one phrase of its own table, so Chinese has no English word in it', () => {
-    // It joined core's translated count to the English "working": "Sous-agents 2 working".
+  it('says the phone fold in one phrase of its own table, so Chinese has no English word in it', () => {
+    // It joined core's translated count to the English "working": "Sous-agents 2 working". Under the phone's Live work
+    // (beside running jobs) the fold row names its subagents, since Live work is already the header above it.
     const zh = threadSidebarDictionaries.zh.subagentsWorking_other
     const foldLabel = (count: number): string => zh.replace('{count}', String(count))
-    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={foldLabel} />)
-    expect(fold()?.textContent).toBe('4 个子智能体工作中')
-    expect(fold()?.textContent).not.toMatch(/[A-Za-z]/u)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 27.99rem)', addEventListener: () => undefined, removeEventListener: () => undefined }))
+    try {
+      render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={foldLabel} />)
+      expect(fold()?.textContent).toBe('4 个子智能体工作中')
+      expect(fold()?.textContent).not.toMatch(/[A-Za-z]/u)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('heads the desktop fold "Live work · 4 working" in the one count formula, with no trailing ring (council round 23, item 3)', () => {
+    // It read "6 subagents working" with a spinner at its end that repeated every row's ring.
+    for (const [locale, expected] of [
+      ['en', 'Live work · 4 working'],
+      ['zh', '运行中的工作 · 4 个进行中'],
+    ] as const) {
+      const table: Record<string, string> = threadSidebarDictionaries[locale]
+      // SAFETY: a test translator over the real table; the dock passes `{ count }` or `{ label }` only.
+      const t = ((key: string, params?: { readonly count?: number; readonly label?: string }) =>
+        (table[key] ?? key).replace(/\{(count|label)\}/gu, (_, name: 'count' | 'label') => String(params?.[name] ?? ''))) as SubagentPreviewBindings['t']
+      const { unmount } = render(
+        <SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'], bindings: preview({ t }) })} foldLabel={count => `${count} subagents working`} />,
+      )
+      expect(fold()?.textContent).toBe(expected)
+      expect(fold()?.querySelector('[data-slot="status-glyph"]')).toBeNull()
+      unmount()
+    }
   })
 
   it('keeps every row whole and scrolls the dock instead, under its sticky fold row (round 21 D2)', () => {

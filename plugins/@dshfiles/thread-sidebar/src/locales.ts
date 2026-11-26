@@ -23,6 +23,8 @@ const en = {
   subagentCountCalls_other: '{count} calls',
   subagentCountNotStarted: '{count} didn’t start',
   subagentPreviewDock: 'Working subagents',
+  /** The desktop dock's fold row, "Live work · 6 working" (council round 23, item 3); rich-composer's phone header says the same. */
+  subagentDockTitle: 'Live work',
   subagentPreviewToggle: 'Show or hide the progress of {label}',
   subagentPreviewStarting: 'Working',
   subagentPreviewFailedToStart: 'Failed',
@@ -648,6 +650,7 @@ const zh = {
   subagentCountCalls_other: '{count} 次调用',
   subagentCountNotStarted: '{count} 个未启动',
   subagentPreviewDock: '工作中的子智能体',
+  subagentDockTitle: '运行中的工作',
   subagentPreviewToggle: '显示或隐藏 {label} 的进度',
   subagentPreviewStarting: '工作中',
   subagentPreviewFailedToStart: '失败',
