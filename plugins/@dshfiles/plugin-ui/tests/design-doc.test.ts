@@ -373,4 +373,33 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(prose).not.toContain("The row's detail says which: the question's first words")
     expect(prose).not.toContain('Line 2: the `ProjectMark`, the kind (Approval, Question, Turn failed…) and the age')
   })
+
+  it('records the fifteenth council pass: the 20px rail seat, the desktop Inbox head, the failed reason, one tally, one overflow glyph and the disclosure link (council round 15 A4)', () => {
+    const prose = design.replace(/\s+/gu, ' ')
+    for (const text of [
+      '**Rail seat: 20px**',
+      '`--attention-meta-rail-seat`',
+      'glyph and mark share one centre axis',
+      'only the text parts clip',
+      '**Desktop Inbox head**',
+      'no separator dot before the mark',
+      'Review and Open thread are the same 28px band-tinted pill',
+      '**Failed card reason.**',
+      '`Error: <first line>`, mono 12/18',
+      'at least 8px clear above the tab bar',
+      '**The tally lives on the tab only**',
+      '**One overflow glyph**',
+      '`OverflowGlyph`',
+      'at 16px with a 2px stroke',
+      '**Disclosure link**',
+      '`DisclosureLink`',
+      'a 12px chevron 4px after the text',
+    ])
+      expect(prose, text).toContain(text)
+    // The kit modules it names exist.
+    for (const module of ['overflow-glyph', 'disclosure-link']) expect(prose).toContain(`components/ui/${module}`)
+    // Retired by this pass: the mark in the glyph's 16px column; the tab tally on the phone only.
+    expect(prose).not.toContain("the mark hangs in the status glyph's 16px column")
+    expect(prose).not.toContain('`PageTab` `statusCounts`, phone shell only')
+  })
 })

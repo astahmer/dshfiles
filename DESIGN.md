@@ -538,8 +538,21 @@ beside ⋯ (council round 11 C1: its label, never an icon alone); the Needs you 
 Triage control. **Bar text buttons.** Every worded action in a phone top bar is `Button variant="bar"` (council
 round 13): the secondary label at 500 with a 16px glyph 6px before it (Triage: list-checks), no fill at rest, on the
 44px seat, so it reads as a control, never as a second title. When Needs you holds more than one status, its segment counts them as a tally (◆ 2 · ✕ 1: each
-status glyph and its tabular number 4px apart, no pill, a muted dot between; `PageTab` `statusCounts`, phone shell
-only), so a failure below the fold shows at first glance.
+status glyph and its tabular number 4px apart, no pill, a muted dot between; `PageTab` `statusCounts`), so a failure
+below the fold shows at first glance. **The tally lives on the tab only** (council round 15), desktop and phone: the
+Inbox `h1` carries no ◆ 2 ✕ 1 chips beside it, and the rail keeps its one `AttentionBadge`. One count, said once per
+surface.
+
+**Desktop Inbox head** (council round 15). A desktop card's head takes two lines, as on the phone: line 1 is the status
+glyph, the title at 15/20, then the verbs and ⋯ on the trailing edge; line 2 is the `AttentionMeta` line at 12/16 under
+the title, with no separator dot before the mark (the mark leads the line). Its verbs are one style: Review and Open
+thread are the same 28px band-tinted pill (`Button band`, the attention tint), never a pill beside a bare text link.
+
+**Failed card reason.** A failed card has a body: one reason line under the title, `Error: <first line>`, mono 12/18
+in a red-soft well (light about `oklch(0.96 0.02 25)`, dark about `oklch(0.26 0.03 25)`, text AA on it), desktop and
+phone. On the phone its Review becomes the same full-width 44px footer button as the approval card's (red-tinted) with
+only ⋯ in the head, when at 390×664 the failed card's title, reason and Review all show with at least 8px clear above
+the tab bar; otherwise it keeps the head pill and adds only the reason line.
 
 **Phone dock.** On a phone the transcript scroller ends above the dock (composer and its docked rows), never under
 it: a fade one line-height tall (28px) ending exactly at the top edge of the dock's first card, so no line is half
@@ -579,7 +592,8 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   bleed (`width="full"`, the default for a `fill` master–detail page); `width="page"` (1080px) is the legacy default
   that new pages do not choose. The header actions sit on the frame's trailing edge, never the window's. A page that
   owns its layout puts the standalone `PageHeader` inside the same frame (`PAGE_FRAME_CLASS.lane` / `.form` / `.wide`). The `h1` is 22px/650 (`text-title font-title`); its count is tertiary ink, or one
-  `StatusCount` per status present (`statusCounts`). **Page title mark.** A destination page (Inbox, Backlog,
+  `StatusCount` per status present (`statusCounts`), unless a tab already carries that tally (Inbox's Needs you tab:
+  the count is said once). **Page title mark.** A destination page (Inbox, Backlog,
   Usage, Review, AI accounts, Settings…) carries one identity mark: the destination's rail glyph before the `h1`,
   18px, 8px from the title and centred on its first line, in the destination's nav tone (`Page` or `PageHeader`
   `mark` and `markTone`, a `NavToneId`; `text-nav-<id>`). A glyph only: never a tile, a tinted header or a coloured
@@ -773,6 +787,17 @@ reader hears), never a number glued to a second control.
 a 2px ring in the surface it sits on (the rail's panel step; elsewhere set `--dshx-badge-ring`). It sits in a trailing
 seat beside the glyph and never covers it. A zero draws nothing; past 99 it reads `99+`.
 
+**One overflow glyph** (council round 15 A2). Every ⋯ trigger draws `OverflowGlyph`
+(`components/ui/overflow-glyph`): the horizontal ellipsis at 16px with a 2px stroke, whatever the trigger's size (an
+`icon-xs` button would draw an unsized icon at 12px). Never a vertical ⋮, a 12 or 14px ⋯, or a 1.5px stroke; the
+trigger carries the name ("More actions"). The phone tab bar's More tab is a tab, drawn at the tab icons' 20px.
+
+**Disclosure link** (council round 15 A3). Text that opens more of the same place ("More font settings") is a
+`DisclosureLink` (`components/ui/disclosure-link`, or `dshx:disclosure-link` on a control the kit does not draw): the
+link token (`--dsw-alias-link`, the accent; AA on the page, the nav column, panel and raised in both schemes) at 13/18
+and 500, a 12px chevron 4px after the text, turned while open, no underline at rest and one under the pointer, 44px
+tall on a coarse pointer. It reads as a link, never as a label in the ink.
+
 **DiffStat.** Every change count is `DiffStat` from `@dshfiles/plugin-ui/components/diff-stat`: `+N` then `−N`, sans,
 tabular, 12px, additions in success and deletions in danger (AA on bg, panel, raised and the selected wash), a zero side
 muted, the minus U+2212.
@@ -792,7 +817,8 @@ item — thread, subagent, job, check, workspace, host. Plugins map onto them an
 | Idle      | seen, nothing pending                | faint ring                | normal    |
 | Done      | landed or closed; workspace released | muted check               | muted     |
 
-Every glyph sits in a 16px seat, so a row never shifts when its state changes. Needs you, Failed and Working draw at
+Every glyph sits in a 16px seat, so a row never shifts when its state changes (in a list row with a second line, the
+20px rail seat it shares with the project mark; see **One attention meta line**). Needs you, Failed and Working draw at
 14px; the Ready dot and the Idle ring both at 10px (the ring as wide as the dot, council round 6 A6). In light the
 Ready dot is a lighter green than the ready text (`--dshx-ready-mark`, `oklch(0.55 0.13 150)`, 3:1 on every row surface)
 so it is not the heaviest mark in a list; dark keeps the success tone. A count chip (`StatusCount`) draws the same glyph in a 10px seat beside its number;
@@ -825,8 +851,11 @@ shows only where the surface has no other clock (an Inbox card, not a thread row
 line runs out of room, the age goes first, then the name truncates, and a name is never cut to a stub: once fewer than
 eight of its characters would show, it drops and the mark alone names the project (the words stay for assistive
 tech). In list rows (the desktop thread list, the phone list) the line takes `markSeat="rail"`: on every row with a
-second line (Needs you, Failed, Working, Ready) the mark hangs in the status glyph's 16px column, so the marks form one
-rail and the name starts under the title. The trailing verb's reservation is sized to the verb, not a fixed width, so
+second line (Needs you, Failed, Working, Ready) the mark hangs in the status glyph's column, so the marks form one
+rail and the name starts under the title. **Rail seat: 20px** (council round 15 A1), `--attention-meta-rail-seat`
+(declared once in the kit sheet), as wide as the widest dense mark ("WA", 20.94px in Geist); the row's status-glyph
+column takes the same width, so glyph and mark share one centre axis. The seat centres safely (a wider mark starts at
+the line's edge), and only the text parts clip: the line never cuts the mark inside a tinted or bordered row. The trailing verb's reservation is sized to the verb, not a fixed width, so
 "billing-api" and "web-app" read whole at the default sidebar width and at 390px (about 146px of line). On an Inbox
 card, desktop and phone, the line sits under the title (`markSeat="inline"`, the mark 6px before the name).
 
@@ -936,7 +965,8 @@ translate DSH's built-in parts only.
 - **Do** format every duration with `formatElapsed` or `formatDurationMs`, every time of day with `formatClockTime`,
   and take a thread's status from the thread list's projection.
 - **Do** draw every disclosure with the kit chevron: `DisclosureTrigger` inside a `Collapsible`, or `dshx:disclosure`
-  on a `<details>`. **Don't** show the native ▶ marker.
+  on a `<details>`; a text link that discloses is a `DisclosureLink`. **Don't** show the native ▶ marker.
+- **Do** draw every overflow trigger with `OverflowGlyph` (16px, stroke 2). **Don't** draw ⋮, a smaller ⋯ or a thin one.
 - **Don't** give Working a hue, colour a row for being healthy beyond its one dot, or add a second attention colour.
 - **Don't** put plugin names in labels ("pulls.review: Reviews", "Thread Sidebar: Navigation").
 - **Don't** use an indigo or blue primary button, an indigo selection fill, an icon tile in a page header, a
