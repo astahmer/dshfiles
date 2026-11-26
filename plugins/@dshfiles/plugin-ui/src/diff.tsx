@@ -88,20 +88,24 @@ const DIFF_FONT_STYLE = {
 const THEME = 'dshx-syntax'
 registerCustomTheme(THEME, () => Promise.resolve(createCssVariablesTheme({ name: THEME, variablePrefix: '--shiki-' })))
 
-/** Each change type's letter and its words; a rename that also edits the file says both. */
+/**
+ * Each change type's letter, its words and its tone at the tint rung (council round 18 A2): the letter in the diff's
+ * status colour on a 12% tint of it, M amber (the library's modified tone), A green, D red, R in secondary ink. A rename
+ * that also edits the file says both.
+ */
 const CHANGE_BADGE = {
-  change: { letter: 'M', label: 'Modified', tone: 'dshx:text-muted-foreground' },
-  new: { letter: 'A', label: 'Added', tone: 'dshx:text-success' },
-  deleted: { letter: 'D', label: 'Deleted', tone: 'dshx:text-destructive' },
-  'rename-pure': { letter: 'R', label: 'Renamed', tone: 'dshx:text-muted-foreground' },
-  'rename-changed': { letter: 'R', label: 'Renamed and modified', tone: 'dshx:text-muted-foreground' },
+  change: { letter: 'M', label: 'Modified', tone: 'dshx:bg-warning/12 dshx:text-warning' },
+  new: { letter: 'A', label: 'Added', tone: 'dshx:bg-success/12 dshx:text-success' },
+  deleted: { letter: 'D', label: 'Deleted', tone: 'dshx:bg-destructive/12 dshx:text-destructive' },
+  'rename-pure': { letter: 'R', label: 'Renamed', tone: 'dshx:bg-muted-foreground/12 dshx:text-muted-foreground' },
+  'rename-changed': { letter: 'R', label: 'Renamed and modified', tone: 'dshx:bg-muted-foreground/12 dshx:text-muted-foreground' },
 } as const satisfies Record<ChangeTypes, { readonly letter: string; readonly label: string; readonly tone: string }>
 
 /**
- * A file's change as a letter badge before its name (council round 17 A2): M modified and R renamed in the secondary
- * ink, A added in the success tone, D deleted in the danger tone, each AA on the diff header. A 16px box with a 1px edge
- * in the same tone, the 11px step at 600, so it reads as a status letter, not a radio button. A screen reader hears the
- * word.
+ * A file's change as a letter badge before its name (council round 17 A2, tones round 18 A2): M modified in the warning
+ * tone, A added in the success tone, D deleted in the danger tone, R renamed in the secondary ink, each on a 12% tint of
+ * its own colour and AA on it over the diff header. A 16px tag with no edge, the 11px step at 600, so it reads as a
+ * status letter, not a radio button. A screen reader hears the word.
  */
 export const ChangeBadge = (props: { readonly type: ChangeTypes }): JSX.Element => {
   const badge = CHANGE_BADGE[props.type]
@@ -109,7 +113,7 @@ export const ChangeBadge = (props: { readonly type: ChangeTypes }): JSX.Element 
     <span
       data-change-badge={props.type}
       className={cn(
-        'dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-current dshx:font-sans dshx:text-2xs dshx:leading-none dshx:font-semibold',
+        'dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:font-sans dshx:text-2xs dshx:leading-none dshx:font-semibold',
         badge.tone,
       )}
     >

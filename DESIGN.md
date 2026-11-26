@@ -843,9 +843,11 @@ tabular, 12px, additions in success and deletions in danger (AA on bg, panel, ra
 muted, the minus U+2212.
 
 **Change badge.** A diff file header leads with its change as a letter, `ChangeBadge` (`@dshfiles/plugin-ui/diff`,
-drawn by `PatchView` in the header's prefix slot): M, A, D, R for modified, added, deleted and renamed, in a 16px box
-with a 1px edge in the letter's tone, the 11px step at 600. M and R are the secondary ink, A success, D danger, each AA
-on the diff header; a screen reader hears the word. The diff library's own glyph (a ringed dot that read as a radio
+drawn by `PatchView` in the header's prefix slot): M, A, D, R for modified, added, deleted and renamed, a 16px tag at
+the 11px step at 600 with no edge. Council round 18 A2: each letter sits at the tint rung of the diff's own status
+tones, M amber (`warning`, the library's modified tone), A green (`success`), D red (`destructive`), R the secondary
+ink, each on a 12% tint of its colour and AA on it over the diff header (tests/patch-header); a screen reader hears
+the word. The diff library's own glyph (a ringed dot that read as a radio
 button) is hidden (council round 17).
 
 **EmptyState.** One sentence, centred, muted, at most one outline action. It never draws its own frame; the list or
