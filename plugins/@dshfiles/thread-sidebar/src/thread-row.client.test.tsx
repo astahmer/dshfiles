@@ -236,6 +236,59 @@ describe('a row that needs you', () => {
     const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
     expect(failed.querySelector('[data-testid="thread-row-status-detail"]')?.className).toContain('dshx:truncate')
   })
+
+  it('says the kind of ask and the project on a desktop row, and the excerpt on a phone (council round 12 B4)', async () => {
+    for (const [workStatus, kind] of [
+      [asking.workStatus, 'threadSidebarAskQuestion · sample'],
+      [rowStatus({ status: 'needs-you', verb: 'Approve', detail: 'git push --force origin main' }), 'threadSidebarAskApproval · sample'],
+    ] as const) {
+      const row = await renderRow({ workStatus })
+      // Desktop: one line, `Question · billing-api`, never a cut excerpt; hidden on touch.
+      const said = row.querySelector<HTMLElement>('[data-testid="thread-row-status-kind"]')
+      expect(said?.textContent).toBe(kind)
+      expect(said?.className).toContain('dshx:truncate')
+      expect(said?.className).toContain('dshx:text-muted-foreground')
+      expect(said?.className).toContain('dshx:pointer-coarse:hidden')
+      // Touch: the excerpt, hidden on a desktop.
+      const excerpt = row.querySelector<HTMLElement>('[data-testid="thread-row-status-detail"]')
+      expect(excerpt?.className).toMatch(/(^| )dshx:hidden( |$)/u)
+      expect(excerpt?.className).toMatch(/dshx:pointer-coarse:(line-clamp-2|block)/u)
+      cleanup()
+    }
+    // A failed row keeps its reason on both.
+    const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
+    expect(failed.querySelector('[data-testid="thread-row-status-kind"]')).toBeNull()
+    expect(failed.querySelector('[data-testid="thread-row-status-detail"]')?.className).not.toMatch(/(^| )dshx:hidden( |$)/u)
+  })
+
+  it('pins a touch question\'s verb to the first line of its two-line excerpt (council round 12 B4)', async () => {
+    // A phone: a coarse pointer, and a layout where the excerpt starts 40px under the top of the row's fill.
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(pointer: coarse)', media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (this: HTMLElement) {
+      const top = this.getAttribute('data-testid') === 'thread-row-status-detail' ? 140 : 100
+      return { top, bottom: top + 18, left: 0, right: 300, width: 300, height: 18, x: 0, y: top, toJSON: () => ({}) }
+    })
+    try {
+      const row = await renderRow(asking)
+      // The 28px verb centres on the excerpt's first 18px line: 5px above it, not on the row's bottom.
+      const end = row.querySelector<HTMLElement>('[data-thread-row-end]')
+      expect(end?.hasAttribute('data-verb-pinned')).toBe(true)
+      expect(end?.style.top).toBe('35px')
+      expect(end?.style.bottom).toBe('auto')
+      cleanup()
+      // A one-line approval keeps the verb on its 28px line 2.
+      const approval = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Approve', detail: 'git push --force origin main' }) })
+      expect(approval.querySelector<HTMLElement>('[data-thread-row-end]')?.style.top).toBe('')
+      cleanup()
+      // A desktop question keeps the bottom seat.
+      vi.stubGlobal('matchMedia', (query: string) => ({ matches: false, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }))
+      const desktop = await renderRow(asking)
+      expect(desktop.querySelector<HTMLElement>('[data-thread-row-end]')?.hasAttribute('data-verb-pinned')).toBe(false)
+    } finally {
+      rect.mockRestore()
+      vi.unstubAllGlobals()
+    }
+  })
 })
 
 describe('colour in a row', () => {

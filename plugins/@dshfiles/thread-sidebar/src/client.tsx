@@ -41,6 +41,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { STATUS_GROUP_KEY_PREFIX, ThreadStatusModel, type RowInlineVerb, type ThreadStatus, type ThreadStatusCopy, type ThreadStatusGroup } from './thread-status.js'
 import { RowVerb } from './row-verb.js'
+import { usePinnedVerbTop } from './row-verb-pin.js'
 import { AttentionSubtitleModel } from './attention-subtitle.js'
 import { plural, useApi, useApiEvent, useApiQuery, usePlugin, useRegistry, type CommandTrigger } from '@dshfiles/dshx/client'
 import { useThreadSubscriptions, type ThreadNotifyChoice } from './subscriptions-client.js'
@@ -1524,17 +1525,23 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   // ink; only a real question may take two lines.
   const ask = workStatus?.status === 'needs-you' ? AttentionSubtitleModel.askOf(workStatus.verb) : undefined
   const askRepeatsTitle = ask !== undefined && statusDetail !== undefined && AttentionSubtitleModel.repeatsTitle(statusDetail, session.displayTitle)
-  const askSubtitle = askRepeatsTitle
-    ? [t(ask === 'question' ? 'threadSidebarAskQuestion' : 'threadSidebarAskApproval'), showMark ? (props.workspaceTitle ?? t('threadSidebarUnassigned')) : undefined]
-        .filter(part => part !== undefined)
-        .join(' · ')
-    : undefined
+  const askKind =
+    ask === undefined
+      ? undefined
+      : [t(ask === 'question' ? 'threadSidebarAskQuestion' : 'threadSidebarAskApproval'), showMark ? (props.workspaceTitle ?? t('threadSidebarUnassigned')) : undefined]
+          .filter(part => part !== undefined)
+          .join(' · ')
+  const askSubtitle = askRepeatsTitle ? askKind : undefined
   // A working thread trades its static meta for what it is doing now (polish pass b:r4et): its step or the subagent
   // rollup, with the working shimmer. Under a status glyph the spinner and the group already say Working, so a turn
   // with no known step keeps the meta line (where it runs) instead of naming the state again; the dot-only groupings
   // keep the word. The elapsed time takes the first line's time slot, so the row shows one clock, not an age and a clock.
   const live = session.running && (workStatus === undefined || workStatus.status === 'working')
   const liveStep = live ? (workStatus?.detail ?? props.liveTurn?.step ?? (workStatus === undefined ? t('threadSidebarWorking') : undefined)) : undefined
+  // A desktop Needs-you row's one line says the kind of ask and the project (`Question · billing-api`), never a cut
+  // excerpt (council round 12 B4); a phone row keeps the excerpt, which a question may run over two lines.
+  const desktopKind = askSubtitle === undefined && liveStep === undefined && statusDetail !== undefined ? askKind : undefined
+  const touchQuestion = ask === 'question' && askSubtitle === undefined && liveStep === undefined && statusDetail !== undefined
   const liveStartedAt = live ? props.liveTurn?.startedAt : undefined
   // The project name only when line 2 has nothing else to say: beside a reason or a step it was cut to "b…" (T1).
   const showProjectName = showProject && liveStep === undefined && statusDetail === undefined
@@ -1555,6 +1562,11 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   // subagent counter when there is one, at its own reserved width so the question keeps the rest of the line (C14).
   // A row with no second line keeps the verb at the first line's end.
   const verbSeat = inlineVerb === undefined ? undefined : metaLine ? 'meta' : 'head'
+  // Touch: beside a two-line question the verb centres on the excerpt's first line (council round 12 B4), not on the
+  // row's bottom. Where that line starts depends on the title's lines, so the row measures it (touch only).
+  const pinVerb = touchQuestion && verbSeat === 'meta' && !props.renaming
+  const excerptRef = useRef<HTMLSpanElement | null>(null)
+  const pinnedVerbTop = usePinnedVerbTop(excerptRef, pinVerb)
   // One layer of colour (council round 8 B3): the row keeps its Needs-you or Failed wash, so its verb is text in the
   // attention or danger foreground on a transparent fill, tinted only on hover and press. A Ready row's Land stays an
   // outline, so the ink primary is left to the page.
@@ -1957,8 +1969,17 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       className="dshx:min-w-0 dshx:flex-1"
                     />
                   )}
+                  {desktopKind === undefined ? null : (
+                    <span
+                      className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm/[18px] dshx:text-muted-foreground dshx:pointer-coarse:hidden"
+                      data-testid="thread-row-status-kind"
+                    >
+                      {desktopKind}
+                    </span>
+                  )}
                   {liveStep !== undefined || statusDetail === undefined ? null : (
                     <span
+                      ref={excerptRef}
                       className={cn(
                         // The reason takes the line: the project name no longer follows it (the tile names the project).
                         // On a desktop every attention row is two lines tall, so the question truncates to one line like
@@ -1973,6 +1994,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         // ink at 13/18 (council round 8 B3).
                         (askSubtitle !== undefined || workStatus?.status === 'needs-you' || workStatus?.status === 'failed') &&
                           'dshx:text-sm/[18px] dshx:text-muted-foreground dshx:pointer-coarse:text-xs/[18px]',
+                        // The excerpt is the phone's: a desktop row says the kind of ask instead (council round 12 B4).
+                        desktopKind !== undefined && 'dshx:hidden',
+                        desktopKind !== undefined && !touchQuestion && 'dshx:pointer-coarse:block',
                       )}
                       data-testid="thread-row-status-detail"
                     >
@@ -2023,6 +2047,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             <div
               data-thread-row-end=""
               data-verb-seat={verbSeat === 'meta' ? 'meta' : undefined}
+              data-verb-pinned={pinnedVerbTop === undefined ? undefined : ''}
+              // Beside a two-line question on touch, the measured seat: centred on the excerpt's first line.
+              style={pinnedVerbTop === undefined ? undefined : { top: `${String(pinnedVerbTop)}px`, bottom: 'auto' }}
               className={cn(
                 'dshx:absolute dshx:right-1.5 dshx:flex dshx:items-center dshx:gap-1',
                 verbSeat !== 'meta' || props.renaming
