@@ -53,6 +53,10 @@
       "types": "./src/lib/error-copy.ts",
       "default": "./src/lib/error-copy.ts"
     },
+    "./lib/work-count": {
+      "types": "./src/lib/work-count.ts",
+      "default": "./src/lib/work-count.ts"
+    },
     "./lib/host-connection": {
       "types": "./src/lib/host-connection.ts",
       "default": "./src/lib/host-connection.ts"
