@@ -28,8 +28,16 @@ describe('the phone meter line (council round 13 C5)', () => {
   it('hides the passive project/branch line under the composer on a phone, unless an entry flags an alert or messages wait', () => {
     const rule = inMedia(
       '@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px)',
-      ":global(html[data-shell-phone-nav]) .root:not(.hero) > .dock:not(:has(:global([data-meter-alert]), .queued))",
+      ":global(html[data-shell-phone-nav]) .root:not(.hero) > .dock:not([data-meter-expanded]):not(:has(:global([data-meter-alert]), .queued))",
     )
     expect(rule).toMatch(/display: none;/)
+  })
+
+  it('shows the line when the thread sheet asks for its readings, with the toggle that folds it away', () => {
+    const toggle = inMedia(
+      '@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px)',
+      ':global(html[data-shell-phone-nav]) .dock[data-meter-expanded] .meterMore',
+    )
+    expect(toggle).toMatch(/display: inline-flex;/)
   })
 })

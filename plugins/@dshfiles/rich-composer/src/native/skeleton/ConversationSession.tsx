@@ -433,6 +433,7 @@ export function ConversationSessionHeader({
         <button
           type="button"
           className={css.phoneMenuButton}
+          data-phone-thread-menu=""
           aria-label={t('session.menu')}
           aria-haspopup="dialog"
           aria-expanded={menuOpen}

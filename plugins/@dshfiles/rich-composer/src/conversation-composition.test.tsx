@@ -536,6 +536,72 @@ describe('fixed Conversation content factory composition', () => {
     expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
   })
 
+  // Council round 13 C5 hides the passive meter line on a phone; its readings (activity, tokens, cost) must stay
+  // reachable. The thread bar's ⋯ sheet lists them, and picking that row lays the line out expanded, focus on its toggle.
+  it('reaches the hidden meter line\'s readings from the phone thread sheet, by touch or keyboard', async () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        disconnect() {}
+      },
+    )
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const menu = createPhoneThreadMenu()
+    const client = await createTestClient()
+    await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
+      packageId: '@dshfiles/rich-composer',
+    })
+    dispose.push(() => {
+      void client.dispose()
+    })
+    const Scope = menu.scope.Provider
+    const a = fixture('phone-details')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    await act(async () =>
+      root.render(
+        <Scope value="phone-details-reader">
+          <ConversationSessionHeader {...a.header} />
+          <ConversationContent {...a.props} />
+        </Scope>,
+      ),
+    )
+    const line = element.querySelector('[data-meter-line]')
+    expect(line?.hasAttribute('data-meter-expanded')).toBe(false)
+    act(() => document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-bar] button[aria-label="session.menu"]')?.click())
+    const row = [...document.body.querySelectorAll<HTMLButtonElement>('[data-conversation-phone-sheet] [data-phone-thread-tool-proxy]')].find(
+      button => button.textContent === 'runRow.moreDetails',
+    )
+    expect(row).toBeDefined()
+    // A real button: Tab reaches it and Enter or Space activates it like a tap.
+    expect(row?.tagName).toBe('BUTTON')
+    await act(async () => row?.click())
+    expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
+    expect(line?.hasAttribute('data-meter-expanded')).toBe(true)
+    const toggle = line?.querySelector<HTMLButtonElement>('[data-meter-more]')
+    expect(toggle?.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(toggle)
+    // Its own toggle folds the line away again. On a phone the folded line (and the toggle) leaves the page, so focus
+    // goes back to the thread bar's ⋯ it came from instead of dropping to the page (jsdom draws no boxes, as the
+    // hidden line draws none).
+    // A tap: WebKit does not focus the button it activates.
+    act(() => toggle?.blur())
+    act(() => toggle?.click())
+    expect(line?.hasAttribute('data-meter-expanded')).toBe(false)
+    expect(document.activeElement).toBe(document.body.querySelector('[data-conversation-phone-bar] [data-phone-thread-menu]'))
+  })
+
   it('keeps draft tools visible without a reachable menu launcher', async () => {
     const menu = createPhoneThreadMenu()
     const client = await createTestClient()

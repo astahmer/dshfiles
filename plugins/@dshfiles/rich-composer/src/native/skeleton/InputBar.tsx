@@ -38,6 +38,7 @@ import { resolveSubmitMode } from '../input/submission-policy.ts'
 import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
+import { usePhoneThreadTool } from '../../phone-thread-menu.tsx'
 import { RpcFailure } from '../../rpc-failure.ts'
 import { useTriggerMenuRoom } from '../../trigger-menu-room.ts'
 import { SendWhenUploaded, settleHeldSend, uploadGate, type HeldDraft, type HeldSend, type UploadGate } from '../../held-send.ts'
@@ -178,6 +179,34 @@ export const InputBar = memo(function InputBar({
   const planActive = useProjection('plan', plan => plan !== undefined && (plan.pending ? !plan.active : plan.active))
   // The narrow meter line's ⋯: its readings on a second line (b:gyk7).
   const [metaExpanded, setMetaExpanded] = useState(false)
+  // Council round 13 C5: a phone hides the passive meter line, so its readings are a row of the thread bar's ⋯ sheet.
+  // Picking it lays the line out expanded (the phone rule shows an expanded line) and focuses the line's toggle, which
+  // folds it away again.
+  const meterMoreRef = useRef<HTMLButtonElement | null>(null)
+  const focusMeterMore = useRef(false)
+  usePhoneThreadTool({
+    id: '@dshfiles/rich-composer/thread-details',
+    label: t('runRow.moreDetails'),
+    open: () => {
+      focusMeterMore.current = true
+      setMetaExpanded(true)
+    },
+    available: variant === 'composer' && sessionId !== undefined,
+  })
+  // Folding the line from its toggle: where the folded line leaves the page (a phone), focus returns to the
+  // thread bar's ⋯ the readings were opened from, instead of dropping to the page (or raising the keyboard).
+  const refocusAfterFold = useRef(false)
+  useEffect(() => {
+    if (metaExpanded && focusMeterMore.current) {
+      focusMeterMore.current = false
+      meterMoreRef.current?.focus()
+    }
+    if (metaExpanded || !refocusAfterFold.current) return
+    refocusAfterFold.current = false
+    const toggle = meterMoreRef.current
+    if (toggle !== null && toggle.getClientRects().length > 0) return
+    document.querySelector<HTMLElement>('[data-conversation-phone-bar] [data-phone-thread-menu]')?.focus()
+  }, [metaExpanded])
   // Absent (undefined: no frame yet) and cleared (null) both mean no goal.
   const hasGoal = useProjection('goal', goal => goal != null)
   // Session-maybe: the machine faces are absent together while no session is
@@ -930,12 +959,17 @@ export const InputBar = memo(function InputBar({
         {variant === 'composer' ? <span className={css.meterSpacer} aria-hidden /> : null}
         {variant === 'composer' ? (
           <button
+            ref={meterMoreRef}
             type="button"
             className={css.meterMore}
             aria-expanded={metaExpanded}
             aria-label={metaExpanded ? t('runRow.lessDetails') : t('runRow.moreDetails')}
             data-meter-more=""
-            onClick={() => { setMetaExpanded(open => !open) }}
+            onClick={() => {
+              // A tap does not focus a button in WebKit, so any fold from the toggle counts, not only a focused one.
+              refocusAfterFold.current = metaExpanded
+              setMetaExpanded(open => !open)
+            }}
           >
             ⋯
           </button>
