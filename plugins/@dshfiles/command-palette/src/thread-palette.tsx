@@ -745,8 +745,9 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           onKeyDown={onKeyDown}
           loop
           // The palette's selection wash (council round 17 B2.1): with no edge, the active row needs a clearly visible
-          // fill, so the dialog wash is capped at L 0.925 (light 0.935 → 0.925; dark keeps the dialog's 0.30).
-          className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1 dshx:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_min(l,0.925)_c_h)]"
+          // fill, so the dialog wash is capped at L 0.925 in light (0.935 → 0.925). In dark it lifts to L 0.33, about
+          // #393532 (council round 18 B2.2): the dialog's 0.30 sat too close to its 0.27 fill.
+          className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1 dshx:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_min(l,0.925)_c_h)] dshx:dark:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_max(l,0.33)_c_h)]"
         >
           {/* The dialog is the field's one frame: no second ring around the search row inside it (round five B6). A 48px
               search lane with no rule of its own: the one rule sits under the filters, above the results (council round 4

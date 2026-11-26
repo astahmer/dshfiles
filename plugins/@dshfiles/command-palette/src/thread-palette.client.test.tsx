@@ -781,17 +781,20 @@ describe('ThreadPalette goes to threads', () => {
     const view = render(palette())
     const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
     expect(row.className).not.toContain('selected-edge')
-    // The palette caps the dialog wash at L 0.925: light 0.935 → 0.925, dark keeps the dialog's 0.30.
+    // The palette caps the dialog wash at L 0.925 in light (0.935 → 0.925), and lifts it to L 0.33 in dark (council
+    // round 18 B2.2: the dialog's 0.30 sat too close to its 0.27 fill), about #393532.
     const root = view.baseElement.querySelector<HTMLElement>('[cmdk-root]')
     expect(root?.className).toContain('dshx:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_min(l,0.925)_c_h)]')
+    expect(root?.className).toContain('dshx:dark:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_max(l,0.33)_c_h)]')
   })
 
   it.each(['light', 'dark'] as const)('keeps the row text at AA and the status glyphs at 3:1 on the palette wash (%s)', (scheme: 'light' | 'dark') => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    // The dialog wash: the page wash, lifted to 0.30 in dark (ui-styles surfaces.css), then capped at 0.925 here.
+    // The dialog wash: the page wash, lifted to 0.30 in dark (ui-styles surfaces.css); here capped at 0.925 in light
+    // and lifted to 0.33 in dark.
     const dialog = scheme === 'dark' ? { ...p.selectedWash, l: Math.max(p.selectedWash.l, 0.3) } : p.selectedWash
-    const wash = { ...dialog, l: Math.min(dialog.l, 0.925) }
-    expect(wash.l).toBe(scheme === 'light' ? 0.925 : 0.3)
+    const wash = scheme === 'dark' ? { ...dialog, l: Math.max(dialog.l, 0.33) } : { ...dialog, l: Math.min(dialog.l, 0.925) }
+    expect(wash.l).toBe(scheme === 'light' ? 0.925 : 0.33)
     // Ink (title) and secondary (the AttentionMeta line, a destination's glyph); a row draws no faint text, its hints
     // are kit chips on their own fill.
     for (const step of [9, 10]) expect(PaletteMath.contrastRatio(p.neutral[step]!, wash), `step ${step}`).toBeGreaterThanOrEqual(4.5)
