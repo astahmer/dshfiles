@@ -161,9 +161,27 @@ section[data-plugin-panel] [class*='_cardIcon'] > * {
 section[data-plugin-panel] [class*='_cardDesc'] {
   /* A first line of at most 70ch reads as the row's summary; the rest wraps once, then clamps (council round 6, D4). */
   max-width: 70ch;
+  /* Two complete 18px lines, never a partial third where the clamp is not honoured (council round 10, D4). */
+  max-height: 36px;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   text-wrap: pretty;
+}
+
+/*
+ * A row with a description hangs from its title line (council round 10, D4): the 20px switch in a 20px end column at
+ * the row's top sits on the title's 20px line, and the icon tile starts at the title's top, so a two-line description
+ * no longer pulls the switch half a line below the title. Package rows only (the rows with a switch): a settings item row
+ * keeps its icon and chevron centred, since its description slot may render an empty wrapper, and so does a package
+ * row with no description.
+ */
+section[data-plugin-panel] li[data-plugin-package] [class*='_cardHead']:has([class*='_cardDesc']:not(:empty)) > [class*='_cardEnd'] {
+  align-self: flex-start;
+  height: 20px;
+}
+
+section[data-plugin-panel] li[data-plugin-package] [class*='_cardHead']:has([class*='_cardDesc']:not(:empty)) > [class*='_cardIcon'] {
+  align-self: flex-start;
 }
 
 section[data-plugin-panel] [class*='_cardMain'] {

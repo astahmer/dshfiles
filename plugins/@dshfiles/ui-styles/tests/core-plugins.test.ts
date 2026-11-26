@@ -227,6 +227,34 @@ describe('core Plugins page title and descriptions (council round 6, D4)', () =>
   })
 })
 
+describe('core Plugins multi-line rows (council round 10, D4)', () => {
+  it('still renders the hooks: a centred row head, a 20px title line and a 20px Host switch', () => {
+    expect(/_cardHead\{align-items:center;/u.test(page), 'centred head').toBe(true)
+    expect(/_cardTitle\{[^}]*line-height:20px/u.test(page), 'title line').toBe(true)
+    expect(/_cardDesc\{[^}]*line-height:18px/u.test(page), 'description line').toBe(true)
+    const switchSheet = readFileSync(join(primitives, 'lib/Switch.module.css'), 'utf8')
+    expect(switchSheet).toMatch(/\.switch \{[^}]*height: 20px;/u)
+  })
+
+  it('hangs a row with a description from its title line: the switch on the title, the icon at the top', () => {
+    // The 20px switch in a 20px end column at the row's top sits on the title's 20px line, however many lines follow.
+    const end = ruleFor("li[data-plugin-package] [class*='_cardHead']:has([class*='_cardDesc']:not(:empty)) > [class*='_cardEnd']")
+    expect(end).toMatch(/align-self:\s*flex-start;/u)
+    expect(end).toMatch(/height:\s*20px;/u)
+    expect(ruleFor("li[data-plugin-package] [class*='_cardHead']:has([class*='_cardDesc']:not(:empty)) > [class*='_cardIcon']")).toMatch(/align-self:\s*flex-start;/u)
+  })
+
+  it('leaves settings item rows centred: their description slot can render an empty wrapper (HMR updates)', () => {
+    const raised = rules.filter(([selector, body]) => /> \[class\*='_card(?:Icon|End)'\]/u.test(selector) && /align-self:\s*flex-start;/u.test(body))
+    expect(raised).toHaveLength(2)
+    for (const [selector] of raised) expect(selector).toContain('li[data-plugin-package] ')
+  })
+
+  it('clamps a description at two complete lines, never a partial third', () => {
+    expect(ruleFor("[class*='_cardDesc']")).toMatch(/max-height:\s*36px;/u)
+  })
+})
+
 describe('core Plugins header (council round 7, D1 and D5)', () => {
   it('still renders the toolbar, its Refresh button and the title hooks', () => {
     expect(page.includes('"data-plugin-toolbar"') || page.includes('data-plugin-toolbar'), 'toolbar').toBe(true)
