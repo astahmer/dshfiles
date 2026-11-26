@@ -671,6 +671,10 @@ describe('DestinationShell', () => {
     expect(search.parentElement?.className).toContain('dshx:gap-2')
     expect(search.parentElement?.className).toContain('dshx:pb-1.5')
     expect(ListHeaderExtras.get().scopeSlot).toBe(seat)
+    // The toolbar band measures 48px (council round 11 B2): the list starts 4px under the top bar's rule when it leads
+    // with this row, instead of the 12px other lists keep.
+    expect(search.parentElement?.hasAttribute('data-threads-toolbar')).toBe(true)
+    expect(list?.className).toContain('dshx:has-[[data-threads-toolbar]]:pt-1')
     cleanup()
     // A desktop column keeps the list's own project and Filter row: no seat.
     setPhone(false)
@@ -694,7 +698,7 @@ describe('DestinationShell', () => {
     renderShell({ collapsed: false })
     const list = document.querySelector<HTMLElement>('[data-phone-list]')
     expect(list?.className).toContain('dshx:pt-3')
-    expect(list?.className).not.toContain('dshx:pt-1')
+    expect(list?.className).not.toMatch(/(^| )dshx:pt-1( |$)/u)
     const search = within(list ?? document.body).getByRole('button', { name: 'Search threads' })
     expect(search.parentElement?.className).toContain('dshx:px-3')
     expect(search.className).toContain('dshx:px-3')

@@ -910,7 +910,10 @@ const ThreadsPane = (props: ListPaneProps): JSX.Element => {
         // The phone gutter (round nine B4): fields fill from 12px, their text and glyphs start at 24px. On a phone the row
         // is the list's one toolbar (council round 10 B1): the search and the list's scope button, 8px apart, 6px over the
         // first group head (its own half-leading makes about 12px to the label).
-        <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1', phone && 'dshx:gap-2 dshx:px-3 dshx:pb-1.5')}>
+        <div
+          className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1', phone && 'dshx:gap-2 dshx:px-3 dshx:pb-1.5')}
+          data-threads-toolbar=""
+        >
           <Button
             // The one control height (round nine B5, kit A4): 32px beside the project and Filter fields, 44px on touch.
             size="field"
@@ -1844,6 +1847,8 @@ const PhoneNavigation = (
           className={cn(
             // 12px under the top bar's rule (round nine B4, the phone shell grid).
             'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-3 dshx:text-foreground',
+            // The Threads toolbar band measures 48px (council round 11 B2): 4px under the rule, then the 44px search row.
+            'dshx:has-[[data-threads-toolbar]]:pt-1',
             // The frame's status pill row (44px, just above the tab bar) stays visible under a full-screen list: the list
             // ends above it whenever the frame draws it (round five, lane C asked), and covers it while the keyboard is up.
             'dshx:[html:not([data-phone-keyboard]):has([data-status-strip=compact])_&]:[--phone-list-status-room:44px]',

@@ -6347,10 +6347,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // (council round 10 B1), where it also holds the project.
   const scopeSlot = headerExtras.scopeSlot
   const scopeInput = {
-    view: listFiltered ? (presetsOn ? activeViewShortLabel : activeFilterSummary) : null,
+    filterCount: ThreadListScope.filterCount({ filtered: listFiltered, filterLabels: activeFilterLabels.length }),
     project: projectFilterValue === ALL_PROJECTS ? null : projectFilterLabel,
-    all: props.tSidebar('threadSidebarAllShort'),
+    filters: props.tSidebar('threadSidebarFilters'),
   }
+  const scopeCount = ThreadListScope.count(scopeInput)
   const filterMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -6373,7 +6374,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           className={
             scopeSlot === null
               ? 'dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3'
-              : // The phone scope button: the funnel and the scope in words, as wide as its words, at most 45% of the row.
+              : // The phone scope button: the funnel, "Filters" or the project, and the count of filters on; as wide as
+                // its words, at most 45% of the row.
                 'dshx:w-full dshx:min-w-0 dshx:gap-2 dshx:px-3'
           }
           // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
@@ -6388,10 +6390,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           <span className="dshx:truncate">
             {scopeSlot === null ? (presetsOn ? activeViewShortLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
-          {scopeSlot === null ? null : ThreadListScope.narrowed(scopeInput) ? (
-            // A narrowed scope (a view, a filter or a project) shows one ink dot; the status views' own dots stay in the menu.
-            <span aria-hidden="true" data-testid="thread-scope-dot" className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary" />
-          ) : null}
+          {scopeSlot === null || scopeCount === null ? null : (
+            // How many filters are on (council round 11 B2); the accessible name already spells them out.
+            <Badge aria-hidden="true" data-testid="thread-scope-count" className="dshx:h-4.5 dshx:min-w-4.5 dshx:px-1 dshx:py-0 dshx:tabular-nums">
+              {scopeCount}
+            </Badge>
+          )}
           {scopeSlot !== null ? null : presetEdited ? (
             <span
               aria-hidden="true"
