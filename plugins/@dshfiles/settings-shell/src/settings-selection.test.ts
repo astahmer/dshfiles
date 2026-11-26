@@ -20,8 +20,8 @@ describe('Settings selection at the tint rung (round five P4, K2)', () => {
     expect(general).toContain(`dshx:${cube}:selected-card!`)
     expect(general).not.toContain(`dshx:${cube}:selected-marker!`)
     expect(general).not.toContain(`dshx:${cube}:after:rotate-45`)
-    // Smaller cubes in a narrow pane.
-    expect(general).toContain('dshx:@max-pane-narrow:[&_[class*=_themeCube]]:py-2!')
+    // One 80px card height in every pane (council round 11 B4).
+    expect(general).toContain('dshx:[&_[class*=_themeCube]]:h-20!')
   })
 })
 

@@ -40,7 +40,7 @@ const previewParts = (colours: SchemeColours): string =>
 /**
  * Each Appearance card's preview (round five B7): a miniature drawn in that theme's own palette, so the card shows the
  * theme it picks rather than an icon. System shows the light window with its trailing half in dark. Drawn on a 96×56
- * grid and shown at 80×46 (council round 10 B3), so the card stays 88–96px tall.
+ * grid and shown at 72×42 (council round 11 B4), so the 80px card keeps air above the preview and under its label.
  */
 const themePreview = (scheme: 'light' | 'dark' | 'system'): string => {
   const light = PaletteMath.standaloneColours('light')
@@ -51,7 +51,7 @@ const themePreview = (scheme: 'light' | 'dark' | 'system'): string => {
       : previewParts(scheme === 'light' ? light : dark)
   // One mid-grey edge on every preview, so a near-white or near-black window shows on a light and on a dark card alike.
   const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="46" viewBox="0 0 96 56" preserveAspectRatio="none">',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="72" height="42" viewBox="0 0 96 56" preserveAspectRatio="none">',
     '<defs><clipPath id="frame"><rect width="96" height="56" rx="6"/></clipPath><clipPath id="half"><rect x="48" width="48" height="56"/></clipPath></defs>',
     `<g clip-path="url(#frame)">${body}</g>`,
     `<rect x="0.5" y="0.5" width="95" height="55" rx="5.5" fill="none" stroke="${light.faint}"/>`,
@@ -103,9 +103,12 @@ export const GeneralSection = (
         'dshx:[&_[class$=row]:has(+[data-settings-language-note])]:border-b-0! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:bg-none! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:pb-1!',
         // The chosen Appearance cube (core theme row, unlayered module CSS) is the kit's selected card (council round 8 A2,
         // B4): a 2px edge and a check badge in its top-end corner on the card's own surface, no fill change and no inset
-        // row marker. Narrow panes get shorter cubes.
+        // row marker.
         'dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-card! dshx:[&_[class*=_themeCube][aria-pressed=true]]:bg-transparent!',
-        'dshx:@max-pane-narrow:[&_[class*=_themeCube]]:py-2! dshx:@max-pane-narrow:[&_[class*=_themeCube]]:gap-1!',
+        // Three ~152×80 cards from the row's start edge, 8px apart (council round 11 B4), instead of three cards splitting
+        // the column: a choice of three reads at a glance. A narrow pane shrinks them on one line, never wrapping the third.
+        'dshx:[&_[class$=_cubeRow]]:flex-nowrap! dshx:[&_[class$=_cubeRow]]:gap-2! dshx:[&_[class$=_cubeRow]]:justify-start!',
+        'dshx:[&_[class*=_themeCube]]:flex-[0_1_152px]! dshx:[&_[class*=_themeCube]]:h-20! dshx:[&_[class*=_themeCube]]:min-w-0! dshx:[&_[class*=_themeCube]]:px-2!',
         // The rows' selectors (core module CSS, filled and borderless) in the kit's one select look (council round 3 B3,
         // kit A4): 32px, a 1px border, the page fill, 8px corners.
         'dshx:[&_[class*=_selector_]]:select-look! dshx:[&_[class*=_selector_]:hover]:bg-(--dsw-alias-interactive-bg-hover)!',
@@ -126,9 +129,9 @@ export const GeneralSection = (
         // menu. It is a link under the field (council round 10 B3), named by its own label, on the field's start edge.
         'dshx:[&_[class*=_expander_]]:ml-0! dshx:[&_[class*=_expander_]]:col-span-full! dshx:[&_[class*=_expander_]]:justify-start! dshx:[&_[class*=_expander_]]:h-auto! dshx:[&_[class*=_expander_]]:w-auto! dshx:[&_[class*=_expander_]]:rounded-sm! dshx:[&_[class*=_expander_]]:bg-transparent! dshx:[&_[class*=_expander_]]:p-0! dshx:[&_[class*=_expander_]]:text-sm! dshx:[&_[class*=_expander_]]:text-foreground! dshx:[&_[class*=_expander_]]:underline! dshx:[&_[class*=_expander_]]:decoration-field-border! dshx:[&_[class*=_expander_]]:underline-offset-4! dshx:[&_[class*=_expander_]:hover]:decoration-current! dshx:pointer-coarse:[&_[class*=_expander_]]:min-h-11! dshx:[&_[class*=_expander_]>svg]:hidden! dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]',
         'dshx:[&_[class*=_stepper_]+[class*=_unit_]]:ml-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:inline-flex! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:h-8! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:items-center! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:rounded-r-(--dsw-radius-md)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-field-border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:pr-2.5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-muted-foreground!',
-        // Each card leads with its theme's 80×46 preview (`themeSwatches`, round five B7; council round 10 B3) in place of
-        // core's icon, label under it; cards in core order, Light, Dark, System. 8px padding keeps the card 88–96px tall.
-        "dshx:[&_[class*=_themeCube]>svg]:hidden! dshx:[&_[class*=_themeCube]]:py-2! dshx:[&_[class*=_themeCube]]:gap-2! dshx:[&_[class*=_themeCube]]:before:order-first dshx:[&_[class*=_themeCube]]:before:h-[46px] dshx:[&_[class*=_themeCube]]:before:w-20 dshx:[&_[class*=_themeCube]]:before:shrink-0 dshx:[&_[class*=_themeCube]]:before:content-['']",
+        // Each card leads with its theme's 72×42 preview (`themeSwatches`, round five B7; council round 11 B4) in place of
+        // core's icon, label under it; cards in core order, Light, Dark, System. Centred in the 80px card: 42 + 4 + 22.
+        "dshx:[&_[class*=_themeCube]>svg]:hidden! dshx:[&_[class*=_themeCube]]:py-0! dshx:[&_[class*=_themeCube]]:gap-1! dshx:[&_[class*=_themeCube]]:before:order-first dshx:[&_[class*=_themeCube]]:before:h-[42px] dshx:[&_[class*=_themeCube]]:before:w-18 dshx:[&_[class*=_themeCube]]:before:shrink-0 dshx:[&_[class*=_themeCube]]:before:content-['']",
         // Helper copy reads in lines of 60 characters at most (council round 6 B5), whichever plugin drew the row.
         'dshx:[&_[class*=_desc]]:max-w-[60ch]! dshx:[&_[class*=Description]]:max-w-[60ch]!',
         'dshx:[&_[class*=_themeCube]:nth-child(1)]:before:[background:var(--settings-swatch-light)] dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)] dshx:[&_[class*=_themeCube]:nth-child(3)]:before:[background:var(--settings-swatch-system)]',
