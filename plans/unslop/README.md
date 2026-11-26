@@ -222,6 +222,14 @@ Round 11 findings, merged in `.cache/unslop-audit/r5/council/round-11-fixes.md`:
 a glyph or tile; a resting hairline on quiet triggers and the field edge on the empty composer; a stronger light diff;
 one-row Usage breakdowns and one toolbar label grammar; one verb slot on desktop Inbox cards; inherited AI accounts
 effort as text; a ~72-character prose measure; a worded phone Triage and a Filters scope button.
+All four lanes done: A kit 9 revisions `nsvtwtzy` … `uqzzqnpq` (marker skipped beside a leading glyph with a
+MARKER_KEEP exception for attention rows, a resting hairline on quiet triggers, a typeable combobox rest look, a 16 px
+checkbox, light diff at 16 %/34 %, quiet peek choices, DESIGN.md); B 6 revisions `zkrtwknt` … `rzytprus` (152×80 theme
+tiles, one-line desktop question previews, a Filters scope button in a 48 px band, no pill beside leading glyphs in the
+list and palette); C 7 revisions `owxtmrut` … `soynztwr` (worded phone Triage in the top bar, one verb slot on desktop
+Inbox heads, quiet question options, the composer's 3:1 edge, the phone Live work strip on nav with a footer dot, prose
+at 36em); D 7 revisions `ltnpxuux` … `wvsvtuyk` (a one-row single-entry breakdown, one filter label grammar, outline
+plugin tiles in their group tones, Compare against at rest, quiet inherited effort and dense checkboxes).
 
 ## Round four
 
