@@ -627,8 +627,9 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     )
   }
 
-  // Two-line rows at 56px (council round 4 A5/B7): the title, then its meta line, with room above and below.
-  const itemClass = 'dshx:group/item dshx:min-h-14 dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
+  // Two-line rows at 56px (council round 4 A5/B7): the title, then its meta line, with room above and below. The active
+  // row takes the kit selected edge beside its wash and ↵ (council round 13 B1): the dark wash alone read 1.1:1.
+  const itemClass = 'dshx:group/item dshx:min-h-14 dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2 dshx:data-[selected=true]:selected-edge'
   const viewCopy = {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },

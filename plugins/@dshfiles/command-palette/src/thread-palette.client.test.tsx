@@ -776,6 +776,14 @@ describe('ThreadPalette goes to threads', () => {
     expect(enter?.parentElement?.className).toContain('dshx:grid')
   })
 
+  it('outlines the active row with the kit selected edge beside its wash (council round 13 B1)', async () => {
+    render(palette())
+    const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
+    // The dark wash alone measured 1.1:1 on the dialog; the edge holds 3:1 and draws only while the row is active.
+    expect(row.className).toContain('dshx:data-[selected=true]:selected-edge')
+    expect(row.className).not.toMatch(/(^|\s)dshx:selected-edge(\s|$)/u)
+  })
+
   it('draws every hint as the kit shortcut chip, unfaded and unrestyled (council round 10 A5, B4)', () => {
     const source = readFileSync('src/thread-palette.tsx', 'utf8')
     // A 70% chip read under AA; the kit chip carries its own fill, edge and face, so no hint overrides them.
