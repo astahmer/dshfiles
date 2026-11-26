@@ -46,8 +46,9 @@ describe('the failed card\'s reason well (council round 15 C2)', () => {
     expect(InboxView.failureWell(failed('Turn failed.'))).toEqual({ kind: 'stopped-on-error' })
     expect(InboxView.failureWell(failed('“Upgrade the router to v8” stopped at the output token limit'))).toEqual({ kind: 'token-limit' })
     expect(InboxView.failureWell(failed('Turn stopped at the output token limit.'))).toEqual({ kind: 'token-limit' })
-    expect(locales).toContain("failedError: 'Error: {line}',")
-    expect(locales).toContain("failedOnError: 'The turn stopped on an error.',")
+    // Council round 16 C3: "Error:" is the well's label; a plain error draws no well, so it has no sentence.
+    expect(locales).toContain("failedErrorLabel: 'Error:',")
+    expect(locales).not.toContain('failedOnError')
     expect(locales).toContain("failedTokenLimit: 'The turn hit the output token limit.',")
   })
 
@@ -57,10 +58,8 @@ describe('the failed card\'s reason well (council round 15 C2)', () => {
     expect(InboxView.failureWell({ ...failed('Push failed', 'rejected'), source: 'jj-integration.land' })).toBeNull()
   })
 
-  it('is one line on the failed wash in ink, mono for an error, under the title on every width', () => {
-    for (const part of ['dshx:bg-wash-failed', 'dshx:truncate', 'dshx:text-xs', 'dshx:leading-4.5', 'dshx:text-foreground', 'dshx:rounded-md', 'dshx:py-1', 'dshx:px-2.5'])
-      expect(InboxView.FAILURE_WELL).toContain(part)
-    expect(InboxView.FAILURE_WELL_ERROR).toBe('dshx:font-mono')
+  // Council round 16 C3: the kit's danger evidence well (inbox-round16.test.ts).
+  it('marks its kind on the well', () => {
     expect(panel).toContain('data-inbox-failure-well={failure.kind}')
   })
 

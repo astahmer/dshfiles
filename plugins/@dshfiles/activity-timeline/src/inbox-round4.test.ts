@@ -36,9 +36,9 @@ describe('an Inbox card (round five C3, council round 4)', () => {
     expect(question).toEqual({ reason: 'Asks: Which rate?', detail: null, command: false })
   })
 
-  it('draws an approval command as 12/16 mono, in ink after its muted lead-in since council round 8 C2', () => {
-    expect(InboxView.COMMAND).toBe('dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground')
-    expect(row).toContain('InboxView.COMMAND')
+  // Council round 16 C3: the command sits in the kit evidence well (inbox-round16.test.ts).
+  it('draws an approval command as a command in the evidence well', () => {
+    expect(row).toContain('<code className={InboxView.WELL_CODE}>')
   })
 
   it('titles a card at the contextual heading step, 15/20 at 600', () => {

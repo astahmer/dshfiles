@@ -25,17 +25,14 @@ describe('the phone approval card (council round 13 C1)', () => {
 
   it('reads "Runs:" inline with its command, as on desktop: no caption line above the command', () => {
     expect(runs).not.toContain('data-inbox-runs-caption')
-    expect(runs).toContain("<span>{t('runs')}</span>")
+    expect(runs).toContain("<span data-evidence-label=\"\">{t('runs')}</span>")
     expect('RUNS_INLINE' in InboxView).toBe(false)
     expect('RUNS_CAPTION' in InboxView).toBe(false)
   })
 
-  it('keeps the muted block, and clamps and hangs the whole line there, so the command stays inline', () => {
-    for (const part of ['dshx:@max-pane-narrow:bg-muted', 'dshx:@max-pane-narrow:rounded-md', 'dshx:@max-pane-narrow:line-clamp-4', 'dshx:@max-pane-narrow:-indent-[2ch]'])
-      expect(InboxView.RUNS_BLOCK).toContain(part)
-    expect(InboxView.RUNS_BLOCK).not.toContain('dshx:@max-pane-narrow:block')
-    for (const part of ['line-clamp', 'indent', 'pl-[2ch]']) expect(InboxView.COMMAND_BLOCK).not.toContain(part)
-    expect(InboxView.COMMAND_BLOCK).toContain('dshx:@max-pane-narrow:leading-4.5')
+  // Council round 16 C3: the command sits in the kit evidence well (inbox-round16.test.ts).
+  it('clamps the whole line in the well, so the command stays inline after "Runs:"', () => {
+    expect(runs).toContain('InboxView.WELL_CLAMP_RUNS')
   })
 })
 

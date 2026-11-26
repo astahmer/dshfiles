@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { EvidenceWell } from '@dshfiles/plugin-ui/components/ui/evidence-well'
 import { KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
@@ -464,38 +465,51 @@ const InboxRow = (props: {
         </div>
   )
   /**
-   * What the card acts on, first in its body (council round 8 C2): a question's "Asks: …" in ink at body size, an
-   * approval's "Runs: `command`" (12/16, the command in ink mono), any other note muted.
+   * What the card acts on, first in its body (council round 8 C2): a question's "Asks: …" in ink at body size, any
+   * other note muted. Council round 16 C3: what a card quotes sits in the kit's evidence well across the text measure,
+   * desktop and phone: an approval's "Runs: command" in the neutral well, a failed turn's provider line as
+   * "Error: line" in the danger well, and a failed turn with no line has no well (its meta already says Turn failed).
    */
+  const failureText =
+    failure === null || failure.kind === 'stopped-on-error' ? null : failure.kind === 'error' ? (
+      <>
+        <span data-evidence-label="">{t('failedErrorLabel')}</span> {failure.line}
+      </>
+    ) : (
+      t('failedTokenLimit')
+    )
   const evidence =
     failure !== null ? (
-      <div data-inbox-card-body="" className="dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:flex-col">
-        <span data-inbox-failure-well={failure.kind} className={cn(InboxView.FAILURE_WELL, failure.kind === 'error' && InboxView.FAILURE_WELL_ERROR, InboxView.TEXT_MEASURE)}>
-          {failure.kind === 'error' ? t('failedError', { line: failure.line }) : failure.kind === 'token-limit' ? t('failedTokenLimit') : t('failedOnError')}
-        </span>
-      </div>
+      failureText === null ? null : (
+        <div data-inbox-card-body="" className={InboxView.WELL_BODY}>
+          <EvidenceWell tone="danger" data-inbox-failure-well={failure.kind} className={InboxView.TEXT_MEASURE}>
+            <span className={InboxView.WELL_CLAMP_ERROR}>{failureText}</span>
+          </EvidenceWell>
+        </div>
+      )
     ) : reason === null && card.detail === null ? null : (
       <div
         data-inbox-card-body=""
         className={cn(
-          'dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:flex-col dshx:gap-0.5',
+          card.command ? InboxView.WELL_BODY : 'dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:flex-col dshx:gap-0.5',
           answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
         )}
       >
         {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
         {card.detail === null ? null : card.command ? (
-          <span data-inbox-runs="" className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.LEAD_IN, InboxView.RUNS_BLOCK, InboxView.TEXT_MEASURE)}>
-            {/* "Runs: command" inline on every width (council round 13 C1); a compact pane draws it as one muted block. */}
-            <span>{t('runs')}</span>{' '}
-            <code className={cn(InboxView.COMMAND, InboxView.COMMAND_BLOCK)}>
-              {InboxView.commandWords(card.detail).map((word, index) => (
-                <span key={index}>
-                  {index === 0 ? null : ' '}
-                  {word.keep ? <span className="dshx:whitespace-nowrap">{word.text}</span> : word.text}
-                </span>
-              ))}
-            </code>
-          </span>
+          <EvidenceWell data-inbox-runs="" className={InboxView.TEXT_MEASURE}>
+            <span className={cn(clamped && InboxView.WELL_CLAMP_RUNS)}>
+              <span data-evidence-label="">{t('runs')}</span>{' '}
+              <code className={InboxView.WELL_CODE}>
+                {InboxView.commandWords(card.detail).map((word, index) => (
+                  <span key={index}>
+                    {index === 0 ? null : ' '}
+                    {word.keep ? <span className="dshx:whitespace-nowrap">{word.text}</span> : word.text}
+                  </span>
+                ))}
+              </code>
+            </span>
+          </EvidenceWell>
         ) : (
           <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', answerable && 'dshx:text-xs dshx:text-muted-foreground', InboxView.TEXT_MEASURE)}>
             {card.detail}

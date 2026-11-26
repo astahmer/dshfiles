@@ -33,16 +33,10 @@ describe('the phone Inbox head (council round 9 C1)', () => {
     expect(InboxView.CARD_HEAD).not.toContain('dshx:@max-pane-narrow:[&>div:first-child]:px-4')
   })
 
-  it('draws an approval command as 13/18 mono on a muted fill after "Runs:", hanging 2ch on wrap', () => {
-    expect(row).toContain('<code className={cn(InboxView.COMMAND, InboxView.COMMAND_BLOCK)}>')
-    // Council round 11 C1: the fill, radius and inset moved to the runs line, which captions the block (RUNS_BLOCK).
-    // Council round 13 C1: the clamp and the hanging indent moved to the runs block, which holds "Runs:" inline.
-    expect(InboxView.COMMAND_BLOCK).toContain('dshx:@max-pane-narrow:leading-4.5')
-    for (const part of ['dshx:@max-pane-narrow:line-clamp-4', 'dshx:@max-pane-narrow:-indent-[2ch]', 'dshx:@max-pane-narrow:rounded-md', 'dshx:@max-pane-narrow:bg-muted', 'dshx:@max-pane-narrow:py-1.5', 'dshx:@max-pane-narrow:pr-2.5'])
-      expect(InboxView.RUNS_BLOCK).toContain(part)
-    expect(InboxView.COMMAND_BLOCK).not.toContain('text-sm')
-    // The lead-in's two-line clamp would cut the block: it lets go on a phone and the block clamps itself.
-    expect(InboxView.LEAD_IN).toContain('dshx:@max-pane-narrow:line-clamp-none')
+  // Council round 16 C3: the command sits in the kit evidence well (inbox-round16.test.ts).
+  it('draws an approval command in the evidence well, clamped to four lines in the list', () => {
+    expect(row).toContain('<code className={InboxView.WELL_CODE}>')
+    expect(InboxView.WELL_CLAMP_RUNS).toBe('dshx:line-clamp-4')
   })
 })
 

@@ -275,31 +275,19 @@ const commandWords = (command: string): readonly { readonly text: string; readon
 const TITLE = 'dshx:text-heading'
 
 /**
- * A command an approval would run (council round 8 C2): 12/16 mono in ink after its muted "Runs:" lead-in, so the
- * evidence the user reviews reads at full contrast.
+ * Council round 16 C3: a card body that quotes something (an approval's command, a failed turn's provider line) puts it
+ * in the kit's evidence well (`EvidenceWell`: padding 8/12, radius 6, mono 12/18 on its neutral or danger fill) across
+ * the text measure, desktop and phone. The body holding it spans the card's width, so the well is never
+ * shrink-to-content.
  */
-const COMMAND = 'dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground'
+const WELL_BODY = 'dshx:flex dshx:w-full dshx:min-w-0 dshx:flex-col dshx:gap-0.5'
 
-/**
- * The lead-in before an approval's command: 12/16 sans, muted. On a compact pane its two-line clamp lets go, since the
- * command under it is a block that clamps itself (COMMAND_BLOCK).
- */
-const LEAD_IN = 'dshx:font-sans dshx:text-xs dshx:leading-4 dshx:text-muted-foreground dshx:@max-pane-narrow:line-clamp-none'
+/** The command inherits the well's mono 12/18 (a UA `code` would set its own font). */
+const WELL_CODE = 'dshx:[font:inherit]'
 
-/**
- * On a compact pane the command is 13/18 mono (council round 9 C1; COMMAND's meta step is 13px on a touch screen),
- * inline after "Runs:" (council round 13 C1); the block around it (RUNS_BLOCK) clamps and hangs the whole line.
- */
-const COMMAND_BLOCK = 'dshx:@max-pane-narrow:leading-4.5'
-
-/**
- * The approval's evidence on a compact pane (council round 11 C1): one muted block, 6px radius, 6px by 10px inside
- * (council round 12 C3: 6px, not 8, top and bottom). Council round 13 C1: "Runs: command" reads inline as on a wide
- * pane, so the caption line above the command is gone (a line back above the fold); a wrapped line hangs 2ch under the
- * first, at most four lines.
- */
-const RUNS_BLOCK =
-  'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted dshx:@max-pane-narrow:py-1.5 dshx:@max-pane-narrow:pr-2.5 dshx:@max-pane-narrow:pl-[calc(0.625rem+2ch)] dshx:@max-pane-narrow:-indent-[2ch]'
+/** A long command shows four lines in the list; a provider error line two. */
+const WELL_CLAMP_RUNS = 'dshx:line-clamp-4'
+const WELL_CLAMP_ERROR = 'dshx:line-clamp-2'
 
 /**
  * A compact card's body verb under its evidence (council round 11 C1): 4px under it to the card's edge. Council round 16
@@ -325,7 +313,7 @@ const wordsOf = (text: string): string[] =>
 /**
  * What a card prints under its band (council round 4, C3). An approval says its title once: its "Approve: <what>" line
  * goes when <what> only restates the title (the band, its type and its Review verb already say approve), and otherwise
- * keeps <what> without the lead-in; its command reads as a command (`command`, drawn in COMMAND). Others are unchanged.
+ * keeps <what> without the lead-in; its command reads as a command (in the evidence well). Others are unchanged.
  */
 export interface InboxCardText {
   /** The line under the band, or null when the band already says it. */
@@ -347,11 +335,12 @@ const cardText = (
 }
 
 /**
- * What a failed turn's card says under its title (council round 15 C2): one line in a red-soft well. The order is the
- * provider's error (its detail's first line, as `Error: <line>`), else the failure kind its reason names, in plain
- * words; with neither, no well. thread-sidebar's failed-turn item carries no error text yet (a Host change, recorded as
- * a follow-up), so its reason's wording is the kind: "“<title>” failed" or "Turn failed." for an error, "… output
- * token limit" for the token limit (thread-sidebar inbox-provider FINISH_COPY).
+ * What a failed turn's card says under its title (council round 15 C2). Council round 16 C3: a provider error line
+ * shows in the danger evidence well, as does the token limit; a plain error (`stopped-on-error`) draws no well, as the
+ * meta already says Turn failed. The order is the provider's error (its detail's first line, as `Error: <line>`), else
+ * the failure kind its reason names; with neither, no well. thread-sidebar's failed-turn item carries no error text yet
+ * (a Host change, recorded as a follow-up), so its reason's wording is the kind: "“<title>” failed" or "Turn
+ * failed." for an error, "… output token limit" for the token limit (thread-sidebar inbox-provider FINISH_COPY).
  */
 export type InboxFailureWell =
   | { readonly kind: 'error'; readonly line: string }
@@ -373,13 +362,6 @@ const failureWell = (item: Pick<AttentionItem, 'source' | 'severity' | 'reason' 
   if (TOKEN_LIMIT_REASON.test(reason)) return { kind: 'token-limit' }
   return ERROR_REASON.test(reason) ? { kind: 'stopped-on-error' } : null
 }
-
-/**
- * The well (council round 15 C2): the failed wash (the head band's tested AA pair, light oklch(0.94 0.031 25), dark
- * oklch(0.255 0.032 25)), 6px radius, 4px by 10px inside, one line at 12/18 in ink; an error line is mono.
- */
-const FAILURE_WELL = 'dshx:block dshx:truncate dshx:rounded-md dshx:bg-wash-failed dshx:px-2.5 dshx:py-1 dshx:text-xs dshx:leading-4.5 dshx:text-foreground'
-const FAILURE_WELL_ERROR = 'dshx:font-mono'
 
 /** A Failed item with nothing to say under its band is one row: its title and its recovery verb, no empty body. */
 const compact = (status: WorkStatus, text: { readonly reason: string | null; readonly detail: string | null }): boolean =>
@@ -575,10 +557,10 @@ export class InboxView {
   static readonly headMeta = headMeta
   static readonly commandWords = commandWords
   static readonly TITLE = TITLE
-  static readonly COMMAND = COMMAND
-  static readonly LEAD_IN = LEAD_IN
-  static readonly COMMAND_BLOCK = COMMAND_BLOCK
-  static readonly RUNS_BLOCK = RUNS_BLOCK
+  static readonly WELL_BODY = WELL_BODY
+  static readonly WELL_CODE = WELL_CODE
+  static readonly WELL_CLAMP_RUNS = WELL_CLAMP_RUNS
+  static readonly WELL_CLAMP_ERROR = WELL_CLAMP_ERROR
   static readonly VERB_MARGIN = VERB_MARGIN
   static readonly QUIET_OPEN = QUIET_OPEN
   static readonly cardText = cardText
@@ -588,8 +570,6 @@ export class InboxView {
   static readonly PHONE_BAR_LEADING = PHONE_BAR_LEADING
   static readonly bodyReason = bodyReason
   static readonly failureWell = failureWell
-  static readonly FAILURE_WELL = FAILURE_WELL
-  static readonly FAILURE_WELL_ERROR = FAILURE_WELL_ERROR
   static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge
   static readonly undoOf = undoOf

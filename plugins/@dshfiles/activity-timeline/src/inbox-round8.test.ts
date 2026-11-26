@@ -21,9 +21,9 @@ describe('one Inbox card structure (council round 8 C2)', () => {
     expect(InboxView.EVIDENCE).toContain('dshx:@max-pane-narrow:flex-col')
   })
 
-  it('opens an approval body with "Runs:" and its command in 12/16 ink mono', () => {
-    // Council round 13 C1: inline on every width, a compact pane included (inbox-round13.test.ts).
-    expect(row).toMatch(/data-inbox-runs=""[^>]*>[\s\S]*?<span>\{t\('runs'\)\}<\/span>\{' '\}\s*<code className=\{cn\(InboxView\.COMMAND, InboxView\.COMMAND_BLOCK\)\}>\s*\{InboxView\.commandWords\(card\.detail\)/u)
+  it('opens an approval body with "Runs:" and its command', () => {
+    // Council round 16 C3: the command sits in the kit evidence well (inbox-round16.test.ts).
+    expect(row).toMatch(/data-inbox-runs=""[^>]*>[\s\S]*?<span data-evidence-label="">\{t\('runs'\)\}<\/span>\{' '\}\s*<code className=\{InboxView\.WELL_CODE\}>\s*\{InboxView\.commandWords\(card\.detail\)/u)
     // It wraps only between words: a phone broke `--env` after its dashes.
     expect(InboxView.commandWords('node scripts/publish-preview.mjs --env preview')).toEqual([
       { text: 'node', keep: true },
@@ -33,8 +33,6 @@ describe('one Inbox card structure (council round 8 C2)', () => {
     ])
     expect(InboxView.commandWords('x'.repeat(41))[0]?.keep).toBe(false)
     expect(row).toContain('<span className="dshx:whitespace-nowrap">{word.text}</span>')
-    expect(InboxView.COMMAND).toBe('dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground')
-    expect(InboxView.LEAD_IN).toContain('dshx:text-xs dshx:leading-4 dshx:text-muted-foreground')
   })
 
   it('a question card keeps its answers as its verbs, any other verb after them', () => {

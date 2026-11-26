@@ -28,15 +28,10 @@ describe('the phone Triage button (council round 11 C1)', () => {
 })
 
 describe('the phone approval card (council round 11 C1)', () => {
-  it('holds "Runs:" inside the block, at 12px (council round 13 C1: inline, no caption line)', () => {
+  // Council round 16 C3: the command sits in the kit evidence well (inbox-round16.test.ts).
+  it('holds "Runs:" inside the well', () => {
     const runs = panel.slice(panel.indexOf('data-inbox-runs=""'), panel.indexOf('</code>', panel.indexOf('data-inbox-runs=""')))
-    expect(runs).toContain('InboxView.RUNS_BLOCK')
-    expect(runs).toContain("<span>{t('runs')}</span>")
-    // The block (fill, radius, inset) is the runs line, not the code inside it.
-    expect(InboxView.RUNS_BLOCK).toContain('dshx:@max-pane-narrow:bg-muted')
-    expect(InboxView.COMMAND_BLOCK).not.toContain('bg-muted')
-    expect(InboxView.COMMAND_BLOCK).not.toContain('mt-1')
-    expect(InboxView.LEAD_IN).toContain('dshx:text-xs dshx:leading-4')
+    expect(runs).toContain("<span data-evidence-label=\"\">{t('runs')}</span>")
   })
 
   // Council round 16 C2: 8px under the block (inbox-round16.test.ts), 4px above the card edge.

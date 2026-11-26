@@ -42,8 +42,9 @@ in 12/16 secondary mono, and a Failed item with nothing to say is one compact ro
 page title carries one count chip per status present, ◆2 ✕1 (the kit Page's `statusCounts`), and the header ends at the
 list's trailing edge, so Start triage and the page menu line up with the cards. Council round 8: every card has one
 structure. The head reads glyph · title · project · kind · time with muted "·" separators, plus its `⋯` menu; the
-body opens with the evidence (an approval's "Runs: `command`" in 12/16 mono, on a phone one muted block captioned
-"Runs"; a question's "Asks: …") and the verbs
+body opens with the evidence (council round 16 C3: what a card quotes sits in the kit's evidence well, desktop and
+phone: an approval's "Runs: `command`" in the neutral well, a failed turn's provider line as "Error: …" in the danger
+well, and no well for a failure without one; a question's "Asks: …") and the verbs
 follow it as full-width buttons on a phone (a question's answers are its verbs). On a desktop (council round 11) a
 card's verb sits in its head's trailing slot, 12 px before the `⋯`, approval and failed alike; answers stay under the
 question. Council round 16 C2: a question card's head **Open thread** is a quiet ghost in secondary ink with ↗, so its

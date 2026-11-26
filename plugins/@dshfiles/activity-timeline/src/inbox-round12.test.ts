@@ -39,9 +39,9 @@ describe('the phone Inbox fold (council round 12 C3)', () => {
     expect(InboxView.HEAD_TWO_LINES).toContain('gap-y-0.5')
   })
 
-  it('pads the command block 6px top and bottom', () => {
-    expect(InboxView.RUNS_BLOCK).toContain('dshx:@max-pane-narrow:py-1.5')
-    expect(InboxView.RUNS_BLOCK).not.toContain('py-2')
+  // Council round 16 C3: the command sits in the kit evidence well (inbox-round16.test.ts). The kit pads it 8/12.
+  it('draws no padding of its own around the command', () => {
+    expect('RUNS_BLOCK' in InboxView).toBe(false)
   })
 
   it('stacks the answers 4px apart and ends the card 4px under the last one, as Review ends the approval card', () => {
