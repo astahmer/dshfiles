@@ -212,16 +212,19 @@ describe('AI accounts page (council round 5, D2)', () => {
   })
 })
 
-describe('AI accounts page title mark (council round 7, D1)', () => {
-  it('marks the page, loading or loaded, with the Settings destination glyph in its nav tone', () => {
-    const pages = source('accounts-panel.tsx')
+describe('AI accounts page title mark (council round 8, D4)', () => {
+  it("marks the page, loading or loaded, with its own Settings leaf glyph: the violet people mark of Models & accounts", () => {
+    const panel = source('accounts-panel.tsx')
+    const pages = panel
       .split('<Page')
       .slice(1)
       .map(part => part.slice(0, part.indexOf('heading="AI accounts"')))
     expect(pages).toHaveLength(2)
     for (const page of pages) {
-      expect(page).toContain('mark={<SettingsIcon />}')
-      expect(page).toContain('markTone="settings"')
+      expect(page).toContain('mark={ACCOUNTS_MARK}')
+      // An identity tone is not a nav tone: the glyph carries it, and the kit's muted default stays unused.
+      expect(page).not.toContain('markTone=')
     }
+    expect(panel).toContain('const ACCOUNTS_MARK = <UsersRoundIcon className="dshx:text-identity-2" strokeWidth={1.5} />')
   })
 })

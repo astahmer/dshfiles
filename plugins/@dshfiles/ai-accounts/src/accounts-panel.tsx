@@ -2,7 +2,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { PlusIcon, SettingsIcon } from '@dshfiles/plugin-ui/icons'
+import { PlusIcon, UsersRoundIcon } from '@dshfiles/plugin-ui/icons'
 import { useApi } from '@dshfiles/dshx/client'
 import { useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
@@ -18,6 +18,9 @@ import { NativeProviderDetail } from './native-provider-detail.js'
 import type { AccountSection } from './account-connection-status.js'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import type { CredentialSetupPort } from './credential-setup-port.js'
+
+/** The page's own leaf glyph from the Settings column (Models & accounts), in its violet identity tone (council round 8, D4). */
+const ACCOUNTS_MARK = <UsersRoundIcon className="dshx:text-identity-2" strokeWidth={1.5} />
 
 /** The reference's rail and detail share one selection; Query owns data and the existing queue owns writes. */
 export const AccountsPanel = (props: {
@@ -54,7 +57,7 @@ export const AccountsPanel = (props: {
     })
   if (state.file === null)
     return (
-      <Page mark={<SettingsIcon />} markTone="settings" heading="AI accounts" description="Manage your accounts and model settings.">
+      <Page mark={ACCOUNTS_MARK} heading="AI accounts" description="Manage your accounts and model settings.">
         <p className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm dshx:text-muted-foreground" role="status">
           {state.notice === null ? <Spinner /> : null}
           {state.notice ?? 'Loading accounts…'}
@@ -76,8 +79,7 @@ export const AccountsPanel = (props: {
         scroll
         width="wide"
         className="dshx:surface-stage"
-        mark={<SettingsIcon />}
-        markTone="settings"
+        mark={ACCOUNTS_MARK}
         heading="AI accounts"
         description="Manage your accounts and model settings."
         count={accountsPageCount({ accounts: state.file.accounts, native: nativeProviders.data })}
