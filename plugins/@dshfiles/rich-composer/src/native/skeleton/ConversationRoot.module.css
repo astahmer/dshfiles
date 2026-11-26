@@ -738,6 +738,11 @@ button.crumbEditable {
   background: var(--dsw-specific-input-major);
 }
 
+/* The hairline between rows, restated after the row rule above: its `border: 0` would otherwise win (round seven). */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) > * + :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold])) {
+  border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+}
+
 /* A job row is the kit's dock row: it fills the surface instead of drawing a card inside it. */
 :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row'][data-variant='card']) {
   width: 100%;

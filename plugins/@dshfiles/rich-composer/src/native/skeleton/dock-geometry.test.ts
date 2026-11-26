@@ -142,6 +142,17 @@ describe('the desktop live work dock (round six C2)', () => {
     expect(rule(`${DESK} > * + *`)).toMatch(/border-top: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
   })
 
+  it('keeps the hairline between dock rows after each row drops its own frame (round seven)', () => {
+    // The row rule's `border: 0` came after the `> * + *` divider with a higher specificity, so desktop rows lost it.
+    const ROWS = ":is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold]))"
+    const all = blocks()
+    const frame = all.findIndex(block => block.selector === `${DESK} > ${ROWS}`)
+    const divider = all.findIndex(block => block.selector === `${DESK} > * + ${ROWS}`)
+    expect(frame).toBeGreaterThan(-1)
+    expect(divider).toBeGreaterThan(frame)
+    expect(all[divider]?.body).toMatch(/border-top: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+  })
+
   it('drops each row\'s own card frame and keeps a collapsed row 32px', () => {
     const rows = rule(`${DESK} > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold]))`)
     expect(rows).toMatch(/border: 0;/)
