@@ -48,6 +48,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 19 (round-18 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | No increase (first). Shared: the Inbox's folded brand overhang; Opus: sidebar content presses against the new brand hairline (regression) |
 | 20 (round-19 shots) | **9.5** | **9.5** (Astra) | **9.5** (Fable, for Mistral) | **Round six target met.** Mistral's provider failed every request this round; Fable held its seat |
 | 22 (round-20 shots + subagent shots) | 9 | 9 (Astra) | 9 (Fable, for Mistral) | Round seven. 01–14 hold 9.5; subagent shots 7.5–9: phone dock rows lose task names, failures hard to see, four counts, phone child doesn't name its parent |
+| 23 (round-21 shots + subagent shots) | 9 | 9 (Astra) | **9.5** (Fable, for Mistral) | Child views at 9.5; the parent views hold 9: transcript group shows no live state, failed count drawn four ways, text cut under the desktop dock, the phone dock is three boxes |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -389,6 +390,10 @@ footer; the desktop child header state after its model); P `xvupqvnz` … `yztpx
 `pzkxswwl` (two-line phone dock rows, one Live work header and card with a clean sticky edge, a desktop model column, ↗
 alone at rest, fades under the dock, launch order, the phone ⋯ kept in the bar row); the lead: a subagent tab named by
 its description. Kept: the transcript group lists calls in call order, which can differ from launch order.
+Round 23 findings, merged in `.cache/unslop-audit/r5/council/round-23-fixes.md`: live state and a model column in the
+transcript group, one failed-count treatment, "Live work · 6 working" on the desktop dock, nothing cut under it, the
+expanded phone dock fused to the composer with snap scrolling, child rows without an age, the failure notice naming its
+model, breadcrumb sizes, clearer "1 thread working" and "1 job · 1 subagent".
 
 ## Round four
 
