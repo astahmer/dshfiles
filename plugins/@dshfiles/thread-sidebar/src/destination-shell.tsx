@@ -1784,16 +1784,16 @@ const PhoneNavigation = (
               onClick={() => select(tab)}
               className={cn(
                 'dshx:flex dshx:h-14 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-0.5 dshx:text-(--dsw-alias-label-tertiary) dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:active:text-foreground',
-                // The current tab (council round 3 B6): its glyph in its destination's tone on that tone's 14% tile, and
-                // an ink label at 600. More stands for Settings and the other destinations: the neutral tone.
+                // Every glyph in its destination's tone at rest, as on the rail (round nine B3); the current tab adds that
+                // tone's 14% tile and an ink label at 600. Inbox and More carry the neutral (ink) tone.
                 NAV_TONE[tab === 'more' ? 'settings' : tab],
                 current === tab && 'dshx:text-foreground',
               )}
             >
               <span
                 className={cn(
-                  'dshx:inline-flex dshx:h-7 dshx:w-11 dshx:items-center dshx:justify-center dshx:rounded-full',
-                  current === tab && 'dshx:bg-nav-tile dshx:text-nav-tone',
+                  'dshx:inline-flex dshx:h-7 dshx:w-11 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-nav-tone',
+                  current === tab && 'dshx:bg-nav-tile',
                 )}
                 aria-hidden="true"
                 data-phone-tab-seat=""

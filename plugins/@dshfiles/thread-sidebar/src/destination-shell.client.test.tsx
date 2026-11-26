@@ -532,6 +532,11 @@ describe('DestinationShell', () => {
     const threads = within(bar).getByRole('button', { name: 'Threads' })
     expect(threads.getAttribute('aria-current')).toBeNull()
     expect(threads.querySelector('[data-phone-tab-seat]')?.className).not.toContain('dshx:bg-nav-tile')
+    // At rest every glyph keeps its destination tone (round nine B3); only the tile and the 600 label mark the current one.
+    for (const tab of within(bar).getAllByRole('button')) {
+      expect(tab.querySelector('[data-phone-tab-seat]')?.className).toContain('dshx:text-nav-tone')
+    }
+    expect(threads.className).toContain('dshx:nav-tone-threads')
     cleanup()
     // Another destination's page reached through More keeps More lit too.
     renderShell({ collapsed: true, activePanelId: 'dshfiles-usage' })
