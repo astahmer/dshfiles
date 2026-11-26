@@ -100,6 +100,69 @@ export const ModelMark = (props: { readonly modelId: string; readonly className?
   )
 }
 
+/** What a route names: the family whose mark to draw (none when no token names one) and the model's display name. */
+export interface ModelIdentity {
+  readonly mark: ModelFamily | undefined
+  readonly name: string
+}
+
+/**
+ * A route's model identity (council round 17 A1): the mark and name every subagent surface shows. The name is the model
+ * picker's: an account provider's `<provider>/` prefix says nothing under its provider and drops (`deepseek` +
+ * `deepseek/deepseek-v4-flash` → `deepseek-v4-flash`). The mark is the model's family, else the provider's
+ * (`anthropic` + `opus-next`), else none. No model → `undefined`: a provider alone is not a model name, and nothing is
+ * guessed. Callers pass route parts they may show (thread-sidebar's `visibleRoutePart` screens secrets out first).
+ */
+export const modelIdentity = (provider?: string, model?: string): ModelIdentity | undefined => {
+  const providerId = provider?.trim() ?? ''
+  const modelId = model?.trim() ?? ''
+  const name = providerId.length > 0 && modelId.startsWith(`${providerId}/`) ? modelId.slice(providerId.length + 1) : modelId
+  if (name.length === 0) return undefined
+  return { mark: modelFamily(name) ?? (providerId.length > 0 ? modelFamily(providerId) : undefined), name }
+}
+
+export interface RouteModelProps {
+  readonly provider?: string | undefined
+  readonly model?: string | undefined
+  /** `sm` (default): 12/16, beside meta text. `md`: 13/18, on a row's own line or a header. The mark is 16 px in both. */
+  readonly size?: 'sm' | 'md' | undefined
+  readonly className?: string | undefined
+}
+
+/**
+ * A route's model as a subagent surface shows it (council round 17 A1): the 16 px brand mark and the display name in
+ * secondary ink, 6px apart. The name truncates; the mark never shrinks. An unknown family draws no mark (no empty seat,
+ * no guess); no model renders nothing. In light the mark is drawn at 85% brightness: the brand colours sit at 2.4–3.6:1
+ * on the light fills, and a row that shows a subagent can be panel, raised or selected; at 85% every mark holds 3:1 on
+ * all four fills (tests/route-model). Dark keeps the brand colour (4.1:1 or more).
+ */
+export const RouteModel = ({ provider, model, size = 'sm', className }: RouteModelProps): JSX.Element | null => {
+  const identity = modelIdentity(provider, model)
+  if (identity === undefined) return null
+  return (
+    <span
+      data-slot="route-model"
+      data-model-family={identity.mark ?? 'none'}
+      className={cn(
+        'dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground',
+        size === 'md' ? 'dshx:text-[13px]/[18px]' : 'dshx:text-xs/4',
+        className,
+      )}
+    >
+      {identity.mark === undefined ? null : (
+        <span
+          aria-hidden
+          data-model-mark={identity.mark}
+          className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:brightness-85 dshx:dark:brightness-100"
+        >
+          <FamilyGlyph family={identity.mark} />
+        </span>
+      )}
+      <span className="dshx:min-w-0 dshx:truncate">{identity.name}</span>
+    </span>
+  )
+}
+
 /**
  * A built-in provider's tile, like an account's: the DeepSeek mark for DeepSeek, a neutral cube otherwise. 32 px in a
  * detail header, 28 px in a list row (`size="list"`, council round 5 D2).

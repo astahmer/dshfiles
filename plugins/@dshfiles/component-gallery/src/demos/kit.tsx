@@ -21,6 +21,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { StatusCount, workStatusValues, workStatusLabels } from '@dshfiles/plugin-ui/components/work-status'
 import {
   ActivityIcon,
@@ -368,6 +369,27 @@ export const kitDemos: readonly GalleryDemo[] = [
             <InboxIcon aria-hidden className="dshx:size-4.5" />
             <AttentionBadge count={count} label="need you" className="dshx:absolute dshx:-top-1 dshx:left-5.5" />
           </span>
+        ))}
+      </div>
+    ),
+  },
+  {
+    id: 'kit-route-model',
+    title: 'RouteModel',
+    description: "A subagent's model: the provider's 16px mark and the picker's name in secondary ink. No family, no mark; no model, nothing.",
+    source: "import { RouteModel, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'",
+    static: true,
+    render: () => (
+      <div className="dshx:grid dshx:max-w-md dshx:gap-1">
+        {(['dshx:bg-background', 'dshx:bg-card', 'dshx:bg-popover', 'dshx:bg-selected-wash'] as const).map(fill => (
+          <div key={fill} className={`dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-1 dshx:rounded-md dshx:px-2 dshx:py-1.5 ${fill}`}>
+            <RouteModel provider="openai-codex" model="gpt-6.2-astra" />
+            <RouteModel provider="claude-code" model="claude-opus-5-5" />
+            <RouteModel provider="deepseek" model="deepseek/deepseek-v4-flash" />
+            <RouteModel provider="mistral" model="mistral-large-4" />
+            <RouteModel provider="google" model="gemini-3.8-flash" size="md" />
+            <RouteModel provider="local" model="step-5-preview" />
+          </div>
         ))}
       </div>
     ),
