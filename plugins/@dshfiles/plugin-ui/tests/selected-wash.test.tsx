@@ -117,7 +117,7 @@ describe('selected card (council round 3 A1, round 8 A2)', () => {
     expect(card.replace(/&::after\s*\{[^}]*\}/u, '')).not.toMatch(/background/u)
     // A 1px border in the ring colour plus a 1px inset ring: 2px on a bordered card, without changing its box.
     // The control-on ink (council round 7 A1), not the accent: indigo means attention, focus and links only.
-    expect(roles).toContain('--color-control-on: var(--dsw-alias-label-primary);')
+    expect(roles).toContain('--color-control-on: var(--dshx-control-on, var(--dsw-alias-label-primary));')
     expect(card).toContain('border-color: var(--dsw-alias-label-primary);')
     expect(card).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);')
     expect(card).not.toContain('business')

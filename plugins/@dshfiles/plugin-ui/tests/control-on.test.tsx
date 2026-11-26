@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, render } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Checkbox } from '../src/components/ui/checkbox.js'
 import { RadioGroup, RadioGroupItem } from '../src/components/ui/radio-group.js'
@@ -56,17 +58,34 @@ describe('control on state', () => {
   })
 })
 
-describe('control on contrast (council round 7 A1)', () => {
+describe('control on contrast (council round 7 A1, dark at L 0.82 since council round 9 A2)', () => {
   const schemes: readonly Scheme[] = ['light', 'dark']
+  const roles = readFileSync(join(process.cwd(), 'src/color-roles.css'), 'utf8')
+  const block = (selector: string): string => {
+    const start = roles.indexOf(`${selector} {`)
+    return start < 0 ? '' : roles.slice(start, roles.indexOf('}', start))
+  }
+
+  it('reads the on state from a kit variable: the ink in light, the ink\'s hue at L 0.82 in dark', () => {
+    expect(roles).toContain('--color-control-on: var(--dshx-control-on, var(--dsw-alias-label-primary));')
+    expect(roles).toContain('--color-control-on-foreground: var(--dshx-control-on-foreground, var(--dsw-alias-label-primary-foreground));')
+    expect(block('  body')).toContain('--dshx-control-on: var(--dsw-alias-label-primary);')
+    expect(block('  body')).toContain('--dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);')
+    expect(block('  body[data-ds-dark-theme]')).toContain('--dshx-control-on: oklch(from var(--dsw-alias-label-primary) 0.82 c h);')
+    expect(block('  body[data-ds-dark-theme]')).toContain('--dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);')
+  })
+
   it.each(schemes)('holds the fill at 3:1 on bg, panel, raised and the selection wash, the tick and knob at 3:1 on the fill (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     // `--dsw-alias-label-primary` is step 10, `-foreground` step 0 and `--dsw-alias-bg-base` step 0 (theme-css.ts).
-    const fill = p.neutral[10]!
+    // Dark steps the ink down to L 0.82 at its own hue and chroma: no near-white glare.
+    const fill = scheme === 'light' ? p.neutral[10]! : { ...p.neutral[10]!, l: 0.82 }
     const tick = p.neutral[0]!
     for (const [surface, under] of Object.entries({ bg: p.neutral[0]!, panel: p.neutral[1]!, raised: p.neutral[2]!, selected: p.selectedWash }))
       expect(PaletteMath.contrastRatio(fill, under), `fill on ${surface}`).toBeGreaterThanOrEqual(3)
     expect(PaletteMath.contrastRatio(tick, fill), 'tick and knob on the fill').toBeGreaterThanOrEqual(3)
-    expect(PaletteMath.toHex(fill)).toBe(scheme === 'light' ? '#1b1a19' : '#eae7e4')
+    expect(PaletteMath.toHex(fill)).toBe(scheme === 'light' ? '#1b1a19' : '#c6c3c1')
+    if (scheme === 'dark') expect(PaletteMath.contrastRatio(fill, p.neutral[10]!), 'visibly below the ink').toBeGreaterThan(1.3)
     expect(PaletteMath.toHex(tick)).toBe(scheme === 'light' ? '#fefcfa' : '#15120f')
     const block = ThemeCss.blockDeclarations(WARM_STONE, scheme).join('\n')
     expect(block).toContain('--dsw-alias-label-primary: var(--dshx-tone-10);')
