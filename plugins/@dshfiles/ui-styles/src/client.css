@@ -35,6 +35,13 @@ button[role='switch'][aria-checked='true']:not([data-slot]) {
   background: var(--dsw-alias-label-primary);
 }
 
+/* An enabled off switch shows its boundary, the field border (council round 8 A3), so an off toggle reads as a control.
+   The Host track is border-box with border 0 and 2px padding, so the edge is an inset ring: a border would push the
+   knob 1px. A disabled one keeps the washed look. Guard: tests/core-switch.test.ts. */
+button[role='switch'][aria-checked='false']:not([data-slot], :disabled) {
+  box-shadow: inset 0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3));
+}
+
 /* Touch platform baseline: the tells that make the page feel like a website on a phone. Rules gate by capability,
    never by width, so a touchscreen laptop and an iPad with a trackpad get what their input can do. It sits in
    `base` so every `dshx:` utility still overrides it; unlayered rules would beat `dshx:touch-none`. */

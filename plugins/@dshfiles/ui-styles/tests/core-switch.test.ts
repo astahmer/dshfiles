@@ -33,4 +33,15 @@ describe('core switch on state (round five K10)', () => {
     // Unlayered, like the Host module sheet: a layered rule would lose whatever its specificity.
     expect(client.slice(0, at)).not.toMatch(/@layer[^{]*\{[^}]*$/u)
   })
+
+  it('outlines an enabled off core switch with the field border as an inset ring, no layout change (council round 8 A3)', () => {
+    const off = "button[role='switch'][aria-checked='false']:not([data-slot], :disabled)"
+    const at = client.indexOf(`${off} {`)
+    expect(at).toBeGreaterThan(-1)
+    // The Host track is border-box with border 0 and 2px padding: a real border would push the knob 1px, a ring does not.
+    expect(client.slice(at, client.indexOf('}', at))).toContain('box-shadow: inset 0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3));')
+    expect(hostSheet).toMatch(/\.switch \{[^}]*border: 0;/u)
+    expect(hostSheet).not.toMatch(/\.switch[^{]*\{[^}]*box-shadow/u)
+    expect(client.slice(0, at)).not.toMatch(/@layer[^{]*\{[^}]*$/u)
+  })
 })
