@@ -130,6 +130,30 @@ describe('AttentionMeta', () => {
     expect(root.querySelector('[data-attention-meta-part="name"]')?.textContent).toBe('billing-api')
   })
 
+  it('draws a kind mark 4px before the kind, hidden from assistive tech, and measures it with the kind (council round 18)', () => {
+    const view = render(<AttentionMeta project="billing-api" kind="Working" age="2m" kindMark={<svg data-glyph="working" />} />)
+    const root = view.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!
+    expect(shown(root)).toBe('mark name sep kind sep age')
+    const kind = root.querySelector<HTMLElement>(':scope > [data-attention-meta-part="kind"]')!
+    expect(kind.className.split(' ')).toEqual(expect.arrayContaining(['dshx:inline-flex', 'dshx:items-center', 'dshx:gap-1']))
+    const glyph = kind.querySelector('[data-attention-meta-part="kind-mark"]')!
+    expect(glyph.getAttribute('aria-hidden')).toBe('true')
+    expect(glyph.querySelector('[data-glyph="working"]')).not.toBeNull()
+    expect(glyph.nextElementSibling?.textContent).toBe('Working')
+    // The measure copy carries it too, so the drop steps count its width.
+    expect(root.querySelector('[data-measure-part="kind"] [data-glyph="working"]')).not.toBeNull()
+  })
+
+  it('lets a wider kind mark move the drop step', () => {
+    // 166px fits "billing-api · Approval · 2m" exactly; a 12px mark in the kind pushes the age out.
+    available = 166
+    const bare = render(<AttentionMeta project="billing-api" kind="Approval" age="2m" />)
+    expect(bare.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!.dataset['step']).toBe('full')
+    cleanup()
+    const marked = render(<AttentionMeta project="billing-api" kind="Approval" age="2m" kindMark={<span>●●</span>} />)
+    expect(marked.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!.dataset['step']).toBe('no-age')
+  })
+
   it('takes each drop step as its column narrows, and comes back as it widens', () => {
     const view = render(<AttentionMeta project="billing-api" kind="Approval" age="2m" />)
     const root = view.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!

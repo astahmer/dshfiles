@@ -131,6 +131,12 @@ export interface AttentionMetaProps extends Omit<React.ComponentPropsWithoutRef<
   /** Extra classes for the kind (a status ink, a weight). */
   readonly kindClassName?: string | undefined
   /**
+   * A glyph before the kind's word, 4px before it, inside the kind part (council round 18: a 12px Working ring before
+   * "Working" in the phone thread header). Decorative: the word names the state. It is measured with the kind, so the
+   * drop steps account for it, and it goes with the kind.
+   */
+  readonly kindMark?: React.ReactNode
+  /**
    * Which word outlasts the other when the line runs short. `kind` (default): age, then name. `name`: age, then the kind,
    * then the name truncates to its eight-character floor, then only the mark is left; for a row whose status glyph and
    * verb already say the kind (the desktop thread list).
@@ -157,7 +163,7 @@ const Separator = (): JSX.Element => (
  * truncate): the line never cuts the mark inside a tinted or bordered row (council round 15 A1).
  */
 export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProps>(function AttentionMeta(
-  { project, kind, age, markSeat = 'inline', mark, kindClassName, keep = 'kind', className, ...props },
+  { project, kind, age, markSeat = 'inline', mark, kindClassName, kindMark, keep = 'kind', className, ...props },
   forwardedRef,
 ) {
   const rail = markSeat === 'rail'
@@ -215,7 +221,13 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
   const markElement =
     name === undefined ? null : <ProjectMark {...mark} ref={rail ? undefined : lead} name={name} size="dense" data-attention-meta-part="mark" />
   const nameClass = cn('dshx:whitespace-nowrap', !rail && 'dshx:pl-1.5')
-  const kindClass = cn('dshx:whitespace-nowrap', kindClassName)
+  const kindClass = cn('dshx:whitespace-nowrap', kindMark !== undefined && kindMark !== null && 'dshx:inline-flex dshx:items-center dshx:gap-1', kindClassName)
+  const kindGlyph =
+    kindMark === undefined || kindMark === null ? null : (
+      <span aria-hidden="true" data-attention-meta-part="kind-mark" className="dshx:inline-flex dshx:shrink-0">
+        {kindMark}
+      </span>
+    )
 
   return (
     <span
@@ -251,7 +263,14 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
         <>
           {nameShown || (name !== undefined && !rail) ? <Separator /> : null}
           <span data-attention-meta-part="kind" className={cn(kindClass, nameShown ? 'dshx:shrink-0' : 'dshx:min-w-0 dshx:truncate')}>
-            {kindText}
+            {kindGlyph === null ? (
+              kindText
+            ) : (
+              <>
+                {kindGlyph}
+                <span className="dshx:min-w-0 dshx:truncate">{kindText}</span>
+              </>
+            )}
           </span>
         </>
       ) : (
@@ -283,6 +302,7 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
           )}
           {kindText === undefined ? null : (
             <span data-measure-part="kind" className={cn(kindClass, 'dshx:shrink-0')}>
+              {kindGlyph}
               {kindText}
             </span>
           )}
