@@ -39,6 +39,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 10 (round-9 shots) | 8.5 | 8.5 | **9** | control chrome too loud, phone toolbar and dock, selection bar bends, Review icon |
 | 11 (round-10 shots) | 8.5 | 8.5 | **9** | marker crowds leading glyphs, quiet triggers vanish at rest, light diff, Usage repeats, prose measure |
 | 12 (round-11 shots) | 8.5 | 8.5 | **9** | selection too quiet on glyph rows, dock edge regression, Inbox verbs, Usage table, phone tab tone |
+| 13 (round-12 shots) | 8.5 | 8.5 | **9** | palette dark selection, phone tab pill, chart headroom, New thread chips, send seat, phone Inbox fold |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -245,6 +246,12 @@ Review verb, a phone Inbox whose failed title clears the tab bar, Resume/Inbox c
 column, Provider default · Auto, selected edge on accounts, three-line plugin summaries).
 Follow-ups: the committed thread-sidebar `phone-tab-bar.png` predates the current-tab-only tone; Usage's day labels
 overlap at 390 px.
+
+Round 13 findings, merged in `.cache/unslop-audit/r5/council/round-13-fixes.md`, follow Opus's and Sol's own
+minimum-for-9 lists: a visible dark palette selection, one neutral active pill on the phone tab bar, ProjectMark in the
+desktop attention slot, a roomier phone Inbox fold, `.nice()` chart domains and a carded distribution table, one chip
+style on New thread, a seated send button, the selected edge only where no place tile shows selection, a one-line phone
+thread header, and two AA fixes (composer hint, side-column hover labels).
 
 ## Round four
 
