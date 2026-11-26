@@ -58,7 +58,7 @@ import { StageFold, type StageFoldState } from './stage-fold.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
 import { SettingsColumn, type SettingsColumnRow } from './settings-column.js'
-import { SettingsEntryGlyph } from '@dshfiles/settings-shell/settings-icons'
+import { SettingsEntryGlyph, SettingsToneMark } from '@dshfiles/settings-shell/settings-icons'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -550,21 +550,26 @@ const EntryRows = (props: {
   readonly renderPanelIcon: DestinationShellProps['renderPanelIcon']
   readonly folderUi: SidebarFolderUi | undefined
   readonly descriptions?: boolean
+  /** In the Settings column: the group whose tone the rows' own icons take (council round 8 B4, no grey group). */
+  readonly toneGroup?: 'pages' | 'developer' | undefined
 }): JSX.Element => (
   <>
-    {props.entries.map(entry => (
-      <SectionButton
-        key={entry.viewId}
-        panelId={entry.viewId}
-        label={entry.title}
-        description={props.descriptions === false ? undefined : entry.description}
-        icon={entry.kind === 'page' ? props.renderPanelIcon(entry.viewId, 16, props.activePanelId === entry.viewId) : <ViewGlyph />}
-        selected={props.activePanelId === entry.viewId}
-        onSelect={() => props.openEntry(entry)}
-        menu={props.folderUi === undefined ? undefined : <EntryMenu entry={entry} folderId={props.folder.id} ui={props.folderUi} />}
-        drag={props.folderUi === undefined ? undefined : { onDropBefore: viewId => props.folderUi?.actions.movePanel(viewId, props.folder.id, entry.viewId) }}
-      />
-    ))}
+    {props.entries.map(entry => {
+      const icon = entry.kind === 'page' ? props.renderPanelIcon(entry.viewId, 16, props.activePanelId === entry.viewId) : <ViewGlyph />
+      return (
+        <SectionButton
+          key={entry.viewId}
+          panelId={entry.viewId}
+          label={entry.title}
+          description={props.descriptions === false ? undefined : entry.description}
+          icon={props.toneGroup === undefined ? icon : <SettingsToneMark group={props.toneGroup}>{icon}</SettingsToneMark>}
+          selected={props.activePanelId === entry.viewId}
+          onSelect={() => props.openEntry(entry)}
+          menu={props.folderUi === undefined ? undefined : <EntryMenu entry={entry} folderId={props.folder.id} ui={props.folderUi} />}
+          drag={props.folderUi === undefined ? undefined : { onDropBefore: viewId => props.folderUi?.actions.movePanel(viewId, props.folder.id, entry.viewId) }}
+        />
+      )
+    })}
   </>
 )
 
@@ -586,7 +591,7 @@ const SettingsColumnList = (props: {
   readonly openEntry: (entry: ResolvedEntry) => void
   readonly selectPanel: (panelId: string) => void
   readonly folderUi: SidebarFolderUi | undefined
-  readonly rows: (entries: readonly ResolvedEntry[]) => JSX.Element
+  readonly rows: (entries: readonly ResolvedEntry[], toneGroup?: 'pages' | 'developer') => JSX.Element
   readonly addPanel: ReactNode
 }): JSX.Element => {
   const { navigation, folder, folderUi } = props
@@ -645,7 +650,7 @@ const SettingsColumnList = (props: {
       {rest.length === 0 ? null : (
         <div role="group" aria-label="Pages" data-settings-group="pages" className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5">
           <h3 className={SETTINGS_GROUP_HEAD}>Pages</h3>
-          {props.rows(rest)}
+          {props.rows(rest, 'pages')}
         </div>
       )}
       {props.addPanel}
@@ -693,7 +698,7 @@ const FolderIndex = (props: {
   const empty = mapped.length === 0 && unmapped.length === 0 && developer.length === 0 && settings === null
   const missingPage = Destinations.expectedPageOf(folder.id)
   // Rows are names only (round five B1): the header's one line describes the destination, each page says the rest.
-  const rows = (entries: readonly ResolvedEntry[]): JSX.Element => (
+  const rows = (entries: readonly ResolvedEntry[], toneGroup?: 'pages' | 'developer'): JSX.Element => (
     <EntryRows
       folder={folder}
       entries={entries}
@@ -702,6 +707,7 @@ const FolderIndex = (props: {
       renderPanelIcon={props.renderPanelIcon}
       folderUi={folderUi}
       descriptions={false}
+      toneGroup={toneGroup}
     />
   )
   return (
@@ -774,7 +780,7 @@ const FolderIndex = (props: {
         {developer.length === 0 ? null : (
           <section className="dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3" aria-label="Developer" data-destination-group="developer">
             <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Developer</h3>
-            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer)}</div>
+            <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer, folder.id === 'settings' ? 'developer' : undefined)}</div>
           </section>
         )}
       </div>

@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs'
 import { BotIcon, CpuIcon, KeyboardIcon, PaletteIcon, PlugIcon, ShieldIcon, SlidersHorizontalIcon } from '@dshfiles/plugin-ui/icons'
 import { PaletteMath, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { describe, expect, it } from 'vitest'
-import { SettingsIcons } from './settings-icons.js'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { SettingsIcons, SettingsToneMark } from './settings-icons.js'
 
 const roles = readFileSync(new URL('../../plugin-ui/src/color-roles.css', import.meta.url), 'utf8')
 
@@ -20,7 +21,9 @@ const COLUMN = {
   plugins: ['Built-in plugins', 'Installed plugins', 'Plugin Market', 'Plugin updates', 'OpenCode plugins'],
   about: ['Update DSH', 'Getting started', 'Diagnostics'],
   // Plugins is listed here only when no Installed plugins link stands for it (settings-groups.ts › DESTINATION_PAGES).
-  pages: ['Capabilities hub', 'Component gallery', 'Plugin guide'],
+  pages: ['Capabilities hub'],
+  // The thread sidebar's Developer block closes the column (component gallery, plugin guide).
+  developer: ['Component gallery', 'Plugin guide'],
 } as const satisfies Readonly<Record<string, readonly string[]>>
 
 const channel = (hex: string, index: number): number => Number.parseInt(hex.slice(1 + index * 2, 3 + index * 2), 16)
@@ -104,11 +107,15 @@ describe('SettingsIcons (round five B5, B6; council round 6 B3, B4)', () => {
   it('tints every group of the column, each in its own tone, neighbours at least 40° apart (council round 8 B4)', () => {
     const groups = Object.keys(COLUMN)
     const tones = groups.map(group => SettingsIcons.toneOf(group))
-    // No grey group: none is the bare secondary ink.
-    for (const [index, tone] of tones.entries()) expect(tone, groups[index]).not.toBe('var(--dsw-alias-label-secondary)')
-    // No repeats.
-    expect(new Set(tones).size).toBe(groups.length)
-    // Groups that stand one after the other in the column read apart: 40° of hue, or one of them is the low-chroma slate.
+    // No grey group: every tone is an identity hue, neither the secondary ink nor a step greyed into it.
+    for (const [index, tone] of tones.entries()) expect(toneHue(tone, 'light'), `${groups[index] ?? ''}: ${tone}`).toBeDefined()
+    // The ramp has ten hues clear of the status hues for twelve groups: a tone repeats only four or more groups away.
+    for (const [index, tone] of tones.entries()) {
+      const again = tones.indexOf(tone, index + 1)
+      if (again !== -1) expect(again - index, `${groups[index] ?? ''} / ${groups[again] ?? ''}`).toBeGreaterThanOrEqual(4)
+    }
+    expect(new Set(tones).size).toBeGreaterThanOrEqual(10)
+    // Groups that stand one after the other in the column read apart: 40° of hue.
     for (const scheme of ['light', 'dark'] as const)
       for (let index = 1; index < groups.length; index += 1) {
         const [before, after] = [toneHue(tones[index - 1] ?? '', scheme), toneHue(tones[index] ?? '', scheme)]
@@ -137,5 +144,19 @@ describe('SettingsIcons (round five B5, B6; council round 6 B3, B4)', () => {
         for (const status of [25, 80, 150, 270]) expect(Math.min(Math.abs(h - status), 360 - Math.abs(h - status)), `${scheme} ${group}`).toBeGreaterThanOrEqual(20)
       }
     }
+  })
+})
+
+describe('SettingsToneMark (council round 8 B4)', () => {
+  it('draws a page\'s own icon in its group\'s tone, so a Pages or Developer row is never grey', () => {
+    const markup = renderToStaticMarkup(
+      <SettingsToneMark group="developer">
+        <svg data-own-icon="" />
+      </SettingsToneMark>,
+    )
+    expect(markup).toContain('data-settings-glyph="developer"')
+    expect(markup).toContain('dshx:text-(--settings-tone)')
+    expect(markup).toContain(`--settings-tone:${SettingsIcons.toneOf('developer')}`)
+    expect(markup).toContain('data-own-icon')
   })
 })

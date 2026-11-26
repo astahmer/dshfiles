@@ -174,6 +174,9 @@ describe('DestinationShell', () => {
     ).toEqual(['Component gallery', 'Plugin guide'])
     // The group follows everything a user came for.
     expect(screen.getByRole('navigation', { name: 'Settings pages' }).compareDocumentPosition(developer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // Council round 8 B4: no grey group; its rows keep their own icons, drawn in the Developer tone.
+    for (const button of within(developer).getAllByRole('button', { name: /^(?:Component gallery|Plugin guide)$/u }))
+      expect(button.querySelector('[data-section-icon] [data-settings-glyph]')?.getAttribute('data-settings-glyph')).toBe('developer')
     cleanup()
     DestinationSelection.set('settings')
     renderShell({ panels: developerPanels, showDeveloperPages: false })
@@ -256,6 +259,11 @@ describe('DestinationShell', () => {
       expect(glyph?.getAttribute('class'), name).toContain('dshx:text-(--settings-tone)')
       expect(glyph?.getAttribute('data-settings-glyph'), name).toBe(group)
     }
+    // Council round 8 B4: the Pages group's rows keep their own icons, in the Pages tone, never grey.
+    const pages = list.querySelector<HTMLElement>('[data-settings-group="pages"]')
+    expect(pages).not.toBeNull()
+    for (const button of within(pages ?? list).getAllByRole('button'))
+      expect(button.querySelector('[data-section-icon] [data-settings-glyph]')?.getAttribute('data-settings-glyph'), button.getAttribute('aria-label') ?? '').toBe('pages')
     const head = within(list).getByRole('group', { name: 'Models & accounts' }).querySelector('h3')
     expect(head?.className).toContain('dshx:text-sm')
     expect(head?.className).toContain('dshx:font-semibold')

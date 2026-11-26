@@ -70,7 +70,7 @@ import {
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { createElement, type CSSProperties } from 'react'
+import { createElement, type CSSProperties, type ReactNode } from 'react'
 
 /** A category's group, as Settings groups its entries. */
 export type SettingsIconGroup =
@@ -86,6 +86,8 @@ export type SettingsIconGroup =
   | 'about'
   | 'other'
   | 'pages'
+  /** The thread sidebar's Developer block at the end of the column. */
+  | 'developer'
 
 /** The entries Settings places, by their exact (lower-case) name: one glyph each, never repeated in the column. */
 const BY_LABEL: ReadonlyMap<string, LucideIcon> = new Map([
@@ -196,6 +198,7 @@ const BY_GROUP = {
   about: InfoIcon,
   other: CircleDashedIcon,
   pages: FileTextIcon,
+  developer: ShapesIcon,
 } as const satisfies Record<SettingsIconGroup, LucideIcon>
 
 /** The secondary ink: the groups the ramp leaves neutral (Developer, Pages, About and the rest). */
@@ -210,8 +213,9 @@ const between = (a: number, b: number): string => `color-mix(in oklch, var(--dsh
  * more apart. The ramp's six steps clear of the status hues (round 6 B3) go first — General sky 235, Models & accounts
  * violet 300, Agents rose 350, Tools & MCP copper 50, Projects olive 100, Plugins teal 195 — and the rest take the hue
  * between two steps (an OKLCH mix keeps the steps' lightness, so the 3:1 glyph holds in both schemes): Hosts azure 215,
- * Security orchid 325, Notifications moss 122, Pages aqua 170. About is slate, the sky step greyed into the secondary
- * ink. Green 145 and amber 70 stay out: they sit on the status hues.
+ * Security orchid 325, Notifications moss 122, Pages aqua 170. That is every hue 20° clear of the status hues and of each
+ * other, so the last groups repeat one six or more groups up: About copper (as Tools), Developer violet (as Models).
+ * Green 145 and amber 70 stay out: they sit on the status hues.
  */
 const TONE = {
   general: 'var(--dshx-identity-7)',
@@ -223,9 +227,10 @@ const TONE = {
   security: between(2, 4),
   notifications: between(6, 5),
   plugins: 'var(--dshx-identity-1)',
-  about: `color-mix(in srgb, var(--dshx-identity-7) 55%, ${NEUTRAL})`,
+  about: 'var(--dshx-identity-3)',
   other: NEUTRAL,
   pages: between(1, 5),
+  developer: 'var(--dshx-identity-2)',
 } as const satisfies Record<SettingsIconGroup, string>
 
 const isGroup = (group: string): group is SettingsIconGroup => Object.hasOwn(BY_GROUP, group)
@@ -264,6 +269,21 @@ export const SettingsEntryTile = (props: { readonly label: string; readonly grou
     style={toneStyle(props.group)}
   >
     {createElement(glyphOf(props), { className: 'dshx:size-4', strokeWidth: 1.75 })}
+  </span>
+)
+
+/**
+ * A page's own icon in its group's tone (council round 8 B4): the column's Pages and Developer rows keep the icon their
+ * plugin registered, drawn in the group's tone like every category glyph, so no group reads grey; decorative.
+ */
+export const SettingsToneMark = (props: { readonly group: string; readonly children: ReactNode }): JSX.Element => (
+  <span
+    aria-hidden="true"
+    data-settings-glyph={props.group}
+    className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-(--settings-tone)"
+    style={toneStyle(props.group)}
+  >
+    {props.children}
   </span>
 )
 
