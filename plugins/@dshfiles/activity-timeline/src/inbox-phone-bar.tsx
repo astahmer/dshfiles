@@ -17,12 +17,14 @@ import { useEffect, useId, useSyncExternalStore } from 'react'
 import { InboxView } from './inbox-view.js'
 
 export interface InboxPhoneActions {
-  /**
-   * The page's header actions, folded into one menu: the top bar keeps its title and ⋯ (council round 9 C2; Triage is a
-   * worded button on the view switcher's row).
-   */
+  /** The page's other header actions, folded into one menu: the top bar keeps its title, Triage and ⋯. */
   readonly actions: readonly PageAction[]
   readonly moreLabel: string
+  /**
+   * Council round 11 C1: Start triage as a worded 44px "Triage" text button in the bar's trailing seats, beside ⋯, so
+   * the view switcher's row keeps only the segments and their tally. Absent while nothing is open to triage.
+   */
+  readonly triage?: { readonly label: string; readonly onSelect: () => void }
 }
 
 /** The latest published actions per mounted page; the bar draws the most recent publisher's. */
@@ -67,7 +69,7 @@ export const InboxPhoneBar = (): JSX.Element | null => {
   // round 5): it takes the bar's leading seat, left of the centred title, so the trailing corner (its ⋯) never
   // runs over "Inbox" at 390 px.
   const status = useContract(PhoneStatus)
-  if (value === undefined || (value.actions.length === 0 && status.status !== 'active')) return null
+  if (value === undefined || (value.actions.length === 0 && value.triage === undefined && status.status !== 'active')) return null
   // A dialog root with no content is only a portal: no focus trap, no scroll lock, nothing hidden from assistive tech.
   return (
     <Dialog open modal={false}>
@@ -78,6 +80,11 @@ export const InboxPhoneBar = (): JSX.Element | null => {
           </div>
         ) : null}
         <div data-inbox-phone-bar="trailing" className={InboxView.PHONE_BAR}>
+          {value.triage === undefined ? null : (
+            <Button type="button" variant="ghost" data-inbox-phone-triage="" className={InboxView.PHONE_TRIAGE} onClick={value.triage.onSelect}>
+              {value.triage.label}
+            </Button>
+          )}
           {value.actions.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

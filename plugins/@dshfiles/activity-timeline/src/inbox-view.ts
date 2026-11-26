@@ -233,14 +233,28 @@ const COMMAND = 'dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground
 const LEAD_IN = 'dshx:font-sans dshx:text-xs dshx:leading-4 dshx:text-muted-foreground dshx:@max-pane-narrow:line-clamp-none'
 
 /**
- * On a compact pane the command is a block under "Runs:" (council round 9 C1): 13/18 mono (COMMAND's meta step is 13px
- * on a touch screen) on a muted fill, 6px radius,
- * 8px by 10px inside, a wrapped line hanging 2ch under the first, at most four lines.
+ * On a compact pane the command is a block (council round 9 C1): 13/18 mono (COMMAND's meta step is 13px on a touch
+ * screen), a wrapped line hanging 2ch under the first, at most four lines. Council round 11 C1: the block holds its
+ * "Runs" caption (RUNS_BLOCK, RUNS_CAPTION), so the command line is one object instead of a label above a box.
  */
 const COMMAND_BLOCK =
-  'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:mt-1 dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted' +
-  ' dshx:@max-pane-narrow:py-2 dshx:@max-pane-narrow:pr-2.5 dshx:@max-pane-narrow:pl-[calc(0.625rem+2ch)] dshx:@max-pane-narrow:-indent-[2ch]' +
-  ' dshx:@max-pane-narrow:leading-4.5'
+  'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:pl-[2ch] dshx:@max-pane-narrow:-indent-[2ch] dshx:@max-pane-narrow:leading-4.5'
+
+/**
+ * The approval's evidence on a compact pane (council round 11 C1): one muted block, 6px radius, 8px by 10px inside,
+ * "Runs" as its 12/16 muted caption on the first line and the command under it. A wide pane keeps "Runs: command" inline.
+ */
+const RUNS_BLOCK = 'dshx:@max-pane-narrow:block dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted dshx:@max-pane-narrow:px-2.5 dshx:@max-pane-narrow:py-2'
+
+/** The block's caption: "Runs" with no colon, 12/16, on its own line (the inline "Runs:" hides there). */
+const RUNS_CAPTION = 'dshx:hidden dshx:@max-pane-narrow:block dshx:@max-pane-narrow:mb-0.5'
+const RUNS_INLINE = 'dshx:@max-pane-narrow:hidden'
+
+/**
+ * A compact card's body verb under its evidence (council round 11 C1): 4px above and below, so the approval card is
+ * the block, Review, and the card's edge with no slack between them.
+ */
+const VERB_MARGIN = 'dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:pb-1'
 
 const APPROVAL_SOURCE = 'thread-sidebar.approval'
 const APPROVE_LEAD_IN = /^Approve:\s*/u
@@ -301,14 +315,11 @@ const PHONE_BAR =
  * title, so the trailing corner holds only the menu and Start triage and never runs over the title at 390 px.
  */
 /**
- * Start triage on a phone (council round 9 C2): a worded 44px "Triage" button at the trailing end of the view switcher's
- * row, not an icon in the top bar. The page's tabs root is its frame (`relative`), so it sits on the switcher's row.
- * Council round 10 C2: a framed 44px square (the kit's outline button) with the list-checks glyph, named "Triage", so it
- * reads as a control, not a label beside the segments; the worded button (89px) no longer fit beside the Needs you
- * tally at 390px.
+ * Start triage on a phone (council round 11 C1): a worded "Triage" text button, 44px tall, in the top bar's trailing
+ * seats beside ⋯ (InboxPhoneBar), in ink at the bar's 14/500, so the view switcher's row holds only the segments and
+ * the Needs you tally. (Round 9 put a worded button on that row, round 10 a framed list-checks square; both crowded it.)
  */
-const PHONE_TRIAGE =
-  'dshx:hidden dshx:in-data-shell-phone-nav:inline-flex dshx:absolute dshx:top-0 dshx:right-0 dshx:h-11 dshx:w-11 dshx:p-0'
+const PHONE_TRIAGE = 'dshx:h-11 dshx:px-3 dshx:text-sm dshx:font-medium dshx:text-foreground'
 
 const PHONE_BAR_LEADING =
   'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:left-[max(12px,env(safe-area-inset-left,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
@@ -472,6 +483,10 @@ export class InboxView {
   static readonly COMMAND = COMMAND
   static readonly LEAD_IN = LEAD_IN
   static readonly COMMAND_BLOCK = COMMAND_BLOCK
+  static readonly RUNS_BLOCK = RUNS_BLOCK
+  static readonly RUNS_CAPTION = RUNS_CAPTION
+  static readonly RUNS_INLINE = RUNS_INLINE
+  static readonly VERB_MARGIN = VERB_MARGIN
   static readonly cardText = cardText
   static readonly compact = compact
   static readonly titleCounts = titleCounts

@@ -45,9 +45,10 @@ describe('the phone Inbox (council round 7 C2)', () => {
   it('takes 8px, not 12, from the non-interactive gaps on a phone: page top, tabs to list, body to verb, card end', () => {
     expect(page).toContain('dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]]:pt-2')
     expect(page).toContain('dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:gap-2')
-    // Council round 8 C2: the verb follows the evidence 8px under it on a phone, and the card ends 8px under the verb.
+    // Council round 8 C2: the verb follows the evidence on a phone; council round 11 C1 tightened it to 4px above and
+    // below (inbox-round11.test.ts).
     expect(InboxView.EVIDENCE).toContain('dshx:@max-pane-narrow:gap-2')
-    expect(row).toContain("answers === null && bodyVerbs !== null && 'dshx:@max-pane-narrow:pb-2'")
+    expect(row).toContain('answers === null && bodyVerbs !== null && InboxView.VERB_MARGIN,')
     // Answers stay 8px apart.
     expect(row.slice(row.indexOf('const answers = '), row.indexOf('const row = '))).toContain('dshx:gap-2')
   })

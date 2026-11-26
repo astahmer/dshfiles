@@ -5,7 +5,6 @@ import { InboxView } from './inbox-view.js'
 const panel = readFileSync(new URL('./inbox-panel.tsx', import.meta.url), 'utf8')
 const row = panel.slice(panel.indexOf('const InboxRow = '), panel.indexOf('const InboxActionSheet = '))
 const verbs = row.slice(row.indexOf('const verbButtons = '), row.indexOf('const headVerbs = '))
-const list = panel.slice(panel.indexOf('const triageable = '))
 
 describe('the phone Inbox head (council round 9 C1)', () => {
   it('gives every card the same two-line head: glyph · full title · seat, then mark · kind · age at 13/400', () => {
@@ -34,18 +33,11 @@ describe('the phone Inbox head (council round 9 C1)', () => {
 
   it('draws an approval command as a 13/18 mono block on a muted fill under "Runs:", hanging 2ch on wrap', () => {
     expect(row).toContain('<code className={cn(InboxView.COMMAND, InboxView.COMMAND_BLOCK)}>')
-    for (const part of [
-      'dshx:@max-pane-narrow:line-clamp-4',
-      'dshx:@max-pane-narrow:mt-1',
-      'dshx:@max-pane-narrow:rounded-md',
-      'dshx:@max-pane-narrow:bg-muted',
-      'dshx:@max-pane-narrow:py-2',
-      'dshx:@max-pane-narrow:pr-2.5',
-      'dshx:@max-pane-narrow:pl-[calc(0.625rem+2ch)]',
-      'dshx:@max-pane-narrow:-indent-[2ch]',
-      'dshx:@max-pane-narrow:leading-4.5',
-    ])
+    // Council round 11 C1: the fill, radius and inset moved to the runs line, which captions the block (RUNS_BLOCK).
+    for (const part of ['dshx:@max-pane-narrow:line-clamp-4', 'dshx:@max-pane-narrow:pl-[2ch]', 'dshx:@max-pane-narrow:-indent-[2ch]', 'dshx:@max-pane-narrow:leading-4.5'])
       expect(InboxView.COMMAND_BLOCK).toContain(part)
+    for (const part of ['dshx:@max-pane-narrow:rounded-md', 'dshx:@max-pane-narrow:bg-muted', 'dshx:@max-pane-narrow:py-2', 'dshx:@max-pane-narrow:px-2.5'])
+      expect(InboxView.RUNS_BLOCK).toContain(part)
     expect(InboxView.COMMAND_BLOCK).not.toContain('text-sm')
     // The lead-in's two-line clamp would cut the block: it lets go on a phone and the block clamps itself.
     expect(InboxView.LEAD_IN).toContain('dshx:@max-pane-narrow:line-clamp-none')
@@ -70,21 +62,7 @@ describe('the Failed card (council round 9 C3)', () => {
   })
 })
 
-describe('the phone Triage button (council round 9 C2)', () => {
-  it('is a worded 44px button at the trailing end of the view switcher, never in the top bar', () => {
-    expect(InboxView.PHONE_TRIAGE).toContain('dshx:hidden')
-    expect(InboxView.PHONE_TRIAGE).toContain('dshx:in-data-shell-phone-nav:inline-flex')
-    expect(InboxView.PHONE_TRIAGE).toContain('dshx:absolute dshx:top-0 dshx:right-0')
-    expect(InboxView.PHONE_TRIAGE).toContain('dshx:h-11')
-    // Council round 10 C2: a framed 44px square named "Triage" (inbox-round10.test.ts).
-    expect(list).toMatch(/aria-label=\{t\('triage'\)\}[^\n]*data-inbox-phone-triage=""/u)
-    // The switcher row holds it: the tabs root is its frame, and the strip keeps clear of it.
-    expect(list).toContain("'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:relative'")
-    // The top bar keeps its title and ⋯: Triage never reaches it, and it has no primary seat.
-    expect(list).toContain("headerActions.filter(action => action.id !== 'triage')")
-    expect(list).toContain("usePublishInboxPhoneActions({ actions: triaging ? [] : phoneActions, moreLabel: t('more') })")
-  })
-})
+// Council round 11 C1 moved Triage to a worded button in the top bar (inbox-round11.test.ts).
 
 describe('the phone Inbox gutter (council round 9, lane B B4)', () => {
   it('sets a card glyph and its body text at 24px: the 12px card edge, its 1px border and 11px', () => {

@@ -42,12 +42,14 @@ in 12/16 secondary mono, and a Failed item with nothing to say is one compact ro
 page title carries one count chip per status present, ◆2 ✕1 (the kit Page's `statusCounts`), and the header ends at the
 list's trailing edge, so Start triage and the page menu line up with the cards. Council round 8: every card has one
 structure. The head reads glyph · title · project · kind · time with muted "·" separators, plus its `⋯` menu; the
-body opens with the evidence (an approval's "Runs: `command`" in 12/16 mono, a question's "Asks: …") and the verbs
+body opens with the evidence (an approval's "Runs: `command`" in 12/16 mono, on a phone one muted block captioned
+"Runs"; a question's "Asks: …") and the verbs
 follow it: beside it on a wide pane, under it as full-width buttons on a phone (a question's answers are its verbs). A
 bodyless failure keeps its verb in the head. On a phone the head of a card with a body is one 44 pt line: the title
 truncates, the project's mark and the kind stay ("BA · Approval"), and the age shows only where it fits; the body
-takes the card's 16 pt inset and a long answer wraps inside its 44 pt row. **Start triage** (a 44 pt icon button named
-by its label and tooltip), the page menu and the frame's status button (frame-layout's `PhoneStatus`) sit in the top
+takes the card's 16 pt inset and a long answer wraps inside its 44 pt row. **Start triage** (a worded 44 pt "Triage" text
+button beside the `⋯`, council round 11; the view switcher's row keeps only the segments and the Needs you tally), the
+page menu and the frame's status button (frame-layout's `PhoneStatus`) sit in the top
 bar beside the "Inbox" title (`src/inbox-phone-bar.tsx`, drawn from the frame's root overlay) instead of a row of
 their own.
 
