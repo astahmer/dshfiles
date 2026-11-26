@@ -87,12 +87,12 @@ const DockRow = (
             className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden', open && 'dshx:rotate-90')}
           />
           <StatusGlyph label={stateLabel} status={waiting ? 'needs-you' : 'working'} />
-          <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:font-medium dshx:@max-pane-narrow:text-sm" data-subagent-dock-title="">
+          <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:font-medium dshx:@max-pane-narrow:text-sm/5" data-subagent-dock-title="">
             {label}
           </span>
           {/* One line with the title on a wide pane (`contents`), its own line under the title on a narrow one. */}
           <span
-            className="dshx:contents dshx:@max-pane-narrow:col-start-2 dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:text-muted-foreground"
+            className="dshx:contents dshx:@max-pane-narrow:col-start-2 dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:text-xs/4 dshx:@max-pane-narrow:text-muted-foreground"
             data-subagent-dock-meta=""
           >
             {step === undefined ? null : (

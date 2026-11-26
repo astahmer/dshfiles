@@ -219,6 +219,10 @@ describe('SubagentPreviewDock', () => {
     expect(meta?.contains(toggle?.querySelector('[data-subagent-dock-title]') ?? null)).toBe(false)
     // Two lines stay a whole touch row: at least 44pt.
     expect(line?.className).toContain('dshx:@max-pane-narrow:min-h-[54px]')
+    // 8 + 20 + 2 + 16 + 8 = 54px, as the composer's 3.5-row cap counts it: each line states its own leading (line 2
+    // inherited a ratio and measured 18px, so rows came out 56px and the cap cut them in the wrong place).
+    expect(toggle?.querySelector('[data-subagent-dock-title]')?.className).toContain('dshx:@max-pane-narrow:text-sm/5')
+    expect(meta?.className).toContain('dshx:@max-pane-narrow:text-xs/4')
     expect(line?.querySelector('[data-live-work-action]')?.className).toContain('dshx:@max-pane-narrow:self-stretch')
   })
 
