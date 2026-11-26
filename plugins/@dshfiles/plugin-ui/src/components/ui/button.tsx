@@ -57,6 +57,13 @@ const buttonVariants = cva(
           triggerLook,
           'dshx:justify-between dshx:font-normal dshx:text-foreground dshx:active:bg-(--dsw-alias-interactive-bg-active) dshx:[&_svg:not([class*=text-])]:text-muted-foreground',
         ),
+        /*
+         * A worded action in a phone top bar (council round 13 A4: the Inbox's Triage): one rule for every bar text
+         * button, the secondary label at 500 with its 16px glyph 6px before it, no fill or edge at rest, ink on hover
+         * and the press wash. With the default size it takes the bar's 44px seat (compound rule below), so it never
+         * reads as a second title or a chip. Outside `Button`, read it through `cn(buttonVariants({ variant: 'bar' }))`.
+         */
+        bar: 'dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:active:bg-(--dsw-alias-interactive-bg-active)',
       },
       size: {
         default: 'dshx:h-(--dshx-control-h) dshx:px-3 dshx:py-1.5 dshx:has-[>svg]:px-2.5',
@@ -83,6 +90,7 @@ const buttonVariants = cva(
       },
     },
     compoundVariants: [
+      { variant: 'bar', size: 'default', class: 'dshx:h-11 dshx:gap-1.5 dshx:px-3 dshx:has-[>svg]:px-3' },
       {
         variant: 'attention',
         band: true,
