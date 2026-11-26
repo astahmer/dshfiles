@@ -222,7 +222,7 @@ const JobPreviewCard = (
         // Council round 8 C3: the dock row ends like a subagent row's, with a worded link out and its arrow.
         actions={
           dock ? (
-            <Button size="xs" variant="ghost" className="dshx:shrink dshx:text-muted-foreground" data-job-open-processes="" onClick={props.openProcesses}>
+            <Button size="xs" variant="ghost" className="dshx:min-w-34 dshx:justify-end dshx:text-muted-foreground dshx:@max-pane-narrow:min-w-0" data-job-open-processes="" data-live-work-action="" onClick={props.openProcesses}>
               <span className="dshx:@max-pane-narrow:sr-only">{t('previewOpenProcesses')}</span>
               <ArrowUpRightIcon aria-hidden="true" />
             </Button>

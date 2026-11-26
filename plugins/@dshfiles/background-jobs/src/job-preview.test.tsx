@@ -264,6 +264,17 @@ describe('JobPreviewDock', () => {
     expect(bindings.openProcesses).toHaveBeenCalled()
   })
 
+  it("ends in the dock's fixed action column, so its clock lines up with a subagent row's (council round 18, B1.2)", () => {
+    renderDock(fakeJobs([row({ id: 'bash-col' as JobView['id'] })]))
+    const link = dockCards()[0]?.querySelector('[data-job-open-processes]')
+    if (!(link instanceof HTMLElement)) throw new Error('no Open in Processes')
+    expect(link.hasAttribute('data-live-work-action')).toBe(true)
+    expect(link.className).toContain('dshx:min-w-34')
+    expect(link.className).toContain('dshx:justify-end')
+    expect(link.className).toContain('dshx:@max-pane-narrow:min-w-0')
+    expect(link.classList.contains('dshx:shrink')).toBe(false)
+  })
+
   it('renders nothing for a thread with no running job', () => {
     renderDock(fakeJobs([]))
     expect(document.querySelector('[data-dshfiles-live-preview-dock]')).toBeNull()
