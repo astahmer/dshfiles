@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { DEFAULT_APPEARANCE, DEFAULT_FONT_STACKS, SCENE_FRAME_RATE, THEME_PRESETS } from '@dshfiles/plugin-ui/theme/appearance'
+import { AppearanceModel, DEFAULT_APPEARANCE, DEFAULT_FONT_STACKS, SCENE_FRAME_RATE, THEME_PRESETS } from '@dshfiles/plugin-ui/theme/appearance'
+import { IdentityPalette, PALETTE_NAMES_ATTRIBUTE } from '@dshfiles/plugin-ui/theme/identity'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { Effect, Layer } from 'effect'
 import * as Schema from 'effect/Schema'
@@ -232,6 +233,29 @@ describe('theme tools', () => {
     expect(scheme).toContain('"paletteNames"')
     expect(remove.tool).toMatchObject({ name: 'theme_remove', readOnly: false })
     expect(remove.description).toMatch(/confirm: true/u)
+  })
+})
+
+describe('identity palette names (round eight)', () => {
+  const root = () => {
+    const attributes = new Map<string, string>()
+    return {
+      attributes,
+      getAttribute: (name: string) => attributes.get(name) ?? null,
+      setAttribute: (name: string, value: string) => void attributes.set(name, value),
+      removeAttribute: (name: string) => void attributes.delete(name),
+    }
+  }
+
+  it('publishes the active theme’s slot names on <html> and removes them with the theme', () => {
+    const html = root()
+    RuntimeTheme.applyPaletteNames(html, AppearanceModel.identityNames({ ...DEFAULT_APPEARANCE, preset: 'dracula' }))
+    expect(IdentityPalette.parseNames(html.attributes.get(PALETTE_NAMES_ATTRIBUTE))).toEqual({
+      light: ['Cyan', 'Green', 'Orange', 'Purple', 'Pink', 'Yellow'],
+      dark: ['Cyan', 'Green', 'Orange', 'Purple', 'Pink', 'Yellow'],
+    })
+    RuntimeTheme.applyPaletteNames(html, AppearanceModel.identityNames(DEFAULT_APPEARANCE))
+    expect(html.attributes.has(PALETTE_NAMES_ATTRIBUTE)).toBe(false)
   })
 })
 

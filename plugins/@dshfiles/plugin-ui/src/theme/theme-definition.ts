@@ -7,7 +7,8 @@
  * (read from its background and accent), then the definition pins the eleven steps, the accent and status colours and
  * the Shiki tokens it gives. A scheme the definition leaves out keeps the generated palette.
  */
-import { IDENTITY_SLOT_COUNT } from './identity-palette.ts'
+import { IdentityDerivation } from './identity-derivation.ts'
+import { COOL_ORDER, IDENTITY_SLOT_COUNT } from './identity-palette.ts'
 import { PaletteMath, type PaletteInput, type Scheme } from './palette.ts'
 import { ReadabilityModel, type Rgb, type VeilInput } from './readability.ts'
 import { SCENE_IDS, SceneCatalog, type SceneGlass } from './scene-catalog.ts'
@@ -394,6 +395,17 @@ function pins(theme: SchemeTheme): string[] {
     if (role === 'string') push('--shiki-token-string-expression', colour)
   }
   return out
+}
+
+/**
+ * The identity slots a scheme writes over styles.css (round eight): `--dshx-project-balanced-<n>` is slot n, and
+ * `--dshx-project-cool-<n>` the same six in the cool order, so every `project-tone-*` class, `ProjectMark` and swatch
+ * follows the theme.
+ */
+function identityPins(palette: IdentityTuple): string[] {
+  const balanced = palette.map((colour, slot) => `  --dshx-project-balanced-${slot}: ${colour};`)
+  const cool = COOL_ORDER.map((slot, n) => `  --dshx-project-cool-${n}: ${palette[slot]};`)
+  return [...balanced, ...cool]
 }
 
 /** The main workbench: the conversation and its tabs, never the sidebars, dialogs or the composer. */
@@ -812,6 +824,12 @@ function definitionCss(
     if (theme === undefined) continue
     const selector = selectors[scheme]
     parts.push([`${selector} {`, ...pins(theme), '}'].join('\n'))
+    // The light block is guarded: these slots have no generated dark value to out-rank a light one in dark.
+    parts.push(
+      [`${scheme === 'light' ? `${selector}:not([data-ds-dark-theme])` : selector} {`, ...identityPins(IdentityDerivation.paletteOf(theme, scheme)), '}'].join(
+        '\n',
+      ),
+    )
     if (theme.backdrop !== undefined)
       parts.push(backdropCss(scheme === 'light' ? `${selector}:not([data-ds-dark-theme])` : selector, theme, theme.backdrop, scenes, reading))
   }
