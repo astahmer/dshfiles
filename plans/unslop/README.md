@@ -280,6 +280,15 @@ Round 15 findings, merged in `.cache/unslop-audit/r5/council/round-15-fixes.md`:
 clipped, the Inbox tally on the tab only, a two-line desktop Inbox head, one Inbox verb style, a reason well on failed
 cards, AttentionMeta wording in the palette, a link-styled More font settings, glyphs on every group count, one overflow
 glyph. The next council round seats GPT-6.2 Astra instead of Sol (owner's request), once that route is available.
+All four lanes done: A kit 5 revisions `noopnqyu` … `kkvxvoyz` (a 20 px unclipped rail seat, DisclosureLink, one
+OverflowGlyph, DESIGN.md); B 5 revisions `qmtxsmyw` … `mtnvwuoq` (glyphs on group counts, the 20 px glyph column, palette
+attention rows on AttentionMeta, More font settings as a disclosure link, overflow glyphs); C 4 revisions `tnrxltxp` …
+`xlozvqsx` (one tally, a two-line desktop head and one pill verb, a reason well on failed cards, the chat ⋯); D 3
+revisions `qqxxuqzq` … `tnkmyvnr` (a bare provider mark in Where it went, overflow glyphs). The phone failed card kept
+its head pill: a full-width footer Review needed ~78 px and only 16–34 px could be recovered. The lead fixed the stale
+finished-turn reach.
+Follow-ups: keep a failed turn's error first line on the Host so the reason well can quote it; agents and jujutsu still
+draw off-size overflow glyphs; ~77 idle thread workspaces had 117 GB of turbo caches (cleared) and still hold node_modules.
 
 ## Round four
 
