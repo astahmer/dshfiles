@@ -55,6 +55,22 @@ export const ModelCuration = (props: {
   const customModelId = ModelCurationModel.parseAdditionalModelId(current.modelId, account)
   const duplicate = catalog.some(model => model.id === customModelId)
   const customize = (patch: CurationPatch): void => props.onChange({ ...patch, inheritModelSettings: false })
+  const isCustom = (model: CatalogModel): boolean => model.accountAdditional ?? account.additionalModelIds.includes(model.id)
+  const isOverridden = (model: CatalogModel): boolean => {
+    const localEffort = effective.reasoningDefaults[model.id]
+    return (
+      !inherited &&
+      (model.efforts.some(effort => effort.id === localEffort) ||
+        model.efforts.some(effort => effort.id === effective.defaultReasoningEffort) ||
+        hidden.has(model.id) ||
+        favorites.has(model.id) ||
+        effective.modelOrder.includes(model.id) ||
+        isCustom(model))
+    )
+  }
+  // When every row inherits, one caption above the table says so instead of an Inherited label on each row, and the
+  // Source column goes (council round 10, D2).
+  const allInherit = shown.every(model => !isOverridden(model))
   const addModel = (): void => {
     if (customModelId === null || duplicate) return
     customize({ additionalModelIds: [...new Set([...account.additionalModelIds, customModelId])] })
@@ -131,15 +147,21 @@ export const ModelCuration = (props: {
           This account is hidden, so none of its models show in the model picker. Turn on Show this account to use them.
         </p>
       )}
+      {allInherit && shown.length > 0 ? (
+        <p className="dshx:text-xs dshx:leading-4 dshx:text-muted-foreground" data-models-inherit-note>
+          All models inherit the provider’s effort.
+        </p>
+      ) : null}
       {/* Rows separate by hairlines; the detail pane is the only frame. */}
       <div className="dshx:overflow-x-auto dshx:border-y">
         <table className="dshx:w-full dshx:min-w-[600px] dshx:border-collapse dshx:text-sm">
           <thead className="dshx:border-b dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
             <tr>
-              <th className="dshx:px-3 dshx:py-2 dshx:font-normal">Model</th>
+              {/* Starts on the names: the cell's 8 px, the 24 px star, the 16 px mark and two 8 px gaps (council round 10, D2). */}
+              <th className="dshx:py-2 dshx:pr-3 dshx:pl-16 dshx:font-normal">Model</th>
               <th className="dshx:w-36 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show model</th>
-              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>
+              {allInherit ? null : <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>}
               <th className="dshx:w-10">
                 <span className="dshx:sr-only">Actions</span>
               </th>
@@ -150,15 +172,8 @@ export const ModelCuration = (props: {
               const favorite = favorites.has(model.id)
               const localEffort = effective.reasoningDefaults[model.id]
               const validEffort = model.efforts.some(effort => effort.id === localEffort) ? localEffort : undefined
-              const custom = model.accountAdditional ?? account.additionalModelIds.includes(model.id)
-              const overridden =
-                !inherited &&
-                (validEffort !== undefined ||
-                  model.efforts.some(effort => effort.id === effective.defaultReasoningEffort) ||
-                  hidden.has(model.id) ||
-                  favorite ||
-                  effective.modelOrder.includes(model.id) ||
-                  custom)
+              const custom = isCustom(model)
+              const overridden = isOverridden(model)
               const fullOrder = ModelCurationModel.curationRows(activeCatalog, effective.modelOrder, '')
               const index = fullOrder.findIndex(candidate => candidate.id === model.id)
               const accountEffort = model.efforts.find(effort => effort.id === effective.defaultReasoningEffort)
@@ -181,9 +196,10 @@ export const ModelCuration = (props: {
                       </Button>
                       <ModelMark modelId={model.id} />
                       <ActionHint label={model.id}>
-                        <strong tabIndex={0} className="dshx:min-w-0 dshx:truncate dshx:font-medium">
+                        {/* A span at 500: the Host's unlayered strong weight would outrank the utility (council round 10, D2). */}
+                        <span tabIndex={0} className="dshx:min-w-0 dshx:truncate dshx:font-medium">
                           {model.name}
-                        </strong>
+                        </span>
                       </ActionHint>
                       {custom ? (
                         <span className="dshx:rounded-full dshx:bg-muted dshx:px-2 dshx:py-0.5 dshx:text-xs dshx:text-muted-foreground">Custom</span>
@@ -212,16 +228,18 @@ export const ModelCuration = (props: {
                       onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, checked !== true) })}
                     />
                   </td>
-                  <td className="dshx:px-3 dshx:py-2">
-                    <span
-                      className={cn(
-                        'dshx:text-xs',
-                        overridden ? 'dshx:rounded-full dshx:bg-accent dshx:px-2 dshx:py-1 dshx:text-accent-foreground' : 'dshx:text-muted-foreground',
-                      )}
-                    >
-                      {overridden ? 'Overridden' : 'Inherited'}
-                    </span>
-                  </td>
+                  {allInherit ? null : (
+                    <td className="dshx:px-3 dshx:py-2">
+                      <span
+                        className={cn(
+                          'dshx:text-xs',
+                          overridden ? 'dshx:rounded-full dshx:bg-accent dshx:px-2 dshx:py-1 dshx:text-accent-foreground' : 'dshx:text-muted-foreground',
+                        )}
+                      >
+                        {overridden ? 'Overridden' : 'Inherited'}
+                      </span>
+                    </td>
+                  )}
                   <td className="dshx:pr-2">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>

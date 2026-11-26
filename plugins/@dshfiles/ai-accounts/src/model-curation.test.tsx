@@ -68,14 +68,8 @@ describe('reference Models table', () => {
     expect(container.textContent).not.toContain('Custom')
   })
   it('starts at five rows, reveals the real remaining count, and keeps custom ID entry behind disclosure', async () => {
-    await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
-    expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual([
-      'Model',
-      'Reasoning effort',
-      'Show model',
-      'Source',
-      'Actions',
-    ])
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false, favoriteModelIds: ['model-0'] })
+    expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effort', 'Show model', 'Source', 'Actions'])
     expect(container.querySelectorAll('tbody tr')).toHaveLength(5)
     const more = [...container.querySelectorAll('button')].find(element => element.textContent?.includes('Show 4 more models'))
     await click(more ?? null)
@@ -144,5 +138,38 @@ describe('reference Models table', () => {
     await click(container.querySelector('[aria-label="Inherit model settings from provider"]'))
     expect(state.draft().inheritModelSettings).toBe(false)
     expect(container.querySelector('[aria-label="Default reasoning effort"]')?.textContent).toBe('Low')
+  })
+
+  it('says once above the table that every row inherits, instead of an Inherited label per row (council round 10, D2)', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true })
+    const note = container.querySelector('[data-models-inherit-note]')
+    expect(note?.textContent).toBe('All models inherit the provider’s effort.')
+    // A 12/16 caption above the table.
+    for (const look of ['dshx:text-xs', 'dshx:leading-4', 'dshx:text-muted-foreground']) expect(note?.className).toContain(look)
+    const table = container.querySelector('table')
+    expect(note !== null && table !== null && (note.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+    expect(container.querySelector('tbody')?.textContent).not.toContain('Inherited')
+    expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effort', 'Show model', 'Actions'])
+    await act(async () => root?.unmount())
+    container.remove()
+    // One overridden row brings the Source column back, and the caption goes.
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false, favoriteModelIds: ['model-0'] })
+    expect(container.querySelector('[data-models-inherit-note]')).toBeNull()
+    expect(container.querySelector('tbody')?.textContent).toContain('Overridden')
+    expect(container.querySelector('tbody')?.textContent).toContain('Inherited')
+  })
+
+  it('sets model names at 500 and starts the Model heading on the names (council round 10, D2)', async () => {
+    await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
+    // Not a <strong>: the Host's unlayered strong weight outranks the layered utility.
+    expect(container.querySelector('tbody strong')).toBeNull()
+    const name = container.querySelector('tbody span[tabindex="0"]')
+    expect(name?.textContent).toBe('Model 0')
+    expect(name?.className).toContain('dshx:font-medium')
+    // The cell's 8 px inset, the 24 px star, the 16 px model mark and two 8 px gaps: names start 64 px in.
+    const head = [...container.querySelectorAll('th')].find(element => element.textContent === 'Model')
+    expect(head?.className).toContain('dshx:pl-16')
+    expect(container.querySelector('tbody td > div')?.className).toContain('dshx:gap-2')
+    expect(container.querySelector('tbody td')?.className).toContain('dshx:px-2')
   })
 })

@@ -20,10 +20,15 @@ export const DetailHeader = (props: {
     {/* In a phone-width pane the name takes its own line, so the controls never squeeze it to one letter. */}
     <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-2 dshx:@max-pane-narrow:basis-full">
       {props.mark}
-      {props.title}
-      {props.detail === undefined || props.detail === '' ? null : (
-        <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:text-muted-foreground">{props.detail}</span>
-      )}
+      {/* What the provider reported (plan, identity, the Checked time) sits under the name (council round 10, D2). */}
+      <div className="dshx:flex dshx:min-w-0 dshx:flex-col">
+        {props.title}
+        {props.detail === undefined || props.detail === '' ? null : (
+          <span className="dshx:min-w-0 dshx:truncate dshx:text-xs dshx:leading-4 dshx:text-muted-foreground" data-detail-header-detail>
+            {props.detail}
+          </span>
+        )}
+      </div>
     </div>
     <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2">
       {props.state === undefined || props.state === null ? null : (

@@ -39,6 +39,11 @@ describe('account detail anatomy', () => {
     expect(header('')).toContain('Checked 03:18 PM')
     expect(header('business · real@example.test')).toContain('business · real@example.test')
   })
+  it('sets the Checked time under the account name, not beside it (council round 10, D2)', () => {
+    const markup = renderToStaticMarkup(<DetailHeader detail="Checked 03:18 PM" mark={<ProviderGlyph kind="codex" />} title={<h2>Work</h2>} />)
+    // The name and its detail line share one column beside the mark.
+    expect(markup).toMatch(/<div class="[^"]*dshx:flex-col[^"]*"><h2>Work<\/h2><span[^>]*data-detail-header-detail[^>]*>Checked 03:18 PM<\/span><\/div>/u)
+  })
   it('renders Models as a page section with no card or framed table', () => {
     const draft = AccountDraftModel.toDraft(
       Schema.decodeUnknownSync(accountProfileSchema)({
@@ -214,7 +219,7 @@ describe('AI accounts page (council round 5, D2)', () => {
 })
 
 describe('AI accounts page title mark (council round 8, D4)', () => {
-  it("marks the page, loading or loaded, with its own Settings leaf glyph: the violet people mark of Models & accounts", () => {
+  it('marks the page, loading or loaded, with its own Settings leaf glyph: the violet people mark of Models & accounts', () => {
     const panel = source('accounts-panel.tsx')
     const pages = panel
       .split('<Page')
