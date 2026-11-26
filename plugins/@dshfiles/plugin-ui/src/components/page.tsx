@@ -31,6 +31,13 @@ export interface PageTab {
   readonly value: string
   readonly label: string
   readonly count?: number
+  /**
+   * What the tab's count is made of (`{ 'needs-you': 2, failed: 1 }`). When two or more statuses are present, the phone
+   * shell draws them as a tally of `StatusCount`s, attention first (◆ 2 ✕ 1), in place of `count`, so a failure below
+   * the fold shows at first glance; elsewhere the tab keeps the plain `count` (the desktop page title already shows the
+   * tally). With one status or none, every shell shows `count`.
+   */
+  readonly statusCounts?: PageStatusCounts
 }
 
 export interface PageTabs {
@@ -56,6 +63,13 @@ export type PageWidth = 'page' | 'lane' | 'form' | 'wide' | 'full'
 export type PageStatusCounts = Partial<Readonly<Record<WorkStatus, number>>>
 
 const STATUS_COUNT_ORDER: readonly WorkStatus[] = ['needs-you', 'failed', 'working', 'ready', 'idle', 'done']
+
+/** The statuses present in a count, attention first, zeros dropped. */
+const presentStatuses = (statusCounts: PageStatusCounts | undefined): readonly (readonly [WorkStatus, number])[] =>
+  STATUS_COUNT_ORDER.flatMap(status => {
+    const count = statusCounts?.[status] ?? 0
+    return count > 0 ? [[status, count] as const] : []
+  })
 const SEGMENTED_MAX = 4
 
 /** The rail destinations whose tone a page title mark can take (`--dshx-nav-tone-<id>`, DESIGN.md › Navigation identity). */
@@ -215,10 +229,7 @@ export const PageTitleCount = (props: {
   readonly count?: number | string | undefined
   readonly statusCounts?: PageStatusCounts | undefined
 }): React.ReactNode => {
-  const statusCounts = STATUS_COUNT_ORDER.flatMap(status => {
-    const count = props.statusCounts?.[status] ?? 0
-    return count > 0 ? [[status, count] as const] : []
-  })
+  const statusCounts = presentStatuses(props.statusCounts)
   if (statusCounts.length > 0)
     return (
       <span data-slot="page-status-counts" className="dshx:flex dshx:items-center dshx:gap-1.5">
@@ -424,8 +435,30 @@ function PageTabList({ tabs }: { readonly tabs: PageTabs }) {
   return segmented ? <SegmentedTabList tabs={tabs} /> : <UnderlineTabList tabs={tabs} />
 }
 
-const TabCount = ({ count }: { readonly count: number | undefined }): React.ReactNode =>
-  count === undefined ? null : <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{count}</span>
+/**
+ * A tab's count. With two or more statuses in `statusCounts`, the phone shell (`html[data-shell-phone-nav]`) shows
+ * their tally (council round 10, Inbox "Needs you": ◆ 2 ✕ 1) and hides the plain count; every other shell keeps the
+ * plain count. Both sit inside the tab's own height, so the segment's height and hit area do not change.
+ */
+const TabCount = ({ count, statusCounts }: { readonly count: number | undefined; readonly statusCounts?: PageStatusCounts | undefined }): React.ReactNode => {
+  const tally = presentStatuses(statusCounts)
+  const plain = count === undefined ? null : <span className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums">{count}</span>
+  if (tally.length < 2) return plain
+  return (
+    <>
+      {count === undefined ? null : (
+        <span data-slot="page-tab-count" className="dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums dshx:in-data-shell-phone-nav:hidden">
+          {count}
+        </span>
+      )}
+      <span data-slot="page-tab-status-counts" className="dshx:hidden dshx:items-center dshx:gap-1 dshx:in-data-shell-phone-nav:inline-flex">
+        {tally.map(([status, value]) => (
+          <StatusCount key={status} status={status} count={value} />
+        ))}
+      </span>
+    </>
+  )
+}
 
 /**
  * Page sections as underline tabs (council round 3 A5): ink labels on a hairline, the active one in ink with a 2px
@@ -441,7 +474,7 @@ function UnderlineTabList({ tabs }: { readonly tabs: PageTabs }) {
           className="dshx:h-full dshx:flex-none dshx:rounded-none dshx:border-0 dshx:px-0 dshx:after:bg-foreground dshx:data-[state=active]:text-foreground dshx:group-data-[orientation=horizontal]/tabs:after:bottom-[-1px]"
         >
           {tab.label}
-          <TabCount count={tab.count} />
+          <TabCount count={tab.count} statusCounts={tab.statusCounts} />
         </TabsTrigger>
       ))}
     </TabsList>
@@ -467,7 +500,7 @@ function SegmentedTabList({ tabs }: { readonly tabs: PageTabs }) {
             className="dshx:flex-none dshx:data-[state=active]:border-transparent! dshx:data-[state=active]:bg-transparent! dshx:data-[state=active]:shadow-none!"
           >
             <SegmentLabel label={tab.label} />
-            <TabCount count={tab.count} />
+            <TabCount count={tab.count} statusCounts={tab.statusCounts} />
           </TabsTrigger>
         ))}
       </TabsList>

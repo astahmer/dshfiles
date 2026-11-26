@@ -206,7 +206,9 @@ full-width head band (an Inbox card's) takes `bg-wash-needs-you-band` instead: t
 **Counts that name a status.** `StatusCount` (`components/work-status`) is a pill with the status glyph at 10px
 (`StatusGlyph size="small"`) and a tabular number: `<StatusCount status="needs-you" count={3} />`. Needs you and Failed
 sit on their tint pair; other states are a muted chip. A zero draws nothing; `label` sets what a screen reader hears
-(default "3 Needs you"). Use it for a group header's count and a page title's count of what waits on you.
+(default "3 Needs you"). Use it for a group header's count and a page title's count of what waits on you. A `PageTab` takes
+`statusCounts` too: with two or more statuses present, the phone shell draws them as a tally of `StatusCount`s in the
+segment (◆ 2 ✕ 1, attention first) in place of its `count`; every other shell keeps the plain count.
 
 **The attention badge.** `AttentionBadge` (`components/ui/attention-badge`) is the Needs-you count on a nav glyph or a
 tab: `<AttentionBadge count={3} label="need you" />` draws a 16px pill (`dshx:badge-attention`, usable on a plain span)
