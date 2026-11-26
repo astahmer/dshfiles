@@ -96,8 +96,8 @@
   "apiToolBindings": 488,
   "apiToolNameCount": 488,
   "apiToolSchemas": 487,
-  "definedTools": 24,
-  "tools": 511,
+  "definedTools": 25,
+  "tools": 512,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -10675,6 +10675,34 @@
         },
         "required": [
           "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "secret_run",
+      "description": "Run a command with this workspace's secret aliases injected as environment variables. Values are never returned: exact value bytes in the child output are replaced with [scrubbed] by the Host. Use this instead of secret_get whenever a command needs a credential.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "command": {
+            "description": "Command and arguments, e.g. [\"npm\", \"test\"].",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "environment": {
+            "description": "Secret environment; defaults to prod.",
+            "type": "string"
+          },
+          "timeoutSeconds": {
+            "description": "Maximum run time in seconds; defaults to 60.",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "command"
         ],
         "additionalProperties": false
       }

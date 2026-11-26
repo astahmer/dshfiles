@@ -9,43 +9,42 @@ import { describe, expect, it } from 'vitest'
 import { createServer } from 'vite'
 import { buildHost, type BuildHostOptions } from '../src/compiler/host/build.js'
 import { resolveDshxConfig } from '../src/config/resolve.js'
+import { decodeJson, jsonValueSchema, type JsonObject, type JsonValue } from '../src/json.js'
 import { createTestHost } from '../src/testing/index.js'
 
-const expectedCounts = { hostBundles: 90, apiMethods: 691, apiToolBindings: 488, apiToolSchemas: 487, definedTools: 24, tools: 511 }
+const expectedCounts = { hostBundles: 90, apiMethods: 691, apiToolBindings: 488, apiToolSchemas: 487, definedTools: 25, tools: 512 }
 const fixturePath = new URL('../../../e2e/fixtures/tool-schemas.json', import.meta.url)
 
-const isObjectRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value)
+const isObjectRecord = (value: JsonValue): value is JsonObject => typeof value === 'object' && value !== null && !Array.isArray(value)
 
-const getObjectProperty = (value: unknown, key: string) => (isObjectRecord(value) ? value[key] : undefined)
+const getObjectProperty = (value: JsonValue | undefined, key: string): JsonValue | undefined =>
+  value !== undefined && isObjectRecord(value) ? value[key] : undefined
 
-const getArrayProperty = (value: unknown, key: string): readonly unknown[] => {
+const getArrayProperty = (value: JsonValue | undefined, key: string): readonly JsonValue[] => {
   const result = getObjectProperty(value, key)
   if (result === undefined) return []
   if (!Array.isArray(result)) throw new Error(`Host definition field ${key} must be an array.`)
   return result
 }
 
-type JsonSnapshot = string | number | boolean | null | readonly JsonSnapshot[] | { readonly [key: string]: JsonSnapshot }
-
-const canonicalize = (value: unknown): JsonSnapshot => {
+const canonicalize = (value: JsonValue): JsonValue => {
   if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') return value
   if (Array.isArray(value)) return value.map(canonicalize)
-  if (!isObjectRecord(value)) throw new Error('Host tool schema snapshot contains a non-JSON value.')
   const entries = Object.entries(value).sort(([left], [right]) => left.localeCompare(right))
-  const canonical: Record<string, JsonSnapshot> = {}
+  const canonical: Record<string, JsonValue> = {}
   for (const [key, entry] of entries) canonical[key] = canonicalize(entry)
   return canonical
 }
 
-const toolProperty = (schemas: readonly unknown[], name: string, propertyName: string): Record<string, unknown> | undefined => {
+const toolProperty = (schemas: readonly JsonValue[], name: string, propertyName: string): JsonObject | undefined => {
   const tool = schemas.find(schema => isObjectRecord(schema) && schema.name === name)
   const parameters = getObjectProperty(tool, 'parameters')
   const properties = getObjectProperty(parameters, 'properties')
   const property = getObjectProperty(properties, propertyName)
-  return isObjectRecord(property) ? property : undefined
+  return property !== undefined && isObjectRecord(property) ? property : undefined
 }
 
-const canonicalSnapshot = (source: string): string => `${JSON.stringify(canonicalize(JSON.parse(source)), null, 2)}\n`
+const canonicalSnapshot = (source: string): string => `${JSON.stringify(canonicalize(decodeJson(jsonValueSchema, source)), null, 2)}\n`
 
 const linkNodeModules = async (source: string, target: string) => {
   await mkdir(target, { recursive: true })
@@ -76,7 +75,7 @@ const workspaceAliases = async (pluginRoot: string, projects: readonly { readonl
   const aliases: { readonly find: string; readonly replacement: string }[] = []
   for (const project of projects) {
     const root = join(pluginRoot, project.name)
-    const manifest: unknown = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+    const manifest = decodeJson(jsonValueSchema, await readFile(join(root, 'package.json'), 'utf8'))
     const name = getObjectProperty(manifest, 'name')
     if (typeof name !== 'string' || name === '@dshfiles/dshx') continue
     const exports = getObjectProperty(manifest, 'exports')
@@ -148,7 +147,7 @@ const collectHostToolSchemas = async () => {
   try {
     for (const project of projects) {
       const root = join(pluginRoot, project.name)
-      const packageManifest: unknown = JSON.parse(await readFile(join(root, 'package.json'), 'utf8'))
+      const packageManifest = decodeJson(jsonValueSchema, await readFile(join(root, 'package.json'), 'utf8'))
       const packageId = getObjectProperty(packageManifest, 'name')
       if (typeof packageId !== 'string' || excludedPackageIds.has(packageId)) continue
       if (!(await readdir(root)).includes('dshx.config.ts')) continue
@@ -252,7 +251,7 @@ describe('all Host tool schemas', () => {
     }
 
     const snapshotText = snapshot.toString()
-    const recorded: unknown = JSON.parse(snapshotText)
+    const recorded = decodeJson(jsonValueSchema, snapshotText)
     expect(recorded).toMatchObject(expectedCounts)
     expect(canonicalSnapshot(snapshotText)).toBe(canonicalSnapshot(await readFile(fixturePath, 'utf8')))
 
