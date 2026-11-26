@@ -177,6 +177,11 @@ describe('DestinationShell', () => {
     // Council round 8 B4: no grey group; its rows keep their own icons, drawn in the Developer tone.
     for (const button of within(developer).getAllByRole('button', { name: /^(?:Component gallery|Plugin guide)$/u }))
       expect(button.querySelector('[data-section-icon] [data-settings-glyph]')?.getAttribute('data-settings-glyph')).toBe('developer')
+    // Round nine B1: its head is a Settings group head like the others, at their indent and 16px under the group above,
+    // with no rule of its own.
+    expect(developer.className).not.toContain('dshx:border-t')
+    expect(developer.className).toContain('dshx:mt-4')
+    expect(developer.querySelector('h3')?.className).toBe('dshx:px-2.5 dshx:pb-1 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground')
     cleanup()
     DestinationSelection.set('settings')
     renderShell({ panels: developerPanels, showDeveloperPages: false })

@@ -778,8 +778,16 @@ const FolderIndex = (props: {
           </section>
         )}
         {developer.length === 0 ? null : (
-          <section className="dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3" aria-label="Developer" data-destination-group="developer">
-            <h3 className="dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">Developer</h3>
+          // In Settings the group's head is one more Settings group head (round nine B1): the same step, indent and 16px
+          // above it, no rule of its own; elsewhere it stays a quiet label under a rule.
+          <section
+            className={folder.id === 'settings' ? 'dshx:mt-4' : 'dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3'}
+            aria-label="Developer"
+            data-destination-group="developer"
+          >
+            <h3 className={folder.id === 'settings' ? SETTINGS_GROUP_HEAD : 'dshx:px-2 dshx:pb-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground'}>
+              Developer
+            </h3>
             <div className="dshx:flex dshx:flex-col dshx:gap-0.5">{rows(developer, folder.id === 'settings' ? 'developer' : undefined)}</div>
           </section>
         )}
