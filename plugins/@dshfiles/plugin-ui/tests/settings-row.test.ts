@@ -1,6 +1,7 @@
 /**
  * The Settings row grammar (council round 8 A5): a hairline between rows, a full-row hover wash, and three type steps
- * (section heading 15/600 with 32px above, row label 14/500, description 13/400 muted). Checked in the compiled kit
+ * (section heading 18/600 with 40px above and 12px below since council round 10 A6, row label 14/500, description
+ * 13/400 muted). Checked in the compiled kit
  * sheet, so a utility that never reaches the sheet fails here.
  */
 import { readFileSync } from 'node:fs'
@@ -51,7 +52,8 @@ describe('settings row (council round 8 A5)', () => {
   })
 
   it('sets the three type steps', () => {
-    expect(rules('dshx:settings-heading')).toMatch(/margin-block-start: 32px;[\s\S]*font-size: 15px;[\s\S]*line-height: 20px;[\s\S]*font-weight: 600;/u)
+    // Council round 10 A6: the section heading is 18/24 at 600 with 40px above and 12px below; labels stay 14/500.
+    expect(rules('dshx:settings-heading')).toMatch(/margin-block-start: 40px;[\s\S]*margin-block-end: 12px;[\s\S]*font-size: 18px;[\s\S]*line-height: 24px;[\s\S]*font-weight: 600;/u)
     expect(rules('dshx:settings-label')).toMatch(/font-size: 14px;[\s\S]*line-height: 20px;[\s\S]*font-weight: 500;[\s\S]*color: var\(--dsw-alias-label-primary\);/u)
     expect(rules('dshx:settings-description')).toMatch(/font-size: 13px;[\s\S]*line-height: 18px;[\s\S]*font-weight: 400;[\s\S]*color: var\(--dsw-alias-label-secondary\);/u)
   })

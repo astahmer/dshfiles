@@ -7,7 +7,8 @@
  *   text on each side (a negative margin paid back as padding), so the wash has room around the label without moving
  *   it. The hairline is a background stripe, so a native row's own border is dropped; the last row drops its hairline
  *   with `dshx:bg-none`. Hover only where a pointer hovers, so a phone never keeps a stale wash.
- * - `settings-heading` (section heading, 15/20 at 600, 32px above; drop the margin on the first one with `first:mt-0`),
+ * - `settings-heading` (section heading, 18/24 at 600, 40px above and 12px below since council round 10 A6, so a group
+ *   reads as a section and not one more row; drop the top margin on the first one with `first:mt-0`),
  *   `settings-label` (row label, 14/20 at 500, ink) and `settings-description` (13/18 at 400, secondary ink).
  *
  * Pixel sizes, as `text-title`: the Host's root font is about 12.5px. Ink and secondary ink hold AA on the wash
@@ -35,9 +36,10 @@
 }
 
 @utility settings-heading {
-  margin-block-start: 32px;
-  font-size: 15px;
-  line-height: 20px;
+  margin-block-start: 40px;
+  margin-block-end: 12px;
+  font-size: 18px;
+  line-height: 24px;
   font-weight: 600;
   color: var(--dsw-alias-label-primary);
 }
