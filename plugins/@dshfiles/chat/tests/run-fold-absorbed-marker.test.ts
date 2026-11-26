@@ -14,3 +14,11 @@ describe('run fold member marker', () => {
     expect(source('ChatNodeSeat.tsx')).toMatch(/data-run-fold-member=\{runFold === undefined \? \(runFoldAbsorbed === true \? 'absorbed' : undefined\)/)
   })
 })
+
+describe('run fold absorbed row spacing (council round 22, item 9)', () => {
+  it('keeps the run’s 2px pitch for the row it took in from after its group', () => {
+    const css = readFileSync(new URL('../src/native/chat/ChatView.module.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+    // It sat 4px under the run's other rows, the flow's gap after a group.
+    expect(css).toMatch(/\.flowItem\[data-run-fold-member="absorbed"\]\s*\{\s*--dsh-chat-flow-gap:\s*2px;\s*\}/)
+  })
+})

@@ -123,6 +123,12 @@
   --dsh-chat-flow-gap: 2px;
 }
 
+/* dshfiles (council round 22, item 9): the failed call a run took in from after its process group is the run's last
+   row; it keeps the run's 2px pitch instead of the 4px gap after a group. */
+.flowItem[data-run-fold-member="absorbed"] {
+  --dsh-chat-flow-gap: 2px;
+}
+
 /* Settled-flow identity boundary. It is neutral until it becomes the natural
    measurement/mount unit for a virtualizer without changing the column gap. */
 .flowItem {
