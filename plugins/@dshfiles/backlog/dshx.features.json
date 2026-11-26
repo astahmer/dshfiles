@@ -4331,15 +4331,25 @@
     {
       "id": "tag-colors",
       "title": "Choose a tag\u2019s colour",
-      "surface": "agentToolOnly",
-      "surfaces": ["host", "tool"],
-      "destination": "none",
-      "currentSurface": "agent tools: backlog_set_tag_color, backlog_list tagColors",
+      "surface": "rowAction",
+      "surfaces": ["client", "host", "tool"],
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog \u203a a tag chip on a feed row or in the item panel \u203a Colour of #tag",
+      "reach": [
+        "click tab \"Work\"",
+        "click button \"Backlog\"",
+        "click button \"New\"",
+        "fill textbox \"Capture\" \"Pay the invoice #billing\"",
+        "press Enter",
+        "click button \"#billing colour\"",
+        "expect radiogroup \"Colour of #billing\""
+      ],
       "summary": "Give a backlog tag one of the theme\u2019s six identity colours, or return it to its default.",
-      "details": "A tag\u2019s chips take a colour slot 0\u20135 of the active theme\u2019s identity palette, so switching theme recolours them. A tag without a chosen slot keeps the colour hashed from its name. The choice is stored per tag, as items store it, in Backlog settings (dshfiles-backlog.tagColors) and shared by every browser. Agents choose or clear it with backlog_set_tag_color (slot null returns the default) and read it in backlog_list `tagColors`.",
-      "states": ["default-colour", "chosen-colour", "cleared"],
+      "details": "Press a tag chip (on a feed row, or in the item panel where tags are added and removed) to open its colour menu: the theme\u2019s six identity colours with the tag\u2019s default marked, and Use default colour to undo a pick. A tag\u2019s chips take a colour slot 0\u20135 of the active theme\u2019s identity palette, so switching theme recolours them. A tag without a chosen slot keeps the colour hashed from its name. The choice is stored per tag, as items store it, in Backlog settings (dshfiles-backlog.tagColors) and shared by every browser. Agents choose or clear it with backlog_set_tag_color (slot null returns the default) and read it in backlog_list `tagColors`.",
+      "states": ["default-colour", "menu-open", "chosen-colour", "cleared"],
       "failureModes": [
-        "A Host older than tag colours refuses backlog_set_tag_color and lists no tagColors: tags keep their default colours until the DSH Host process restarts."
+        "A Host older than tag colours refuses backlog_set_tag_color and lists no tagColors: tags keep their default colours until the DSH Host process restarts.",
+        "A refused pick returns the chip to the colour the settings hold, and the notice says to retry or, on an older Host, to restart DSH."
       ],
       "configuration": [
         {
@@ -4364,9 +4374,21 @@
           "testName": "the tool takes a slot 0\u20135 or null, a non-empty tag, and says the user must have asked"
         },
         {
+          "kind": "unit-test",
+          "id": "backlog.tag-colors-menu",
+          "file": "plugins/@dshfiles/backlog/src/tag-chip.test.tsx",
+          "testName": "picking a swatch chooses its slot, and \"Use default colour\" clears a chosen one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.tag-colors-chips",
+          "file": "plugins/@dshfiles/backlog/src/use-tag-colors.test.tsx",
+          "testName": "a pick shows at once and is written through setTagColor; clearing writes null and returns the default"
+        },
+        {
           "kind": "not-applicable",
           "id": "backlog.tag-colors-browser",
-          "reason": "Agent tool and Host storage only in this step: the tag chip menu that picks a colour comes with its own browser scenario."
+          "reason": "The chip menu is covered by the jsdom tests above and the reach path; a Gherkin scenario belongs in tooling/dshx/e2e, outside the Backlog plugin, and is a follow-up."
         }
       ],
       "telemetry": [

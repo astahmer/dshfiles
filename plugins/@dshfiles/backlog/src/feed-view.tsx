@@ -22,7 +22,8 @@ import { useBacklogActions } from './use-backlog-actions.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { FeedLook } from './feed-look.js'
-import { useTagColors } from './use-tag-colors.js'
+import { TagChip } from './tag-chip.js'
+import { useTagColors, type TagColorsView } from './use-tag-colors.js'
 import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 
 const DAY_MS = 86_400_000
@@ -114,8 +115,8 @@ const FeedEntry = (props: {
   readonly openThread: (sessionId: string) => void
   /** False when every row in the feed has the same author: the avatar would repeat one face down the page. */
   readonly showAuthor: boolean
-  /** A tag's tone: its chosen slot, else its fixed hashed one (`useTagColors().tone`). */
-  readonly tagTone: (tag: string) => string
+  /** The tags' chosen colours (`useTagColors`): a chip's tone, and its colour menu's pick. */
+  readonly tagColors: TagColorsView
   readonly timeShownAbove: boolean
 }): JSX.Element => {
   const actions = useBacklogActions()
@@ -126,9 +127,13 @@ const FeedEntry = (props: {
   const rename = useBacklogInlineRename(() => props.select(item.id))
   const inlineTag = FeedLook.inlineTag(item)
   const tagChip = (tag: string): JSX.Element => (
-    <span key={tag} className={cn(FeedLook.TAG_CHIP, props.tagTone(tag))}>
-      <span className="dshx-project-mark-letters">#{tag}</span>
-    </span>
+    <TagChip
+      key={tag}
+      tag={tag}
+      chosen={props.tagColors.chosen.get(tag)}
+      onChoose={slot => props.tagColors.choose(tag, slot)}
+      className={cn(FeedLook.TAG_CHIP, props.tagColors.tone(tag))}
+    />
   )
   return (
     <BacklogItemMenu
@@ -381,7 +386,7 @@ export const FeedView = (props: {
           triageOff={props.triageOff}
           openThread={props.openThread}
           showAuthor={showAuthor}
-          tagTone={tagColors.tone}
+          tagColors={tagColors}
           timeShownAbove={!separator && FeedLook.timeShownAbove(times, index)}
         />
       </div>

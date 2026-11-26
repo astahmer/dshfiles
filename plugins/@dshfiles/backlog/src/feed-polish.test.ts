@@ -25,9 +25,8 @@ describe('Backlog feed (round five P6)', () => {
     expect(FeedLook.tagTone('billing')).toBe(FeedLook.tagTone('billing'))
     expect(new Set(['billing', 'finance', 'web-app', 'a11y', 'docs'].map(FeedLook.tagTone)).size).toBeGreaterThan(2)
     for (const tag of ['billing', 'docs']) expect(FeedLook.tagTone(tag)).toMatch(/^project-tone-balanced-[0-5]$/u)
-    expect(feed).toMatch(
-      /<span key=\{tag\} className=\{cn\(FeedLook\.TAG_CHIP, props\.tagTone\(tag\)\)\}>\s*<span className="dshx-project-mark-letters">#\{tag\}<\/span>/u,
-    )
+    // Round eight, lane T: the chip is the tag's colour menu (`TagChip`), painted with the tone it reads.
+    expect(feed).toMatch(/<TagChip[\s\S]*?className=\{cn\(FeedLook\.TAG_CHIP, props\.tagColors\.tone\(tag\)\)\}/u)
     expect(FeedLook.TAG_CHIP).toContain('dshx:bg-current/14')
     expect(FeedLook.TAG_CHIP).not.toMatch(/text-muted|border/u)
   })
@@ -84,7 +83,7 @@ describe('Backlog feed (council round 3, D2)', () => {
     expect(FeedLook).not.toHaveProperty('tagTones')
     expect(feed).not.toContain('tagTones')
     // Round eight, lane T: the feed passes the user's chosen colours; an unpicked tag still gets the same hashed tone.
-    expect(feed).toMatch(/tagTone=\{tagColors\.tone\}/u)
+    expect(feed).toMatch(/tagColors=\{tagColors\}/u)
   })
 
   it('paints a tag the user coloured in its chosen slot, and every other tag in its hashed one', () => {

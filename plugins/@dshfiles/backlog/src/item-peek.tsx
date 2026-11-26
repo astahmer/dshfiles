@@ -95,6 +95,8 @@ import { BacklogTriage } from './triage.js'
 import { workspaceReferenceLabel } from './workspace-reference-label.js'
 import { SecretLinkRevealSlot } from './secret-link-reveal.js'
 import { BacklogQueries, useBacklogActions } from './use-backlog-actions.js'
+import { TagChip } from './tag-chip.js'
+import { useTagColors } from './use-tag-colors.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
 import { ItemTimeline } from './item-timeline.js'
@@ -360,19 +362,29 @@ const BodyField = (props: {
 
 const TagsField = (props: { readonly id: number; readonly tags: readonly string[] }): JSX.Element => {
   const actions = useBacklogActions()
+  const tagColors = useTagColors()
   const [draft, setDraft] = useState('')
   return (
     <span className="dshx:inline-flex dshx:flex-wrap dshx:items-center dshx:gap-1">
       {props.tags.map(tag => (
+        // The tag's own tone on its wash, as on feed rows; the chip opens its colour menu, the × removes it.
         <span
           key={tag}
-          className="dshx:group/tag dshx:inline-flex dshx:h-6 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:border dshx:border-border dshx:pr-1 dshx:pl-1.5 dshx:text-xs dshx:text-muted-foreground"
+          className={cn(
+            'dshx:group/tag dshx:inline-flex dshx:h-6 dshx:items-center dshx:rounded-md dshx:bg-current/14 dshx:pr-1 dshx:text-xs dshx:font-medium',
+            tagColors.tone(tag),
+          )}
         >
-          #{tag}
+          <TagChip
+            tag={tag}
+            chosen={tagColors.chosen.get(tag)}
+            onChoose={slot => tagColors.choose(tag, slot)}
+            className="dshx:inline-flex dshx:h-6 dshx:items-center dshx:rounded-md dshx:pr-0.5 dshx:pl-1.5"
+          />
           <button
             type="button"
             aria-label={`Remove tag ${tag}`}
-            className="dshx:opacity-0 dshx:transition-opacity dshx:group-hover/tag:opacity-100 dshx:hover:text-foreground"
+            className="dshx:opacity-0 dshx:transition-opacity dshx:group-hover/tag:opacity-100 dshx:group-focus-within/tag:opacity-100 dshx:pointer-coarse:opacity-100 dshx:hover:text-foreground"
             onClick={() => actions.update.mutate({ id: props.id, tags: props.tags.filter(other => other !== tag) })}
           >
             <XIcon className="dshx:size-3" />
