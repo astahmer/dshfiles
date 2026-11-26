@@ -116,6 +116,14 @@ describe('PalettePicker', () => {
     expect(swatches()[0]!.querySelector('[data-slot="palette-swatch-tone"]')!.className).toContain('dshx:size-4')
   })
 
+  it('keeps each swatch and its ring a true circle under the Host squircle corner shape', () => {
+    render(<PalettePicker value={0} onChange={() => undefined} label="Project colour" />)
+    for (const swatch of swatches()) {
+      expect(swatch.querySelector('[data-slot="palette-swatch-ring"]')!.className).toContain('dshx:[corner-shape:round]!')
+      expect(swatch.querySelector('[data-slot="palette-swatch-tone"]')!.className).toContain('dshx:[corner-shape:round]!')
+    }
+  })
+
   it('disables every swatch when disabled', () => {
     render(<PalettePicker value={0} disabled onChange={() => undefined} label="Project colour" />)
     for (const swatch of swatches()) expect(swatch.hasAttribute('disabled')).toBe(true)

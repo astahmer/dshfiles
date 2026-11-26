@@ -88,6 +88,8 @@ const slotAfterKey = (key: string, slot: number): number | undefined => {
  * Six round swatches of the active theme's identity palette as one radio group (owner decision of 2026-11-26): a
  * choice stores the slot, so the colour follows the theme. The chosen swatch has a solid ink ring; with nothing chosen
  * the default slot has a dashed one and "Default" in its name. Arrow keys move and choose, Home and End jump to the ends.
+ * Swatch and ring set `corner-shape: round` with `!`: the Host's unlayered squircle corner shape beats a layered
+ * utility and would square a full radius.
  */
 export function PalettePicker({ value, onChange, label, defaultSlot, size = 'md', disabled, className }: PalettePickerProps): React.JSX.Element {
   const names = useIdentityPaletteNames()
@@ -146,7 +148,7 @@ export function PalettePicker({ value, onChange, label, defaultSlot, size = 'md'
               aria-hidden
               data-slot="palette-swatch-ring"
               className={cn(
-                'dshx:flex dshx:items-center dshx:justify-center dshx:rounded-full dshx:border-2 dshx:transition-[border-color] dshx:duration-(--dshx-duration-hover)',
+                'dshx:flex dshx:items-center dshx:justify-center dshx:rounded-full dshx:[corner-shape:round]! dshx:border-2 dshx:transition-[border-color] dshx:duration-(--dshx-duration-hover)',
                 size === 'sm' ? 'dshx:size-6' : 'dshx:size-7',
                 selected
                   ? 'dshx:border-foreground'
@@ -157,7 +159,7 @@ export function PalettePicker({ value, onChange, label, defaultSlot, size = 'md'
             >
               <span
                 data-slot="palette-swatch-tone"
-                className={cn('dshx:block dshx:rounded-full', size === 'sm' ? 'dshx:size-4' : 'dshx:size-5')}
+                className={cn('dshx:block dshx:rounded-full dshx:[corner-shape:round]!', size === 'sm' ? 'dshx:size-4' : 'dshx:size-5')}
                 style={{ backgroundColor: identityToneColor(slot) }}
               />
             </span>
