@@ -968,6 +968,52 @@ describe('DestinationShell', () => {
     expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
   })
 
+  it('names a subagent by its call, its model on line 2, and goes Back to its parent thread in a 44px seat (round 21 D3)', async () => {
+    setPhone(true)
+    const openThread = vi.fn()
+    const shell = renderShell({
+      collapsed: true,
+      selectedThreadId: 'child-1',
+      stageThreadId: 'child-1',
+      stageTitle: 'Compare the ledger export to invoiceTotal for the last 100 invoices.',
+      openThread,
+      stageMeta: {
+        project: undefined,
+        mark: undefined,
+        route: { provider: 'dshx_fake_commandcode', model: 'claude-sonnet-5-5' },
+        status: 'Working',
+        working: true,
+        subagents: undefined,
+        parent: { id: 'session-parent', title: 'Audit money rounding' },
+        title: 'Diff the ledger export against totals',
+      },
+    })
+    // The title is the name its parent gave it, not its prompt.
+    expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Diff the ledger export against totals')
+    // Line 2: `[mark] model · state`, the kit's RouteModel where the project would be, no project mark.
+    const line = document.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect(line?.className).toContain('dshx:text-sm/4')
+    expect(line?.className).toContain('dshx:text-muted-foreground')
+    const model = line?.querySelector('[data-slot="route-model"]')
+    expect(model?.querySelector('[data-model-mark="claude"]')).not.toBeNull()
+    expect(model?.textContent).toBe('claude-sonnet-5-5')
+    expect(line?.querySelector('[data-attention-meta-part="mark"]')).toBeNull()
+    expect(line?.querySelector('[data-attention-meta-part="kind"]')?.textContent).toBe('Working')
+    // The model leads the line, then one "·", then the state word.
+    expect([...(line?.children ?? [])].map(part => part.getAttribute('data-slot') ?? part.textContent)).toEqual(['route-model', '·, ', 'attention-meta'])
+    // Back opens the parent from the 44px chevron seat, and says where it goes.
+    const back = screen.getByRole('button', { name: 'Back to Audit money rounding' })
+    expect(back.className).toContain('dshx:w-11')
+    expect(back.className).toContain('dshx:h-11')
+    fireEvent.click(back)
+    await waitFor(() => expect(openThread).toHaveBeenCalledWith('session-parent'))
+    expect(shell.toggleSidebar).not.toHaveBeenCalled()
+    cleanup()
+    // Without a parent to open, Back is the list's as before.
+    renderShell({ collapsed: true, selectedThreadId: 'child-1', stageThreadId: 'child-1', stageTitle: 'Fix', openThread })
+    expect(screen.getByRole('button', { name: 'Back to Threads' })).toBeTruthy()
+  })
+
   it('moves Thread panels into the thread\'s ⋯ menu, keeping the bar button only without that menu (council round 17 B2.2)', () => {
     setPhone(true)
     const togglePanels = vi.fn()

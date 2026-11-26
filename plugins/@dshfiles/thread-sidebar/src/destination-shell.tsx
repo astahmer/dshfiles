@@ -54,6 +54,7 @@ import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { usePhoneThreadMenu } from '@dshfiles/rich-composer/phone-thread-menu'
 import type { PhoneStageMeta } from './phone-thread-meta.js'
 import { PhoneLayout } from './phone-layout.js'
@@ -201,6 +202,8 @@ export interface DestinationShellProps {
   readonly stageWorking?: boolean | undefined
   /** The phone thread header's meta line under the title: project, status, subagents (council round 17 B2.2). */
   readonly stageMeta?: PhoneStageMeta | undefined
+  /** Opens a thread on the stage: a subagent's phone Back opens its parent (round 21 D3). */
+  readonly openThread?: ((sessionId: string) => void) | undefined
   /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
   readonly togglePanels?: (() => void) | null
   /** A swipe in from the right edge, inside a thread, opens the thread panel (Settings › phoneEdgeSwipePanels). */
@@ -1529,7 +1532,8 @@ const PhoneNavigation = (
     destinations: props.destinations,
     activePanelId: props.activePanelId,
     selectedThreadId: props.stageThreadId === undefined ? props.selectedThreadId : props.stageThreadId,
-    stageTitle: props.stageTitle,
+    // A subagent is called by the name its parent gave it, as in the list, not by its prompt (round 21 D3).
+    stageTitle: props.stageMeta?.title ?? props.stageTitle,
     pendingTitle: props.pendingTitle,
     origin,
   }
@@ -1543,6 +1547,16 @@ const PhoneNavigation = (
   // the working glyph leads the title instead (council round 13 B6).
   const meta = centred ? undefined : props.stageMeta
   const working = !centred && meta === undefined && props.stageWorking === true
+  // A subagent's Back opens its parent thread (round 21 D3), as the desktop lineage's parent link does: the 44px chevron
+  // and the edge swipe. System Back still pops the stack to the list.
+  const openThread = props.openThread
+  const parentBack = meta?.parent !== undefined && openThread !== undefined ? meta.parent : null
+  const backToParent = (): void => {
+    if (parentBack === null || openThread === undefined) return
+    const parentId = parentBack.id
+    if (drawer) openThread(parentId)
+    else runStackMotion('pop', () => openThread(parentId))
+  }
   // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
   const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
   const backToPage = (): void => {
@@ -1606,7 +1620,7 @@ const PhoneNavigation = (
     })
   }
   // The iOS back swipe (T5.3): a left-edge swipe is Back wherever the bar offers one.
-  useEdgeSwipe({ side: 'left', enabled: !drawer && bar.back !== null, onSwipe: back })
+  useEdgeSwipe({ side: 'left', enabled: !drawer && bar.back !== null, onSwipe: parentBack === null ? back : backToParent })
   // Android's back gesture (and a browser Back) pops the same stack: each level is one history entry. A push drops the
   // thread from the entry it leaves below, so going back never switches to another thread through the URL route.
   // In drawer mode the open drawer is one level (two inside More or a list opened there): system Back closes it first.
@@ -1838,6 +1852,18 @@ const PhoneNavigation = (
               <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
             </button>
           )}
+          {drawer && pageBack === null && parentBack !== null ? (
+            <button
+              type="button"
+              data-phone-back=""
+              data-phone-back-parent=""
+              aria-label={`Back to ${parentBack.title}`}
+              onClick={backToParent}
+              className="dshx:flex dshx:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent"
+            >
+              <ChevronLeftIcon className="dshx:size-5" aria-hidden="true" />
+            </button>
+          ) : null}
           {drawer ? (
             <button
               ref={sidebarButton}
@@ -1856,8 +1882,9 @@ const PhoneNavigation = (
             <button
               type="button"
               data-phone-back=""
-              aria-label={`Back to ${bar.back.label}`}
-              onClick={back}
+              data-phone-back-parent={parentBack === null ? undefined : ''}
+              aria-label={`Back to ${parentBack?.title ?? bar.back.label}`}
+              onClick={parentBack === null ? back : backToParent}
               className={cn(
                 'dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent',
                 // The chevron sits in the leading seat (council round 17 B2.2), centred where the Threads and Inbox bars
@@ -1867,7 +1894,7 @@ const PhoneNavigation = (
               )}
             >
               <ChevronLeftIcon className="dshx:size-5 dshx:shrink-0" aria-hidden="true" />
-              <span className={cn('dshx:min-w-0 dshx:truncate', bar.thread && 'dshx:sr-only')}>{bar.back.label}</span>
+              <span className={cn('dshx:min-w-0 dshx:truncate', bar.thread && 'dshx:sr-only')}>{parentBack?.title ?? bar.back.label}</span>
             </button>
           )}
           {/* The status gauge leads, in the seat the Inbox bar gives it (council round 6 B1); + stays trailing. */}
@@ -1890,16 +1917,34 @@ const PhoneNavigation = (
                 {stageBar.title}
               </h1>
               {/* 13/16 in the secondary ink: the list row's line 2, its project mark and its status word. */}
-              <AttentionMeta
-                data-phone-subtitle=""
-                className="dshx:flex-none dshx:text-sm/4"
-                project={meta.project}
-                kind={meta.status}
-                // The list's 12px working ring before "Working" (council round 18 B2.3), as the row's glyph says it.
-                kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
-                age={meta.subagents}
-                {...(meta.mark === undefined ? {} : { mark: meta.mark })}
-              />
+              {meta.route === undefined ? (
+                <AttentionMeta
+                  data-phone-subtitle=""
+                  className="dshx:flex-none dshx:text-sm/4"
+                  project={meta.project}
+                  kind={meta.status}
+                  // The list's 12px working ring before "Working" (council round 18 B2.3), as the row's glyph says it.
+                  kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
+                  age={meta.subagents}
+                  {...(meta.mark === undefined ? {} : { mark: meta.mark })}
+                />
+              ) : (
+                // A subagent (round 21 D3): `[mark] model · state`, the kit's RouteModel where the project would be. The
+                // model's name truncates first; the state word stays whole.
+                <span data-phone-subtitle="" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:text-sm/4 dshx:whitespace-nowrap dshx:text-muted-foreground">
+                  <RouteModel provider={meta.route.provider} model={meta.route.model} className="dshx:text-sm/4" />
+                  <span className="dshx:shrink-0 dshx:px-1">
+                    <span aria-hidden="true">·</span>
+                    <span className="dshx:sr-only">, </span>
+                  </span>
+                  <AttentionMeta
+                    className="dshx:flex-none dshx:text-sm/4"
+                    kind={meta.status}
+                    kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
+                    age={meta.subagents}
+                  />
+                </span>
+              )}
             </div>
           ) : (
             <h1

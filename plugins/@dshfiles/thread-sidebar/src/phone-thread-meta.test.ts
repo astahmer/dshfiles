@@ -54,3 +54,35 @@ describe('phone thread meta line (council round 17 B2.2)', () => {
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['elsewhere'] })).toMatchObject({ project: undefined, mark: undefined })
   })
 })
+
+describe('a subagent\'s phone header (round 21 D3)', () => {
+  const deepseek = { provider: 'dshx_fake_commandcode', model: 'deepseek/deepseek-v4-flash' }
+  const child = { parentTitle: 'Audit money rounding', label: 'Check credit note rounding', route: deepseek }
+
+  it('puts the model where the project was, names its parent for Back, and takes its call\'s name as the title', () => {
+    const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], running: true, child })
+    expect(meta).toEqual({
+      project: undefined,
+      mark: undefined,
+      route: deepseek,
+      status: 'Working',
+      working: true,
+      subagents: undefined,
+      parent: { id: 's-root', title: 'Audit money rounding' },
+      title: 'Check credit note rounding',
+    })
+  })
+
+  it('keeps the project without a known model, today\'s title without a name, and Threads without a parent title', () => {
+    const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], child: { parentTitle: ' ', label: '', route: undefined } })
+    expect(meta).toMatchObject({ project: 'billing-api', status: 'Idle' })
+    expect(meta.route).toBeUndefined()
+    expect(meta.parent).toBeUndefined()
+    expect(meta.title).toBeUndefined()
+  })
+
+  it('ignores child facts on a root thread', () => {
+    const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], child })
+    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Idle', working: false, subagents: undefined })
+  })
+})

@@ -3,6 +3,7 @@ import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { ProjectColorPalette } from './organization.js'
 import type { ProjectChip } from './project-colors.js'
 import type { ThreadDirectories } from './thread-directories.js'
+import type { SubagentModelRoute } from './subagent-provenance/route-label.js'
 import type { ThreadWorkStatus } from './thread-status-client.js'
 import { WorkspacePaths } from './workspace-paths.js'
 
@@ -11,6 +12,10 @@ import { WorkspacePaths } from './workspace-paths.js'
  * list's grammar under the title. The project is the one the list names (a thread workspace reads the project it was cut
  * from), its mark painted as the list's row paints it; the status word is the list's own (Approval, Question, Turn failed
  * for an attention thread); the count is the subagents working now. Unknown project: no mark and no name.
+ *
+ * A subagent's header (round 21 D3) says what the desktop lineage says: line 2 reads `[mark] model · state` (the model
+ * stands where the project would), the bar's Back opens its parent thread, and the title is the name its parent gave it
+ * (the subagent call's description), not the prompt it was sent. An unknown model keeps the project.
  */
 export interface PhoneStageMeta {
   readonly project: string | undefined
@@ -19,6 +24,19 @@ export interface PhoneStageMeta {
   /** The status word says Working (not an attention kind): the header draws the list's working ring before it. */
   readonly working: boolean
   readonly subagents: string | undefined
+  /** A subagent's model, drawn with the kit's `RouteModel` where the project would be. */
+  readonly route?: SubagentModelRoute | undefined
+  /** A subagent's parent thread: the bar's Back opens it. */
+  readonly parent?: { readonly id: string; readonly title: string } | undefined
+  /** A subagent's name from its parent's call; the bar's title instead of the Session title (its prompt). */
+  readonly title?: string | undefined
+}
+
+/** What the stage thread is as a subagent: the parent's title, the name it was given, the model it runs on. */
+export interface PhoneStageChild {
+  readonly parentTitle: string | undefined
+  readonly label: string | undefined
+  readonly route: SubagentModelRoute | undefined
 }
 
 /** The workspace a thread or one of its ancestors is filed in, walking up the lineage (stage first). */
@@ -52,6 +70,8 @@ const resolve = (input: {
   readonly palette: ProjectColorPalette
   /** The list's project colour preference: off, the mark takes the line's ink. */
   readonly coloured: boolean
+  /** Set when the stage thread has a parent (`lineage[1]`). */
+  readonly child?: PhoneStageChild | undefined
 }): PhoneStageMeta => {
   const filed = workspaceOf(input.lineage, input.workspaces)
   const projectPath = filed === undefined ? undefined : WorkspacePaths.projectPathOf({ path: filed.path, threadDirectories: input.threadDirectories })
@@ -65,7 +85,19 @@ const resolve = (input: {
   const work = input.status?.status ?? (input.running || input.subagents > 0 ? 'working' : 'idle')
   const status = input.status?.kind ?? input.wordOf(work)
   const working = input.status?.kind === undefined && work === 'working'
-  return { project, mark, status, working, subagents: input.subagents > 0 ? input.subagentsLabel(input.subagents) : undefined }
+  const subagents = input.subagents > 0 ? input.subagentsLabel(input.subagents) : undefined
+  const parentId = input.lineage[1]
+  const child = input.child
+  if (parentId === undefined || child === undefined) return { project, mark, status, working, subagents }
+  const parentTitle = child.parentTitle?.trim() || undefined
+  const title = child.label?.trim() || undefined
+  const meta: { -readonly [Key in keyof PhoneStageMeta]: PhoneStageMeta[Key] } =
+    child.route === undefined
+      ? { project, mark, status, working, subagents }
+      : { project: undefined, mark: undefined, route: child.route, status, working, subagents }
+  if (parentTitle !== undefined) meta.parent = { id: parentId, title: parentTitle }
+  if (title !== undefined) meta.title = title
+  return meta
 }
 
 export const PhoneThreadMeta = { resolve }

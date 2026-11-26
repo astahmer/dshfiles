@@ -71,6 +71,7 @@ import {
 } from 'react'
 import { PendingPick, SETTINGS_PANEL_ID } from './phone-shell.js'
 import { PhoneThreadMeta, type PhoneStageMeta } from './phone-thread-meta.js'
+import { SubagentRouteLabelModel } from './subagent-provenance/route-label.js'
 import { STATUS_WORD_KEYS } from './palette-thread-statuses.js'
 import { useSavedProjectChip } from './project-colors.js'
 import { HostSnapshotsModel } from './snapshots.js'
@@ -303,6 +304,20 @@ const usePhoneStageMeta = (
   const threadDirectories = useThreadDirectories(workspaces)
   const savedChipOf = useSavedProjectChip()
   const status = useSyncExternalStore(threadWorkStatusStore.subscribe, () => (stageThread === undefined ? undefined : threadWorkStatusStore.getSnapshot()?.get(stageThread)))
+  // A subagent's header (round 21 D3): its parent's title, the name its call gave it and its model, each a string.
+  const parentId = lineageKey.split('\n')[1]
+  const parentTitle = props.useSessions(state => (parentId === undefined ? undefined : Object.values(state.byId).find(session => session.id === parentId)?.displayTitle))
+  const childLabel = props.useSessions(state => {
+    if (parentId === undefined || stageThread === undefined) return undefined
+    const own = Object.values(state.byId).find(session => session.id === stageThread)?.projectionValues?.subagent?.label
+    return own ?? state.projectionsBySession[SessionId(parentId)]?.values.subagentCatalog?.find(entry => entry.id === stageThread)?.label
+  })
+  const routeKey = props.useSessions(state => {
+    if (parentId === undefined || stageThread === undefined) return undefined
+    const values = Object.values(state.byId).find(session => session.id === stageThread)?.projectionValues
+    const route = SubagentRouteLabelModel.subagentRoute({ route: values?.threadSidebarModelRoute, identity: values?.subagent })
+    return route === undefined ? undefined : `${route.provider}\n${route.model}`
+  })
   const t = props.t
   return useMemo(
     () =>
@@ -320,8 +335,30 @@ const usePhoneStageMeta = (
             savedChipOf,
             palette: preferences.projectColorPalette,
             coloured: preferences.threadRowProjectColor,
+            child: {
+              parentTitle,
+              label: childLabel,
+              route:
+                routeKey === undefined
+                  ? undefined
+                  : { provider: routeKey.slice(0, routeKey.indexOf('\n')), model: routeKey.slice(routeKey.indexOf('\n') + 1) },
+            },
           }),
-    [lineageKey, workspaces, threadDirectories, status, running, subagents, t, savedChipOf, preferences.projectColorPalette, preferences.threadRowProjectColor],
+    [
+      lineageKey,
+      workspaces,
+      threadDirectories,
+      status,
+      running,
+      subagents,
+      t,
+      savedChipOf,
+      preferences.projectColorPalette,
+      preferences.threadRowProjectColor,
+      parentTitle,
+      childLabel,
+      routeKey,
+    ],
   )
 }
 
@@ -1479,6 +1516,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             stageTitle={stageTitle}
             stageWorking={stageWorking}
             stageMeta={stageMeta}
+            openThread={sessionId => props.openSession(SessionId(sessionId))}
             pendingTitle={pendingTitle}
             // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
