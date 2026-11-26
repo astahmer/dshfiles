@@ -29,6 +29,11 @@ export interface DestinationSection {
    * in any folder.
    */
   readonly unlisted?: boolean
+  /**
+   * `destination`: the row draws its destination's glyph, the one the page's tab shows (council round 10 B2), instead of
+   * the glyph the page registers. For the page that is the destination's own act (Review under Land).
+   */
+  readonly glyph?: 'destination'
 }
 
 /**
@@ -67,6 +72,7 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     label: 'Review',
     description: 'Review a workspace before landing it.',
     order: 2,
+    glyph: 'destination',
     formerLabels: ['pulls.review: Reviews', 'Review'],
   },
   {

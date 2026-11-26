@@ -237,6 +237,36 @@ describe('DestinationShell', () => {
     expect(quiet?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dsw-alias-label-secondary)')
   })
 
+  it('sizes every side-column glyph by its seat and draws Review with the Land glyph its tab shows (council round 10 B2)', () => {
+    setPhone(false)
+    DestinationSelection.set('land')
+    // A page that registers a bare lucide icon (24px by default), as diffs-review does.
+    const unsized = (panelId: string) => (
+      <svg data-registered-glyph={panelId} width="24" height="24" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="4" />
+      </svg>
+    )
+    renderShell({
+      panels: [
+        ...panels,
+        { id: 'jj-integration', label: 'JJ Integration: Thread integration', order: 1 },
+        { id: 'diffs-review', label: 'Review', order: 2 },
+      ],
+      activePanelId: 'diffs-review',
+      renderPanelIcon: unsized,
+    })
+    const review = screen.getByRole('button', { name: 'Review' })
+    const seat = review.querySelector<HTMLElement>('[data-section-icon]')
+    expect(seat?.className).toContain('dshx:[&_svg]:size-4')
+    // The Land glyph, not the page's registered one: the row and its tab name the page alike.
+    expect(seat?.querySelector('[data-registered-glyph]')).toBeNull()
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('lucide-git-merge')
+    // Every other row keeps its own glyph, sized by the seat.
+    const workspaces = screen.getByRole('button', { name: 'Workspaces' }).querySelector<HTMLElement>('[data-section-icon]')
+    expect(workspaces?.querySelector('[data-registered-glyph="jj-integration"]')).not.toBeNull()
+    expect(workspaces?.className).toContain('dshx:[&_svg]:size-4')
+  })
+
   it('keeps the Settings column open on every Settings page: it is the one Settings navigation (council round 4 B1)', () => {
     setPhone(false)
     DestinationSelection.set('settings')

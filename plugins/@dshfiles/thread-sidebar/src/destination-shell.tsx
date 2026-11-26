@@ -37,6 +37,7 @@ import { createPortal } from 'react-dom'
 import {
   DESTINATION_IDS,
   Destinations,
+  KNOWN_SECTIONS,
   type DestinationIcon,
   type DestinationId,
   type DestinationPanel,
@@ -446,6 +447,11 @@ const folderIcon = (props: Pick<DestinationShellProps, 'panels' | 'renderPanelIc
 const SECTION_ROW_BADGE =
   'dshx:[&_[data-attention-badge]]:static dshx:[&_[data-attention-badge]>span]:top-2 dshx:[&_[data-attention-badge]>span]:right-8 dshx:[&_[data-attention-badge]>span]:left-auto'
 const SECTION_ROW_BADGE_ROOM = "dshx:has-[[data-attention-badge]:not([data-attention-badge='0'])]:pr-14"
+/**
+ * The seat sizes the glyph (council round 10 B2): a page may register an unsized icon (a bare lucide icon is 24px), which
+ * filled the 24px place seat. Every side-column glyph draws at 16px in its seat.
+ */
+const SECTION_ROW_GLYPH = 'dshx:[&_svg]:size-4 dshx:[&_svg]:shrink-0'
 
 /** One section: its label is the button's whole name, so a reach or a screen reader finds it by that alone. */
 const SectionButton = (props: {
@@ -519,6 +525,7 @@ const SectionButton = (props: {
             className={cn(
               'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center',
               props.selected ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+              SECTION_ROW_GLYPH,
               SECTION_ROW_BADGE,
             )}
             aria-hidden="true"
@@ -533,6 +540,7 @@ const SectionButton = (props: {
             className={cn(
               'dshx:place-seat dshx:size-6 dshx:-mx-1 dshx:-mt-0.5 dshx:-mb-1 dshx:rounded-md',
               'tone' in props.place && props.selected ? PLACE_TONE_CLASS[props.place.tone] : undefined,
+              SECTION_ROW_GLYPH,
               SECTION_ROW_BADGE,
             )}
             style={'color' in props.place ? placeToneStyle(props.place.color) : props.selected ? undefined : placeToneStyle(PLACE_REST_TONE)}
@@ -583,7 +591,16 @@ const EntryRows = (props: {
 }): JSX.Element => (
   <>
     {props.entries.map(entry => {
-      const icon = entry.kind === 'page' ? props.renderPanelIcon(entry.viewId, 16, props.activePanelId === entry.viewId) : <ViewGlyph />
+      const destination = props.folder.destination
+      const icon =
+        entry.kind !== 'page' ? (
+          <ViewGlyph />
+        ) : destination !== undefined && DESTINATION_GLYPH_PAGES.has(entry.viewId) ? (
+          // The destination's own act (Review under Land): its tab's glyph, so the row and the tab name it alike.
+          <DestinationGlyph icon={destination.icon} />
+        ) : (
+          props.renderPanelIcon(entry.viewId, 16, props.activePanelId === entry.viewId)
+        )
       return (
         <SectionButton
           key={entry.viewId}
@@ -601,6 +618,14 @@ const EntryRows = (props: {
     })}
   </>
 )
+
+/** Pages whose row draws their destination's glyph, the one their tab shows (council round 10 B2). */
+const DESTINATION_GLYPH_PAGES: ReadonlySet<string> = new Set(KNOWN_SECTIONS.flatMap(section => (section.glyph === 'destination' ? [section.panelId] : [])))
+
+const DestinationGlyph = (props: { readonly icon: DestinationIcon }): JSX.Element => {
+  const Icon = ICONS[props.icon]
+  return <Icon className="dshx:size-4" strokeWidth={1.5} />
+}
 
 /** The phone bar's title: the bar row's 17/22, at 600 (council round 4 B3, round 7 B5). */
 const PHONE_TITLE_CLASS = 'dshx:min-w-0 dshx:truncate dshx:font-semibold'
