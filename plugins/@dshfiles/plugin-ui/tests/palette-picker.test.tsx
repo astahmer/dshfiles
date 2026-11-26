@@ -124,6 +124,16 @@ describe('PalettePicker', () => {
     }
   })
 
+  it('shows the hover edge only for the hovered, enabled swatch: a named group, never an outer one', () => {
+    render(<PalettePicker value={0} onChange={() => undefined} label="Project colour" />)
+    const unchosen = swatches()[1]!
+    expect(unchosen.className.split(/\s+/u)).toContain('dshx:group/swatch')
+    expect(unchosen.className.split(/\s+/u)).not.toContain('dshx:group')
+    const ring = unchosen.querySelector('[data-slot="palette-swatch-ring"]')!.className
+    expect(ring).toContain('dshx:group-[:enabled:hover]/swatch:border-border')
+    expect(ring).not.toMatch(/(?:^|\s)dshx:group-(?:hover|enabled):/u)
+  })
+
   it('disables every swatch when disabled', () => {
     render(<PalettePicker value={0} disabled onChange={() => undefined} label="Project colour" />)
     for (const swatch of swatches()) expect(swatch.hasAttribute('disabled')).toBe(true)

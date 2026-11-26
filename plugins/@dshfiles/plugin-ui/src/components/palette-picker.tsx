@@ -139,7 +139,7 @@ export function PalettePicker({ value, onChange, label, defaultSlot, size = 'md'
             onClick={() => choose(slot)}
             onKeyDown={event => onKeyDown(event, slot)}
             className={cn(
-              'dshx:group dshx:inline-flex dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-full dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50',
+              'dshx:group/swatch dshx:inline-flex dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-full dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50',
               size === 'sm' ? 'dshx:size-6' : 'dshx:size-7',
               'dshx:pointer-coarse:size-11',
             )}
@@ -154,7 +154,7 @@ export function PalettePicker({ value, onChange, label, defaultSlot, size = 'md'
                   ? 'dshx:border-foreground'
                   : isDefault
                     ? 'dshx:border-dashed dshx:border-foreground'
-                    : 'dshx:border-transparent dshx:group-enabled:group-hover:border-border',
+                    : 'dshx:border-transparent dshx:group-[:enabled:hover]/swatch:border-border',
               )}
             >
               <span
