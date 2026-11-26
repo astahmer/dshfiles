@@ -60,7 +60,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "agents",
       "description": "Persistent, mentionable agents: identity, instructions, model route and tool preset, dispatched into an ordinary thread.",
       "ui": true,
-      "features": 3
+      "features": 4
     },
     {
       "name": "agentsview",
@@ -102,7 +102,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "backlog",
       "description": "One capture feed for notes, tasks and agent work that organizes and ages itself.",
       "ui": true,
-      "features": 51
+      "features": 52
     },
     {
       "name": "backlog-jira",
@@ -2546,6 +2546,68 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "panel": "dshfiles-agents"
         }
       }
+    },
+    {
+      "key": "agents#agent-colour",
+      "plugin": "agents",
+      "id": "agent-colour",
+      "title": "Colour an agent",
+      "summary": "Give an agent a colour from the theme's palette, so its tile and mentions are easy to tell apart.",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents",
+      "reach": [
+        {
+          "text": "click button \"Agents\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"New agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New agent",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Name\" \"Luna\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Name",
+          "value": "Luna"
+        },
+        {
+          "text": "expect radiogroup \"Colour\"",
+          "action": "expect",
+          "by": "radiogroup",
+          "name": "Colour",
+          "value": null
+        },
+        {
+          "text": "click radio \"Violet\"",
+          "action": "click",
+          "by": "radio",
+          "name": "Violet",
+          "value": null
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved.",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
     },
     {
       "key": "agents#agent-mentions",
@@ -11068,6 +11130,68 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "onboarding": null
+    },
+    {
+      "key": "backlog#tag-colors",
+      "plugin": "backlog",
+      "id": "tag-colors",
+      "title": "Choose a tag’s colour",
+      "summary": "Give a backlog tag one of the theme’s six identity colours, or return it to its default.",
+      "destination": "work",
+      "currentSurface": "left-nav: Backlog › a tag chip on a feed row or in the item panel › Colour of #tag",
+      "reach": [
+        {
+          "text": "click tab \"Work\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Work",
+          "value": null
+        },
+        {
+          "text": "click button \"Backlog\"",
+          "action": "click",
+          "by": "button",
+          "name": "Backlog",
+          "value": null
+        },
+        {
+          "text": "click button \"New\"",
+          "action": "click",
+          "by": "button",
+          "name": "New",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Capture\" \"Pay the invoice #billing\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Capture",
+          "value": "Pay the invoice #billing"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "click button \"#billing colour\"",
+          "action": "click",
+          "by": "button",
+          "name": "#billing colour",
+          "value": null
+        },
+        {
+          "text": "expect radiogroup \"Colour of #billing\"",
+          "action": "expect",
+          "by": "radiogroup",
+          "name": "Colour of #billing",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
       "onboarding": null
     },
     {

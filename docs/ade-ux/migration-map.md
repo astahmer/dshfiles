@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-570 features from 121 plugins.
+572 features from 121 plugins.
 
 ## Counts
 
@@ -15,8 +15,8 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Threads |  |  |  |  | 13 | 1 | 1 |  | 17 | 2 |  | 1 |  |  | 35 |
 | Inbox |  | 19 |  |  | 3 |  |  |  | 1 |  |  |  |  |  | 23 |
 | Land |  |  | 2 |  | 7 | 2 | 1 |  | 4 |  |  |  |  |  | 16 |
-| Work |  |  | 1 |  | 24 | 8 | 1 |  | 7 |  |  |  |  |  | 41 |
-| Agents |  |  |  |  | 4 |  | 1 |  |  |  |  |  |  |  | 5 |
+| Work |  |  | 1 |  | 24 | 8 | 1 |  | 8 |  |  |  |  |  | 42 |
+| Agents |  |  |  |  | 5 |  | 1 |  |  |  |  |  |  |  | 6 |
 | Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
 | Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
 | Settings |  |  |  |  | 3 |  |  |  | 1 |  | 64 |  |  |  | 68 |
@@ -34,12 +34,12 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Activity Timeline: Activity | Inbox, Observe | activity-timeline/activity-condensation → Inbox (attentionProvider)<br>activity-timeline/activity-feed → Observe (destinationSection)<br>activity-timeline/verification-receipts → Observe (destinationSection) |
 | Agent CLI threads | Knowledge | agentsview/agent-sessions-panel → Knowledge (destinationSection) |
 | Agent Toolkit: Capabilities | Thread panel | agent-toolkit/agent-toolkit-page → Thread panel (threadFacet) |
-| Agents | Agents | agents/agent-registry → Agents (destinationSection) |
+| Agents | Agents | agents/agent-colour → Agents (destinationSection)<br>agents/agent-registry → Agents (destinationSection) |
 | AI Accounts: Accounts | Settings | ai-accounts/account-lifecycle → Settings (settingsSection)<br>ai-accounts/model-routing → Settings (settingsSection)<br>ai-accounts/reference-dashboard → Settings (settingsSection) |
 | AI Accounts: Quota forecast | Observe | ai-accounts/quota-forecast → Observe (destinationSection) |
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
 | Background Jobs: Jobs | Observe | background-jobs/batch-stop-jobs → Observe (rowAction)<br>background-jobs/jobs-board → Observe (destinationSection)<br>background-jobs/outlived-jobs → Observe (rowAction) |
-| Backlog | Work, Inbox, Settings | backlog/acceptance-criteria → Work (destinationSection)<br>backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/agent-claims → Work (detail)<br>backlog/agent-run-state → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/capture-templates → Work (destinationSection)<br>backlog/due-dates → Work (destinationSection)<br>backlog/duplicate-merge → Work (destinationSection)<br>backlog/export-backlog → Settings (settingsSection)<br>backlog/gates-and-pull-requests → Work (destinationSection)<br>backlog/hide-agent-items → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/item-priority → Work (destinationSection)<br>backlog/item-timeline-lanes → Work (detail)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/peer-hosts → Settings (settingsSection)<br>backlog/project-agent-guidance → Work (destinationSection)<br>backlog/project-scope → Work (destinationSection)<br>backlog/ready-queue → Work (destinationSection)<br>backlog/recurring-items → Work (destinationSection)<br>backlog/revert-field-change → Work (detail)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/scheduled-rules → Work (destinationSection)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/secret-link-reveal → Work (detail)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/shipped-digest → Work (destinationSection)<br>backlog/shipped-summary → Work (destinationSection)<br>backlog/short-item-references → Work (destinationSection)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/sub-issues → Work (detail)<br>backlog/tweet-context-enrichment → Work (rowAction) |
+| Backlog | Work, Inbox, Settings | backlog/acceptance-criteria → Work (destinationSection)<br>backlog/activity-feed-and-freshness → Work (destinationSection)<br>backlog/agent-claims → Work (detail)<br>backlog/agent-run-state → Work (destinationSection)<br>backlog/attention-inbox → Inbox (attentionProvider)<br>backlog/auto-triage → Work (destinationSection)<br>backlog/backfill-triage → Work (command)<br>backlog/board-column-preferences → Work (destinationSection)<br>backlog/board-links-and-history → Work (detail)<br>backlog/capture-and-triage → Work (destinationSection)<br>backlog/capture-templates → Work (destinationSection)<br>backlog/due-dates → Work (destinationSection)<br>backlog/duplicate-merge → Work (destinationSection)<br>backlog/export-backlog → Settings (settingsSection)<br>backlog/gates-and-pull-requests → Work (destinationSection)<br>backlog/hide-agent-items → Work (destinationSection)<br>backlog/inline-title-edit → Work (rowAction)<br>backlog/item-priority → Work (destinationSection)<br>backlog/item-timeline-lanes → Work (detail)<br>backlog/jev-settings → Settings (settingsSection)<br>backlog/multi-select-items → Work (rowAction)<br>backlog/peer-hosts → Settings (settingsSection)<br>backlog/project-agent-guidance → Work (destinationSection)<br>backlog/project-scope → Work (destinationSection)<br>backlog/ready-queue → Work (destinationSection)<br>backlog/recurring-items → Work (destinationSection)<br>backlog/revert-field-change → Work (detail)<br>backlog/rich-capture → Work (destinationSection)<br>backlog/rich-item-text → Work (detail)<br>backlog/scheduled-rules → Work (destinationSection)<br>backlog/search-and-views → Work (destinationSection)<br>backlog/secret-link-reveal → Work (detail)<br>backlog/selection-context-menu → Work (rowAction)<br>backlog/shipped-digest → Work (destinationSection)<br>backlog/shipped-summary → Work (destinationSection)<br>backlog/short-item-references → Work (destinationSection)<br>backlog/start-thread-from-item → Work (rowAction)<br>backlog/sub-issues → Work (detail)<br>backlog/tag-colors → Work (rowAction)<br>backlog/tweet-context-enrichment → Work (rowAction) |
 | Backlog: Items | Work, Settings | backlog/remote-sync → Work (rowAction)<br>backlog/remote-sync-settings → Settings (settingsSection) |
 | Hosts | Observe | multi-host/checkout-sync → Observe (destinationSection)<br>multi-host/fleet-update → Observe (destinationSection)<br>multi-host/host-management → Observe (destinationSection)<br>multi-host/host-settings → Observe (detail)<br>multi-host/isolated-runtime-views → Observe (rowAction)<br>multi-host/linked-machines → Observe (detail) |
 | Inbox | Inbox | activity-timeline/inbox-panel → Inbox (destinationSection)<br>activity-timeline/inbox-push → Inbox (destinationSection)<br>agent-questions/child-questions-inbox → Inbox (attentionProvider)<br>agent-questions/native-questions-inbox → Inbox (attentionProvider)<br>ai-accounts/quota-inbox-items → Inbox (attentionProvider)<br>backlog/backlog-inbox-items → Inbox (attentionProvider)<br>hmr-gate/deferred-update-inbox-item → Inbox (attentionProvider)<br>jj-integration/land-inbox-items → Inbox (attentionProvider)<br>thread-sidebar/finished-turn-inbox → Inbox (attentionProvider)<br>traces/alert-inbox-items → Inbox (attentionProvider) |
@@ -97,7 +97,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | Inbox | 1 | Inbox 1 |
 | keyboard | 5 | No place of its own 5 |
-| left-nav | 120 | Work 36, Observe 24, Settings 16, Land 15, Inbox 13, Knowledge 6, Agents 4, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 122 | Work 37, Observe 24, Settings 16, Land 15, Inbox 13, Knowledge 6, Agents 5, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 12 | No place of its own 7, Thread panel 4, Settings 1 |
 | module | 1 | No place of its own 1 |
 | new-thread screen | 2 | Composer 2 |
@@ -232,7 +232,7 @@ rail destination; 16 features.
 
 ### Work
 
-rail destination; 41 features.
+rail destination; 42 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -276,17 +276,19 @@ rail destination; 41 features.
 | backlog/remote-sync: Sync items with Linear, GitHub Issues or Markdown files | rowAction | left-nav: Backlog: Items › row menu › Link to … / Create in … / row selection › Create in… per binding / item detail › sync chips |
 | backlog/selection-context-menu: Apply every context-menu action to the selection | rowAction | left-nav: Backlog › row menu |
 | backlog/start-thread-from-item: Start a thread from an item | rowAction | left-nav: Backlog › Start thread |
+| backlog/tag-colors: Choose a tag’s colour | rowAction | left-nav: Backlog › a tag chip on a feed row or in the item panel › Colour of #tag |
 | backlog/tweet-context-enrichment: Bring a tweet's text into an item | rowAction | left-nav: Backlog › row menu › tweet context |
 
 ### Agents
 
-rail destination; 5 features.
+rail destination; 6 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agent-communication/agent-directory: Find running agents | destinationSection | left-nav: Messages |
 | agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Messages › post |
 | agent-communication/passive-messaging: Store and browse agent messages | destinationSection | left-nav: Messages |
+| agents/agent-colour: Colour an agent | destinationSection | left-nav: Agents |
 | agents/agent-registry: Manage agents | destinationSection | left-nav: Agents |
 | agents/agent-mention-preview: Preview an agent from its mention | entityProvider | overlay: shared reference preview card (input-trigger entity registry), agent kind |
 

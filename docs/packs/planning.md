@@ -25,7 +25,7 @@ Pack id `planning`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 61 features, the 54 curated ones first.
+From the onboarding feature catalog: 62 features, the 55 curated ones first.
 
 ### Curated
 
@@ -75,14 +75,15 @@ From the onboarding feature catalog: 61 features, the 54 curated ones first.
 44. **Wait on a PR, a revision, a check or a date, and see linked PRs live** (`backlog`, work) — Hold an item until a pull request merges, a revision lands, a check passes or a date arrives.
 45. **Schedule backlog rules as project automations** (`backlog`, work) — Schedule nightly triage or other backlog rules as project automations.
 46. **Give agents per-project guidance** (`backlog`, work) — Write guidance for agents per project, and threads started from its items begin with it.
-47. **Share one backlog across hosts** (`backlog`, settings) — Turn on other hosts in Backlog settings to share and merge one backlog across them.
-48. **Tasks and reminders load once** (`schedule`, work) — The Tasks page and thread reminders reload only when a schedule changes.
-49. **Reorder pending messages** (`queue-reorder`, composer) — Move queued messages up, down or by drag.
-50. **Edit queued messages in the composer** (`queue-reorder`, composer) — Edit a queued message in the composer, and it goes back to the same place in the queue.
-51. **Preview queued message text** (`queue-reorder`, composer) — Each queued message shows a one-line preview of its text.
-52. **Move a queued message to another thread** (`queue-reorder`, composer) — Move a queued message, with its files, to another thread.
-53. **Preview queued attachments** (`queue-reorder`, composer) — Queued messages show a thumbnail for each image and a name for each file.
-54. **Send a message later** (`queue-reorder`, composer) — Schedule a message to send later, and edit, send now or cancel it until then.
+47. **Choose a tag’s colour** (`backlog`, work) — Give a backlog tag one of the theme’s six identity colours, or return it to its default.
+48. **Share one backlog across hosts** (`backlog`, settings) — Turn on other hosts in Backlog settings to share and merge one backlog across them.
+49. **Tasks and reminders load once** (`schedule`, work) — The Tasks page and thread reminders reload only when a schedule changes.
+50. **Reorder pending messages** (`queue-reorder`, composer) — Move queued messages up, down or by drag.
+51. **Edit queued messages in the composer** (`queue-reorder`, composer) — Edit a queued message in the composer, and it goes back to the same place in the queue.
+52. **Preview queued message text** (`queue-reorder`, composer) — Each queued message shows a one-line preview of its text.
+53. **Move a queued message to another thread** (`queue-reorder`, composer) — Move a queued message, with its files, to another thread.
+54. **Preview queued attachments** (`queue-reorder`, composer) — Queued messages show a thumbnail for each image and a name for each file.
+55. **Send a message later** (`queue-reorder`, composer) — Schedule a message to send later, and edit, send now or cancel it until then.
 
 ### More
 

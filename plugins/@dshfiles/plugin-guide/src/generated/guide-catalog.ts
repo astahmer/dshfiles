@@ -747,7 +747,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "backlogApi",
       "importFrom": "@dshfiles/backlog/api",
       "owner": "@dshfiles/backlog",
-      "source": "plugins/@dshfiles/backlog/src/api.ts:747",
+      "source": "plugins/@dshfiles/backlog/src/api.ts:754",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/backlog:backlog",
@@ -760,8 +760,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/backlog owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, ready, claim, release, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, syncSources, saveSyncConnection, removeSyncConnection, moveSyncConnection, saveSyncBinding, removeSyncBinding, discoverSync, testSyncConnection, testSyncConnections, importRemote, importAllRemote, acknowledge, triage, regenerateImageTitle, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, revert, setProjectGuidance, scheduleRule, pullRequests, linkPullRequest, merge, export, shipped, summarizeShipped, deleteComment, peerInfo, peerOpsSince, peerFiles, peerStatus, peerSync, configurePeers, eventHosts",
-        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_ready (read-only), backlog_claim, backlog_release, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_connections (read-only), backlog_sync_connection_save, backlog_sync_connection_remove, backlog_sync_connection_move, backlog_sync_binding_save, backlog_sync_binding_remove, backlog_sync_discover (read-only), backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_sync_import_all, backlog_triage, backlog_regenerate_title, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment, backlog_revert, backlog_set_project_guidance, backlog_schedule_rule, backlog_pull_requests (read-only), backlog_link_pr, backlog_merge, backlog_export, backlog_shipped (read-only), backlog_summarize_shipped, backlog_peer_status (read-only), backlog_peer_sync, backlog_peers_configure"
+        "Methods: list, revision, aiActivity, projects, get, getMany, referencing, capture, attachFile, readFile, removeFile, delete, speechStatus, jevSetupStatus, classifyReply, generateReply, transcribeSpeech, enrichTweet, update, ready, claim, release, link, agentContinuationCandidates, continueAgentThread, startThread, syncStatus, syncNow, linkRemote, syncSources, saveSyncConnection, removeSyncConnection, moveSyncConnection, saveSyncBinding, removeSyncBinding, discoverSync, testSyncConnection, testSyncConnections, importRemote, importAllRemote, acknowledge, triage, regenerateImageTitle, backfillTriage, backfillTriageStatus, applyProposal, dismissProposal, comment, editComment, revert, setProjectGuidance, setTagColor, scheduleRule, pullRequests, linkPullRequest, merge, export, shipped, summarizeShipped, deleteComment, peerInfo, peerOpsSince, peerFiles, peerStatus, peerSync, configurePeers, eventHosts",
+        "Agent tools: backlog_list (read-only), backlog_projects (read-only), backlog_get (read-only), backlog_get_many (read-only), backlog_referencing (read-only), backlog_capture, backlog_attach_file, backlog_read_file (read-only), backlog_remove_file, backlog_delete, backlog_enrich_tweet, backlog_update, backlog_ready (read-only), backlog_claim, backlog_release, backlog_link, backlog_start_thread, backlog_sync_status (read-only), backlog_sync_now, backlog_link_remote, backlog_sync_connections (read-only), backlog_sync_connection_save, backlog_sync_connection_remove, backlog_sync_connection_move, backlog_sync_binding_save, backlog_sync_binding_remove, backlog_sync_discover (read-only), backlog_sync_test_connection (read-only), backlog_sync_test_all (read-only), backlog_import_remote, backlog_sync_import_all, backlog_triage, backlog_regenerate_title, backlog_triage_backfill, backlog_triage_backfill_status (read-only), backlog_accept_proposal, backlog_dismiss_proposal, backlog_comment, backlog_revert, backlog_set_project_guidance, backlog_set_tag_color, backlog_schedule_rule, backlog_pull_requests (read-only), backlog_link_pr, backlog_merge, backlog_export, backlog_shipped (read-only), backlog_summarize_shipped, backlog_peer_status (read-only), backlog_peer_sync, backlog_peers_configure"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -3668,7 +3668,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/activity-timeline › inbox-push"
       ],
       "details": [
-        "Used by 84 catalog feature(s)",
+        "Used by 85 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3778,7 +3778,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/backlog › inline-title-edit"
       ],
       "details": [
-        "Used by 35 catalog feature(s)",
+        "Used by 36 catalog feature(s)",
         "Destinations in use: inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
