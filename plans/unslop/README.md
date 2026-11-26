@@ -43,6 +43,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 14 (round-13 shots) | 8.5 | 8.5 | **9** | all three: project names cut in attention rows, a stray dash on New thread; one attention meta wording |
 | 15 (round-14 shots) | 8.5 | **9** | **9** | Sol and Mistral at target; Opus: rail marks clipped (regression), Inbox tally and verbs, palette wording |
 | 16 (round-15 shots) | **9** | 8.5 (Astra) | 8.5 | Opus at target; Astra (new GPT seat): composer, answer-first Inbox, installed plugins first; Mistral: colour (owner kept the restraint) |
+| 17 (round-16 shots) | **9** | **9** (Astra) | **9** (Fable, for Mistral) | **Target met.** Mistral's provider failed every request; the owner seated Claude Fable 5.2 for this round |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -306,6 +307,13 @@ Review, Inbox bodies on the evidence well, a failed well only with a real error 
 core's). The Settings "Open configuration file" chevron stays: it opens a real menu. Review's collapsed-line bars can't
 expand (patch text only; follow-up: the Host would have to send full file contents). Trade-off: the phone failed card
 starts 16 pt lower; only its title clears the tab bar, the Needs you tab's ✕ 1 still flags it.
+
+Round 17: every deciding seat scored the round-16 set 9/10 (Opus 9, Astra 9, Claude Fable 5.2 9 in Mistral's seat at the
+owner's request, after the Mistral provider failed every request including a one-line probe; GLM's review died in the same
+outage). Polish the seats named for 9.5, not done: one phone top-bar seat rule across Threads and Inbox, one Inbox card body
+measure, one phone action-foot grammar for failed cards, palette selection as wash plus ↵ only, a quieter phone row ⋯,
+no current-thread edge on the phone list, a phone thread header meta line, the sidebar's ragged trailing column, Plugins
+header buttons at 500, the unselected Inbox glyph in secondary ink, the phone transcript fade limited to 6–8 px.
 
 ## Round four
 
