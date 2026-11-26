@@ -173,6 +173,16 @@ Round 8 findings, merged in `.cache/unslop-audit/r5/council/round-8-fixes.md`: o
 verbs), filter-row trigger grammar, the dark search edge that did not render, phone Inbox project and kind and the full
 band strength, one Inbox card structure with verbs beside their evidence, one dock grammar attached to the composer,
 rail tones ≥ 40° apart, every Settings group tinted, Settings row dividers and type steps, switch off boundaries.
+All four lanes done: A kit 7 revisions `qyvqtklz` … `nkupyqwu` (attention-text and danger-text verbs, rail tones 40° apart
+with Inbox in secondary ink, selected card edge and check only, Settings row utilities, switch off edge, code hang from
+the line's own indent, DESIGN.md); B 7 revisions `qvysksxx` … `tlkvvyrp` (field-look search and filter triggers, text verbs
+and secondary previews on rows, one tone per Settings group, Settings row grammar); C 7 revisions `pzpovtrn` … `ovlvtort`
+(one Inbox card structure with verbs after their evidence, one-line phone heads, icon Start triage, New thread 305/305,
+16 px phone fade, flat jump button, one dock row grammar attached to the composer, CodeIndent wired); D 10 revisions
+`zurvrquo` … `lwooopws` (Re-index in the page menu, More numbers in the stats corner, active spend nodes edged in their
+series colour, Backlog rounded-square statuses and field triggers, Review's labelled controls and base combobox, leaf
+title marks for AI accounts and Plugins). The lead raised the spend node edge to the full series colour (60 % was
+2.1:1) and taught the capture script the Re-index menu. Backlog's "Inbox" view is not renamed: it lists attention items.
 
 ## Round four
 
