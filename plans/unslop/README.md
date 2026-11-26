@@ -381,6 +381,14 @@ Round 22 findings, merged in `.cache/unslop-audit/r5/council/round-22-fixes.md`:
 header and card with a clean sticky edge, failed rows marked (Turn failed / Didn't start) and the failure notice named,
 one count formula (`6 working · 2 failed`), the phone child names its parent, a fade under the dock, the desktop child
 header state after the model, one child order, a dock model column, a merged list footer.
+All lanes done, linearised into one line: F `txulxqop` … `lnwlksuy` (one count formula in the kit with a `notStarted`
+part; the header chip, list and transcript group on it; failed rows with the red ✕ and Turn failed / Didn't start; a
+named failure notice; no empty seat inline; no kind prefix inside the group; aligned durations; launch order; one list
+footer; the desktop child header state after its model); P `xvupqvnz` … `yztpxtzr` ("{count} failed", a "Subagent of
+…" strip under the phone bar, the failed count in the phone parent header, Working said once); D `lvmytlln` …
+`pzkxswwl` (two-line phone dock rows, one Live work header and card with a clean sticky edge, a desktop model column, ↗
+alone at rest, fades under the dock, launch order, the phone ⋯ kept in the bar row); the lead: a subagent tab named by
+its description. Kept: the transcript group lists calls in call order, which can differ from launch order.
 
 ## Round four
 
