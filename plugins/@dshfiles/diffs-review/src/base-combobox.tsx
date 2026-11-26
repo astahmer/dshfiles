@@ -71,6 +71,8 @@ export const BaseCombobox = (props: {
         <div className="dshx:relative dshx:w-44 dshx:max-w-full" data-review-base-field>
           <Input
             id={props.id}
+            // At rest it looks like the project picker beside it; focus, hover or typing gives it the field edge (A4).
+            rest="trigger"
             role="combobox"
             aria-autocomplete="none"
             aria-expanded={open}

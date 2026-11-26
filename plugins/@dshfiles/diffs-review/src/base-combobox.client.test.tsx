@@ -64,3 +64,12 @@ describe('Review › Compare against (council round 8, D3)', () => {
     expect(panel).toContain('dshx:max-w-[62ch] dshx:text-pretty')
   })
 })
+
+describe('Review › Compare against at rest (council round 11, D3)', () => {
+  it('takes the trigger look of the project picker beside it at rest, the field edge on focus or typing', () => {
+    render(<BaseCombobox id="base" base="main" value="" onValueChange={() => undefined} />)
+    const input = screen.getByRole('combobox')
+    // The kit's typeable rest look (A4): the trigger fill and hairline at rest, the 3:1 edge on hover, open or typing.
+    expect(input.getAttribute('data-rest')).toBe('trigger')
+  })
+})
