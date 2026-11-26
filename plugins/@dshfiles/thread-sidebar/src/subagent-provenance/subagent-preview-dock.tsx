@@ -7,6 +7,7 @@ import { ArrowUpRightIcon, BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, useSyncExternalStore } from 'react'
+import { launchOrdered } from '../thread-children.js'
 import { ToolSteps } from '../tool-steps.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
 import { useSubagentRun } from './subagent-run.js'
@@ -187,12 +188,15 @@ export const SubagentPreviewDock = (
   },
 ): JSX.Element | null => {
   const parentId = SessionId(props.sessionId)
-  const children = props.useSessions(list =>
-    (list.projectionsBySession[parentId]?.values.subagentCatalog ?? [])
-      .filter(entry => entry.mode !== 'external')
+  // One child order on every subagent surface (council round 22, item 12): launch order, as the list and the transcript
+  // read; the dock lists working children only, so none is failed.
+  const children = props.useSessions(list => {
+    const catalog = (list.projectionsBySession[parentId]?.values.subagentCatalog ?? []).filter(entry => entry.mode !== 'external')
+    const launchOrder = [...catalog].sort((left, right) => left.createdAt - right.createdAt).map(entry => entry.id)
+    return launchOrdered({ children: catalog, launchOrder, isFailed: () => false })
       .map(entry => entry.id)
-      .join(ID_SEPARATOR),
-  )
+      .join(ID_SEPARATOR)
+  })
   const working = props.useSessionStatus(statuses =>
     (children === '' ? [] : children.split(ID_SEPARATOR)).filter(id => statuses.get(SessionId(id))?.running === true).join(ID_SEPARATOR),
   )

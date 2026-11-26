@@ -44,7 +44,7 @@ const childInTool = (input: { readonly cancel?: () => Promise<{ readonly ok: tru
   return { cancel, retainChild }
 }
 
-const sessionList = (input: { readonly childTiming: boolean }) => ({
+const sessionList = (input: { readonly childTiming: boolean; readonly catalog?: readonly { readonly id: string; readonly mode: string; readonly label: string; readonly createdAt: number }[] }) => ({
   byId: input.childTiming
     ? Object.fromEntries(
         ['child-a', 'child-b'].map(id => [
@@ -61,12 +61,12 @@ const sessionList = (input: { readonly childTiming: boolean }) => ({
   projectionsBySession: {
     [PARENT]: {
       values: {
-        subagentCatalog: [
-          { id: 'child-a', mode: 'one-shot', label: 'Review' },
-          { id: 'child-b', mode: 'continuable', label: 'Refactor' },
-          { id: 'child-c', mode: 'external', label: 'Remote' },
-          { id: 'child-d', mode: 'one-shot', label: 'Lint' },
-          { id: 'child-e', mode: 'one-shot', label: 'Docs' },
+        subagentCatalog: input.catalog ?? [
+          { id: 'child-a', mode: 'one-shot', label: 'Review', createdAt: 1 },
+          { id: 'child-b', mode: 'continuable', label: 'Refactor', createdAt: 2 },
+          { id: 'child-c', mode: 'external', label: 'Remote', createdAt: 3 },
+          { id: 'child-d', mode: 'one-shot', label: 'Lint', createdAt: 4 },
+          { id: 'child-e', mode: 'one-shot', label: 'Docs', createdAt: 5 },
         ],
       },
     },
@@ -78,14 +78,17 @@ const dockProps = (input: {
   readonly bindings?: SubagentPreviewBindings
   readonly runCards?: boolean
   readonly childTiming?: boolean
+  readonly catalog?: Parameters<typeof sessionList>[0]['catalog']
 }): Props => {
   const statuses = new Map(CHILDREN.map(id => [id, { running: input.running.includes(id) }]))
+  const childTiming = input.childTiming ?? false
+  const list = input.catalog === undefined ? sessionList({ childTiming }) : sessionList({ childTiming, catalog: input.catalog })
   return {
     sessionId: PARENT,
     preview: input.bindings ?? preview(),
     runCards: input.runCards ?? false,
     // SAFETY: the dock reads only these fields of the session list.
-    useSessions: selector => selector(sessionList({ childTiming: input.childTiming ?? false }) as never),
+    useSessions: selector => selector(list as never),
     // SAFETY: the dock reads only `running` of each status.
     useSessionStatus: selector => selector(statuses as never),
   }
@@ -106,6 +109,17 @@ const openFold = (): void => {
 }
 
 describe('SubagentPreviewDock', () => {
+  it('lists working children in launch order, as the list and the transcript do (council round 22, item 12)', () => {
+    // The catalog holds children in its own order; the dock read it as is, so Sweep came before CSV here but not there.
+    const catalog = [
+      { id: 'child-d', mode: 'one-shot', label: 'Lint', createdAt: 30 },
+      { id: 'child-a', mode: 'one-shot', label: 'Review', createdAt: 10 },
+      { id: 'child-b', mode: 'continuable', label: 'Refactor', createdAt: 20 },
+    ]
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'], catalog })} />)
+    expect([...rows()].map(row => row.getAttribute('aria-label'))).toEqual(['subagentPreviewKind: Review', 'subagentPreviewKind: Refactor', 'subagentPreviewKind: Lint'])
+  })
+
   it('lists working children only, and clears as they go idle', () => {
     const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-c'] })} />)
     expect([...rows()].map(row => row.getAttribute('aria-label'))).toEqual(['subagentPreviewKind: Review'])
