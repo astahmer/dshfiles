@@ -77,10 +77,8 @@ describe('the two Review verbs on head bands (council round 12 C2)', () => {
     expect(InboxView.onBand('needs-you')).toBe(true)
     expect(InboxView.onBand('ready')).toBe(false)
     expect(open).toContain("band={place === 'head' && InboxView.onBand(status)}")
-    // Drawn 28px on every pointer: a 44pt band fill hung from the card's top; the kit's ::after keeps the 44pt hit area.
-    expect(InboxView.HEAD_VERB).toBe('dshx:h-7 dshx:pointer-coarse:h-7')
-    // In the merged class list the 28px touch height replaces the chip's 44pt one.
-    expect(cn(INBOX_CHIP, cn('dshx:shrink', InboxView.HEAD_VERB))).not.toContain('pointer-coarse:h-11')
+    // 28px on a desktop; council round 14 C2 draws it 44pt on a touch screen (inbox-round14.test.ts).
+    expect(cn(INBOX_CHIP, cn('dshx:shrink', InboxView.HEAD_VERB))).toContain('dshx:h-7')
     // One size and padding for both: the same chip, size and short-verb inset whatever the status.
     expect(open).toContain('className={cn(\'dshx:max-w-full\', INBOX_CHIP, size, shortLabel !== null && InboxView.SHORT_VERB)}')
   })

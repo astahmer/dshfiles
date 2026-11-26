@@ -130,11 +130,10 @@ const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-[11px]'
 
 /**
  * The verb a card asks for sits in its head row, trailing, before the menu (round five C4, council round 5): 28px on a
- * wide pane, pulled 4px into the row's padding so the 36px band keeps its height. Council round 12 C2: drawn 28px on a
- * touch screen too, now that it carries the band tint (a 44pt fill hung from the card's top edge); the kit's ::after
- * keeps its 44pt hit area (`pointer-coarse:h-7` replaces INBOX_CHIP's touch height in `cn`).
+ * wide pane, pulled 4px into the row's padding so the 36px band keeps its height. Council round 14 C2: on a touch
+ * screen it is drawn 44pt tall (round 12's 28px read as a small target), centred in the head band by HEAD_SEAT_VERB.
  */
-const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-7'
+const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
 
 /**
  * The head row's trailing seat (the menu, and on a wide pane the verbs) is an ordinary part of the row at every width.
@@ -182,6 +181,13 @@ const HEAD_TWO_LINES =
  */
 const HEAD_SEAT =
   'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-2!'
+
+/**
+ * A touch screen's seat that holds a verb (a bodyless Failed card's 44pt Review, council round 14 C2): 2px into the
+ * head's 6px padding, not 8, so the pill sits 4px inside the 52px band, centred on both head lines; its 40px outer
+ * height keeps the head (and the card's clearance above a phone's tab bar) unchanged.
+ */
+const HEAD_SEAT_VERB = 'dshx:@max-pane-narrow:-my-0.5!'
 
 /**
  * Where a card's verbs sit. Council round 11 C2: with a fine pointer (a desktop) every card's primary verb is in its
@@ -509,6 +515,7 @@ export class InboxView {
   static readonly HEAD_PART = HEAD_PART
   static readonly HEAD_TWO_LINES = HEAD_TWO_LINES
   static readonly HEAD_SEAT = HEAD_SEAT
+  static readonly HEAD_SEAT_VERB = HEAD_SEAT_VERB
   static readonly footsVerbs = footsVerbs
   static readonly MENU_AFTER_VERB = MENU_AFTER_VERB
   static readonly EVIDENCE = EVIDENCE

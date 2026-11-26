@@ -338,7 +338,7 @@ const InboxRow = (props: {
     )
   }
   const headVerbs = (
-        <div data-inbox-row-actions="band" className={InboxView.HEAD_SEAT}>
+        <div data-inbox-row-actions="band" className={cn(InboxView.HEAD_SEAT, phone && !footed && InboxView.HEAD_SEAT_VERB)}>
           {footed ? null : verbButtons('head')}
           {/* Utility verbs live in the card's menu (round five P2): the row shows the one verb it asks for. */}
           {hasMenu ? (
