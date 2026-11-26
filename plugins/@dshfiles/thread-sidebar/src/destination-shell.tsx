@@ -1928,8 +1928,10 @@ const PhoneNavigation = (
           data-phone-list=""
           onClick={closeAfterPick}
           className={cn(
-            // 12px under the top bar's rule (round nine B4, the phone shell grid).
-            'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-3 dshx:text-foreground',
+            // 12px under the top bar's rule (round nine B4, the phone shell grid). The phone roots share one canvas
+            // (council round 18 B2.1): Threads sits on the stage as Inbox and Settings do, and the list's own sidebar
+            // fills (its root, sticky group headers, a swiped row's backing) resolve to that canvas here.
+            'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:surface-stage dshx:[--dsw-specific-sidebar-fill:var(--dshx-surface-stage)] dshx:pt-3 dshx:text-foreground',
             // The Threads toolbar band measures 48px (council round 11 B2): 4px under the rule, then the 44px search row.
             'dshx:has-[[data-threads-toolbar]]:pt-1',
             // The frame's status pill row (44px, just above the tab bar) stays visible under a full-screen list: the list

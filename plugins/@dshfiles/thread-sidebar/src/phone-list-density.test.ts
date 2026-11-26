@@ -61,7 +61,7 @@ describe('phone thread list density (round five B1)', () => {
     expect(client).toContain('dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]')
     // The phone shell grid (round nine B4, B5) spends room the round-7 fold had reclaimed: 12px under the top bar and
     // 44px project and Filter fields, as the council asked.
-    expect(shell).toContain("'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-3 dshx:text-foreground'")
+    expect(shell).toContain("'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:surface-stage dshx:[--dsw-specific-sidebar-fill:var(--dshx-surface-stage)] dshx:pt-3 dshx:text-foreground'")
     expect(client).toContain('triggerClassName="dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:phone:px-3"')
   })
 })

@@ -1410,9 +1410,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
       >
         <div
           ref={brandRef}
-          // A named container: the brand row decides what collapses from its own width (T1.2), not the viewport's.
+          // A named container: the brand row decides what collapses from its own width (T1.2), not the viewport's. It is
+          // the tab strip's height with the strip's hairline (council round 18 B2.1): one top bar across column and stage.
           className={cn(
-            'dshx:@container/brand dshx:flex dshx:h-12 dshx:w-full dshx:shrink-0 dshx:items-center dshx:gap-1',
+            'dshx:@container/brand dshx:flex dshx:h-bar dshx:w-full dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:shadow-[inset_0_-1px_0_var(--dshx-tone-line,var(--dsw-alias-border-l2))]',
             props.collapsed ? 'dshx:justify-center' : 'dshx:px-1.5',
           )}
           // Folded, the open row drawn over the stage replaces this one wherever main-tabs makes room for it (client.css).
