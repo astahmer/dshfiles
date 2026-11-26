@@ -359,22 +359,29 @@ export const ModelCuration = (props: {
           <span className="dshx:text-xs dshx:text-muted-foreground">
             {activeCatalog.filter(model => !hidden.has(model.id)).length} shown · {activeCatalog.length} available
           </span>
-          <Button
-            size="xs"
-            variant="ghost"
-            type="button"
-            disabled={activeCatalog.length === 0}
-            onClick={() => {
-              const allHidden = activeCatalog.every(model => hidden.has(model.id))
-              customize({
-                hiddenModelIds: allHidden
-                  ? account.hiddenModelIds.filter(id => !activeCatalog.some(model => model.id === id))
-                  : [...new Set([...account.hiddenModelIds, ...activeCatalog.map(model => model.id)])],
-              })
-            }}
-          >
-            {activeCatalog.length > 0 && activeCatalog.every(model => hidden.has(model.id)) ? 'Enable all' : 'Disable all'}
-          </Button>
+          {/* The bulk verb sits in a menu at the table's end, in ink, not a bare button (council round 18, D1). */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="xs" variant="ghost" type="button" disabled={activeCatalog.length === 0}>
+                Model actions
+                <ChevronDownIcon aria-hidden className="dshx:opacity-50" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onSelect={() => {
+                  const allHidden = activeCatalog.every(model => hidden.has(model.id))
+                  customize({
+                    hiddenModelIds: allHidden
+                      ? account.hiddenModelIds.filter(id => !activeCatalog.some(model => model.id === id))
+                      : [...new Set([...account.hiddenModelIds, ...activeCatalog.map(model => model.id)])],
+                  })
+                }}
+              >
+                {activeCatalog.length > 0 && activeCatalog.every(model => hidden.has(model.id)) ? 'Enable all' : 'Disable all'}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       {current.adding ? (

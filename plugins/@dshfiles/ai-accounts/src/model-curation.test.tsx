@@ -263,6 +263,23 @@ describe('Models table cells (council round 11, D2)', () => {
     expect(classesOf(box?.parentElement ?? null)).toEqual(expect.arrayContaining(['dshx:flex', 'dshx:justify-center']))
   })
 
+  it('puts Disable all in a Model actions menu at the table end, not in danger red (council round 18, D1)', async () => {
+    const state = await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false })
+    const buttons = (): HTMLButtonElement[] => [...container.querySelectorAll('button')]
+    expect(buttons().some(button => button.textContent === 'Disable all')).toBe(false)
+    const trigger = buttons().find(button => button.textContent === 'Model actions')
+    expect(trigger?.getAttribute('aria-haspopup')).toBe('menu')
+    if (!('ResizeObserver' in globalThis))
+      Object.assign(globalThis, { ResizeObserver: class { observe(): void {} unobserve(): void {} disconnect(): void {} } })
+    await act(async () => {
+      trigger?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+    const item = [...document.querySelectorAll('[role="menuitem"]')].find(element => element.textContent === 'Disable all')
+    expect(item?.getAttribute('data-variant')).not.toBe('destructive')
+    await click(item ?? null)
+    expect(state.draft().hiddenModelIds).toHaveLength(9)
+  })
+
   it('draws the Show model checkboxes at the dense 16 px size', async () => {
     await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
     const boxes = [...container.querySelectorAll('[aria-label^="Show "][aria-label$=" in the picker"]')]
