@@ -240,9 +240,7 @@ function palette(input: PaletteInput): Palette {
     segmentThumb: dark ? { l: 0.296, c: round((chroma * 9) / 7, 4), h: hue } : bg,
     segmentEdge: dark ? { l: 1, c: 0, h: 0, alpha: 0.07 } : withAlpha(neutral[10] ?? { l: 0.22, c: 0, h: hue }, 0.1),
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
-    primaryHover: dark
-      ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue }
-      : { l: 0.24, c: primaryChroma, h: hue },
+    primaryHover: dark ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue } : { l: 0.24, c: primaryChroma, h: hue },
   }
 }
 
@@ -264,7 +262,8 @@ function fitAccent(accent: Oklch, raised: Oklch, dark: boolean): Oklch {
 function fitSelectedEdge(edge: Oklch, wash: Oklch, dark: boolean): Oklch {
   const under = dark ? [wash, { ...wash, l: Math.max(wash.l, 0.3) }] : [wash]
   let fitted = edge
-  for (let i = 0; i < 40 && Math.min(...under.map(back => contrastRatio(fitted, back))) < 3.05; i += 1) fitted = { ...fitted, l: round(fitted.l + (dark ? 0.01 : -0.01), 4) }
+  for (let i = 0; i < 40 && Math.min(...under.map(back => contrastRatio(fitted, back))) < 3.05; i += 1)
+    fitted = { ...fitted, l: round(fitted.l + (dark ? 0.01 : -0.01), 4) }
   return fitted
 }
 
@@ -273,7 +272,15 @@ function paintOver(under: Oklch, over: Oklch): Oklch {
   const alpha = over.alpha ?? 1
   const channels = (color: Oklch): readonly number[] => [1, 3, 5].map(at => Number.parseInt(toHex(color).slice(at, at + 2), 16))
   const [u, o] = [channels(under), channels(over)]
-  return hexToOklch(`#${u.map((value, i) => Math.round(value * (1 - alpha) + (o[i] ?? 0) * alpha).toString(16).padStart(2, '0')).join('')}`)
+  return hexToOklch(
+    `#${u
+      .map((value, i) =>
+        Math.round(value * (1 - alpha) + (o[i] ?? 0) * alpha)
+          .toString(16)
+          .padStart(2, '0'),
+      )
+      .join('')}`,
+  )
 }
 
 /**
@@ -337,6 +344,11 @@ function hexToOklch(hex: string): Oklch {
   const B = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
   const h = (Math.atan2(B, A) * 180) / Math.PI
   return { l: L, c: Math.hypot(A, B), h: h < 0 ? h + 360 : h }
+}
+
+/** Whether a colour is inside sRGB, so `toHex` paints it without clipping a channel (and shifting its hue). */
+function inGamut(color: Oklch): boolean {
+  return toLinearSrgb(color).every(x => x >= -1e-4 && x <= 1 + 1e-4)
 }
 
 /** WCAG 2 relative luminance of an opaque colour after gamut clipping. */
@@ -426,6 +438,7 @@ export class PaletteMath {
   static readonly hexToOklch = hexToOklch
   static readonly luminance = luminance
   static readonly contrastRatio = contrastRatio
+  static readonly inGamut = inGamut
   static readonly toCss = toCss
   static readonly standaloneColours = standaloneColours
 }
