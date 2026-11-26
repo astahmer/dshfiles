@@ -3,6 +3,7 @@ import { ActivityIcon, BotIcon, GitMergeIcon, InboxIcon, LibraryIcon, ListTodoIc
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { placeToneStyle } from '@dshfiles/plugin-ui/components/ui/place-glyph'
 import { defineRegistry, useRegistry } from '@dshfiles/dshx/client'
+import type { ComponentType } from 'react'
 import type { TabDestination, TabDestinationIcon, TabDestinationId, TabStatus } from './tabs.js'
 
 /**
@@ -62,11 +63,12 @@ const DESTINATION_TONES = {
  * A page's own glyph for its tab (round nine B2): a page that sits under a destination but is a place of its own (AI
  * accounts and Plugins under Settings) names itself with the glyph and tone its row carries in that destination's list,
  * not the destination's glyph. The plugin that owns that list provides the entries (settings-shell for Settings pages);
- * both tab strips read them. Tone: any CSS colour.
+ * both tab strips read them. Tone: any CSS colour. Glyph: a lucide icon or any svg component that takes `size` and
+ * `strokeWidth` (Usage's own bar chart).
  */
 export interface TabPlaceGlyph {
   readonly panelId: string
-  readonly glyph: LucideIcon
+  readonly glyph: LucideIcon | ComponentType<{ readonly size?: number; readonly strokeWidth?: number }>
   readonly tone: string
 }
 export const TabPlaceGlyphs = defineRegistry<TabPlaceGlyph>('@dshfiles/workbench.tab-place-glyph')
