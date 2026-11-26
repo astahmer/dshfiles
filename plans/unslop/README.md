@@ -49,6 +49,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 20 (round-19 shots) | **9.5** | **9.5** (Astra) | **9.5** (Fable, for Mistral) | **Round six target met.** Mistral's provider failed every request this round; Fable held its seat |
 | 22 (round-20 shots + subagent shots) | 9 | 9 (Astra) | 9 (Fable, for Mistral) | Round seven. 01–14 hold 9.5; subagent shots 7.5–9: phone dock rows lose task names, failures hard to see, four counts, phone child doesn't name its parent |
 | 23 (round-21 shots + subagent shots) | 9 | 9 (Astra) | **9.5** (Fable, for Mistral) | Child views at 9.5; the parent views hold 9: transcript group shows no live state, failed count drawn four ways, text cut under the desktop dock, the phone dock is three boxes |
+| 24 (round-22 shots + subagent shots) | 9 | **9.5** (Astra) | **9.5** (Fable, for Mistral) | Astra and Fable at target; Opus: transcript model/outcome columns, the failed child's model, the phone dock end, one selected look, one clock |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -401,6 +402,9 @@ on group rows, one title column, the failure notice naming its model through a `
 run-folds contract, even notice spacing); D `uvwskmnp` … `qzzuqvso` ("Live work · N working" on the desktop dock,
 nothing under its edge, the open phone dock as the composer's top section with snap scrolling, "1 job · 1 subagent").
 Open: the failed child row's model still truncates ("claude-sonnet…") at the default sidebar width.
+Round 24 findings, merged in `.cache/unslop-audit/r5/council/round-24-fixes.md`: the unknown model's seat and one model
+and outcome column in the transcript group, "Failed" on child rows so the model reads whole, the phone dock's end and
+edge fades, one selected look for child rows, one clock on the desktop child view.
 
 ## Round four
 
