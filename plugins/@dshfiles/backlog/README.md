@@ -16,6 +16,8 @@
 
 ![Feed ordered by activity, with idle items sinking](docs/screenshots/activity-feed-and-freshness.png)
 
+![Choose a tag’s colour](docs/screenshots/tag-colors.png)
+
 ![Start a thread from an item](docs/screenshots/start-thread-from-item.png)
 
 ![Select items in ranges, batch-edit them and start one thread for the selection](docs/screenshots/multi-select-items.png)
