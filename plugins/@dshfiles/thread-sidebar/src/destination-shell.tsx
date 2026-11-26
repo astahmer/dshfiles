@@ -17,6 +17,7 @@ import {
   ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
+  CornerDownRightIcon,
   EllipsisIcon,
   GitMergeIcon,
   InboxIcon,
@@ -512,8 +513,9 @@ const SectionButton = (props: {
         className={cn(
           'dshx:relative dshx:flex dshx:w-full dshx:min-w-0 dshx:items-start dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-colors',
           'dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-          // A child row starts 12px past its parent's text edge (council round 6 B3): 10px inset, 16px glyph, 8px gap.
-          props.nested === true && 'dshx:pl-11.5',
+          // A child row hangs its child-line glyph 12px in from its parent's (council round 14 B2), so its label still
+          // starts 12px past the parent's text edge (council round 6 B3): 22px inset, 16px seat, 8px gap.
+          props.nested === true && 'dshx:pl-5.5',
           props.count === 0 && 'dshx:opacity-45',
           // A row whose glyph carries a count keeps room for it at its trailing edge, before the row's own menu.
           SECTION_ROW_BADGE_ROOM,
@@ -523,10 +525,24 @@ const SectionButton = (props: {
           // A row led by a plain glyph draws no pill, so the kit's selected edge outlines its wash (council round 12 B1). A
           // place-tile row (the Settings column, a side column's pages) takes no edge either (council round 13 B4): its
           // toned tile, the wash and the 550 label carry the selection.
-          props.selected && props.icon !== undefined && props.icon !== null && props.place === undefined && SELECTED_EDGE,
+          // A child row's connector is not a place either: it is selected like its place-tile siblings.
+          props.selected && props.icon !== undefined && props.icon !== null && props.place === undefined && props.nested !== true && SELECTED_EDGE,
         )}
       >
-        {props.icon === undefined || props.icon === null ? null : props.place === undefined ? (
+        {props.nested === true ? (
+          // The child line (council round 14 B2): a muted ↳ in the 16px glyph seat, so the row reads as its parent's
+          // child instead of a row that lost its glyph.
+          <span
+            className="dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
+            aria-hidden="true"
+            data-section-icon=""
+            data-section-child-line=""
+            {...LEADING_GLYPH_ATTRIBUTE}
+          >
+            <CornerDownRightIcon className="dshx:size-3.5" strokeWidth={1.5} />
+          </span>
+        ) : null}
+        {props.nested === true || props.icon === undefined || props.icon === null ? null : props.place === undefined ? (
           <span
             className={cn(
               'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center',

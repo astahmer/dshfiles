@@ -377,12 +377,36 @@ describe('DestinationShell', () => {
     const navigation = navigationOf({ ...settingsState, open: false, activeId: undefined })
     renderShell({ panels: settingsPanels, contributed, activePanelId: 'ai-accounts', settingsNavigation: navigation })
     expect(screen.getByRole('button', { name: 'AI accounts' }).getAttribute('aria-current')).toBe('page')
-    // Council round 6 B3: the child row starts 12px past its parent's text edge (10px inset + 16px glyph + 8px gap).
-    expect(screen.getByRole('button', { name: 'AI accounts settings' }).className).toContain('dshx:pl-11.5')
+    // Council round 14 B2: the child row hangs a child-line glyph (↳) in a 16px seat that starts 12px in from the
+    // parent's glyph, so its label still starts 12px past the parent's text edge (22px + 16px seat + 8px gap = 46px).
+    const child = screen.getByRole('button', { name: 'AI accounts settings' })
+    expect(child.className).toContain('dshx:pl-5.5')
+    expect(child.className).not.toContain('dshx:pl-11.5')
+    const seat = child.querySelector<HTMLElement>(':scope > [data-section-icon]')
+    expect(seat?.className).toContain('dshx:size-4')
+    expect(seat?.className).toContain('dshx:text-muted-foreground')
+    expect(seat?.getAttribute('aria-hidden')).toBe('true')
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('lucide-corner-down-right')
+    // The connector is not a place: no toned tile and no selected edge when its row is current.
+    expect(seat?.hasAttribute('style')).toBe(false)
     // On another Settings page the column keeps its visible title: the page's h1 names that page, not Settings.
     expect(screen.getByRole('heading', { level: 2, name: 'Settings' }).className).not.toContain('dshx:sr-only')
     fireEvent.click(screen.getByRole('button', { name: 'AI accounts settings' }))
     expect(navigation.select).toHaveBeenCalledWith('ai-accounts')
+  })
+
+  it('selects a child row with the wash alone, like its place-tile siblings: no selected edge (council round 14 B2)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const settingsPanels = [...panels, { id: 'ai-accounts', label: 'AI accounts', order: 1 }]
+    const contributed = [{ panelId: 'ai-accounts', destination: 'settings' as const, label: 'AI accounts', order: 0 }]
+    const navigation = navigationOf({ ...settingsState, open: true, activeId: 'ai-accounts' })
+    renderShell({ panels: settingsPanels, contributed, activePanelId: 'dshfiles-settings', settingsNavigation: navigation })
+    const child = screen.getByRole('button', { name: 'AI accounts settings' })
+    expect(child.getAttribute('aria-current')).toBe('page')
+    expect(child.className).toContain('dshx:bg-selected-wash')
+    expect(child.className).not.toContain('selected-edge')
+    expect(child.querySelector('[data-section-icon] svg')?.getAttribute('class')).toContain('lucide-corner-down-right')
   })
 
   it('shows match counts while Settings searches, and dims a category without one', () => {
