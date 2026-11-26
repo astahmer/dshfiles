@@ -247,7 +247,14 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
  * record), so a child whose provider refused it no longer reads Ready or Idle. Its parent's roll-up leaves that failure
  * out: a subagent's failed turn is its parent's tool result, which the parent's own turn answers.
  */
-const childStatusOf = (input: ThreadStatusInput): { readonly row: ThreadStatus; readonly rollup: ThreadStatus } => {
+export interface ChildThreadStatus {
+  /** What the child's own row, tab, header and palette show. */
+  readonly row: ThreadStatus
+  /** What its parent's roll-up counts. */
+  readonly rollup: ThreadStatus
+}
+
+const childStatusOf = (input: ThreadStatusInput): ChildThreadStatus => {
   const rollup = statusOf({ ...input, failedTurn: undefined })
   return { row: input.failedTurn === undefined ? rollup : statusOf(input), rollup }
 }

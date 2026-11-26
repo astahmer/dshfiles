@@ -57,16 +57,16 @@ const messageText = (message: { readonly content: readonly unknown[] }): string 
 const EMPTY: SubagentFeed = { tool: undefined, toolCalls: 0, text: '', lastTurnEnd: undefined }
 
 /** `turn/end` reasons (DSH's `TurnEndReasonMap`) that are a failure rather than a stop. */
-const FAILED_TURN_END_KINDS: ReadonlySet<string> = new Set(['error', 'max-tokens'])
+const FAILED_TURN_END_KINDS = new Set<unknown>(['error', 'max-tokens'])
 
 /**
- * A `turn/end` reason as a terminal state. DSH writes `{ kind: 'completed' | 'error' | 'aborted' | … }`; reading the
- * reason as a bare string made every real turn end look stopped.
+ * A `turn/end` payload's reason as a terminal state. DSH writes `{ kind: 'completed' | 'error' | 'aborted' | … }`;
+ * reading the reason as a bare string made every real turn end look stopped.
  */
-const terminalOfTurnEnd = (reason: unknown): SubagentTerminal => {
-  const kind = isRecord(reason) ? reason.kind : reason
+const terminalOfTurnEnd = (data: WirePayload): SubagentTerminal => {
+  const kind = isRecord(data.reason) ? data.reason.kind : data.reason
   if (kind === 'completed') return 'completed'
-  return typeof kind === 'string' && FAILED_TURN_END_KINDS.has(kind) ? 'failed' : 'stopped'
+  return FAILED_TURN_END_KINDS.has(kind) ? 'failed' : 'stopped'
 }
 
 /** Wire payloads reach the client unnarrowed for this plugin's purposes, so each field is read defensively. */
@@ -91,7 +91,7 @@ const foldEntry = (feed: SubagentFeed, entry: SessionEventLikeEntry): SubagentFe
     case 'turn/start':
       return { ...feed, tool: undefined, text: '', lastTurnEnd: undefined }
     case 'turn/end':
-      return { ...feed, tool: undefined, lastTurnEnd: terminalOfTurnEnd(data.reason) }
+      return { ...feed, tool: undefined, lastTurnEnd: terminalOfTurnEnd(data) }
     default:
       return feed
   }
@@ -118,8 +118,6 @@ export const SubagentFeedModel = {
   fold(feed: SubagentFeed, entries: readonly SessionEventLikeEntry[]): SubagentFeed {
     return entries.reduce(foldEntry, feed)
   },
-
-  terminalOfTurnEnd,
 
   /**
    * A child's terminal state from what every list surface holds without opening the child (round 21 D4): the Host's

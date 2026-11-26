@@ -5,6 +5,12 @@ import { createSubagentFeedStore, SubagentFeedModel } from './subagent-feed.js'
 // SAFETY: fixture events carry only what the fold reads.
 const entry = <Data>(type: string, data: Data): SessionEventLikeEntry =>
   ({ type: 'event', event: { type, data, seq: 1, time: 1 } }) as unknown as SessionEventLikeEntry
+/** The `turn/end` reasons DSH writes (its `TurnEndReasonMap`), as far as the fold reads them. */
+interface TurnEndReasonFixture {
+  readonly kind: 'completed' | 'error' | 'max-tokens' | 'aborted' | 'blocked' | 'interrupted'
+  readonly error?: { readonly message: string; readonly code: string }
+  readonly reason?: { readonly kind: 'user' }
+}
 const chunk = (text: string) => entry('assistant/live-chunk', { chunk: { type: 'text-delta', index: 0, text } })
 
 const source = (initial: readonly SessionEventLikeEntry[] = []) => {
@@ -58,7 +64,7 @@ describe('SubagentFeedModel', () => {
   })
 
   it('records how the latest turn ended, from the reason DSH writes, and forgets it when another starts (round 21 D4)', () => {
-    const endedWith = (reason: object) => SubagentFeedModel.fold(SubagentFeedModel.empty, [entry('turn/end', { turn: 1, reason })]).lastTurnEnd
+    const endedWith = (reason: TurnEndReasonFixture) => SubagentFeedModel.fold(SubagentFeedModel.empty, [entry('turn/end', { turn: 1, reason })]).lastTurnEnd
     const ended = SubagentFeedModel.fold(SubagentFeedModel.empty, [entry('turn/end', { turn: 1, reason: { kind: 'completed' } })])
     expect(ended.lastTurnEnd).toBe('completed')
     expect(SubagentFeedModel.fold(ended, [entry('turn/start', {})]).lastTurnEnd).toBeUndefined()

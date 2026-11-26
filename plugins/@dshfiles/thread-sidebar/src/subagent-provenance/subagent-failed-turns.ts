@@ -21,6 +21,8 @@ const noSubscription = (): (() => void) => () => undefined
 const noSnapshot = (): undefined => undefined
 
 export const SubagentFailedTurns = {
+  /** The entry's binding now; undefined before the entry bound one or after it unbound. */
+  current: (): { readonly client: AttentionClient; readonly key: string } | undefined => bound,
   /** Bind the entry's client; returns the unbind for the entry's disposal. */
   bind(ctx: Parameters<typeof createApiClient>[0]): () => void {
     const client = createClient(ctx)
@@ -37,7 +39,7 @@ export const SubagentFailedTurns = {
 
 /** Children whose last finished turn failed, by session id. */
 export const useSubagentFailedTurns = (): ReadonlyMap<string, FailedTurn> => {
-  const binding = bound
+  const binding = SubagentFailedTurns.current()
   const store = resourceStore()
   const subscribe = useCallback(
     (listener: () => void) => {
