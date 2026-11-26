@@ -16,6 +16,15 @@ describe('the phone Triage button (council round 10 C2)', () => {
   })
 })
 
+describe('the phone "Needs you" segment (council round 10 C2)', () => {
+  it('hands the kit its statuses, so a failure below the fold shows as a tally (◆ 2 · ✕ 1) at first glance', () => {
+    const tabs = panel.slice(panel.indexOf('const tabs: readonly'), panel.indexOf('const visibleTabs'))
+    expect(tabs).toMatch(/view: 'needs-you', label: t\('needsYou'\), count: counts\?\.needsYou \?\? 0, statusCounts: InboxView\.titleCounts\(counts\)/u)
+    // The kit reads it from the tab items the page passes.
+    expect(list).toContain('...(tab.statusCounts !== undefined && { statusCounts: tab.statusCounts })')
+  })
+})
+
 describe('the phone Inbox card (council round 10 C2)', () => {
   it('pads its head 8px tighter (8px above and below, not 12) and keeps the 44pt seat inside that padding', () => {
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-2')

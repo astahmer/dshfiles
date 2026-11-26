@@ -1352,8 +1352,10 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   // Triage (one card at a time, 1 of N; on a phone its verbs sit in the thumb zone) is the way through the Inbox: it is
   // the page's one ink button, unless Resume all needs that seat (round five P2: no ink button in a card).
   const triageOnTop = resumeAllAction === null && triageable
-  const tabs: readonly { readonly view: AttentionView; readonly label: string; readonly count: number }[] = [
-    { view: 'needs-you', label: t('needsYou'), count: counts?.needsYou ?? 0 },
+  // Needs you holds two statuses: on a phone its segment shows them as a tally (◆ 2 · ✕ 1), so a failure below the fold
+  // shows at first glance (council round 10 C2; the kit draws it only in the phone shell, where the title is hidden).
+  const tabs: readonly { readonly view: AttentionView; readonly label: string; readonly count: number; readonly statusCounts?: ReturnType<typeof InboxView.titleCounts> }[] = [
+    { view: 'needs-you', label: t('needsYou'), count: counts?.needsYou ?? 0, statusCounts: InboxView.titleCounts(counts) },
     { view: 'other', label: t('other'), count: counts?.other ?? 0 },
     { view: 'snoozed', label: t('snoozed'), count: counts?.snoozed ?? 0 },
     { view: 'closed', label: t('closed'), count: counts?.closed ?? 0 },
@@ -1471,7 +1473,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         label: t('title'),
         value: view,
         onValueChange: value => setView(tabs.find(tab => tab.view === value)?.view ?? 'needs-you'),
-        items: visibleTabs.map(tab => ({ value: tab.view, label: tab.label, ...(tab.count > 0 && { count: tab.count }) })),
+        items: visibleTabs.map(tab => ({ value: tab.view, label: tab.label, ...(tab.count > 0 && { count: tab.count }), ...(tab.statusCounts !== undefined && { statusCounts: tab.statusCounts }) })),
       }}
     >
       {triageable ? (
