@@ -246,7 +246,11 @@ boundary; a text field a plugin draws itself takes `dshx:border-field-border` to
 `Select` and `Combobox` triggers, `Button variant="field"` and `select-look`, shares `triggerLook`: `bg-trigger-fill`
 (`--dshx-trigger-fill`, the ink at 5% light / 5.2% dark, so it paints `oklch(0.955 0.004 65)` / `oklch(0.235 0.006 65)`
 on the page and stays a visible step on a panel, the nav column, raised or a dialog), a quiet 1px hairline at rest
-(`border-border`, `--dsw-alias-border-l2`; council round 11 A2, so a chip never vanishes into its surface), the 3:1 field edge on hover and while open, and the accent edge plus the kit ring on focus; the box never changes size. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
+(`border-border`, `--dsw-alias-border-l2`; council round 11 A2, so a chip never vanishes into its surface), the 3:1 field edge on hover and while open, and the accent edge plus the kit ring on focus; the box never changes size.
+**A typeable combobox** (council round 11 A4), a text field that also opens a list and sits beside quiet triggers
+(Review's "Compare against"), takes `Input rest="trigger"` (or `typeableTriggerLook` on a wrapper that holds the
+input): the trigger look at rest, then the field look (page fill, 3:1 edge) on hover, while open and while it has
+focus, so while you type, with the accent edge and ring on focus as every field. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
 coarse pointer, sizes `Input`, `InputGroup`, `Combobox`, the default `Select` trigger, `select-look`, the segmented
 `TabsList` (items inset 3px) and default-size `Button`s (so `Page` header actions); every `Button` size shares the 8px
 radius. The trigger takes that height (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;

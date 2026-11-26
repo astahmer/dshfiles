@@ -21,14 +21,34 @@ export const fieldLook = 'dshx:rounded-lg dshx:border dshx:border-field-border d
 export const triggerLook =
   'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-trigger-fill dshx:not-disabled:hover:border-field-border dshx:data-[state=open]:border-field-border dshx:aria-expanded:border-field-border'
 
-const Input = React.forwardRef<HTMLInputElement, React.ComponentPropsWithoutRef<'input'>>(function Input({ className, type, ...props }, ref) {
+/**
+ * A typeable combobox at rest (council round 11 A4): a text field that also opens a list (Review's "Compare against",
+ * a branch or revision you may type) sits beside quiet triggers, so at rest it takes the trigger look, the fill and the
+ * 1px hairline; it takes the field look, the page fill and the 3:1 `border-field-border` edge, while it has focus (so
+ * while you type), while its list is open and on hover. Focus keeps the field's accent edge and ring on top. Use it as
+ * `Input rest="trigger"`, or put the class string on a wrapper that holds the input (an `InputGroup`): `focus-within`
+ * reaches the wrapper too. The box never changes size.
+ */
+export const typeableTriggerLook =
+  'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-trigger-fill dshx:not-disabled:hover:border-field-border dshx:aria-expanded:border-field-border dshx:focus-within:border-field-border dshx:focus-within:bg-background'
+
+export interface InputProps extends React.ComponentPropsWithoutRef<'input'> {
+  /**
+   * The look at rest: `field` (default) is the edged text field; `trigger` is `typeableTriggerLook`, for a typeable
+   * combobox that sits beside quiet triggers.
+   */
+  readonly rest?: 'field' | 'trigger'
+}
+
+const Input = React.forwardRef<HTMLInputElement, InputProps>(function Input({ className, type, rest = 'field', ...props }, ref) {
   return (
     <input
       ref={ref}
       type={type}
       data-slot="input"
+      data-rest={rest === 'trigger' ? 'trigger' : undefined}
       className={cn(
-        fieldLook,
+        rest === 'trigger' ? typeableTriggerLook : fieldLook,
         'dshx:h-(--dshx-control-h) dshx:w-full dshx:min-w-0 dshx:px-2.5 dshx:py-1 dshx:text-base dshx:transition-[color,box-shadow] dshx:outline-none dshx:selection:bg-primary dshx:selection:text-primary-foreground dshx:file:inline-flex dshx:file:h-7 dshx:file:border-0 dshx:file:bg-transparent dshx:file:text-sm dshx:file:font-medium dshx:file:text-foreground dshx:placeholder:text-muted-foreground dshx:disabled:pointer-events-none dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:md:text-sm',
         'dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50',
         'dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:aria-invalid:ring-destructive/40',

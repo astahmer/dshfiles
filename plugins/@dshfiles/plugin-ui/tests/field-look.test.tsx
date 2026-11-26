@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Button, buttonVariants } from '../src/components/ui/button.js'
-import { Input, fieldLook, triggerLook } from '../src/components/ui/input.js'
+import { Input, fieldLook, triggerLook, typeableTriggerLook } from '../src/components/ui/input.js'
 import { InputGroup } from '../src/components/ui/input-group.js'
 import { Select, SelectTrigger, SelectValue, selectLook } from '../src/components/ui/select.js'
 import { Combobox } from '../src/components/ui/combobox.js'
@@ -253,6 +253,43 @@ describe('quiet trigger (council round 10 A1)', () => {
       expect(PaletteMath.contrastRatio(hairline, fill(under)), `${name} hairline quieter than the edge`).toBeLessThan(PaletteMath.contrastRatio(p.fieldBorder, fill(under)))
     }
     for (const under of [surfaces.bg, surfaces.panel, surfaces.nav]) expect(PaletteMath.contrastRatio(hairline, fill(under))).toBeGreaterThanOrEqual(1.08)
+  })
+})
+
+describe('typeable combobox at rest (council round 11 A4)', () => {
+  const rest = (element: Element): readonly string[] => classes(element).filter(name => !/:(hover|focus|data-|aria-|not-|placeholder|disabled|selection|file|md|dark)/u.test(name.replace(/^dshx:/u, '')))
+
+  it('looks like its trigger pair at rest and takes the field look on focus, while typing and while open', () => {
+    expect(typeableTriggerLook.split(' ')).toEqual([
+      'dshx:rounded-lg',
+      'dshx:border',
+      'dshx:border-border',
+      'dshx:bg-trigger-fill',
+      'dshx:not-disabled:hover:border-field-border',
+      'dshx:aria-expanded:border-field-border',
+      'dshx:focus-within:border-field-border',
+      'dshx:focus-within:bg-background',
+    ])
+    // The rest look is the quiet trigger's, part for part.
+    for (const part of ['dshx:rounded-lg', 'dshx:border', 'dshx:border-border', 'dshx:bg-trigger-fill']) expect(triggerLook.split(' ')).toContain(part)
+  })
+
+  it('is an Input option, rest="trigger", that keeps the focus ring and the default field look otherwise', () => {
+    const view = render(
+      <>
+        <Input aria-label="Compare against" role="combobox" aria-expanded={false} rest="trigger" />
+        <Input aria-label="Name" />
+      </>,
+    )
+    const typeable = view.getByRole('combobox', { name: 'Compare against' })
+    expect(typeable.getAttribute('data-rest')).toBe('trigger')
+    expect(rest(typeable)).toEqual(expect.arrayContaining(['dshx:border-border', 'dshx:bg-trigger-fill']))
+    expect(rest(typeable)).not.toContain('dshx:border-field-border')
+    expect(rest(typeable)).not.toContain('dshx:bg-background')
+    expect(classes(typeable)).toEqual(expect.arrayContaining(['dshx:focus-within:border-field-border', 'dshx:focus-within:bg-background', 'dshx:focus-visible:border-ring']))
+    const plain = view.getByRole('textbox', { name: 'Name' })
+    expect(plain.getAttribute('data-rest')).toBeNull()
+    expect(rest(plain)).toEqual(expect.arrayContaining(fieldLook.split(' ')))
   })
 })
 
