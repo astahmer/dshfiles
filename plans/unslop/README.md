@@ -320,6 +320,14 @@ header buttons at 500, the unselected Inbox glyph in secondary ink, the phone tr
 Goal: every deciding seat (Opus, Astra, Mistral; Claude Fable stands in if Mistral's provider fails) at ≥ 9.5, or
 stop after two rounds with no score increase. Owner request: a subagent's model must be easy to read wherever a subagent
 appears (provider mark plus model name). First fix list: `.cache/unslop-audit/r5/council/round-17-fixes.md`.
+All five lanes done: A kit 6 revisions `yttyyurm` … `yvrkpttz` (RouteModel and modelIdentity, an M/A/D/R diff badge,
+nav-seat glyph ink, token fixes, DESIGN.md); B1 3 revisions `tqxulrlw` … `vyvyvskr` (one trailing edge, a quieter phone
+row, a held subagent's model from its descriptor, RouteModel on the transcript row, dock, child row and header); B2 4
+revisions `mvtkpryy` … `olnnvmtu` (palette wash + ↵, one phone top-bar seat rule, a phone thread meta line, the
+General title mark); C 5 revisions `otlqrmor` … `knmlnoou` (one Inbox body measure, a borderless Write your own, an 8 px
+phone fade, Inbox bars on the seat rule); D 6 revisions `rrzswuzq` … `nsuvmmxw` (a short Review subtitle, Plugins
+buttons at 500, an HMR updates description, Auto explained once, a summarised Usage table). Restart: thread-sidebar's
+Host half (its route projection is now version 2). The Mistral provider still fails; Claude Fable takes that seat.
 
 ## Round four
 
