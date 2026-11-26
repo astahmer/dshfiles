@@ -354,7 +354,9 @@ work on any surface.
    council round 14 A2 it is its own token, a clear step past `--dshx-field-border` (`#88827d` / `#76706c`, about 3.1:1
    on the wash), so a selected row never reads as a resting text field; text fields keep their 3:1 resting edge
    (tests/selected-edge). An inset shadow, so it moves nothing. **Selected edge only where it is needed.** The current
-   thread row, an account row and the palette's active result take it (council round 13); a row with a place tile (the
+    thread row on desktop and an account row take it (council round 13); the command palette's active result does not
+    (see **Palette selection**), nor the phone thread list's current row, which you leave for the thread (council
+    round 17); a row with a place tile (the
    Settings column, the Backlog, Usage and Review rows of the side columns) does not: its tile, wash and 550 title
    already carry the selection. A pill row never does. The kit finds its own leading
    `StatusGlyph`, `ProjectMark`, `PlaceGlyph`, `ModelMark` and `NativeProviderMark`; a plugin row marks its own glyph
@@ -417,7 +419,9 @@ work on any surface.
     tone. `nav-tone-<id>` on the item, `text-nav-tone` on its icon and `bg-nav-tile` on the active seat
     (`plugin-ui/src/color-roles.css`). The rail has its own six tones, not the identity ramp: Work orange 52, Observe lime 118, Land teal 180, Threads blue 235, Knowledge violet 305, Agents rose 350.
     Inbox is the attention destination: its glyph is the secondary ink, like Settings, and its indigo
-    `AttentionBadge` carries the colour. **Nav tone constraints** (`tests/nav-tone.test.ts`): one hue per destination
+    `AttentionBadge` carries the colour. A panel glyph that brings its own `.dshx-root` (the Inbox glyph) takes the seat's colour:
+    the kit lets that root inherit in a rail seat that is not current and in every phone tab seat, so it is secondary
+    on the rail, tertiary on a resting tab and ink on the current one, never the root's ink (council round 17 A3). **Nav tone constraints** (`tests/nav-tone.test.ts`): one hue per destination
     in both schemes; light L 0.52–0.56 at chroma 0.14, dark L 0.78 at 0.13; a chroma floor of 0.12, or the sRGB edge
     where a hue ends lower (teal and blue in light, about 0.10 and 0.12), so no tone reads muddy; every hue 25° or more
     from the status hues (25, 80, 150, 270) and 40° or more from every other; every pair ΔE 0.06 or more; the glyph
@@ -533,6 +537,13 @@ A phone turned sideways (844×390) keeps it. Key phone layout on that rule, not 
 in a 44px top-bar status button on Threads and Inbox that opens the status sheet (with the usage ring); there is no
 permanent band above the tab bar, and a strip returns only for an actionable condition (quota low, disconnected).
 
+**One top-bar seat rule.** Every phone top bar, Threads, Inbox, a page and a thread alike, has a leading and a trailing
+44 x 44 seat on its 44px row under the status bar, 4px in from the screen edge (the safe-area inset when that is larger),
+so a 20px glyph centres 26px from its edge on every root screen and nothing moves between them (council round 17). A
+page's or a thread's Back chevron is centred in the leading seat. The shell publishes the insets as
+`--dsh-phone-seat-left` / `--dsh-phone-seat-right`; a page or plugin that draws into the bar (the Inbox's gauge, Triage
+and ⋯, a thread's menu) seats its controls with them, never with its own padding.
+
 **Phone Settings is a drill-down.** The Settings root is a grouped list: 44px rows, each with a 28px identity tile, its
 name and a trailing chevron; the first group sits 16px under the header. A category page shows only its fields, 16px
 apart, under a Back control and the category name; there is no category dropdown on the page. Modified moves into
@@ -562,11 +573,14 @@ trailing ↗), never a band pill competing with the answers (council round 16). 
 
 **Evidence well.** What an Inbox card body quotes sits in one well, desktop and phone (council round 16): `EvidenceWell`
 (`@dshfiles/plugin-ui/components/ui/evidence-well`, `tone="neutral"` or `"danger"`, a `label`), or `dshx:evidence-well`
-on a block (`data-tone="danger"`, a `data-evidence-label` span). The full measure of the body, padding 8/12, radius 6,
+on a block (`data-tone="danger"`, a `data-evidence-label` span). The body's one measure (below), padding 8/12, radius 6,
 mono 12/18 that wraps; the neutral fill `oklch(0.95 0.004 70)` / dark `oklch(0.24 0.006 70)` for "Runs: <command>", the
 red-soft `oklch(0.96 0.02 25)` / dark `oklch(0.26 0.03 25)` for an error line. The label is secondary ink, or the
 danger tone in a danger well; ink, secondary and danger text hold AA on both fills (`plugin-ui/tests/evidence-well`).
 It is plainly not a button: no control height, no border, no shadow, the text flush to its start.
+**One body measure.** An Inbox card body's well, prose and answers share one measure, 36rem (`max-w-xl`), so the body
+has one right edge, not three (council round 17: 72ch in the well's mono 12px, the prose's sans 14px and the answers'
+own width drew three). A phone is narrower than the measure, so its body runs the full card.
 
 **Failed card reason.** A failed card's body is its provider error line, `Error: <first line>`, mono 12/18 in the
 danger evidence well, desktop and phone; with none, no well (the meta line already says Turn failed). On the phone its Review becomes the same full-width 44px footer button as the approval card's (red-tinted) with
@@ -824,6 +838,12 @@ tall on a coarse pointer. It reads as a link, never as a label in the ink.
 tabular, 12px, additions in success and deletions in danger (AA on bg, panel, raised and the selected wash), a zero side
 muted, the minus U+2212.
 
+**Change badge.** A diff file header leads with its change as a letter, `ChangeBadge` (`@dshfiles/plugin-ui/diff`,
+drawn by `PatchView` in the header's prefix slot): M, A, D, R for modified, added, deleted and renamed, in a 16px box
+with a 1px edge in the letter's tone, the 11px step at 600. M and R are the secondary ink, A success, D danger, each AA
+on the diff header; a screen reader hears the word. The diff library's own glyph (a ringed dot that read as a radio
+button) is hidden (council round 17).
+
 **EmptyState.** One sentence, centred, muted, at most one outline action. It never draws its own frame; the list or
 card it sits in does. Loading is a `Spinner`, not an empty state.
 
@@ -891,7 +911,10 @@ status glyph draws no pill (council round 11 A1), only the wash, the 550 title a
 **One palette row grammar.** Every thread row in the command palette reads like a thread-list row (council round 16):
 its rail is its `StatusGlyph`, and line 2 is always `AttentionMeta`, `[mark] project · word · age`, the word one of
 Working, Ready, Idle, Approval, Question, Turn failed. There is no status tail at the row's end and no project tile in
-the rail: the mark lives on line 2.
+the rail: the mark lives on line 2. **Palette selection.** The active result is the wash and ↵ only (council round 17):
+no selected edge, which read as a second frame inside the dialog. With no edge the palette's wash is a step deeper
+than a list's: the dialog wash capped at L 0.925 in light (about `oklch(0.925 0.004 70)`), the dialog's own
+`oklch(0.30 0.006 70)` in dark; ink and secondary text keep AA and the status glyphs 3:1 on it.
 **Child rows.** A row that belongs to the row above it (a subagent under its thread, a Settings entry under its
 group, such as AI accounts settings under AI accounts) carries a child line in a 16px seat in the parent's glyph
 column: the thread list's tree line, or a leading elbow (↳, faint ink) where a list has none (council round 14). It
@@ -903,6 +926,18 @@ detail and its Stop verb; the transcript keeps a record row with the same glyph 
 ends the dock row leaves and the record row takes the final state and the total (`Done · 5m 02s`). The name is the
 task description its parent gave, the same string in the row, the list, the header and the tab: no generated handle,
 no route or account id. One thing is never a card and a row on the same screen.
+**A subagent's model is easy to read** (owner request, council round 17). Wherever a subagent appears, its model
+shows beside it as `RouteModel` (`components/model-mark`): the provider's 16px `ModelMark` and the model's display
+name in secondary ink, 12px (`size="sm"`, the meta step) or 13px (`size="md"`, the UI step) where it has its own line.
+The surfaces: the transcript subagent row (the `subagent` tool card, in its head after the description), the desktop
+dock's subagent row (on the row itself, not only its expanded detail), the thread list's child row (line 2,
+`[mark] gpt-6.2-astra · Working`, in the `AttentionMeta` way) and the subagent thread's header lineage. One rule,
+`modelIdentity(provider, model)`: the name is the model picker's (an account provider's own `<provider>/` prefix
+drops), the mark from the model id first and the provider id only as a fallback (route provider ids such as
+`codex_work_…` name no family); a family no token names draws the name with no mark, and no model draws nothing: a
+provider id is never shown as a model, and nothing is guessed. The name truncates and the mark never shrinks. The brand
+colours sit at 2.4–3.6:1 on the light fills, so in light the mark is drawn at 85% brightness, 3:1 on bg, panel,
+raised and the selected wash; dark keeps the brand colour (`plugin-ui/tests/route-model`).
 **Dock row grammar** (council round 8 C3): every dock row reads `› glyph · Label · detail · elapsed · worded link ↗`,
 with one leading chevron per row: the label 13/500 sans ("Running" for a job), the detail 13 regular (a job's command
 in mono). The desktop dock attaches to the composer: the composer fill (`--dsw-specific-input-major`), the dock's top

@@ -438,4 +438,34 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(prose).not.toContain('Resume, Inbox and the starters under the new-thread composer share one chip')
     expect(prose).not.toContain('in a red-soft well (light about')
   })
+
+  it("records the seventeenth council pass: a subagent's model, the change badge, the nav seat's root, palette selection, one top-bar seat rule, one Inbox body measure (council round 17 A4)", () => {
+    const prose = design.replace(/\s+/gu, ' ')
+    for (const text of [
+      "**A subagent's model is easy to read**",
+      '`RouteModel`',
+      '`modelIdentity(provider, model)`',
+      'the mark from the model id first',
+      'the transcript subagent row',
+      'the thread list\'s child row',
+      'the subagent thread\'s header lineage',
+      'at 85% brightness',
+      '**Change badge.**',
+      '`ChangeBadge`',
+      'M, A, D, R',
+      'takes the seat\'s colour',
+      '**Palette selection.**',
+      'the wash and ↵ only',
+      '`oklch(0.925 0.004 70)`',
+      '**One top-bar seat rule.**',
+      '44 x 44',
+      '`--dsh-phone-seat-left`',
+      '**One body measure.**',
+      '36rem',
+    ])
+      expect(prose, text).toContain(text)
+    for (const module of ['model-mark']) expect(prose).toContain(`components/${module}`)
+    // Retired by this pass: the palette's active result taking the selected edge.
+    expect(prose).not.toContain("The current thread row, an account row and the palette's active result take it")
+  })
 })
