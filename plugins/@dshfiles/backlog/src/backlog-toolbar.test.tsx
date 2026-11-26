@@ -60,8 +60,13 @@ test('the toolbar folds project scope, sort, agent items and saved views into on
   )
   expect(byName('combobox', 'Filter by project')).toBeUndefined()
   const trigger = byName('button', 'Backlog view options')
-  expect(trigger?.dataset.variant).toBe('ghost')
-  expect(byName('button', 'Filter')?.dataset.variant).toBe('ghost')
+  // Filter-row grammar (council round 8, D2): beside the search field, the triggers that show a value (the project
+  // scope, the active filter count) take the field look, at the search's 28 px.
+  for (const control of [trigger, byName('button', 'Filter')]) {
+    expect(control?.dataset.variant).toBe('field')
+    expect(control?.className).toContain('dshx:border-field-border')
+    expect(control?.className).toContain('dshx:h-7')
+  }
   act(() => trigger?.click())
   expect(byName('combobox', 'Filter by project')).toBeDefined()
   expect(byName('button', 'Sort by last update')).toBeDefined()

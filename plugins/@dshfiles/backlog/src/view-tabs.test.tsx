@@ -48,4 +48,10 @@ describe('Backlog search field (council round 6, A2)', () => {
     expect(search).toContain('dshx:border-field-border')
     expect(search).not.toContain('dshx:border-input')
   })
+  it("shares the kit field's 8 px corner with the View and Filter triggers beside it (council round 8, D2)", () => {
+    const panel = readFileSync(new URL('backlog-panel.tsx', import.meta.url), 'utf8')
+    const search = panel.slice(panel.lastIndexOf('<label', panel.indexOf('aria-label="Search backlog"')), panel.indexOf('aria-label="Search backlog"'))
+    expect(search).toContain('dshx:rounded-lg')
+    expect(search).not.toContain('dshx:rounded-md')
+  })
 })

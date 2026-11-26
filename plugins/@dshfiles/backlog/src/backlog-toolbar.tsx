@@ -137,7 +137,8 @@ export const FilterMenu = (props: {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button type="button" variant="ghost" size="sm" aria-label="Filter" className={active > 0 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground'}>
+        {/* It shows a value (the active count) beside the search field: the field look (council round 8, D2). */}
+        <Button type="button" variant="field" size="sm" aria-label="Filter" className={active > 0 ? 'dshx:text-foreground' : 'dshx:text-muted-foreground'}>
           <ListFilterIcon aria-hidden />
           <span className="dshx:@max-pane-narrow:sr-only">Filter</span>
           {active > 0 ? <span className="dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">{active}</span> : null}
@@ -333,9 +334,10 @@ export const ViewMenu = (props: {
 }): JSX.Element => (
   <Popover>
     <PopoverTrigger asChild>
+      {/* It shows a value (the project scope) beside the search field: the field look (council round 8, D2). */}
       <Button
         type="button"
-        variant="ghost"
+        variant="field"
         size="sm"
         aria-label="Backlog view options"
         className={cn('dshx:max-w-56', props.projects.length === 0 ? 'dshx:text-muted-foreground' : 'dshx:text-foreground')}
