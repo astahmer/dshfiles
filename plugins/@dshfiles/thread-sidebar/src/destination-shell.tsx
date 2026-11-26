@@ -836,16 +836,19 @@ const ListPane = (
       />
       {/* One search entry above the list (T5.3/T5.4): Board and Customize live in the list's Filter menu. */}
       {props.searchThreads === null ? null : (
-        <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1">
+        // The phone gutter (round nine B4): fields fill from 12px, their text and glyphs start at 24px; 8px over the
+        // project row.
+        <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1', props.phone === true && 'dshx:px-3 dshx:pb-2')}>
           <Button
-            size="sm"
+            // The one control height (round nine B5, kit A4): 32px beside the project and Filter fields, 44px on touch.
+            size="field"
             // A launcher that looks like a field is drawn as one (council round 8 B1): the kit field look, so no
             // outline `dark:border-input` replaces the field edge in dark; left-aligned, its label in placeholder ink.
             variant="field"
             className={cn(
               'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:text-muted-foreground',
-              // A phone's search is a 44px control (council round 6 B8); the list's touch gaps give the height back.
-              props.phone === true && 'dshx:h-11 dshx:gap-2 dshx:px-3 dshx:text-base',
+              // On a phone its glyph starts on the 24px text edge (round nine B4).
+              props.phone === true && 'dshx:gap-2 dshx:px-3',
             )}
             onClick={props.searchThreads}
           >
@@ -1757,8 +1760,8 @@ const PhoneNavigation = (
           data-phone-list=""
           onClick={closeAfterPick}
           className={cn(
-            // 4px under the top bar (council round 7 B4): the first Ready row fits above the tab bar at 390x664.
-            'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-1 dshx:text-foreground',
+            // 12px under the top bar's rule (round nine B4, the phone shell grid).
+            'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-3 dshx:text-foreground',
             // The frame's status pill row (44px, just above the tab bar) stays visible under a full-screen list: the list
             // ends above it whenever the frame draws it (round five, lane C asked), and covers it while the keyboard is up.
             'dshx:[html:not([data-phone-keyboard]):has([data-status-strip=compact])_&]:[--phone-list-status-room:44px]',

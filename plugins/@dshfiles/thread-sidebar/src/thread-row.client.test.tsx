@@ -197,6 +197,19 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-34')
   })
 
+  it('ends a touch row\'s verb label at the time column above it, the counter at the menu column (round nine B5)', async () => {
+    const row = await renderRow(asking)
+    const end = row.querySelector<HTMLElement>('[data-thread-row-end]')
+    // The verb button's 8px padding reaches into the 44px menu column, so its label ends where the time does.
+    expect(end?.className).toContain('dshx:pointer-coarse:right-9')
+    expect(end?.className).not.toContain('dshx:pointer-coarse:right-11')
+    expect(row.querySelector('[data-testid="thread-row-verb"]')?.className).toContain('dshx:px-2')
+    cleanup()
+    const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const counted = await renderRow({ ...asking, childThreads: children })
+    expect(counted.querySelector('[data-thread-row-end]')?.className).toContain('dshx:pointer-coarse:right-11')
+  })
+
   it('keeps the attention verb to Needs-you and Failed rows: a Ready row carries no Land button', async () => {
     const row = await renderRow({
       workStatus: rowStatus({ status: 'ready', verb: 'Land' }),

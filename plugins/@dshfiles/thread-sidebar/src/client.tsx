@@ -1778,6 +1778,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 // A press answers within 80ms (DESIGN.md › Motion), on a phone tap as on a click.
                 'dshx:transition-[background-color] dshx:duration-(--dshx-duration-hover) dshx:active:bg-accent',
                 compact ? 'dshx:gap-0.5 dshx:px-2 dshx:py-1.5' : 'dshx:gap-1 dshx:px-2.5 dshx:py-2.5',
+                // The phone gutter (round nine B4): the row fills from 12px, its glyph starts at 24px (the leading side
+                // only: the trailing side keeps the row menu's 44px column).
+                'dshx:phone:pl-3',
                 // Phone rows are a two-row grid (round five B1): [title | time ⋯] over [subtitle | verb], 6px apart, at
                 // least 52pt tall, whatever the density preference, so the first Ready row shows above the tab bar.
                 'dshx:pointer-coarse:min-h-13 dshx:pointer-coarse:justify-center dshx:pointer-coarse:gap-1.5 dshx:pointer-coarse:py-1',
@@ -2003,9 +2006,14 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 'dshx:absolute dshx:right-1.5 dshx:flex dshx:items-center dshx:gap-1',
                 verbSeat !== 'meta' || props.renaming
                   ? 'dshx:bottom-1'
-                  : // Touch: the verb ends where the time above it does, left of the row menu's column (council round 4 B4),
-                    // and stands on the row's 4px bottom padding, so it fills row 2 and never meets the time (round five B1).
-                    cn(compact ? 'dshx:bottom-0.5' : 'dshx:bottom-1.5', 'dshx:pointer-coarse:right-11 dshx:pointer-coarse:bottom-1'),
+                  : // Touch: the verb's label ends where the time above it does (round nine B5: its 8px padding reaches into
+                    // the row menu's column), and stands on the row's 4px bottom padding, so it fills row 2 and never meets
+                    // the time (round five B1). Beside a subagent counter the counter ends the line, left of that column.
+                    cn(
+                      compact ? 'dshx:bottom-0.5' : 'dshx:bottom-1.5',
+                      'dshx:pointer-coarse:bottom-1',
+                      childCount > 0 ? 'dshx:pointer-coarse:right-11' : 'dshx:pointer-coarse:right-9',
+                    ),
               )}
             >
               {verbSeat === 'meta' && !props.renaming ? verbButton : null}
@@ -6342,7 +6350,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 searchLabel={props.tSidebar('threadSidebarProjectSearch')}
                 searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
                 triggerClassName={cn(
-                  'dshx:h-8 dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
+                  'dshx:min-w-0 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:font-medium dshx:hover:bg-accent',
                   isBoard ? 'dshx:w-56 dshx:text-sm' : 'dshx:flex-1 dshx:text-base',
                 )}
                 triggerContent={
@@ -6597,7 +6605,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // views, grouping, status and source filters, the Threads pages (Board) and both settings live in that menu.
           // The trigger keeps the former filter button's accessible name, "Filter: <active filters>".
           // On touch the row sits 4px under the 44px search and directly over the first group head (council round 6 B8).
-          <header className="dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0">
+          // The phone shell grid (round nine B4): fields fill from the 12px gutter, 8px under the search (its own padding)
+          // and about 12px over the first group head's label (6px here, the head's own half-leading the rest).
+          <header className="dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0 dshx:phone:px-3 dshx:phone:pb-1.5">
             {/* Filter-row grammar (council round 8 B2): beside the search field, both value-showing triggers take the field
                 look, 8px apart; their values in ink at the body weight. */}
             <div className="dshx:flex dshx:items-center dshx:gap-2">
@@ -6610,8 +6620,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 searchAbove={0}
                 searchLabel={props.tSidebar('threadSidebarProjectSearch')}
                 searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
-                // 28px on touch, its 44px hit area from the kit (council round 7 B4), like the group heads under it.
-                triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:pointer-coarse:h-7"
+                // The kit trigger's one control height, as the search (round nine B5); on a phone its value at the 24px
+                // text edge.
+                triggerClassName="dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:phone:px-3"
                 triggerContent={
                   <>
                     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
@@ -6628,7 +6639,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     type="button"
                     // The field look whether or not a filter is on: its value names the active filter.
                     variant="field"
-                    size="sm"
+                    size="field"
                     data-thread-list-filter=""
                     data-filtered={listFiltered ? '' : undefined}
                     // The list's keyboard model treats the view control as the way into the rows (thread-list-navigation.ts).
@@ -6640,7 +6651,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       navigateThreadList(event.nativeEvent)
                       event.preventDefault()
                     }}
-                    className="dshx:h-8 dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-sm dshx:pointer-coarse:h-7"
+                    className="dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3"
                     // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
                     // filters it holds; the Status and Source rows inside the menu still spell those out.
                     aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}`}
@@ -7180,7 +7191,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // padding under a 24px fade (round five C5), so a row scrolled to the status bar thins out instead of being cut.
           // A phone fades only 14px (council round 7 B4): the line above the tab bar reads instead of fading out.
           className={cn(
-            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)] dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]',
+            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:phone:px-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)] dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]',
             isBoard && 'dshx:p-4 dshx:[mask-image:none]',
           )}
           onKeyDown={event => {
