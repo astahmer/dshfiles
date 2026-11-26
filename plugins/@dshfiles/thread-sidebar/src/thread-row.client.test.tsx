@@ -91,11 +91,12 @@ describe('the hover actions of a thread row', () => {
 describe('a row that needs you', () => {
   const asking = { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: Which layout should the release notes use?' }) }
 
-  it('keeps the title and time on line 1 and puts Answer at line 2\'s trailing edge on its attention tint', async () => {
+  it('keeps the title and time on line 1 and puts Answer at line 2\'s trailing edge as attention text (council round 8 B3)', async () => {
     const row = await renderRow(asking)
     const verb = row.querySelector<HTMLElement>('[data-testid="thread-row-verb"]')
     expect(verb?.closest('[data-verb-seat]')?.getAttribute('data-verb-seat')).toBe('meta')
-    expect(verb?.getAttribute('data-variant')).toBe('attention')
+    // One layer of colour: the row keeps its wash, the verb is attention text on a transparent fill.
+    expect(verb?.getAttribute('data-variant')).toBe('attention-text')
     // 24px drawn; the kit gives it a 44px hit area on touch, painted above the row after it.
     expect(verb?.className).toContain('dshx:h-6')
     expect(verb?.className).toContain('dshx:z-10')
@@ -141,9 +142,19 @@ describe('a row that needs you', () => {
     expect(detail?.className).not.toContain('dshx:line-clamp-2')
   })
 
-  it('gives a failed row\'s verb the danger tint', async () => {
+  it('gives a failed row\'s verb the danger text (council round 8 B3)', async () => {
     const row = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
-    expect(row.querySelector('[data-testid="thread-row-verb"]')?.getAttribute('data-variant')).toBe('danger-tint')
+    expect(row.querySelector('[data-testid="thread-row-verb"]')?.getAttribute('data-variant')).toBe('danger-text')
+  })
+
+  it('reads the question, command or failure under the title in the secondary ink at 13/18 (council round 8 B3)', async () => {
+    for (const workStatus of [asking.workStatus, rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' })]) {
+      const row = await renderRow({ workStatus })
+      const detail = row.querySelector<HTMLElement>('[data-testid="thread-row-status-detail"]')
+      expect(detail?.className).toContain('dshx:text-sm/[18px]')
+      expect(detail?.className).toContain('dshx:text-muted-foreground')
+      expect(detail?.className).not.toContain('dshx:text-foreground')
+    }
   })
 
   it('lets a Failed title wrap to two lines like a Needs-you one', async () => {

@@ -1549,9 +1549,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   // subagent counter when there is one, at its own reserved width so the question keeps the rest of the line (C14).
   // A row with no second line keeps the verb at the first line's end.
   const verbSeat = inlineVerb === undefined ? undefined : metaLine ? 'meta' : 'head'
-  // The tint rung (round five K3): Needs-you verbs on the attention tint, a failed row's on the danger tint; a Ready
-  // row's Land stays an outline, so the ink primary is left to the page.
-  const verbVariant = workStatus?.status === 'needs-you' ? 'attention' : workStatus?.status === 'failed' ? 'danger-tint' : 'outline'
+  // One layer of colour (council round 8 B3): the row keeps its Needs-you or Failed wash, so its verb is text in the
+  // attention or danger foreground on a transparent fill, tinted only on hover and press. A Ready row's Land stays an
+  // outline, so the ink primary is left to the page.
+  const verbVariant = workStatus?.status === 'needs-you' ? 'attention-text' : workStatus?.status === 'failed' ? 'danger-text' : 'outline'
   // A Needs-you or Failed title may take two lines (13/18, 550): it is the row you act on, so it reads whole.
   const wrapTitle = workStatus?.status === 'needs-you' || workStatus?.status === 'failed'
   // Colour in the list (round five T2): Needs you and Failed hold a soft wash of their hue after the arrival tint fades.
@@ -1944,9 +1945,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         // decide on, so more of it reads before you open the thread.
                         'dshx:min-w-0 dshx:flex-1',
                         ask === 'question' && askSubtitle === undefined ? 'dshx:line-clamp-2 dshx:break-words' : 'dshx:truncate',
-                        askSubtitle !== undefined
-                          ? 'dshx:text-sm/[18px] dshx:text-muted-foreground dshx:pointer-coarse:text-xs/[18px]'
-                          : (workStatus?.status === 'needs-you' || workStatus?.status === 'failed') && 'dshx:text-foreground',
+                        // The title is the row's ink; what it asks, runs or failed on reads under it in the secondary
+                        // ink at 13/18 (council round 8 B3).
+                        (askSubtitle !== undefined || workStatus?.status === 'needs-you' || workStatus?.status === 'failed') &&
+                          'dshx:text-sm/[18px] dshx:text-muted-foreground dshx:pointer-coarse:text-xs/[18px]',
                       )}
                       data-testid="thread-row-status-detail"
                     >
