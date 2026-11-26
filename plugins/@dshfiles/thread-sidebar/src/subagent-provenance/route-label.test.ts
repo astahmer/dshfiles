@@ -32,7 +32,31 @@ describe('subagent route labels', () => {
     expect(SubagentRouteLabelModel.displayedAgentRouteLabel('openai/gpt-6.1-luna', fallback)).toBe('openai/gpt-6.1-luna')
     expect(SubagentRouteLabelModel.displayedAgentRouteLabel(null, fallback)).toBe('in-process')
     expect(SubagentRouteLabelModel.projectedRouteLabel('alex@example.com/gpt-6.1-luna')).toBeUndefined()
-    expect(SubagentRouteLabelModel.projectedRouteLabel('openai/gpt-6.1-luna/other')).toBeUndefined()
+    expect(SubagentRouteLabelModel.projectedRouteLabel('openai/')).toBeUndefined()
+  })
+
+  it('keeps a model id that carries a vendor path: the provider ends at the first "/" (round 21 D1)', () => {
+    const account = 'dshx_fake_commandcode'
+    // One slash in the model, two in the label.
+    expect(SubagentRouteLabelModel.providerModelLabel(account, 'deepseek/deepseek-v4-flash')).toBe(`${account}/deepseek/deepseek-v4-flash`)
+    expect(SubagentRouteLabelModel.projectedRouteLabel(`${account}/google/gemini-3.8-flash`)).toBe(`${account}/google/gemini-3.8-flash`)
+    expect(SubagentRouteLabelModel.routeOf(`${account}/google/gemini-3.8-flash`)).toEqual({ provider: account, model: 'google/gemini-3.8-flash' })
+    // Two slashes in the model (an OpenRouter-style path).
+    expect(SubagentRouteLabelModel.providerModelLabel('openrouter', 'meta/llama/llama-5-70b')).toBe('openrouter/meta/llama/llama-5-70b')
+    expect(
+      SubagentRouteLabelModel.subagentRoute({ route: null, identity: undefined, requested: { provider: account, model: 'google/gemini-3.8-flash' } }),
+    ).toEqual({ provider: account, model: 'google/gemini-3.8-flash' })
+    // An email-like or generated-handle provider stays hidden, whatever the model.
+    expect(SubagentRouteLabelModel.providerModelLabel('alex@example.com', 'deepseek/deepseek-v4-flash')).toBeUndefined()
+    expect(SubagentRouteLabelModel.projectedRouteLabel('alex@example.com/deepseek/deepseek-v4-flash')).toBeUndefined()
+    expect(SubagentRouteLabelModel.providerModelLabel('openai/compat', 'gpt-6-luna')).toBeUndefined()
+    // A secret in any path segment stays hidden; so do empty segments and a blank model.
+    expect(SubagentRouteLabelModel.providerModelLabel(account, 'vendor/secret-token')).toBeUndefined()
+    expect(SubagentRouteLabelModel.providerModelLabel(account, 'vendor/sk-proj-0123456789abcdef')).toBeUndefined()
+    expect(SubagentRouteLabelModel.providerModelLabel(account, 'deepseek//flash')).toBeUndefined()
+    expect(SubagentRouteLabelModel.providerModelLabel(account, 'deepseek/')).toBeUndefined()
+    expect(SubagentRouteLabelModel.providerModelLabel(account, '  ')).toBeUndefined()
+    expect(SubagentRouteLabelModel.providerModelLabel(account, undefined)).toBeUndefined()
   })
 
   it('names the model a subagent runs on from its real route, then its descriptor, then its call; never a backend (council round 17 B1.1)', () => {

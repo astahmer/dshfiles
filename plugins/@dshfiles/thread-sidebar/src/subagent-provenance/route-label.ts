@@ -22,17 +22,32 @@ export interface SubagentModelRoute {
 
 export class SubagentRouteLabelModel {
   private static readonly routePartPattern = /^[a-z\d][a-z\d._:-]{0,95}$/iu
+  /** A model id may carry a vendor path (`deepseek/deepseek-v4-flash`, round 21 D1): non-empty segments, 160 at most. */
+  private static readonly modelPartPattern = /^[a-z\d][a-z\d._:-]*(?:\/[a-z\d][a-z\d._:-]*)*$/iu
+  private static readonly modelPartMaxLength = 160
+  /** The longest label a provider and a model can make: 96 + "/" + 160. */
+  static readonly routeLabelMaxLength = 96 + 1 + 160
   private static readonly sensitiveRoutePattern =
     /@|%40|(?:^|[-_.])(?:api[-_]?key|access[-_]?token|bearer|secret|credential|password|token|private[-_]?key)(?:$|[-_.])/iu
   private static readonly knownSecretPrefixPattern = /^(?:sk|rk|pk|gh[pousr]s|xox[baprs])[-_][a-z\d._-]{8,}$/iu
 
+  private static readonly sensitive = (part: string): boolean =>
+    SubagentRouteLabelModel.sensitiveRoutePattern.test(part) || SubagentRouteLabelModel.knownSecretPrefixPattern.test(part)
+
   static readonly visibleRoutePart = (value: string | undefined): string | undefined => {
+    const normalized = value?.trim()
+    if (normalized === undefined || !SubagentRouteLabelModel.routePartPattern.test(normalized) || SubagentRouteLabelModel.sensitive(normalized)) return undefined
+    return normalized
+  }
+
+  /** A model id, vendor path included; each segment gets the same secret screens as a provider. */
+  static readonly visibleModelPart = (value: string | undefined): string | undefined => {
     const normalized = value?.trim()
     if (
       normalized === undefined ||
-      !SubagentRouteLabelModel.routePartPattern.test(normalized) ||
-      SubagentRouteLabelModel.sensitiveRoutePattern.test(normalized) ||
-      SubagentRouteLabelModel.knownSecretPrefixPattern.test(normalized)
+      normalized.length > SubagentRouteLabelModel.modelPartMaxLength ||
+      !SubagentRouteLabelModel.modelPartPattern.test(normalized) ||
+      normalized.split('/').some(SubagentRouteLabelModel.sensitive)
     )
       return undefined
     return normalized
@@ -40,15 +55,16 @@ export class SubagentRouteLabelModel {
 
   static readonly providerModelLabel = (provider: string | undefined, model: string | undefined): string | undefined => {
     const visibleProvider = SubagentRouteLabelModel.visibleRoutePart(provider)
-    const visibleModel = SubagentRouteLabelModel.visibleRoutePart(model)
+    const visibleModel = SubagentRouteLabelModel.visibleModelPart(model)
     return visibleProvider === undefined || visibleModel === undefined ? undefined : `${visibleProvider}/${visibleModel}`
   }
 
+  /** A stored label: the provider ends at the first "/", the rest is the model (which may hold more). */
   static readonly projectedRouteLabel = (value: ThreadSidebarModelRoute | undefined): string | undefined => {
-    const parsed = Schema.decodeUnknownResult(Schema.String.check(Schema.isMaxLength(193)))(value)
+    const parsed = Schema.decodeUnknownResult(Schema.String.check(Schema.isMaxLength(SubagentRouteLabelModel.routeLabelMaxLength)))(value)
     if (Result.isFailure(parsed)) return undefined
     const separator = parsed.success.indexOf('/')
-    if (separator <= 0 || separator !== parsed.success.lastIndexOf('/')) return undefined
+    if (separator <= 0) return undefined
     return SubagentRouteLabelModel.providerModelLabel(parsed.success.slice(0, separator), parsed.success.slice(separator + 1))
   }
 

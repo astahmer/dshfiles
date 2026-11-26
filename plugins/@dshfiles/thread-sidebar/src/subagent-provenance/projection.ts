@@ -5,7 +5,7 @@ import { SubagentRouteLabelModel } from './route-label.js'
 import type { ThreadSidebarModelRoute } from './projection-types.js'
 import { SchemaHelpers } from '../schema-helpers.js'
 
-const routeLabelSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(193)))
+const routeLabelSchema = Schema.NullOr(Schema.String.check(Schema.isMaxLength(SubagentRouteLabelModel.routeLabelMaxLength)))
 
 const assistantRouteEventSchema = Schema.Struct({
   type: Schema.Literal('assistant/message'),
@@ -55,5 +55,6 @@ export const threadSidebarModelRouteProjection = {
   },
   wire: { viewSchema: zodSchemaFromEffect(routeLabelSchema), view: state => state },
   // 2: the fold reads the child's descriptor too, so older checkpoints refold.
-  stateVersion: 2,
+  // 3: a model id may carry a vendor path (`deepseek/deepseek-v4-flash`, round 21 D1); those children stored null.
+  stateVersion: 3,
 } satisfies ProjectionDefinition<'threadSidebarModelRoute', ThreadSidebarModelRoute>
