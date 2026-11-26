@@ -342,8 +342,10 @@ work on any surface.
    Things. **Selected edge.** Such a row adds `selected-edge` beside its wash (council round 12 A1; `SELECTED_EDGE` in
    `components/selection`): a neutral 1px inset edge, `--dshx-selected-edge` (light `#88827d`, dark `#7f7974`; the
    council's `#a39b93` held only 2.26:1 on the light wash), 3:1 against the wash on the page, the nav column and a
-   dialog, because the wash alone sits about 1.1:1 off the dark page. An inset shadow, so it moves nothing. The current
-   thread row and an account row take it; a pill row never does. The kit finds its own leading
+   dialog, because the wash alone sits about 1.1:1 off the dark page. An inset shadow, so it moves nothing. **Selected edge only where it is needed.** The current
+   thread row, an account row and the palette's active result take it (council round 13); a row with a place tile (the
+   Settings column, the Backlog, Usage and Review rows of the side columns) does not: its tile, wash and 550 title
+   already carry the selection. A pill row never does. The kit finds its own leading
    `StatusGlyph`, `ProjectMark`, `PlaceGlyph`, `ModelMark` and `NativeProviderMark`; a plugin row marks its own glyph
    with `LEADING_GLYPH_ATTRIBUTE` or opts the row out with `MARKER_OPT_OUT` (`components/selection`). Only plain-text
    rows keep the pill, and one exception: a selected Needs-you or Failed row keeps it (`MARKER_KEEP`,
@@ -370,7 +372,9 @@ work on any surface.
    figures; the chart library's own 68–78% opacity and 10–11px are overridden, and the frame's own text is the 12px meta
    step, so no chart text is under 12px (council round 10 A8). The interactive legend takes the size only, so a hidden
    series keeps its dimmed label. Gridlines and value labels on marks stay quiet.
-   **Spend map breakdown.** `SpendMap` `picker="segments"` shows one dimension at a time: a "Breakdown by" segmented
+   **Nice value domains.** A value axis is `.nice()`d: its top tick is the next round step above the largest mark (a
+   55K bar under a 60K tick), so no mark touches the chart's ceiling (council round 13).
+   **Spend map breakdown.** `SpendMap` `picker="segments"` shows one dimension at a time: a "Share by" segmented
    control (Models / Accounts / Projects / Purpose) above the flow of the selected dimension only, which spans the card
    width so its labels show in full; the caption names the active metric and its unit (council round 10 D1).
 9. **Diff and syntax.** The transcript's code blocks and the diff view share one syntax pair: Shiki's `css-variables`
@@ -416,10 +420,11 @@ work on any surface.
     tile of that tone, a 24px seat (`PlaceGlyph`, `components/ui/place-glyph`: `tone` for a nav place, `toneColor`
     for any identity tone; or `dshx:place-seat` with your own size and radius). The seat lights from the row's own
     `aria-current`, a tab's `aria-selected="true"` or Dockview's `.dv-active-tab`, and keeps its size either way, so
-    selecting never moves a row. **Phone tab bar: colour on the current tab only** (council round 12, reversing round
+    selecting never moves a row. **Phone tab bar: one neutral pill, colour in the glyph** (council round 12, reversing round
     9 B3: on iOS a tinted glyph means selected, so tinted neighbours pulled the eye away from the current tab). Unselected
-    glyphs are the tertiary ink; the current one is drawn in its tone on its tile with a 600 label; Inbox keeps its
-    badge. The desktop rail keeps its always-toned glyphs: it is a launcher, not a tab bar. The selection bar, the
+    glyphs are the tertiary ink. Every current tab takes the same neutral selected pill (the selected wash; council
+    round 13: a blue pill on Threads and a grey one on Inbox read as a bug), with its glyph in its tone and a 600 label;
+    Inbox's glyph is the ink, with its badge. The desktop rail keeps its always-toned glyphs: it is a launcher, not a tab bar. The selection bar, the
     wash and the label stay neutral ink: only the glyph and its tile carry colour. Page `h1` marks stay glyph-only.
     Glyph 3:1 and the ink label AA on the tile over bg, panel, raised and the selection wash, for every nav and
     identity tone (`plugin-ui/tests/place-glyph.test.tsx`).
@@ -524,7 +529,9 @@ status glyph, the full title (wrapping to two lines, never cut for metadata) and
 from the card edge. Line 2: the `ProjectMark`, the kind (Approval, Question, Turn failed…) and the age, at 13/400 in
 secondary ink. Titles win over the fold. **Triage** is a worded 44px text button in the top bar's trailing seats,
 beside ⋯ (council round 11 C1: its label, never an icon alone); the Needs you / Other / Done segmented row carries no
-Triage control. When Needs you holds more than one status, its segment counts them as a tally (◆ 2 · ✕ 1: each
+Triage control. **Bar text buttons.** Every worded action in a phone top bar is `Button variant="bar"` (council
+round 13): the secondary label at 500 with a 16px glyph 6px before it (Triage: list-checks), no fill at rest, on the
+44px seat, so it reads as a control, never as a second title. When Needs you holds more than one status, its segment counts them as a tally (◆ 2 · ✕ 1: each
 status glyph and its tabular number 4px apart, no pill, a muted dot between; `PageTab` `statusCounts`, phone shell
 only), so a failure below the fold shows at first glance.
 
@@ -594,6 +601,12 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   message column. Everything docked above the composer shares the composer card's fill, but only the editable card
   keeps the field edge: the dock's outline and its internal dividers are `border-l2` (`#dedcda` / `#2f2c29`; council
   round 12 C1, after the dividers took the 3:1 edge), on desktop and phone.
+- **Composer send.** The send arrow sits in a 28px circle (32px on a phone): the raised fill with a faint glyph while
+  there is nothing to send, the ink fill with the inverse glyph once it can send (council round 13). It is the one
+  filled mark in the composer bar.
+- **New thread chips: one style.** Resume, Inbox and the starters under the new-thread composer share one chip:
+  32px tall, radius 8, the raised fill, no border, 12px side padding, 8px apart. Resume and Inbox come first, then a
+  1 × 16px divider, then the starters (council round 13).
 - **One Settings navigation.** While any Settings page is on stage (General or another), the side column stays open
   and lists, once each, the preference categories (General, Appearance, Keyboard shortcuts, Thread list, Layout,
   Composer, Transcript, Editor, Models & accounts…, grouped) and the Settings pages (AI accounts, MCP servers,

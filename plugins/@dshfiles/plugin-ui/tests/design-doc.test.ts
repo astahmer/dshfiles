@@ -310,7 +310,7 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '**Verbs on a head band**',
       '`Button band`: 20% at rest, 26% on hover, 32% pressed',
       '`control-on-dense`, `oklch(0.50 0.01 65)`',
-      '**Phone tab bar: colour on the current tab only**',
+      '**Phone tab bar: one neutral pill, colour in the glyph**',
       'Unselected\n    glyphs are the tertiary ink',
       '**Triage** is a worded 44px text button in the top bar',
       'only the editable card\n  keeps the field edge',
@@ -322,5 +322,28 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('every destination glyph is drawn in its tone at rest')
     expect(design).not.toContain("shares the composer card's two edges")
     expect(design).not.toContain("the composer card's ring as the one shared edge")
+  })
+
+  it('records the thirteenth council pass: one tab-bar pill, the edge only where needed, the send seat, one chip, bar text buttons, nice domains (council round 13 A5)', () => {
+    for (const text of [
+      '**Phone tab bar: one neutral pill, colour in the glyph**',
+      'the same neutral selected pill',
+      '**Selected edge only where it is needed.**',
+      'a row with a place tile',
+      '**Composer send.**',
+      'a 28px circle (32px on a phone)',
+      '**New thread chips: one style.**',
+      '32px tall, radius 8, the raised fill, no border',
+      '**Bar text buttons.**',
+      '`Button variant="bar"`',
+      '`control-on-dense`, `oklch(0.50 0.01 65)`',
+      '**Nice value domains.**',
+      '`.nice()`',
+      'a "Share by" segmented',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: a toned tile on the current phone tab, the edge on place-tile rows, "Breakdown by".
+    expect(design).not.toContain('the current one is drawn in its tone on its tile with a 600 label')
+    expect(design).not.toContain('a "Breakdown by" segmented')
   })
 })
