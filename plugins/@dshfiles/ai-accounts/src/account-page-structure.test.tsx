@@ -145,10 +145,10 @@ describe('account detail sections (council round 3, D3)', () => {
     const effort = classOf('Default reasoning effort for GPT Six')
     const mode = classOf('Model settings mode')
     // The kit's quiet trigger (council round 10, A1/D2): filled, no edge at rest, the 3:1 edge on hover and when open.
-    for (const look of ['dshx:bg-trigger-fill', 'dshx:not-disabled:hover:border-field-border', 'dshx:h-(--dshx-control-h)']) {
+    for (const look of ['dshx:bg-trigger-fill', 'dshx:not-disabled:hover:border-field-border', 'dshx:h-(--dshx-control-h)']) expect(mode).toContain(look)
+    // An inherited effort rests as quiet text and takes the same trigger on hover, focus and open (council round 11, D2).
+    for (const look of ['dshx:hover:bg-trigger-fill', 'dshx:not-disabled:hover:border-field-border', 'dshx:h-(--dshx-control-h)'])
       expect(effort).toContain(look)
-      expect(mode).toContain(look)
-    }
     // A1's control height owns every field's height: no per-control override, the account search included.
     expect(source('model-curation.tsx')).not.toContain('dshx:h-8')
     expect(source('accounts-toolbar.tsx')).not.toContain('dshx:h-10')

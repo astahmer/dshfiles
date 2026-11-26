@@ -103,7 +103,8 @@ describe('reference Models table', () => {
     expect(effortHead?.className).toContain('dshx:w-36')
     const trigger = container.querySelector('[aria-label="Default reasoning effort for Model 0"]')
     const classes = (trigger?.getAttribute('class') ?? '').split(' ')
-    for (const look of ['dshx:w-fit', 'dshx:min-w-24', 'dshx:max-w-full', 'dshx:px-2']) expect(classes).toContain(look)
+    // An inherited value hugs its text (council round 11, D2); an overridden chip keeps the 96 px minimum (below).
+    for (const look of ['dshx:w-fit', 'dshx:max-w-full', 'dshx:px-2']) expect(classes).toContain(look)
     expect(classes).not.toContain('dshx:w-full')
     expect(classes).not.toContain('dshx:w-40')
   })
@@ -171,5 +172,45 @@ describe('reference Models table', () => {
     expect(head?.className).toContain('dshx:pl-16')
     expect(container.querySelector('tbody td > div')?.className).toContain('dshx:gap-2')
     expect(container.querySelector('tbody td')?.className).toContain('dshx:px-2')
+  })
+})
+
+describe('Models table cells (council round 11, D2)', () => {
+  const effortTrigger = (name: string): Element | null => container.querySelector(`[aria-label="Default reasoning effort for ${name}"]`)
+  const classesOf = (element: Element | null): string[] => (element?.getAttribute('class') ?? '').split(' ')
+
+  it('shows an inherited effort as 13 px secondary text with a small chevron, the trigger chrome on hover, focus and open', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true })
+    const trigger = effortTrigger('Model 0')
+    const classes = classesOf(trigger)
+    for (const look of ['dshx:text-sm', 'dshx:text-muted-foreground', 'dshx:border-transparent', 'dshx:bg-transparent']) expect(classes, look).toContain(look)
+    for (const look of ['dshx:hover:bg-trigger-fill', 'dshx:focus-visible:bg-trigger-fill', 'dshx:aria-expanded:bg-trigger-fill', 'dshx:hover:text-foreground'])
+      expect(classes, look).toContain(look)
+    // The kit trigger's hover, open and focus edges stay: only the rest look is quiet.
+    for (const look of ['dshx:not-disabled:hover:border-field-border', 'dshx:aria-expanded:border-field-border', 'dshx:focus-visible:border-ring'])
+      expect(classes, look).toContain(look)
+    expect(classes).toContain('dshx:[&>svg]:size-3')
+    // The chevron sits beside the value: the cell hugs it instead of the 96 px chip minimum.
+    expect(classes).toContain('dshx:min-w-0')
+    expect(classes).not.toContain('dshx:min-w-24')
+  })
+
+  it('keeps the trigger chrome on an overridden row', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false, reasoningDefaults: { 'model-0': 'low' } })
+    const trigger = effortTrigger('Model 0')
+    expect(trigger?.textContent).toBe('Low')
+    const classes = classesOf(trigger)
+    expect(classes).not.toContain('dshx:border-transparent')
+    expect(classes).not.toContain('dshx:bg-transparent')
+    expect(classes).toContain('dshx:bg-trigger-fill')
+    expect(classes).toContain('dshx:min-w-24')
+    expect(classesOf(effortTrigger('Model 1'))).toContain('dshx:bg-transparent')
+  })
+
+  it('draws the Show model checkboxes at the dense 16 px size', async () => {
+    await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
+    const boxes = [...container.querySelectorAll('[aria-label^="Show "][aria-label$=" in the picker"]')]
+    expect(boxes.length).toBeGreaterThan(0)
+    for (const box of boxes) expect(box.getAttribute('data-size')).toBe('sm')
   })
 })

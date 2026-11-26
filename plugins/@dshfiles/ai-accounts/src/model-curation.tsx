@@ -30,6 +30,14 @@ export type CurationPatch = Partial<
 >
 const PROVIDER_DEFAULT = '__provider-default__'
 
+/**
+ * An inherited effort at rest (council round 11, D2): 13 px secondary text with a 12 px chevron beside it (the cell hugs
+ * its value), no fill and no edge, so a column of "Auto" reads as values, not four settings. Hover, focus and open bring back the kit trigger: its fill, the
+ * ink and the edges `triggerLook` keeps for those states.
+ */
+const INHERITED_EFFORT =
+  'dshx:min-w-0 dshx:border-transparent dshx:bg-transparent dshx:text-muted-foreground dshx:[&>svg]:size-3 dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:focus-visible:bg-trigger-fill dshx:focus-visible:text-foreground dshx:aria-expanded:bg-trigger-fill dshx:aria-expanded:text-foreground'
+
 /** Provider inheritance suspends saved overrides; editing a row explicitly resumes account customization. */
 export const ModelCuration = (props: {
   readonly account: AccountDraft
@@ -217,12 +225,18 @@ export const ModelCuration = (props: {
                       ]}
                       onValueChange={value => setEffort(model, value)}
                       // The table's one field look, the same as the mode and search fields above it (council round 5, D2),
-                      // sized to its value so the width goes to model names (council round 7, D2).
-                      triggerClassName="dshx:w-fit dshx:min-w-24 dshx:max-w-full dshx:px-2 dshx:disabled:[&>svg]:hidden"
+                      // sized to its value so the width goes to model names (council round 7, D2). An inherited value is
+                      // quiet text with a small chevron; the chip shows on hover, focus and open, and on an overridden row
+                      // (council round 11, D2).
+                      triggerClassName={cn(
+                        'dshx:w-fit dshx:min-w-24 dshx:max-w-full dshx:px-2 dshx:disabled:[&>svg]:hidden',
+                        validEffort === undefined && INHERITED_EFFORT,
+                      )}
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">
                     <Checkbox
+                      size="sm"
                       aria-label={`Show ${model.name} in the picker`}
                       checked={!hidden.has(model.id)}
                       onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, checked !== true) })}
