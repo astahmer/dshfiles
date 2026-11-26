@@ -2566,7 +2566,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "kind": "module",
       "title": "@dshfiles/settings-shell/settings-icons",
       "summary": "One glyph per Settings category (round five B5, B6): the desktop column draws it at 16px beside each row, the phone root list as a 28px identity tile. Published as the `@dshfiles/settings-shell/settings-icons` dshx module, so the thread sidebar's Settings column draws the same glyph the page does without restating the…",
-      "publicSymbol": "SettingsIconGroup, SettingsEntryGlyph, SettingsEntryTile, SettingsIcons",
+      "publicSymbol": "SettingsIconGroup, SettingsEntryGlyph, SettingsEntryTile, SettingsToneMark, SettingsIcons",
       "importFrom": "@dshfiles/settings-shell/settings-icons",
       "owner": "@dshfiles/settings-shell",
       "scope": "client",
