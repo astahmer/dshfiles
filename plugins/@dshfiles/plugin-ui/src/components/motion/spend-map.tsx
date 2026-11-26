@@ -174,7 +174,8 @@ export function SpendMap({
             width={layout.width}
             height={layout.height}
           >
-            <g className="dshx:text-border">
+            {/* Inactive connectors: 1 px in the field neutral, visible on the card in both schemes (council round 8, D1). */}
+            <g className="dshx:text-(--dshx-field-border)">
               {links.map(link => (
                 <g key={link.id} data-spend-link={link.id} style={linkStyle(link.id)}>
                   <DrawnPath
@@ -210,7 +211,7 @@ export function SpendMap({
                 <g
                   key={link.id}
                   style={linkStyle(link.id)}
-                  className={cn('dshx:transition-colors dshx:duration-300', active ? 'dshx:text-foreground' : 'dshx:text-border')}
+                  className={cn('dshx:transition-colors dshx:duration-300', active ? 'dshx:text-foreground' : 'dshx:text-(--dshx-field-border)')}
                 >
                   <circle cx={ends[0]} cy={ends[1]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
                   <circle cx={ends[2]} cy={ends[3]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
@@ -369,6 +370,18 @@ function arcPath(radius: number): string {
   return `M ${point(START)} A ${radius} ${radius} 0 1 1 ${point(START + SWEEP)}`
 }
 
+/**
+ * The active node (council round 8, D1): the card surface itself, no grey fill or shadow, edged 1.5 px in its series
+ * colour at 60 %. The edge is an outline laid over the 1 px border (offset inward by its own width), so selecting a node
+ * never moves its content. The full-strength 2 px route into it stays the selection's 3:1 cue.
+ */
+const ACTIVE_NODE = 'dshx:outline-[length:1.5px] dshx:outline-solid dshx:-outline-offset-[1.5px]'
+
+/** The active edge colour: the node's series colour at 60 %, ink at 60 % when it has none. */
+const nodeEdge = (color: string | undefined): React.CSSProperties => ({
+  outlineColor: `color-mix(in oklab, ${color ?? 'var(--dsw-alias-label-primary)'} 60%, transparent)`,
+})
+
 function DimensionCard({
   dimension,
   selected,
@@ -391,9 +404,10 @@ function DimensionCard({
       aria-checked={selected}
       data-node-anchor={`dim:${dimension.id}`}
       onClick={onSelect}
+      style={selected ? nodeEdge(topColor) : undefined}
       className={cn(
-        'dshx:flex dshx:w-full dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:px-2.5 dshx:py-2 dshx:text-left dshx:outline-none dshx:transition-[background-color,border-color,box-shadow] dshx:duration-200 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-        selected ? 'dshx:border-foreground/25 dshx:bg-muted dshx:shadow-sm' : 'dshx:border-border dshx:bg-card dshx:hover:bg-accent/50',
+        'dshx:flex dshx:w-full dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-2.5 dshx:py-2 dshx:text-left dshx:outline-none dshx:transition-[background-color,outline-color] dshx:duration-200 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+        selected ? ACTIVE_NODE : 'dshx:hover:bg-accent/50',
       )}
     >
       <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:font-medium dshx:text-foreground dshx:[&_svg]:size-3.5 dshx:[&_svg]:text-muted-foreground">
@@ -451,9 +465,10 @@ function LeafCard({
       aria-checked={selected}
       data-node-anchor={anchor}
       onClick={onSelect}
+      style={selected ? nodeEdge(leaf.color) : undefined}
       className={cn(
-        'dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:px-2 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-[background-color,border-color,box-shadow,transform] dshx:duration-200 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:active:scale-[0.98]',
-        selected ? 'dshx:border-foreground/25 dshx:bg-muted dshx:shadow-sm' : 'dshx:border-border dshx:bg-card dshx:hover:bg-accent/50',
+        'dshx:flex dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-2 dshx:py-1.5 dshx:text-left dshx:outline-none dshx:transition-[background-color,outline-color,transform] dshx:duration-200 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:active:scale-[0.98]',
+        selected ? ACTIVE_NODE : 'dshx:hover:bg-accent/50',
       )}
     >
       <span

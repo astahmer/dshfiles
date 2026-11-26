@@ -97,3 +97,41 @@ describe('SpendMap › dimension colour (council round 7, D3)', () => {
     expect(card(render(), 'provider')).toContain('dshx:bg-muted-foreground/40')
   })
 })
+
+describe('SpendMap › active node and connectors (council round 8, D1)', () => {
+  const html = render('var(--dshx-data-2)')
+  const opening = (anchor: string): string => new RegExp(`<button[^>]*data-node-anchor="${anchor}"[^>]*>`, 'u').exec(html)?.[0] ?? ''
+
+  it('draws the active nodes on the card surface with a 1.5 px edge in their series colour at 60 %, no grey fill or shadow', () => {
+    for (const anchor of ['dim:model', 'leaf:model:a']) {
+      const node = opening(anchor)
+      expect(node).toContain('aria-checked="true"')
+      expect(node).toContain('outline-color:color-mix(in oklab, var(--dshx-data-2) 60%, transparent)')
+      // An outline drawn over the 1 px border: 1.5 px without moving the content (no layout shift).
+      expect(node).toContain('dshx:outline-[length:1.5px] dshx:outline-solid dshx:-outline-offset-[1.5px]')
+      expect(node).toContain('dshx:bg-card')
+      expect(node).not.toContain('dshx:bg-muted ')
+      expect(node).not.toContain('dshx:shadow')
+      // The base list's outline-none gives way to the edge (cn merges the outline style).
+      expect(node).not.toContain('dshx:outline-none')
+    }
+  })
+
+  it('falls back to ink at 60 % when the node has no series colour', () => {
+    const node = /<button[^>]*aria-checked="true"[^>]*data-node-anchor="leaf:model:a"[^>]*>/u.exec(render())?.[0] ?? ''
+    expect(node).toContain('outline-color:color-mix(in oklab, var(--dsw-alias-label-primary) 60%, transparent)')
+  })
+
+  it('keeps inactive nodes on the plain 1 px hairline', () => {
+    const node = opening('leaf:model:b')
+    expect(node).toContain('aria-checked="false"')
+    expect(node).toContain('dshx:border-border')
+    expect(node).not.toContain('outline-solid')
+  })
+
+  it('draws inactive connectors 1 px in the visible field neutral, not the hairline border', () => {
+    const base = /<g class="([^"]*)"><g data-spend-link=/u.exec(html)?.[1]
+    expect(base).toBe('dshx:text-(--dshx-field-border)')
+    expect(html).not.toContain('dshx:text-border')
+  })
+})
