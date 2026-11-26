@@ -44,6 +44,6 @@ describe('phone thread list density (round five B1)', () => {
     expect(client).toContain('dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]')
     // 8px reclaimed above the first group: 4px over the search, 4px from the project row's touch height.
     expect(shell).toContain("'dshx:fixed dshx:inset-x-0 dshx:z-40 dshx:flex dshx:flex-col dshx:bg-(--dsw-specific-sidebar-fill) dshx:pt-1 dshx:text-foreground'")
-    expect(client).toContain('triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:text-base dshx:font-medium dshx:hover:bg-accent dshx:pointer-coarse:h-7"')
+    expect(client).toContain('triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:pointer-coarse:h-7"')
   })
 })

@@ -6596,7 +6596,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // The trigger keeps the former filter button's accessible name, "Filter: <active filters>".
           // On touch the row sits 4px under the 44px search and directly over the first group head (council round 6 B8).
           <header className="dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0">
-            <div className="dshx:flex dshx:items-center dshx:gap-1">
+            {/* Filter-row grammar (council round 8 B2): beside the search field, both value-showing triggers take the field
+                look, 8px apart; their values in ink at the body weight. */}
+            <div className="dshx:flex dshx:items-center dshx:gap-2">
               <Combobox
                 contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
                 emptyLabel={props.tSidebar('threadSidebarProjectSearchEmpty')}
@@ -6607,7 +6609,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 searchLabel={props.tSidebar('threadSidebarProjectSearch')}
                 searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
                 // 28px on touch, its 44px hit area from the kit (council round 7 B4), like the group heads under it.
-                triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:justify-between dshx:border-0 dshx:bg-transparent dshx:px-2.5 dshx:text-base dshx:font-medium dshx:hover:bg-accent dshx:pointer-coarse:h-7"
+                triggerClassName="dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:pointer-coarse:h-7"
                 triggerContent={
                   <>
                     <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
@@ -6622,9 +6624,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 <DropdownMenuTrigger asChild>
                   <Button
                     type="button"
-                    variant={listFiltered ? 'secondary' : 'ghost'}
+                    // The field look whether or not a filter is on: its value names the active filter.
+                    variant="field"
                     size="sm"
                     data-thread-list-filter=""
+                    data-filtered={listFiltered ? '' : undefined}
                     // The list's keyboard model treats the view control as the way into the rows (thread-list-navigation.ts).
                     data-thread-list-view-button=""
                     // Arrow keys from the trigger move into the list, as the former view tabs did; Enter or Space opens it.
@@ -6634,7 +6638,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       navigateThreadList(event.nativeEvent)
                       event.preventDefault()
                     }}
-                    className="dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground"
+                    className="dshx:h-8 dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-sm dshx:pointer-coarse:h-7"
                     // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
                     // filters it holds; the Status and Source rows inside the menu still spell those out.
                     aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}`}
