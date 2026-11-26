@@ -10505,6 +10505,9 @@ importers:
 
   plugins/@dshfiles/workspace-folder-picker:
     dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: 'catalog:'
+        version: 3.19.0
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
