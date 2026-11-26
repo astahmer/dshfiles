@@ -399,12 +399,13 @@ const InboxRow = (props: {
                   <Button
                     key={choice.id}
                     size="sm"
-                    variant={choice.recommended === true ? 'attention' : 'outline'}
+                    variant={InboxView.answerVariant(choice.recommended === true)}
                     // On a phone each option is a full-width row of at least 44 px: a long answer wraps inside it and
                     // reads in full (round five C3), and the row is easy to hit.
                     className={cn(
                       'dshx:shrink dshx:max-w-full',
                       INBOX_CHIP,
+                      InboxView.ANSWER,
                       'dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start',
                       'dshx:pointer-coarse:h-auto dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:py-2.5 dshx:pointer-coarse:whitespace-normal',
                     )}

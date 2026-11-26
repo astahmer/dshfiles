@@ -34,8 +34,9 @@ const Question = (props: { readonly item: AttentionItem; readonly t: InboxTransl
           <Button
             key={choice.id}
             size="sm"
-            variant={choice.recommended === true ? 'default' : 'outline'}
-            className={`dshx:max-w-full dshx:shrink ${INBOX_CHIP}`}
+            // Council round 11 C6: quiet triggers, the recommended answer by its tint only (as in the Inbox).
+            variant={InboxView.answerVariant(choice.recommended === true)}
+            className={`dshx:max-w-full dshx:shrink ${INBOX_CHIP} ${InboxView.ANSWER}`}
             disabled={answer.isPending || answer.data?.ok === true}
             onClick={() => answer.mutate(choice.id)}
           >

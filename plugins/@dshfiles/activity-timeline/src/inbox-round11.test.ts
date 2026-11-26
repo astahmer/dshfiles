@@ -70,3 +70,19 @@ describe('the desktop Inbox card (council round 11 C2)', () => {
     expect(menu).toContain('InboxView.MENU_AFTER_VERB')
   })
 })
+
+describe('question options (council round 11 C6)', () => {
+  const dock = readFileSync(new URL('./thread-question-dock.tsx', import.meta.url), 'utf8')
+  it('draws unselected answers as quiet triggers and the recommended one by its tint only, at one weight', () => {
+    expect(InboxView.answerVariant(false)).toBe('field')
+    expect(InboxView.answerVariant(true)).toBe('attention')
+    expect(InboxView.ANSWER).toBe('dshx:font-normal')
+    const answers = panel.slice(panel.indexOf('item.choices.map('), panel.indexOf('data-inbox-recommended'))
+    expect(answers).toContain('variant={InboxView.answerVariant(choice.recommended === true)}')
+    expect(answers).toContain('InboxView.ANSWER,')
+    expect(answers).not.toContain("'outline'")
+    // The thread's question dock answers the same way: no ink fill for the recommended answer.
+    expect(dock).toContain('variant={InboxView.answerVariant(choice.recommended === true)}')
+    expect(dock).not.toContain("'default' : 'outline'")
+  })
+})

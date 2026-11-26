@@ -72,6 +72,14 @@ const attentionVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'ou
   status === 'needs-you' ? 'attention' : status === 'failed' ? 'danger-tint' : 'outline'
 
 /**
+ * A question's answers (council round 11 C6): each is the kit's quiet trigger (`field`: the trigger fill and its
+ * hairline at rest, the 3:1 edge on hover), and the recommended one differs by its tint only (`attention`). Both at
+ * the body weight, so the tint is the one difference; the recommendation is also said in words.
+ */
+const answerVariant = (recommended: boolean): 'attention' | 'field' => (recommended ? 'attention' : 'field')
+const ANSWER = 'dshx:font-normal'
+
+/**
  * The verb in a card's head sits on its wash (council round 9 C3): a Failed head is already red, so its verb is red
  * text, not a red fill on a red row.
  */
@@ -467,6 +475,8 @@ export class InboxView {
   static readonly severityGlyph = severityGlyph
   static readonly statusOf = statusOf
   static readonly attentionVariant = attentionVariant
+  static readonly answerVariant = answerVariant
+  static readonly ANSWER = ANSWER
   static readonly headVariant = headVariant
   static readonly headerBand = headerBand
   static readonly CARD = CARD

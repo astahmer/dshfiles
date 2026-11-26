@@ -12,7 +12,8 @@ describe('Inbox colour on things you act on (round five P2)', () => {
     expect(InboxView.attentionVariant('needs-you')).toBe('attention')
     expect(InboxView.attentionVariant('failed')).toBe('danger-tint')
     expect(InboxView.attentionVariant('ready')).toBe('outline')
-    expect(row).toContain("variant={choice.recommended === true ? 'attention' : 'outline'}")
+    // Council round 11 C6: quiet triggers, the recommended answer by its tint (inbox-round11.test.ts).
+    expect(row).toContain('variant={InboxView.answerVariant(choice.recommended === true)}')
     // A Failed head's verb is red text on its red band (council round 9 C3); a body verb keeps the tint rung.
     expect(row).toContain("place === 'head' ? InboxView.headVariant(status) : InboxView.attentionVariant(status)")
   })
