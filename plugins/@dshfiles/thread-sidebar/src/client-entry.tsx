@@ -958,6 +958,7 @@ export default defineClient({
       working: translate('subagentPreviewWorking'),
       done: translate('subagentPreviewFinished'),
       stopped: translate('subagentPreviewInterrupted'),
+      failed: translate('subagentPreviewFailed'),
     }
     const subagentCatalogActions = (_parentSessionId: SessionId): SubagentCatalogInjected => ({
       openChild(address: SubagentAddress) {

@@ -7,6 +7,10 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentHeaderLineageProps } from './SubagentHeaderLineage.js'
 
+/** The Host's failed-turn record the menu reads (round 21 D4); a test fills it per case. */
+const failedTurns = vi.hoisted(() => new Map<string, { readonly sessionId: string; readonly failedAt: number; readonly reason: 'error' | 'max-tokens' }>())
+vi.mock('./subagent-failed-turns.js', () => ({ useSubagentFailedTurns: () => failedTurns }))
+
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconChevronDownOutlineRegular: () => null,
   IconChevronRightOutlineRegular: () => null,
@@ -139,14 +143,17 @@ const props = (): SubagentHeaderLineageProps => ({
   openChild: vi.fn(),
   openChildAside: vi.fn(),
   refreshProjection: vi.fn(),
-  copy: { count: count => `${String(count)} ${count === 1 ? 'subagent' : 'subagents'}`, working: 'Working', done: 'Done', stopped: 'Stopped' },
+  copy: { count: count => `${String(count)} ${count === 1 ? 'subagent' : 'subagents'}`, working: 'Working', done: 'Done', stopped: 'Stopped', failed: 'Failed' },
   sessionId: CHILD,
   lineageSessionId: CHILD,
   displayTitle: 'worker',
   t: translate,
 })
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  failedTurns.clear()
+})
 
 describe('SubagentHeaderLineage route provenance', () => {
   it('keeps the model in the child header as the kit mark and name, out of the catalog row (council round 17 B1.1)', () => {
@@ -204,6 +211,24 @@ describe('SubagentHeaderLineage route provenance', () => {
     expect(row.textContent).toContain('5m 00s')
     expect(row.textContent).not.toMatch(/tok|once call/u)
     expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('done')
+  })
+
+  it('shows a child whose turn failed as Failed, and keeps Stopped for one the user stopped (round 21 D4)', () => {
+    const ended: SessionListState = {
+      ...sessionList,
+      byId: { [CHILD]: { ...childSummary, projectionValues: { ...childSummary.projectionValues, subagentTiming: { settledMs: 0, lastTurnCompleted: false } } } },
+    }
+    failedTurns.set(CHILD, { sessionId: CHILD, failedAt: 1, reason: 'error' })
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(ended)} />)
+    fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
+    const failed = screen.getByRole('treeitem', { name: /^worker · Failed/ })
+    expect(failed.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
+    cleanup()
+    failedTurns.clear()
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(ended)} />)
+    fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
+    const stopped = screen.getByRole('treeitem', { name: /^worker · Stopped/ })
+    expect(stopped.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('stopped')
   })
 
   it('hovers the catalog open and closed with its delays, and a click pins it open', () => {

@@ -14,6 +14,8 @@ import { createHoverIntentMachine, useMachine } from '@dshfiles/plugin-ui/machin
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
 import { SubagentRouteLabelModel } from './route-label.js'
+import { SubagentFeedModel } from './subagent-feed.js'
+import { useSubagentFailedTurns } from './subagent-failed-turns.js'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-token-meter/client'
 import css from './SubagentHeaderLineage.module.css'
@@ -82,6 +84,7 @@ export interface SubagentCatalogCopy {
   readonly working: string
   readonly done: string
   readonly stopped: string
+  readonly failed: string
 }
 
 /** Business actions supplied by the slot registration. */
@@ -152,19 +155,28 @@ function isKnownLeaf(catalog: SubagentCatalogSnapshot | undefined): boolean {
   return catalog?.state === 'ready' && catalog.entries.length === 0
 }
 
-/** A child's glyph in the popover: working, done or stopped; nothing while neither is known, and never Idle. */
-const rowStateOf = (input: { readonly external: boolean; readonly running: boolean; readonly lastTurnCompleted: boolean | undefined }): StatusGlyphState | undefined => {
+/**
+ * A child's glyph in the popover: working, done, failed or stopped (round 21 D4: the same terminal state as the
+ * transcript and the list); nothing while none is known, and never Idle.
+ */
+const rowStateOf = (input: {
+  readonly external: boolean
+  readonly running: boolean
+  readonly failedTurn: boolean
+  readonly lastTurnCompleted: boolean | undefined
+}): StatusGlyphState | undefined => {
   if (input.external) return undefined
   if (input.running) return 'working'
-  if (input.lastTurnCompleted === true) return 'done'
-  if (input.lastTurnCompleted === false) return 'stopped'
-  return undefined
+  const terminal = SubagentFeedModel.terminalOf(input)
+  if (terminal === 'completed') return 'done'
+  return terminal
 }
 
 const stateWordOf = (copy: SubagentCatalogCopy, state: StatusGlyphState | undefined): string | undefined => {
   if (state === 'working') return copy.working
   if (state === 'done') return copy.done
   if (state === 'stopped') return copy.stopped
+  if (state === 'failed') return copy.failed
   return undefined
 }
 
@@ -186,6 +198,7 @@ function CatalogRows({
   t,
 }: CatalogRowsProps & { t: TranslateNS<typeof NS> }) {
   const [now, setNow] = useState(() => Date.now())
+  const failedTurns = useSubagentFailedTurns()
   const running = catalog.entries.some(entry => entry.activity === 'running')
   useEffect(() => {
     if (!running) return
@@ -229,7 +242,12 @@ function CatalogRows({
         const runningEntry = entry.activity === 'running'
         // The row is the child's glyph, its description and how long it worked; the child's own title (often the raw
         // prompt), its mode, its route and a token count stay out of it (C13).
-        const rowState = rowStateOf({ external, running: runningEntry, lastTurnCompleted: summary?.projectionValues?.subagentTiming?.lastTurnCompleted })
+        const rowState = rowStateOf({
+          external,
+          running: runningEntry,
+          failedTurn: failedTurns.has(entry.id),
+          lastTurnCompleted: summary?.projectionValues?.subagentTiming?.lastTurnCompleted,
+        })
         const stateWord = stateWordOf(copy, rowState)
         const durationMs = activityDuration(summary, entry.activity, now)
         const duration = durationMs === undefined ? undefined : formatElapsed(durationMs)
