@@ -656,9 +656,10 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   edit, shell and subagent in identity tones; read and search neutral). A work row (a turn's "Worked for" header, a
   tool call, a summary line) is as wide as its content and no wider than that column; its duration or count follows the label after 8px, and its
   hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
-  message column. Everything docked above the composer shares the composer card's fill, but only the editable card
-  keeps the field edge: the dock's outline and its internal dividers are `border-l2` (`#dedcda` / `#2f2c29`; council
-  round 12 C1, after the dividers took the 3:1 edge), on desktop and phone.
+  message column. Everything docked above the composer shares the composer card's fill. The Live work dock's top and
+  side edges take the card's 3:1 field edge, so dock and composer read as one field; its internal dividers (between
+  rows, and where a subagents dock joins a jobs dock) stay `border-l2` hairlines (`#dedcda` / `#2f2c29`; council round
+  19 C2, reversing round 12 C1's quiet outline), on desktop and phone.
 - **Composer send.** The send arrow sits in a 28px circle (32px on a phone): the raised fill with a faint glyph while
   there is nothing to send, the ink fill with the inverse glyph once it can send (council round 13). It is the one
   filled mark in the composer bar.
@@ -957,8 +958,8 @@ raised and the selected wash; dark keeps the brand colour (`plugin-ui/tests/rout
 **Dock row grammar** (council round 8 C3): every dock row reads `› glyph · Label · detail · elapsed · worded link ↗`,
 with one leading chevron per row: the label 13/500 sans ("Running" for a job), the detail 13 regular (a job's command
 in mono). The desktop dock attaches to the composer: the composer fill (`--dsw-specific-input-major`), the dock's top
-corners at `--dsw-radius-lg` and its bottom square, its outline and dividers in the quiet `border-l2` while the
-editable card alone keeps the 3:1 field edge, and the card's top corners square under the dock.
+corners at `--dsw-radius-lg` and its bottom square, its top and side edges the card's 3:1 field edge and its
+dividers the quiet `border-l2`, and the card's top corners square under the dock.
 
 **PageSection.** `h2` (section title) that names its `section` region, optional muted meta ("3 enabled") and actions.
 

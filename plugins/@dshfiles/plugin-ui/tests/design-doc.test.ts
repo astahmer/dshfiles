@@ -314,7 +314,8 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '**Phone tab bar: one neutral pill, colour in the glyph**',
       'Unselected\n    glyphs are the tertiary ink',
       '**Triage** is a worded 44px text button in the top bar',
-      'only the editable card\n  keeps the field edge',
+      // Council round 19 C2 reversed the quiet dock outline: dock and composer now share the field edge.
+      'so dock and composer read as one field',
     ])
       expect(design, text).toContain(text)
     // Retired by this pass: Triage kept out of the top bar, every tab-bar glyph toned at rest, the dock sharing the
