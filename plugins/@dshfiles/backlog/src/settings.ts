@@ -221,6 +221,15 @@ export const backlogSettings = defineSettings({
       .description(
         'Standing instructions per project that open each thread started from its items, edited in the Projects view.',
       ),
+    tagColors: Schema.array(
+      Schema.object({
+        tag: Schema.string().required().description('The tag as items store it, without the #.'),
+        slot: Schema.natural().max(5).required().description('A colour of the active theme’s identity palette, 0 to 5.'),
+      }),
+    )
+      .default([])
+      .hidden()
+      .description('Colours chosen for tags from a tag chip’s menu, shared by every browser. A tag without one keeps its default colour.'),
   }),
   applies: 'live',
 })

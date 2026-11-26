@@ -278,6 +278,9 @@ const listInputSchema = Schema.Struct({
   limit: Schema.Number.check(Schema.isInt(), Schema.isGreaterThan(0), Schema.isLessThanOrEqualTo(2_000)).pipe(Schema.optional),
 })
 
+/** A colour of the active theme's identity palette (the kit's six project tones). */
+const tagColorSlotSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(5))
+
 const listOutputSchema = Schema.Struct({
   revision: Schema.Number.check(Schema.isFinite()),
   total: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
@@ -288,6 +291,10 @@ const listOutputSchema = Schema.Struct({
   ),
   /** backlog_ready: the agent guidance of the projects its items belong to. */
   guidance: Schema.optionalKey(Schema.Array(Schema.Struct({ project: Schema.String, guidance: Schema.String }))),
+  /** Colours the user chose for the listed items' tags; a tag left out keeps its default. A Host older than tag colours sends none. */
+  tagColors: Schema.optionalKey(Schema.Array(Schema.Struct({ tag: Schema.String, slot: tagColorSlotSchema }))).annotate({
+    description: "Colours chosen for the listed items' tags: a slot 0–5 of the active theme's identity palette. Tags not listed keep their default colour.",
+  }),
 })
 
 const previewText = (text: string): string => text.trim().replace(/\s+/g, ' ').slice(0, 240)
@@ -1311,6 +1318,18 @@ export const backlogApi = defineApi({
       description:
         'Set one project’s standing guidance for agents: it opens the first message of threads started from its items and comes back with backlog_get and backlog_ready. Run only when the user asked for this change.',
       tool: { name: 'backlog_set_project_guidance', readOnly: false },
+    }),
+    setTagColor: method({
+      input: Schema.Struct({
+        tag: BacklogItems.tagSchema.check(Schema.isMinLength(1)).annotate({ description: 'The tag as items carry it, without the #.' }),
+        slot: Schema.NullOr(tagColorSlotSchema).annotate({
+          description: "A colour of the active theme's identity palette, 0 to 5; null returns the tag to its default colour.",
+        }),
+      }),
+      output: Schema.Struct({ tag: Schema.String, slot: Schema.NullOr(tagColorSlotSchema) }),
+      description:
+        "Choose the colour of one backlog tag's chips, a slot 0–5 of the active theme's identity palette, so a theme switch recolours it; `slot: null` reverses it to the default colour. backlog_list reports chosen colours in `tagColors`. Run only when the user asked for this change.",
+      tool: { name: 'backlog_set_tag_color', readOnly: false },
     }),
     scheduleRule: method({
       input: Schema.Struct({

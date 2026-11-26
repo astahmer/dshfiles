@@ -4329,6 +4329,58 @@
       ]
     },
     {
+      "id": "tag-colors",
+      "title": "Choose a tag\u2019s colour",
+      "surface": "agentToolOnly",
+      "surfaces": ["host", "tool"],
+      "destination": "none",
+      "currentSurface": "agent tools: backlog_set_tag_color, backlog_list tagColors",
+      "summary": "Give a backlog tag one of the theme\u2019s six identity colours, or return it to its default.",
+      "details": "A tag\u2019s chips take a colour slot 0\u20135 of the active theme\u2019s identity palette, so switching theme recolours them. A tag without a chosen slot keeps the colour hashed from its name. The choice is stored per tag, as items store it, in Backlog settings (dshfiles-backlog.tagColors) and shared by every browser. Agents choose or clear it with backlog_set_tag_color (slot null returns the default) and read it in backlog_list `tagColors`.",
+      "states": ["default-colour", "chosen-colour", "cleared"],
+      "failureModes": [
+        "A Host older than tag colours refuses backlog_set_tag_color and lists no tagColors: tags keep their default colours until the DSH Host process restarts."
+      ],
+      "configuration": [
+        {
+          "key": "dshfiles-backlog.tagColors",
+          "defaultValue": "[]",
+          "constraints": "One slot 0\u20135 per tag as items store it; a slot out of range is ignored and the tag keeps its default.",
+          "coveredBy": ["backlog.tag-colors-tool"]
+        }
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "backlog.tag-colors-tool",
+          "file": "plugins/@dshfiles/backlog/src/tag-colors.test.ts",
+          "testName": "the write tool path sets a slot, backlog_list reports it, and clearing reverses it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog.tag-colors-schema",
+          "file": "plugins/@dshfiles/backlog/src/tag-colors.test.ts",
+          "testName": "the tool takes a slot 0\u20135 or null, a non-empty tag, and says the user must have asked"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "backlog.tag-colors-browser",
+          "reason": "Agent tool and Host storage only in this step: the tag chip menu that picks a colour comes with its own browser scenario."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
       "id": "peer-hosts",
       "title": "Share one backlog across hosts",
       "summary": "Turn on other hosts in Backlog settings to share and merge one backlog across them.",

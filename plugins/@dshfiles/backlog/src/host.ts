@@ -22,6 +22,7 @@ import { BacklogSettingsTag, backlogSettingsLayer, sharedJevSettingsLayer } from
 import { BacklogItemNotFound, BacklogTemplateNotFound } from './errors.js'
 import { BacklogTemplates } from './templates.js'
 import { ProjectGuidance } from './project-guidance.js'
+import { TagColorSettings } from './tag-color-settings.js'
 import { BacklogItems } from './item.js'
 import { BacklogGates } from './gates.js'
 import type { BacklogDetailView } from './api.js'
@@ -181,7 +182,11 @@ const moveExternalRefs = (input: { readonly survivorId: number; readonly refs: r
   ).pipe(Effect.catch(error => Effect.logWarning('backlog: a merged duplicate kept its remote links', error)))
 
 const backlogHandlers = Api.handlers(backlogApi, {
-  list: input => BacklogStore.use(store => store.list(input)),
+  list: input =>
+    Effect.gen(function* () {
+      const listed = yield* BacklogStore.use(store => store.list(input))
+      return { ...listed, tagColors: yield* TagColorSettings.listed(listed.items) }
+    }),
   get: input => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.get(id))),
   getMany: input =>
     Effect.gen(function* () {
@@ -216,6 +221,7 @@ const backlogHandlers = Api.handlers(backlogApi, {
       const project = BacklogItems.projectPath(input.project)
       return { project, guidance: ProjectGuidance.mapOf(entries).get(project) ?? null }
     }),
+  setTagColor: input => TagColorSettings.set(input),
   claim: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.claim({ id, actor: actorOf(call.caller) }))),
   release: (input, call) => Effect.flatMap(itemIdOf(input.id), id => BacklogStore.use(store => store.release({ id, actor: actorOf(call.caller) }))),
   capture: (input, call) =>

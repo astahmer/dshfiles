@@ -278,6 +278,10 @@ changes and can be reverted), never parsed out of its description.
 - **Agent guidance per project**: the project overview in **Projects** holds markdown guidance for agents (settings
   `projectGuidance`, or `backlog_set_project_guidance`). A thread started from items opens its first message with
   their projects' guidance; `backlog_get` returns it with the item and `backlog_ready` with the queue.
+- **Tag colours**: a tag's chips take one of the six identity colours of the active theme (a slot 0–5, so a theme
+  switch recolours them); a tag without a choice keeps the colour hashed from its name. The choice is kept per tag, as
+  items store it, in Backlog settings (`tagColors`, shared by every browser); `backlog_set_tag_color` sets it or, with
+  `slot: null`, returns the default, and `backlog_list` reports the chosen ones in `tagColors`.
 - **Scheduled rules**: **Schedule nightly triage** (item menu, project overview) and `backlog_schedule_rule` create a
   `@dshfiles/project-automations` automation of the item's project whose prompt calls backlog tools, so the backlog
   runs no scheduler of its own. `triage` runs `backlog_triage_backfill` and reports what still waits on you; `recreate`
@@ -550,6 +554,7 @@ dropping the rest of the draft.
 | `backlog_link_pr`                | write: link a pull request as `fixes` (or `implements`), optionally as a gate, and watch it                                              |
 | `backlog_pull_requests`          | read: an item's pull requests with live state and checks, its linked GitHub issues' state, and when each was last read                   |
 | `backlog_set_project_guidance`   | write: one project's markdown guidance for agents                                                                                        |
+| `backlog_set_tag_color`          | write: one tag's colour slot 0–5 of the theme's identity palette; `slot: null` returns its default                                       |
 | `backlog_schedule_rule`          | write: a project automation that triages the inbox or recreates an item on a schedule                                                    |
 | `backlog_ready`                  | read: the ready queue, urgent first then oldest; `project`, `limit` (20)                                                                 |
 | `backlog_claim`                  | write: claim an item for this thread (delegate, `doing`, thread link, lease); refused while another agent holds it                       |
