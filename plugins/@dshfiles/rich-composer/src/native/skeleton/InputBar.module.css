@@ -471,13 +471,13 @@
 }
 
 /* The muted sigil hint after "Ask anything" (InputBar sets the variable only for the default placeholder). It leaves
-   first when the line gets short: narrow bars and touch screens show "Ask anything" alone. */
+   first when the line gets short: narrow bars and touch screens show "Ask anything" alone. Council round 13 C4: the
+   caption at 0.8 opacity measured 2.7-3.5:1; the faint step at full opacity holds AA on the card in both schemes. */
 .placeholder::after {
   content: var(--dsh-composer-placeholder-hint, '');
   margin-left: 12px;
-  color: var(--dsw-alias-label-caption);
+  color: var(--dsw-alias-label-tertiary);
   font-size: var(--dshx-density-text-meta, 12px);
-  opacity: 0.8;
 }
 
 @container (max-width: 560px) {
