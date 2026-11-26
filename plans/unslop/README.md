@@ -296,6 +296,9 @@ group tones, tags and charts; no tinted surfaces, heroes or empty states. The GP
 Round 16 findings, merged in `.cache/unslop-audit/r5/council/round-16-fixes.md`: one composer location control and lighter
 starters, the answer as the strongest Inbox control with a quiet Open thread, installed plugins first, one palette row
 grammar, one evidence well and a failed well only with a real error line, a Drafts count chip.
+Owner decision (round 16): don't fork core's Plugins page to list installed plugins first. Core's
+`@deepseek-ai/dsh-client-ui-plugin-manager` fixes the section order (`PluginManagerPage.tsx:1855-1857`) and no slot
+reaches it; the route, if ever wanted, is a whole-package native fork (follow-up, not this PR).
 
 ## Round four
 
