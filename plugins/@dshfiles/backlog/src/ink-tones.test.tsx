@@ -56,7 +56,9 @@ test('status glyphs are ink rings, not the to-do square that read as a checkbox 
     expect(markup, status).toMatch(/<circle [^>]*stroke-width="1.5"/u)
     expect(markup, status).not.toContain('<rect')
     expect(markup, status).not.toContain('stroke-dasharray')
-    expect(markup, status).toContain('dshx:text-foreground')
+    // Council round 12, D2: the 1.5 px ring in secondary ink, so a column of them stays quiet beside the titles.
+    expect(markup, status).toContain('dshx:text-muted-foreground')
+    expect(markup, status).not.toContain('dshx:text-foreground')
   }
   expect(renderToStaticMarkup(<ItemGlyphs.StatusIcon status="doing" />)).toMatch(/<path d="M8 [^"]*a3\.5 3\.5 [^"]*" fill="currentColor"/u)
   expect(renderToStaticMarkup(<ItemGlyphs.StatusIcon status="done" />)).toMatch(/<path d="m[^"]*" fill="none" stroke="currentColor"/u)

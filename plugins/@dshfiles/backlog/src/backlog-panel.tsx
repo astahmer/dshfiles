@@ -593,7 +593,7 @@ export const BacklogPanel = (props: {
             <BacklogViewSwitch view={view} onSelect={switchView} modifierHeld={modifierHeld} />
             <Tooltip>
               <TooltipTrigger asChild>
-                <label className="dshx:ml-auto dshx:flex dshx:h-7 dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-field-border dshx:bg-background dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-ring dshx:focus-within:ring-[3px] dshx:focus-within:ring-ring/50 dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:h-touch dshx:@max-pane-narrow:basis-full">
+                <label className="dshx:ml-auto dshx:flex dshx:h-control-h dshx:min-w-28 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-field-border dshx:bg-background dshx:px-2 dshx:text-muted-foreground dshx:transition-colors dshx:focus-within:border-ring dshx:focus-within:ring-[3px] dshx:focus-within:ring-ring/50 dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:h-touch dshx:@max-pane-narrow:basis-full">
                   <SearchIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0" />
                   <input
                     ref={searchInput}
@@ -614,7 +614,7 @@ export const BacklogPanel = (props: {
                       setSearch(SearchScopes.idle)
                       event.currentTarget.blur()
                     }}
-                    className="dshx:w-44 dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-xs dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground"
+                    className="dshx:w-44 dshx:min-w-0 dshx:flex-1 dshx:bg-transparent dshx:text-sm dshx:text-foreground dshx:outline-none dshx:placeholder:text-muted-foreground"
                   />
                   {query === '' ? (
                     <Kbd className="dshx:@max-pane-narrow:hidden">/</Kbd>

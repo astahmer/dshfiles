@@ -475,8 +475,9 @@ export const Composer = (props: {
       data-composer-card
       data-idle={idle || undefined}
       className={cn(
-        'dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:transition-[border-color,box-shadow] dshx:focus-within:border-input dshx:focus-within:shadow-sm',
-        failed === null ? 'dshx:border-border' : 'dshx:border-destructive/60',
+        // The fields' 3:1 edge at rest, like every kit field (council round 12, D2): a hairline read as a passive card.
+        'dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-xl dshx:border dshx:bg-card dshx:transition-[border-color,box-shadow] dshx:focus-within:border-ring dshx:focus-within:shadow-sm',
+        failed === null ? 'dshx:border-field-border' : 'dshx:border-destructive/60',
         drop.dragging && 'dshx:border-primary/60 dshx:ring-2 dshx:ring-primary/15',
         chat ? (idle ? 'dshx:h-11 dshx:justify-center dshx:px-3 dshx:py-0' : 'dshx:px-3 dshx:pt-2.5 dshx:pb-2') : 'dshx:px-2.5 dshx:py-1.5',
       )}

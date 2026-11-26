@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { BacklogViewSwitch } from './backlog-toolbar.js'
+import { BacklogViewSwitch, tabStripFade } from './backlog-toolbar.js'
 
 const tabClasses = (markup: string, current: boolean): string =>
   (current ? /<button type="button" aria-current="page" class="([^"]*)"/u : /<button type="button" class="([^"]*)"/u).exec(markup)?.[1] ?? ''
@@ -23,7 +23,8 @@ describe('Backlog view tabs (council round 6, D6)', () => {
     for (const look of [
       'dshx:after:absolute',
       'dshx:after:inset-x-0',
-      'dshx:after:bottom-[-1px]',
+      // The strip reaches 1 px over the hairline (council round 12, D2), so the bar's bottom edge is the strip's.
+      'dshx:after:bottom-0',
       'dshx:after:h-0.5',
       'dshx:after:bg-foreground',
       'dshx:after:opacity-100',
@@ -53,5 +54,42 @@ describe('Backlog search field (council round 6, A2)', () => {
     const search = panel.slice(panel.lastIndexOf('<label', panel.indexOf('aria-label="Search backlog"')), panel.indexOf('aria-label="Search backlog"'))
     expect(search).toContain('dshx:rounded-lg')
     expect(search).not.toContain('dshx:rounded-md')
+  })
+})
+
+describe('Backlog view tabs scroll instead of clipping (council round 12, D2)', () => {
+  const markup = renderToStaticMarkup(
+    <TooltipProvider>
+      <BacklogViewSwitch view="ready" onSelect={() => undefined} modifierHeld={false} />
+    </TooltipProvider>,
+  )
+  const nav = /<nav aria-label="Backlog views"[^>]*class="([^"]*)"/u.exec(markup)?.[1] ?? ''
+
+  it('lets the strip shrink and scroll sideways with no visible scrollbar', () => {
+    expect(nav).toContain('dshx:min-w-0')
+    expect(nav).toContain('dshx:overflow-x-auto')
+    expect(nav).toContain('dshx:[scrollbar-width:none]')
+    expect(nav).not.toContain('dshx:shrink-0')
+    // The strip reaches over the row's hairline, so the active bar still sits on it inside the scroll box.
+    expect(nav).toContain('dshx:-mb-px')
+    expect(tabClasses(markup, true)).toContain('dshx:after:bottom-0')
+    // A focus ring drawn inside the tab, which the scroll box would otherwise clip.
+    expect(tabClasses(markup, true)).toContain('dshx:focus-visible:ring-inset')
+  })
+
+  it('fades only the edge that hides a tab', () => {
+    expect(tabStripFade({ start: false, end: false })).toBeUndefined()
+    expect(tabStripFade({ start: false, end: true })).toBe('linear-gradient(to right, black, black calc(100% - 24px), transparent)')
+    expect(tabStripFade({ start: true, end: false })).toBe('linear-gradient(to right, transparent, black 24px, black)')
+    expect(tabStripFade({ start: true, end: true })).toBe('linear-gradient(to right, transparent, black 24px, black calc(100% - 24px), transparent)')
+  })
+})
+
+describe('Backlog search field height (council round 12, D2)', () => {
+  it('stands at the one control height, beside the 32 px View and Filter triggers', () => {
+    const panel = readFileSync(new URL('backlog-panel.tsx', import.meta.url), 'utf8')
+    const search = panel.slice(panel.lastIndexOf('<label', panel.indexOf('aria-label="Search backlog"')), panel.indexOf('aria-label="Search backlog"'))
+    expect(search).toContain('dshx:h-control-h')
+    expect(search).not.toContain('dshx:h-7')
   })
 })

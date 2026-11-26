@@ -40,3 +40,26 @@ describe('Backlog status trigger (council round 10, D3)', () => {
     expect(feed).toContain('className="dshx:flex dshx:w-8 dshx:justify-center"')
   })
 })
+
+describe('Backlog status trigger chevron (council round 12, D2)', () => {
+  it('shows the chevron only on row hover or focus, and keeps the trigger and its name for assistive tech', () => {
+    const button = trigger(false)
+    expect(button).toContain('aria-label="Status of b:1"')
+    const chevron = [...button.matchAll(/<svg([^>]*)>/gu)].map(match => match[1] ?? '')[1] ?? ''
+    expect(chevron).toContain('lucide-chevron-down')
+    expect(chevron).toContain('dshx:opacity-0')
+    for (const reveal of [
+      'dshx:group-hover/entry:opacity-100',
+      'dshx:group-focus-within/entry:opacity-100',
+      'dshx:group-hover/row:opacity-100',
+      'dshx:group-focus-within/row:opacity-100',
+      'dshx:group-hover/status:opacity-100',
+      'dshx:group-focus-visible/status:opacity-100',
+      'dshx:group-aria-expanded/status:opacity-100',
+      // A touch screen has no hover: the chevron stays.
+      'dshx:pointer-coarse:opacity-100',
+    ])
+      expect(chevron).toContain(reveal)
+    expect(/<button([^>]*)>/u.exec(button)?.[1]).toContain('dshx:group/status')
+  })
+})

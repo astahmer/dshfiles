@@ -25,11 +25,13 @@ const statusLabels = { inbox: 'Inbox', todo: 'Todo', doing: 'In progress', done:
 const kindLabels = { task: 'Task', bug: 'Bug', idea: 'Idea', note: 'Note', question: 'Question' } satisfies Record<BacklogKind, string>
 const attentionLabels = { none: 'No attention', 'needs-input': 'Needs you', blocked: 'Blocked', waiting: 'Waiting' } satisfies Record<BacklogAttention, string>
 
+// Council round 12, D2: every ring in secondary ink (#646362 light, about 5.8:1 on the page; #a7a4a1 dark, about 7.4:1),
+// so a column of rings stays quiet beside the titles. The shape, not the tone, tells the statuses apart.
 const statusTone = {
-  inbox: 'dshx:text-foreground',
-  todo: 'dshx:text-foreground',
-  doing: 'dshx:text-foreground',
-  done: 'dshx:text-foreground',
+  inbox: 'dshx:text-muted-foreground',
+  todo: 'dshx:text-muted-foreground',
+  doing: 'dshx:text-muted-foreground',
+  done: 'dshx:text-muted-foreground',
   dropped: 'dshx:text-muted-foreground',
 } satisfies Record<BacklogStatus, string>
 

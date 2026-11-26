@@ -15,7 +15,7 @@ import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, ChevronDownIcon, FolderIcon, ListFilterIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react'
 
 import type { BacklogSort } from './backlog-sort.js'
 import { BacklogItems, type BacklogKind, type BacklogStatus } from './item.js'
@@ -57,65 +57,113 @@ const sortOrders = ['updated', 'created', 'priority', 'due'] as const
  */
 const tabClass = (active: boolean): string =>
   cn(
-    'dshx:relative dshx:inline-flex dshx:h-full dshx:items-center dshx:gap-1.5 dshx:rounded-none dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50',
-    'dshx:after:absolute dshx:after:inset-x-0 dshx:after:bottom-[-1px] dshx:after:h-0.5 dshx:after:bg-foreground dshx:after:transition-opacity',
+    'dshx:relative dshx:inline-flex dshx:h-full dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:rounded-none dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:outline-none dshx:transition-colors dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-inset dshx:focus-visible:ring-ring/50',
+    'dshx:after:absolute dshx:after:inset-x-0 dshx:after:bottom-0 dshx:after:h-0.5 dshx:after:bg-foreground dshx:after:transition-opacity',
     active ? 'dshx:text-foreground dshx:after:opacity-100' : 'dshx:text-muted-foreground dshx:after:opacity-0 dshx:hover:text-foreground',
   )
 
+/** The tab strip's mask: a 24 px fade on each edge that hides a tab, none when every tab shows. */
+export const tabStripFade = (edges: { readonly start: boolean; readonly end: boolean }): string | undefined =>
+  edges.start || edges.end
+    ? `linear-gradient(to right, ${edges.start ? 'transparent, black 24px' : 'black'}, ${edges.end ? 'black calc(100% - 24px), transparent' : 'black'})`
+    : undefined
+
+/** Which edges of a horizontal scroller hide content, kept current on scroll and resize. */
+const useScrollEdges = (ref: RefObject<HTMLElement | null>): { readonly start: boolean; readonly end: boolean } => {
+  const [edges, setEdges] = useState({ start: false, end: false })
+  useEffect(() => {
+    const node = ref.current
+    if (node == null) return
+    const measure = (): void => {
+      const start = node.scrollLeft > 1
+      const end = node.scrollLeft + node.clientWidth < node.scrollWidth - 1
+      setEdges(current => (current.start === start && current.end === end ? current : { start, end }))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(node)
+    node.addEventListener('scroll', measure, { passive: true })
+    return () => {
+      observer.disconnect()
+      node.removeEventListener('scroll', measure)
+    }
+  }, [ref])
+  return edges
+}
+
 /**
  * The Backlog's views: labelled underline tabs, and one labelled select once the pane is phone-narrow, so no view is
- * ever an unlabeled icon. Holding the shortcut modifier shows each tab's digit.
+ * ever an unlabeled icon. Holding the shortcut modifier shows each tab's digit. When the row is too narrow for every
+ * tab, the strip scrolls sideways and fades the edge that hides one, so no label ends on a hard cut (council round 12,
+ * D2); it reaches 1 px over the row's hairline, so the active bar still sits on it inside the scroll box.
  */
-export const BacklogViewSwitch = (props: { readonly view: View; readonly onSelect: (view: View) => void; readonly modifierHeld: boolean }): JSX.Element => (
-  <>
-    <nav
-      aria-label="Backlog views"
-      data-tabs="underline"
-      className="dshx:flex dshx:h-full dshx:shrink-0 dshx:items-stretch dshx:gap-5 dshx:@max-pane-narrow:hidden"
-    >
-      {views.map((entry, index) => (
-        <Tooltip key={entry}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              aria-current={props.view === entry ? 'page' : undefined}
-              onClick={() => props.onSelect(entry)}
-              className={tabClass(props.view === entry)}
-            >
-              {viewLabels[entry]}
-              {props.modifierHeld ? (
-                <kbd aria-hidden className="dshx:font-mono dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
-                  {index + 1}
-                </kbd>
-              ) : null}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{`${viewLabels[entry]} (${String(index + 1)})`}</TooltipContent>
-        </Tooltip>
-      ))}
-    </nav>
-    <div className="dshx:hidden dshx:min-w-0 dshx:flex-1 dshx:@max-pane-narrow:block">
-      <Select
-        value={props.view}
-        onValueChange={value => {
-          const next = views.find(candidate => candidate === value)
-          if (next !== undefined) props.onSelect(next)
-        }}
+export const BacklogViewSwitch = (props: { readonly view: View; readonly onSelect: (view: View) => void; readonly modifierHeld: boolean }): JSX.Element => {
+  const strip = useRef<HTMLElement>(null)
+  const edges = useScrollEdges(strip)
+  const fade = tabStripFade(edges)
+  // The current tab scrolls into the strip (a digit shortcut can pick a hidden one); only the strip moves, never the page.
+  useEffect(() => {
+    const node = strip.current
+    const tab = node?.querySelector<HTMLElement>('[aria-current="page"]')
+    if (node == null || tab == null) return
+    const box = node.getBoundingClientRect()
+    const seat = tab.getBoundingClientRect()
+    if (seat.left < box.left) node.scrollLeft -= box.left - seat.left + 24
+    else if (seat.right > box.right) node.scrollLeft += seat.right - box.right + 24
+  }, [props.view])
+  return (
+    <>
+      <nav
+        ref={strip}
+        aria-label="Backlog views"
+        data-tabs="underline"
+        className="dshx:-mb-px dshx:flex dshx:min-w-0 dshx:items-stretch dshx:gap-5 dshx:self-stretch dshx:overflow-x-auto dshx:overflow-y-hidden dshx:[scrollbar-width:none] dshx:@max-pane-narrow:hidden"
+        style={fade === undefined ? undefined : { maskImage: fade, WebkitMaskImage: fade }}
       >
-        <SelectTrigger aria-label="Backlog view" className="dshx:w-full">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="dshx-root">
-          {views.map(entry => (
-            <SelectItem key={entry} value={entry}>
-              {viewLabels[entry]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  </>
-)
+        {views.map((entry, index) => (
+          <Tooltip key={entry}>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                aria-current={props.view === entry ? 'page' : undefined}
+                onClick={() => props.onSelect(entry)}
+                className={tabClass(props.view === entry)}
+              >
+                {viewLabels[entry]}
+                {props.modifierHeld ? (
+                  <kbd aria-hidden className="dshx:font-mono dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
+                    {index + 1}
+                  </kbd>
+                ) : null}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{`${viewLabels[entry]} (${String(index + 1)})`}</TooltipContent>
+          </Tooltip>
+        ))}
+      </nav>
+      <div className="dshx:hidden dshx:min-w-0 dshx:flex-1 dshx:@max-pane-narrow:block">
+        <Select
+          value={props.view}
+          onValueChange={value => {
+            const next = views.find(candidate => candidate === value)
+            if (next !== undefined) props.onSelect(next)
+          }}
+        >
+          <SelectTrigger aria-label="Backlog view" className="dshx:w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="dshx-root">
+            {views.map(entry => (
+              <SelectItem key={entry} value={entry}>
+                {viewLabels[entry]}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+    </>
+  )
+}
 
 /** A view's status filter, shown as the Filter menu's first group where the view has no status row of its own. */
 export interface StatusFilter {

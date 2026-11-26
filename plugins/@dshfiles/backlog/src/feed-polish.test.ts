@@ -157,3 +157,12 @@ describe('Backlog feed time groups (council round 8, D2)', () => {
     expect(view).toContain("FeedLook.startsTimeGroup(times, index, separator) && 'dshx:mt-2'")
   })
 })
+
+describe('Backlog capture field (council round 12, D2)', () => {
+  it("draws the fields' 3:1 edge at rest, so the capture box reads as a place to type", () => {
+    const composer = read('composer.tsx')
+    expect(composer).toContain("failed === null ? 'dshx:border-field-border' : 'dshx:border-destructive/60'")
+    expect(composer).toContain('dshx:focus-within:border-ring')
+    expect(composer).not.toContain('dshx:focus-within:border-input')
+  })
+})

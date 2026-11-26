@@ -82,14 +82,22 @@ const StatusPicker = (props: {
     // Without its name the trigger is one status-glyph button: the ink ring and a 10 px chevron in a 32 px seat, so it
     // reads as a menu, not a checkbox (council round 10, D3). It overhangs its 24 px line by 4 px each way, so rows keep
     // their height.
-    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-sm' : 'dshx:-my-1 dshx:size-8 dshx:justify-center dshx:gap-0.5'}
+    triggerClassName={
+      props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-sm' : 'dshx:group/status dshx:-my-1 dshx:size-8 dshx:justify-center dshx:gap-0.5'
+    }
     trigger={
       <>
         <ItemGlyphs.StatusIcon status={props.status} stale={props.stale === true} />
         {props.withLabel === true ? (
           <span>{ItemGlyphs.statusLabels[props.status]}</span>
         ) : (
-          <ChevronDownIcon aria-hidden strokeWidth={2.5} className="dshx:size-2.5 dshx:shrink-0 dshx:text-muted-foreground" />
+          // Council round 12, D2: the chevron shows on the row's hover or focus (and the open menu), not on every row at
+          // rest; it keeps its seat, so nothing moves. A touch screen has no hover, so it stays there.
+          <ChevronDownIcon
+            aria-hidden
+            strokeWidth={2.5}
+            className="dshx:size-2.5 dshx:shrink-0 dshx:text-muted-foreground dshx:opacity-0 dshx:transition-opacity dshx:duration-(--dshx-duration-hover) dshx:group-hover/entry:opacity-100 dshx:group-focus-within/entry:opacity-100 dshx:group-hover/row:opacity-100 dshx:group-focus-within/row:opacity-100 dshx:group-hover/status:opacity-100 dshx:group-focus-visible/status:opacity-100 dshx:group-aria-expanded/status:opacity-100 dshx:pointer-coarse:opacity-100"
+          />
         )}
       </>
     }
