@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PaletteApi } from './palette-api.js'
-import type { PaletteActionContext } from './palette-contract.js'
+import type { PaletteActionContext, PaletteThreadStatus } from './palette-contract.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
 
 const copy: ThreadPaletteCopy = {
@@ -829,6 +829,46 @@ describe('ThreadPalette goes to threads', () => {
     expect(row.textContent).not.toContain('Working')
     // The row's muted-icon rule must not grey the glyph: Needs you keeps its indigo, Failed its red.
     expect(row.querySelector('[data-slot="status-glyph"]')?.className).toContain('dshx:[&_svg]:text-current!')
+  })
+
+  it('reads an attention row through the kit AttentionMeta with the one word list, the status glyph leading (council round 15 B3)', async () => {
+    const kinds = new Map<string, PaletteThreadStatus>([
+      ['session-fake-1', { status: 'needs-you', label: 'Needs you', kind: 'Approval' }],
+      ['session-fake-2', { status: 'needs-you', label: 'Needs you', kind: 'Question' }],
+      ['session-fake-3', { status: 'failed', label: 'Failed', kind: 'Turn failed' }],
+    ])
+    render(palette({ threadStatusOf: thread => kinds.get(thread.id) }))
+    for (const [title, status, kind] of [
+      ['Fake provider seeds', 'needs-you', 'Approval'],
+      ['Fake child run', 'needs-you', 'Question'],
+      ['Remove the fake clock', 'failed', 'Turn failed'],
+    ] as const) {
+      const row = await screen.findByRole('option', { name: new RegExp(title, 'u') })
+      const meta = row.querySelector<HTMLElement>('[data-slot="attention-meta"]')
+      expect(meta?.getAttribute('data-mark-seat')).toBe('inline')
+      // `[mark] project · kind · age`, the Inbox card's and the list row's grammar.
+      const parts = Array.from(meta?.querySelectorAll(':scope > [data-attention-meta-part]') ?? []).map(part => part.getAttribute('data-attention-meta-part'))
+      expect(parts).toEqual(['mark', 'name', 'sep', 'kind', 'sep', 'age'])
+      expect(meta?.querySelector('[data-attention-meta-part="name"]')?.textContent).toBe('dshfiles')
+      expect(meta?.querySelector('[data-attention-meta-part="kind"]')?.textContent).toBe(kind)
+      // The status word gives way to the kind; the project mark is drawn once, in the line.
+      expect(row.querySelector('[data-palette-thread-status]')).toBeNull()
+      expect(row.querySelectorAll('[data-slot="project-mark"]')).toHaveLength(1)
+      // The status glyph leads the row in its hue, as on the list.
+      const lead = row.firstElementChild
+      expect(lead?.hasAttribute('data-leading-glyph')).toBe(true)
+      const glyph = lead?.querySelector('[data-slot="status-glyph"]')
+      expect(glyph?.getAttribute('data-status')).toBe(status)
+      expect(glyph?.className).toContain('dshx:[&_svg]:text-current!')
+    }
+  })
+
+  it('keeps the status word on a row without an attention kind (council round 15 B3)', async () => {
+    render(palette({ threadStatusOf: thread => (thread.id === 'session-fake-2' ? { status: 'ready', label: 'Ready' } : undefined) }))
+    const row = await screen.findByRole('option', { name: /Fake child run/ })
+    expect(row.querySelector('[data-slot="attention-meta"]')).toBeNull()
+    expect(row.querySelector('[data-palette-thread-status]')?.textContent).toBe('Ready')
+    expect(row.firstElementChild?.querySelector('[data-palette-project-mark]')).not.toBeNull()
   })
 
   it('replaces the clipped prefix legend with one "? Prefixes" hint that opens the prefix list', async () => {

@@ -93,6 +93,12 @@ export const PaletteProjectColors = defineRegistry<PaletteProjectColorSource>('@
 export interface PaletteThreadStatus {
   readonly status: WorkStatus
   readonly label: string
+  /**
+   * A Needs-you or Failed thread's kind in the one attention word list (Approval, Question, Turn failed), as the list
+   * row's line 2 says it. With it the row reads `[mark] project · kind · age` through the kit's AttentionMeta (council
+   * round 15 B3); without it (an older provider, any other status) the row keeps its status word.
+   */
+  readonly kind?: string | undefined
 }
 
 /** What the thread list says of each thread, so a palette row and a list row never disagree (DESIGN.md R2). */

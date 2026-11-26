@@ -229,6 +229,7 @@ import { ThreadSelectionBar } from './thread-selection-bar.js'
 import { workingThreadIds, WorkingThreadsProjection } from './working-threads.js'
 import { HeldUpdatesPill } from './held-updates-pill.js'
 import { RunningJobsModel } from './running-jobs.js'
+import type { ThreadWorkStatus } from './thread-status-client.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
@@ -4312,11 +4313,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       threadWorkStatusStore.publish(null)
       return
     }
-    const projected = new Map<string, { readonly status: WorkStatus; readonly detail: string | undefined }>()
-    for (const [sessionId, status] of childStatusById) projected.set(sessionId, { status: status.status, detail: status.detail })
-    for (const [sessionId, status] of threadStatusById) projected.set(sessionId, { status: status.status, detail: status.detail })
+    // An attention row's kind travels with its status, so the palette says Approval, Question or Turn failed as the row
+    // does (council round 15 B3).
+    const words = {
+      question: tSidebar('threadSidebarAskQuestion'),
+      approval: tSidebar('threadSidebarAskApproval'),
+      failed: tSidebar(workStatusLabelKeys.failed),
+    }
+    const projected = new Map<string, ThreadWorkStatus>()
+    for (const statuses of [childStatusById, threadStatusById]) {
+      for (const [sessionId, status] of statuses) {
+        projected.set(sessionId, { status: status.status, detail: status.detail, kind: AttentionSubtitleModel.kindOf(status, words) })
+      }
+    }
     threadWorkStatusStore.publish(projected)
-  }, [childStatusById, isPrimarySurface, sessionState.phase, statusGlyphs, threadStatusById])
+  }, [childStatusById, isPrimarySurface, sessionState.phase, statusGlyphs, threadStatusById, tSidebar])
   useEffect(() => (isPrimarySurface ? () => threadWorkStatusStore.publish(null) : undefined), [isPrimarySurface])
   const workingThreadCountsBySource = useMemo(
     () => ({

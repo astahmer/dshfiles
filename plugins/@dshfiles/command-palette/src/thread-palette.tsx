@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { ProjectMark, type ProjectMarkProps } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
@@ -680,10 +681,18 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
             // The list's status, rolled up: a thread that waits for an answer is Needs you here too, not Working.
             const listed = props.threadStatusOf?.(thread)
+            // A thread that needs you or failed reads as the list row and the Inbox card do (council round 15 B3): its
+            // status glyph leads, and the meta is the kit's AttentionMeta, `[mark] project · kind · age`, in the one
+            // word list (Approval, Question, Turn failed). Every other row keeps its project tile and its status word.
+            const attentionKind = listed?.status === 'needs-you' || listed?.status === 'failed' ? listed.kind : undefined
+            const age = thread.updatedAt > 0 ? recentTime(thread.updatedAt) : undefined
             return (
               <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
                 <span className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
-                  {thread.project.length > 0 ? (
+                  {listed !== undefined && attentionKind !== undefined ? (
+                    // The row's own rule greys every icon without a text colour; the glyph keeps its status hue.
+                    <StatusGlyph status={listed.status} decorative className="dshx:[&_svg]:text-current!" />
+                  ) : thread.project.length > 0 ? (
                     <ProjectMark name={project} data-palette-project-mark="" {...projectMarkPaint(props.projectColorOf?.(thread))} />
                   ) : (
                     <span
@@ -696,27 +705,32 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                 </span>
                 <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                   <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
-                  <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
-                    <span className="dshx:min-w-0 dshx:truncate">
-                      {[
-                        project,
-                        thread.updatedAt > 0 ? recentTime(thread.updatedAt) : null,
-                        listed !== undefined || thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle,
-                      ]
-                        .filter(value => value !== null)
-                        .join(' · ')}
+                  {attentionKind !== undefined ? (
+                    <AttentionMeta
+                      project={thread.project.length > 0 ? thread.project : undefined}
+                      kind={attentionKind}
+                      age={age}
+                      mark={{ ...projectMarkPaint(props.projectColorOf?.(thread)), 'data-palette-project-mark': '' }}
+                    />
+                  ) : (
+                    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
+                      <span className="dshx:min-w-0 dshx:truncate">
+                        {[project, age ?? null, listed !== undefined || thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle]
+                          .filter(value => value !== null)
+                          .join(' · ')}
+                      </span>
+                      {listed === undefined ? null : (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          {/* The row's own rule greys every icon without a text colour; the glyph keeps its status hue. */}
+                          <StatusGlyph status={listed.status} decorative className="dshx:[&_svg]:text-current!" />
+                          <span className="dshx:shrink-0" data-palette-thread-status="">
+                            {listed.label}
+                          </span>
+                        </>
+                      )}
                     </span>
-                    {listed === undefined ? null : (
-                      <>
-                        <span aria-hidden="true">·</span>
-                        {/* The row's own rule greys every icon without a text colour; the glyph keeps its status hue. */}
-                        <StatusGlyph status={listed.status} decorative className="dshx:[&_svg]:text-current!" />
-                        <span className="dshx:shrink-0" data-palette-thread-status="">
-                          {listed.label}
-                        </span>
-                      </>
-                    )}
-                  </span>
+                  )}
                 </span>
                 {shortcut(row)}
               </CommandItem>

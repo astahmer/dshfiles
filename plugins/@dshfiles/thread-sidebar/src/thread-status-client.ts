@@ -13,6 +13,11 @@ export interface ThreadWorkStatus {
   readonly status: WorkStatus
   /** The list's detail line, such as "Waiting on 1 subagent"; already in the user's language. */
   readonly detail: string | undefined
+  /**
+   * An attention row's kind as its line 2 says it (Approval, Question, or a Failed row's reason such as "Turn failed");
+   * undefined for every other status. Optional, so an older publisher still type-checks.
+   */
+  readonly kind?: string | undefined
 }
 
 export type ThreadWorkStatusSnapshot = ReadonlyMap<string, ThreadWorkStatus>
@@ -35,7 +40,7 @@ const sameSnapshot = (left: ThreadWorkStatusSnapshot | null, right: ThreadWorkSt
   if (left.size !== right.size) return false
   for (const [sessionId, status] of left) {
     const other = right.get(sessionId)
-    if (other === undefined || other.status !== status.status || other.detail !== status.detail) return false
+    if (other === undefined || other.status !== status.status || other.detail !== status.detail || other.kind !== status.kind) return false
   }
   return true
 }
