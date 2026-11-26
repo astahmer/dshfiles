@@ -34,7 +34,7 @@ import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, InboxIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowRightIcon, BellIcon, CheckIcon, ClockIcon, EllipsisIcon, InboxIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -297,17 +297,18 @@ const InboxRow = (props: {
             </Button>
           ) : null}
           {/* A question's answers are its verbs; on a desktop its head still seats a quiet Open (council round 13 C2), so
-              the verb column down the list has no hole. */}
+              the verb column down the list has no hole. Council round 14 C3: it names where it goes, "Open thread" with a
+              12px arrow. */}
           {place === 'head' && openable && answerable ? (
             <Button
               size="sm"
               variant="ghost"
               data-inbox-open-quiet=""
               className={cn('dshx:max-w-full dshx:text-muted-foreground dshx:hover:text-foreground', INBOX_CHIP, size, InboxView.SHORT_VERB)}
-              aria-label={openLabel}
               onClick={() => props.onOpen(item)}
             >
-              {t('open')}
+              <span className="dshx:truncate">{openLabel}</span>
+              <ArrowRightIcon aria-hidden className="dshx:size-3" />
             </Button>
           ) : null}
           {openable && !answerable ? (
@@ -1472,6 +1473,9 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]>div]:w-full',
         'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]_[data-slot=tabs-list]]:w-full',
         'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]_[data-slot=tabs-trigger]]:flex-[1_1_0]',
+        // Council round 14 C3: the desktop "Needs you" tab shows its status tally (◆ 2 · ✕ 1) like the phone, not a
+        // plain 3 that hides which of them failed.
+        'dshx:[&_[data-slot=page-tab-count]]:hidden dshx:[&_[data-slot=page-tab-status-counts]]:inline-flex',
       )}
       // The kit's list lane (920px): header and list share one container, so Start triage ends on the list's edge.
       width="lane"

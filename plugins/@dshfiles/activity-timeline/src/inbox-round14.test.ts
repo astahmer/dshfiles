@@ -23,3 +23,20 @@ describe('the phone failed card\'s Review (council round 14 C2)', () => {
     expect(panel).toContain('className={cn(InboxView.HEAD_SEAT, phone && !footed && InboxView.HEAD_SEAT_VERB)}')
   })
 })
+
+describe('the desktop question card\'s quiet verb (council round 14 C3)', () => {
+  it('reads "Open thread" (its open label) with a 12px arrow after it', () => {
+    const at = panel.indexOf('data-inbox-open-quiet=""')
+    const button = panel.slice(panel.lastIndexOf('<Button', at), panel.indexOf('</Button>', at))
+    expect(button).toContain('{openLabel}')
+    expect(button).not.toContain("{t('open')}")
+    expect(button).toMatch(/\{openLabel\}<\/span>\s*<ArrowRightIcon aria-hidden className="dshx:size-3" \/>\s*$/u)
+  })
+})
+
+describe('the desktop "Needs you" tab (council round 14 C3)', () => {
+  it('shows the status tally (◆ 2 · ✕ 1) in place of its plain count, as the phone does', () => {
+    const page = panel.slice(panel.indexOf('mark={<InboxIcon />}\n      markTone="inbox"\n      heading={t(\'title\')}'))
+    expect(page).toContain("'dshx:[&_[data-slot=page-tab-count]]:hidden dshx:[&_[data-slot=page-tab-status-counts]]:inline-flex'")
+  })
+})

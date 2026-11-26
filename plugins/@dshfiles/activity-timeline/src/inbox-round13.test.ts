@@ -45,8 +45,8 @@ describe('the desktop question card (council round 13 C2)', () => {
     expect(at).toBeGreaterThan(-1)
     const button = panel.slice(panel.lastIndexOf('<Button', at), panel.indexOf('</Button>', at))
     expect(button).toContain('variant="ghost"')
-    expect(button).toContain('aria-label={openLabel}')
-    expect(button).toContain("{t('open')}")
+    // Council round 14 C3: it reads its open label ("Open thread") in words (inbox-round14.test.ts).
+    expect(button).toContain('{openLabel}')
     // Only in the head (a desktop), only for a card whose answers are its verbs.
     expect(panel).toContain("{place === 'head' && openable && answerable ? (")
   })
