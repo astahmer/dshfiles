@@ -46,9 +46,11 @@ export class StarterTasks {
   static readonly beforeFirstThread = beforeFirstThread
 }
 
-// A starter is a 28px ghost chip (round five C4, council round 3): no outline, a hover fill, 44pt on touch.
+// The hero chip style, shared with thread-sidebar's Resume and Inbox (council round 13 C6): 32px, radius 8, the raised
+// fill with no border, 12px padding and an 8px gap; the hover steps to the selected surface; 44pt on touch. The
+// rich-composer hero lays the same values over every `[data-hero-card]`.
 const CHIP =
-  'dshx-root dshx:inline-flex dshx:h-7 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:bg-transparent dshx:pr-2.5 dshx:pl-1 dshx:text-sm dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base'
+  'dshx-root dshx:inline-flex dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-0 dshx:bg-secondary dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-(--dshx-tone-selected) dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base'
 
 const TILE = 'dshx:grid dshx:size-5 dshx:flex-none dshx:place-items-center dshx:rounded-sm dshx:[&_svg]:size-3.5'
 
@@ -72,7 +74,8 @@ export const StarterTaskCards = (props: {
           Pick a first task for {project}; it goes into the composer and nothing is sent.
         </p>
       ) : null}
-      {/* The starters take a line of their own under Resume and Inbox (the hero's navigation line). */}
+      {/* The starters take a line of their own under Resume and Inbox (the hero's navigation line); the hero draws the
+          divider at the head of this row, so it wraps. */}
       <div className="dshx-root dshx:flex dshx:basis-full dshx:flex-wrap dshx:justify-center dshx:gap-2 dshx:order-1" data-starter-row="">
         {StarterTasks.list({ project })
           .slice(0, 3)

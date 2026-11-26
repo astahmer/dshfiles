@@ -72,18 +72,30 @@ describe('the new-thread hero (round five C4, council round 3)', () => {
 
   it('starts its navigation line 12px below the composer and keeps the starters on their own line', () => {
     expect(block('.heroSuggestions')).toMatch(/padding: 12px var\(--dsh-composer-side-clearance\) 0;/)
-    expect(block('.heroSuggestions')).toMatch(/row-gap: 12px;/)
+    expect(block('.heroSuggestions')).toMatch(/row-gap: 8px;/)
   })
 
-  it('draws Resume, Review and Inbox as quiet 28px chips 12px apart: a hairline, an 8px radius, no fill (council round 12 C4)', () => {
-    const nav = block(".heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-']))")
-    expect(nav).toMatch(/height: 28px;/)
-    expect(nav).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
-    expect(nav).toMatch(/border-radius: var\(--dsw-radius-md\);/)
-    // No fill of its own: the card stays clear and keeps its hover wash.
-    expect(nav).not.toMatch(/background/)
-    expect(nav).not.toMatch(/border-color: transparent;/)
-    expect(block('.heroSuggestions')).toMatch(/column-gap: 12px;/)
+  it('draws Resume, Review, Inbox and the starters in one chip style: 32px, radius 8, raised fill, no border, 12px padding, 8px apart (council round 13 C6)', () => {
+    const chip = block('.heroSuggestions :global([data-hero-card])')
+    expect(chip).toMatch(/height: 32px;/)
+    expect(chip).toMatch(/border: 0;/)
+    expect(chip).toMatch(/border-radius: var\(--dsw-radius-md\);/)
+    expect(chip).toMatch(/background: var\(--dshx-tone-raised, var\(--dsw-alias-bg-module-platform\)\);/)
+    expect(chip).toMatch(/padding-inline: 12px;/)
+    expect(chip).toMatch(/gap: 8px;/)
+    expect(blocks().find(candidate => candidate.selector === '.heroSuggestions :global([data-hero-card]):hover' && candidate.context === '@media (hover: hover)')?.body).toMatch(/background: var\(--dshx-tone-selected, var\(--dsw-specific-sidebar-nav-item-active\)\);/)
+    expect(block('.heroSuggestions')).toMatch(/column-gap: 8px;/)
+    // The old split (a hairline on the navigation chips only) is gone.
+    expect(blocks().filter(candidate => candidate.selector.startsWith(".heroSuggestions :global([data-hero-card]:not("))).toHaveLength(0)
+  })
+
+  // The two groups never share one line (the starters alone take ~450px of the column), so the divider is the 16px
+  // hairline centred between the navigation line and the starter line, 8px from each.
+  it('puts a 16px hairline divider between Resume/Inbox and the starters, only when a navigation chip is there (council round 13 C6)', () => {
+    const divider = block(".heroSuggestions:has(:global([data-hero-card]:not([data-hero-card^='starter-']))) :global([data-starter-row])::before")
+    expect(divider).toMatch(/flex-basis: 100%;/)
+    expect(divider).toMatch(/height: 1px;/)
+    expect(divider).toMatch(/background: linear-gradient\(var\(--dsw-alias-label-tertiary\), var\(--dsw-alias-label-tertiary\)\) center \/ 16px 1px no-repeat;/)
   })
 })
 
