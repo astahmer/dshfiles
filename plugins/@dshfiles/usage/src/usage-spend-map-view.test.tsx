@@ -113,6 +113,13 @@ describe('Usage › Where it went (council round 5, D1)', () => {
     const seat = /data-spend-single=""[^>]*><span[^>]*>(.*?)<\/span><span/u.exec(html)
     expect(seat?.[1]).toContain('data-model-mark="openai"')
   })
+  it('draws the mark bare at 16 px, as the table does, not on a tinted tile (council round 15, D1)', () => {
+    const seat = /data-spend-single=""[^>]*><span([^>]*)>/u.exec(html)?.[1] ?? ''
+    expect(seat).toContain('data-spend-seat="mark"')
+    expect(seat).toContain('dshx:size-4')
+    expect(seat).not.toContain('dshx:border')
+    expect(seat).not.toContain('style=')
+  })
   it('keeps the letter for an entry no brand names', () => {
     const plain = renderToStaticMarkup(
       <UsageSpendMap

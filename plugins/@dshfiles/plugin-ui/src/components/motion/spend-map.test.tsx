@@ -274,3 +274,49 @@ describe('SpendMap › a breakdown with one entry (council round 11, D1)', () =>
     expect(html).not.toContain('data-spend-single')
   })
 })
+
+describe('SpendMap › an entry with a mark (council round 15, D1)', () => {
+  const marked: SpendDimension[] = [
+    {
+      id: 'model',
+      label: 'Models',
+      leaves: [
+        { id: 'luna', label: 'gpt-6-luna', icon: <svg data-mark="" />, amount: 6, share: 0.6, color: 'var(--dshx-data-1)' },
+        { id: 'rest', label: '3 more', amount: 4, share: 0.4 },
+      ],
+    },
+  ]
+  const html = (leaves: SpendDimension[]): string =>
+    renderToStaticMarkup(
+      <SpendMap
+        heading="Where it went"
+        owner="All accounts"
+        total={10}
+        format={value => String(value)}
+        dimensions={leaves}
+        dimensionId="model"
+        leafId="luna"
+        picker="segments"
+        onDimensionChange={() => undefined}
+        onLeafChange={() => undefined}
+      />,
+    )
+  const seatOf = (markup: string, id: string): string =>
+    new RegExp(`data-node-anchor="leaf:model:${id}"[^>]*><span([^>]*)>`, 'u').exec(markup)?.[1] ?? ''
+
+  it('draws the bare 16 px mark the table draws: no tile, no border, no series tint', () => {
+    const seat = seatOf(html(marked), 'luna')
+    expect(seat).toContain('data-spend-seat="mark"')
+    expect(seat).toContain('dshx:size-4')
+    expect(seat).not.toContain('dshx:border')
+    expect(seat).not.toContain('dshx:bg-background')
+    expect(seat).not.toContain('style=')
+  })
+
+  it('keeps the tinted letter tile for an entry without a mark', () => {
+    const seat = seatOf(html(marked), 'rest')
+    expect(seat).toContain('data-spend-seat="letter"')
+    expect(seat).toContain('dshx:size-6')
+    expect(seat).toContain('dshx:border')
+  })
+})

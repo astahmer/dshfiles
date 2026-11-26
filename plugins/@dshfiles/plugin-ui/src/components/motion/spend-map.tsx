@@ -10,7 +10,7 @@ import { SlidingSegments, type SlidingSegmentOption } from './sliding-segments.j
 export interface SpendLeaf {
   readonly id: string
   readonly label: string
-  /** A lucide icon or a letter tile. */
+  /** A mark (a provider's), drawn bare at 16 px; without one the seat is a tile with the label's first letter. */
   readonly icon?: React.ReactNode
   readonly amount: number
   /** Share of the total, 0..1. */
@@ -535,16 +535,31 @@ function LeafCard({
   )
 }
 
-/** The entry's seat: its mark or first letter. */
+/**
+ * The entry's seat: its mark or first letter. A mark (a provider's) is drawn bare at 16 px, the way a table row draws it,
+ * so one page shows the mark one way; the share bar and route already key the entry to its series (council round 15,
+ * D1). A letter needs a tile to read as a seat, so it keeps one.
+ */
 function LeafSeat({ leaf }: { readonly leaf: SpendLeaf }) {
+  if (leaf.icon !== undefined) {
+    return (
+      <span
+        data-spend-seat="mark"
+        className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-foreground dshx:[&_svg]:size-4"
+      >
+        {leaf.icon}
+      </span>
+    )
+  }
   return (
     <span
-      className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:[&_svg]:size-3.5"
+      data-spend-seat="letter"
+      className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-2xs dshx:font-semibold dshx:text-foreground"
       // The seat keys the entry to its series: a 14 % tint behind ink text (AA on both schemes) and a border in the
       // series colour, which the data ramp holds at 3:1 against every surface.
       style={leaf.color === undefined ? undefined : { borderColor: leaf.color, backgroundColor: `color-mix(in oklab, ${leaf.color} 14%, transparent)` }}
     >
-      {leaf.icon ?? leaf.label.slice(0, 1)}
+      {leaf.label.slice(0, 1)}
     </span>
   )
 }
