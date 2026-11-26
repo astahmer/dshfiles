@@ -1,7 +1,10 @@
+import type { Translate } from '@deepseek-ai/dsh-client-ui-slots'
+import { plural } from '@dshfiles/dshx/client'
 import type { StatusItemProps } from '@dshfiles/frame-layout/status-strip'
 import { SHOW_DESTINATION_EVENT } from './destination-shell.js'
 import { useSyncExternalStore } from 'react'
 import { useWorkingTabTitle } from './header-live-activity.js'
+import type { ThreadSidebarLocaleKey } from './locales.js'
 import { WorkingThreadsProjection } from './working-threads.js'
 
 /**
@@ -70,7 +73,17 @@ export const WorkingStatusItem = (props: StatusItemProps & { readonly label: (co
   )
 }
 
+/**
+ * The item's words: it counts threads, so it says so, "1 thread working" (council round 23, item 10); a bare "1 working"
+ * read as the subagent count every other surface prints.
+ */
+const label =
+  (translate: Translate<ThreadSidebarLocaleKey>) =>
+  (count: number): string =>
+    plural(translate, 'threadSidebarThreadsWorking', count)
+
 export class WorkingStatusModel {
   static readonly workingCount = workingCount
+  static readonly label = label
   static readonly open = openWorkingThreads
 }

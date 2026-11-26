@@ -3,7 +3,8 @@ import { act, cleanup, render, screen } from '@testing-library/react'
 import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, describe, expect, it } from 'vitest'
-import { WorkingStatusItem } from './working-status-item.js'
+import { threadSidebarDictionaries, type ThreadSidebarLocaleKey } from './locales.js'
+import { WorkingStatusItem, WorkingStatusModel } from './working-status-item.js'
 import { WorkingThreadsProjection } from './working-threads.js'
 
 type ActiveQuestion = NonNullable<NonNullable<SessionSummary['projectionValues']>['userQuestions']>['active'][number]
@@ -37,6 +38,15 @@ afterEach(() => {
 })
 
 describe('the status strip working item', () => {
+  it('says it counts threads, "1 thread working", not the subagent formula\'s bare "1 working" (council round 23, item 10)', () => {
+    const en: Readonly<Record<string, string>> = threadSidebarDictionaries.en
+    const translate = (key: ThreadSidebarLocaleKey, params?: { readonly count?: number }): string =>
+      (en[key] ?? key).replace('{count}', String(params?.count ?? ''))
+    const words = WorkingStatusModel.label(translate)
+    expect(words(1)).toBe('1 thread working')
+    expect(words(3)).toBe('3 threads working')
+  })
+
   it('shows the count the thread list groups under Working, not every thread with a running turn', () => {
     document.title = 'DSH'
     mount()

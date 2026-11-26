@@ -320,9 +320,9 @@ export default defineClient({
         },
       })
     if (plugin !== undefined) {
-      // The status strip's "N working" item; frame-layout owns the strip and renders nothing when it is not the frame.
+      // The status strip's "N threads working" item; frame-layout owns the strip and renders nothing when it is not the frame.
       const WorkingItem = (props: StatusItemProps): JSX.Element | null => (
-        <WorkingStatusItem {...props} label={count => translate('threadSidebarWorkingCount', { count })} />
+        <WorkingStatusItem {...props} label={WorkingStatusModel.label(translate)} />
       )
       ctx.effect(
         () =>

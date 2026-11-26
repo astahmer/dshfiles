@@ -116,6 +116,9 @@ const en = {
   threadSidebarVerbLand: 'Land',
   threadSidebarVerbFailed: 'That did not work. Open the thread to act there, or use the Inbox.',
   threadSidebarWorkingCount: '{count} working',
+  // The status bar counts threads, not subagents: "1 thread working" (council round 23, item 10).
+  threadSidebarThreadsWorking_one: '1 thread working',
+  threadSidebarThreadsWorking_other: '{count} threads working',
   threadSidebarRestartPendingCount: 'Restart pending · {count} plugins',
   threadSidebarAutoRestartCountdown: 'Restarting to apply updates in {seconds} s',
   threadSidebarAutoRestartPostpone: 'Postpone',
@@ -738,6 +741,8 @@ const zh = {
   threadSidebarVerbLand: '落地',
   threadSidebarVerbFailed: '操作未成功。请打开会话处理，或使用收件箱。',
   threadSidebarWorkingCount: '{count} 个进行中',
+  threadSidebarThreadsWorking_one: '{count} 个线程进行中',
+  threadSidebarThreadsWorking_other: '{count} 个线程进行中',
   threadSidebarRestartPendingCount: '待重启 · {count} 个插件',
   threadSidebarAutoRestartCountdown: '{seconds} 秒后重启以应用更新',
   threadSidebarAutoRestartPostpone: '推迟',
