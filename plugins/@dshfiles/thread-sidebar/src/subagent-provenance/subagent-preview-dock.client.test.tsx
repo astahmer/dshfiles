@@ -157,6 +157,24 @@ describe('SubagentPreviewDock', () => {
     }
   })
 
+  it('shows the open arrow alone at rest and its words on row hover or focus, keeping the name (council round 22, item 13)', () => {
+    // Six "Open thread ↗" in one column read as a wall of the same words.
+    const bindings = preview()
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'], bindings })} />)
+    const row = rowOf('Review')
+    expect(row.className).toContain('dshx:group/dock-row')
+    const action = row.querySelector<HTMLElement>('[data-live-work-action]')
+    const words = action?.querySelector<HTMLElement>('span')
+    expect(words?.textContent).toBe('subagentPreviewOpenThread')
+    const classes = words?.className.split(/\s+/u) ?? []
+    expect(classes).toContain('dshx:sr-only')
+    expect(classes).toContain('dshx:@pane-narrow:group-hover/dock-row:not-sr-only')
+    expect(classes).toContain('dshx:@pane-narrow:group-has-[:focus-visible]/dock-row:not-sr-only')
+    // The arrow stays; the accessible name is the words, at rest too.
+    expect(action?.querySelector('svg')).not.toBeNull()
+    expect(screen.getAllByRole('button', { name: 'subagentPreviewOpenThread' })).toHaveLength(2)
+  })
+
   it('says the step in words, never the tool identifier, and names the model on the row itself (council round 17 B1.1)', async () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)

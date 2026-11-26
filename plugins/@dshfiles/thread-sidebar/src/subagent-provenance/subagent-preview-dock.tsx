@@ -47,7 +47,7 @@ const DockRow = (
     // row; whole rows overflow the column, which scrolls under its sticky fold row instead.
     <section
       aria-label={`${preview.t('subagentPreviewKind')}: ${label}`}
-      className="dshx-root dshx:@container dshx:my-1 dshx:min-w-0 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:text-xs"
+      className="dshx-root dshx:group/dock-row dshx:@container dshx:my-1 dshx:min-w-0 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:text-xs"
       data-dshfiles-live-preview="agent"
       data-dshfiles-live-preview-seat="dock"
       data-state="working"
@@ -137,7 +137,12 @@ const DockRow = (
           data-live-work-action=""
           onClick={() => preview.openChild(childId)}
         >
-          <span className="dshx:@max-pane-narrow:sr-only">{preview.t('subagentPreviewOpenThread')}</span>
+          {/* Council round 22, item 13: the arrow alone at rest, the words when the row is hovered or holds keyboard focus;
+              they are the button's name either way. They appear inside the fixed column, so nothing moves. A narrow pane
+              keeps the arrow alone. */}
+          <span className="dshx:sr-only dshx:@pane-narrow:group-hover/dock-row:not-sr-only dshx:@pane-narrow:group-has-[:focus-visible]/dock-row:not-sr-only">
+            {preview.t('subagentPreviewOpenThread')}
+          </span>
           <ArrowUpRightIcon aria-hidden="true" />
         </Button>
       </div>
