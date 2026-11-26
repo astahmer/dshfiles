@@ -194,6 +194,16 @@ describe('AI accounts page (council round 5, D2)', () => {
     expect(title('Command Code 2')).toContain('dshx:font-medium')
   })
 
+  it('outlines the selected glyph-leading row with the kit selected edge, its outer hairline giving way (council round 12, A1)', () => {
+    expect(row('Command Code 1')).toContain('dshx:selected-edge')
+    // The edge follows the card's inner corner (the 8 px card less its 1 px border is close to the 6 px step).
+    expect(row('Command Code 1')).toContain('dshx:rounded-md')
+    expect(unselectedRow).not.toContain('dshx:selected-edge')
+    const card = (name: string): string => new RegExp(`<li[^>]*class="([^"]*)"><div[^>]*><button[^>]*aria-label="Select ${name}"`, 'u').exec(markup)?.[1] ?? ''
+    expect(card('Command Code 1')).toContain('dshx:border-transparent')
+    expect(card('Command Code 2')).not.toContain('dshx:border-transparent')
+  })
+
   it('draws the list marks at 28 px; the detail header keeps 32', () => {
     expect(markup).toMatch(/<span aria-hidden="true"(?: data-leading-glyph="")? class="[^"]*dshx:size-7[^"]*"/u)
     expect(renderToStaticMarkup(<ProviderGlyph kind="commandcode" />)).toContain('dshx:size-8')

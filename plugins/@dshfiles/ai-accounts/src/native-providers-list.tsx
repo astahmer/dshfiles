@@ -1,5 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { SELECTED_EDGE } from '@dshfiles/plugin-ui/components/selection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
@@ -43,7 +44,9 @@ export const NativeProvidersList = (props: {
             <li
               className={cn(
                 'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-3 dshx:rounded-lg dshx:border dshx:border-border/60 dshx:bg-card dshx:px-3 dshx:py-3',
-                props.selectedEntryId === provider.entryId && 'dshx:bg-selected-wash dshx:text-foreground dshx:selected-marker',
+                // A glyph-leading row: the wash takes the kit's neutral inset edge in place of the hairline (council round 12, A1).
+                props.selectedEntryId === provider.entryId &&
+                  cn('dshx:border-transparent dshx:bg-selected-wash dshx:bg-clip-padding dshx:text-foreground dshx:selected-marker', SELECTED_EDGE),
               )}
               key={provider.entryId}
             >

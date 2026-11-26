@@ -7,6 +7,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ArrowDownIcon, ArrowUpIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Settings2Icon } from '@dshfiles/plugin-ui/icons'
+import { SELECTED_EDGE } from '@dshfiles/plugin-ui/components/selection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountLabels, KIND_LABEL } from './account-labels.js'
 import type { AccountOrderDirection, AccountProfile, AccountsUsage } from './api.js'
@@ -48,13 +49,15 @@ export const AccountGroup = (props: {
               key={profile.instanceId}
               className={cn(
                 'dshx:min-w-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border/60 dshx:bg-card dshx:transition-colors',
-                !selected && 'dshx:hover:border-muted-foreground/40',
+                // The selected edge replaces the hairline rather than doubling it (council round 12, A1).
+                selected ? 'dshx:border-transparent dshx:bg-clip-padding' : 'dshx:hover:border-muted-foreground/40',
               )}
             >
               <div
                 className={cn(
                   'dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-3 dshx:py-3',
-                  selected && 'dshx:bg-selected-wash dshx:text-foreground dshx:selected-marker',
+                  // A glyph-leading row: no pill, so the wash takes the kit's neutral inset edge, on the card's inner corner.
+                  selected && cn('dshx:rounded-md dshx:bg-selected-wash dshx:text-foreground dshx:selected-marker', SELECTED_EDGE),
                 )}
               >
                 <button
