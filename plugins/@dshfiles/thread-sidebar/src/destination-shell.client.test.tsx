@@ -631,7 +631,7 @@ describe('DestinationShell', () => {
     expect(source).toContain('className="dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3"')
     expect(source).not.toContain('dshx:px-2.5 dshx:pointer-coarse:h-7"')
     // Rows and the scroll area sit on the same gutter, the group heads' labels on the 24px text edge.
-    expect(source).toContain('dshx:px-2 dshx:pb-3 dshx:phone:px-3')
+    expect(source).toContain('dshx:px-2 dshx:pb-6 dshx:pointer-coarse:pb-3.5 dshx:phone:px-3')
     expect(source).toContain("'dshx:phone:pl-3',")
     expect(readFileSync('src/thread-group-header.tsx', 'utf8')).toContain('dshx:pointer-coarse:h-7 dshx:phone:px-3')
   })

@@ -10,6 +10,7 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { DetachedThreadsModel, type DetachedGroupAction } from './detached-threads.js'
 import { DraftThreadsModel } from './draft-threads.js'
 import { DraftsSection } from './drafts-section.js'
+import { ListFade } from './list-fade.js'
 import { ApprovalDetail } from './approval-detail.js'
 import type { SessionDraft, SessionDrafts } from '@dshfiles/session-controller/draft-client'
 import { isListedUnsentThread, presentUnsentRows } from './unsent-threads.js'
@@ -3809,6 +3810,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     return groupThreadChildren({ threads: listed })
   }, [draftSessionIds, activeWorkspaceFilter, sessionState.byId, sessionState.ids, workspaceBySession, selectedSessionId, unsentDrafts])
 
+  // The selected row is never drawn under the list's bottom fade (round nine B6): a New thread lands in Drafts, at the
+  // list's end. When the selected row reaches into the fade zone the fade turns off for it; nothing scrolls, so no row
+  // slides under a sticky group head. The user's next scroll brings the fade back.
+  useEffect(() => {
+    const area = scrollAreaRef.current
+    if (area === null) return
+    const frame = requestAnimationFrame(() => ListFade.sync(area, selectedSessionId, ListFade.height(window.matchMedia('(pointer: coarse)').matches)))
+    return () => cancelAnimationFrame(frame)
+  }, [selectedSessionId])
+
   useEffect(() => {
     if (!isPrimarySurface || threadToScrollTo === null) return
     const scrollArea = document.querySelector<HTMLElement>('[data-testid="thread-sidebar-scroll"]')
@@ -7177,6 +7188,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         <div
           ref={scrollAreaRef}
           data-testid="thread-sidebar-scroll"
+          onScroll={event => ListFade.restore(event.currentTarget)}
           data-shortcut-scope={isBoard ? undefined : 'list'}
           onPointerEnter={() => holdOrder('hover', true)}
           onPointerLeave={() => holdOrder('hover', false)}
@@ -7187,11 +7199,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) holdOrder('focus', false)
           }}
           // A floor of about two rows: in a short docked column (free docking with the bottom pane open) the section
-          // scrolls past its controls instead of squeezing the list to a sliver no row fits in. The list ends in 12px of
-          // padding under a 24px fade (round five C5), so a row scrolled to the status bar thins out instead of being cut.
-          // A phone fades only 14px (council round 7 B4): the line above the tab bar reads instead of fading out.
+          // scrolls past its controls instead of squeezing the list to a sliver no row fits in. A row scrolled to the
+          // status bar thins out under a 24px fade (round five C5) instead of being cut; the list ends in padding as deep
+          // as the fade, so the last row, scrolled to the end, is never under it (round nine B6). A phone fades only 14px
+          // (council round 7 B4): the line above the tab bar reads instead of fading out.
           className={cn(
-            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:phone:px-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)] dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]',
+            'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-6 dshx:pointer-coarse:pb-3.5 dshx:phone:px-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)] dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]',
+            // A selected row inside the fade zone switches the fade off (`ListFade`, round nine B6).
+            'dshx:data-[fade-off]:[mask-image:none]',
             isBoard && 'dshx:p-4 dshx:[mask-image:none]',
           )}
           onKeyDown={event => {

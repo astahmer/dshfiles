@@ -37,8 +37,19 @@ describe('phone thread list density (round five B1)', () => {
     expect(client).toContain("className=\"dshx:z-10 dshx:h-6 dshx:px-2 dshx:pointer-coarse:h-7\"")
   })
 
-  it('ends the list in 12px of padding under a 24px fade, so the status bar never cuts the last row hard (round five C5)', () => {
-    expect(client).toContain("'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-3 dshx:phone:px-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]")
+  it('ends the list under a 24px fade, so the status bar never cuts the last row hard (round five C5)', () => {
+    expect(client).toContain("dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]")
+  })
+
+  it('never leaves the selected or the last row under the bottom fade (round nine B6)', () => {
+    // The list ends in padding as deep as its fade: 24px, 14px on touch, so the last row scrolled to the end is clear.
+    expect(client).toContain("'dshx:min-h-32 dshx:flex-1 dshx:overflow-auto dshx:overscroll-y-contain dshx:px-2 dshx:pb-6 dshx:pointer-coarse:pb-3.5 dshx:phone:px-3 dshx:[mask-image:linear-gradient(to_bottom,#000_calc(100%-24px),transparent)]")
+    expect(client).toContain('dshx:pointer-coarse:[mask-image:linear-gradient(to_bottom,#000_calc(100%-14px),transparent)]')
+    // A selected row inside the fade zone switches the fade off instead of scrolling the list (`ListFade`).
+    expect(client).toContain("'dshx:data-[fade-off]:[mask-image:none]'")
+    expect(client).toContain('onScroll={event => ListFade.restore(event.currentTarget)}')
+    expect(client).not.toContain('scroll-mb-6')
+    expect(client).not.toContain("row?.scrollIntoView({ block: 'nearest' })")
   })
 
   it('fades the touch list 14px and keeps the phone list on the shell grid (council round 7 B4, round nine B4)', () => {
