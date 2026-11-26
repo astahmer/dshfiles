@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { InboxView } from './inbox-view.js'
 
 const panel = readFileSync(new URL('./inbox-panel.tsx', import.meta.url), 'utf8')
+const locales = readFileSync(new URL('./inbox-locales.ts', import.meta.url), 'utf8')
 
 describe('the desktop Inbox (council round 15 C1)', () => {
   it('draws no tally beside the page title; the Needs you tab keeps it', () => {
@@ -29,5 +30,45 @@ describe('the desktop Inbox (council round 15 C1)', () => {
     expect(button).toContain('band={InboxView.onBand(status)}')
     for (const quiet of ['variant="ghost"', 'text-muted-foreground', 'ArrowRightIcon']) expect(button).not.toContain(quiet)
     expect(button).toContain('{openLabel}')
+  })
+})
+
+describe('the failed card\'s reason well (council round 15 C2)', () => {
+  const failed = (reason: string, detail: string | null = null) => ({ source: 'thread-sidebar.finished-turn', severity: 'failed' as const, reason, detail })
+
+  it('reads a provider error\'s first line', () => {
+    expect(InboxView.failureWell(failed('“Upgrade the router to v8” failed', '\n  The model provider is overloaded (HTTP 529).\n  at stack'))).toEqual({
+      kind: 'error',
+      line: 'The model provider is overloaded (HTTP 529).',
+    })
+  })
+
+  it('otherwise names the failure in plain words', () => {
+    expect(InboxView.failureWell(failed('“Upgrade the router to v8” failed'))).toEqual({ kind: 'stopped-on-error' })
+    expect(InboxView.failureWell(failed('Turn failed.'))).toEqual({ kind: 'stopped-on-error' })
+    expect(InboxView.failureWell(failed('“Upgrade the router to v8” stopped at the output token limit'))).toEqual({ kind: 'token-limit' })
+    expect(InboxView.failureWell(failed('Turn stopped at the output token limit.'))).toEqual({ kind: 'token-limit' })
+    expect(locales).toContain("failedError: 'Error: {line}',")
+    expect(locales).toContain("failedOnError: 'The turn stopped on an error.',")
+    expect(locales).toContain("failedTokenLimit: 'The turn hit the output token limit.',")
+  })
+
+  it('draws no well when nothing is known, nor on another kind of item', () => {
+    expect(InboxView.failureWell(failed('“Upgrade the router to v8” paused'))).toBeNull()
+    expect(InboxView.failureWell({ ...failed('“Fix auth” finished · ready to review'), severity: 'ready' })).toBeNull()
+    expect(InboxView.failureWell({ ...failed('Push failed', 'rejected'), source: 'jj-integration.land' })).toBeNull()
+  })
+
+  it('is one line on the failed wash in ink, mono for an error, under the title on every width', () => {
+    for (const part of ['dshx:bg-wash-failed', 'dshx:truncate', 'dshx:text-xs', 'dshx:leading-4.5', 'dshx:text-foreground', 'dshx:rounded-md', 'dshx:py-1', 'dshx:px-2.5'])
+      expect(InboxView.FAILURE_WELL).toContain(part)
+    expect(InboxView.FAILURE_WELL_ERROR).toBe('dshx:font-mono')
+    expect(panel).toContain('data-inbox-failure-well={failure.kind}')
+  })
+
+  it('keeps the card compact, so a phone keeps its 46pt head Review (the 390×664 fold has no room for a footer)', () => {
+    expect(panel).toMatch(/failure === null\s*\?\s*InboxView\.cardText\([^]*?: \{ reason: null, detail: null, command: false \}/u)
+    expect(InboxView.compact('failed', { reason: null, detail: null })).toBe(true)
+    expect(InboxView.footsVerbs(true, true)).toBe(false)
   })
 })

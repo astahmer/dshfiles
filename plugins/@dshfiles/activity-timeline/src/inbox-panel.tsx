@@ -229,8 +229,14 @@ const InboxRow = (props: {
   const statusLabel = statusLabelOf(status, t)
   const title = InboxView.subjectTitleOf(item, props.sessionLabel)
   const text = InboxView.textOf(item)
+  // Council round 15 C2: a failed turn says why in one well under its title; its head keeps its one verb (a phone's
+  // 390×664 fold cannot seat a footer Review), so the card stays compact.
+  const failure = InboxView.failureWell(item)
   // Council round 4 (C3): an approval says its title once and reads its command as one; a bodyless Failed item is one row.
-  const card = InboxView.cardText({ source: item.source, reason: InboxView.bodyReason(text.reason, title), detail: text.detail }, title)
+  const card =
+    failure === null
+      ? InboxView.cardText({ source: item.source, reason: InboxView.bodyReason(text.reason, title), detail: text.detail }, title)
+      : { reason: null, detail: null, command: false }
   const reason = card.reason
   const compact = InboxView.compact(status, card)
   const clamped = InboxView.clampsText(item, props.view)
@@ -451,7 +457,13 @@ const InboxRow = (props: {
    * approval's "Runs: `command`" (12/16, the command in ink mono), any other note muted.
    */
   const evidence =
-    reason === null && card.detail === null ? null : (
+    failure !== null ? (
+      <div data-inbox-card-body="" className="dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:flex-col">
+        <span data-inbox-failure-well={failure.kind} className={cn(InboxView.FAILURE_WELL, failure.kind === 'error' && InboxView.FAILURE_WELL_ERROR, InboxView.TEXT_MEASURE)}>
+          {failure.kind === 'error' ? t('failedError', { line: failure.line }) : failure.kind === 'token-limit' ? t('failedTokenLimit') : t('failedOnError')}
+        </span>
+      </div>
+    ) : reason === null && card.detail === null ? null : (
       <div
         data-inbox-card-body=""
         className={cn(

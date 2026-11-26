@@ -122,6 +122,9 @@ const en = {
   quickReplySent: 'Sent “{text}” to the thread.',
   quickReplyFailed: 'The reply did not reach the thread. Open it and send the reply there.',
   writeOwn: 'Write your own…',
+  failedError: 'Error: {line}',
+  failedOnError: 'The turn stopped on an error.',
+  failedTokenLimit: 'The turn hit the output token limit.',
 } as const
 
 const zh = {
@@ -242,6 +245,9 @@ const zh = {
   quickReplySent: '已向线程发送“{text}”。',
   quickReplyFailed: '回复未能送达线程。请打开线程并在那里发送。',
   writeOwn: '自己填写…',
+  failedError: '错误：{line}',
+  failedOnError: '本轮因错误而停止。',
+  failedTokenLimit: '本轮达到了输出 token 上限。',
 } as const
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {

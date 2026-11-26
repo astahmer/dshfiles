@@ -340,6 +340,41 @@ const cardText = (
   return { reason: restates ? null : subject, detail: item.detail, command: item.detail !== null }
 }
 
+/**
+ * What a failed turn's card says under its title (council round 15 C2): one line in a red-soft well. The order is the
+ * provider's error (its detail's first line, as `Error: <line>`), else the failure kind its reason names, in plain
+ * words; with neither, no well. thread-sidebar's failed-turn item carries no error text yet (a Host change, recorded as
+ * a follow-up), so its reason's wording is the kind: "“<title>” failed" or "Turn failed." for an error, "… output
+ * token limit" for the token limit (thread-sidebar inbox-provider FINISH_COPY).
+ */
+export type InboxFailureWell =
+  | { readonly kind: 'error'; readonly line: string }
+  | { readonly kind: 'stopped-on-error' }
+  | { readonly kind: 'token-limit' }
+
+const FAILED_TURN_SOURCE = 'thread-sidebar.finished-turn'
+const TOKEN_LIMIT_REASON = /output token limit\.?$/u
+const ERROR_REASON = /(?:^Turn failed|” failed)\.?$/u
+
+const failureWell = (item: Pick<AttentionItem, 'source' | 'severity' | 'reason' | 'detail'>): InboxFailureWell | null => {
+  if (item.severity !== 'failed' || item.source !== FAILED_TURN_SOURCE) return null
+  const line = item.detail
+    ?.split('\n')
+    .map(part => part.trim())
+    .find(part => part !== '')
+  if (line !== undefined) return { kind: 'error', line }
+  const reason = item.reason.trim()
+  if (TOKEN_LIMIT_REASON.test(reason)) return { kind: 'token-limit' }
+  return ERROR_REASON.test(reason) ? { kind: 'stopped-on-error' } : null
+}
+
+/**
+ * The well (council round 15 C2): the failed wash (the head band's tested AA pair, light oklch(0.94 0.031 25), dark
+ * oklch(0.255 0.032 25)), 6px radius, 4px by 10px inside, one line at 12/18 in ink; an error line is mono.
+ */
+const FAILURE_WELL = 'dshx:block dshx:truncate dshx:rounded-md dshx:bg-wash-failed dshx:px-2.5 dshx:py-1 dshx:text-xs dshx:leading-4.5 dshx:text-foreground'
+const FAILURE_WELL_ERROR = 'dshx:font-mono'
+
 /** A Failed item with nothing to say under its band is one row: its title and its recovery verb, no empty body. */
 const compact = (status: WorkStatus, text: { readonly reason: string | null; readonly detail: string | null }): boolean =>
   status === 'failed' && text.reason === null && text.detail === null
@@ -545,6 +580,9 @@ export class InboxView {
   static readonly PHONE_BAR = PHONE_BAR
   static readonly PHONE_BAR_LEADING = PHONE_BAR_LEADING
   static readonly bodyReason = bodyReason
+  static readonly failureWell = failureWell
+  static readonly FAILURE_WELL = FAILURE_WELL
+  static readonly FAILURE_WELL_ERROR = FAILURE_WELL_ERROR
   static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge
   static readonly undoOf = undoOf
