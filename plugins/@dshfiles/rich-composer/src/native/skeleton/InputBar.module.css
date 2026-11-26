@@ -171,6 +171,17 @@
   display: none;
 }
 
+/* Council round 13 C5: on a phone the passive line under the composer ("billing-api · In the project · 1 ahead of
+   main") repeats what the header and the thread list already say and costs a line over the keyboard. It shows only
+   when an entry flags a state worth seeing (`data-meter-alert`: jujutsu's conflict, behind or detached) or messages
+   wait in the queue; the readings behind its ⋯ stay on desktop and in the context ring. Hidden from the first paint,
+   so readings landing never move the composer. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .root:not(.hero) > .dock:not(:has(:global([data-meter-alert]), .queued)) {
+    display: none;
+  }
+}
+
 .hero {
   /* No bottom pad in the centered hero, but the side clearance must survive:
      the hero wrapper is full-width on narrow viewports, so this padding is
