@@ -51,6 +51,15 @@ describe('the composer send seat (council round 13 C3)', () => {
     expect(disabled).not.toMatch(/transparent/)
   })
 
+  it('rims its resting disc with a 1px border-l2 hairline drawn inside, so a disabled send stays findable (council round 14 C5)', () => {
+    const disabled = rules('', '.primary:disabled')
+    expect(disabled).toMatch(/box-shadow: inset 0 0 0 1px var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+    // Inside the disc, never a border: the circle keeps its 28px box (no layout shift).
+    expect(disabled).not.toMatch(/border:/)
+    // The ready circle (ink) draws no hairline.
+    expect(rules('', '.primary')).not.toMatch(/box-shadow/)
+  })
+
   it.each(['light', 'dark'] as const)('reads the ready glyph and the faint glyph at 3:1 or more (%s)', (scheme: Scheme) => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     expect(PaletteMath.contrastRatio(p.neutral[0]!, p.neutral[10]!)).toBeGreaterThanOrEqual(4.5)

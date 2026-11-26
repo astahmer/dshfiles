@@ -702,8 +702,11 @@
   outline-offset: 2px;
 }
 
+/* Council round 14 C5: the resting disc is rimmed with the border-l2 hairline, drawn inside it (no layout shift), so a
+   disabled send stays findable on the composer card's fill. The ready ink circle needs none. */
 .primary:disabled {
   background: var(--dsw-specific-selector, var(--dshx-tone-raised));
+  box-shadow: inset 0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2));
   color: var(--dsw-alias-label-tertiary);
   cursor: default;
 }
