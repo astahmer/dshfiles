@@ -242,8 +242,16 @@ Then('the run row holds project, host, workspace and model, and sending with the
   await recordAssertion(page, 'rich-composer-run-row-holds-every-pre-send-choice', async () => {
     const row = runRow(page)
     await expect(row.locator('[data-run-segment="project"]')).toBeVisible()
+    // Council round 16 C1: host and working location are one location chip, "Local" while both keep their defaults; its
+    // panel holds both pickers.
+    const location = row.getByRole('button', { name: /^Where this thread runs: Local/u })
+    await expect(location).toContainText('Local')
+    await location.click()
+    await expect(location).toHaveAttribute('aria-expanded', 'true')
     await expect(row.getByRole('button', { name: 'Run on Local', exact: true })).toBeVisible()
     await expect(row.locator('[data-run-segment="workspace"]')).toBeVisible()
+    await page.keyboard.press('Escape')
+    await expect(location).toHaveAttribute('aria-expanded', 'false')
     // Visual refresh T3.2: the pickers ride inside the card's bottom bar (nothing above the input), and the one model
     // seat sits beside Send.
     await expect(page.locator('[data-composer-card] [data-run-row]')).toHaveCount(1)

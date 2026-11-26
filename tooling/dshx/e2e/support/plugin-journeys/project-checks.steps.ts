@@ -6,7 +6,7 @@ import { After, Given, Then, When } from '../bdd.js'
 import { bootComposedPluginProfile } from '../boot.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, profileFor, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
-import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
+import { createScratchDirectory, openComposerLocation, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 /**
  * Trusted actions live only in the profile row, never in a settings form, so a journey writes them to the scratch
@@ -313,6 +313,7 @@ Then('the cancelled check remains available in Project Checks', async ({ page }:
 })
 
 When('the New thread workspace is set to its own workspace', async ({ page }: { page: Page }) => {
+  await openComposerLocation(page)
   const segment = page.locator('[data-run-segment="workspace"]').first()
   await expect(segment).toBeVisible({ timeout: 30_000 })
   await segment.click()

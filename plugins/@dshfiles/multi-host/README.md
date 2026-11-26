@@ -46,7 +46,8 @@ The dedicated reusable hosts page is **Hosts** in navigation and the Workbench c
 ## Using it
 
 The New thread bar (rendered by `@dshfiles/jj-integration`) starts with the
-**host chip**:
+**host chip**, inside the composer's location chip ("Where this thread runs"; it reads "Local" while nothing
+differs from the default):
 
 - **Local ✓** — the default; nothing changes.
 - **A host** — each registered host with a status dot (green: connected, with

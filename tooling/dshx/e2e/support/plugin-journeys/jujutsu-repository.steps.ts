@@ -7,7 +7,7 @@ import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake
 import { After, Then, When } from '../bdd.js'
 import { fakeCommandCodeFor } from '../fake-command-code.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
-import { createScratchDirectory, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
+import { createScratchDirectory, openComposerLocation, registerWorkspaceFolder, sendMessage, startThreadWithModel } from '../threads.js'
 
 interface Repository {
   readonly root: string
@@ -342,6 +342,7 @@ When('the repository is registered and a thread is started in it', async ({ page
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, repository.path)
   // The composer run row's Workspace segment: choose the thread's own workspace.
+  await openComposerLocation(page)
   await page.getByRole('button', { name: /^Workspace: / }).click()
   await page.getByRole('option', { name: /^Own workspace/ }).click()
   await sendMessage(page, 'jujutsu composer context thread')
@@ -376,6 +377,7 @@ When('the repository is registered and its thread answers {string}', async ({ pa
   const repository = repositoryFor(page)
   await registerWorkspaceFolder(page, repository.path)
   // The composer run row's Workspace segment: choose the thread's own workspace.
+  await openComposerLocation(page)
   await page.getByRole('button', { name: /^Workspace: / }).click()
   await page.getByRole('option', { name: /^Own workspace/ }).click()
   await startThreadWithModel(page, { project: repository.path, model: FAKE_COMMAND_CODE_MODEL })

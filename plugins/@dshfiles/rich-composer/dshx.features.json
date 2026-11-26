@@ -575,6 +575,7 @@
         "click button \"New thread\"",
         "expect group \"Run settings\"",
         "expect button \"Choose project\"",
+        "click button \"Where this thread runs: Local*\"",
         "expect button \"Run on Local\"",
         "expect button \"Workspace: *\"",
         "expect button \"Send message\""

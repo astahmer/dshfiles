@@ -55,7 +55,7 @@ blocks the app, makes no model request, and changes the profile only when you co
       **Show the setup wizard** (⌘K) or **Start setup** on the page replays it on any profile.
 
 3. **First tasks** — the new-thread screen offers three tasks for the project on screen (**Explain the project**,
-   **Find a rough edge**, **Add a missing test**) as 28px ghost chips, each with a 20px tile in its own identity tone, on a
+   **Find a rough edge**, **Add a missing test**) as light text-and-icon actions (no fill, the label in secondary ink, the glyph in its own identity tone; council round 16 C1), on a
    line of their own under rich-composer's quiet Resume and Inbox line (round five C4); until the first thread has a message one sentence above them explains them. A task puts its prompt in the composer and never sends it; nothing shows without a
    project on screen. The wizard's First task step offers the same prompts for "this project".
 

@@ -1205,6 +1205,14 @@ button.crumbEditable {
   }
 }
 
+/* Council round 16 C1: under the filled Resume and Inbox chips, onboarding's starters are lighter text-and-icon actions:
+   no fill at rest (the hover above still steps to the selected surface), 8px padding and a 6px gap. */
+.heroSuggestions :global([data-hero-card^='starter-']) {
+  gap: 6px;
+  padding-inline: 8px;
+  background: none;
+}
+
 /* A touch screen keeps the 44pt target. */
 @media (pointer: coarse) {
   .heroSuggestions :global([data-hero-card]) {
@@ -1277,8 +1285,17 @@ button.crumbEditable {
   :global(html[data-shell-phone-nav]) .heroSuggestions {
     order: -1;
     flex-direction: column;
+    flex-wrap: nowrap;
     align-items: stretch;
     padding-top: 0;
+  }
+
+  /* Council round 16 C1: in that column the starters' line takes its content's height, not a 100% basis (which, with
+     the row's wrapping, pushed it into a second column off the right edge), and its actions start at the left edge
+     under Resume and Inbox, wrapping onto a second line. */
+  :global(html[data-shell-phone-nav]) .heroSuggestions :global([data-starter-row]) {
+    flex-basis: auto;
+    justify-content: flex-start;
   }
 }
 
@@ -1527,139 +1544,162 @@ button.crumbEditable {
   }
 }
 
-/* Where the thread runs (b:4qjm). A wide bar dissolves the group: its pickers sit in the run row as before and the phone
-   chip, headings and Done stay out of it. */
-.runPlace,
-.placeSheet {
+/* Where the thread runs (b:4qjm; council round 16 C1). The project chip leads the group; the host and the working
+   location are ONE location chip ("Local", with "Own workspace from main" or a remote host added only when it differs
+   from the default) that opens a panel in the card holding both pickers. A wide bar dissolves the group into the run
+   row; the panel takes a line of its own under the bar (the card clips anything drawn outside it). */
+.runPlace {
   display: contents;
 }
 
-.placeSummary,
+.placeSummary {
+  display: inline-flex;
+  order: -1;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: none;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.placeSummary > svg {
+  flex: none;
+  color: var(--dsw-alias-label-secondary);
+}
+
+/* No host or location picker is installed: nothing to choose, so no chip. */
+.placeSummary[data-place-empty] {
+  display: none;
+}
+
+.placeSummary:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.placeSummary:focus-visible,
+.runPlace[data-place-open] .placeSummary {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+@media (hover: hover) {
+  .placeSummary:hover {
+    background: var(--dsw-alias-interactive-bg-hover);
+  }
+}
+
+.placeSheet,
 .placeHeading,
 .placeLabel,
 .placeDone {
   display: none;
 }
 
-/* A phone bar: the group is one chip on its own first line, ahead of +; the pickers wait in a panel the chip opens in
-   the card, under it (the card clips anything drawn outside it). The attribute selectors outrank the new-thread bar's
-   `.rowHero .runRow > *` (flex: none), which would otherwise keep the chip beside +. */
+.runPlace[data-place-open] .placeSheet {
+  display: grid;
+  order: 3;
+  flex: 0 0 100%;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  box-sizing: border-box;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-md);
+}
+
+.runPlace[data-place-open] .placeSheet > * {
+  grid-column: 1 / -1;
+}
+
+.runPlace[data-place-open] .placeHeading {
+  display: block;
+  grid-row: 1;
+  color: var(--dsw-alias-label-secondary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-weight: 600;
+}
+
+.runPlace[data-place-open] .placeLabel {
+  display: block;
+  grid-column: 1;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+
+.runPlace[data-place-open] [data-place-label='host'] {
+  grid-row: 2;
+}
+
+.runPlace[data-place-open] [data-place-label='workspace'] {
+  grid-row: 3;
+}
+
+.runPlace[data-place-open] .placeSheet :global(span:has(> [data-run-segment='host'])) {
+  grid-row: 2;
+  grid-column: 2;
+  justify-self: start;
+}
+
+.runPlace[data-place-open] .placeSheet :global([data-run-segment='workspace']) {
+  grid-row: 3;
+  grid-column: 2;
+  justify-self: start;
+}
+
+.runPlace[data-place-open] .placeDone {
+  display: inline-flex;
+  justify-self: end;
+  height: 28px;
+  align-items: center;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: var(--dsw-alias-interactive-bg-hover);
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  cursor: pointer;
+}
+
+.placeDone:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+/* A phone bar: the project and location chips share a line of their own, ahead of +; the panel opens under them. The
+   attribute selectors outrank the new-thread bar's `.rowHero .runRow > *` (flex: none). */
 @container (max-width: 560px) {
   .runPlace[data-run-place][data-row-break] {
     display: flex;
     flex: 0 0 100%;
     flex-wrap: wrap;
+    align-items: center;
+    gap: 2px;
     order: -10;
     min-width: 0;
   }
 
-  .placeSummary {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    max-width: 100%;
+  .runPlace[data-run-place][data-row-break] > .runProject {
     min-width: 0;
-    height: 28px;
-    padding: 0 8px;
-    border: 0;
-    border-radius: var(--dsw-radius-sm);
-    background: none;
-    color: var(--dsw-alias-label-secondary);
-    font: inherit;
-    font-size: var(--dsh-content-font-size-secondary, 13px);
-    white-space: nowrap;
-    cursor: pointer;
   }
 
-  .placeSummary:focus-visible,
-  .runPlace[data-place-open] .placeSummary {
-    background: var(--dsw-alias-interactive-bg-hover);
-    color: var(--dsw-alias-label-primary);
-  }
-
-  @media (hover: hover) {
-    .placeSummary:hover {
-      background: var(--dsw-alias-interactive-bg-hover);
-      color: var(--dsw-alias-label-primary);
-    }
-  }
-
-  .placeSheet {
-    display: none;
+  .placeSummary {
+    flex: 0 1 auto;
   }
 
   .runPlace[data-place-open] .placeSheet {
-    display: grid;
-    flex: 0 0 100%;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
-    gap: 4px 12px;
-    margin: 4px 0;
-    padding: 8px 10px;
-    border: 1px solid var(--dsw-alias-border-l2);
-    border-radius: var(--dsw-radius-md);
-  }
-
-  .runPlace[data-place-open] .placeSheet > * {
-    grid-column: 1 / -1;
-  }
-
-  .runPlace[data-place-open] .placeHeading {
-    display: block;
-    grid-row: 1;
-    color: var(--dsw-alias-label-secondary);
-    font-size: var(--dsh-content-font-size-secondary, 13px);
-    font-weight: 600;
-  }
-
-  .runPlace[data-place-open] .placeLabel {
-    display: block;
-    grid-column: 1;
-    color: var(--dsw-alias-label-tertiary);
-    font-size: var(--dsh-content-font-size-secondary, 13px);
-  }
-
-  .runPlace[data-place-open] [data-place-label='project'] {
-    grid-row: 2;
-  }
-
-  .runPlace[data-place-open] [data-place-label='host'] {
-    grid-row: 3;
-  }
-
-  .runPlace[data-place-open] [data-place-label='workspace'] {
-    grid-row: 4;
-  }
-
-  .runPlace[data-place-open] .placeSheet > .runProject {
-    grid-row: 2;
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .runPlace[data-place-open] .placeSheet :global(span:has(> [data-run-segment='host'])) {
-    grid-row: 3;
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .runPlace[data-place-open] .placeSheet :global([data-run-segment='workspace']) {
-    grid-row: 4;
-    grid-column: 2;
-    justify-self: start;
-  }
-
-  .runPlace[data-place-open] .placeDone {
-    display: inline-flex;
-    justify-self: end;
-    height: 28px;
-    align-items: center;
-    padding: 0 10px;
-    border: 0;
-    border-radius: var(--dsw-radius-md);
-    background: var(--dsw-alias-interactive-bg-hover);
-    color: var(--dsw-alias-label-primary);
-    font: inherit;
-    cursor: pointer;
+    margin-bottom: 4px;
   }
 }

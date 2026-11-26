@@ -14339,6 +14339,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
+          "value": null
+        },
+        {
           "text": "expect button \"Workspace: *\"",
           "action": "expect",
           "by": "button",
@@ -14539,6 +14546,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": "Enter"
         },
         {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
+          "value": null
+        },
+        {
           "text": "expect button \"Workspace: *\"",
           "action": "expect",
           "by": "button",
@@ -14616,10 +14630,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect button \"Workspace: Own workspace*\"",
+          "text": "expect button \"Local · Own workspace*\"",
           "action": "expect",
           "by": "button",
-          "name": "Workspace: Own workspace*",
+          "name": "Local · Own workspace*",
           "value": null
         }
       ],
@@ -14640,6 +14654,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
           "value": null
         },
         {
@@ -18773,6 +18794,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
+          "value": null
+        },
+        {
           "text": "click button \"Run on Local\"",
           "action": "click",
           "by": "button",
@@ -18821,6 +18849,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
           "value": null
         },
         {
@@ -19339,6 +19374,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "click",
           "by": "button",
           "name": "New session",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: *",
           "value": null
         },
         {
@@ -21630,6 +21672,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Choose project",
+          "value": null
+        },
+        {
+          "text": "click button \"Where this thread runs: Local*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Where this thread runs: Local*",
           "value": null
         },
         {

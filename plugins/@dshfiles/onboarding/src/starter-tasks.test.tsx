@@ -41,7 +41,7 @@ describe('StarterTasks.beforeFirstThread', () => {
 })
 
 describe('the starter line (round five C4, council round 3)', () => {
-  it('sets at most three starters on a line of their own, in the hero chip style, each with a 20px identity-tone tile (council round 13 C6)', () => {
+  it('sets at most three starters on a line of their own as light text-and-icon actions, each glyph in its identity tone (council round 16 C1)', () => {
     const { container } = render(<StarterTaskCards beforeFirstThread={false} insert={() => undefined} project="sample" />)
     const line = container.querySelector<HTMLElement>('[data-starter-row]')
     expect(line).not.toBeNull()
@@ -52,12 +52,14 @@ describe('the starter line (round five C4, council round 3)', () => {
     expect(chips).toHaveLength(3)
     for (const chip of chips) {
       const classes = chip.className.split(/\s+/u)
-      // One chip style with Resume and Inbox: 32px, radius 8, raised fill, no border, 12px padding, 8px gap.
-      for (const token of ['dshx:h-8', 'dshx:rounded-lg', 'dshx:bg-secondary', 'dshx:border-0', 'dshx:px-3', 'dshx:gap-2', 'dshx:hover:bg-(--dshx-tone-selected)']) expect(classes).toContain(token)
-      expect(classes).not.toContain('dshx:bg-transparent')
+      // Lighter than Resume and Inbox: 32px, no fill, no border, 8px padding, 6px gap, the label in secondary ink; the
+      // hover steps to the selected surface.
+      for (const token of ['dshx:h-8', 'dshx:rounded-lg', 'dshx:bg-transparent', 'dshx:border-0', 'dshx:px-2', 'dshx:gap-1.5', 'dshx:text-muted-foreground', 'dshx:hover:bg-(--dshx-tone-selected)']) expect(classes).toContain(token)
+      expect(classes).not.toContain('dshx:bg-secondary')
+      expect(chip.querySelector('span:not([data-starter-tile])')?.className).not.toContain('dshx:text-foreground')
       const tile = chip.querySelector<HTMLElement>('[data-starter-tile]')
-      expect(tile?.className).toContain('dshx:size-5')
-      expect(tile?.className).toMatch(/dshx:bg-identity-\d\/14 dshx:text-identity-\d/u)
+      expect(tile?.className).toMatch(/dshx:text-identity-\d/u)
+      expect(tile?.className).not.toMatch(/dshx:bg-/u)
       // Green (identity 5) sits beside the success hue: never on a starter.
       expect(tile?.className).not.toContain('identity-5')
     }

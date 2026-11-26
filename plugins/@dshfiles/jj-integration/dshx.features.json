@@ -9,6 +9,7 @@
       "details": "The Workspace segment of a new thread\u2019s run row: its own jj workspace (from a chosen bookmark, or from a remote bookmark such as main@origin that the Host fetches first) or in place in the project checkout, defaulting to the isolate-by-default setting; unsent drafts, attachments, and structured references follow workspace changes. A project that is not a Jujutsu repository yet says so in the same segment and offers Enable, which runs the guarded colocated init the folder picker uses; the segment becomes the real one when the Host reports a repository.",
       "reach": [
         "click button \"New session\"",
+        "click button \"Where this thread runs: *\"",
         "expect button \"Workspace: *\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Keep this draft\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
@@ -402,6 +403,7 @@
         "fill textbox \"Search projects or enter a folder path\" \"sample\"",
         "expect option \"sample*\"",
         "press Enter",
+        "click button \"Where this thread runs: *\"",
         "expect button \"Workspace: *\"",
         "click button \"Workspace: *\"",
         "click option \"Own workspace*\"",
@@ -413,7 +415,7 @@
         "click button \"New thread\"",
         "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
         "expect button \"Choose project\"",
-        "expect button \"Workspace: Own workspace*\""
+        "expect button \"Local · Own workspace*\""
       ],
       "surfaces": ["host", "client", "integration"],
       "surface": "composerContribution",
@@ -506,6 +508,7 @@
       "details": "The sidebar's New thread, the palette and the project picker open the composer at once and claim nothing: with isolation on by default the blank thread waits in the project (or inherited) checkout. Once its draft holds something, the destination is prepared in the background (the jj workspace claimed, its blank Session connected) so the first send copies the draft and submits instead of waiting for both; the send still holds the composer until that Session is open. The created thread takes the view only while this New thread screen is the visible main view, and is otherwise offered in a toast. An abandoned draft keeps the prepared workspace as the project's spare, which a reload or the next New thread reuses. A thread left in another thread's workspace moves back to the project checkout on arrival when isolation is off, which creates nothing.",
       "reach": [
         "click button \"New thread\"",
+        "click button \"Where this thread runs: *\"",
         "expect button \"Workspace: *\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"prepared while writing\"",
         "expect text \"prepared while writing\""

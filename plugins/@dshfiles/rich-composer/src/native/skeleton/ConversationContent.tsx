@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import clsx from 'clsx'
-import { IconFolderOpenRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
+import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { ChevronDownIcon, FolderIcon, LaptopIcon, ServerIcon } from '@dshfiles/plugin-ui/icons'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
@@ -67,10 +67,18 @@ export function ConversationContent(props: ConversationContentProps) {
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
   const pickerAnchor = useRef<HTMLButtonElement>(null)
   const agentPresetShown = useSyncExternalStore(AgentPresetVisibility.subscribe, AgentPresetVisibility.get, AgentPresetVisibility.get)
-  // b:4qjm: on a phone the project, host and workspace pickers fold into one chip that opens a panel holding all three.
+  // Council round 16 C1 (b:4qjm): the host and working-location pickers fold into ONE location chip on every width; it
+  // opens a panel in the card holding both. The project chip stays its own control beside it.
   const [placeOpen, setPlaceOpen] = useState(false)
   const placeRef = useRef<HTMLSpanElement>(null)
-  const placeText = useRunPlaceText(placeRef)
+  const placeSummaryRef = useRef<HTMLButtonElement>(null)
+  const placeSheetId = useId()
+  const { place, alert: placeAlert } = useRunPlaceText(placeRef)
+  const closePlace = useCallback((): void => {
+    // Focus inside the panel returns to the chip that opened it, so a keyboard user is not dropped on the page.
+    if (placeRef.current?.contains(document.activeElement) === true) placeSummaryRef.current?.focus()
+    setPlaceOpen(false)
+  }, [])
   // Unslop r5 C1: below 28rem the dock's jobs and subagents fold into one Live work row; open per thread.
   const stackRef = useRef<HTMLDivElement>(null)
   const liveWork = useLiveWorkCounts(stackRef)
@@ -87,7 +95,7 @@ export function ConversationContent(props: ConversationContentProps) {
       setPlaceOpen(false)
     }
     const escape = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !event.defaultPrevented) setPlaceOpen(false)
+      if (event.key === 'Escape' && !event.defaultPrevented) closePlace()
     }
     document.addEventListener('pointerdown', close, true)
     document.addEventListener('keydown', escape)
@@ -95,7 +103,7 @@ export function ConversationContent(props: ConversationContentProps) {
       document.removeEventListener('pointerdown', close, true)
       document.removeEventListener('keydown', escape)
     }
-  }, [placeOpen])
+  }, [placeOpen, closePlace])
 
   // Publishes the two live measurements floating View chrome reads off the
   // scroll body: the seat's height as --dsh-composer-height, so controls clear
@@ -188,26 +196,11 @@ export function ConversationContent(props: ConversationContentProps) {
   // owner keeps its own state; this row only places their slots, so a missing owner just drops its segment.
   const heroWorkspaceRow = (
     <>
-      {/* b:4qjm: one group for where the thread runs. Wide bars lay its pickers out in the row as before; a phone bar shows
-          one "sample · In the project" chip on its own line, opening a panel with the three pickers. */}
-      <span className={css.runPlace} data-run-place="" data-place-open={placeOpen ? '' : undefined} data-row-break="" ref={placeRef}>
-        <button
-          type="button"
-          className={clsx(css.placeSummary, 'dshx-hit-44')}
-          aria-expanded={placeOpen}
-          aria-label={t('runRow.placeSummary', { place: placeText ?? chipTitle ?? t('runRow.project') })}
-          onClick={() => { setPlaceOpen(open => !open) }}
-          data-place-summary=""
-        >
-          {chipTitle === undefined ? <IconFolderOpenRegular size={13} aria-hidden /> : <ProjectMark name={chipTitle} size="dense" />}
-          <span className={css.runSummaryText}>{placeText ?? chipTitle ?? t('runRow.project')}</span>
-          <ChevronDownIcon size={12} aria-hidden />
-        </button>
-        <span className={css.placeSheet} role="group" aria-label={t('runRow.placeSheet')} data-place-sheet="">
-          <span className={css.placeHeading} aria-hidden>{t('runRow.placeSheet')}</span>
-          <span className={css.placeLabel} data-place-label="project" aria-hidden>{t('runRow.placeProject')}</span>
-          <span className={css.placeLabel} data-place-label="host" aria-hidden>{t('runRow.placeHost')}</span>
-          <span className={css.placeLabel} data-place-label="workspace" aria-hidden>{t('runRow.placeWorkspace')}</span>
+      {/* b:4qjm, council round 16 C1: one group for where the thread runs. The project chip leads it; the host and the
+          working location fold into one location chip ("Local", plus a detail only when either differs from the
+          default) that opens a panel with both pickers. A phone bar gives the group a line of its own. */}
+      {/* A picker's error (an unreadable destination, a failed switch) never waits behind the closed chip: the panel opens. */}
+      <span className={css.runPlace} data-run-place="" data-place-open={placeOpen || placeAlert ? '' : undefined} data-row-break="" ref={placeRef}>
       <span className={css.runProject} data-run-segment="project" data-thread-workspace={threadWorkspaceName}>
         {/* Unslop r5 C5: the project's identity tile, the one the thread list and tabs draw, beside the chip rather than
             in it, so the chip's text stays the project's name (scratch seeding and journeys read it). */}
@@ -223,6 +216,27 @@ export function ConversationContent(props: ConversationContentProps) {
           />
         </Tooltip>
       </span>
+        <button
+          ref={placeSummaryRef}
+          type="button"
+          className={clsx(css.placeSummary, 'dshx-hit-44')}
+          aria-expanded={placeOpen || placeAlert}
+          aria-controls={placeSheetId}
+          // The name says every part ("Local · In the project"); the chip shows only what differs from the default.
+          aria-label={t('runRow.placeSummary', { place: place?.full ?? '' })}
+          onClick={() => { if (placeOpen || placeAlert) closePlace(); else setPlaceOpen(true) }}
+          data-place-summary=""
+          data-run-segment="location"
+          data-place-empty={place === undefined ? '' : undefined}
+        >
+          {place?.host === 'remote' ? <ServerIcon size={14} aria-hidden /> : place?.host === 'local' ? <LaptopIcon size={14} aria-hidden /> : <FolderIcon size={14} aria-hidden />}
+          <span className={css.runSummaryText}>{place?.shown}</span>
+          <ChevronDownIcon size={12} aria-hidden />
+        </button>
+        <span className={css.placeSheet} id={placeSheetId} role="group" aria-label={t('runRow.placeSheet')} data-place-sheet="">
+          <span className={css.placeHeading} aria-hidden>{t('runRow.placeSheet')}</span>
+          <span className={css.placeLabel} data-place-label="host" aria-hidden>{t('runRow.placeHost')}</span>
+          <span className={css.placeLabel} data-place-label="workspace" aria-hidden>{t('runRow.placeWorkspace')}</span>
       {renderSlot('conversation.hero.workspace', {
         open: pickerOpen,
         anchorRef: pickerAnchor,
@@ -236,7 +250,7 @@ export function ConversationContent(props: ConversationContentProps) {
         },
         onClose: () => { setPickerOpen(false) },
       })}
-          <button type="button" className={css.placeDone} onClick={() => { setPlaceOpen(false) }}>{t('runRow.placeDone')}</button>
+          <button type="button" className={css.placeDone} onClick={closePlace}>{t('runRow.placeDone')}</button>
         </span>
       </span>
       {/* b:4v6p: unless Settings always shows it, the picker hides while the draft keeps the default agent mode. */}
@@ -375,32 +389,78 @@ export function textWithoutMarks(element: Element | null): string {
   return copy.textContent ?? ''
 }
 
+/** What the location chip says (council round 16 C1): every part for its name, the non-default ones on the chip. */
+export interface RunPlace {
+  /** "Local · In the project": the host, a remote folder and the working location, for the chip's accessible name. */
+  readonly full: string
+  /** "Local", or "Local · Own workspace from main" once the working location differs from its default. */
+  readonly shown: string
+  /** Which glyph leads the chip; undefined when no host picker is installed. */
+  readonly host: 'local' | 'remote' | undefined
+}
+
+/** A picker's words with a space between its parts ("Own workspace" + "from main"), never "Own workspacefrom main". */
+const segmentText = (element: Element | null): string => {
+  if (element === null) return ''
+  const parts = Array.from(element.childNodes, node => {
+    if (!(node instanceof Element)) return node.textContent ?? ''
+    return node.getAttribute('data-slot') === 'project-mark' ? '' : textWithoutMarks(node)
+  })
+  return parts.join(' ').replace(/\s+/gu, ' ').trim()
+}
+
 /**
- * "sample · In the project": what the project, host and workspace pickers in the place group say now, read
- * from their own segments (b:4qjm) so each owner keeps its state. Undefined until a segment has text.
- * @param ref - the place group.
- * @returns the joined text.
+ * Read the place group's host and working-location pickers from their own segments (b:4qjm), so each owner keeps its
+ * state: multi-host's host chip (`data-host-kind`), jj-integration's workspace segment (`data-location-default` while it
+ * keeps the project's default) and a remote host's folder chip. The chip names the host, and the working location only
+ * when it differs from the default, or when no host picker could name the place.
+ * @param place - the place group.
+ * @returns the chip's words, or undefined when neither picker is installed.
  */
-function useRunPlaceText(ref: { readonly current: HTMLElement | null }): string | undefined {
-  const [text, setText] = useState<string | undefined>(undefined)
+export function readRunPlace(place: Element): RunPlace | undefined {
+  const host = place.querySelector('[data-run-segment="host"]')
+  const workspace = place.querySelector('[data-run-segment="workspace"]')
+  const hostText = segmentText(host)
+  const folderText = segmentText(place.querySelector('[data-remote-folder]'))
+  const workspaceText = segmentText(workspace)
+  const full = [hostText, folderText, workspaceText].filter(part => part !== '')
+  if (full.length === 0) return undefined
+  const quietWorkspace = hostText !== '' && workspace?.hasAttribute('data-location-default') === true
+  const shown = [hostText, folderText, quietWorkspace ? '' : workspaceText].filter(part => part !== '')
+  const hostKind = host === null ? undefined : host.getAttribute('data-host-kind') === 'local' ? 'local' : 'remote'
+  return { full: full.join(' · '), shown: shown.join(' · '), host: hostKind }
+}
+
+const samePlace = (left: RunPlace | undefined, right: RunPlace | undefined): boolean =>
+  left === right || (left !== undefined && right !== undefined && left.full === right.full && left.shown === right.shown && left.host === right.host)
+
+/**
+ * The location chip's words, kept current as the pickers in the place group change (text, a host switch, a workspace
+ * choice), and whether a picker in its panel shows an error. Undefined words until a picker has text.
+ * @param ref - the place group.
+ * @returns what the chip says, and whether the panel holds an alert.
+ */
+function useRunPlaceText(ref: { readonly current: HTMLElement | null }): { readonly place: RunPlace | undefined; readonly alert: boolean } {
+  const [text, setText] = useState<RunPlace | undefined>(undefined)
+  const [alert, setAlert] = useState(false)
   useEffect(() => {
     const place = ref.current
     if (place === null) return
     const read = (): void => {
-      const parts = ['project', 'host', 'workspace'].flatMap(segment => {
-        const element = place.querySelector(`[data-run-segment="${segment}"]`)
-        // b:212a: "sample · Own workspace": this machine is the default, so only a remote host is named.
-        if (segment === 'host' && element?.getAttribute('data-host-kind') === 'local') return []
-        const value = textWithoutMarks(element).replace(/\s+/gu, ' ').trim()
-        return value === '' ? [] : [value]
-      })
-      const next = parts.length === 0 ? undefined : parts.join(' · ')
-      setText(current => (current === next ? current : next))
+      const next = readRunPlace(place)
+      setText(current => (samePlace(current, next) ? current : next))
+      setAlert(place.querySelector('[data-place-sheet] [role="alert"]') !== null)
     }
     read()
     const observer = new MutationObserver(read)
-    observer.observe(place, { subtree: true, childList: true, characterData: true })
+    observer.observe(place, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['data-host-kind', 'data-location-default'],
+    })
     return () => { observer.disconnect() }
   }, [ref])
-  return text
+  return { place: text, alert }
 }

@@ -26,6 +26,7 @@
       "externalDependencies": [],
       "reach": [
         "click button \"New session\"",
+        "click button \"Where this thread runs: *\"",
         "click button \"Run on Local\"",
         "click option \"Add host…\"",
         "expect dialog \"Add host\"",
@@ -35,6 +36,7 @@
       "reachNarrow": [
         "click button \"Back to Threads\"",
         "click button \"New thread\"",
+        "click button \"Where this thread runs: *\"",
         "click button \"Run on Local\"",
         "click option \"Add host…\"",
         "expect dialog \"Add host\"",
@@ -684,7 +686,7 @@
           "deterministicFake": "Use an injected in-memory gateway transport with synthetic token and runtime identities; no real DSH profile credentials."
         }
       ],
-      "reach": ["seed multi-host-hosts", "click button \"New session\"", "click button \"Run on Local\"", "expect text \"Auto\""],
+      "reach": ["seed multi-host-hosts", "click button \"New session\"", "click button \"Where this thread runs: *\"", "click button \"Run on Local\"", "expect text \"Auto\""],
       "verification": [
         {
           "kind": "gherkin",

@@ -428,6 +428,12 @@
   caret-color: var(--dsw-alias-state-business-primary);
 }
 
+/* Council round 16 C1: the New thread composer reads as a place to write: its empty writing area is 10px taller (54px:
+   a 24px line, 10px above it, 20px under it) than a started thread's, still growing with the draft. */
+.hero .input {
+  min-height: 54px;
+}
+
 /* Lexical paragraphs are <p> blocks: strip the UA margins so the surface
    keeps the textarea's line rhythm. */
 .input p {

@@ -13,6 +13,7 @@ import { bootComposedPluginProfile, type BootedProfile } from '../boot.js'
 import { startMutationResponseProxy } from '../mutation-response-proxy.mjs'
 import { reserveLoopbackPort, startLoopbackSshd } from '../loopback-sshd.mjs'
 import { allowLoopbackBrowserOrigin, finishJourneyAssertions, recordAssertion, visitIsolatedPluginProfile } from '../steps.js'
+import { openComposerLocation } from '../threads.js'
 import { connectDshxApi } from '../../../packages/dshx/src/platform/dshx-api.js'
 import { DSHFILES_ROOT } from '../../../packages/dshx/src/project/local-bundles.js'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
@@ -513,6 +514,7 @@ When('Auto creates a thread through the remote folder picker', async ({ page }: 
     await page.keyboard.press('Escape')
     await expect(initialFolderPicker).toBeHidden()
   }
+  await openComposerLocation(page)
   await page.getByRole('button', { name: /^Run on /u }).click()
   const autoOption = page.getByRole('option', { name: /^Auto/u })
   await expect(autoOption).toContainText(scratchRemoteName, { timeout: 30_000 })
@@ -1367,6 +1369,7 @@ When('a Git project is cloned with selected local files', async ({ page }: { rea
   const gitServer = await startScratchGitServer({ projectPath: sourceProjectPath, scratchRoot: pair.sshd.scratchRoot })
 
   try {
+    await openComposerLocation(page)
     await page.getByRole('button', { name: /^Run on /u }).click()
     const cloneTargetGroup = page.getByRole('group', { name: 'Add project to another machine' })
     const cloneTarget = cloneTargetGroup.getByRole('option', { name: scratchRemoteName, exact: true })

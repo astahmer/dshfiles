@@ -9,7 +9,7 @@ import { basename, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { After, Then, When } from '../bdd.js'
 import { finishJourneyAssertions, openSettingsDialog, recordAssertion, settingsNavEntry, settingsPage } from '../steps.js'
-import { confirmFolderSetupStep, createScratchDirectory, selectModelForNewThread } from '../threads.js'
+import { confirmFolderSetupStep, createScratchDirectory, openComposerLocation, selectModelForNewThread } from '../threads.js'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import { withUnknownProperties } from '../../../packages/dshx/src/schema.js'
@@ -228,8 +228,11 @@ const dismissGetStartedDialog = async (page: Page): Promise<void> => {
   await dialog.getByRole('button', { name: 'Close', exact: true }).click()
   await expect(dialog).toBeHidden()
 }
-/** The composer run row's Workspace segment: "Workspace: Own workspace from main" or "Workspace: In the project". */
-const workspaceToggle = (page: Page) => page.getByRole('button', { name: /^Workspace: / })
+/**
+ * The composer's Workspace picker: "Workspace: Own workspace from main" or "Workspace: In the project". It waits in the
+ * location chip's panel (council round 16 C1), so it is found while hidden; a click or a visibility check opens the panel.
+ */
+const workspaceToggle = (page: Page) => page.getByRole('button', { name: /^Workspace: /, includeHidden: true })
 const expectOwnWorkspace = (page: Page, own: boolean, bookmark?: string) =>
   expect(workspaceToggle(page)).toHaveAccessibleName(
     own ? (bookmark === undefined ? /^Workspace: Own workspace/ : `Workspace: Own workspace from ${bookmark}`) : 'Workspace: In the project',
@@ -237,7 +240,10 @@ const expectOwnWorkspace = (page: Page, own: boolean, bookmark?: string) =>
 const chooseWorkspace = async (page: Page, choice: 'Own workspace' | 'In the project'): Promise<void> => {
   // The destination bar can remount while a new thread settles on its project, which closes an open menu: reopen it.
   await expect(async () => {
-    if ((await page.getByRole('option', { name: new RegExp(`^${choice}`) }).count()) === 0) await workspaceToggle(page).click()
+    if ((await page.getByRole('option', { name: new RegExp(`^${choice}`) }).count()) === 0) {
+      await openComposerLocation(page)
+      await workspaceToggle(page).click()
+    }
     await page.getByRole('option', { name: new RegExp(`^${choice}`) }).click({ timeout: 3_000 })
   }).toPass({ timeout: 20_000 })
 }
@@ -436,6 +442,7 @@ Then('the New thread workspace starts from the project\'s main branch {string}',
 
 When('the {string} bookmark is picked in the destination bar and refused', async ({ page }: { page: Page }, bookmark: string) => {
   const refusal = page.getByText(`"${bookmark}" points at more than one revision, so no workspace was created.`, { exact: false })
+  await openComposerLocation(page)
   await workspaceToggle(page).click()
   await page.getByPlaceholder('Search workspaces and bookmarks').fill(bookmark)
   await page.getByRole('option', { name: bookmark, exact: true }).click()
@@ -529,6 +536,7 @@ Then('the destination bar offers the main branch in the shared git checkout', as
   const repository = repositoryFor(page)
   // The run row's Workspace segment lists the branches a thread can start from, as it lists jj bookmarks.
   await recordAssertion(page, 'jj-integration-git-destination-starts-on-main', async () => {
+    await openComposerLocation(page)
     await workspaceToggle(page).click()
     await expect(page.getByRole('option', { name: 'main', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
@@ -736,6 +744,7 @@ When('the New thread workspace is kept in the shared checkout', async ({ page }:
 })
 
 When('the {string} bookmark is picked in the destination bar', async ({ page }: { page: Page }, bookmark: string) => {
+  await openComposerLocation(page)
   await workspaceToggle(page).click()
   await page.getByPlaceholder('Search workspaces and bookmarks').fill(bookmark)
   await page.getByRole('option', { name: bookmark, exact: true }).click()
@@ -968,6 +977,7 @@ Then('the prepared destination is a checked-out thread workspace', async ({ page
 
 Then('the New thread screen still shows that draft', async ({ page }: { page: Page }) => {
   await expect(newThreadComposer(page)).toHaveText('typed before the thread has a workspace')
+  await openComposerLocation(page)
   await expect(workspaceToggle(page)).toBeVisible()
 })
 
@@ -1163,6 +1173,7 @@ Then('the blank new thread returns to the owning project checkout', async ({ pag
     await expect(newThreadComposer(page)).toBeVisible()
     await expect(newThreadComposer(page)).toHaveText('')
     await expect(projectButton(page)).toHaveText('repo', { timeout: 15_000 })
+    await openComposerLocation(page)
     await expect(workspaceToggle(page)).toBeVisible()
     await expectOwnWorkspace(page, false)
     expect(workspaceNames(repository, [provisionedThreadName(page)])).toEqual(['default', provisionedThreadName(page)])
@@ -1202,6 +1213,7 @@ When('a plain folder is chosen as the New thread project', async ({ page }: { pa
 
 Then('the destination bar offers Initialize repository instead of a workspace toggle', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-not-a-repository-offers-initialize', async () => {
+    await openComposerLocation(page)
     const destination = page.getByLabel('New thread destination', { exact: true })
     await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toBeVisible({ timeout: 30_000 })
     await expect(destination.getByRole('button', { name: 'Initialize repository', exact: true })).toBeVisible()
@@ -1209,6 +1221,7 @@ Then('the destination bar offers Initialize repository instead of a workspace to
 })
 
 When('Initialize repository is clicked in the destination bar', async ({ page }: { page: Page }) => {
+  await openComposerLocation(page)
   await page.getByLabel('New thread destination', { exact: true }).getByRole('button', { name: 'Initialize repository', exact: true }).click()
 })
 
@@ -1219,6 +1232,7 @@ Then('the opened project becomes a Jujutsu repository', async ({ page }: { page:
     await expect.poll(() => existsSync(join(folder, '.jj')), { timeout: 60_000 }).toBe(true)
     const destination = page.getByLabel('New thread destination', { exact: true })
     await expect(destination.getByText('Not a Jujutsu repository', { exact: true })).toHaveCount(0, { timeout: 30_000 })
+    await openComposerLocation(page)
     await expect(workspaceToggle(page)).toBeVisible()
   })
   await finishJourneyAssertions(page)
@@ -1226,10 +1240,12 @@ Then('the opened project becomes a Jujutsu repository', async ({ page }: { page:
 
 Then('the destination bar offers the main bookmark in the shared checkout', async ({ page }: { page: Page }) => {
   const repository = repositoryFor(page)
-  await recordAssertion(page, 'jj-integration-destination-names-the-local-host', () =>
-    expect(page.getByLabel('New thread destination', { exact: true }).getByText('Local', { exact: true })).toBeVisible(),
-  )
+  await recordAssertion(page, 'jj-integration-destination-names-the-local-host', async () => {
+    await openComposerLocation(page)
+    await expect(page.getByLabel('New thread destination', { exact: true }).getByText('Local', { exact: true })).toBeVisible()
+  })
   await recordAssertion(page, 'jj-integration-destination-starts-on-the-configured-bookmark', async () => {
+    await openComposerLocation(page)
     await workspaceToggle(page).click()
     await expect(page.getByRole('option', { name: 'main', exact: true })).toBeVisible()
     await page.keyboard.press('Escape')
@@ -1264,6 +1280,7 @@ Then('the blank thread returns to the shared checkout and its workspace is kept 
 Then('the destination bar offers neither a bookmark nor a workspace toggle', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'jj-integration-no-folder-has-no-jj-destination', async () => {
     await expect(projectButton(page)).toHaveText(/no-folder|No folder/)
+    await openComposerLocation(page)
     await expect(page.getByLabel('New thread destination', { exact: true }).getByText('Local', { exact: true })).toBeVisible()
     await expect(workspaceToggle(page)).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'main', exact: true })).toHaveCount(0)

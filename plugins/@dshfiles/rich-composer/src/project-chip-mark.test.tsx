@@ -32,11 +32,11 @@ const between = (start: string, end: string): string => source.slice(source.inde
 
 // Unslop round five, C5: the composer's project chips show the project's identity tile, as the thread list does.
 describe('the composer project chip', () => {
-  it("leads the started thread's summary chip and the phone place chip with the project's 16px mark", () => {
+  it("leads the started thread's summary chip with the project's 16px mark; the location chip names no project (council round 16 C1)", () => {
     const summary = between('data-run-summary=""', '</Tooltip>')
     expect(summary).toContain('<ProjectMark name={chipTitle} size="dense" />')
     expect(summary).not.toContain('IconFolderOpenRegular')
-    expect(between('data-place-summary=""', '</button>')).toContain('<ProjectMark name={chipTitle} size="dense" />')
+    expect(between('data-place-summary=""', '</button>')).not.toContain('ProjectMark')
   })
 
   it("puts the new thread's mark beside the project chip, so the chip's text stays the project's name", async () => {

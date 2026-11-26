@@ -15,13 +15,13 @@ interface SessionRow {
 const ICONS = { explain: BookOpenIcon, 'rough-edge': BugIcon, test: FlaskConicalIcon } as const
 
 /**
- * Each starter's 20px tile in its own identity tone (round five C4, council round 3): glyph at the tone, a 14% tile
- * behind it, the label in ink. Identity 5 (green) is never used: it sits beside the success hue.
+ * Each starter's glyph in its own identity tone (round five C4, council round 3; council round 16 C1: no tile behind
+ * it). Identity 5 (green) is never used: it sits beside the success hue.
  */
 const TILES = {
-  explain: 'dshx:bg-identity-7/14 dshx:text-identity-7',
-  'rough-edge': 'dshx:bg-identity-3/14 dshx:text-identity-3',
-  test: 'dshx:bg-identity-2/14 dshx:text-identity-2',
+  explain: 'dshx:text-identity-7',
+  'rough-edge': 'dshx:text-identity-3',
+  test: 'dshx:text-identity-2',
 } as const satisfies Record<StarterTask['id'], string>
 
 /** Three first tasks for one project, or for "this project" when none is named; each one only reads or proposes first. */
@@ -46,16 +46,17 @@ export class StarterTasks {
   static readonly beforeFirstThread = beforeFirstThread
 }
 
-// The hero chip style, shared with thread-sidebar's Resume and Inbox (council round 13 C6): 32px, radius 8, the raised
-// fill with no border, 12px padding and an 8px gap; the hover steps to the selected surface; 44pt on touch. The
-// rich-composer hero lays the same values over every `[data-hero-card]`.
+// Council round 16 C1: the starters are lighter than Resume and Inbox (which keep the filled hero chip): a text-and-icon
+// action with no fill, the label in secondary ink, 32px tall with 8px padding and a 6px gap; the hover steps to the
+// selected surface and the label to ink; 44pt on touch. The rich-composer hero leaves `[data-hero-card^='starter-']`
+// unfilled.
 const CHIP =
-  'dshx-root dshx:inline-flex dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-0 dshx:bg-secondary dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-(--dshx-tone-selected) dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base'
+  'dshx-root dshx:inline-flex dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border-0 dshx:bg-transparent dshx:px-2 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-(--dshx-tone-selected) dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base'
 
-const TILE = 'dshx:grid dshx:size-5 dshx:flex-none dshx:place-items-center dshx:rounded-sm dshx:[&_svg]:size-3.5'
+const TILE = 'dshx:grid dshx:size-4 dshx:flex-none dshx:place-items-center dshx:[&_svg]:size-3.5'
 
 /**
- * The new-thread hero's suggested tasks (calm-onboarding C2, round five B8): three outline chips for the project on
+ * The new-thread hero's suggested tasks (calm-onboarding C2, round five B8): three light actions for the project on
  * screen, beside Resume and Inbox. Until the first thread has a message one sentence explains them; after that the
  * chips stay on their own, so a new thread always offers a start. A chip puts its prompt in the composer and never sends
  * it.
@@ -86,7 +87,7 @@ export const StarterTaskCards = (props: {
                 <span aria-hidden="true" className={`${TILE} ${TILES[task.id]}`} data-starter-tile="">
                   <Icon />
                 </span>
-                <span className="dshx:min-w-0 dshx:truncate dshx:font-medium dshx:text-foreground">{task.label}</span>
+                <span className="dshx:min-w-0 dshx:truncate">{task.label}</span>
               </button>
             )
           })}

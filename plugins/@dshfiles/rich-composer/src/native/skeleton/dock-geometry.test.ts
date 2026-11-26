@@ -75,7 +75,7 @@ describe('the new-thread hero (round five C4, council round 3)', () => {
     expect(block('.heroSuggestions')).toMatch(/row-gap: 8px;/)
   })
 
-  it('draws Resume, Review, Inbox and the starters in one chip style: 32px, radius 8, raised fill, no border, 12px padding, 8px apart (council round 13 C6)', () => {
+  it('draws Resume, Review and Inbox in one chip style: 32px, radius 8, raised fill, no border, 12px padding, 8px apart (council round 13 C6)', () => {
     const chip = block('.heroSuggestions :global([data-hero-card])')
     expect(chip).toMatch(/height: 32px;/)
     expect(chip).toMatch(/border: 0;/)
@@ -87,6 +87,24 @@ describe('the new-thread hero (round five C4, council round 3)', () => {
     expect(block('.heroSuggestions')).toMatch(/column-gap: 8px;/)
     // The old split (a hairline on the navigation chips only) is gone.
     expect(blocks().filter(candidate => candidate.selector.startsWith(".heroSuggestions :global([data-hero-card]:not("))).toHaveLength(0)
+  })
+
+  // Council round 16 C1: the starters under them are lighter text-and-icon actions, unfilled until hovered.
+  it('leaves the starters unfilled at rest, with 8px padding and a 6px gap (council round 16 C1)', () => {
+    const starter = block(".heroSuggestions :global([data-hero-card^='starter-'])")
+    expect(starter).toMatch(/background: none;/)
+    expect(starter).toMatch(/padding-inline: 8px;/)
+    expect(starter).toMatch(/gap: 6px;/)
+  })
+
+  // A phone stacks the hero entries in one column: a wrapping column sent the starters' 100% basis into a second column
+  // off the right edge (x 347 of 390).
+  it('keeps the starters in the phone column, under Resume and Inbox (council round 16 C1)', () => {
+    const phone = (selector: string): string => blocks().find(candidate => candidate.selector === selector && candidate.context.startsWith('@media (max-width: 639.98px)'))?.body ?? ''
+    expect(phone(':global(html[data-shell-phone-nav]) .heroSuggestions')).toMatch(/flex-direction: column;\s*flex-wrap: nowrap;/)
+    const starters = phone(':global(html[data-shell-phone-nav]) .heroSuggestions :global([data-starter-row])')
+    expect(starters).toMatch(/flex-basis: auto;/)
+    expect(starters).toMatch(/justify-content: flex-start;/)
   })
 
   // Council round 14 C4: the 16px hairline between the two lines read as a stray dash; space alone separates them.
