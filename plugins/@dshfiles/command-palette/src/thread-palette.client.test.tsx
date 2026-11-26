@@ -5,6 +5,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { PaletteApi } from './palette-api.js'
 import type { PaletteActionContext, PaletteThreadStatus } from './palette-contract.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
+import { PaletteMath, WARM_STONE } from '@dshfiles/plugin-ui/theme/palette'
 
 const copy: ThreadPaletteCopy = {
   title: 'Command palette',
@@ -776,12 +777,25 @@ describe('ThreadPalette goes to threads', () => {
     expect(enter?.parentElement?.className).toContain('dshx:grid')
   })
 
-  it('outlines the active row with the kit selected edge beside its wash (council round 13 B1)', async () => {
-    render(palette())
+  it('marks the active row with a deeper wash and ↵ only, no edge (council round 17 B2.1)', async () => {
+    const view = render(palette())
     const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
-    // The dark wash alone measured 1.1:1 on the dialog; the edge holds 3:1 and draws only while the row is active.
-    expect(row.className).toContain('dshx:data-[selected=true]:selected-edge')
-    expect(row.className).not.toMatch(/(^|\s)dshx:selected-edge(\s|$)/u)
+    expect(row.className).not.toContain('selected-edge')
+    // The palette caps the dialog wash at L 0.925: light 0.935 → 0.925, dark keeps the dialog's 0.30.
+    const root = view.baseElement.querySelector<HTMLElement>('[cmdk-root]')
+    expect(root?.className).toContain('dshx:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_min(l,0.925)_c_h)]')
+  })
+
+  it.each(['light', 'dark'] as const)('keeps the row text at AA and the status glyphs at 3:1 on the palette wash (%s)', (scheme: 'light' | 'dark') => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    // The dialog wash: the page wash, lifted to 0.30 in dark (ui-styles surfaces.css), then capped at 0.925 here.
+    const dialog = scheme === 'dark' ? { ...p.selectedWash, l: Math.max(p.selectedWash.l, 0.3) } : p.selectedWash
+    const wash = { ...dialog, l: Math.min(dialog.l, 0.925) }
+    expect(wash.l).toBe(scheme === 'light' ? 0.925 : 0.3)
+    // Ink (title) and secondary (the AttentionMeta line, a destination's glyph); a row draws no faint text, its hints
+    // are kit chips on their own fill.
+    for (const step of [9, 10]) expect(PaletteMath.contrastRatio(p.neutral[step]!, wash), `step ${step}`).toBeGreaterThanOrEqual(4.5)
+    for (const key of ['accent', 'danger', 'success', 'warning'] as const) expect(PaletteMath.contrastRatio(p[key].fg, wash), key).toBeGreaterThanOrEqual(3)
   })
 
   it('draws every hint as the kit shortcut chip, unfaded and unrestyled (council round 10 A5, B4)', () => {

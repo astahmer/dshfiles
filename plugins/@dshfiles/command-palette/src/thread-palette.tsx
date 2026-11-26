@@ -629,8 +629,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   // Two-line rows at 56px (council round 4 A5/B7): the title, then its meta line, with room above and below. The active
-  // row takes the kit selected edge beside its wash and ↵ (council round 13 B1): the dark wash alone read 1.1:1.
-  const itemClass = 'dshx:group/item dshx:min-h-14 dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2 dshx:data-[selected=true]:selected-edge'
+  // row is the wash and ↵ only (council round 17 B2.1): no outline; the palette's own wash is a step deeper (below).
+  const itemClass = 'dshx:group/item dshx:min-h-14 dshx:gap-3 dshx:rounded-md dshx:px-2.5 dshx:py-2'
   const viewCopy = {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
@@ -744,7 +744,9 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
           onValueChange={value => sendNavigation({ type: 'selection.change', value })}
           onKeyDown={onKeyDown}
           loop
-          className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1"
+          // The palette's selection wash (council round 17 B2.1): with no edge, the active row needs a clearly visible
+          // fill, so the dialog wash is capped at L 0.925 (light 0.935 → 0.925; dark keeps the dialog's 0.30).
+          className="dshx:rounded-none dshx:phone:min-h-0 dshx:phone:flex-1 dshx:[--dshx-selected-wash:oklch(from_var(--dshx-dialog-selected-wash)_min(l,0.925)_c_h)]"
         >
           {/* The dialog is the field's one frame: no second ring around the search row inside it (round five B6). A 48px
               search lane with no rule of its own: the one rule sits under the filters, above the results (council round 4
