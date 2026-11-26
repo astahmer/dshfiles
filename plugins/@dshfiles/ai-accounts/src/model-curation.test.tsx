@@ -240,6 +240,29 @@ describe('Models table cells (council round 11, D2)', () => {
     expect(container.querySelector('[role="combobox"][aria-label^="Default reasoning effort for Model 1"]')?.textContent).toBe('High')
   })
 
+  it('sets the effort header on one line, starting on the values, with Auto explained by an ⓘ (council round 18, D1)', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true })
+    const head = [...container.querySelectorAll('th')].find(element => element.textContent?.startsWith('Reasoning effort'))
+    // The cell's 12 px, the trigger's 1 px transparent edge and its 8 px inset: "Auto" starts where the header does.
+    expect(classesOf(head ?? null)).toContain('dshx:pl-[21px]')
+    expect(classesOf(head ?? null)).toContain('dshx:whitespace-nowrap')
+    expect(classesOf(effortTrigger('Model 0'))).toContain('dshx:px-2')
+    expect(classesOf(effortTrigger('Model 0'))).toContain('dshx:border-transparent')
+    const info = head?.querySelector('button')
+    expect(info?.querySelector('svg')).not.toBeNull()
+    // The note is the ⓘ's name (and its tooltip), not a second header line.
+    expect(info?.querySelector('[data-effort-auto-note]')?.className).toContain('dshx:sr-only')
+    expect(info?.textContent).toBe('Auto: provider default')
+  })
+
+  it('centres the Show model checkboxes under their header (council round 18, D1)', async () => {
+    await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
+    const head = [...container.querySelectorAll('th')].find(element => element.textContent === 'Show model')
+    expect(classesOf(head ?? null)).toContain('dshx:text-center')
+    const box = container.querySelector('[aria-label="Show Model 0 in the picker"]')
+    expect(classesOf(box?.parentElement ?? null)).toEqual(expect.arrayContaining(['dshx:flex', 'dshx:justify-center']))
+  })
+
   it('draws the Show model checkboxes at the dense 16 px size', async () => {
     await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
     const boxes = [...container.querySelectorAll('[aria-label^="Show "][aria-label$=" in the picker"]')]

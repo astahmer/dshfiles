@@ -14,7 +14,8 @@ import {
 import { ActionHint } from './panel-primitives.js'
 import { ModelMark } from '@dshfiles/plugin-ui/components/model-mark'
 import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
-import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, InfoIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 import type { AccountDraft, AccountsCatalog } from './api.js'
@@ -170,13 +171,25 @@ export const ModelCuration = (props: {
             <tr className="dshx:align-top">
               {/* Starts on the names: the cell's 8 px, the 24 px star, the 16 px mark and two 8 px gaps (council round 10, D2). */}
               <th className="dshx:py-2 dshx:pr-3 dshx:pl-16 dshx:font-normal">Model</th>
-              <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">
-                Reasoning effort
-                <span data-effort-auto-note className="dshx:block">
-                  {autoNote}
+              {/* One line, starting on the values: the cell's 12 px, the trigger's 1 px edge and 8 px inset; Auto's source is
+                  the ⓘ's tooltip (council round 18, D1). */}
+              <th className="dshx:w-48 dshx:py-2 dshx:pr-3 dshx:pl-[21px] dshx:font-normal dshx:whitespace-nowrap">
+                <span className="dshx:inline-flex dshx:items-center dshx:gap-1">
+                  Reasoning effort
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button type="button" className="dshx:inline-flex dshx:rounded-sm dshx:text-muted-foreground dshx:hover:text-foreground">
+                        <InfoIcon aria-hidden className="dshx:size-3" />
+                        <span data-effort-auto-note className="dshx:sr-only">
+                          {autoNote}
+                        </span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{autoNote}</TooltipContent>
+                  </Tooltip>
                 </span>
               </th>
-              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show model</th>
+              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:text-center dshx:font-normal">Show model</th>
               {allInherit ? null : <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>}
               <th className="dshx:w-10">
                 <span className="dshx:sr-only">Actions</span>
@@ -257,12 +270,15 @@ export const ModelCuration = (props: {
                     />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">
-                    <Checkbox
-                      size="sm"
-                      aria-label={`Show ${model.name} in the picker`}
-                      checked={!hidden.has(model.id)}
-                      onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, checked !== true) })}
-                    />
+                    {/* Centred under its header (council round 18, D1). */}
+                    <div className="dshx:flex dshx:justify-center">
+                      <Checkbox
+                        size="sm"
+                        aria-label={`Show ${model.name} in the picker`}
+                        checked={!hidden.has(model.id)}
+                        onCheckedChange={checked => customize({ hiddenModelIds: membership(account.hiddenModelIds, model.id, checked !== true) })}
+                      />
+                    </div>
                   </td>
                   {allInherit ? null : (
                     <td className="dshx:px-3 dshx:py-2">
