@@ -23,6 +23,7 @@ colors:
   success-green: '#00792f'
   warn-amber: '#805400'
   ink-dark: '#eae7e4'
+  control-on-dark: '#c6c3c1'
   paper-dark: '#15120f'
   surface-panel-dark: '#1b1815'
   surface-nav-dark: '#1e1b19'
@@ -288,9 +289,12 @@ work on any surface.
    project tones (hues 225, 110, 55, 305, 340, 195) keep 25° or more from every status hue.
 6. **Indigo is attention, focus and links; every on state is ink.** Indigo marks Needs you, the focus ring, links and
    text selection, nothing else. The on state of a switch, checkbox or radio is `control-on`, the ink (light
-   `#1b1a19`, dark `#eae7e4`) with its tick or knob in `control-on-foreground` (white in light, `#15120f` in dark); a
-   chosen card's ring and check, and the active tab bar (2px, page tabs and the window tab strip alike) are ink too.
-   Fill on bg, panel, raised and the selection wash and tick on fill hold 3:1 (`plugin-ui/tests/control-on.test.tsx`).
+   `#1b1a19`) with its tick or knob in `control-on-foreground` (white in light, `#15120f` in dark). **Dark on state.**
+   In dark the on state is the ink's own hue and chroma stepped down to L 0.82 (`#c6c3c1`, `--dshx-control-on`), not
+   the near-white ink (L 0.93), so a column of on switches reads as ink without glaring; the core Plugins switch follows
+   the same variable. A chosen card's edge and check, and the active tab bar (2px, page tabs and the window tab strip
+   alike) are ink too. Fill on bg, panel, raised and the selection wash and tick on fill hold 3:1
+   (`plugin-ui/tests/control-on.test.tsx`).
    Never a button fill, never decoration. The primary button is ink.
    **Off switch.** An enabled off switch draws its boundary in the field border (`--dshx-field-border`, 1px, 3:1 on
    every surface), so an off toggle reads as a control beside the fields around it: the kit `Switch` in its own
@@ -313,8 +317,9 @@ work on any surface.
    hue, with ink text. Indigo fills mean attention only, and a selection's cue is ink too. A
    selected list row, nav item, palette row or account row adds `selected-marker` (a 2px ink bar,
    `--dsw-alias-label-primary`, inset on its leading edge, which follows a rounded row; 3:1 on the wash) and sets its title at `font-selected` (550); a chosen card or tile (a theme card, a starter) takes `selected-card`
-   instead, nothing heavier: a 2px ink ring edge and an ink check badge in its trailing top corner (16px) in the
-   `control-on` ink, no wash, so the card keeps its own surface and its artwork; no leading marker. The current
+   instead, nothing heavier: a 1.5px edge in the ink at 80% (its 1px border plus a 0.5px inset ring, so the box never
+   moves; 3:1 on every card surface) and an ink check badge in its trailing top corner (16px) in the full ink, no
+   wash, so the card keeps its own surface and its artwork; no leading marker. The current
    place shows strongly once: a leaf row takes the wash, marker and 550; its parent rail item only an ink label and its
    glyph in colour. Hover stays the ink wash.
    **Attention outranks selection.** A Needs-you row holds `bg-wash-needs-you` and a Failed row `bg-wash-failed` for as
@@ -360,8 +365,19 @@ work on any surface.
     **Rail surface.** The rail is one surface in every state: the nav tone (`--dsw-specific-sidebar-fill`) beside a
     page on bg, whichever destination is open, whether its side column is open or folded. A destination never repaints
     the rail. **Active destination tab.** The active main tab of a destination page (Inbox, Backlog, Usage, Review,
-    Settings, Plugins…) draws the destination's glyph in its nav tone (`text-nav-<id>`, or `nav-tone-<id>` with
-    `text-nav-tone`); the label stays ink and the tab takes no tile or tint. A thread tab keeps its `ProjectMark`.
+    Settings, Plugins…) draws the destination's glyph in its nav tone on that tone's 14% tile (the selected-place
+    tile below); the label stays ink and the tab takes no tint or bar colour. A thread tab keeps its `ProjectMark`.
+    **Selected-place tile: a selected place carries its tone.** The rail's pattern holds wherever a place is
+    selected: the selected row of the Settings column (its group's identity tone), the selected row of the Work,
+    Observe and Land side columns (its destination's tone), and the active main tab put their 16–18px glyph on a 14%
+    tile of that tone, a 24px seat (`PlaceGlyph`, `components/ui/place-glyph`: `tone` for a nav place, `toneColor`
+    for any identity tone; or `dshx:place-seat` with your own size and radius). The seat lights from the row's own
+    `aria-current`, a tab's `aria-selected="true"` or Dockview's `.dv-active-tab`, and keeps its size either way, so
+    selecting never moves a row. On the phone tab bar every destination glyph is drawn in its tone at rest and the
+    active one keeps its tile and a 600 label; Inbox stays the secondary ink beside its badge. The selection bar, the
+    wash and the label stay neutral ink: only the glyph and its tile carry colour. Page `h1` marks stay glyph-only.
+    Glyph 3:1 and the ink label AA on the tile over bg, panel, raised and the selection wash, for every nav and
+    identity tone (`plugin-ui/tests/place-glyph.test.tsx`).
     **Settings group tones.** Every Settings group has its own tone, on its desktop navigation glyphs (16px) and its
     phone root tiles (28px) alike, so no group is grey: General sky 235, Models & accounts violet 300, Agents rose 350,
     Tools copper 50, Projects olive 100, Plugins teal 195, Hosts azure 215, Security orchid 325, Notifications moss 122,
@@ -438,7 +454,9 @@ Two densities, switched by pointer and width, never by user agent (`plugin-ui/sr
 `Input`, `InputGroup`, `Combobox`, the default `Select` trigger (and `select-look`), the segmented `TabsList` root with
 its items inset 3px, and default-size `Button`s, so `Page` header actions. All take one radius, 8px
 (`--dsw-radius-md`, `rounded-lg`); every `Button` size shares it. `size="sm"` (28px) is for a dense row or toolbar,
-never beside a field.
+never beside a field. **Toolbar fields.** In a toolbar row, a field-look launcher or value trigger (Search threads, a
+filter, a project picker) is `Button` `variant="field"` `size="field"`: the control height at 13px with a 14px
+glyph, so the search field, the pickers and the filter are one 32px row on desktop and 44px on a coarse pointer.
 
 Safe areas: `--dshx-safe-top|right|bottom|left` (`env(safe-area-inset-*)`) on the phone top bar, tab bar, composer and
 sheets. Kit buttons, toggles and menu rows already get 44px hit areas on a coarse pointer.
@@ -453,6 +471,12 @@ permanent band above the tab bar, and a strip returns only for an actionable con
 name and a trailing chevron; the first group sits 16px under the header. A category page shows only its fields, 16px
 apart, under a Back control and the category name; there is no category dropdown on the page. Modified moves into
 the search field's filter or the ⋯ menu, never the toolbar.
+
+**Phone Inbox head.** Every phone Inbox card, the failed one included, takes the same two-line head. Line 1: the
+status glyph, the full title (wrapping to two lines, never cut for metadata) and the ⋯ menu, whose glyph sits 22px
+from the card edge. Line 2: the `ProjectMark`, the kind (Approval, Question, Turn failed…) and the age, at 13/400 in
+secondary ink. Titles win over the fold. The Needs you / Other / Done segmented row ends with a labelled 44px
+**Triage** text button (never an icon, never in the top bar, which keeps its title and ⋯ only).
 
 **Phone dock.** On a phone the transcript scroller ends above the dock (composer and its docked rows), never under
 it: a 24px fade at its bottom edge instead of a hard clip line through text, and bottom padding that clears the last
@@ -481,13 +505,16 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   into the `⋯` overflow menu below that; the primary never folds.
 - **Two page frames, not four widths.** The header and the body share one start-aligned container: `lane`, 880px
   of content (960px once the pane is 1280px or wider, `@min-pane-wide`; the cap is the content box, the 24px padding
-  sits outside it, so Inbox, Backlog and Plugins rows end on one edge), for lists and forms (Inbox, Backlog, Plugins,
-  Settings; the Settings field column stays 680px inside it), never centred, and
-  `wide`, min(100%, 1200px), for data (Usage, Review, AI accounts) — `Page` `width="lane"` / `width="wide"`
-  (`max-w-lane`, `max-w-wide`). Both start at the same 24px pane inset. Only a diff, a chart or a table runs full
+  sits outside it, so Inbox, Backlog and Plugins rows end on one edge), for lists (Inbox, Backlog, Plugins), never
+  centred, and `wide`, min(100%, 1200px), for data (Usage, Review, AI accounts) — `Page` `width="lane"` /
+  `width="wide"` (`max-w-lane`, `max-w-wide`). **Form frame.** A page of label/control rows (Settings) takes `form`:
+  720px of content on the lane's inset rules (content box, padding outside, start-aligned, no wide-pane step;
+  `width="form"`, `PAGE_FRAME_CLASS.form`, `max-w-form`), so a label and its value sit close and the header actions,
+  the toolbar and the controls end on one edge. Selects in it share one 176px minimum width, so the control column's
+  left edge is straight. All frames start at the same 24px pane inset. Only a diff, a chart or a table runs full
   bleed (`width="full"`, the default for a `fill` master–detail page); `width="page"` (1080px) is the legacy default
   that new pages do not choose. The header actions sit on the frame's trailing edge, never the window's. A page that
-  owns its layout puts the standalone `PageHeader` inside the same frame (`PAGE_FRAME_CLASS.lane` / `.wide`). The `h1` is 22px/650 (`text-title font-title`); its count is tertiary ink, or one
+  owns its layout puts the standalone `PageHeader` inside the same frame (`PAGE_FRAME_CLASS.lane` / `.form` / `.wide`). The `h1` is 22px/650 (`text-title font-title`); its count is tertiary ink, or one
   `StatusCount` per status present (`statusCounts`). **Page title mark.** A destination page (Inbox, Backlog,
   Usage, Review, AI accounts, Settings…) carries one identity mark: the destination's rail glyph before the `h1`,
   18px, 8px from the title and centred on its first line, in the destination's nav tone (`Page` or `PageHeader`
@@ -518,7 +545,7 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   Secrets, Plugins, Plugin market, Capabilities hub, Developer…). The General page has no in-page category list and
   no second "General" heading: the page header, then the selected category's fields, its sections headed with
   `text-heading`. Settings never folds the column; other one-page destinations (Inbox) may.
-- **Settings rows.** Rows stay on the 880 frame; the eye follows a label to its value through the row grammar
+- **Settings rows.** Rows sit on the 720 form frame; the eye follows a label to its value through the row grammar
   (`plugin-ui/src/settings-rows.css`): `settings-row` on each row draws a 1px hairline (`border-border`) inset to the
   text edges and a full-row wash (the ghost hover fill) on hover, where a pointer hovers, and while a control inside
   has keyboard focus; the row bleeds 8px past its text so the wash has room without moving it, and the last row drops
@@ -527,7 +554,8 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 - Counts: the count beside a heading is the number of rows its list shows with no filter; a filter's count is what
   it would show; a zero is not drawn. A count the list cannot reproduce is a bug.
 - One name per destination: the rail row, the tab title, the palette row and the `h1` are the same words, with no
-  plugin prefix. On a phone the top bar names the page, so the `h1` and its count hide together.
+  plugin prefix. A name means one place: Backlog's view of the items that need a decision is **Triage**, never a
+  second "Inbox", and starting that pass on the phone Inbox is the same word. On a phone the top bar names the page, so the `h1` and its count hide together.
 
 ## Elevation & Depth
 

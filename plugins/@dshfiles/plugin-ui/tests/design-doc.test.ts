@@ -161,7 +161,7 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     for (const text of [
       '**Indigo is attention, focus and links; every on state is ink.**',
       '`control-on-foreground`',
-      'a 2px ink ring edge and an ink check badge',
+      'an ink check badge',
       'over a 2px ink bar',
       '**Page title mark.**',
       '`markTone`',
@@ -184,7 +184,7 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '`variant="attention-text"`',
       '`variant="danger-text"`',
       'the card keeps its own surface',
-      'a 2px ink ring edge and an ink check badge',
+      'an ink check badge',
       '**Off switch.**',
       'Work orange 52, Observe lime 118, Land teal 180, Threads blue 235, Knowledge violet 305, Agents rose 350',
       'Inbox is the attention destination',
@@ -204,6 +204,32 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('Inbox violet 297')
     expect(design).not.toContain('Threads at hue 235 or less')
     expect(design).not.toContain('instead: the wash, a 2px ink ring edge')
+  })
+
+  it('records the ninth council pass: selected-place tile, dark on state, toolbar fields, form frame, phone Inbox head, Triage (council round 9 A6)', () => {
+    for (const text of [
+      '**Selected-place tile: a selected place carries its tone.**',
+      '`PlaceGlyph`',
+      '`dshx:place-seat`',
+      'Page `h1` marks stay glyph-only',
+      '**Dark on state.**',
+      "  control-on-dark: '#c6c3c1'",
+      'a 1.5px edge in the ink at 80%',
+      '**Toolbar fields.**',
+      '`size="field"`',
+      '**Form frame.**',
+      '`PAGE_FRAME_CLASS.form`',
+      '176px minimum width',
+      'Rows sit on the 720 form frame',
+      '**Phone Inbox head.**',
+      'never cut for metadata',
+      '**Triage**',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: the 2px pure-ink card edge, the untiled active tab and the 880 Settings frame.
+    expect(design).not.toContain('a 2px ink ring edge')
+    expect(design).not.toContain('the tab takes no tile or tint')
+    expect(design).not.toContain('Rows stay on the 880 frame')
   })
 })
 
