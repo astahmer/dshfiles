@@ -188,6 +188,14 @@ describe('Usage › Where it went, one dimension at a time (council round 10, D1
     expect(html).toMatch(/<div data-spend-single=""[^>]*>[\s\S]*>Show requests<\/button><\/span><\/div>/u)
   })
 
+  it('draws the share as an 8 px bar with a 4 px radius in a 12 px track that keeps its 2 px rim (council round 18, D2)', () => {
+    const section = (/<section aria-label="Where it went" class="([^"]*)"/u.exec(render('cost'))?.[1] ?? '').replaceAll('&amp;', '&').replaceAll('&gt;', '>')
+    expect(section).toContain('dshx:[&_span:has(>[data-spend-share])]:h-3')
+    expect(section).toContain('dshx:[&_[data-spend-share]]:rounded-sm')
+    // The kit track keeps its 2 px padding, so the bar inside a 12 px track is 8 px.
+    expect(render('cost')).toMatch(/dshx:h-2[^"]*dshx:p-0\.5"><span data-spend-share=""/u)
+  })
+
   it('names the active metric and its unit in the caption', () => {
     expect(header('cost')).toContain('Cost · USD, list-price estimate')
     expect(header('tokens')).toContain('Tokens · input, cache and output')

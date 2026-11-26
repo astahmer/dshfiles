@@ -117,6 +117,13 @@ const PLAIN_TOTAL =
  */
 export const SPEND_MAP_CARD = 'dshx:rounded-lg dshx:[&_[data-spend-map-inset]>div]:pt-0'
 
+/**
+ * The share bar 8 px with a 4 px radius (council round 18, D2): the kit row draws a 4 px bar in an 8 px track, too thin
+ * to read beside 13 px numbers. The track grows to 12 px and keeps its 2 px rim (round 12: a 100 % share still reads as a
+ * measure), so the bar inside is 8 px; `rounded-sm` is the kit's 4 px radius. Follow-up: a kit prop for the share bar's weight.
+ */
+export const SHARE_BAR = 'dshx:[&_span:has(>[data-spend-share])]:h-3 dshx:[&_[data-spend-share]]:rounded-sm'
+
 export const UsageSpendMap = (props: {
   readonly view: ChartView
   /** The chart's measure: the page has one metric switch, on the chart card. */
@@ -140,7 +147,7 @@ export const UsageSpendMap = (props: {
   return (
     <SpendMap
       data-usage-spend-map
-      className={cn(PLAIN_TOTAL, SPEND_MAP_CARD)}
+      className={cn(PLAIN_TOTAL, SPEND_MAP_CARD, SHARE_BAR)}
       inset="flush"
       // One dimension at a time: a "Share by" control in the header and only that dimension's flow, its entries
       // across the card so labels show in full (council round 10, D1).
