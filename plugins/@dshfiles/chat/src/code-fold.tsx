@@ -9,6 +9,7 @@
  */
 import { Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import { WrapTextIcon } from '@dshfiles/plugin-ui/icons'
+import { CodeIndent } from '@dshfiles/plugin-ui/lib/code-indent'
 import { cloneElement, useLayoutEffect, useRef, useState, type ReactElement, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import css from './code-fold.module.css'
@@ -87,9 +88,20 @@ export function CodeFold({ block }: { readonly block: ReactElement<FoldableCodeB
   }, [])
   useLayoutEffect(() => {
     const host = root.current
-    if (host === null || wrapped) {
+    if (host === null) return
+    if (wrapped) {
       setEdges(undefined)
-      return
+      // Council round 8 A6: a wrapped line hangs 2ch right of its own statement's indent. CSS cannot count a line's
+      // leading spaces, so each highlighted line gets its indent in columns (`--dshx-line-indent`, read by
+      // ui-styles' transcript.css), now and whenever the native card swaps its lines (highlighting lands, code streams).
+      const mark = (): void => {
+        const pre = host.querySelector<HTMLElement>('.md-code-block pre')
+        if (pre !== null) CodeIndent.mark(pre)
+      }
+      const changes = new MutationObserver(mark)
+      changes.observe(host, { childList: true, subtree: true })
+      mark()
+      return () => changes.disconnect()
     }
     // The native card swaps its plain `pre` for the highlighted one once highlighting lands, so the scroller is found
     // again whenever the card's subtree changes, and read again when it scrolls, resizes or its font arrives.

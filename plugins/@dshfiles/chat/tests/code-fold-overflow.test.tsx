@@ -159,3 +159,56 @@ describe('short code on a narrow pane (council round 7 C4)', () => {
     expect(css).toMatch(/\.fold\[data-code-narrow\] \{[^}]*--dsw-font-markdown-code-block-font-size: 12px;[^}]*--dsw-font-markdown-code-block-line-height: 18px;/u)
   })
 })
+
+/** A highlighted card as Shiki draws it: one `.line` span per row inside the `pre`'s `code`. */
+const Highlighted = (props: { readonly code: string; readonly wrap?: boolean; readonly toolbarLabels?: { readonly wrapLabel: string; readonly unwrapLabel: string } }): ReactNode => (
+  <div className="md-code-block" data-code-wrap={String(props.wrap === true)}>
+    <div data-code-block-banner="">
+      <span>ts</span>
+      <div />
+    </div>
+    <pre>
+      <code>
+        {props.code.split('\n').map((line, index) => (
+          <span key={index} className="line">
+            {line}
+          </span>
+        ))}
+      </code>
+    </pre>
+  </div>
+)
+
+describe('the hanging indent of wrapped code (council round 8 A6)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const code = 'for (const item of items) {\n  const net = item.quantity * item.unitPriceCents\n}'
+
+  it("hands each wrapped line its own indent, so a continuation hangs 2ch right of its statement's indent", () => {
+    atWidth(358)
+    const { container } = render(<CodeFold block={<Highlighted code={code} toolbarLabels={labels} />} />)
+    const rows = [...container.querySelectorAll<HTMLElement>('.line')]
+    expect(rows.map(row => row.style.getPropertyValue('--dshx-line-indent'))).toEqual(['', '2ch', ''])
+  })
+
+  it('marks the lines again when the native card swaps in its highlighted ones', async () => {
+    atWidth(358)
+    const { container } = render(<CodeFold block={<Highlighted code={code} toolbarLabels={labels} />} />)
+    const fresh = document.createElement('span')
+    fresh.className = 'line'
+    fresh.textContent = '    total += net'
+    await act(async () => {
+      container.querySelector('code')?.append(fresh)
+      await Promise.resolve()
+    })
+    expect(fresh.style.getPropertyValue('--dshx-line-indent')).toBe('4ch')
+  })
+
+  it('leaves unwrapped code alone', () => {
+    atWidth(680)
+    const { container } = render(<CodeFold block={<Highlighted code={code} toolbarLabels={labels} />} />)
+    expect(container.querySelector<HTMLElement>('.line:nth-child(2)')?.style.getPropertyValue('--dshx-line-indent')).toBe('')
+  })
+})
