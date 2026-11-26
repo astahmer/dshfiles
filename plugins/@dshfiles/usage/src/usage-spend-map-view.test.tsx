@@ -108,8 +108,9 @@ describe('Usage › Where it went (council round 5, D1)', () => {
       onShowRequests={() => undefined}
     />,
   )
+  // One entry draws one ranked row (council round 11, D1): its seat leads the row.
   it("seats the model's brand mark in the end node instead of its first letter", () => {
-    const seat = /data-node-anchor="leaf:model:gpt-6-luna"[^>]*><span[^>]*>(.*?)<\/span><span/u.exec(html)
+    const seat = /data-spend-single=""[^>]*><span[^>]*>(.*?)<\/span><span/u.exec(html)
     expect(seat?.[1]).toContain('data-model-mark="openai"')
   })
   it('keeps the letter for an entry no brand names', () => {
@@ -123,7 +124,7 @@ describe('Usage › Where it went (council round 5, D1)', () => {
         onShowRequests={() => undefined}
       />,
     )
-    expect(/data-node-anchor="leaf:model:m1"[^>]*><span[^>]*>(.*?)<\/span>/u.exec(plain)?.[1]).toBe('m')
+    expect(/data-spend-single=""[^>]*><span[^>]*>(.*?)<\/span>/u.exec(plain)?.[1]).toBe('m')
   })
   it('spans the end nodes across the card, so a long account name shows in full (council round 10, D1)', () => {
     expect(html).not.toMatch(/<div role="radiogroup" aria-label="Models"[^>]*style="max-width/u)
@@ -168,8 +169,16 @@ describe('Usage › Where it went, one dimension at a time (council round 10, D1
     expect(labels).toEqual(['Models', 'Accounts', 'Projects', 'Purpose'])
     // Only the selected dimension's flow: no card per dimension, no route into one.
     expect(html).not.toContain('data-node-anchor="dim:')
-    expect(html).toContain('data-spend-link="leaf:model:m1"')
+    expect(html).toMatch(/data-spend-single=""[\s\S]*>m1<\/span>/u)
     expect(html).not.toContain('leaf:provider:')
+  })
+
+  it("draws a one-entry breakdown as one ranked row with Show requests beside it, no flow and no 'this range' block (council round 11, D1)", () => {
+    const html = render('cost')
+    expect(html).not.toContain('data-spend-link')
+    expect(html).not.toContain('this range')
+    expect(html).not.toContain('All accounts')
+    expect(html).toMatch(/<div data-spend-single=""[^>]*>[\s\S]*>Show requests<\/button><\/span><\/div>/u)
   })
 
   it('names the active metric and its unit in the caption', () => {

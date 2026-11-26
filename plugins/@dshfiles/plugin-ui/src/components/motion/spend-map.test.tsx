@@ -196,3 +196,59 @@ describe('SpendMap › one dimension at a time (council round 10, D1)', () => {
     expect(render()).not.toContain('Breakdown by')
   })
 })
+
+describe('SpendMap › a breakdown with one entry (council round 11, D1)', () => {
+  const single = renderToStaticMarkup(
+    <SpendMap
+      heading="Where it went"
+      owner="All accounts"
+      period="Nov 20 – Nov 26"
+      total={10}
+      format={value => `${String(value)}K`}
+      dimensions={dimensions('var(--dshx-data-2)')}
+      dimensionId="provider"
+      leafId="acme"
+      picker="segments"
+      detailPeriod="this range"
+      footer={<button type="button">Show requests</button>}
+      onDimensionChange={() => undefined}
+      onLeafChange={() => undefined}
+    />,
+  )
+
+  it('draws one ranked row: no connector, no total node, no repeated detail block', () => {
+    expect(single).not.toContain('data-spend-link')
+    expect(single).not.toContain('data-node-anchor="root"')
+    expect(single).not.toContain('All accounts')
+    expect(single).not.toContain('this range')
+    expect(single).not.toContain('data-node-anchor="leaf:')
+    expect(single).toContain('data-spend-single=""')
+  })
+
+  it('keeps the label, a 6 px share bar and "amount · share", with the footer action beside them', () => {
+    const row = /<div[^>]*data-spend-single=""[^>]*>.*?Show requests<\/button>/su.exec(single)?.[0] ?? ''
+    expect(row).toContain('>Acme</span>')
+    expect(row).toMatch(/dshx:h-1\.5[^"]*"><span data-spend-share=""/u)
+    expect(row).toContain('10K</span> · 100%')
+    expect(single).not.toContain('<footer')
+  })
+
+  it('keeps the flow when the dimension holds two or more entries', () => {
+    const html = renderToStaticMarkup(
+      <SpendMap
+        heading="Where it went"
+        owner="All accounts"
+        total={10}
+        format={value => String(value)}
+        dimensions={dimensions()}
+        dimensionId="model"
+        leafId="a"
+        picker="segments"
+        onDimensionChange={() => undefined}
+        onLeafChange={() => undefined}
+      />,
+    )
+    expect(html).toContain('data-spend-link="leaf:model:a"')
+    expect(html).not.toContain('data-spend-single')
+  })
+})

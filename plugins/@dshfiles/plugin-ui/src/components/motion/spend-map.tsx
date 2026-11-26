@@ -121,6 +121,12 @@ export function SpendMap({
   const dimension = dimensions.find(entry => entry.id === dimensionId) ?? dimensions[0]
   const leaves = dimension?.leaves ?? noLeaves
   const leaf = leaves.find(entry => entry.id === leafId) ?? leaves[0]
+  /**
+   * One entry in the shown breakdown says one number: a flow from the total to it, a selected node and a detail block
+   * that repeats it read as three copies. It draws one ranked row instead, the footer action beside it (council round
+   * 11, D1).
+   */
+  const single = segments && leaves.length === 1 ? leaves[0] : undefined
 
   const links = React.useMemo<NodeLink[]>(
     () => [
@@ -181,134 +187,138 @@ export function SpendMap({
         ) : null}
       </header>
 
+      {single !== undefined ? <SingleLeafRow leaf={single} format={format} footer={footer} /> : null}
+
       {/* The map scrolls inside its own box when even the narrow layout cannot fit; it never widens the card. */}
-      <div
-        data-spend-map-inset={inset}
-        className={
-          inset === 'flush'
-            ? 'dshx:overflow-x-auto dshx:overflow-y-hidden dshx:[scrollbar-width:thin]'
-            : 'dshx:mx-2.5 dshx:overflow-x-auto dshx:overflow-y-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-background dshx:[scrollbar-width:thin]'
-        }
-      >
+      {single !== undefined ? null : (
         <div
-          ref={mapRef}
-          className={cn(
-            'dshx:relative dshx:flex dshx:min-w-fit dshx:items-center dshx:gap-7 dshx:p-4 dshx:@max-pane-compact:gap-5 dshx:@max-pane-narrow:gap-4 dshx:@max-pane-narrow:p-3',
-            // With no card column between them, the total and its entries keep a run long enough to read as a flow.
-            segments && 'dshx:gap-16 dshx:@max-pane-compact:gap-10',
-          )}
+          data-spend-map-inset={inset}
+          className={
+            inset === 'flush'
+              ? 'dshx:overflow-x-auto dshx:overflow-y-hidden dshx:[scrollbar-width:thin]'
+              : 'dshx:mx-2.5 dshx:overflow-x-auto dshx:overflow-y-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-background dshx:[scrollbar-width:thin]'
+          }
         >
-          <svg
-            aria-hidden
-            className="dshx:pointer-events-none dshx:absolute dshx:inset-0 dshx:size-full dshx:overflow-visible"
-            width={layout.width}
-            height={layout.height}
+          <div
+            ref={mapRef}
+            className={cn(
+              'dshx:relative dshx:flex dshx:min-w-fit dshx:items-center dshx:gap-7 dshx:p-4 dshx:@max-pane-compact:gap-5 dshx:@max-pane-narrow:gap-4 dshx:@max-pane-narrow:p-3',
+              // With no card column between them, the total and its entries keep a run long enough to read as a flow.
+              segments && 'dshx:gap-16 dshx:@max-pane-compact:gap-10',
+            )}
           >
-            {/* Inactive connectors: 1 px in the field neutral, visible on the card in both schemes (council round 8, D1). */}
-            <g className="dshx:text-(--dshx-field-border)">
-              {links.map(link => (
-                <g key={link.id} data-spend-link={link.id} style={linkStyle(link.id)}>
-                  <DrawnPath
-                    d={layout.paths.get(link.id) ?? ''}
-                    drawKey={link.id}
-                    delay={link.id.startsWith('leaf:') ? 0.05 : 0}
-                    stroke="currentColor"
-                    strokeWidth={1}
-                  />
-                </g>
-              ))}
-            </g>
-            {/* The selected route is a second, darker stroke that mounts (and so draws) on each new selection. */}
-            <g className="dshx:text-foreground">
-              {activeLinks.map(id => (
-                <g key={id} data-spend-link-active={id} style={linkStyle(id)}>
-                  <DrawnPath
-                    d={layout.paths.get(id) ?? ''}
-                    drawKey={id}
-                    delay={0.08}
-                    duration={durations.slow}
-                    stroke="currentColor"
-                    strokeWidth={linkColors.has(id) ? 2 : 1.5}
-                  />
-                </g>
-              ))}
-            </g>
-            {links.map(link => {
-              const ends = layout.ends.get(link.id)
-              if (ends === undefined) return null
-              const active = activeLinks.includes(link.id)
-              return (
-                <g
-                  key={link.id}
-                  style={linkStyle(link.id)}
-                  className={cn('dshx:transition-colors dshx:duration-300', active ? 'dshx:text-foreground' : 'dshx:text-(--dshx-field-border)')}
-                >
-                  <circle cx={ends[0]} cy={ends[1]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
-                  <circle cx={ends[2]} cy={ends[3]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
-                </g>
-              )
-            })}
-          </svg>
-
-          <div className="dshx:relative dshx:flex dshx:w-[118px] dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-2 dshx:@max-pane-narrow:hidden">
-            <div data-node-anchor="root" className="dshx:relative">
-              <CapGauge value={total} cap={cap} format={format} />
-            </div>
-            <div className="dshx:flex dshx:flex-col dshx:items-center dshx:text-center">
-              <span className="dshx:text-xs dshx:font-semibold dshx:text-foreground">{owner}</span>
-              {period ? <span className="dshx:text-2xs dshx:text-muted-foreground">{period}</span> : null}
-            </div>
-            {projected !== undefined ? (
-              <span className="dshx:rounded-md dshx:bg-warning/15 dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:font-medium dshx:text-warning">
-                Projected {format(projected)}
-              </span>
-            ) : null}
-          </div>
-
-          {segments ? null : (
-            <div
-              role="radiogroup"
-              aria-label="Split by"
-              className="dshx:relative dshx:flex dshx:w-[150px] dshx:shrink-0 dshx:flex-col dshx:gap-2 dshx:@max-pane-narrow:w-[116px]"
+            <svg
+              aria-hidden
+              className="dshx:pointer-events-none dshx:absolute dshx:inset-0 dshx:size-full dshx:overflow-visible"
+              width={layout.width}
+              height={layout.height}
             >
-              {dimensions.map(entry => (
-                <DimensionCard
+              {/* Inactive connectors: 1 px in the field neutral, visible on the card in both schemes (council round 8, D1). */}
+              <g className="dshx:text-(--dshx-field-border)">
+                {links.map(link => (
+                  <g key={link.id} data-spend-link={link.id} style={linkStyle(link.id)}>
+                    <DrawnPath
+                      d={layout.paths.get(link.id) ?? ''}
+                      drawKey={link.id}
+                      delay={link.id.startsWith('leaf:') ? 0.05 : 0}
+                      stroke="currentColor"
+                      strokeWidth={1}
+                    />
+                  </g>
+                ))}
+              </g>
+              {/* The selected route is a second, darker stroke that mounts (and so draws) on each new selection. */}
+              <g className="dshx:text-foreground">
+                {activeLinks.map(id => (
+                  <g key={id} data-spend-link-active={id} style={linkStyle(id)}>
+                    <DrawnPath
+                      d={layout.paths.get(id) ?? ''}
+                      drawKey={id}
+                      delay={0.08}
+                      duration={durations.slow}
+                      stroke="currentColor"
+                      strokeWidth={linkColors.has(id) ? 2 : 1.5}
+                    />
+                  </g>
+                ))}
+              </g>
+              {links.map(link => {
+                const ends = layout.ends.get(link.id)
+                if (ends === undefined) return null
+                const active = activeLinks.includes(link.id)
+                return (
+                  <g
+                    key={link.id}
+                    style={linkStyle(link.id)}
+                    className={cn('dshx:transition-colors dshx:duration-300', active ? 'dshx:text-foreground' : 'dshx:text-(--dshx-field-border)')}
+                  >
+                    <circle cx={ends[0]} cy={ends[1]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
+                    <circle cx={ends[2]} cy={ends[3]} r={2.75} className="dshx:fill-card" stroke="currentColor" strokeWidth={1.25} />
+                  </g>
+                )
+              })}
+            </svg>
+
+            <div className="dshx:relative dshx:flex dshx:w-[118px] dshx:shrink-0 dshx:flex-col dshx:items-center dshx:gap-2 dshx:@max-pane-narrow:hidden">
+              <div data-node-anchor="root" className="dshx:relative">
+                <CapGauge value={total} cap={cap} format={format} />
+              </div>
+              <div className="dshx:flex dshx:flex-col dshx:items-center dshx:text-center">
+                <span className="dshx:text-xs dshx:font-semibold dshx:text-foreground">{owner}</span>
+                {period ? <span className="dshx:text-2xs dshx:text-muted-foreground">{period}</span> : null}
+              </div>
+              {projected !== undefined ? (
+                <span className="dshx:rounded-md dshx:bg-warning/15 dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:font-medium dshx:text-warning">
+                  Projected {format(projected)}
+                </span>
+              ) : null}
+            </div>
+
+            {segments ? null : (
+              <div
+                role="radiogroup"
+                aria-label="Split by"
+                className="dshx:relative dshx:flex dshx:w-[150px] dshx:shrink-0 dshx:flex-col dshx:gap-2 dshx:@max-pane-narrow:w-[116px]"
+              >
+                {dimensions.map(entry => (
+                  <DimensionCard
+                    key={entry.id}
+                    dimension={entry}
+                    selected={entry.id === dimension?.id}
+                    highlightLeafId={entry.id === dimension?.id ? (leaf?.id ?? null) : null}
+                    onSelect={() => onDimensionChange(entry.id)}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div
+              ref={leavesRef}
+              key={dimension?.id}
+              role="radiogroup"
+              aria-label={dimension?.label ?? 'Entries'}
+              className="dshx:relative dshx:flex dshx:min-w-[8.5rem] dshx:flex-1 dshx:flex-col dshx:gap-1.5"
+              style={leafMaxWidth === undefined || segments ? undefined : { maxWidth: leafMaxWidth }}
+            >
+              {leaves.map(entry => (
+                <LeafCard
                   key={entry.id}
-                  dimension={entry}
-                  selected={entry.id === dimension?.id}
-                  highlightLeafId={entry.id === dimension?.id ? (leaf?.id ?? null) : null}
-                  onSelect={() => onDimensionChange(entry.id)}
+                  anchor={`leaf:${dimension?.id}:${entry.id}`}
+                  leaf={entry}
+                  selected={entry.id === leaf?.id}
+                  wide={segments}
+                  format={format}
+                  onSelect={() => onLeafChange(entry.id)}
                 />
               ))}
             </div>
-          )}
-
-          <div
-            ref={leavesRef}
-            key={dimension?.id}
-            role="radiogroup"
-            aria-label={dimension?.label ?? 'Entries'}
-            className="dshx:relative dshx:flex dshx:min-w-[8.5rem] dshx:flex-1 dshx:flex-col dshx:gap-1.5"
-            style={leafMaxWidth === undefined || segments ? undefined : { maxWidth: leafMaxWidth }}
-          >
-            {leaves.map(entry => (
-              <LeafCard
-                key={entry.id}
-                anchor={`leaf:${dimension?.id}:${entry.id}`}
-                leaf={entry}
-                selected={entry.id === leaf?.id}
-                wide={segments}
-                format={format}
-                onSelect={() => onLeafChange(entry.id)}
-              />
-            ))}
           </div>
         </div>
-      </div>
+      )}
 
-      {leaf ? <LeafDetail leaf={leaf} format={format} period={detailPeriod} capped={cap !== undefined} /> : null}
+      {leaf && single === undefined ? <LeafDetail leaf={leaf} format={format} period={detailPeriod} capped={cap !== undefined} /> : null}
 
-      {footer ? (
+      {footer && single === undefined ? (
         <footer className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-4 dshx:pb-3 dshx:text-2xs dshx:text-muted-foreground">
           {footer}
         </footer>
@@ -508,29 +518,9 @@ function LeafCard({
         selected ? ACTIVE_NODE : 'dshx:hover:bg-accent/50',
       )}
     >
-      <span
-        className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:[&_svg]:size-3.5"
-        // The seat keys the entry to its series: a 14 % tint behind ink text (AA on both schemes) and a border in the
-        // series colour, which the data ramp holds at 3:1 against every surface.
-        style={leaf.color === undefined ? undefined : { borderColor: leaf.color, backgroundColor: `color-mix(in oklab, ${leaf.color} 14%, transparent)` }}
-      >
-        {leaf.icon ?? leaf.label.slice(0, 1)}
-      </span>
+      <LeafSeat leaf={leaf} />
       {wide ? (
-        <>
-          <span className="dshx:shrink-0 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground">{leaf.label}</span>
-          {/* The share as a bar on a quiet track, in the entry's series colour (ink without one). */}
-          <span aria-hidden className="dshx:h-1.5 dshx:min-w-12 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-            <span
-              data-spend-share=""
-              className={cn('dshx:block dshx:h-full dshx:rounded-full', leaf.color === undefined && 'dshx:bg-foreground')}
-              style={{ width: percent(leaf.share), ...(leaf.color !== undefined && { backgroundColor: leaf.color }) }}
-            />
-          </span>
-          <span className="dshx:shrink-0 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums">
-            <span className="dshx:font-medium dshx:text-foreground">{format(leaf.amount)}</span> · {percent(leaf.share)}
-          </span>
-        </>
+        <ShareLine leaf={leaf} format={format} />
       ) : (
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
           <span className="dshx:truncate dshx:text-xs dshx:font-medium dshx:text-foreground">{leaf.label}</span>
@@ -539,19 +529,72 @@ function LeafCard({
           </span>
         </span>
       )}
-      {leaf.flag ? (
-        <span
-          className={cn(
-            'dshx:shrink-0 dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:font-medium dshx:@max-pane-narrow:hidden',
-            leaf.flag.tone === 'destructive' ? 'dshx:bg-destructive/12 dshx:text-destructive' : 'dshx:bg-warning/15 dshx:text-warning',
-          )}
-        >
-          {leaf.flag.label}
-        </span>
-      ) : leaf.trend !== undefined ? (
-        <TrendChip trend={leaf.trend} className="dshx:@max-pane-narrow:hidden" />
-      ) : null}
+      <LeafFlag leaf={leaf} />
     </button>
+  )
+}
+
+/** The entry's seat: its mark or first letter. */
+function LeafSeat({ leaf }: { readonly leaf: SpendLeaf }) {
+  return (
+    <span
+      className="dshx:grid dshx:size-6 dshx:shrink-0 dshx:place-items-center dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:[&_svg]:size-3.5"
+      // The seat keys the entry to its series: a 14 % tint behind ink text (AA on both schemes) and a border in the
+      // series colour, which the data ramp holds at 3:1 against every surface.
+      style={leaf.color === undefined ? undefined : { borderColor: leaf.color, backgroundColor: `color-mix(in oklab, ${leaf.color} 14%, transparent)` }}
+    >
+      {leaf.icon ?? leaf.label.slice(0, 1)}
+    </span>
+  )
+}
+
+/** One line: the label in full, a 6 px bar of the entry's share, then its amount and share. */
+function ShareLine({ leaf, format }: { readonly leaf: SpendLeaf; readonly format: (value: number) => string }) {
+  return (
+    <>
+      <span className="dshx:shrink-0 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground">{leaf.label}</span>
+      {/* The share as a bar on a quiet track, in the entry's series colour (ink without one). */}
+      <span aria-hidden className="dshx:h-1.5 dshx:min-w-12 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
+        <span
+          data-spend-share=""
+          className={cn('dshx:block dshx:h-full dshx:rounded-full', leaf.color === undefined && 'dshx:bg-foreground')}
+          style={{ width: percent(leaf.share), ...(leaf.color !== undefined && { backgroundColor: leaf.color }) }}
+        />
+      </span>
+      <span className="dshx:shrink-0 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums">
+        <span className="dshx:font-medium dshx:text-foreground">{format(leaf.amount)}</span> · {percent(leaf.share)}
+      </span>
+    </>
+  )
+}
+
+function LeafFlag({ leaf }: { readonly leaf: SpendLeaf }) {
+  return leaf.flag ? (
+    <span
+      className={cn(
+        'dshx:shrink-0 dshx:rounded-md dshx:px-1.5 dshx:py-0.5 dshx:text-2xs dshx:font-medium dshx:@max-pane-narrow:hidden',
+        leaf.flag.tone === 'destructive' ? 'dshx:bg-destructive/12 dshx:text-destructive' : 'dshx:bg-warning/15 dshx:text-warning',
+      )}
+    >
+      {leaf.flag.label}
+    </span>
+  ) : leaf.trend !== undefined ? (
+    <TrendChip trend={leaf.trend} className="dshx:@max-pane-narrow:hidden" />
+  ) : null
+}
+
+/**
+ * The breakdown's only entry as one ranked row on the card, on the header's 16 px inset: no node box, no selection, the
+ * footer action (Show requests) at its end.
+ */
+function SingleLeafRow({ leaf, format, footer }: { readonly leaf: SpendLeaf; readonly format: (value: number) => string; readonly footer: React.ReactNode }) {
+  return (
+    <div data-spend-single="" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-4 dshx:pb-3.5">
+      <LeafSeat leaf={leaf} />
+      <ShareLine leaf={leaf} format={format} />
+      <LeafFlag leaf={leaf} />
+      {footer ? <span className="dshx:ml-2 dshx:flex dshx:shrink-0 dshx:items-center">{footer}</span> : null}
+    </div>
   )
 }
 
