@@ -328,6 +328,19 @@ describe('SubagentPreviewDock', () => {
     for (const row of rows()) expect(row.classList.contains('dshx:shrink-0')).toBe(true)
   })
 
+  it('lists every row on a narrow phone, where Live work is the fold, and leaves the fold row to the composer (council round 22, item 5)', () => {
+    // The phone stacked "Live work · 6 subagents" over a second, closed "6 subagents working" fold. Below 28rem the rows
+    // stay mounted; the composer hides this fold row while Live work holds only subagents, and the closed rows otherwise.
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 27.99rem)', addEventListener: () => undefined, removeEventListener: () => undefined }))
+    try {
+      render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={count => `${count} subagents`} />)
+      expect(fold()?.getAttribute('aria-expanded')).toBe('false')
+      expect(rows()).toHaveLength(4)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("shows up to three rows, folds four or more into one closed row, and keeps the reader's choice", () => {
     const count = (n: number): string => `${n} subagents`
     const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'] })} foldLabel={count} />)

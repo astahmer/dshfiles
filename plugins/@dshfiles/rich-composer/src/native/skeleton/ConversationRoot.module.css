@@ -1428,6 +1428,18 @@ button.crumbEditable {
     display: none;
   }
 
+  /* Council round 22, item 5: Live work is the phone's one header. While it holds only subagents, the subagent dock's
+     own "6 subagents working" fold row repeated it under it; it is hidden, and the rows (thread-sidebar keeps them
+     mounted below 28rem) list under Live work directly. Beside running jobs the fold row stays, and while it is closed
+     the rows behind it hide. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):not(:has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents'])))) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview-fold]) {
+    display: none;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold][aria-expanded='false'])) > :global([data-dshfiles-live-preview]) {
+    display: none;
+  }
+
   /* A dock holding only live work leaves no empty seat (and no stack gap) while the summary is closed. */
   :global(html[data-shell-phone-nav]) .composerStack:has(> .dockHead > .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']):not(:has(> :not([data-dshfiles-live-preview-dock]))) {
     display: none !important;

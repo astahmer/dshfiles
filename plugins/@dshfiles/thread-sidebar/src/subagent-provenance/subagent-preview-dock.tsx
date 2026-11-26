@@ -6,7 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArrowUpRightIcon, BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { ToolSteps } from '../tool-steps.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
 import { useSubagentRun } from './subagent-run.js'
@@ -18,6 +18,21 @@ const ID_SEPARATOR = '\n'
 const ignoreTurnState = (): void => undefined
 /** Up to this many working children show as rows; more fold into one "N subagents" row. */
 const MAX_OPEN_ROWS = 3
+
+/**
+ * rich-composer's narrow phone bound (`LIVE_WORK_QUERY`): below it the composer folds every live row into one "Live
+ * work" disclosure, so that is the fold, and this dock keeps its rows mounted (council round 22, item 5).
+ */
+const LIVE_WORK_QUERY = '(max-width: 27.99rem)'
+const liveWorkQuery = (): MediaQueryList | undefined =>
+  typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia(LIVE_WORK_QUERY) : undefined
+const subscribeLiveWork = (notify: () => void): (() => void) => {
+  const list = liveWorkQuery()
+  list?.addEventListener('change', notify)
+  return () => list?.removeEventListener('change', notify)
+}
+const readLiveWork = (): boolean => liveWorkQuery()?.matches ?? false
+const readLiveWorkOnServer = (): boolean => false
 
 /**
  * One working child as one compact row, whatever it is doing: `glyph · name · [mark] model · current step · elapsed ·
@@ -184,6 +199,7 @@ export const SubagentPreviewDock = (
   // Four or more working children fold into one row (b:7rv2), the same row as background-jobs' dock; the reader's
   // choice holds while children start and finish, and resets with the thread (the dock is keyed by its session).
   const [expanded, setExpanded] = useState(false)
+  const underLiveWork = useSyncExternalStore(subscribeLiveWork, readLiveWork, readLiveWorkOnServer)
   if (working === '') return null
   const list = working.split(ID_SEPARATOR)
   const folded = list.length > MAX_OPEN_ROWS
@@ -208,7 +224,9 @@ export const SubagentPreviewDock = (
           <StatusGlyph status="working" decorative />
         </button>
       ) : null}
-      {!folded || expanded ? list.map(childId => <DockRow key={childId} {...props} parentId={props.sessionId} childId={childId} />) : null}
+      {/* Under the phone's Live work fold the rows stay mounted: the composer hides this fold row while Live work holds
+          only subagents (one header, council round 22 item 5), and hides the rows behind it while it is closed. */}
+      {!folded || expanded || underLiveWork ? list.map(childId => <DockRow key={childId} {...props} parentId={props.sessionId} childId={childId} />) : null}
     </div>
   )
 }

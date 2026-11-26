@@ -249,6 +249,26 @@ describe('Live work attached to the composer on a phone (council round 9 C4)', (
   })
 })
 
+describe('one header for live subagents on a phone (council round 22, item 5)', () => {
+  const NARROW = '@media (max-width: 27.99rem)'
+  const phone = ':global(html[data-shell-phone-nav])'
+  const SUBAGENTS = ":global([data-dshfiles-live-preview-dock='subagents'])"
+  const OTHER = ":global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))"
+
+  it('hides the subagent fold row while Live work holds only subagents, so "Live work · 6 working" is the one header', () => {
+    const only = ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:not(:has(> ${OTHER})) > ${SUBAGENTS} > :global([data-dshfiles-live-preview-fold])`)
+    expect(only).toMatch(/display:\s*none/)
+  })
+
+  it('keeps the fold row beside running jobs, and its closed state hides the rows behind it', () => {
+    const closed = ruleIn(
+      NARROW,
+      `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}:has(> :global([data-dshfiles-live-preview-fold][aria-expanded='false'])) > :global([data-dshfiles-live-preview])`,
+    )
+    expect(closed).toMatch(/display:\s*none/)
+  })
+})
+
 describe('the phone Live work strip on the nav surface (council round 11 C4)', () => {
   const NARROW = '@media (max-width: 27.99rem)'
   const phone = ':global(html[data-shell-phone-nav])'
