@@ -36,6 +36,7 @@ const maxNativeResponseBytes = 32 * 1024 * 1024
 const maxNativeRequestBytes = 48 * 1024 * 1024
 const maxStreamFrameBytes = 2 * 1024 * 1024
 const maxFollowFrames = 256
+const defaultConnectTimeout = Duration.seconds(5)
 
 const passthrough = <S extends Schema.Struct.Fields>(fields: S) => Schema.StructWithRest(Schema.Struct(fields), [Schema.Record(Schema.String, Schema.Unknown)])
 
@@ -224,14 +225,17 @@ const pluginApiError = (cause: unknown): PluginApiError => {
 export const connectGateway = Effect.fn('multi-host gateway connect')(function* <E, R>(input: {
   readonly launchUrl: string
   readonly transport: (origin: URL) => Effect.Effect<GatewayTransport, E, R | Scope.Scope>
+  readonly connectTimeout?: Duration.Input
 }) {
   const client = yield* HttpClient.HttpClient
   const launch = yield* Effect.try({ try: () => loopbackLaunchUrl(input.launchUrl), catch: cause => new InvalidRuntimeLocator({ cause }) })
   const transport = yield* input.transport(new URL(launch.origin))
   const runtimeLaunchUrl = transport.launchUrl ?? input.launchUrl
   const runtimeLaunch = yield* Effect.try({ try: () => loopbackLaunchUrl(runtimeLaunchUrl), catch: cause => new InvalidRuntimeLocator({ cause }) })
+  // A peer whose firewall drops the SYN otherwise holds the caller for the OS connect timeout (75 s on macOS).
   const exchange = yield* client.get(`${runtimeLaunch.origin}/?token=${encodeURIComponent(runtimeLaunch.token)}`).pipe(
     Effect.provideService(FetchHttpClient.RequestInit, { redirect: 'manual' }),
+    Effect.timeout(input.connectTimeout ?? defaultConnectTimeout),
     Effect.mapError(cause => new GatewayUnreachable({ cause })),
   )
   if (exchange.status === 401 || exchange.status === 403) return yield* new AuthenticationFailed()
