@@ -117,7 +117,9 @@ export class PatchLook {
     '[data-unmodified-lines] { font-family: var(--diffs-header-font-family, var(--diffs-header-font-fallback)); } ' +
     // Diff lines paint their band as is (theme/diff-look.ts): the library's own line mix off, dark since council round 7
     // A6 (its 20% mix), light since round 11 A3 (its 12% mix capped the light tint below the 16% the council asked for).
-    '[data-line], [data-no-newline], [data-gutter-buffer], [data-column-number] { --mix-dark: 0%; --mix-light: 0%; }'
+    '[data-line], [data-no-newline], [data-gutter-buffer], [data-column-number] { --mix-dark: 0%; --mix-light: 0%; } ' +
+    // The "modified" glyph in the secondary ink (council round 13 A2, theme/diff-look.ts).
+    DiffLook.CHANGE_GLYPH_CSS
 
   /**
    * The bar's label in our words (council round 7 A3): "Show N unchanged lines" where it expands, "N unchanged lines"

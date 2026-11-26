@@ -1,6 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { PatchLook, parsePatchFiles } from '../src/diff.js'
+import { DiffLook } from '../src/theme/diff-look.js'
+import { PaletteMath, WARM_STONE } from '../src/theme/palette.ts'
 
 const patch = `diff --git a/src/totals.ts b/src/totals.ts
 --- a/src/totals.ts
@@ -52,5 +54,22 @@ describe('PatchView collapsed-lines bar (council round 6, D2)', () => {
       expect(css).toMatch(/\[data-separator=line-info\] \[data-separator-wrapper\]\s*\{[^}]*padding-inline:\s*0;/u)
       expect(css).toMatch(/\[data-separator=line-info\] \[data-separator-content\]\s*\{\s*border-radius:\s*0;?\s*\}/u)
     }
+  })
+})
+
+describe('PatchView change glyph (council round 13 A2)', () => {
+  it('draws the "modified" glyph in the secondary ink; added, deleted and renamed keep the library colours', () => {
+    for (const dark of [false, true]) {
+      const css = PatchLook.options(dark).unsafeCSS ?? ''
+      expect(css).toMatch(/\[data-change-icon=change\]\s*\{\s*color:\s*var\(--dshx-tone-9\);?\s*\}/u)
+      expect(css).not.toMatch(/\[data-change-icon=(?:new|deleted|rename-pure|rename-changed)\]/u)
+      // Amber still means a rename (and the line selection), so the library's modified tone stays the warning step.
+      expect(DiffLook.style(dark ? 'dark' : 'light')['--diffs-modified-color-override']).toBe('var(--dshx-tone-warning)')
+    }
+  })
+
+  it.each(['light', 'dark'] as const)('keeps the secondary glyph at 3:1 on the file header (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    expect(PaletteMath.contrastRatio(p.neutral[9]!, DiffLook.surfaces(p).body)).toBeGreaterThanOrEqual(3)
   })
 })

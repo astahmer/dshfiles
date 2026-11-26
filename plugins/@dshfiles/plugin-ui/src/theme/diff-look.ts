@@ -139,8 +139,17 @@ function style(scheme: Scheme) {
   }
 }
 
+/**
+ * The file header's change glyph (council round 13 A2): "modified" is the secondary ink, not amber, because amber means a
+ * warning. The library paints that glyph, renames and its line selection from one modified tone, so the override stays
+ * the warning step and only the plain-change glyph is re-coloured inside the shadow root (`PatchLook.HEADER_CSS`).
+ * Added and deleted keep the success and danger marks; a rename keeps amber.
+ */
+const CHANGE_GLYPH_CSS = '[data-change-icon=change] { color: var(--dshx-tone-9); }'
+
 /** Diff surfaces as colours (for contrast) and as CSS (for `PatchView`). */
 export class DiffLook {
+  static readonly CHANGE_GLYPH_CSS = CHANGE_GLYPH_CSS
   static readonly mixOklab = mixOklab
   static readonly surfaces = surfaces
   static readonly style = style
