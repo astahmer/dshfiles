@@ -388,13 +388,22 @@
    * Chart labels (round five A5): TanStack charts draw axis ticks and legend labels in currentColor at 68–78% opacity
    * and 11px, which measured 2.95:1. Inside a `ChartFrame` they read at full secondary ink (the frame's
    * `text-muted-foreground`, AA on bg, panel and raised), at the 12px meta size and with tabular figures. A CSS rule
-   * beats the library's presentation attributes; gridlines and value labels keep their own style.
+   * beats the library's presentation attributes; gridlines and value labels keep their own style. Council round 10 A8
+   * extends it to every axis and legend text, 12px minimum: axis titles (`x-label`, `y-label`), every static legend
+   * text (labels, steps, the gradient's min and max at 10px), facet labels; the interactive legend takes the size
+   * only, so a hidden series keeps its dimmed label.
    */
   .dshx-chart-frame text[data-ts-key*='tick-label'],
-  .dshx-chart-frame text[data-ts-key^='legend-label'],
-  .dshx-chart-frame text[data-ts-key^='legend-step-label'] {
+  .dshx-chart-frame text[data-ts-key*='legend']:not([data-ts-key^='interactive-legend']),
+  .dshx-chart-frame text[data-ts-key$='-label'],
+  .dshx-chart-frame text[data-ts-key$=':label'] {
     fill: currentColor;
     fill-opacity: 1;
+    font-size: var(--dshx-density-text-meta);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .dshx-chart-frame text[data-ts-key^='interactive-legend-label'] {
     font-size: var(--dshx-density-text-meta);
     font-variant-numeric: tabular-nums;
   }

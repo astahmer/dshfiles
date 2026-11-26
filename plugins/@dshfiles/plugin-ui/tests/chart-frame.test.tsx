@@ -65,6 +65,37 @@ describe('ChartFrame labels (round five A5)', () => {
     expect(body).toMatch(/font-variant-numeric:\s*tabular-nums;/u)
   })
 
+  it('reaches every other axis and legend text at 12px minimum, and the frame itself never drops below 12px (council round 10 A8)', () => {
+    const view = render(
+      <ChartFrame title="Tokens">
+        <svg>
+          {['x-label', 'y-label', 'legend-step-label:0:5', 'legend-gradient:min', 'legend-gradient:max', 'facet:Mon:label'].map(key => (
+            <text key={key} data-ts-key={key}>
+              {key}
+            </text>
+          ))}
+          <text data-ts-key="interactive-legend-label:Input">Input</text>
+          <text data-ts-key="bar:Mon">3</text>
+        </svg>
+      </ChartFrame>,
+    )
+    const figure = view.container.querySelector('figure')!
+    // The frame's own text (a caption, an HTML legend a plugin draws) is the 12px meta step, never the 11px minimum.
+    expect(figure.className).toContain('dshx:text-xs')
+    expect(figure.className).not.toContain('dshx:text-2xs')
+    for (const node of figure.querySelectorAll('text:not([data-ts-key^="interactive"]):not([data-ts-key^="bar"])'))
+      expect(node.matches(selector), node.getAttribute('data-ts-key') ?? '').toBe(true)
+    // The interactive legend keeps its own dimmed hidden-series opacity; it takes the size only.
+    const interactive = figure.querySelector('[data-ts-key^="interactive-legend-label"]')!
+    expect(interactive.matches(selector)).toBe(false)
+    const sizeOnly = /([^{}]*interactive-legend-label[^{]*)\{([^}]*)\}/u.exec(roles.replace(/\/\*[\s\S]*?\*\//gu, ''))
+    expect(interactive.matches(sizeOnly?.[1]?.trim() ?? ':not(*)')).toBe(true)
+    expect(sizeOnly?.[2]).toMatch(/font-size:\s*var\(--dshx-density-text-meta\);/u)
+    expect(sizeOnly?.[2]).not.toMatch(/fill-opacity/u)
+    // A value label on a mark is not an axis or legend label.
+    expect(figure.querySelector('[data-ts-key="bar:Mon"]')!.matches(selector)).toBe(false)
+  })
+
   const schemes: readonly Scheme[] = ['light', 'dark']
   it.each(schemes)('holds that ink at AA where charts sit (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
