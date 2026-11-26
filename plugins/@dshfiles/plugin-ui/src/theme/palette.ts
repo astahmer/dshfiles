@@ -54,6 +54,13 @@ export interface Palette {
    */
   readonly selectedWash: Oklch
   /**
+   * The selected edge (council round 12 A1): a neutral 1px inset edge on top of the wash, for a selected row that leads
+   * with a glyph, tile or mark and so draws no `selected-marker` pill (`dshx:selected-edge`). 3:1 against the wash on the
+   * page, the nav column and a dialog (dark dialogs lift the wash to L 0.30): light oklch(0.61 0.01 65) #88827D (the
+   * council's #A39B93 held 2.26:1), dark oklch(0.58 0.01 65) #7F7974 (the council's #817A73 within one step).
+   */
+  readonly selectedEdge: Oklch
+  /**
    * Attention at the tint rung (round five A2): the persistent wash of a Needs-you row (accent hue) and of a Failed row
    * (danger hue). Opaque and stronger than `selectedWash`, so what waits on you outranks what you selected.
    */
@@ -134,6 +141,9 @@ const STATUS_HUES = { success: 150, warning: 80, danger: 25 } as const
  */
 const TRIGGER_FILL_ALPHA = { light: 0.05, dark: 0.052 } as const
 
+/** Where the selected edge starts before it is fitted to 3:1 on the wash (council round 12 A1). */
+const SELECTED_EDGE_L = { light: 0.61, dark: 0.58 } as const
+
 /** Default warm-stone input (D1). */
 export const WARM_STONE = { hue: 65, chroma: 0.007, accentHue: 270, contrast: 1 } as const
 
@@ -172,6 +182,7 @@ function palette(input: PaletteInput): Palette {
   const [bg, panel, raised] = neutral as [Oklch, Oklch, Oklch]
   // The light primary's warmth: 0.01 for warm stone (grey chroma 0.007), none for a neutral preset.
   const primaryChroma = round(chroma / 0.7, 4)
+  const selectedWash: Oklch = dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 }
   const accentFg = fitAccent(dark ? { l: 0.72, c: 0.14, h: accentHue } : { l: 0.53, c: 0.19, h: accentHue - 2 }, raised, dark)
   const status = (h: number): Oklch => (dark ? { l: 0.75, c: 0.14, h } : { l: 0.5, c: 0.15, h })
   return {
@@ -184,7 +195,8 @@ function palette(input: PaletteInput): Palette {
     danger: trio(status(STATUS_HUES.danger)),
     info: trio(accentFg),
     // Neutral (council round 3 A1): the fill carries no hue; the row marker is ink (council round 6 A1).
-    selectedWash: dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 },
+    selectedWash,
+    selectedEdge: fitSelectedEdge({ l: round(clamp(base + (SELECTED_EDGE_L[scheme] - base) * contrast, 0, 1), 4), c: 0.01, h: hue }, selectedWash, dark),
     // Light washes sit on the sRGB edge (council round 5 A8): at L 0.94 a 0.035 blue clipped to 0.029, so each light
     // wash takes the lowest L where faint text still holds AA and the most chroma that L renders unclipped.
     needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
@@ -213,6 +225,17 @@ function palette(input: PaletteInput): Palette {
 function fitAccent(accent: Oklch, raised: Oklch, dark: boolean): Oklch {
   let fitted = accent
   for (let i = 0; i < 40 && contrastRatio(fitted, raised) < 4.6; i += 1) fitted = { ...fitted, l: round(fitted.l + (dark ? 0.01 : -0.01), 4) }
+  return fitted
+}
+
+/**
+ * Moves the selected edge away from the wash until it holds 3:1 on it wherever it is painted: the page and the nav column
+ * share the opaque wash; a dark dialog lifts it to L 0.30 (surfaces.css). The warm-stone default already passes.
+ */
+function fitSelectedEdge(edge: Oklch, wash: Oklch, dark: boolean): Oklch {
+  const under = dark ? [wash, { ...wash, l: Math.max(wash.l, 0.3) }] : [wash]
+  let fitted = edge
+  for (let i = 0; i < 40 && Math.min(...under.map(back => contrastRatio(fitted, back))) < 3.05; i += 1) fitted = { ...fitted, l: round(fitted.l + (dark ? 0.01 : -0.01), 4) }
   return fitted
 }
 

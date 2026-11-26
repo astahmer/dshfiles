@@ -11,6 +11,9 @@
  *   attention wash instead of the selection wash, so the pill is its only selection cue besides the 550 title.
  *
  * Spread them: `<span {...LEADING_GLYPH_ATTRIBUTE}>…</span>`, `<div {...MARKER_OPT_OUT} className="… dshx:selected-marker">`.
+ *
+ * A row that draws no pill because it leads with a glyph adds `SELECTED_EDGE` beside its wash (council round 12 A1): a
+ * neutral 1px inset edge, 3:1 on the wash, so the selection reads on every surface. Plain-text rows keep the pill alone.
  */
 export const LEADING_GLYPH_ATTRIBUTE = { 'data-leading-glyph': '' } as const
 
@@ -19,3 +22,10 @@ export const MARKER_OPT_OUT = { 'data-marker': 'none' } as const
 
 /** The row keeps its selection pill even when it leads with a glyph (a selected Needs-you or Failed row). */
 export const MARKER_KEEP = { 'data-marker': 'pill' } as const
+
+/**
+ * The selected edge class (council round 12 A1): `cn('dshx:bg-selected-wash dshx:selected-marker', SELECTED_EDGE)` on a
+ * selected glyph-leading row (the current thread row, an account row). Never on a plain-text row or a Needs-you or
+ * Failed row, which keep the pill.
+ */
+export const SELECTED_EDGE = 'dshx:selected-edge'

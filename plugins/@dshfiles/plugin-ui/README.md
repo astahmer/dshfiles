@@ -172,7 +172,12 @@ and a palette row that starts with a project tile lose the pill. A plugin row sp
 (`data-leading-glyph`, found anywhere in the row) on its own leading glyph, or `MARKER_OPT_OUT` (`data-marker="none"`)
 on the row itself; both come from `@dshfiles/plugin-ui/components/selection`. Only plain-text rows keep the pill,
 and a row that spreads `MARKER_KEEP` (`data-marker="pill"`): a selected Needs-you or Failed row, which shows its
-attention wash instead of the selected wash. The
+attention wash instead of the selected wash. **Selected edge** (council round 12 A1): a selected row that leads with
+a glyph, tile or mark, so draws no pill, adds `dshx:selected-edge` (`SELECTED_EDGE` from `components/selection`) beside
+its wash: a neutral 1px inset edge (`--dshx-selected-edge`, light `#88827D`, dark `#7F7974`), 3:1 against the wash on
+the page, the nav column and a dialog, so the selection still reads where the wash alone sits near 1.1:1 off the page
+(the current thread row, an account row). An inset shadow: it moves nothing and follows the row's radius. Plain-text
+rows and `MARKER_KEEP` rows take the pill instead, never both. The
 active underline tab draws a
 2px ink bar too (council round 7 A1), like the window tab strip; the checked switch, checkbox and radio fill
 `control-on`, the ink, with the tick or knob in `control-on-foreground`. Indigo is attention, the focus ring and links. The kit applies wash and marker to the selected
