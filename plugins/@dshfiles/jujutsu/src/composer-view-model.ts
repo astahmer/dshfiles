@@ -69,9 +69,20 @@ const locationLabel = (input: {
     .join(' · ')
 }
 
+/**
+ * The state the location chip flags for a phone's meter line (council round 13 C5), which rich-composer hides unless an
+ * entry carries one: a conflict first, then no bookmark to stand on, then commits behind the base.
+ */
+const meterAlert = (input: { readonly conflict: boolean; readonly bookmark: string | undefined; readonly behind: number }): 'conflict' | 'detached' | 'behind' | undefined => {
+  if (input.conflict) return 'conflict'
+  if (input.bookmark === undefined) return 'detached'
+  return input.behind > 0 ? 'behind' : undefined
+}
+
 export class ComposerViewModel {
   static readonly changesPill = changesPill
   static readonly projectChanges = projectChanges
   static readonly changesSize = changesSize
   static readonly locationLabel = locationLabel
+  static readonly meterAlert = meterAlert
 }

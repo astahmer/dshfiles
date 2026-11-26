@@ -334,6 +334,8 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
   // b:212a: the same two words the workspace picker uses, "Own workspace" or "In the project", never the folder name.
   const location = ComposerViewModel.locationLabel({ ownWorkspace, bookmark, onBookmark: ownBookmark !== undefined, counts })
   const label = location.length === 0 ? `@ ${repository.changeId}` : location
+  // Council round 13 C5: a phone hides rich-composer's passive meter line unless an entry flags a state worth seeing.
+  const alert = ComposerViewModel.meterAlert({ conflict: repository.conflict, bookmark, behind: counts?.behind ?? 0 })
   const title = [
     'Toggle Jujutsu on ' + repository.root,
     'Project: ' + project,
@@ -346,7 +348,12 @@ export const ComposerChips = (props: ComposerSlotProps): JSX.Element | null => {
     .join('\n')
   return (
     <TooltipProvider delayDuration={500}>
-      <div className="dshx-root dshx:flex dshx:items-center dshx:text-xs dshx:text-muted-foreground" data-composer-meta="location" ref={context.ref}>
+      <div
+        className="dshx-root dshx:flex dshx:items-center dshx:text-xs dshx:text-muted-foreground"
+        data-composer-meta="location"
+        data-meter-alert={alert}
+        ref={context.ref}
+      >
         <Chip onClick={toggle} tooltip={title}>
           <span className="dshx:min-w-0 dshx:truncate">{label}</span>
           {repository.conflict && <span className="dshx:shrink-0 dshx:text-destructive">conflict</span>}

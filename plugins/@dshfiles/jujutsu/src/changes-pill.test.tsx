@@ -13,11 +13,11 @@ const repository = (workspace: string) => ({
   commitId: '0123456789ab',
   description: '',
   empty: false,
-  conflict: false,
+  conflict: host.conflict,
   bookmarks: [],
-  nearestBookmarks: ['main'],
+  nearestBookmarks: host.nearestBookmarks,
   base: { label: 'main', found: true },
-  revisionCounts: { ahead: 1, behind: 0 },
+  revisionCounts: host.revisionCounts,
   totals: { files: 3, additions: 21, deletions: 0 },
   files: [],
   filesTruncated: false,
@@ -25,7 +25,15 @@ const repository = (workspace: string) => ({
   remoteBookmarks: [],
 })
 
-const host = vi.hoisted(() => ({ workspace: 'default', totals: { files: 3, additions: 21, deletions: 0 }, reads: 0 }))
+const host = vi.hoisted(() => ({
+  workspace: 'default',
+  totals: { files: 3, additions: 21, deletions: 0 },
+  reads: 0,
+  // The repository's state a test may change (behind, conflict, no bookmark).
+  conflict: false,
+  nearestBookmarks: ['main'],
+  revisionCounts: { ahead: 1, behind: 0 },
+}))
 
 // The native package pulls its icon set at import; the pill needs none of it.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({ ReferenceChip: () => null }))
@@ -94,6 +102,9 @@ afterEach(() => {
   host.workspace = 'default'
   host.totals = { files: 3, additions: 21, deletions: 0 }
   host.reads = 0
+  host.conflict = false
+  host.nearestBookmarks = ['main']
+  host.revisionCounts = { ahead: 1, behind: 0 }
 })
 
 describe('Changes pill', () => {
@@ -155,6 +166,28 @@ describe('Location chip on the meter line', () => {
     host.workspace = 'default'
     const view = await mount(<ComposerChips sessionId={'session-1' as never} jujutsu={services('/work/sample', () => true)} />)
     expect(view.querySelector('[data-composer-meta="location"]')?.textContent).toBe('In the project · 1 ahead of main')
+  })
+
+  // Council round 13 C5: a phone hides the passive meter line; the chip flags the states it must still show.
+  it('flags no alert while the checkout only stands ahead of its bookmark', async () => {
+    const view = await mount(<ComposerChips sessionId={'session-1' as never} jujutsu={services('/work/sample', () => true)} />)
+    expect(view.querySelector('[data-composer-meta="location"]')?.hasAttribute('data-meter-alert')).toBe(false)
+  })
+
+  it.each([
+    ['behind', (): void => {
+      host.revisionCounts = { ahead: 1, behind: 2 }
+    }],
+    ['conflict', (): void => {
+      host.conflict = true
+    }],
+    ['detached', (): void => {
+      host.nearestBookmarks = []
+    }],
+  ] as const)('flags %s as an alert the meter line keeps on a phone', async (state, arrange) => {
+    arrange()
+    const view = await mount(<ComposerChips sessionId={'session-1' as never} jujutsu={services('/work/sample', () => true)} />)
+    expect(view.querySelector('[data-composer-meta="location"]')?.getAttribute('data-meter-alert')).toBe(state)
   })
 })
 
