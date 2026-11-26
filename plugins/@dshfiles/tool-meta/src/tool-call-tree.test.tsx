@@ -5,6 +5,7 @@ import type { ComponentType, ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ANCHORED_ATTRIBUTE,
+  DISCLOSURE_ANCHOR_ATTRIBUTE,
   FIT_ATTRIBUTE,
   installToolCallTreeWrapper,
   isToolCallTreeWrapped,
@@ -200,6 +201,15 @@ describe('installToolCallTreeWrapper', () => {
       // Hidden until anchored: the class pair is what keeps an unanchored label off a card's own header.
       expect(labels[0]?.className).toContain('dshx:invisible')
       expect(labels[0]?.className).toContain('dshx:data-[dshfiles-tool-meta-anchored]:visible')
+    })
+
+    it('takes the 24 px height of a disclosure header, so the time sits on its centre line (council round 22, item 9)', () => {
+      renderNesting()
+      const labels = [...document.querySelectorAll<HTMLElement>('[data-dshfiles-tool-meta-label]')]
+      // The 28 px box centred a 16 px time 2 px under a 24 px row.
+      expect(labels.map(label => label.hasAttribute(DISCLOSURE_ANCHOR_ATTRIBUTE))).toEqual([true, true])
+      expect(labels[0]?.className).toContain('dshx:h-7')
+      expect(labels[0]?.className).toContain('dshx:data-[dshfiles-tool-meta-disclosure]:h-6')
     })
 
     it('keeps the label hidden on a card that draws its own header', () => {

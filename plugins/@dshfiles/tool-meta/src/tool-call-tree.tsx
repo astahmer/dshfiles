@@ -33,6 +33,12 @@ export const OWN_TIMING_SELECTOR = '[data-tool-card-timing="own"]'
  * first match is the card's own unless the card has no header and the match belongs to a nested call's frame.
  */
 const HEADER_ROW_SELECTOR = '[data-disclosure-header], [data-expandable], [data-disclosure-row]'
+/**
+ * Set on the timing label while its card's top row is a native disclosure header, the shared 24 px process row: the
+ * label then takes that row's height, so its time sits on the row's centre line instead of 2 px under it (council round
+ * 22, item 9). Other headers keep the label's 28 px.
+ */
+export const DISCLOSURE_ANCHOR_ATTRIBUTE = 'data-dshfiles-tool-meta-disclosure'
 /** Set on a frame whose card is one collapsed row; the frame then fits that row instead of the message column. */
 export const FIT_ATTRIBUTE = 'data-dshfiles-tool-meta-fit'
 
@@ -109,6 +115,7 @@ const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | nul
       frame.toggleAttribute(FIT_ATTRIBUTE, isLoneRow(frame))
       const anchor = headerRowOf(frame, label)
       label.toggleAttribute(ANCHORED_ATTRIBUTE, anchor !== undefined)
+      label.toggleAttribute(DISCLOSURE_ANCHOR_ATTRIBUTE, anchor?.matches('[data-disclosure-header]') === true)
       const row = width > 0 ? anchor : undefined
       if (row === marked && row?.hasAttribute(RESERVED_ROW_ATTRIBUTE) !== false) return
       marked?.removeAttribute(RESERVED_ROW_ATTRIBUTE)
@@ -136,6 +143,7 @@ const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | nul
       if (queued !== undefined) cancelAnimationFrame(queued)
       marked?.removeAttribute(RESERVED_ROW_ATTRIBUTE)
       label.removeAttribute(ANCHORED_ATTRIBUTE)
+      label.removeAttribute(DISCLOSURE_ANCHOR_ATTRIBUTE)
       frame.removeAttribute(FIT_ATTRIBUTE)
     }
   }, [frameRef, labelRef])
@@ -170,7 +178,7 @@ const ToolCallFrame = (props: {
         <span
           ref={labelRef}
           data-dshfiles-tool-meta-label=""
-          className="dshx-root dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2 dshx:data-[dshfiles-tool-meta-anchored]:visible dshx:@max-pane-narrow/tool-frame:hidden"
+          className="dshx-root dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:right-0 dshx:flex dshx:h-7 dshx:items-center dshx:pr-2 dshx:data-[dshfiles-tool-meta-disclosure]:h-6 dshx:data-[dshfiles-tool-meta-anchored]:visible dshx:@max-pane-narrow/tool-frame:hidden"
         >
           {props.meta}
         </span>
