@@ -118,9 +118,12 @@ export interface AttentionMetaProps extends Omit<React.ComponentPropsWithoutRef<
   /** The age ("2m"), on surfaces that show one. It is the first part to go. */
   readonly age?: string | undefined
   /**
-   * `inline` (default): the mark leads the line, 6px before the name (Inbox cards). `rail`: the mark hangs in a 16px seat
-   * in the row's leading glyph column, `--attention-meta-rail-gap` (default 8px) before the name, so every row's mark
-   * forms one rail and the name lines up with the title (thread list rows).
+   * `inline` (default): the mark leads the line, 6px before the name (Inbox cards). `rail`: the mark hangs in the row's
+   * leading glyph column, a seat `--attention-meta-rail-seat` wide (20px from the kit sheet, as wide as the widest dense
+   * mark), `--attention-meta-rail-gap` (default 8px) before the name, so every row's mark forms one rail and the name
+   * lines up with the title (thread list rows). Give the row's status-glyph column the same seat width so glyph and
+   * mark share one centre axis. The seat centres safely: a mark wider than the seat starts at the line's edge and spills
+   * into the gap, never past the row's leading edge.
    */
   readonly markSeat?: 'inline' | 'rail' | undefined
   /** How the mark is painted: the owner's `tone`, `color` and `palette`, plus any data attribute. */
@@ -150,7 +153,8 @@ const Separator = (): JSX.Element => (
  * the Inbox and the phone. It measures itself: when the line runs out of room the age goes first, then the project's
  * name truncates, and once fewer than eight of its characters would show, the name goes and the mark alone names the
  * project (the dropped words stay for assistive tech). With `keep="name"` the kind goes right after the age instead.
- * The line takes its width from its parent (`flex-1`); 12/16 muted by default.
+ * The line takes its width from its parent (`flex-1`); 12/16 muted by default. Only the text parts clip (they
+ * truncate): the line never cuts the mark inside a tinted or bordered row (council round 15 A1).
  */
 export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProps>(function AttentionMeta(
   { project, kind, age, markSeat = 'inline', mark, kindClassName, keep = 'kind', className, ...props },
@@ -220,7 +224,7 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
       data-mark-seat={markSeat}
       data-step={step}
       className={cn(
-        'dshx:relative dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:overflow-hidden dshx:text-xs/4 dshx:whitespace-nowrap dshx:text-muted-foreground',
+        'dshx:relative dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:text-xs/4 dshx:whitespace-nowrap dshx:text-muted-foreground',
         className,
       )}
       {...props}
@@ -229,7 +233,7 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
         <span
           ref={lead}
           data-attention-meta-part="rail"
-          className="dshx:mr-[var(--attention-meta-rail-gap,0.5rem)] dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center"
+          className="dshx:mr-[var(--attention-meta-rail-gap,0.5rem)] dshx:inline-flex dshx:w-[var(--attention-meta-rail-seat,20px)] dshx:shrink-0 dshx:justify-center-safe"
         >
           {markElement}
         </span>
@@ -263,35 +267,33 @@ export const AttentionMeta = React.forwardRef<HTMLSpanElement, AttentionMetaProp
       ) : (
         <span className="dshx:sr-only">, {ageText}</span>
       )}
-      {/* The parts at their natural width, measured to pick the step; never seen or read. */}
-      <span
-        ref={layer}
-        aria-hidden="true"
-        data-attention-meta-measure=""
-        className="dshx:pointer-events-none dshx:invisible dshx:absolute dshx:top-0 dshx:left-0 dshx:flex dshx:w-max dshx:whitespace-nowrap"
-      >
-        {name === undefined ? null : (
-          <>
-            <span data-measure-part="name" className={cn(nameClass, 'dshx:shrink-0')}>
-              {name}
+      {/* The parts at their natural width, measured to pick the step; never seen or read. Its own clipping box keeps
+          it from widening a scroll container now that the line does not clip. */}
+      <span aria-hidden="true" className="dshx:pointer-events-none dshx:invisible dshx:absolute dshx:inset-0 dshx:overflow-hidden">
+        <span ref={layer} data-attention-meta-measure="" className="dshx:absolute dshx:top-0 dshx:left-0 dshx:flex dshx:w-max dshx:whitespace-nowrap">
+          {name === undefined ? null : (
+            <>
+              <span data-measure-part="name" className={cn(nameClass, 'dshx:shrink-0')}>
+                {name}
+              </span>
+              <span data-measure-part="name-min" className={cn(nameClass, 'dshx:shrink-0')}>
+                {stubOf(name)}
+              </span>
+            </>
+          )}
+          {kindText === undefined ? null : (
+            <span data-measure-part="kind" className={cn(kindClass, 'dshx:shrink-0')}>
+              {kindText}
             </span>
-            <span data-measure-part="name-min" className={cn(nameClass, 'dshx:shrink-0')}>
-              {stubOf(name)}
+          )}
+          {ageText === undefined ? null : (
+            <span data-measure-part="age" className="dshx:shrink-0 dshx:tabular-nums">
+              {ageText}
             </span>
-          </>
-        )}
-        {kindText === undefined ? null : (
-          <span data-measure-part="kind" className={cn(kindClass, 'dshx:shrink-0')}>
-            {kindText}
+          )}
+          <span data-measure-part="sep" className="dshx:shrink-0 dshx:px-1">
+            ·
           </span>
-        )}
-        {ageText === undefined ? null : (
-          <span data-measure-part="age" className="dshx:shrink-0 dshx:tabular-nums">
-            {ageText}
-          </span>
-        )}
-        <span data-measure-part="sep" className="dshx:shrink-0 dshx:px-1">
-          ·
         </span>
       </span>
     </span>

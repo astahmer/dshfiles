@@ -229,6 +229,12 @@
     --dshx-size-bar: 36px;
     --dshx-size-touch: 44px;
     /*
+     * The leading glyph column a list row's second line shares with its first (council round 15 A1): AttentionMeta's
+     * rail seat and the thread list's status-glyph column. 20px, as wide as the widest dense project mark ("WA"), so
+     * the mark is never cut and glyph and mark share one centre axis.
+     */
+    --attention-meta-rail-seat: 20px;
+    /*
      * The one control height (council round 5 A1): Input, InputGroup, Combobox, the default Select trigger, the segmented
      * root and default-size Buttons, all at the 8px radius. 44px on a coarse pointer (below).
      */

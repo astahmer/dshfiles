@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { act, cleanup, render } from '@testing-library/react'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { ATTENTION_KIND_LABEL, ATTENTION_META_NAME_MIN, AttentionMeta, attentionMetaStep } from '../src/components/ui/attention-meta.js'
 
@@ -41,7 +43,10 @@ const resize = (width: number): void => {
   act(() => {
     for (const { callback, targets } of observers)
       // SAFETY: the fake observer's entries only carry the target the component reads.
-      callback([...targets].map(target => ({ target }) as ResizeObserverEntry), {} as ResizeObserver)
+      callback(
+        [...targets].map(target => ({ target }) as ResizeObserverEntry),
+        {} as ResizeObserver,
+      )
   })
 }
 
@@ -158,13 +163,13 @@ describe('AttentionMeta', () => {
     expect(view.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!.dataset['step']).toBe('full')
   })
 
-  it('in rail mode hangs the mark in a 16px seat before the name, and keeps the seat without a project', () => {
+  it('in rail mode hangs the mark in a 20px seat before the name, and keeps the seat without a project', () => {
     const view = render(<AttentionMeta markSeat="rail" project="web-app" kind="Question" mark={{ tone: 2, 'data-thread-project-mark': 'web-app' }} />)
     const root = view.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!
     expect(root.dataset['markSeat']).toBe('rail')
     const seat = root.querySelector<HTMLElement>(':scope > [data-attention-meta-part="rail"]')!
     expect(root.firstElementChild).toBe(seat)
-    expect(seat.className).toContain('dshx:w-4')
+    expect(seat.className).toContain('dshx:w-[var(--attention-meta-rail-seat,20px)]')
     expect(seat.className).toContain('dshx:mr-[var(--attention-meta-rail-gap,0.5rem)]')
     const mark = seat.querySelector<HTMLElement>('[data-slot="project-mark"]')!
     expect(mark.dataset['size']).toBe('dense')
@@ -210,6 +215,47 @@ describe('AttentionMeta', () => {
   it('is the 12/16 muted meta step, and takes its width from its parent', () => {
     const view = render(<AttentionMeta project="docs-site" kind="Approval" />)
     const root = view.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!
-    for (const name of ['dshx:text-xs/4', 'dshx:text-muted-foreground', 'dshx:flex-1', 'dshx:min-w-0', 'dshx:overflow-hidden']) expect(root.className).toContain(name)
+    for (const name of ['dshx:text-xs/4', 'dshx:text-muted-foreground', 'dshx:flex-1', 'dshx:min-w-0']) expect(root.className).toContain(name)
+  })
+
+  describe('the rail seat in a tinted, bordered row (council round 15 A1)', () => {
+    /** The widest dense mark: "WA" in Geist 11px semibold with 2px each side draws 20.94px (Chrome and WebKit). */
+    const WIDEST_DENSE_MARK = 21
+    /** The seat's width as its class resolves it: `--attention-meta-rail-seat` from the kit sheet, else its fallback. */
+    const seatWidth = (seat: HTMLElement): number => {
+      if (seat.className.includes('dshx:w-[var(--attention-meta-rail-seat,')) return sheetSeat
+      const spacing = /dshx:w-(\d+)(?:\s|$)/.exec(seat.className)?.[1]
+      return spacing === undefined ? Number.NaN : Number(spacing) * 4
+    }
+    const sheet = readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8')
+    const sheetSeat = Number(/--attention-meta-rail-seat:\s*(\d+)px/.exec(sheet)?.[1] ?? Number.NaN)
+
+    it('declares the seat once in the kit sheet, 20px', () => {
+      expect(sheetSeat).toBe(20)
+    })
+
+    it('keeps a "WA" mark whole: its left edge is at or right of the line\'s left edge, and nothing on the line clips it', () => {
+      const view = render(
+        <div data-row="" style={{ border: '1px solid', background: 'oklch(0.96 0.02 25)' }}>
+          <AttentionMeta markSeat="rail" project="web-app" kind={ATTENTION_KIND_LABEL.failed} mark={{ tone: 2 }} />
+        </div>,
+      )
+      const root = view.container.querySelector<HTMLElement>('[data-slot="attention-meta"]')!
+      const seat = root.querySelector<HTMLElement>(':scope > [data-attention-meta-part="rail"]')!
+      expect(seat.querySelector('[data-slot="project-mark"]')?.textContent).toBe('WA')
+      // The seat starts at the line's left edge and centres the mark; safe centring (`justify-center-safe`) starts a mark
+      // wider than the seat at the seat's edge instead of spilling it left.
+      expect(root.firstElementChild).toBe(seat)
+      const centred = (seatWidth(seat) - WIDEST_DENSE_MARK) / 2
+      const markLeft = seat.className.includes('dshx:justify-center-safe') ? Math.max(0, centred) : centred
+      expect(markLeft).toBeGreaterThanOrEqual(0)
+      expect(seat.className).toContain('dshx:justify-center-safe')
+      // Only the text parts clip; the line and the seat never cut the mark.
+      expect(root.className).not.toContain('overflow-hidden')
+      expect(seat.className).not.toContain('overflow-hidden')
+      // The measuring layer is clipped by its own box, so it never widens a scroll container.
+      const layer = root.querySelector<HTMLElement>('[data-attention-meta-measure]')!
+      expect(layer.parentElement?.className).toContain('dshx:overflow-hidden')
+    })
   })
 })
