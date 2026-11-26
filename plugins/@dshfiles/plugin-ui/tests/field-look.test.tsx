@@ -76,7 +76,8 @@ describe('one field look (council round 3 A4)', () => {
     const rule = /@utility select-look \{([\s\S]*?)\n\}/u.exec(looks)?.[1] ?? ''
     for (const declaration of [
       'height: var(--dshx-control-h, 32px);',
-      'border: 1px solid transparent;',
+      // Council round 11 A2: the quiet hairline at rest, so the chip never vanishes into its surface.
+      'border: 1px solid var(--dsw-alias-border-l2);',
       'border-radius: var(--dsw-radius-md, 8px);',
       'background-color: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));',
       'box-shadow: none;',
@@ -169,11 +170,12 @@ describe('field boundary (council round 6 A2, WCAG 1.4.11)', () => {
 describe('quiet trigger (council round 10 A1)', () => {
   const rest = (element: Element): readonly string[] => classes(element).filter(name => !/:(hover|focus|data-|aria-|not-)/u.test(name.replace(/^dshx:/u, '')))
 
-  it('is a filled chip with a transparent edge at rest and the 3:1 field edge on hover and while open', () => {
+  it('is a filled chip with a 1px hairline at rest and the 3:1 field edge on hover and while open (council round 11 A2)', () => {
     expect(triggerLook.split(' ')).toEqual([
       'dshx:rounded-lg',
       'dshx:border',
-      'dshx:border-transparent',
+      // The hairline (`--dsw-alias-border-l2`, the divider role) at rest: the chip keeps its outline on any surface.
+      'dshx:border-border',
       'dshx:bg-trigger-fill',
       'dshx:not-disabled:hover:border-field-border',
       'dshx:data-[state=open]:border-field-border',
@@ -204,7 +206,8 @@ describe('quiet trigger (council round 10 A1)', () => {
       view.getByRole('button', { name: 'Range' }),
     ]
     for (const trigger of triggers) {
-      expect(rest(trigger), trigger.getAttribute('aria-label') ?? '').toEqual(expect.arrayContaining(['dshx:border-transparent', 'dshx:bg-trigger-fill']))
+      expect(rest(trigger), trigger.getAttribute('aria-label') ?? '').toEqual(expect.arrayContaining(['dshx:border-border', 'dshx:bg-trigger-fill']))
+      expect(rest(trigger), trigger.getAttribute('aria-label') ?? '').not.toContain('dshx:border-transparent')
       expect(rest(trigger), trigger.getAttribute('aria-label') ?? '').not.toContain('dshx:border-field-border')
       expect(classes(trigger)).toContain('dshx:not-disabled:hover:border-field-border')
     }
@@ -240,6 +243,16 @@ describe('quiet trigger (council round 10 A1)', () => {
     // Where filter rows live (the page, a panel, the nav column) the hover and open edge holds 3:1 on both sides. A
     // placeholder is the secondary step (`data-[placeholder]:text-muted-foreground`), checked above.
     for (const under of [surfaces.bg, surfaces.panel, surfaces.nav]) expect(PaletteMath.contrastRatio(p.fieldBorder, fill(under))).toBeGreaterThanOrEqual(3)
+    // The rest hairline (council round 11 A2) is the divider step (`--dsw-alias-border-l2`, neutral step 4). It outlines
+    // the chip against every surface it sits on (a step off the surface, like a card's hairline), on the page, a panel
+    // and the nav column it also separates from the chip's own fill, and it stays quieter than the 3:1 hover edge, so
+    // hover still reads as a change. The fill and this outline identify the control; the 3:1 edge marks interaction.
+    const hairline = p.neutral[4]!
+    for (const [name, under] of Object.entries(surfaces)) {
+      expect(PaletteMath.contrastRatio(hairline, under), `${name} hairline on surface`).toBeGreaterThanOrEqual(1.06)
+      expect(PaletteMath.contrastRatio(hairline, fill(under)), `${name} hairline quieter than the edge`).toBeLessThan(PaletteMath.contrastRatio(p.fieldBorder, fill(under)))
+    }
+    for (const under of [surfaces.bg, surfaces.panel, surfaces.nav]) expect(PaletteMath.contrastRatio(hairline, fill(under))).toBeGreaterThanOrEqual(1.08)
   })
 })
 

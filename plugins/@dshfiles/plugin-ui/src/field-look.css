@@ -4,8 +4,8 @@
  * Triggers (a select, a combobox, a value picker) take the quiet trigger instead (council round 10 A1, `triggerLook`).
  * `dshx:select-look` is that quiet trigger at the one control height (`--dshx-control-h`, 32px; 44px coarse) for a
  * control the kit does not draw, such as a Host select inside a native settings row, reached with an arbitrary variant
- * (`dshx:[&_[class*=_select]]:select-look`): the trigger fill, a transparent 1px edge at rest and the 3:1 field edge on
- * hover and focus. It never sets a font family or the focus ring: the kit sheet draws the one ring for every control.
+ * (`dshx:[&_[class*=_select]]:select-look`): the trigger fill, the quiet 1px hairline at rest (`--dsw-alias-border-l2`,
+ * council round 11 A2) and the 3:1 field edge on hover and focus. It never sets a font family or the focus ring: the kit sheet draws the one ring for every control.
  *
  * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
  */
@@ -13,7 +13,7 @@
   box-sizing: border-box;
   height: var(--dshx-control-h, 32px);
   padding-inline: 10px;
-  border: 1px solid transparent;
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: var(--dsw-radius-md, 8px);
   background-color: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));
   color: var(--dsw-alias-label-primary);

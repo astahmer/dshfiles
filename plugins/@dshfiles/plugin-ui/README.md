@@ -245,8 +245,8 @@ boundary; a text field a plugin draws itself takes `dshx:border-field-border` to
 `border-border`. **The quiet trigger** (council round 10 A1): a control that opens a list and shows a value, the
 `Select` and `Combobox` triggers, `Button variant="field"` and `select-look`, shares `triggerLook`: `bg-trigger-fill`
 (`--dshx-trigger-fill`, the ink at 5% light / 5.2% dark, so it paints `oklch(0.955 0.004 65)` / `oklch(0.235 0.006 65)`
-on the page and stays a visible step on a panel, the nav column, raised or a dialog), a transparent 1px edge at rest,
-the 3:1 field edge on hover and while open, and the accent edge plus the kit ring on focus; the box never changes size. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
+on the page and stays a visible step on a panel, the nav column, raised or a dialog), a quiet 1px hairline at rest
+(`border-border`, `--dsw-alias-border-l2`; council round 11 A2, so a chip never vanishes into its surface), the 3:1 field edge on hover and while open, and the accent edge plus the kit ring on focus; the box never changes size. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
 coarse pointer, sizes `Input`, `InputGroup`, `Combobox`, the default `Select` trigger, `select-look`, the segmented
 `TabsList` (items inset 3px) and default-size `Button`s (so `Page` header actions); every `Button` size shares the 8px
 radius. The trigger takes that height (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;
