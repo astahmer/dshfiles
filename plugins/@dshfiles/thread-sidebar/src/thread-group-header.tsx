@@ -28,6 +28,27 @@ interface ThreadGroupHeaderProps {
    * plain total.
    */
   readonly statusCounts?: { readonly needsYou: number; readonly failed: number }
+  /**
+   * The status a status group stands for (Working, Ready, Idle, Done): its count is the kit's muted StatusCount with the
+   * 10px status glyph, like the Needs you chips, with no new hue (council round 15 B2). Other groups keep "(n)".
+   */
+  readonly status?: GroupCountStatus
+}
+
+/** The status groups whose count carries its glyph; Needs you splits its count by `statusCounts` instead. */
+export type GroupCountStatus = 'working' | 'ready' | 'idle' | 'done'
+
+/** The glyph a status group's count carries, from the group's status (`state:<status>` without its prefix). */
+export const groupCountStatusOf = (status: string): GroupCountStatus | undefined => {
+  switch (status) {
+    case 'working':
+    case 'ready':
+    case 'idle':
+    case 'done':
+      return status
+    default:
+      return undefined
+  }
 }
 
 export const ThreadGroupHeader = ({
@@ -43,6 +64,7 @@ export const ThreadGroupHeader = ({
   icon,
   checkoutCount,
   statusCounts,
+  status,
 }: ThreadGroupHeaderProps) => {
   const tinted = statusCounts !== undefined && statusCounts.needsYou + statusCounts.failed > 0
   const createLabel = t('threadSidebarNewChatInProject', { project: label })
@@ -68,6 +90,11 @@ export const ThreadGroupHeader = ({
             <span className="dshx:sr-only">({count})</span>
             <StatusCount aria-hidden="true" data-group-count="needs-you" status="needs-you" count={statusCounts.needsYou} />
             <StatusCount aria-hidden="true" data-group-count="failed" status="failed" count={statusCounts.failed} />
+          </>
+        ) : status !== undefined && count > 0 ? (
+          <>
+            <span className="dshx:sr-only">({count})</span>
+            <StatusCount aria-hidden="true" data-group-count={status} status={status} count={count} />
           </>
         ) : (
           <span className="dshx:shrink-0 dshx:font-normal dshx:tabular-nums dshx:text-(--dsw-alias-label-tertiary)">({count})</span>

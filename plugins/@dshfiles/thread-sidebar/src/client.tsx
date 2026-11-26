@@ -31,7 +31,7 @@ import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
-import { ThreadGroupHeader } from './thread-group-header.js'
+import { groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
 import { RemoteThreadInventoryModel, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
@@ -7703,6 +7703,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           { needsYou: 0, failed: 0 },
                         )
                       : undefined
+                  // Working, Ready, Idle and Done count beside their 10px status glyph (council round 15 B2).
+                  const groupStatus = group.key.startsWith(STATUS_GROUP_KEY_PREFIX) ? groupCountStatusOf(group.key.slice(STATUS_GROUP_KEY_PREFIX.length)) : undefined
                   return (
                     <section
                       className={cn(
@@ -7730,6 +7732,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           }
                           checkoutCount={group.checkoutCount}
                           {...(statusCounts === undefined ? {} : { statusCounts })}
+                          {...(groupStatus === undefined ? {} : { status: groupStatus })}
                           label={groupLabel}
                           count={group.threads.length}
                           collapsed={groupCollapsed}

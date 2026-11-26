@@ -14,6 +14,7 @@ const mount = (
     icon?: ReactNode
     checkoutCount?: number
     statusCounts?: { readonly needsYou: number; readonly failed: number }
+    status?: 'working' | 'ready' | 'idle' | 'done'
   } = {},
 ) => {
   const onToggle = vi.fn()
@@ -31,7 +32,8 @@ const mount = (
   const withAction = options.action === undefined ? props : { ...props, action: options.action }
   const withIcon = options.icon === undefined ? withAction : { ...withAction, icon: options.icon }
   const withCheckouts = options.checkoutCount === undefined ? withIcon : { ...withIcon, checkoutCount: options.checkoutCount }
-  const withCounts = options.statusCounts === undefined ? withCheckouts : { ...withCheckouts, statusCounts: options.statusCounts }
+  const withSplit = options.statusCounts === undefined ? withCheckouts : { ...withCheckouts, statusCounts: options.statusCounts }
+  const withCounts = options.status === undefined ? withSplit : { ...withSplit, status: options.status }
   const view = render(
     <TooltipProvider>
       <ThreadGroupHeader {...withCounts} />
@@ -133,6 +135,26 @@ describe('ThreadGroupHeader', () => {
     const plain = mount({ label: 'Working' })
     expect(plain.container.querySelector('[data-group-count]')).toBeNull()
   })
+
+  it.each(['working', 'ready', 'idle'] as const)(
+    'counts the %s group with its 10px status glyph in a muted chip, the spoken name unchanged (council round 15 B2)',
+    status => {
+      const header = mount({ label: 'Group', status })
+      screen.getByRole('button', { name: 'Group (12)' })
+      const chips = Array.from(header.container.querySelectorAll<HTMLElement>('[data-group-count]'))
+      expect(chips.map(chip => [chip.dataset.groupCount, chip.getAttribute('data-slot'), chip.textContent?.replace(/\s.*$/su, '')])).toEqual([
+        [status, 'status-count', '12'],
+      ])
+      const glyph = chips[0]?.querySelector('[data-slot="status-glyph"]')
+      expect(glyph?.getAttribute('data-status')).toBe(status)
+      expect(glyph?.className).toContain('dshx:size-2.5')
+      // Neutral: the muted chip, no new hue.
+      expect(chips[0]?.className).toContain('dshx:bg-muted')
+      expect(chips[0]?.getAttribute('aria-hidden')).toBe('true')
+      // The bracketed total stays for assistive tech only.
+      expect(screen.getAllByText('(12)').map(node => node.className)).toEqual(['dshx:sr-only'])
+    },
+  )
 
   it('names how many local checkouts a repository row stands for', () => {
     mount({ label: 'repo', projectId: 'project-1', checkoutCount: 2 })
