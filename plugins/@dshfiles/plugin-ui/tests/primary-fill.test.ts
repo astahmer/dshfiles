@@ -50,3 +50,20 @@ describe('primary button fill (council round 3 A3, round 4 A2)', () => {
     expect(primary).toContain('dshx:font-medium')
   })
 })
+
+describe('no near-white action fill in dark (council round 10 A7)', () => {
+  // The kit's own actions and on states: a Send button is the primary fill (L 0.88 dark), a selected check the
+  // control-on ink (L 0.82 dark), never the 0.93 ink (`bg-foreground`), which read as near-white.
+  const source = (path: string): string => readFileSync(join(process.cwd(), 'src/components', path), 'utf8')
+  it.each(['motion/clarify-prompt.tsx', 'motion/shapeshift-card.tsx', 'motion/bulk-select-list.tsx'])('%s paints its action or on state with the primary or control-on fill', path => {
+    const text = source(path)
+    expect(text).not.toMatch(/dshx:bg-foreground dshx:text-background/u)
+    expect(text).toMatch(/dshx:bg-primary|dshx:bg-control-on|variant="default"|<Button\b(?![^>]*variant=)/u)
+  })
+  it('measures the rendered dark primary at the round-3 fill, not the ink', () => {
+    const dark = PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' })
+    // Measured on the round-9 shots: "Add account" and "Add plugin" paint #dad7d3 (L 0.880, C 0.006).
+    expect(PaletteMath.toHex(dark.primaryFill)).toBe('#dad7d3')
+    expect(dark.primaryFill.l).toBeLessThanOrEqual(0.9)
+  })
+})
