@@ -19,10 +19,20 @@ describe('a page tab whose count names its statuses (council round 10, phone Inb
     const tab = view.getByRole('tab', { name: /Needs you/u })
     const tally = tab.querySelector('[data-slot="page-tab-status-counts"]')!
     expect(classes(tally)).toEqual(expect.arrayContaining(['dshx:hidden', 'dshx:in-data-shell-phone-nav:inline-flex']))
-    expect([...tally.querySelectorAll('[data-slot="status-count"]')].map(count => [count.getAttribute('data-status'), count.textContent?.match(/\d+/u)?.[0]])).toEqual([
+    expect([...tally.querySelectorAll('[data-slot="page-tab-status"]')].map(pair => [pair.getAttribute('data-status'), pair.textContent?.match(/\d+/u)?.[0]])).toEqual([
       ['needs-you', '2'],
       ['failed', '1'],
     ])
+    // Compact inside a segment: glyph and number 4px apart, no pill fill or padding, a muted "·" between pairs.
+    expect(tally.querySelector('[data-slot="status-count"]')).toBeNull()
+    for (const pair of tally.querySelectorAll('[data-slot="page-tab-status"]')) {
+      expect(classes(pair)).toContain('dshx:gap-1')
+      expect(pair.className).not.toMatch(/(?:^| )dshx:(?:bg-|px-|rounded)/u)
+      expect(pair.querySelector('.dshx\\:sr-only')?.textContent).toMatch(/Needs you|Failed/u)
+    }
+    const dots = [...tally.children].filter(child => child.getAttribute('aria-hidden') === 'true')
+    expect(dots.map(dot => [dot.textContent, classes(dot)])).toEqual([['·', ['dshx:text-muted-foreground']]])
+    expect(classes(tally)).toContain('dshx:tabular-nums')
     const plain = tab.querySelector('[data-slot="page-tab-count"]')!
     expect(plain.textContent).toBe('3')
     expect(classes(plain)).toContain('dshx:in-data-shell-phone-nav:hidden')

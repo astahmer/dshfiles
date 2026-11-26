@@ -5,7 +5,7 @@ import { Button } from './ui/button.js'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu.js'
 import { Spinner } from './ui/spinner.js'
 import { SegmentLabel, Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.js'
-import { StatusCount, type WorkStatus } from './work-status.js'
+import { StatusCount, StatusGlyph, WorkStatusModel, type WorkStatus } from './work-status.js'
 import { useSlidingIndicator } from '../motion/react.js'
 
 /** One header action. The page shows at most one `primaryAction`; everything else is an overflow-capable action. */
@@ -437,8 +437,10 @@ function PageTabList({ tabs }: { readonly tabs: PageTabs }) {
 
 /**
  * A tab's count. With two or more statuses in `statusCounts`, the phone shell (`html[data-shell-phone-nav]`) shows
- * their tally (council round 10, Inbox "Needs you": ◆ 2 ✕ 1) and hides the plain count; every other shell keeps the
- * plain count. Both sit inside the tab's own height, so the segment's height and hit area do not change.
+ * their tally (council round 10, Inbox "Needs you": ◆ 2 · ✕ 1) and hides the plain count; every other shell keeps the
+ * plain count. Compact inside a segment: each status glyph and its tabular number 4px apart with no pill fill or
+ * padding, a muted "·" between pairs (the page title keeps its `StatusCount` pills). Both sit inside the tab's own
+ * height, so the segment's height and hit area do not change.
  */
 const TabCount = ({ count, statusCounts }: { readonly count: number | undefined; readonly statusCounts?: PageStatusCounts | undefined }): React.ReactNode => {
   const tally = presentStatuses(statusCounts)
@@ -451,9 +453,20 @@ const TabCount = ({ count, statusCounts }: { readonly count: number | undefined;
           {count}
         </span>
       )}
-      <span data-slot="page-tab-status-counts" className="dshx:hidden dshx:items-center dshx:gap-1 dshx:in-data-shell-phone-nav:inline-flex">
-        {tally.map(([status, value]) => (
-          <StatusCount key={status} status={status} count={value} />
+      <span data-slot="page-tab-status-counts" className="dshx:hidden dshx:items-center dshx:gap-1 dshx:text-xs dshx:tabular-nums dshx:in-data-shell-phone-nav:inline-flex">
+        {tally.map(([status, value], index) => (
+          <React.Fragment key={status}>
+            {index === 0 ? null : (
+              <span aria-hidden="true" className="dshx:text-muted-foreground">
+                ·
+              </span>
+            )}
+            <span data-slot="page-tab-status" data-status={status} className="dshx:inline-flex dshx:items-center dshx:gap-1">
+              <StatusGlyph status={status} size="small" decorative />
+              {value}
+              <span className="dshx:sr-only"> {WorkStatusModel.label(status)}</span>
+            </span>
+          </React.Fragment>
         ))}
       </span>
     </>
