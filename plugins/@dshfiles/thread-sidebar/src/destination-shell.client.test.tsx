@@ -589,9 +589,15 @@ describe('DestinationShell', () => {
     const threads = within(bar).getByRole('button', { name: 'Threads' })
     expect(threads.getAttribute('aria-current')).toBeNull()
     expect(threads.querySelector('[data-phone-tab-seat]')?.className).not.toContain('dshx:bg-nav-tile')
-    // At rest every glyph keeps its destination tone (round nine B3); only the tile and the 600 label mark the current one.
+    // Colour on the current tab only (council round 12 B3, reversing round nine B3): a tinted glyph means "selected" on a
+    // phone, so the others rest in tertiary ink; the current glyph takes its tone on its tile.
     for (const tab of within(bar).getAllByRole('button')) {
-      expect(tab.querySelector('[data-phone-tab-seat]')?.className).toContain('dshx:text-nav-tone')
+      const seat = tab.querySelector('[data-phone-tab-seat]')?.className
+      if (tab === more) expect(seat).toContain('dshx:text-nav-tone')
+      else {
+        expect(seat).not.toContain('dshx:text-nav-tone')
+        expect(seat).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+      }
     }
     expect(threads.className).toContain('dshx:nav-tone-threads')
     cleanup()

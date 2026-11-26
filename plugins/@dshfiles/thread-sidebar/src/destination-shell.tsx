@@ -1878,16 +1878,18 @@ const PhoneNavigation = (
               onClick={() => select(tab)}
               className={cn(
                 'dshx:flex dshx:h-14 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-0.5 dshx:text-(--dsw-alias-label-tertiary) dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:active:text-foreground',
-                // Every glyph in its destination's tone at rest, as on the rail (round nine B3); the current tab adds that
-                // tone's 14% tile and an ink label at 600. Inbox and More carry the neutral (ink) tone.
+                // Colour on the current tab only (council round 12 B3, reversing round nine B3): a tinted glyph reads as
+                // "selected" on a phone, so the others rest in tertiary ink. The current glyph takes its destination's tone
+                // on that tone's 14% tile, with an ink label at 600. Inbox and More carry the neutral (ink) tone. The
+                // desktop rail keeps its always-toned glyphs: a launcher, not a tab bar.
                 NAV_TONE[tab === 'more' ? 'settings' : tab],
                 current === tab && 'dshx:text-foreground',
               )}
             >
               <span
                 className={cn(
-                  'dshx:inline-flex dshx:h-7 dshx:w-11 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-nav-tone',
-                  current === tab && 'dshx:bg-nav-tile',
+                  'dshx:inline-flex dshx:h-7 dshx:w-11 dshx:items-center dshx:justify-center dshx:rounded-full',
+                  current === tab ? 'dshx:bg-nav-tile dshx:text-nav-tone' : 'dshx:text-(--dsw-alias-label-tertiary)',
                 )}
                 aria-hidden="true"
                 data-phone-tab-seat=""
