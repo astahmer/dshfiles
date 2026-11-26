@@ -213,6 +213,9 @@ describe('ThreadPalette frame (council round 3 B5)', () => {
     // The kit dialog's 24 px sm: padding read as a loose frame: 16 px on every side.
     expect(dialog.className).toContain('dshx:p-4!')
     expect(dialog.className).toContain('dshx:phone:p-0!')
+    // 640 px wide on a desktop (council round 10 B4).
+    expect(dialog.className).toContain('dshx:sm:max-w-160')
+    expect(dialog.className).not.toContain('dshx:sm:max-w-2xl')
     // The kit's floating surface (kit A8) draws the fill, edge and shadow: the palette sets none of its own.
     expect(dialog.className).toContain('dshx:surface-dialog')
     expect(dialog.className).not.toContain('dshx:dark:bg-(--dshx-tone-raised)')

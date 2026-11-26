@@ -712,7 +712,8 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         className={cn(
           // A 16px outer inset (council round 3 B5): the kit dialog's 24px read as a loose frame around the search. Important,
           // to beat the kit's own sm: padding without a viewport variant here; the full-screen phone search keeps none.
-          'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-4! dshx:phone:p-0! dshx:sm:max-w-2xl',
+          // 640px wide (council round 10 B4): the rows and the footer read as one column, not a 672px sheet.
+          'dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-4! dshx:phone:p-0! dshx:sm:max-w-160',
           // One frame: the kit dialog's floating surface (council round 3 B5, kit A8), so in dark the palette is a raised
           // warm card with a faint edge and one deep shadow, not the brightest box on screen.
           // A phone gets a full-screen search: the input at the top, results down to the software keyboard (the visual
