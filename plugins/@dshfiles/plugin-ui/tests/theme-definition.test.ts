@@ -86,7 +86,8 @@ describe('theme definitions', () => {
     expect(parsed.errors).toEqual([])
     expect(parsed.definition?.dark?.palette).toEqual(['#88c0d0', '#a3be8c', '#d08770', '#b48ead', '#ebcb8b', '#8fbcbb'])
     expect(parsed.definition?.dark?.paletteNames).toEqual(['frost', 'green', 'orange', 'purple', 'yellow', 'teal'])
-    const errors = (scheme: object) => ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, ...scheme } }).errors
+    const errors = (scheme: { readonly palette?: readonly string[]; readonly paletteNames?: readonly string[] }) =>
+      ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, ...scheme } }).errors
     expect(errors({ palette: palette.slice(0, 5) })).toEqual(['dark.palette: exactly 6 #rrggbb colours, one per slot'])
     expect(errors({ palette: [...palette.slice(0, 5), 'teal'] })).toEqual(['dark.palette[5]: a #rrggbb colour is required'])
     expect(errors({ paletteNames: names })).toEqual(['dark.paletteNames: give palette too (names follow its order)'])

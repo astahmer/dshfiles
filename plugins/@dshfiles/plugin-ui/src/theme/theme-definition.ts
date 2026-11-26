@@ -141,12 +141,23 @@ function checkKeyframes(text: string, errors: string[], where: string): void {
   if (depth !== 0) errors.push(`${where}: keyframes have unbalanced braces`)
 }
 
+/** A palette entry: a #rrggbb colour, lower-cased, or undefined. */
+function parseHexEntry(entry: unknown): string | undefined {
+  return typeof entry === 'string' && HEX.test(entry) ? entry.toLowerCase() : undefined
+}
+
+/** A palette slot name: 1 to `MAX_PALETTE_NAME_LENGTH` characters once trimmed, or undefined. */
+function parseNameEntry(entry: unknown): string | undefined {
+  const name = typeof entry === 'string' ? entry.trim() : ''
+  return name === '' || name.length > MAX_PALETTE_NAME_LENGTH ? undefined : name
+}
+
 /** Six entries, or undefined when the list is not six of them (its error is recorded). */
-function sixOf(
+function parseSix(
   value: unknown,
   where: string,
   errors: string[],
-  check: (entry: unknown) => string | undefined,
+  parseEntry: typeof parseHexEntry,
   what: { readonly list: string; readonly entry: string },
 ): IdentityTuple | undefined {
   if (!Array.isArray(value) || value.length !== IDENTITY_SLOT_COUNT) {
@@ -154,8 +165,8 @@ function sixOf(
     return undefined
   }
   const entries: string[] = []
-  value.forEach((entry: unknown, index) => {
-    const parsed = check(entry)
+  value.forEach((entry, index) => {
+    const parsed = parseEntry(entry)
     if (parsed === undefined) errors.push(`${where}[${index}]: ${what.entry} is required`)
     else entries.push(parsed)
   })
@@ -163,20 +174,16 @@ function sixOf(
   return a === undefined || b === undefined || c === undefined || d === undefined || e === undefined || f === undefined ? undefined : [a, b, c, d, e, f]
 }
 
-const hexEntry = (entry: unknown): string | undefined => (typeof entry === 'string' && HEX.test(entry) ? entry.toLowerCase() : undefined)
-const nameEntry = (entry: unknown): string | undefined => {
-  const name = typeof entry === 'string' ? entry.trim() : ''
-  return name === '' || name.length > MAX_PALETTE_NAME_LENGTH ? undefined : name
-}
-
 /** The identity palette and its names, checked; names need a palette (a derived one has no order to name). */
 function checkPalette(value: UntrustedObject, where: string, errors: string[]): Pick<SchemeTheme, 'palette' | 'paletteNames'> {
   const palette =
-    value.palette === undefined ? undefined : sixOf(value.palette, `${where}.palette`, errors, hexEntry, { list: '#rrggbb colours', entry: 'a #rrggbb colour' })
+    value.palette === undefined
+      ? undefined
+      : parseSix(value.palette, `${where}.palette`, errors, parseHexEntry, { list: '#rrggbb colours', entry: 'a #rrggbb colour' })
   const paletteNames =
     value.paletteNames === undefined
       ? undefined
-      : sixOf(value.paletteNames, `${where}.paletteNames`, errors, nameEntry, {
+      : parseSix(value.paletteNames, `${where}.paletteNames`, errors, parseNameEntry, {
           list: 'names',
           entry: `a name of 1 to ${MAX_PALETTE_NAME_LENGTH} characters`,
         })
