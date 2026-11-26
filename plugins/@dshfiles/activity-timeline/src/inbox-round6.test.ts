@@ -7,9 +7,9 @@ const row = panel.slice(panel.indexOf('const InboxRow = '), panel.indexOf('const
 const between = (from: string, to: string): string => row.slice(row.indexOf(from), row.indexOf(to, row.indexOf(from)))
 
 describe('a phone Inbox card (round six C1)', () => {
-  it('pads the head row 12px (16px before the glyph, 8px after the seat) and gives the title its own line', () => {
+  it('pads the head row 12px (11px before the glyph, 8px after the seat) and gives the title its own line', () => {
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pl-4')
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px]')
     expect(InboxView.CARD_HEAD).not.toContain('py-0')
     expect(InboxView.CARD_HEAD).not.toContain('min-h-11')
     // The 44pt ⋯ (and a compact card's verb) sits inside the 12px padding, centred on the title's first line.

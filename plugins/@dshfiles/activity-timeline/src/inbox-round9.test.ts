@@ -84,3 +84,11 @@ describe('the phone Triage button (council round 9 C2)', () => {
     expect(list).toContain("usePublishInboxPhoneActions({ actions: triaging ? [] : phoneActions, moreLabel: t('more') })")
   })
 })
+
+describe('the phone Inbox gutter (council round 9, lane B B4)', () => {
+  it('sets a card glyph and its body text at 24px: the 12px card edge, its 1px border and 11px', () => {
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px]')
+    expect(InboxView.BODY_INSET).toContain('dshx:@max-pane-narrow:px-[11px]')
+    expect(InboxView.BODY_INSET).not.toContain('px-4')
+  })
+})

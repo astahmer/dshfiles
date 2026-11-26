@@ -92,9 +92,10 @@ const CARD = 'dshx:relative dshx:overflow-hidden dshx:rounded-lg dshx:border dsh
 
 /**
  * A card's question, note and verbs start under its title on a wide pane (36px, past the glyph); on a phone (a narrow
- * pane) they take the card's own 16px inset, so a question wraps across the card instead of a narrow column.
+ * pane) they take the card's own inset, so a question wraps across the card instead of a narrow column. Council round 9
+ * (lane B's phone gutter): that inset is 11px inside the 1px border, so text starts 24px from the screen's edge.
  */
-const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-4'
+const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-[11px]'
 
 /**
  * The verb a card asks for sits in its head row, trailing, before the menu (round five C4, council round 5): 28px on a
@@ -109,8 +110,9 @@ const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
  */
 const CARD_HEAD =
   // Council round 9 C1: the seat is top-aligned with the title's first line, and its 44px controls sit 8px inside the
-  // card's edge, so the ⋯ glyph is 22px from it on every card.
-  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-4 dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-3' +
+  // card's edge, so the ⋯ glyph is 22px from it on every card. The glyph leads 11px inside the border, 24px from the
+  // screen's edge (lane B's phone gutter).
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-3' +
   ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start' +
   // Council round 8 C2: the head's parts are spaced by their muted "·" separators (6px each side), not by flex gaps.
   ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
