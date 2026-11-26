@@ -148,8 +148,16 @@ const HEAD_TWO_LINES =
 const HEAD_SEAT =
   'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-2!'
 
-/** A card with a body draws its verbs in the body, after its evidence; a bodyless (compact) Failed card keeps them in its head. */
-const footsVerbs = (compactCard: boolean): boolean => !compactCard
+/**
+ * Where a card's verbs sit. Council round 11 C2: with a fine pointer (a desktop) every card's primary verb is in its
+ * head's trailing slot, 12px before ⋯ (MENU_AFTER_VERB), approval and failed alike, so Review is always in one place;
+ * a question's answers stay under it. A touch screen keeps a body's verb under its evidence, in the thumb's reach; a
+ * bodyless (compact) Failed card keeps it in its head everywhere.
+ */
+const footsVerbs = (compactCard: boolean, coarse: boolean): boolean => !compactCard && coarse
+
+/** The card menu's trigger after a head verb: 8px on the seat's 4px gap, 12px; a compact pane's 44pt seats meet. */
+const MENU_AFTER_VERB = 'dshx:not-first:ml-2 dshx:@max-pane-narrow:ml-0!'
 
 /**
  * One card structure (council round 8 C2): the body opens with its evidence (an approval's "Runs: `command`", a
@@ -470,6 +478,7 @@ export class InboxView {
   static readonly HEAD_TWO_LINES = HEAD_TWO_LINES
   static readonly HEAD_SEAT = HEAD_SEAT
   static readonly footsVerbs = footsVerbs
+  static readonly MENU_AFTER_VERB = MENU_AFTER_VERB
   static readonly EVIDENCE = EVIDENCE
   static readonly BODY_VERBS = BODY_VERBS
   static readonly BODY_VERB = BODY_VERB

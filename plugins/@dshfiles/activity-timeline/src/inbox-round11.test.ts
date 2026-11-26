@@ -49,3 +49,24 @@ describe('the phone approval card (council round 11 C1)', () => {
     expect(panel).toContain('answers === null && bodyVerbs !== null && InboxView.VERB_MARGIN,')
   })
 })
+
+describe('the desktop Inbox card (council round 11 C2)', () => {
+  it("puts every card's verb in the head's trailing slot on a desktop; a touch screen keeps a body's verb under its evidence", () => {
+    // Approval (a body with a command) and failed (a body or none): head on a fine pointer.
+    expect(InboxView.footsVerbs(false, false)).toBe(false)
+    expect(InboxView.footsVerbs(true, false)).toBe(false)
+    // A phone keeps the verb under the evidence, and a bodyless failure in the head.
+    expect(InboxView.footsVerbs(false, true)).toBe(true)
+    expect(InboxView.footsVerbs(true, true)).toBe(false)
+    expect(panel).toContain('const footed = InboxView.footsVerbs(compact, phone)')
+    // Answers stay under their question: the answers row draws body verbs only when the card foots them.
+    expect(panel).toContain("{footed && hasVerbs && props.actionRow !== false ? verbButtons('body') : null}")
+  })
+
+  it('seats the verb 12px before ⋯ (the seat gap plus 8px), and a compact pane keeps its 44pt seats touching', () => {
+    expect(InboxView.HEAD_SEAT).toContain('dshx:gap-1')
+    expect(InboxView.MENU_AFTER_VERB).toBe('dshx:not-first:ml-2 dshx:@max-pane-narrow:ml-0!')
+    const menu = panel.slice(panel.indexOf('data-inbox-card-menu=""'), panel.indexOf('aria-label={t(\'more\')}'))
+    expect(menu).toContain('InboxView.MENU_AFTER_VERB')
+  })
+})

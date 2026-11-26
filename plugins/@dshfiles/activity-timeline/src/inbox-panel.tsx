@@ -250,13 +250,14 @@ const InboxRow = (props: {
       ? null
       : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
   /**
-   * The card's verbs (council round 8 C2): in its body, right after the evidence they act on (an approval's command, a
-   * question's answers), on every width; a bodyless Failed card keeps its one verb in the head, under its short name
-   * (council round 9 C3: "Review", named "Review thread"). The head holds glyph · title · project · kind · time and the menu.
+   * The card's verbs: on a desktop in the head's trailing slot before the menu (council round 11 C2), on a touch screen
+   * in the body right after the evidence they act on (council round 8 C2); a bodyless Failed card keeps its one verb in
+   * the head, under its short name (council round 9 C3: "Review", named "Review thread"). A question's answers stay
+   * under it. The head holds glyph · title · project · kind · time, the verb and the menu.
    */
   const hasVerbs =
     (open && PROVIDER_VERBS.some(verb => item.verbs.includes(verb))) || (open && props.onReview !== undefined) || (openable && !answerable) || undo !== null
-  const footed = InboxView.footsVerbs(compact)
+  const footed = InboxView.footsVerbs(compact, phone)
   const hasMenu = doneable || snoozable || quickReplies.length > 0 || mutable
   const verbButtons = (place: 'head' | 'body'): JSX.Element => {
     const size = place === 'head' ? cn('dshx:shrink', InboxView.HEAD_VERB) : InboxView.BODY_VERB
@@ -332,7 +333,7 @@ const InboxRow = (props: {
                   size="icon-sm"
                   variant="ghost"
                   data-inbox-card-menu=""
-                  className="dshx:size-7 dshx:pointer-coarse:size-11"
+                  className={cn('dshx:size-7 dshx:pointer-coarse:size-11', InboxView.MENU_AFTER_VERB)}
                   aria-label={t('more')}
                   disabled={props.busy}
                 >
