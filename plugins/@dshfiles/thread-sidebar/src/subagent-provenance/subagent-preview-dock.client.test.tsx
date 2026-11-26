@@ -147,7 +147,8 @@ describe('SubagentPreviewDock', () => {
       const row = rowOf(label)
       const action = row.querySelector<HTMLElement>('[data-live-work-action]')
       expect(action?.textContent).toBe('subagentPreviewOpenThread')
-      expect(action?.className).toContain('dshx:min-w-28')
+      // The job row's "Open in Processes ↗" renders 132px at 1440px: the column is 8.5rem, 136px (measured, round 18).
+      expect(action?.className).toContain('dshx:min-w-34')
       expect(action?.className).toContain('dshx:justify-end')
       // A narrow pane shows the action as its arrow alone: the column gives way with the label.
       expect(action?.className).toContain('dshx:@max-pane-narrow:min-w-0')
