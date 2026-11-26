@@ -57,6 +57,17 @@ export const groupCountStatusOf = (status: string): GroupCountStatus | undefined
   }
 }
 
+/**
+ * A group head's chevron (council round 19 B3): the row expand chevron's 16px glyph at a 1.5 stroke. Its glyph sits
+ * 4px inside the box; last on its row, the box reaches 4px into the head's 10px padding, so the glyph ends where a
+ * comfortable row's age and chevron do. Beside a trailing control it stays inside the padding.
+ */
+export const GroupChevron = (props: { readonly open: boolean; readonly last: boolean; readonly className?: string }) => (
+  <span className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0', props.last && 'dshx:-mr-1', props.className)} data-group-chevron="" aria-hidden="true">
+    {props.open ? <ChevronUpIcon className="dshx:size-4" strokeWidth={1.5} /> : <ChevronDownIcon className="dshx:size-4" strokeWidth={1.5} />}
+  </span>
+)
+
 export const ThreadGroupHeader = ({
   label,
   count,
@@ -110,16 +121,14 @@ export const ThreadGroupHeader = ({
         <span className="dshx:flex-1" aria-hidden="true" />
         {/* Phone (council round 18 B1.3): a 44pt seat ending on the row edge, so the chevron stands on the row ⋯ axis
             (x ≈ 349 at 390pt) instead of 6pt beside it. */}
-        <span
+        <GroupChevron
+          open={!collapsed}
+          last={lastOnRow}
           className={cn(
-            'dshx:inline-flex dshx:shrink-0 dshx:opacity-60 dshx:group-hover/header:opacity-100 dshx:pointer-coarse:phone:w-11 dshx:pointer-coarse:phone:justify-center',
+            'dshx:opacity-60 dshx:group-hover/header:opacity-100 dshx:pointer-coarse:phone:w-11 dshx:pointer-coarse:phone:justify-center',
             lastOnRow && 'dshx:pointer-coarse:phone:-mr-3',
           )}
-          data-group-chevron=""
-          aria-hidden="true"
-        >
-          {collapsed ? <ChevronDownIcon size={12} /> : <ChevronUpIcon size={12} />}
-        </span>
+        />
       </button>
       {action}
       {projectId === undefined ? null : (

@@ -31,7 +31,7 @@ import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
-import { groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
+import { GroupChevron, groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
 import { RemoteThreadInventoryModel, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
@@ -113,7 +113,6 @@ import {
   BellRingIcon,
   BookmarkPlusIcon,
   ChevronDownIcon,
-  ChevronUpIcon,
   CircleCheckIcon,
   CircleDashedIcon,
   CirclePauseIcon,
@@ -7748,9 +7747,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                         <span className="dshx:whitespace-nowrap">{props.tSidebar(sectionLabels[section])}</span>
                         <span className="dshx:text-xs dshx:tabular-nums">({sectionRows.length})</span>
                         <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                        <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                          {collapsed ? <ChevronDownIcon strokeWidth={1.5} size={12} /> : <ChevronUpIcon strokeWidth={1.5} size={12} />}
-                        </span>
+                        <GroupChevron open={!collapsed} last />
                       </button>
                       {!collapsed ? (
                         <VirtualThreadRows

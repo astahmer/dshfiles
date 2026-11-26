@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -76,6 +77,32 @@ describe('ThreadGroupHeader', () => {
     // A trailing control (the project's +) keeps the edge: the chevron stays inside the padding beside it.
     const project = mount({ status: 'working', projectId: 'p' })
     expect(project.container.querySelector<HTMLElement>('[data-group-chevron]')?.className).not.toContain('-mr-3')
+  })
+
+  it('draws the row expand chevron\'s 16px glyph, ending on the time column\'s edge when it ends the row (council round 19 B3)', () => {
+    const header = mount({ status: 'working' })
+    const seat = header.container.querySelector<HTMLElement>('[data-group-chevron]')
+    const glyph = seat?.querySelector('svg')
+    // The row chevron (data-children-chevron) is a size-4 glyph at a 1.5 stroke; the head's was a 12px glyph at 2.
+    expect(glyph?.getAttribute('class')).toContain('dshx:size-4')
+    expect(glyph?.getAttribute('stroke-width')).toBe('1.5')
+    expect(seat?.className).toContain('dshx:size-4')
+    // The glyph sits 4px inside its 16px box: the box reaches 4px into the head's 10px padding, so the glyph ends where
+    // a comfortable row's age and chevron do (10px inside the row).
+    expect(seat?.className).toContain('dshx:-mr-1')
+    cleanup()
+    // Beside the project's + it stays inside the padding.
+    const project = mount({ status: 'working', projectId: 'p' })
+    expect(project.container.querySelector<HTMLElement>('[data-group-chevron]')?.className).not.toContain('-mr-1')
+  })
+
+  it('draws the same chevron on the section and Drafts heads (council round 19 B3)', () => {
+    const client = readFileSync('src/client.tsx', 'utf8')
+    const drafts = readFileSync('src/drafts-section.tsx', 'utf8')
+    expect(client).not.toMatch(/Chevron(?:Up|Down)Icon strokeWidth=\{1\.5\} size=\{12\}/u)
+    expect(drafts).not.toMatch(/Chevron(?:Up|Down)Icon strokeWidth=\{1\.5\} size=\{12\}/u)
+    expect(client).toContain('<GroupChevron open={!collapsed} last />')
+    expect(drafts).toContain('<GroupChevron open={props.open} last={!props.cleanable} />')
   })
 
   it('uses a focusable native button and accepts keyboard-origin clicks independently', () => {

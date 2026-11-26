@@ -11,10 +11,11 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArchiveIcon, ChevronDownIcon, ChevronUpIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type JSX, type ReactNode } from 'react'
 import { formatAge } from './relative-age.js'
+import { GroupChevron } from './thread-group-header.js'
 import type { ThreadSidebarTranslate } from './thread-view-manager.js'
 
 /** The fields the section and its confirmation read from one draft row. */
@@ -68,9 +69,7 @@ export const DraftsSection = <Row extends DraftRow>(props: {
           <span className="dshx:whitespace-nowrap">{t('threadSidebarDrafts')}</span>
           <span className="dshx:text-xs dshx:tabular-nums">({props.drafts.length})</span>
           <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-          <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-            {props.open ? <ChevronUpIcon strokeWidth={1.5} size={12} /> : <ChevronDownIcon strokeWidth={1.5} size={12} />}
-          </span>
+          <GroupChevron open={props.open} last={!props.cleanable} />
         </button>
         {props.cleanable ? (
           <Tooltip>
