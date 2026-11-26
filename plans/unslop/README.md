@@ -38,6 +38,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 9 (round-8 shots) | 8.5 | 8.5 | **9** | phone Inbox head agreed by all; Settings width, selected-place colour, phone shell grid |
 | 10 (round-9 shots) | 8.5 | 8.5 | **9** | control chrome too loud, phone toolbar and dock, selection bar bends, Review icon |
 | 11 (round-10 shots) | 8.5 | 8.5 | **9** | marker crowds leading glyphs, quiet triggers vanish at rest, light diff, Usage repeats, prose measure |
+| 12 (round-11 shots) | 8.5 | 8.5 | **9** | selection too quiet on glyph rows, dock edge regression, Inbox verbs, Usage table, phone tab tone |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -230,6 +231,11 @@ list and palette); C 7 revisions `owxtmrut` … `soynztwr` (worded phone Triage 
 Inbox heads, quiet question options, the composer's 3:1 edge, the phone Live work strip on nav with a footer dot, prose
 at 36em); D 7 revisions `ltnpxuux` … `wvsvtuyk` (a one-row single-entry breakdown, one filter label grammar, outline
 plugin tiles in their group tones, Compare against at rest, quiet inherited effort and dense checkboxes).
+
+Round 12 findings, merged in `.cache/unslop-audit/r5/council/round-12-fixes.md`: a neutral selected edge and a palette
+↵ for glyph-leading selections; quiet dock dividers (a round-11 regression); one Review verb style on head bands; the
+Usage table aligned and bars on tracks; Backlog tabs that scroll instead of clipping; the phone tab tone on the current
+tab only; New thread's Resume and Inbox as chips; a tighter phone Inbox; DESIGN.md synced on Triage.
 
 ## Round four
 
