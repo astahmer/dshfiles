@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { NAV_TONE_IDS, Page, type PageTab, type PageTabs } from '../src/components/page.js'
+import { NAV_TONE_IDS, PAGE_FRAME_CLASS, Page, type PageTab, type PageTabs } from '../src/components/page.js'
 import { PageHeader } from '../src/components/ui/page-header.js'
 import { PaletteMath, WARM_STONE, type Scheme } from '../src/theme/palette.ts'
 
@@ -153,6 +153,20 @@ describe('page container (council round 3 A5)', () => {
     expect(content(900)).toBe(852)
     // Still start-aligned, never centred.
     expect(classes(box).join(' ')).not.toMatch(/mx-auto|justify-center|items-center/u)
+  })
+
+  it('offers a 720px form frame on the lane inset rules for Settings (council round 9 A5)', () => {
+    expect(resolved('--container-form')).toBe(720)
+    const form = render(<Page heading="Settings" width="form" primaryAction={{ id: 'open', label: 'Open config file', onSelect: vi.fn() }} />)
+    const box = container(form.container)!
+    // Content box with the 24px padding outside, start-aligned, and no wide-pane step: 720 at every pane.
+    expect(classes(box)).toEqual(expect.arrayContaining(['dshx:box-content', 'dshx:max-w-form', 'dshx:p-6']))
+    expect(classes(box).join(' ')).not.toMatch(/mx-auto|justify-center|items-center|max-w-lane/u)
+    expect(form.getByRole('button', { name: 'Open config file' }).closest('[data-slot="page-container"]')).toBe(box)
+    // A page that owns its layout (Settings with PageHeader) takes the same classes.
+    expect(PAGE_FRAME_CLASS.form.split(' ')).toEqual(['dshx:box-content', 'dshx:max-w-form'])
+    // The lane keeps its classes for every existing caller.
+    expect(PAGE_FRAME_CLASS.lane).toBe('dshx:box-content dshx:max-w-lane dshx:@min-pane-wide:max-w-lane-wide')
   })
 
   it('lets a master-detail page (fill) use the whole pane unless it asks for a width', () => {

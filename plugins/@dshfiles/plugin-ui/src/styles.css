@@ -184,6 +184,12 @@
   --container-lane: 880px;
   --container-lane-wide: 960px;
   --container-pane-wide: 1280px;
+  /*
+   * The form frame (council round 9 A5): 720px of content for a page of label/control rows (Settings), so labels and
+   * values sit close and the header actions share the controls' trailing edge. The lane's inset rules: content box,
+   * the page padding outside, start-aligned; it does not widen on a wide pane.
+   */
+  --container-form: 720px;
   --container-wide: 1200px;
 }
 

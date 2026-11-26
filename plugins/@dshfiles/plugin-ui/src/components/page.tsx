@@ -50,7 +50,7 @@ export interface PageTabs {
  * How wide a page runs. Two frames (council round 5 A2): `lane` (880px) for lists and forms, `wide` (min(100%, 1200px))
  * for data pages. `page` (1080px) stays for older callers; `full` is the whole pane (a diff, a chart, a table).
  */
-export type PageWidth = 'page' | 'lane' | 'wide' | 'full'
+export type PageWidth = 'page' | 'lane' | 'form' | 'wide' | 'full'
 
 /** The statuses a page title counts, attention first: one `StatusCount` per status present. */
 export type PageStatusCounts = Partial<Readonly<Record<WorkStatus, number>>>
@@ -125,7 +125,8 @@ export interface PageProps extends Omit<React.ComponentPropsWithoutRef<'div'>, '
    */
   readonly fill?: boolean
   /**
-   * `lane` (880px of content, 960px on a pane of 1280px or more: lists and forms), `wide` (min(100%, 1200px): data), `page` (1080px, the default for older callers) or
+   * `lane` (880px of content, 960px on a pane of 1280px or more: lists), `form` (720px of content: label/control rows,
+   * Settings), `wide` (min(100%, 1200px): data), `page` (1080px, the default for older callers) or
    * `full` (a diff, chart or table; `fill` defaults to it). Every frame starts at the same pane inset.
    */
   readonly width?: PageWidth
@@ -141,6 +142,8 @@ export const PAGE_FRAME_CLASS = {
   page: 'dshx:max-w-page',
   // Content-box (council round 6 A3): the cap is the content width, the padding sits outside it.
   lane: 'dshx:box-content dshx:max-w-lane dshx:@min-pane-wide:max-w-lane-wide',
+  // The form frame (council round 9 A5): 720px of content on the lane's inset rules, for Settings' header, toolbar and rows.
+  form: 'dshx:box-content dshx:max-w-form',
   wide: 'dshx:w-full dshx:max-w-wide',
   full: '',
 } as const satisfies Record<PageWidth, string>
