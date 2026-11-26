@@ -23,7 +23,8 @@
  * - Inline code flows with the sentence (`display: inline`, `box-decoration-break: clone`) instead of the primitive's
  *   `inline-flex` box that turned a long path into a rectangle; 0.9em, never under 12px, tone-2 fill, no border.
  * - The code card's header is a 24px band with a 12px label; the body keeps Geist Mono 12.5/18.
- * - Wrapped code (Chat's wrap toggle) wraps each line with a 2ch hanging indent instead of restarting at column 0;
+ * - Wrapped code (Chat's wrap toggle) wraps each line with a 2ch hanging indent beyond the line's own indent
+ *   (`--dshx-line-indent`, council round 8 A6) instead of restarting at column 0;
  *   unwrapped code (the default) scrolls sideways. Chat folds a card after 24 lines.
  * - Tables read 13/20 (14/20 on a phone), header 600, numbers in tabular figures; cells from 8ch to 40ch instead of
  *   `min(30vw, 320px)`, which was 117px on a phone; code in a cell is 12px, not 11px.
@@ -70,8 +71,10 @@
 :is([data-conversation-scroll], [data-slot='conversation.chat.flow']) [data-dsh-markdown] .md-code-block[data-code-wrap='true'] pre code > .line {
   display: block;
   min-height: 1lh;
-  padding-inline-start: 2ch;
-  text-indent: -2ch;
+  /* Hang 2ch right of the line's own indent (council round 8 A6): the code card's owner sets `--dshx-line-indent` from
+     the leading whitespace (plugin-ui `CodeIndent.mark`); without it the hang is the plain 2ch. */
+  padding-inline-start: calc(var(--dshx-line-indent, 0ch) + 2ch);
+  text-indent: calc(-1 * (var(--dshx-line-indent, 0ch) + 2ch));
   white-space: pre-wrap;
 }
 

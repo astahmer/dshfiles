@@ -1,6 +1,7 @@
 import { languageForPath, useCodeHighlighter, writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import { CheckIcon, CopyIcon, DownloadIcon, WrapTextIcon } from '../icons.js'
+import { CodeIndent } from '../lib/code-indent.js'
 import { cn } from '../lib/utils.js'
 import { Button } from './ui/button.js'
 
@@ -20,6 +21,16 @@ export interface CodeBlockProps {
   readonly downloadable?: boolean
   readonly className?: string | undefined
 }
+
+/**
+ * A wrapped line hangs 2ch right of its own indent (council round 8 A6), so a continuation never starts left of its
+ * statement. Tabs count to the browser's default stop of 8, which this block does not change.
+ */
+const hangingIndent = (line: string): CSSProperties & Record<'--dshx-line-indent', string> => ({
+  '--dshx-line-indent': `${CodeIndent.columns(line, 8)}ch`,
+  paddingInlineStart: 'calc(var(--dshx-line-indent) + 2ch)',
+  textIndent: 'calc(-1 * (var(--dshx-line-indent) + 2ch))',
+})
 
 const fileName = (path: string): string => path.split(/[/\\]/).at(-1) ?? path
 
@@ -122,7 +133,7 @@ export const CodeBlock = (props: CodeBlockProps): JSX.Element => {
                     {number}
                   </span>
                 )}
-                <span className="dshx:min-w-0">
+                <span className="dshx:min-w-0" data-line-text="" style={wrap ? hangingIndent(line) : undefined}>
                   {line === ''
                     ? '\u200b'
                     : (spans?.[index]?.map((span, spanIndex) => (

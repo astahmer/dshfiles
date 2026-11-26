@@ -21,6 +21,10 @@
       "types": "./src/lib/utils.ts",
       "default": "./src/lib/utils.ts"
     },
+    "./lib/code-indent": {
+      "types": "./src/lib/code-indent.ts",
+      "default": "./src/lib/code-indent.ts"
+    },
     "./lib/stack-frames": {
       "types": "./src/lib/stack-frames.ts",
       "default": "./src/lib/stack-frames.ts"
