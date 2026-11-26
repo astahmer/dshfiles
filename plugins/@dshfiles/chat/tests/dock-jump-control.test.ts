@@ -5,9 +5,11 @@ const view = readFileSync(new URL('../src/native/chat/ChatView.tsx', import.meta
 const css = readFileSync(new URL('../src/native/chat/ChatView.module.css', import.meta.url), 'utf8')
 
 describe('Back to bottom (round five C1, council round 5)', () => {
-  it('is an arrow, not a second disclosure chevron beside Live work', () => {
+  it('is an arrow to the latest line, not a second disclosure chevron beside Live work (council round 9 C4)', () => {
     const control = view.slice(view.indexOf('const toBottom = ('), view.indexOf('return (', view.indexOf('const toBottom = (')))
-    expect(control).toContain('<ArrowDownIcon')
+    // arrow-down-to-line reads "jump to latest"; a bare arrow read as "expand".
+    expect(control).toContain('<ArrowDownToLineIcon')
+    expect(control).not.toContain('<ArrowDownIcon')
     expect(control).not.toContain('ChevronDownIcon')
   })
 

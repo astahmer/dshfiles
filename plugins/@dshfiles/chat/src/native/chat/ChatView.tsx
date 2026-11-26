@@ -1,7 +1,7 @@
 // An enclosing `[data-conversation-scroll]` owns scrolling when present;
 // otherwise this view owns it. Each row subscribes to one stable node key.
 
-import { ArrowDownIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowDownToLineIcon } from '@dshfiles/plugin-ui/icons'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type {
@@ -591,9 +591,10 @@ export function ChatView({
       aria-label={t('chat.toBottom')}
       onClick={scroll.returnToBottom}
     >
-      {/* An arrow (round five C1, council round 5): on a phone it shares the dock row with Live work's disclosure
-          chevron, and one row carries one chevron. */}
-      <ArrowDownIcon size={16} strokeWidth={1.75} aria-hidden />
+      {/* An arrow to a line (round five C1, council round 5; council round 9 C4): on a phone it shares the dock row with
+          Live work's disclosure chevron, and one row carries one chevron; the line makes it read "jump to latest", not
+          "expand". */}
+      <ArrowDownToLineIcon size={16} strokeWidth={1.75} aria-hidden />
     </button>
   )
 
