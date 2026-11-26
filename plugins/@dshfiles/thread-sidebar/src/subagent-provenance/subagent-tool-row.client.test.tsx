@@ -261,6 +261,41 @@ describe('SubagentProvenanceToolRow', () => {
     }
   })
 
+  it('gives the model a fixed 144 px column in a run, 16 px after the titles, so every outcome starts on one x (council round 24, item 2)', () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'row-title' ? (this.textContent ?? '').length * 10 : 0
+    })
+    const seats: HTMLElement[] = []
+    try {
+      for (const [description, model] of [
+        ['Audit', 'gpt-6.1-luna'],
+        ['Check credit note rounding', 'claude-sonnet-5-5'],
+        ['Check refund rounding', 'deepseek-v4-flash'],
+      ] as const) {
+        const seat = document.createElement('div')
+        seat.setAttribute('data-chat-flow-key', `model-column-${String(seats.length)}`)
+        seat.setAttribute('data-run-fold-member', 'member')
+        seat.setAttribute('data-run-fold-run', 'run-model-column')
+        seat.setAttribute('data-run-fold-size', '3')
+        document.body.append(seat)
+        seats.push(seat)
+        render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model, description })} />, { container: seat })
+      }
+      for (const seat of seats) {
+        const model = seat.querySelector<HTMLElement>('[data-slot="route-model"]')
+        expect(model?.className).toContain('dshx:w-36')
+        expect(model?.className).toContain('dshx:shrink-0')
+        // The title area ends 6 px past the column, and the header's 8 px gap follows: 16 px of paper before the mark in
+        // the shot (it was 10 px with neither).
+        expect(seat.querySelector('[data-disclosure-row]')?.className).toContain('_+_28px')
+      }
+    } finally {
+      cleanup()
+      for (const seat of seats) seat.remove()
+      width.mockRestore()
+    }
+  })
+
   it('prefers the route the child really runs on over the one its call asked for', () => {
     const base = settled({ running: true })
     const list = {

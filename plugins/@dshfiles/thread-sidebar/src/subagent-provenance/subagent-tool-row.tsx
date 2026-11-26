@@ -12,6 +12,7 @@ import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { JsonText } from '../json-text.js'
 import { SubagentFeedModel, type SubagentTerminal } from './subagent-feed.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
@@ -182,9 +183,11 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     expandable,
     onToggle: disclosure.toggle,
     running: props.phase === 'preparing' || props.phase === 'start' || state === 'working',
-    // The shared column sizes the title area (leading 16 px + 6 px gap, then the title); a longer title truncates in it,
-    // and a narrow pane still shrinks the area. Without a column the row keeps its content width.
-    rowClassName: titleColumn === undefined ? undefined : 'dshx:w-[calc(var(--dshfiles-subagent-title-column)_+_22px_+_var(--dsh-content-font-delta,0px))]',
+    // The shared column sizes the title area (leading 16 px + 6 px gap, then the title, then 6 px that, with the header's
+    // 8 px gap and the glyphs' side bearings, leave 16 px of paper between the widest title and the model's mark: council
+    // round 24, item 2, measured in the shot); a longer title truncates in it, and a narrow pane still shrinks the area.
+    // Without a column the row keeps its content width.
+    rowClassName: titleColumn === undefined ? undefined : 'dshx:w-[calc(var(--dshfiles-subagent-title-column)_+_28px_+_var(--dsh-content-font-delta,0px))]',
     titleClassName: titleColumn === undefined ? undefined : 'dshx:min-w-0! dshx:shrink! dshx:truncate',
     // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; then
     // the outcome: the failure word in failed ink, the live clock or the settled ending in the tertiary ink.
@@ -194,7 +197,18 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
           {route === undefined ? null : (
             // In a shared title column the names stack, so an unknown family keeps its empty mark seat and its name starts on
             // the others' x, as in the dock (council round 24, item 1); inline, a lone row draws no seat (round 22, item 8).
-            <RouteModel provider={route.provider} model={route.model} size="md" seat={titleColumn !== undefined} className="dshx:max-w-[45%] dshx:shrink-0" />
+            // In the column the model is the dock's fixed 144 px, truncating, so every outcome after it starts on one x (round
+            // 24, item 2); a narrow pane lets it shrink again.
+            <RouteModel
+              provider={route.provider}
+              model={route.model}
+              size="md"
+              seat={titleColumn !== undefined}
+              className={cn(
+                'dshx:max-w-[45%] dshx:shrink-0',
+                titleColumn !== undefined && 'dshx:w-36 dshx:@max-pane-narrow:w-auto dshx:@max-pane-narrow:shrink',
+              )}
+            />
           )}
           {failure === undefined ? null : (
             <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
