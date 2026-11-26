@@ -429,6 +429,16 @@ thread-list shot with the seven children; the desktop child prompt bubble clampe
 the group's grid; the child order between transcript and dock; a phone dock title size. Restart when landing live:
 thread-sidebar's Host half (route projection version 3).
 
+### Round eight: colours the user chooses, from the theme
+
+Owner request (2026-11-26): let the user pick the colour of projects, Backlog tags and configured agents from a palette,
+and make that palette match the active theme (neolectron's theme system: Dracula/Alucard, gallery themes, saved
+themes). Owner decisions: a theme defines a six-slot identity palette (derived from its colours when absent); a choice
+stores a slot, so a theme switch recolours everything; new pickers are palette-only; projects keep upstream #287's custom
+hex; the default theme's six tones are unchanged. This widens colour restraint for identity only, never state. Spec:
+`.cache/unslop-audit/r5/council/round-8-palette.md`. Lanes: K (kit picker, theme palette data, derivation, application),
+P (project pickers), T (Backlog tag colours), A (agent colours).
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
