@@ -54,21 +54,22 @@ describe('dense checkbox ink (council round 12 A3)', () => {
     expect(classes(box)).not.toContain('dshx:data-[state=checked]:border-control-on')
   })
 
-  it('is oklch(0.38 0.008 65) in light, from the ink\'s own hue; dark keeps the dark on state', () => {
+  it('is oklch(0.50 0.01 65) in light, from the ink\'s own hue (council round 13 A1); dark keeps the dark on state', () => {
     expect(roles).toContain('--color-control-on-dense: var(--dshx-control-on-dense, var(--dshx-control-on, var(--dsw-alias-label-primary)));')
-    expect(block('  body')).toContain('--dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.38 calc(c * 3.2) h);')
+    expect(block('  body')).toContain('--dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.5 calc(c * 4) h);')
     expect(block('  body[data-ds-dark-theme]')).toContain('--dshx-control-on-dense: var(--dshx-control-on);')
     const ink = PaletteMath.palette({ ...WARM_STONE, scheme: 'light' }).neutral[10]!
-    expect({ l: 0.38, c: Number((ink.c * 3.2).toFixed(4)), h: ink.h }).toEqual({ l: 0.38, c: 0.008, h: 65 })
+    expect({ l: 0.5, c: Number((ink.c * 4).toFixed(4)), h: ink.h }).toEqual({ l: 0.5, c: 0.01, h: 65 })
   })
 
-  it('holds the fill at 3:1 on bg, panel, raised and the selection wash and the tick at 4.5:1 on it (light)', () => {
+  it('holds the fill at 3:1 on bg, panel, raised, nav and the selection wash and the white tick at 4.5:1 on it (light)', () => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme: 'light' })
-    const fill = { l: 0.38, c: 0.008, h: 65 }
+    const fill = { l: 0.5, c: 0.01, h: 65 }
     for (const [surface, under] of Object.entries({ bg: p.neutral[0]!, panel: p.neutral[1]!, raised: p.neutral[2]!, selected: p.selectedWash, nav: p.navSurface }))
       expect(PaletteMath.contrastRatio(fill, under), `fill on ${surface}`).toBeGreaterThanOrEqual(3)
+    // The tick is the inverse ink (step 0, the kit's white).
     expect(PaletteMath.contrastRatio(p.neutral[0]!, fill), 'tick on the fill').toBeGreaterThanOrEqual(4.5)
-    // Visibly lighter than the full ink, so a column of checked boxes stops reading as black squares.
-    expect(PaletteMath.contrastRatio(fill, p.neutral[10]!)).toBeGreaterThan(1.4)
+    // Clearly lighter than the full ink, so a column of checked boxes reads as light marks, not dark squares.
+    expect(PaletteMath.contrastRatio(fill, p.neutral[10]!)).toBeGreaterThan(2.5)
   })
 })

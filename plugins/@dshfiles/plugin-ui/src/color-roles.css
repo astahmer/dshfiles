@@ -371,8 +371,12 @@
     /* The on state (council round 9 A2): the ink and its inverse in light. */
     --dshx-control-on: var(--dsw-alias-label-primary);
     --dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);
-    /* `Checkbox size="sm"` (council round 12 A3): oklch(0.38 0.008 65) on warm stone, the ink's hue at L 0.38. */
-    --dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.38 calc(c * 3.2) h);
+    /*
+     * `Checkbox size="sm"` (council round 13 A1): oklch(0.50 0.01 65) on warm stone, the ink's hue at L 0.5, with the
+     * white (inverse ink) tick at 5.9:1; the fill holds 4.96:1 on raised and the selected wash, so a column of checked
+     * boxes reads as light marks instead of dark squares.
+     */
+    --dshx-control-on-dense: oklch(from var(--dsw-alias-label-primary) 0.5 calc(c * 4) h);
     --dshx-attention-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary));
     --dshx-danger-tint-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
     --dshx-attention-band-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 60%, var(--dsw-alias-label-primary));

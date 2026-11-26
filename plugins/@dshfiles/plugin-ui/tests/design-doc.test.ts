@@ -309,7 +309,7 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       "  selected-edge-dark: '#7f7974'",
       '**Verbs on a head band**',
       '`Button band`: 20% at rest, 26% on hover, 32% pressed',
-      '`control-on-dense`, `oklch(0.38 0.008 65)`',
+      '`control-on-dense`, `oklch(0.50 0.01 65)`',
       '**Phone tab bar: colour on the current tab only**',
       'Unselected\n    glyphs are the tertiary ink',
       '**Triage** is a worded 44px text button in the top bar',
