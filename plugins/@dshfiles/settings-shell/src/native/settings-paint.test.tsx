@@ -49,7 +49,7 @@ describe('Settings › General paints once (round three item 30)', () => {
 const previewSvg = (value: string | undefined): string => decodeURIComponent(/^url\("data:image\/svg\+xml,(.*)"\)$/u.exec(value ?? '')?.[1] ?? '')
 
 describe('Settings › General below 28rem and its Appearance cards (round five B7)', () => {
-  it('stacks every native row and gives each theme card a 96×56 preview drawn in that theme', async () => {
+  it('stacks every native row and gives each theme card an 80×46 preview drawn in that theme (council round 10 B3)', async () => {
     await act(async () => root.render(<GeneralSection renderSlot={() => null} />))
     const column = container.querySelector<HTMLElement>('[data-settings-theme-swatches]')
     expect(column?.className).toContain('dshx:@max-pane-narrow:[&_[class$=row]]:flex-col!')
@@ -58,14 +58,18 @@ describe('Settings › General below 28rem and its Appearance cards (round five 
       const svg = previewSvg(column?.style.getPropertyValue(`--settings-swatch-${scheme}`))
       // The theme's page, its sidebar strip, two text lines and one indigo diamond.
       expect(svg).toContain('viewBox="0 0 96 56"')
+      // Drawn on the 96×56 grid, shown at 80×46 so the card stays 88–96px tall.
+      expect(svg).toContain('width="80" height="46"')
       expect(svg).toContain('data-part="sidebar"')
       expect(svg.match(/data-part="line"/gu)?.length).toBeGreaterThanOrEqual(2)
       expect(svg).toContain('<polygon data-part="diamond"')
     }
-    // The card's icon gives way to the preview, which is 96×56 and leads the card.
+    // The card's icon gives way to the preview, which is 80×46 and leads the card; 8px padding: 2 + 16 + 46 + 8 + 22.
     expect(column?.className).toContain('dshx:[&_[class*=_themeCube]>svg]:hidden!')
-    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:h-14')
-    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:w-24')
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:h-[46px]')
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:w-20')
+    expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:py-2!')
+    expect(column?.className).not.toContain('dshx:[&_[class*=_themeCube]]:py-3!')
     expect(column?.className).toContain('dshx:[&_[class*=_themeCube]]:before:order-first')
     // The light card's paper differs from the dark card's: each swatch shows its own theme.
     expect(column?.style.getPropertyValue('--settings-swatch-light')).not.toBe(column?.style.getPropertyValue('--settings-swatch-dark'))

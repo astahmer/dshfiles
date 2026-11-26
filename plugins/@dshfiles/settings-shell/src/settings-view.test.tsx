@@ -469,12 +469,19 @@ describe('settings view: phone drill-down (round five B6)', () => {
     const root = view.host.querySelector<HTMLElement>('[data-settings-root]')
     expect(root?.className).toContain('dshx:@max-pane-compact:flex')
     expect(root?.className).toContain('dshx:hidden')
-    // 44px rows with a 28px identity tile and a chevron; the first group is named by its first row.
+    // 44px rows with a 28px identity tile and a chevron.
     const row = root?.querySelector<HTMLElement>('[data-settings-root-row="appearance"]')
     expect(row?.className).toContain('dshx:h-11')
     expect(row?.querySelector('[data-settings-tile]')?.className).toContain('dshx:size-7')
     expect(row?.textContent).toBe('Appearance')
-    expect(root?.querySelector('[data-settings-group="general"] h3')).toBeNull()
+    // Every group has a head like the others (council round 10 B3); the first, whose first row is General, reads
+    // Preferences, and names its group.
+    const first = root?.querySelector<HTMLElement>('[data-settings-group="general"]')
+    expect(first?.querySelector('h3')?.textContent).toBe('Preferences')
+    expect(first?.getAttribute('aria-label')).toBe('Preferences')
+    const heads = [...(root?.querySelectorAll<HTMLElement>('[data-settings-group] h3') ?? [])]
+    expect(heads.length).toBeGreaterThan(1)
+    expect(new Set(heads.map(head => head.className)).size).toBe(1)
     // The fields wait for a pick in a narrow pane; a wide pane still shows the first category.
     expect(view.host.querySelector('[data-settings-column]')?.className).toContain('dshx:@max-pane-compact:hidden')
     act(() => row?.click())

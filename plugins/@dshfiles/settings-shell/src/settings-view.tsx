@@ -118,17 +118,27 @@ const NavCell = (props: {
   </button>
 )
 
+/** The phone Settings root's first group head (council round 10 B3). */
+const FIRST_GROUP_HEAD = 'Preferences'
+
 /**
  * The phone's Settings root (round five B6): every category in its task group, as grouped 44px rows with a 28px identity
  * tile, the name and a chevron (an arrow for a row that opens a stage page). Drawn only in a narrow pane; the first group
- * stands 16px under the header and, like the desktop column, is named by its first row.
+ * stands 16px under the header. Every group carries a head (council round 10 B3): the first one, whose first row is
+ * already "General", reads "Preferences".
  */
 const SettingsRootList = (props: { readonly groups: readonly GroupedEntries[]; readonly onOpen: (id: string) => void }): JSX.Element => (
   <div className="dshx:hidden dshx:flex-col dshx:gap-4 dshx:pt-1 dshx:pb-6 dshx:@max-pane-compact:flex" data-settings-root="">
     {props.groups.map(({ group, entries }, index) => (
-      <section aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-1.5" data-settings-group={group.id} key={group.id} role="group">
+      <section
+        aria-label={index === 0 ? FIRST_GROUP_HEAD : group.label}
+        className="dshx:flex dshx:flex-col dshx:gap-1.5"
+        data-settings-group={group.id}
+        key={group.id}
+        role="group"
+      >
         {/* Heads on the phone's 24px text edge (round nine B4). */}
-        {index === 0 ? null : <h3 className="dshx:m-0 dshx:px-3 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.label}</h3>}
+        <h3 className="dshx:m-0 dshx:px-3 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{index === 0 ? FIRST_GROUP_HEAD : group.label}</h3>
         {/* A grouped list (round nine B7): a lighter outer edge than the separators, which start at the label column
             and stop before the last row's end. */}
         <div

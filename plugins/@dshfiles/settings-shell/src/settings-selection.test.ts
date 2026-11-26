@@ -38,7 +38,7 @@ describe('Settings › General controls in the kit field look (council round 3 B
     expect(general).toContain('dshx:[&_[class*=_stepper_]]:rounded-r-none!')
     expect(general).toContain('dshx:[&_[class*=_stepper_]]:border-r-0!')
     expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0!')
-    expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:-ml-2!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:ml-0!')
     // 44px on a touch screen, where the stepper's own buttons are 44px.
     expect(general).toContain('dshx:pointer-coarse:[&_[class*=_stepper_]]:h-11!')
     expect(general).toContain('dshx:pointer-coarse:[&_[class*=_selector_]]:h-11!')
@@ -58,6 +58,21 @@ describe('Settings › General controls in the kit field look (council round 3 B
     // The More font settings disclosure stays reachable, as text, without its chevron.
     expect(general).toContain('dshx:[&_[class*=_expander_]>svg]:hidden!')
     expect(general).toContain('dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]')
+  })
+
+  it('aligns the font size field to the select column, with More font settings as a link under it (council round 10 B3)', () => {
+    const general = read('native/general-section.tsx')
+    // The control is the selects' 176px wide and the field fills it.
+    expect(general).toContain('dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:w-44!')
+    expect(general).toContain('dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:grid-cols-[minmax(0,1fr)_auto]!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]]:w-full!')
+    // The disclosure takes its own line under the field, on its start edge, underlined like a link.
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:col-span-full!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:justify-start!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:underline!')
+    expect(general).not.toContain('dshx:[&_[class*=_expander_]]:ml-1!')
+    // Still a 44px target on touch.
+    expect(general).toContain('dshx:pointer-coarse:[&_[class*=_expander_]]:min-h-11!')
   })
 })
 

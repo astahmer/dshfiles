@@ -38,8 +38,9 @@ const previewParts = (colours: SchemeColours): string =>
   ].join('')
 
 /**
- * Each Appearance card's preview (round five B7): a 96×56 miniature drawn in that theme's own palette, so the card
- * shows the theme it picks rather than an icon. System shows the light window with its trailing half in dark.
+ * Each Appearance card's preview (round five B7): a miniature drawn in that theme's own palette, so the card shows the
+ * theme it picks rather than an icon. System shows the light window with its trailing half in dark. Drawn on a 96×56
+ * grid and shown at 80×46 (council round 10 B3), so the card stays 88–96px tall.
  */
 const themePreview = (scheme: 'light' | 'dark' | 'system'): string => {
   const light = PaletteMath.standaloneColours('light')
@@ -50,7 +51,7 @@ const themePreview = (scheme: 'light' | 'dark' | 'system'): string => {
       : previewParts(scheme === 'light' ? light : dark)
   // One mid-grey edge on every preview, so a near-white or near-black window shows on a light and on a dark card alike.
   const svg = [
-    '<svg xmlns="http://www.w3.org/2000/svg" width="96" height="56" viewBox="0 0 96 56">',
+    '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="46" viewBox="0 0 96 56" preserveAspectRatio="none">',
     '<defs><clipPath id="frame"><rect width="96" height="56" rx="6"/></clipPath><clipPath id="half"><rect x="48" width="48" height="56"/></clipPath></defs>',
     `<g clip-path="url(#frame)">${body}</g>`,
     `<rect x="0.5" y="0.5" width="95" height="55" rx="5.5" fill="none" stroke="${light.faint}"/>`,
@@ -115,16 +116,19 @@ export const GeneralSection = (
         'dshx:pointer-coarse:[&_[class*=_selector_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]+[class*=_unit_]]:h-11!',
         // Font size: the core stepper and its "px" read as one field with the unit as an inner suffix, the kit's UnitInput
         // look (council round 3 B3, kit A4), instead of a filled number pill beside a loose unit.
-        'dshx:[&_[class*=_stepper_]]:h-8! dshx:[&_[class*=_stepper_]]:min-w-14! dshx:[&_[class*=_stepper_]]:justify-start! dshx:[&_[class*=_stepper_]]:rounded-r-none! dshx:[&_[class*=_stepper_]]:border! dshx:[&_[class*=_stepper_]]:border-r-0! dshx:[&_[class*=_stepper_]]:border-field-border! dshx:[&_[class*=_stepper_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]]:pl-2.5!',
+        'dshx:[&_[class*=_stepper_]]:h-8! dshx:[&_[class*=_stepper_]]:min-w-14! dshx:[&_[class*=_stepper_]]:w-full! dshx:[&_[class*=_stepper_]]:justify-start! dshx:[&_[class*=_stepper_]]:rounded-r-none! dshx:[&_[class*=_stepper_]]:border! dshx:[&_[class*=_stepper_]]:border-r-0! dshx:[&_[class*=_stepper_]]:border-field-border! dshx:[&_[class*=_stepper_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]]:pl-2.5!',
         // The value and its unit at the kit UnitInput's text size (council round 4 B5), not core's 14px.
         'dshx:[&_[class*=_stepper_]_[class*=_value_]]:text-sm! dshx:[&_[class*=_stepper_]_[class*=_value_]]:leading-5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-sm!',
+        // The font size field spans the select column (council round 10 B3): its control is as wide as the selects above
+        // and below it (176px), the field filling it, so the column's left edge stays straight.
+        'dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:w-44! dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:grid! dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:grid-cols-[minmax(0,1fr)_auto]! dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:gap-x-0! dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:gap-y-1!',
         // No chevron trailing the field (council round 4 B5): core's More font settings disclosure read as the field's
-        // menu. It stays, as a quiet text button named by its own label, after the field.
-        'dshx:[&_[class*=_expander_]]:ml-1! dshx:[&_[class*=_expander_]]:h-8! dshx:[&_[class*=_expander_]]:w-auto! dshx:[&_[class*=_expander_]]:rounded-md! dshx:[&_[class*=_expander_]]:px-2! dshx:[&_[class*=_expander_]]:text-sm! dshx:[&_[class*=_expander_]]:text-muted-foreground! dshx:[&_[class*=_expander_]>svg]:hidden! dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]',
-        'dshx:[&_[class*=_stepper_]+[class*=_unit_]]:-ml-2! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:inline-flex! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:h-8! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:items-center! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:rounded-r-(--dsw-radius-md)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-field-border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:pr-2.5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-muted-foreground!',
-        // Each card leads with its theme's 96×56 preview (`themeSwatches`, round five B7) in place of core's icon, label
-        // under it; cards in core order, Light, Dark, System. Tighter padding keeps the card about as tall as before.
-        "dshx:[&_[class*=_themeCube]>svg]:hidden! dshx:[&_[class*=_themeCube]]:py-3! dshx:[&_[class*=_themeCube]]:gap-2! dshx:[&_[class*=_themeCube]]:before:order-first dshx:[&_[class*=_themeCube]]:before:h-14 dshx:[&_[class*=_themeCube]]:before:w-24 dshx:[&_[class*=_themeCube]]:before:shrink-0 dshx:[&_[class*=_themeCube]]:before:content-['']",
+        // menu. It is a link under the field (council round 10 B3), named by its own label, on the field's start edge.
+        'dshx:[&_[class*=_expander_]]:ml-0! dshx:[&_[class*=_expander_]]:col-span-full! dshx:[&_[class*=_expander_]]:justify-start! dshx:[&_[class*=_expander_]]:h-auto! dshx:[&_[class*=_expander_]]:w-auto! dshx:[&_[class*=_expander_]]:rounded-sm! dshx:[&_[class*=_expander_]]:bg-transparent! dshx:[&_[class*=_expander_]]:p-0! dshx:[&_[class*=_expander_]]:text-sm! dshx:[&_[class*=_expander_]]:text-foreground! dshx:[&_[class*=_expander_]]:underline! dshx:[&_[class*=_expander_]]:decoration-field-border! dshx:[&_[class*=_expander_]]:underline-offset-4! dshx:[&_[class*=_expander_]:hover]:decoration-current! dshx:pointer-coarse:[&_[class*=_expander_]]:min-h-11! dshx:[&_[class*=_expander_]>svg]:hidden! dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]',
+        'dshx:[&_[class*=_stepper_]+[class*=_unit_]]:ml-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:inline-flex! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:h-8! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:items-center! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:rounded-r-(--dsw-radius-md)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-l-0! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:border-field-border! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:bg-(--dsw-alias-bg-base)! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:pr-2.5! dshx:[&_[class*=_stepper_]+[class*=_unit_]]:text-muted-foreground!',
+        // Each card leads with its theme's 80×46 preview (`themeSwatches`, round five B7; council round 10 B3) in place of
+        // core's icon, label under it; cards in core order, Light, Dark, System. 8px padding keeps the card 88–96px tall.
+        "dshx:[&_[class*=_themeCube]>svg]:hidden! dshx:[&_[class*=_themeCube]]:py-2! dshx:[&_[class*=_themeCube]]:gap-2! dshx:[&_[class*=_themeCube]]:before:order-first dshx:[&_[class*=_themeCube]]:before:h-[46px] dshx:[&_[class*=_themeCube]]:before:w-20 dshx:[&_[class*=_themeCube]]:before:shrink-0 dshx:[&_[class*=_themeCube]]:before:content-['']",
         // Helper copy reads in lines of 60 characters at most (council round 6 B5), whichever plugin drew the row.
         'dshx:[&_[class*=_desc]]:max-w-[60ch]! dshx:[&_[class*=Description]]:max-w-[60ch]!',
         'dshx:[&_[class*=_themeCube]:nth-child(1)]:before:[background:var(--settings-swatch-light)] dshx:[&_[class*=_themeCube]:nth-child(2)]:before:[background:var(--settings-swatch-dark)] dshx:[&_[class*=_themeCube]:nth-child(3)]:before:[background:var(--settings-swatch-system)]',
