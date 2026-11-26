@@ -20,7 +20,7 @@ const base = {
   running: false,
   subagents: 0,
   wordOf: (status: string) => ({ working: 'Working', idle: 'Idle', ready: 'Ready' })[status] ?? status,
-  subagentsLabel: (count: number) => (count === 1 ? '1 subagent' : `${String(count)} subagents`),
+  countWords: { working: (count: number) => `${String(count)} working`, failed: (count: number) => `${String(count)} failed` },
   savedChipOf: () => undefined,
   palette: 'balanced' as const,
   coloured: true,
@@ -29,7 +29,21 @@ const base = {
 describe('phone thread meta line (council round 17 B2.2)', () => {
   it('names the project the list names, its status word and its working subagents', () => {
     const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], status: { status: 'working', detail: 'Waiting on 1 subagent' }, subagents: 1 })
-    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Working', working: true, subagents: '1 subagent' })
+    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Working', working: true, children: [{ key: 'working', count: 1, text: '1 working', tone: 'plain' }] })
+  })
+
+  it('counts its children in the one formula, failed ones in the failed tone (round 22 items 2 and 3)', () => {
+    const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 6, failedSubagents: 1 })
+    expect(meta.children).toEqual([
+      { key: 'working', count: 6, text: '6 working', tone: 'plain' },
+      { key: 'failed', count: 1, text: '1 failed', tone: 'failed' },
+    ])
+    // A failed child alone does not make the thread work; a zero part is left out.
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], failedSubagents: 2 })).toMatchObject({
+      status: 'Idle',
+      children: [{ key: 'failed', count: 2, text: '2 failed', tone: 'failed' }],
+    })
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).children).toEqual([])
   })
 
   it('reads the project a thread workspace was cut from, and a subagent its parent\'s', () => {
@@ -43,9 +57,9 @@ describe('phone thread meta line (council round 17 B2.2)', () => {
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], status: { status: 'needs-you', detail: undefined, kind: 'Approval' } }).working).toBe(false)
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], running: true }).status).toBe('Working')
     // Inside a thread the list is closed and publishes no status: a parent waiting on a working subagent still works.
-    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 1 })).toMatchObject({ status: 'Working', working: true, subagents: '1 subagent' })
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 1 })).toMatchObject({ status: 'Working', working: true, children: [{ text: '1 working' }] })
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).status).toBe('Idle')
-    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).subagents).toBeUndefined()
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).children).toEqual([])
   })
 
   it('paints the mark as the row does: a saved tone or colour, the line\'s ink with project colour off, none without a project', () => {
@@ -76,7 +90,7 @@ describe('a subagent\'s phone header (round 21 D3)', () => {
       route: deepseek,
       status: 'Working',
       working: true,
-      subagents: undefined,
+      children: [],
       parent: { id: 's-root', title: 'Audit money rounding' },
       title: 'Check credit note rounding',
     })
@@ -103,6 +117,6 @@ describe('a subagent\'s phone header (round 21 D3)', () => {
 
   it('ignores child facts on a root thread', () => {
     const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], child })
-    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Idle', working: false, subagents: undefined })
+    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Idle', working: false, children: [] })
   })
 })

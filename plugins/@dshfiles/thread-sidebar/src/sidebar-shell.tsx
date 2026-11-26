@@ -4,7 +4,7 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { plural, useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
 import { SettingsNavigation } from '@dshfiles/settings-shell/settings-navigation'
 import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
 import {
@@ -287,8 +287,8 @@ const focusComposer = (): void => {
 
 /**
  * The phone thread header's meta line (council round 17 B2.2, phone-thread-meta.ts): the stage thread's project, its
- * list status word and its working subagents. Every read is a primitive or a stable snapshot, so a streaming Session
- * list does not re-render the shell.
+ * list status word and its children in the one count formula, `6 working · 2 failed` (round 22 items 2 and 3). Every
+ * read is a primitive or a stable snapshot, so a streaming Session list does not re-render the shell.
  */
 const usePhoneStageMeta = (
   props: SidebarShellProps,
@@ -302,6 +302,15 @@ const usePhoneStageMeta = (
   })
   const running = props.useSessions(state => stageThread !== undefined && Object.values(state.byId).some(session => session.id === stageThread && session.running))
   const subagents = props.useSessions(state => (stageThread === undefined ? 0 : Object.values(state.byId).filter(session => session.parentId === stageThread && session.running).length))
+  // The children that are not working, as one key: those with a failed-turn record are the summary's `2 failed`.
+  const settledChildren = props.useSessions(state =>
+    stageThread === undefined
+      ? ''
+      : Object.values(state.byId)
+          .filter(session => session.parentId === stageThread && !session.running)
+          .map(session => session.id)
+          .join('\n'),
+  )
   const workspaces = props.useWorkspaces(state => HostSnapshotsModel.selectStableWorkspaceItems(state.items))
   const threadDirectories = useThreadDirectories(workspaces)
   const savedChipOf = useSavedProjectChip()
@@ -322,6 +331,7 @@ const usePhoneStageMeta = (
   })
   // How its last turn ended (round 21 D4): the Host's failed-turn record and the child's timing, as the list reads them.
   const failedTurns = useSubagentFailedTurns()
+  const failedSubagents = settledChildren === '' ? 0 : settledChildren.split('\n').filter(id => failedTurns.has(id)).length
   const lastTurnCompleted = props.useSessions(state =>
     parentId === undefined || stageThread === undefined ? undefined : state.byId[SessionId(stageThread)]?.projectionValues?.subagentTiming?.lastTurnCompleted,
   )
@@ -341,8 +351,12 @@ const usePhoneStageMeta = (
             status,
             running,
             subagents,
+            failedSubagents,
             wordOf: word => t(STATUS_WORD_KEYS[word]),
-            subagentsLabel: count => plural(t, 'subagentCount', count),
+            countWords: {
+              working: count => t('threadSidebarWorkingCount', { count }),
+              failed: count => t('threadSidebarFailedCount', { count }),
+            },
             savedChipOf,
             palette: preferences.projectColorPalette,
             coloured: preferences.threadRowProjectColor,
@@ -364,6 +378,7 @@ const usePhoneStageMeta = (
       status,
       running,
       subagents,
+      failedSubagents,
       t,
       savedChipOf,
       preferences.projectColorPalette,

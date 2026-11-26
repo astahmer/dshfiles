@@ -1,5 +1,6 @@
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
+import { workCountParts, type WorkCountPart, type WorkCountWords } from '@dshfiles/plugin-ui/lib/work-count'
 import type { ProjectColorPalette } from './organization.js'
 import type { ProjectChip } from './project-colors.js'
 import type { ThreadDirectories } from './thread-directories.js'
@@ -14,6 +15,10 @@ import { WorkspacePaths } from './workspace-paths.js'
  * from), its mark painted as the list's row paints it; the status word is the list's own (Approval, Question, Turn failed
  * for an attention thread); the count is the subagents working now. Unknown project: no mark and no name.
  *
+ * The count is the one formula every surface that summarises children reads (round 22 items 2 and 3): `6 working ·
+ * 2 failed`, a zero part left out, the failed part drawn in the failed ink after its ✕. Failed counts the children
+ * whose turn failed (the Host's failed-turn record), the same on every surface; a call that never started is no child.
+ *
  * A subagent's header (round 21 D3) says what the desktop lineage says: line 2 reads `[mark] model · state` (the model
  * stands where the project would), the bar's Back opens its parent thread, and the title is the name its parent gave it
  * (the subagent call's description), not the prompt it was sent. An unknown model keeps the project.
@@ -24,7 +29,8 @@ export interface PhoneStageMeta {
   readonly status: string
   /** The status word says Working (not an attention kind): the header draws the list's working ring before it. */
   readonly working: boolean
-  readonly subagents: string | undefined
+  /** The children summary's clauses (`6 working`, `2 failed`), in the formula's order; empty with none to name. */
+  readonly children: readonly WorkCountPart[]
   /** A subagent's model, drawn with the kit's `RouteModel` where the project would be. */
   readonly route?: SubagentModelRoute | undefined
   /** A subagent's parent thread: the bar's Back opens it. */
@@ -71,9 +77,13 @@ const resolve = (input: {
   readonly threadDirectories: ThreadDirectories
   readonly status: ThreadWorkStatus | undefined
   readonly running: boolean
+  /** Children working now. */
   readonly subagents: number
+  /** Children not working whose last turn failed. */
+  readonly failedSubagents?: number | undefined
   readonly wordOf: (status: WorkStatus) => string
-  readonly subagentsLabel: (count: number) => string
+  /** The count formula's words, count included: `6 working`, `2 failed`. */
+  readonly countWords: Pick<WorkCountWords, 'working' | 'failed'>
   readonly savedChipOf: (path: string) => ProjectChip | undefined
   readonly palette: ProjectColorPalette
   /** The list's project colour preference: off, the mark takes the line's ink. */
@@ -93,18 +103,18 @@ const resolve = (input: {
   const work = input.status?.status ?? (input.running || input.subagents > 0 ? 'working' : 'idle')
   const status = input.status?.kind ?? input.wordOf(work)
   const working = input.status?.kind === undefined && work === 'working'
-  const subagents = input.subagents > 0 ? input.subagentsLabel(input.subagents) : undefined
+  const children = workCountParts({ working: input.subagents, failed: input.failedSubagents ?? 0 }, input.countWords)
   const parentId = input.lineage[1]
   const child = input.child
-  if (parentId === undefined || child === undefined) return { project, mark, status, working, subagents }
+  if (parentId === undefined || child === undefined) return { project, mark, status, working, children }
   const parentTitle = child.parentTitle?.trim() || undefined
   const title = child.label?.trim() || undefined
   // The list's own status wins when it publishes one; inside a thread it does not, and a failed child read Idle.
   const childStatus = input.status === undefined && work !== 'working' && child.terminal === 'failed' ? (child.failedLabel ?? status) : status
   const meta: { -readonly [Key in keyof PhoneStageMeta]: PhoneStageMeta[Key] } =
     child.route === undefined
-      ? { project, mark, status: childStatus, working, subagents }
-      : { project: undefined, mark: undefined, route: child.route, status: childStatus, working, subagents }
+      ? { project, mark, status: childStatus, working, children }
+      : { project: undefined, mark: undefined, route: child.route, status: childStatus, working, children }
   if (parentTitle !== undefined) meta.parent = { id: parentId, title: parentTitle }
   if (title !== undefined) meta.title = title
   return meta

@@ -54,6 +54,7 @@ import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
+import type { WorkCountPart } from '@dshfiles/plugin-ui/lib/work-count'
 import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { usePhoneThreadMenu } from '@dshfiles/rich-composer/phone-thread-menu'
 import type { PhoneStageMeta } from './phone-thread-meta.js'
@@ -680,6 +681,31 @@ const DestinationGlyph = (props: { readonly icon: DestinationIcon }): JSX.Elemen
 
 /** The phone bar's title: the bar row's 17/22, at 600 (council round 4 B3, round 7 B5). */
 const PHONE_TITLE_CLASS = 'dshx:min-w-0 dshx:truncate dshx:font-semibold'
+
+/**
+ * The children after line 2's state (round 22 items 2 and 3): `· 6 working · ✕ 2 failed`, the one count formula, the
+ * failed clause in the failed ink after the list's ✕. It keeps its width: the project's name gives way first.
+ */
+const PhoneChildCount = (props: { readonly parts: readonly WorkCountPart[] }): JSX.Element | null =>
+  props.parts.length === 0 ? null : (
+    <span data-phone-children="" className="dshx:flex dshx:shrink-0 dshx:items-center dshx:tabular-nums">
+      {props.parts.map(part => (
+        <Fragment key={part.key}>
+          <span className="dshx:shrink-0 dshx:px-1">
+            <span aria-hidden="true">·</span>
+            <span className="dshx:sr-only">, </span>
+          </span>
+          <span
+            data-phone-children-part={part.key}
+            className={cn('dshx:inline-flex dshx:items-center dshx:gap-1', part.tone === 'failed' && 'dshx:text-destructive')}
+          >
+            {part.tone === 'failed' ? <StatusGlyph status="failed" decorative className="dshx:size-3" /> : null}
+            {part.text}
+          </span>
+        </Fragment>
+      ))}
+    </span>
+  )
 
 /**
  * A Settings group head (council round 13 B5): 12/600 in the tertiary ink at +0.01em, a label over its rows rather than
@@ -1936,16 +1962,17 @@ const PhoneNavigation = (
               </h1>
               {/* 13/16 in the secondary ink: the list row's line 2, its project mark and its status word. */}
               {meta.route === undefined ? (
-                <AttentionMeta
-                  data-phone-subtitle=""
-                  className="dshx:flex-none dshx:text-sm/4"
-                  project={meta.project}
-                  kind={meta.status}
-                  // The list's 12px working ring before "Working" (council round 18 B2.3), as the row's glyph says it.
-                  kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
-                  age={meta.subagents}
-                  {...(meta.mark === undefined ? {} : { mark: meta.mark })}
-                />
+                <span data-phone-subtitle="" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:text-sm/4 dshx:whitespace-nowrap dshx:text-muted-foreground">
+                  <AttentionMeta
+                    className="dshx:flex-initial dshx:text-sm/4"
+                    project={meta.project}
+                    kind={meta.status}
+                    // The list's 12px working ring before "Working" (council round 18 B2.3), as the row's glyph says it.
+                    kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
+                    {...(meta.mark === undefined ? {} : { mark: meta.mark })}
+                  />
+                  <PhoneChildCount parts={meta.children} />
+                </span>
               ) : (
                 // A subagent (round 21 D3): `[mark] model · state`, the kit's RouteModel where the project would be. The
                 // model's name truncates first; the state word stays whole.
@@ -1959,8 +1986,8 @@ const PhoneNavigation = (
                     className="dshx:flex-none dshx:text-sm/4"
                     kind={meta.status}
                     kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
-                    age={meta.subagents}
                   />
+                  <PhoneChildCount parts={meta.children} />
                 </span>
               )}
             </div>

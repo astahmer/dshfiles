@@ -923,7 +923,7 @@ describe('DestinationShell', () => {
     expect(document.querySelector('[data-phone-bar-layout]')?.className).not.toMatch(/dshx:gap-/u)
   })
 
-  it('names the thread\'s project, status and working subagents on a 13px line under its title (council round 17 B2.2)', () => {
+  it('names the thread\'s project, status and children in the count formula on a 13px line under its title (council round 17 B2.2, round 22 item 2)', () => {
     setPhone(true)
     renderShell({
       collapsed: true,
@@ -931,7 +931,16 @@ describe('DestinationShell', () => {
       stageThreadId: 'session-1',
       stageTitle: 'Fix invoice tax rounding',
       stageWorking: true,
-      stageMeta: { project: 'billing-api', mark: { tone: 3, palette: 'balanced' }, status: 'Working', working: true, subagents: '1 subagent' },
+      stageMeta: {
+        project: 'billing-api',
+        mark: { tone: 3, palette: 'balanced' },
+        status: 'Working',
+        working: true,
+        children: [
+          { key: 'working', count: 6, text: '6 working', tone: 'plain' },
+          { key: 'failed', count: 1, text: '1 failed', tone: 'failed' },
+        ],
+      },
     })
     const block = document.querySelector('[data-phone-title-block]')
     expect(block?.querySelector('[data-phone-title]')?.textContent).toBe('Fix invoice tax rounding')
@@ -946,8 +955,21 @@ describe('DestinationShell', () => {
       ['name', 'billing-api'],
       ['kind', 'Working'],
       ['kind-mark', ''],
-      ['age', '1 subagent'],
     ])
+    // The children in the one count formula after the state (round 22 items 2 and 3): `· 6 working · ✕ 1 failed`, the
+    // failed clause in the failed ink after the list's ✕. It never drops; the project's name gives way first.
+    const children = line?.querySelector<HTMLElement>('[data-phone-children]')
+    expect(children?.className).toContain('dshx:shrink-0')
+    expect([...(children?.querySelectorAll('[data-phone-children-part]') ?? [])].map(part => [part.getAttribute('data-phone-children-part'), part.textContent])).toEqual([
+      ['working', '6 working'],
+      ['failed', '1 failed'],
+    ])
+    const failed = children?.querySelector<HTMLElement>('[data-phone-children-part="failed"]')
+    expect(failed?.className).toContain('dshx:text-destructive')
+    expect(failed?.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
+    expect(children?.querySelector('[data-phone-children-part="working"]')?.className).not.toContain('dshx:text-destructive')
+    // Each clause after a muted "·" that assistive tech hears as a comma.
+    expect(children?.textContent).toBe('·, 6 working·, 1 failed')
     // The line says Working after the list's 12px working ring (council round 18 B2.3): one glyph, in the kind, none
     // before the title, and the bar stays one 44px row.
     const ring = line?.querySelector<HTMLElement>('[data-attention-meta-part="kind"] [data-attention-meta-part="kind-mark"] [data-slot="status-glyph"]')
@@ -958,13 +980,13 @@ describe('DestinationShell', () => {
     expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:h-11')
     cleanup()
     // An unknown project draws no mark and no name; a page never draws the line.
-    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', stageMeta: { project: undefined, mark: undefined, status: 'Idle', working: false, subagents: undefined } })
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', stageMeta: { project: undefined, mark: undefined, status: 'Idle', working: false, children: [] } })
     expect(document.querySelector('[data-phone-subtitle] [data-attention-meta-part="mark"]')).toBeNull()
     // Not working: no ring before the word.
     expect(document.querySelector('[data-phone-subtitle] [data-attention-meta-part="kind-mark"]')).toBeNull()
     expect(document.querySelector('[data-phone-subtitle]')?.textContent).toContain('Idle')
     cleanup()
-    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageMeta: { project: 'billing-api', mark: undefined, status: 'Working', working: true, subagents: undefined } })
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageMeta: { project: 'billing-api', mark: undefined, status: 'Working', working: true, children: [] } })
     expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
   })
 
@@ -983,7 +1005,7 @@ describe('DestinationShell', () => {
         route: { provider: 'dshx_fake_commandcode', model: 'claude-sonnet-5-5' },
         status: 'Working',
         working: true,
-        subagents: undefined,
+        children: [],
         parent: { id: 'session-parent', title: 'Audit money rounding' },
         title: 'Diff the ledger export against totals',
       },
@@ -1030,7 +1052,7 @@ describe('DestinationShell', () => {
         route: { provider: 'dshx_fake_commandcode', model: 'deepseek/deepseek-v4-flash' },
         status: 'Working',
         working: true,
-        subagents: undefined,
+        children: [],
         parent: { id: 'session-parent', title: 'Audit money rounding' },
         title: 'Check credit note rounding',
       },
