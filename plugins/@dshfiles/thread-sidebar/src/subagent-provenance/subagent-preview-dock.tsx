@@ -79,10 +79,13 @@ const DockRow = (
             <LiveElapsed active className="dshx:shrink-0 dshx:pr-1 dshx:text-muted-foreground" since={state.since} />
           )}
         </button>
+        {/* Council round 18 B1.2: one fixed action column across the dock (a job row's "Open in Processes" takes the same
+            7rem, right-aligned), so every row's tabular clock ends on one edge. A narrow pane drops the label and the column. */}
         <Button
           size="xs"
           variant="ghost"
-          className="dshx:mr-1 dshx:shrink dshx:text-muted-foreground"
+          className="dshx:mr-1 dshx:min-w-28 dshx:justify-end dshx:text-muted-foreground dshx:@max-pane-narrow:min-w-0"
+          data-live-work-action=""
           onClick={() => preview.openChild(childId)}
         >
           <span className="dshx:@max-pane-narrow:sr-only">{preview.t('subagentPreviewOpenThread')}</span>

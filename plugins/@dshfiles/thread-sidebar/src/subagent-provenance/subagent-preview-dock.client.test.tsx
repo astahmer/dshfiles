@@ -139,6 +139,23 @@ describe('SubagentPreviewDock', () => {
     expect(rowOf('Refactor').querySelector('[data-subagent-run-step]')).toBeNull()
   })
 
+  it('ends in a fixed action column, so every row\'s tabular elapsed time ends on one edge (council round 18 B1.2)', async () => {
+    // "Open thread" is narrower than a job row's "Open in Processes": with content-sized actions the clocks sat ~24px apart.
+    const bindings = preview({ retainChild: childInTool().retainChild })
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'], bindings, runCards: true, childTiming: true })} />)
+    for (const label of ['Review', 'Refactor']) {
+      const row = rowOf(label)
+      const action = row.querySelector<HTMLElement>('[data-live-work-action]')
+      expect(action?.textContent).toBe('subagentPreviewOpenThread')
+      expect(action?.className).toContain('dshx:min-w-28')
+      expect(action?.className).toContain('dshx:justify-end')
+      // A narrow pane shows the action as its arrow alone: the column gives way with the label.
+      expect(action?.className).toContain('dshx:@max-pane-narrow:min-w-0')
+      expect(action?.classList.contains('dshx:shrink')).toBe(false)
+      expect(row.querySelector('[data-live-elapsed]')?.className).toContain('dshx:tabular-nums')
+    }
+  })
+
   it('says the step in words, never the tool identifier, and names the model on the row itself (council round 17 B1.1)', async () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
