@@ -33,8 +33,15 @@
     --dshx-kbd-font: var(--dsw-font-family, ui-sans-serif, system-ui), -apple-system, BlinkMacSystemFont, 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
     --dshx-dialog-selected-wash: var(--dshx-selected-wash);
     --dshx-dialog-faint: var(--dsw-alias-label-tertiary);
+    /*
+     * Faint ink in a nav column (council round 13 A3): a row's hover fill is ink at 6% over the panel step, which left
+     * light faint (step 8) at 4.39:1. In light the column's faint text takes the secondary step (4.78:1 on the hover,
+     * 4.96:1 on the selected wash); dark faint already holds 4.64:1 on its 7% hover.
+     */
+    --dshx-nav-faint: var(--dsw-alias-label-secondary);
   }
   body[data-ds-dark-theme] {
+    --dshx-nav-faint: var(--dsw-alias-label-tertiary);
     --dshx-dialog-fill: oklch(0.27 0.006 60);
     --dshx-dialog-selected-wash: oklch(from var(--dshx-selected-wash) max(l, 0.3) c h);
     --dshx-dialog-faint: oklch(from var(--dsw-alias-label-tertiary) max(l, 0.68) c h);
@@ -45,6 +52,8 @@
 
 @utility surface-nav {
   --dshx-surface: var(--dshx-surface-nav);
+  --dsw-alias-label-tertiary: var(--dshx-nav-faint);
+  --dsw-alias-label-caption: var(--dshx-nav-faint);
   background-color: var(--dshx-surface);
 }
 

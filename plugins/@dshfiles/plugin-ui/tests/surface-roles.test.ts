@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { PaletteMath, WARM_STONE, type Scheme } from '../src/theme/palette.ts'
+import { PaletteMath, WARM_STONE, type Oklch, type Scheme } from '../src/theme/palette.ts'
 import { ThemeCss } from '../src/theme/theme-css.ts'
 
 // Council round 5 A4: two surface roles, so every navigation column sits on `nav` and every page on `stage`.
@@ -71,5 +71,27 @@ describe('surface roles (council round 5 A4)', () => {
     // A selected row still reads as a lightness step off the column; a Needs-you or Failed row by its hue.
     expect(Math.abs(p.selectedWash.l - nav.l)).toBeGreaterThanOrEqual(0.025)
     for (const wash of [p.needsYouWash, p.failedWash]) expect(wash.c - nav.c).toBeGreaterThanOrEqual(0.025)
+  })
+
+  it('steps the faint ink inside a nav column to the secondary step in light, so it holds AA on the row hover fill (council round 13 A3)', () => {
+    // The hover fill is ink at 6% (light) / 7% (dark) over the column; light faint (step 8) sat at 4.39:1 on it.
+    expect(block(surfaces, '  body')).toContain('--dshx-nav-faint: var(--dsw-alias-label-secondary);')
+    expect(block(surfaces, '  body[data-ds-dark-theme]')).toContain('--dshx-nav-faint: var(--dsw-alias-label-tertiary);')
+    const utility = block(surfaces, '@utility surface-nav')
+    expect(utility).toContain('--dsw-alias-label-tertiary: var(--dshx-nav-faint);')
+    expect(utility).toContain('--dsw-alias-label-caption: var(--dshx-nav-faint);')
+  })
+
+  it.each<[Scheme, number, number]>([
+    ['light', 0.06, 9],
+    ['dark', 0.07, 8],
+  ])('keeps the secondary and the nav faint ink AA on the row hover fill over nav (%s)', (scheme, alpha, faint) => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const channels = (color: Oklch) => [1, 3, 5].map(at => Number.parseInt(PaletteMath.toHex(color).slice(at, at + 2), 16))
+    const [under, ink] = [channels(p.navSurface), channels(p.neutral[10]!)]
+    const hover = PaletteMath.hexToOklch(`#${under.map((value, i) => Math.round(value * (1 - alpha) + (ink[i] ?? 0) * alpha).toString(16).padStart(2, '0')).join('')}`)
+    expect(ThemeCss.blockDeclarations(WARM_STONE, scheme).join('\n')).toContain(`--dsw-alias-interactive-bg-hover: color-mix(in oklch, var(--dshx-tone-10) ${Math.round(alpha * 100)}%, transparent);`)
+    for (const step of [9, faint]) expect(PaletteMath.contrastRatio(p.neutral[step]!, hover), `step ${step}`).toBeGreaterThanOrEqual(4.5)
+    for (const step of [9, faint]) expect(PaletteMath.contrastRatio(p.neutral[step]!, p.selectedWash), `step ${step} on wash`).toBeGreaterThanOrEqual(4.5)
   })
 })
