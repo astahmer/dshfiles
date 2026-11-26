@@ -11,6 +11,7 @@ import { PaletteActions } from '@dshfiles/command-palette/palette-contract'
 import { defineClient, MenuItem } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
+import { TabPlaceGlyphs } from '@dshfiles/workbench/tab-status'
 import { AccountUsageDashboard } from './account-usage-dashboard.js'
 import type { OpenThread } from './format.js'
 import { UsagePanel, UsageTabs } from './panel.js'
@@ -30,6 +31,8 @@ export default defineClient({
   inject: ['slots', 'sessions', 'uiWorkspace', 'layout', 'sidebarRightTabs'],
   setup(ctx, decorate, metadata) {
     const plugin = metadata?.plugin
+    // The tab names the page with its own bar chart, as the left column and the title do (council round 18, D2).
+    plugin?.add(TabPlaceGlyphs, { panelId: PANEL_ID, glyph: UsageGlyph, tone: 'var(--dshx-nav-tone-observe)' })
     const navigate = (apply: (panelId?: string) => void): void => {
       void WorkbenchMainNavigation.open(PANEL_ID)
         .then(result => {

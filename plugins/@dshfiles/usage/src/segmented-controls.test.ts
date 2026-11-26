@@ -111,6 +111,12 @@ describe('Usage page title mark (council round 7, D1; round 18, D2)', () => {
     expect(read('client.tsx')).toMatch(/const PanelGlyph = UsageGlyph\b/u)
     expect(page).toContain('markTone="observe"')
   })
+
+  it("names its tab with the same bar-chart glyph in the Observe tone, not the Observe pulse (council round 18, D2)", () => {
+    const client = read('client.tsx')
+    expect(client).toContain("from '@dshfiles/workbench/tab-status'")
+    expect(client).toMatch(/plugin\?\.add\(TabPlaceGlyphs, \{ panelId: PANEL_ID, glyph: UsageGlyph, tone: 'var\(--dshx-nav-tone-observe\)' \}\)/u)
+  })
 })
 
 describe('Usage filter triggers (council round 7, D3 / A4)', () => {
