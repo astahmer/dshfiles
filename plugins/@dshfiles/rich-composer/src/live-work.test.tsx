@@ -315,21 +315,29 @@ describe('one header for live subagents on a phone (council round 22, item 5)', 
     expect(cap).toMatch(/max-height: calc\(44px \+ /)
   })
 
-  it('fades rows out over 8px at the card\'s scroll edges, so no row text rests cut by its top or bottom (17b, item 6)', () => {
-    // Scrolled to its end, the card's top edge sliced the third row's model line in full ink.
+  it('fades rows out over 16px at a scroll edge that can still scroll, and nowhere else (17b, council round 24 item 4)', () => {
+    // Scrolled to its end, the card's top edge sliced the third row's model line in full ink; then an 8px fade sat on
+    // both edges at every position, so the top faded at rest and the bottom at the end.
     const edges = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::before,\n  ${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::after`)
     expect(edges).toMatch(/position: sticky;/)
-    expect(edges).toMatch(/height: 8px;/)
+    expect(edges).toMatch(/height: 16px;/)
     expect(edges).toMatch(/pointer-events: none;/)
+    expect(edges).toMatch(/opacity: 0;/)
     const top = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::before`)
     expect(top).toMatch(/top: 0;/)
-    // No room of its own: at rest it lies over the first row's empty 8px top padding.
-    expect(top).toMatch(/margin-bottom: -8px;/)
-    expect(top).toMatch(/linear-gradient\(180deg, var\(--dsw-specific-input-major\), color-mix\(in srgb, var\(--dsw-specific-input-major\) 0%, transparent\)\)/)
+    // No room of its own. Its first 8px hold the fill: at a snap position that is the edge's padding and the next
+    // row's divider 7px in, which a plain linear fade left half drawn, a second hairline beside the frame's edge.
+    expect(top).toMatch(/margin-bottom: -16px;/)
+    expect(top).toMatch(/linear-gradient\(180deg, var\(--dsw-specific-input-major\) 8px, color-mix\(in srgb, var\(--dsw-specific-input-major\) 0%, transparent\)\)/)
     const bottom = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}::after`)
     expect(bottom).toMatch(/bottom: 0;/)
-    expect(bottom).toMatch(/margin-top: -8px;/)
-    expect(bottom).toMatch(/linear-gradient\(0deg, var\(--dsw-specific-input-major\), color-mix\(in srgb, var\(--dsw-specific-input-major\) 0%, transparent\)\)/)
+    expect(bottom).toMatch(/margin-top: -16px;/)
+    expect(bottom).toMatch(/linear-gradient\(0deg, var\(--dsw-specific-input-major\) 8px, color-mix\(in srgb, var\(--dsw-specific-input-major\) 0%, transparent\)\)/)
+    // Shown only on an edge thread-sidebar's dock marks as able to scroll.
+    expect(ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > :global([data-dshfiles-live-preview-dock='subagents'][data-more-above])::before`)).toMatch(/opacity: 1;/)
+    expect(ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > :global([data-dshfiles-live-preview-dock='subagents'][data-more-below])::after`)).toMatch(/opacity: 1;/)
+    // Beside running jobs the top fade sits under the 44px fold plate, not behind it.
+    expect(ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}::before`)).toMatch(/top: 44px;/)
   })
 
   it('keeps the fold row beside running jobs, and its closed state hides the rows behind it', () => {

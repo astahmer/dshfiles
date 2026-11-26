@@ -1494,30 +1494,42 @@ button.crumbEditable {
     background: var(--dsw-specific-input-major);
   }
 
-  /* Council round 22, item 6 (17b): scrolled, the card's edges sliced a row's text in full ink. An 8px fade sticks to
-     each scroll edge, over the rows and under the fold plate; it takes no room, and at rest it lies over the first and
-     last rows' empty 8px padding, so only text scrolling past an edge dissolves (and the peeking row fades out). */
+  /* Council round 22, item 6 (17b): scrolled, the card's edges sliced a row's text in full ink. A fade sticks to each
+     scroll edge, over the rows and under the fold plate; it takes no room, and only text scrolling past an edge
+     dissolves. Council round 24, item 4: 16px, its first 8px the fill, so at a snap position the edge's padding and the
+     next row's divider 7px in stay clean (a plain linear fade left that divider half drawn, a second hairline beside
+     the frame's edge); and only on an edge with more rows past it (thread-sidebar's dock marks data-more-above and
+     data-more-below), so the top no longer fades at rest nor the bottom at the end; the fades say the list scrolls. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before,
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
     position: sticky;
     z-index: 2;
     display: block;
     flex: none;
-    height: 8px;
+    height: 16px;
     content: '';
     pointer-events: none;
+    opacity: 0;
   }
 
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before {
     top: 0;
-    margin-bottom: -8px;
-    background: linear-gradient(180deg, var(--dsw-specific-input-major), color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+    margin-bottom: -16px;
+    background: linear-gradient(180deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
   }
 
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
     bottom: 0;
-    margin-top: -8px;
-    background: linear-gradient(0deg, var(--dsw-specific-input-major), color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+    margin-top: -16px;
+    background: linear-gradient(0deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-above])::before {
+    opacity: 1;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-below])::after {
+    opacity: 1;
   }
 
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview]) {
@@ -1547,6 +1559,11 @@ button.crumbEditable {
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
     max-height: calc(44px + 2 * 54px + 1px + 8px + 2px);
     scroll-padding-top: 44px;
+  }
+
+  /* There the top fade sits under the 44px plate, not behind it. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents'])::before {
+    top: 44px;
   }
 
   /* A dock holding only live work leaves no empty seat (and no stack gap) while the summary is closed. */
