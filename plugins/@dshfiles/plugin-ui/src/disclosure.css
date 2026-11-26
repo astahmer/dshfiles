@@ -54,7 +54,7 @@
   gap: 4px;
   padding: 0;
   border: 0;
-  border-radius: 4px;
+  border-radius: var(--dsw-radius-xs, 4px);
   background: transparent;
   color: var(--dsw-alias-link, var(--dsw-alias-state-business-primary));
   font-size: var(--dshx-density-text-ui, 13px);
