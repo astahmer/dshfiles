@@ -166,7 +166,8 @@ export const FilterMenu = (props: {
                 onCheckedChange={() => status.toggle(value)}
                 className="dshx:gap-2 dshx:text-sm"
               >
-                <ItemGlyphs.StatusIcon status={value} />
+                {/* 14 px, the Kind rows' icon width, so both groups' labels share one edge. */}
+                <ItemGlyphs.StatusIcon status={value} className="dshx:size-3.5" />
                 {ItemGlyphs.statusLabels[value]}
                 <span className="dshx:ml-auto dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">{status.counts[value]}</span>
               </DropdownMenuCheckboxItem>
