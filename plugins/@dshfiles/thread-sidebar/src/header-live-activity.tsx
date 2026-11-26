@@ -106,13 +106,19 @@ const HeaderLiveActivityBody = (props: HeaderLiveActivityProps): JSX.Element | n
   )
 }
 
-export const HeaderLiveActivity = (props: HeaderLiveActivityProps): JSX.Element => (
-  <PluginQueryProvider>
-    <HeaderLiveSlot>
-      <HeaderLiveActivityBody {...props} />
-    </HeaderLiveSlot>
-  </PluginQueryProvider>
-)
+export const HeaderLiveActivity = (props: HeaderLiveActivityProps): JSX.Element | null => {
+  // A subagent says its state on its title line, right after its model (council round 22, item 7: the seat floated it
+  // mid-bar). Its header has no seat to hold steady, so nothing renders here.
+  const child = props.useSessions(state => state.byId[props.sessionId]?.origin === 'subagent')
+  if (child) return null
+  return (
+    <PluginQueryProvider>
+      <HeaderLiveSlot>
+        <HeaderLiveActivityBody {...props} />
+      </HeaderLiveSlot>
+    </PluginQueryProvider>
+  )
+}
 
 const TITLE_PREFIX = /^⟳ \d+ · /u
 

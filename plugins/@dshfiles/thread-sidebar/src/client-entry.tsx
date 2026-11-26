@@ -958,6 +958,7 @@ export default defineClient({
       count: count => plural(translate, 'subagentCount', count),
       summary: subagentCountWords(translate, { settled: true }),
       working: translate('subagentPreviewWorking'),
+      needsYou: translate('threadSidebarStateNeedsYou'),
       done: translate('subagentPreviewFinished'),
       stopped: translate('subagentPreviewInterrupted'),
       failed: translate('subagentPreviewFailed'),

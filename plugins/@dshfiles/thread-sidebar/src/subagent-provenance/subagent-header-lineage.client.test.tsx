@@ -10,6 +10,11 @@ import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentHeaderLineag
 /** The Host's failed-turn record the menu reads (round 21 D4); a test fills it per case. */
 const failedTurns = vi.hoisted(() => new Map<string, { readonly sessionId: string; readonly failedAt: number; readonly reason: 'error' | 'max-tokens' }>())
 vi.mock('./subagent-failed-turns.js', () => ({ useSubagentFailedTurns: () => failedTurns }))
+// The live-turns read needs the Host API; the child's state line reads its step and start from it.
+vi.mock('../live-activity.js', async original => ({
+  ...(await original<typeof import('../live-activity.js')>()),
+  useLiveTurns: (ids: readonly string[]) => new Map(ids.map(id => [id, { step: undefined, startedAt: 1_000, needsYou: false }])),
+}))
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   IconChevronDownOutlineRegular: () => null,
@@ -152,6 +157,7 @@ const props = (): SubagentHeaderLineageProps => ({
       done: count => `${String(count)} done`,
     },
     working: 'Working',
+    needsYou: 'Needs you',
     done: 'Done',
     stopped: 'Stopped',
     failed: 'Failed',
@@ -179,6 +185,21 @@ describe('SubagentHeaderLineage route provenance', () => {
     expect(container.querySelector('[title]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'switcher.aria' }))
     expect(document.querySelectorAll('[data-slot="route-model"]')).toHaveLength(1)
+  })
+
+  it('says a running child\'s state right after its model, not in the header\'s middle (council round 22, item 7)', () => {
+    const running: SessionListState = { ...sessionList, byId: { [CHILD]: { ...childSummary, running: true } } }
+    const { container } = render(<SubagentHeaderLineage {...props()} useSessions={select => select(running)} />)
+    const model = container.querySelector('[data-subagent-route]')
+    const state = container.querySelector('[data-subagent-live-state]')
+    expect(state).not.toBeNull()
+    // Document order: the model, then its state.
+    expect(model?.compareDocumentPosition(state as Node) ?? 0).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(state?.querySelector('[data-testid="thread-header-live-activity"]')?.textContent).toContain('Working')
+    // An idle child names no state there.
+    cleanup()
+    const idle = render(<SubagentHeaderLineage {...props()} />)
+    expect(idle.container.querySelector('[data-subagent-live-state]')).toBeNull()
   })
 
   it('shows no model while no route names one: no mark, no guess', () => {

@@ -12,6 +12,9 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { WORK_COUNT_SEPARATOR, workCountParts, type WorkCounts, type WorkCountWords } from '@dshfiles/plugin-ui/lib/work-count'
 import { createHoverIntentMachine, useMachine } from '@dshfiles/plugin-ui/machine'
+import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
+import { HeaderLiveSignal } from '../header-live-activity.js'
+import { useLiveTurns } from '../live-activity.js'
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
 import { SubagentRouteLabelModel } from './route-label.js'
@@ -113,6 +116,8 @@ export interface SubagentCatalogCopy {
   /** The one count formula's words (council round 22, item 3): the chip reads `6 working · 1 failed`. */
   readonly summary: WorkCountWords
   readonly working: string
+  /** The child header's live state while its turn waits on the user. */
+  readonly needsYou: string
   readonly done: string
   readonly stopped: string
   readonly failed: string
@@ -731,12 +736,44 @@ export function SubagentCatalogAction({
   )
 }
 
+const NO_IDS: readonly string[] = []
+
+/**
+ * A running child's live state right after its model: `… deepseek-v4-flash · ○ Working · 38s` (council round 22, item 7),
+ * not in the header's utilities seat, where it floated mid-bar. The same signal and live-turn read as a root thread's.
+ */
+const ChildLiveState = (props: {
+  readonly sessionId: SubagentHeaderLineageProps['sessionId']
+  readonly useSessions: SubagentHeaderLineageProps['useSessions']
+  readonly useSessionStatus: SubagentHeaderLineageProps['useSessionStatus']
+  readonly labels: { readonly working: string; readonly needsYou: string }
+}) => {
+  const running = props.useSessions(state => {
+    const session = state.byId[props.sessionId]
+    return session !== undefined && session.running && !session.blank
+  })
+  const phaseReady = props.useSessions(state => state.phase === 'ready')
+  const ids = useMemo(() => (running ? [props.sessionId] : NO_IDS), [props.sessionId, running])
+  const turns = useLiveTurns(ids, phaseReady)
+  const waitingOnYou = props.useSessionStatus(statuses => statuses.get(props.sessionId)?.pendingInteraction !== undefined)
+  if (!running) return null
+  return (
+    <span className={cn('dshx-root', css.childLiveState)} data-subagent-live-state="">
+      <span aria-hidden="true" className={css.childLiveSeparator}>
+        ·
+      </span>
+      <HeaderLiveSignal turn={turns.get(props.sessionId)} waitingOnYou={waitingOnYou} labels={props.labels} />
+    </span>
+  )
+}
+
 /**
  * Render one breadcrumb title together with its subagent navigation.
  * @param props - Breadcrumb title, session standard props, and catalog actions.
  * @returns A title-and-chevron sibling switcher, or nothing on a root session.
  */
 export function SubagentHeaderLineage({
+  sessionId,
   lineageSessionId,
   displayTitle,
   openTitle,
@@ -778,6 +815,16 @@ export function SubagentHeaderLineage({
         <span className={cn('dshx-root', css.agentBadge)} data-subagent-route="">
           <RouteModel provider={route.provider} model={route.model} size="md" />
         </span>
+      )}
+      {lineageSessionId === sessionId && (
+        <PluginQueryProvider>
+          <ChildLiveState
+            sessionId={sessionId}
+            useSessions={useSessions}
+            useSessionStatus={useSessionStatus}
+            labels={{ working: copy.working, needsYou: copy.needsYou }}
+          />
+        </PluginQueryProvider>
       )}
     </>
   )

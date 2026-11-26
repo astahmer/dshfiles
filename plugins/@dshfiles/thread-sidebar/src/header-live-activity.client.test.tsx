@@ -21,9 +21,9 @@ type Props = Parameters<typeof HeaderLiveActivity>[0]
 type SessionsState = Parameters<Parameters<Props['useSessions']>[0]>[0]
 type StatusState = Parameters<Parameters<Props['useSessionStatus']>[0]>[0]
 
-const mount = (running: boolean) => {
-  // SAFETY: the stubbed snapshot selector reads only `phase` and `byId[sessionId].running/blank` of this list.
-  const state = { phase: 'ready', ids: ['parent'], byId: { parent: { id: 'parent', running, blank: false } } } as unknown as SessionsState
+const mount = (running: boolean, origin?: 'subagent') => {
+  // SAFETY: the stubbed snapshot selector reads only `phase` and `byId[sessionId].running/blank/origin` of this list.
+  const state = { phase: 'ready', ids: ['parent'], byId: { parent: { id: 'parent', running, blank: false, origin } } } as unknown as SessionsState
   const statuses: StatusState = new Map()
   const useSessions: Props['useSessions'] = select => select(state)
   const useSessionStatus: Props['useSessionStatus'] = select => select(statuses)
@@ -32,6 +32,12 @@ const mount = (running: boolean) => {
 }
 
 describe('header live seat', () => {
+  it('leaves a subagent\'s state to its title line: no seat in its header\'s middle (council round 22, item 7)', () => {
+    const { container } = mount(true, 'subagent')
+    expect(container.querySelector('[data-header-live-slot]')).toBeNull()
+    expect(container.querySelector('[data-testid="thread-header-live-activity"]')).toBeNull()
+  })
+
   it('says nothing while only subagents work: the header subagent chip already shows them', () => {
     const { container } = mount(false)
     expect(container.textContent).not.toContain('Waiting on 1 subagent')

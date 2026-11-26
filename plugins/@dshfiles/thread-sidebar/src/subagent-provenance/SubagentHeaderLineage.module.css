@@ -68,6 +68,19 @@
   flex: none;
 }
 
+/* A running child's state follows its model on the title line (council round 22, item 7): `· ○ Working · 38s`. */
+.childLiveState {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  min-width: 0;
+}
+
+.childLiveSeparator {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
 .activitySlot {
   display: inline-flex;
   flex: none;
