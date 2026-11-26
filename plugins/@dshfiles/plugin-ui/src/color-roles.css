@@ -326,6 +326,45 @@
   white-space: nowrap;
 }
 
+/*
+ * The evidence well (council round 16 A1): the one recipe for what an Inbox card body quotes, desktop and phone: the
+ * command an approval runs ("Runs: …", neutral) or a failed turn's provider line ("Error: …", `data-tone="danger"`,
+ * only when there is a line to show). `dshx:evidence-well` on a block, or `EvidenceWell` (`components/ui/evidence-well`).
+ * Full measure, padding 8/12, radius 6, mono 12/18 that wraps; neutral oklch(0.95 0.004 70) / dark oklch(0.24 0.006 70),
+ * red-soft oklch(0.96 0.02 25) / dark oklch(0.26 0.03 25). Plainly not a button: no height, no border, no shadow, text
+ * flush to the start. A `[data-evidence-label]` part ("Runs:", "Error:") is secondary ink, or the danger text tone in a
+ * danger well. Ink, secondary and the danger tone hold AA on both fills in both schemes (tests/evidence-well).
+ */
+@utility evidence-well {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm, 6px);
+  box-shadow: none;
+  background-color: var(--dshx-evidence-well);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--ds-font-family-code, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 400;
+  text-align: start;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  & :where([data-evidence-label]) {
+    color: var(--dsw-alias-label-secondary);
+  }
+  &[data-tone='danger'] {
+    background-color: var(--dshx-evidence-well-danger);
+  }
+  &[data-tone='danger'] :where([data-evidence-label]) {
+    color: var(--dsw-alias-state-error-primary);
+  }
+}
+
 @layer base {
   :root {
     /* teal, violet, orange, pink, green, olive, sky, brown */
@@ -383,6 +422,9 @@
     --dshx-danger-band-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 60%, var(--dsw-alias-label-primary));
     --dshx-badge-attention-fill: var(--dsw-alias-state-business-primary);
     --dshx-badge-attention-foreground: oklch(1 0 0);
+    /* The evidence well's fills (council round 16 A1): a warm neutral and a red-soft for an error line. */
+    --dshx-evidence-well: oklch(0.95 0.004 70);
+    --dshx-evidence-well-danger: oklch(0.96 0.02 25);
   }
   body[data-ds-dark-theme] {
     --dshx-identity-1: oklch(0.78 0.09 195);
@@ -427,6 +469,8 @@
     /* The attention badge follows the accent hue (indigo 270 by default) at a fixed lightness and chroma. */
     --dshx-badge-attention-fill: oklch(from var(--dsw-alias-state-business-primary) 0.72 0.14 h);
     --dshx-badge-attention-foreground: oklch(from var(--dsw-alias-state-business-primary) 0.2 0.02 h);
+    --dshx-evidence-well: oklch(0.24 0.006 70);
+    --dshx-evidence-well-danger: oklch(0.26 0.03 25);
   }
 }
 

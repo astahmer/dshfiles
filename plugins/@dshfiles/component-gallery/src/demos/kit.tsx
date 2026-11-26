@@ -4,6 +4,7 @@ import { AttentionBadge } from '@dshfiles/plugin-ui/components/ui/attention-badg
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
+import { EvidenceWell } from '@dshfiles/plugin-ui/components/ui/evidence-well'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
@@ -475,6 +476,21 @@ export const kitDemos: readonly GalleryDemo[] = [
             <TooltipContent>Tooltips instead of native title</TooltipContent>
           </Tooltip>
         </div>
+      </div>
+    ),
+  },
+  {
+    id: 'kit-evidence-well',
+    title: 'EvidenceWell',
+    description: 'What an Inbox card body quotes: the command an approval runs, or a failed turn’s error line. Full measure, mono, never a button.',
+    source: "import { EvidenceWell } from '@dshfiles/plugin-ui/components/ui/evidence-well'",
+    static: true,
+    render: () => (
+      <div className="dshx:flex dshx:flex-col dshx:gap-2">
+        <EvidenceWell label="Runs:">node scripts/publish-preview.mjs --env preview</EvidenceWell>
+        <EvidenceWell tone="danger" label="Error:">
+          429 Too Many Requests: rate limit reached for requests per minute
+        </EvidenceWell>
       </div>
     ),
   },
