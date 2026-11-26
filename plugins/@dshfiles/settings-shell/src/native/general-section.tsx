@@ -12,7 +12,6 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import type { ShellTranslate } from './locales.js'
 import { useObservable } from './use-observable.js'
 import { DshReleaseIndicator } from '../release-notice.js'
-import { SECTION_TITLE_CLASS } from '../section-title.js'
 
 /** The control a search entry names: the row tagged with its id, focused on its first control. */
 const revealSettingsEntry = (input: { readonly container: HTMLElement; readonly entryId: string }): boolean => {
@@ -89,16 +88,19 @@ export const GeneralSection = (
     // native rows are unlayered module CSS, so the basis must be important to beat their own `flex`.
     <div
       className={cn(
-        "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0",
+        "dshx:flex dshx:w-full dshx:flex-col dshx:[&>[data-slot='settings.general.item']>:last-child]:border-b-0 dshx:[&>[data-slot='settings.general.item']>:last-child]:bg-none!",
+        // The kit Settings row grammar (council round 8 B4, kit A5) on core's module rows: an inset hairline (the utility
+        // drops the native border), a full-row hover wash, the 14/500 label and the 13/400 description.
+        'dshx:[&_[class$=row]]:settings-row! dshx:[&_[class$=row]_[class*=_title_]]:settings-label! dshx:[&_[class$=row]_[class*=_description_]]:settings-description!',
         // Below 28rem every native row stacks, its control under its text (round five B7), like the plugin rows.
         'dshx:@max-pane-narrow:[&_[class$=row]]:flex-col! dshx:@max-pane-narrow:[&_[class$=row]]:items-start! dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
         'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:w-full!',
         // Round three item 30: the Language note reads as the Language row's own caption, under one divider.
-        'dshx:[&_[class$=row]:has(+[data-settings-language-note])]:border-b-0! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:pb-1!',
-        // The chosen Appearance cube (core theme row, unlayered module CSS) is the kit's selected card (council round 3
-        // B3, A1): the wash, a ring edge and a check badge in its top-end corner, and no inset row marker. Narrow panes get
-        // shorter cubes.
-        'dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-card!',
+        'dshx:[&_[class$=row]:has(+[data-settings-language-note])]:border-b-0! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:bg-none! dshx:[&_[class$=row]:has(+[data-settings-language-note])]:pb-1!',
+        // The chosen Appearance cube (core theme row, unlayered module CSS) is the kit's selected card (council round 8 A2,
+        // B4): a 2px edge and a check badge in its top-end corner on the card's own surface, no fill change and no inset
+        // row marker. Narrow panes get shorter cubes.
+        'dshx:[&_[class*=_themeCube][aria-pressed=true]]:border! dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-card! dshx:[&_[class*=_themeCube][aria-pressed=true]]:bg-transparent!',
         'dshx:@max-pane-narrow:[&_[class*=_themeCube]]:py-2! dshx:@max-pane-narrow:[&_[class*=_themeCube]]:gap-1!',
         // The rows' selectors (core module CSS, filled and borderless) in the kit's one select look (council round 3 B3,
         // kit A4): 32px, a 1px border, the page fill, 8px corners.
@@ -145,11 +147,11 @@ export const GENERAL_HEADINGS = [
 ] as const
 
 /**
- * One General group heading: 15/20 ink, 24px above it, no divider of its own (the row above keeps its own). The `first`
- * heading opens the page and starts at its top.
+ * One General group heading: the kit's Settings heading step, 15/20 at 600 with 32px above it (council round 8 B4), no
+ * divider of its own (the row above keeps its own). The `first` heading opens the page and starts at its top.
  */
 export const GeneralGroupHeading = (props: { readonly label: string; readonly first?: boolean }): JSX.Element => (
-  <h3 className={cn(SECTION_TITLE_CLASS, props.first === true ? 'dshx:pb-1' : 'dshx:pt-6 dshx:pb-1')} data-settings-general-heading="">
+  <h3 className={cn('dshx:min-w-0 dshx:settings-heading dshx:pb-1', props.first === true && 'dshx:mt-0!')} data-settings-general-heading="">
     {props.label}
   </h3>
 )
@@ -184,12 +186,12 @@ export const DeveloperToolsRow = (props: {
   }
   return (
     <div
-      className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-6 dshx:border-b-[0.5px] dshx:border-[var(--dsw-alias-border-l2)] dshx:py-4"
+      className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-6 dshx:py-4 dshx:settings-row"
       data-settings-entry="developer-tools"
     >
       <div>
-        <div className="dshx:text-base dshx:leading-5">{props.t('developerTools.title')}</div>
-        <div className="dshx:mt-1 dshx:max-w-[60ch] dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">{props.t('developerTools.description')}</div>
+        <div className="dshx:settings-label">{props.t('developerTools.title')}</div>
+        <div className="dshx:mt-1 dshx:max-w-[60ch] dshx:settings-description">{props.t('developerTools.description')}</div>
         {failed && <div role="alert">{props.t('developerTools.error')}</div>}
       </div>
       <Switch

@@ -78,6 +78,17 @@ describe('settings form rows', () => {
     expect(untouched?.textContent).not.toContain('source.default')
   })
 
+  it('draws each row in the kit Settings row grammar: hairline, full-row hover, 14/500 label, 13/400 description (council round 8 B4)', async () => {
+    await act(async () => root.render(<SettingsForm fields={fields} form={form} namespace="example" t={t} />))
+    const first = row('focusThreadInSidebar')
+    expect(first?.className).toContain('dshx:settings-row')
+    expect(first?.className).toContain('dshx:last:bg-none')
+    // The hairline is the utility's inset stripe, not a full-width border.
+    expect(first?.className).not.toContain('dshx:border-b-[0.5px]')
+    expect(first?.querySelector('[data-setting-label]')?.parentElement?.className).toContain('dshx:settings-label')
+    expect(first?.querySelector('.dshx\\:settings-description')?.textContent).toBe('Scroll the thread into view.')
+  })
+
   it('stacks every row below 28rem: the text, then the control (round five B7)', async () => {
     await act(async () => root.render(<SettingsForm fields={fields} form={form} namespace="example" t={t} />))
     const layout = row('focusThreadInSidebar')?.querySelector('[data-setting-row-layout]')
@@ -94,7 +105,7 @@ describe('settings form rows', () => {
     // The control sits right-aligned in its seat, so every control ends where the header's actions do.
     expect(layout?.lastElementChild?.className).toContain('dshx:justify-self-end')
     // The helper copy stays under the label, at 60 characters at most.
-    const description = [...(layout?.firstElementChild?.querySelectorAll('span') ?? [])].find(span => span.className.includes('dshx:text-xs'))
+    const description = [...(layout?.firstElementChild?.querySelectorAll('span') ?? [])].find(span => span.className.includes('dshx:settings-description'))
     expect(description?.className).toContain('dshx:max-w-[60ch]')
   })
 

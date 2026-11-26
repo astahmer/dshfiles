@@ -50,21 +50,39 @@ describe('Settings › General groups its transcript rows (council round 6 B5)',
     expect(basics?.order).toBeLessThan(PERMISSION)
     expect(shellMessages.en['general.basicsHeading']).toBe('Basics')
     expect(shellMessages.zh['general.basicsHeading']).not.toBe('')
-    // The first heading on the page starts at the top: no 24px gap above it.
+    // The first heading on the page starts at the top: no 32px gap above it.
     await act(async () => root.render(<GeneralGroupHeading first label="Basics" />))
     const heading = container.querySelector('h3')
-    expect(heading?.className).toContain('dshx:text-heading')
-    expect(heading?.className).not.toContain('dshx:pt-6')
+    expect(heading?.className).toContain('dshx:settings-heading')
+    expect(heading?.className).toContain('dshx:mt-0!')
     expect(GENERAL_HEADINGS.filter(heading => 'first' in heading && heading.first === true).map(heading => heading.key)).toEqual(['general.basicsHeading'])
   })
 
-  it('draws the heading at the contextual heading size, set apart from the row above it', async () => {
+  it('draws the heading at the Settings heading step, 15/20 at 600 with 32px above (council round 8 B4)', async () => {
     await act(async () => root.render(<GeneralGroupHeading label="Transcript" />))
     const heading = container.querySelector('h3')
     expect(heading?.textContent).toBe('Transcript')
-    expect(heading?.className).toContain('dshx:text-heading')
-    expect(heading?.className).toContain('dshx:pt-6')
+    expect(heading?.className).toContain('dshx:settings-heading')
+    expect(heading?.className).not.toContain('dshx:pt-6')
+    expect(heading?.className).not.toContain('dshx:mt-0!')
     expect(heading?.hasAttribute('data-settings-general-heading')).toBe(true)
+  })
+
+  it('puts every native row on the kit Settings row grammar, the last row and the captioned Language row without a hairline (council round 8 B4)', async () => {
+    await act(async () => root.render(<GeneralSection renderSlot={() => null} />))
+    const column = container.querySelector<HTMLElement>('[data-settings-theme-swatches]')?.className ?? ''
+    expect(column).toContain('dshx:[&_[class$=row]]:settings-row!')
+    expect(column).toContain("dshx:[&>[data-slot='settings.general.item']>:last-child]:bg-none!")
+    expect(column).toContain('dshx:[&_[class$=row]:has(+[data-settings-language-note])]:bg-none!')
+    expect(column).toContain('dshx:[&_[class$=row]_[class*=_title_]]:settings-label!')
+    expect(column).toContain('dshx:[&_[class$=row]_[class*=_description_]]:settings-description!')
+  })
+
+  it('draws the chosen theme card as the kit selected card on the card surface: core\'s platform fill is dropped (council round 8 B4, A2)', async () => {
+    await act(async () => root.render(<GeneralSection renderSlot={() => null} />))
+    const column = container.querySelector<HTMLElement>('[data-settings-theme-swatches]')?.className ?? ''
+    expect(column).toContain('dshx:[&_[class*=_themeCube][aria-pressed=true]]:selected-card!')
+    expect(column).toContain('dshx:[&_[class*=_themeCube][aria-pressed=true]]:bg-transparent!')
   })
 
   it('caps every row\'s helper copy at 60ch', async () => {

@@ -604,14 +604,17 @@ const SettingRow = (props: {
   return (
     <div
       className={cn(
-        'dshx:group dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b-[0.5px] dshx:border-border dshx:py-3.5 dshx:last:border-b-0',
-        flashing && 'dshx:rounded-md dshx:bg-accent/70 dshx:px-2 dshx:transition-colors',
+        // The kit Settings row grammar (council round 8 B4, kit A5): an inset hairline, none under the last row, and a
+        // full-row hover wash; the row bleeds 8px either side, so its text stays on the lane edge.
+        'dshx:group dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:py-3.5 dshx:settings-row dshx:last:bg-none',
+        flashing && 'dshx:bg-accent/70 dshx:transition-colors',
       )}
       data-modified={props.modified ? '' : undefined}
       data-setting-path={field.path.join('.')}
       ref={row}
     >
-      {props.modified && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-3 dshx:-left-3 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
+      {/* 12px left of the text, as before the row's 8px bleed. */}
+      {props.modified && <span aria-hidden="true" className="dshx:absolute dshx:inset-y-3 dshx:-left-1 dshx:w-0.5 dshx:rounded-full dshx:bg-info" />}
       {/* The label takes the rest of the lane and the control a 280px seat, right-aligned, so every control ends on the
           header's action edge (council round 7 B1). Below 28rem (a phone) every row stacks: its text, then its control
           (round five B7). */}
@@ -620,7 +623,7 @@ const SettingRow = (props: {
         data-setting-row-layout=""
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-          <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:text-base dshx:leading-5 dshx:text-foreground">
+          <span className="dshx:flex dshx:min-h-5 dshx:items-center dshx:gap-2 dshx:settings-label">
             {/* The config key stays one hover away (and in the JSON view); it is not a line of every row. */}
             <Tooltip>
               <TooltipTrigger asChild>
@@ -648,7 +651,7 @@ const SettingRow = (props: {
             )}
           </span>
           {field.description !== '' && (
-            <span className="dshx:max-w-[60ch] dshx:text-xs dshx:leading-[18px] dshx:text-muted-foreground">
+            <span className="dshx:max-w-[60ch] dshx:settings-description">
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
@@ -748,7 +751,7 @@ export const SettingsForm = (props: {
       const previous = fields[index - 1]?.groups.join(' › ')
       return (
         <Fragment key={field.path.join('.')}>
-          {group !== '' && group !== previous && <h4 className="dshx:m-0 dshx:mt-5 dshx:text-sm dshx:font-semibold dshx:text-foreground">{group}</h4>}
+          {group !== '' && group !== previous && <h4 className="dshx:mb-0 dshx:settings-heading dshx:first:mt-0">{group}</h4>}
           <SettingRow
             disabled={disabled}
             field={field}
