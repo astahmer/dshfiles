@@ -14,6 +14,12 @@ const subagentIdentitySchema = Schema.StructWithRest(
 
 type SubagentIdentity = Schema.Schema.Type<typeof subagentIdentitySchema>
 
+/** The provider and model a subagent runs on, both checked visible; what the kit's model identity reads. */
+export interface SubagentModelRoute {
+  readonly provider: string
+  readonly model: string
+}
+
 export class SubagentRouteLabelModel {
   private static readonly routePartPattern = /^[a-z\d][a-z\d._:-]{0,95}$/iu
   private static readonly sensitiveRoutePattern =
@@ -68,5 +74,25 @@ export class SubagentRouteLabelModel {
 
   static readonly displayedAgentRouteLabel = (route: ThreadSidebarModelRoute | undefined, identity: SubagentIdentity | null | undefined): string | undefined =>
     SubagentRouteLabelModel.projectedRouteLabel(route) ?? SubagentRouteLabelModel.agentIdentityLabel(identity)
+
+  /** A route label's provider and model; a label that names no model (a backend such as "in-process") has none. */
+  static readonly routeOf = (label: string | undefined): SubagentModelRoute | undefined => {
+    const model = SubagentRouteLabelModel.modelName(label)
+    if (label === undefined || model === undefined) return undefined
+    return { provider: label.slice(0, label.indexOf('/')), model }
+  }
+
+  /**
+   * The model a subagent runs on, for every surface that shows one (council round 17 B1.1): the route projection (the
+   * route the child really used or, until it answers, the one its descriptor started it on), else an identity that names
+   * one, else the route its call asked for. Unknown stays unknown: no guess from a backend name.
+   */
+  static readonly subagentRoute = (input: {
+    readonly route: ThreadSidebarModelRoute | undefined
+    readonly identity: SubagentIdentity | null | undefined
+    readonly requested?: { readonly provider?: string | undefined; readonly model?: string | undefined } | undefined
+  }): SubagentModelRoute | undefined =>
+    SubagentRouteLabelModel.routeOf(SubagentRouteLabelModel.displayedAgentRouteLabel(input.route, input.identity)) ??
+    SubagentRouteLabelModel.routeOf(SubagentRouteLabelModel.providerModelLabel(input.requested?.provider, input.requested?.model))
 }
 export const providerModelLabel = SubagentRouteLabelModel.providerModelLabel

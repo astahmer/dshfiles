@@ -6,17 +6,22 @@ import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ToolCallViewProps } from '@deepseek-ai/dsh-client-ui-tool/client'
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { JsonText } from '../json-text.js'
 import { SubagentFeedModel } from './subagent-feed.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
 import { useSubagentState } from './subagent-state.js'
+import { SubagentRouteLabelModel } from './route-label.js'
 
 const subagentArgumentsSchema = Schema.StructWithRest(
   Schema.Struct({
     prompt: Schema.optional(Schema.String),
     description: Schema.optional(Schema.String),
+    provider: Schema.optional(Schema.String),
+    model: Schema.optional(Schema.String),
   }),
   [Schema.Record(Schema.String, Schema.Unknown)],
 )
@@ -50,7 +55,8 @@ const endingOf = (
 
 /**
  * A delegation's record row in the transcript: `Subagent · {description}`, the same glyph and name as its dock row and
- * no clock. It ends as `Done · 5m 02s`, `Failed` or `Stopped`; it never shows a generated handle or the route.
+ * no clock, then the model it runs on as the kit's mark and name (council round 17 B1.1). It ends as `Done · 5m 02s`,
+ * `Failed` or `Stopped`; it never shows a generated handle or the provider id.
  */
 export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const call = props.phase === 'preparing' ? null : props.phase === 'result' ? props.block.call : props.block
@@ -62,6 +68,15 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     list.projectionsBySession[props.sessionId]?.values.subagentCatalog
   const childId = props.useSessions(list => SubagentFeedModel.childOf(catalog(list), childName))
   const catalogLabel = props.useSessions(list => (childId === undefined ? undefined : catalog(list)?.find(entry => entry.id === childId)?.label))
+  // The route the child really runs on (or was started on), else the one the call asked for; never a guess.
+  const childRouteLabel = props.useSessions(list => {
+    if (childId === undefined) return undefined
+    const summary = list.byId[SessionId(childId)]
+    return SubagentRouteLabelModel.displayedAgentRouteLabel(summary?.projectionValues?.threadSidebarModelRoute, summary?.projectionValues?.subagent)
+  })
+  const route =
+    SubagentRouteLabelModel.routeOf(childRouteLabel) ??
+    SubagentRouteLabelModel.subagentRoute({ route: undefined, identity: undefined, requested: { provider: args?.provider, model: args?.model } })
   // The result only says the child started; the child's own state is what the row reports from here on.
   const output = childId === undefined ? result : undefined
   const child = useSubagentState({ childId, useSessions: props.useSessions, useSessionStatus: props.useSessionStatus })
@@ -88,6 +103,10 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     expandable,
     onToggle: disclosure.toggle,
     running: props.phase === 'preparing' || props.phase === 'start' || state === 'working',
+    // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary.
+    ...(route === undefined
+      ? {}
+      : { headerAccessory: <RouteModel provider={route.provider} model={route.model} size="md" className="dshx:max-w-[45%] dshx:shrink-0" /> }),
   }
 
   return (

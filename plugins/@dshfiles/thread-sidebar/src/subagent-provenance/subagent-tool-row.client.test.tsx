@@ -8,9 +8,22 @@ import type { SubagentPreviewBindings } from './subagent-live-preview.js'
 import { SubagentProvenanceToolRow } from './subagent-tool-row.js'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
-  DisclosureRow: ({ title, collapsedContent, open, children }: { title: string; collapsedContent?: ReactNode; open: boolean; children?: ReactNode }) => (
+  DisclosureRow: ({
+    title,
+    collapsedContent,
+    headerAccessory,
+    open,
+    children,
+  }: {
+    title: string
+    collapsedContent?: ReactNode
+    headerAccessory?: ReactNode
+    open: boolean
+    children?: ReactNode
+  }) => (
     <div>
       <div>{title}</div>
+      {headerAccessory === undefined ? null : <div data-testid="header-accessory">{headerAccessory}</div>}
       {collapsedContent === undefined ? null : <div data-testid="collapsed-content">{collapsedContent}</div>}
       {open ? <div data-testid="expanded-content">{children}</div> : null}
     </div>
@@ -160,6 +173,29 @@ describe('SubagentProvenanceToolRow', () => {
     expect(screen.getByText('subagentPreviewKind · Optimize traces plugin')).not.toBeNull()
   })
 
+  it('shows the model it runs on after the description: the kit mark and the name, never the provider (council round 17 B1.1)', () => {
+    render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description: 'Optimize traces plugin' })} />)
+    const model = screen.getByTestId('header-accessory').querySelector('[data-slot="route-model"]')
+    expect(model?.textContent).toBe('gpt-6.1-luna')
+    expect(model?.getAttribute('data-model-family')).toBe('openai')
+    expect(model?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
+    // The title stays the task; the model is beside it, outside the running shimmer.
+    expect(screen.getByText('subagentPreviewKind · Optimize traces plugin')).not.toBeNull()
+  })
+
+  it('prefers the route the child really runs on over the one its call asked for', () => {
+    const base = settled({ running: true })
+    const list = {
+      byId: { [CHILD]: { projectionValues: { threadSidebarModelRoute: 'anthropic/claude-opus-5-5', subagentTiming: {} } } },
+      projectionsBySession: { 'session-1': { values: { subagentCatalog: [{ id: CHILD, name: 'agent-1', mode: 'continuable', label: 'Long child', createdAt: 1 }] } } },
+    }
+    // SAFETY: the row reads only `projectionValues` of a listed session and the parent's catalog.
+    render(<SubagentProvenanceToolRow {...base} useSessions={selector => selector(list as never)} />)
+    const model = screen.getByTestId('header-accessory').querySelector('[data-slot="route-model"]')
+    expect(model?.textContent).toBe('claude-opus-5-5')
+    expect(model?.getAttribute('data-model-family')).toBe('claude')
+  })
+
   it('falls back to the catalog label when the call gave no description', () => {
     render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
     expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
@@ -182,6 +218,8 @@ describe('SubagentProvenanceToolRow', () => {
     render(<SubagentProvenanceToolRow {...props({ provider: 'alex@example.com', model: 'gpt-6.1-luna' })} />)
     expect(screen.getByText('subagentPreviewKind')).not.toBeNull()
     expect(screen.queryByText(/alex@example\.com/)).toBeNull()
+    // An unsafe route names no model: no mark, no guess.
+    expect(document.querySelector('[data-slot="route-model"]')).toBeNull()
   })
 
   it('reports the child in agent terms, never Idle, and says its total once it is done', () => {

@@ -59,6 +59,8 @@ import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { LEADING_GLYPH_ATTRIBUTE, MARKER_KEEP } from '@dshfiles/plugin-ui/components/selection'
 import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
+import { SubagentRouteLabelModel } from './subagent-provenance/route-label.js'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -852,6 +854,14 @@ const ChildThreadList = (props: {
   const renderChild = (child: SessionSummary): JSX.Element => {
     const childStatus = props.childStatuses?.get(child.id)
     const attentionLabel = childStatus === undefined ? props.attentionLabels.get(child.id) : undefined
+    // Line 2 names the model the subagent runs on (council round 17 B1.1), `[mark] gpt-6-luna · Working`, in the
+    // attention meta's 12/16 secondary ink; its state word moves there from line 1. An unknown model draws no line 2.
+    const route = SubagentRouteLabelModel.subagentRoute({
+      route: child.projectionValues?.threadSidebarModelRoute,
+      identity: child.projectionValues?.subagent,
+    })
+    const stateWord = childStatus === undefined ? undefined : t(workStatusLabelKeys[childStatus.status])
+    const lineOneWord = route === undefined && childStatus !== undefined && (childStatus.status === 'needs-you' || childStatus.status === 'failed')
     return (
       <li key={child.id}>
         <button
@@ -861,6 +871,8 @@ const ChildThreadList = (props: {
             lineClass,
             'dshx:data-[selected=true]:bg-accent',
             'dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
+            // Two lines: line 1 keeps the row's height, line 2 its 16px, 2px apart from the row's edges.
+            route !== undefined && 'dshx:h-auto dshx:flex-col dshx:items-stretch dshx:gap-0 dshx:py-0.5',
           )}
           data-thread-id={child.id}
           data-thread-main-action=""
@@ -871,6 +883,11 @@ const ChildThreadList = (props: {
           onClick={() => props.actions.open(child.id)}
           onDoubleClick={() => keepThreadTab(child.id)}
         >
+          <span
+            className={cn('dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2', compact ? 'dshx:h-6' : 'dshx:h-7')}
+            data-thread-child-head=""
+          >
+          <span className="dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center" data-thread-child-lead="">
           {childStatus === undefined ? (
             <SessionStatusDot
               session={child}
@@ -887,6 +904,7 @@ const ChildThreadList = (props: {
               }
             />
           )}
+          </span>
           <span
             className={cn(
               'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
@@ -896,7 +914,7 @@ const ChildThreadList = (props: {
           >
             {subagentRowTitle(child)}
           </span>
-          {childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? null : (
+          {!lineOneWord || childStatus === undefined ? null : (
             <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>
           )}
           {attentionLabel === undefined ? null : (
@@ -912,6 +930,23 @@ const ChildThreadList = (props: {
           {props.rowStyle.time ? (
             <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
           ) : null}
+          </span>
+          {route === undefined ? null : (
+            // Under the title: the glyph's 16px seat and line 1's 8px gap, then the model whole or truncated, then the word.
+            <span className="dshx:flex dshx:h-4 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:pl-6 dshx:text-xs/4 dshx:text-muted-foreground" data-thread-child-meta="">
+              <RouteModel provider={route.provider} model={route.model} className="dshx:shrink" />
+              {stateWord === undefined ? null : (
+                <>
+                  <span aria-hidden="true" className="dshx:shrink-0">
+                    ·
+                  </span>
+                  <span className="dshx:shrink-0 dshx:whitespace-nowrap" data-thread-child-state="">
+                    {stateWord}
+                  </span>
+                </>
+              )}
+            </span>
+          )}
         </button>
       </li>
     )

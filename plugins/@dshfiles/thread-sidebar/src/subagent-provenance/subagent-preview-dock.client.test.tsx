@@ -139,17 +139,30 @@ describe('SubagentPreviewDock', () => {
     expect(rowOf('Refactor').querySelector('[data-subagent-run-step]')).toBeNull()
   })
 
-  it('says the step in words, never the tool identifier, and keeps the model for the expanded detail', async () => {
+  it('says the step in words, never the tool identifier, and names the model on the row itself (council round 17 B1.1)', async () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
     await waitFor(() => expect(document.querySelector('[data-subagent-run-step]')?.textContent).toBe('Running a command'))
     const row = rowOf('Review')
     expect(row.textContent).not.toMatch(/\bbash\b/u)
-    expect(row.querySelector('[data-subagent-run-model]')).toBeNull()
+    // Collapsed: the kit's mark and the model's name, between the child's name and its step.
+    const model = row.querySelector('[data-subagent-dock-row] [data-slot="route-model"]')
+    expect(model?.textContent).toBe('gpt-6.1-luna')
+    expect(model?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
+    const order = [...(row.querySelector('[data-subagent-dock-row] button')?.children ?? [])].map(
+      child => (child.hasAttribute('data-subagent-run-step') ? 'step' : child.getAttribute('data-slot')) ?? child.tagName,
+    )
+    expect(order.indexOf('route-model')).toBeLessThan(order.indexOf('step'))
+    // The model's name, never the route id with its provider ("openai/gpt-6.1-luna"), and not a second time when open.
     fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
-    // The model's name, never the route id with its provider ("openai/gpt-6.1-luna").
-    expect(row.querySelector('[data-subagent-run-model]')?.textContent).toBe('gpt-6.1-luna')
+    expect(row.querySelectorAll('[data-slot="route-model"]')).toHaveLength(1)
     expect(row.textContent).not.toContain('openai/')
+  })
+
+  it('names the model with the step setting off, and none when the route is unknown', () => {
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-d'], childTiming: true })} />)
+    expect(rowOf('Review').querySelector('[data-slot="route-model"]')?.textContent).toBe('gpt-6.1-luna')
+    expect(rowOf('Lint').querySelector('[data-slot="route-model"]')).toBeNull()
   })
 
   it('says a child held by a question waits for an answer, with the Needs-you glyph', async () => {

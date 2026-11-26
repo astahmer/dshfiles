@@ -6,7 +6,9 @@ import type { SubagentAddress } from '@deepseek-ai/dsh-subagent/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { Tooltip as NativeTooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { StatusGlyph, type StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { createHoverIntentMachine, useMachine } from '@dshfiles/plugin-ui/machine'
 import { HostSnapshotsModel } from '../snapshots.js'
@@ -687,7 +689,9 @@ export function SubagentHeaderLineage({
   t,
 }: SubagentHeaderLineageProps) {
   const address = useSession(session => session.subagent?.address)
-  const agentLabel = SubagentRouteLabelModel.displayedAgentRouteLabel(useProjection('threadSidebarModelRoute'), useProjection('subagent'))
+  // The model this subagent runs on (council round 17 B1.1): the kit's mark and the model's name, never the provider id
+  // or a backend such as "in-process".
+  const route = SubagentRouteLabelModel.subagentRoute({ route: useProjection('threadSidebarModelRoute'), identity: useProjection('subagent') })
   const parentId = useSessions(state => {
     if (address?.childSessionId === lineageSessionId) return address.parentSessionId
     return SubagentCatalogs.parentOf(state.projectionsBySession, lineageSessionId)
@@ -708,9 +712,9 @@ export function SubagentHeaderLineage({
         {...shared}
       />
       {openTitle === undefined && <CatalogDropdown key={`${lineageSessionId}-descendants`} rootSessionId={lineageSessionId} variant="count" {...shared} />}
-      {agentLabel !== undefined && (
-        <span className={css.agentBadge} title={agentLabel}>
-          {agentLabel}
+      {route !== undefined && (
+        <span className={cn('dshx-root', css.agentBadge)} data-subagent-route="">
+          <RouteModel provider={route.provider} model={route.model} size="md" />
         </span>
       )}
     </>

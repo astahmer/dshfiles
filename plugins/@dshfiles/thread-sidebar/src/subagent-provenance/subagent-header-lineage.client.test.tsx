@@ -149,12 +149,22 @@ const props = (): SubagentHeaderLineageProps => ({
 afterEach(cleanup)
 
 describe('SubagentHeaderLineage route provenance', () => {
-  it('keeps the route in the child header, out of the catalog row', () => {
-    render(<SubagentHeaderLineage {...props()} />)
+  it('keeps the model in the child header as the kit mark and name, out of the catalog row (council round 17 B1.1)', () => {
+    const { container } = render(<SubagentHeaderLineage {...props()} />)
 
-    expect(screen.getByText('openai/gpt-6.1-luna')).not.toBeNull()
+    const model = container.querySelector('[data-slot="route-model"]')
+    expect(model?.textContent).toBe('gpt-6.1-luna')
+    expect(model?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
+    // The provider id is not a name to show, and the badge carries no native hover title.
+    expect(container.textContent).not.toContain('openai/')
+    expect(container.querySelector('[title]')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'switcher.aria' }))
-    expect(screen.getAllByText(/openai\/gpt-6\.1-luna/)).toHaveLength(1)
+    expect(document.querySelectorAll('[data-slot="route-model"]')).toHaveLength(1)
+  })
+
+  it('shows no model while no route names one: no mark, no guess', () => {
+    const { container } = render(<SubagentHeaderLineage {...props()} useProjection={() => undefined} />)
+    expect(container.querySelector('[data-slot="route-model"]')).toBeNull()
   })
 
   it('counts the subagents in its own words, with the spinner while one works and no "2/34"', () => {

@@ -456,4 +456,49 @@ describe('a subagent row under its parent', () => {
     const titles = Array.from(row.querySelectorAll('ul [data-thread-main-action]')).map(button => button.querySelector('span.dshx\\:truncate')?.textContent)
     expect(titles).toEqual(['Release check', 'Summarise the diff'])
   })
+
+  it('names the model it runs on in line 2, `[mark] model · state`, and no line 2 for an unknown model (council round 17 B1.1)', async () => {
+    const routed = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      running: true,
+      // A held child has not answered: the route projection holds the route its descriptor started it on (the parent's).
+      projectionValues: {
+        threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna',
+        subagent: { mode: 'continuable', label: 'Audit', seq: SessionSeq(3) },
+      },
+    })
+    const backendOnly = rowSession({
+      id: SessionId('child-2'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: null, subagent: { mode: 'continuable', label: 'Lint', seq: SessionSeq(4) } },
+    })
+    const row = await renderRow({
+      childThreads: [routed, backendOnly],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+      childStatuses: new Map([
+        [routed.id, rowStatus({ status: 'working' })],
+        [backendOnly.id, rowStatus({ status: 'failed' })],
+      ]),
+    })
+    const [first, second] = Array.from(row.querySelectorAll<HTMLElement>('ul [data-thread-main-action]'))
+    const meta = first?.querySelector<HTMLElement>('[data-thread-child-meta]')
+    expect(meta?.querySelector('[data-slot="route-model"]')?.textContent).toBe('gpt-6-luna')
+    expect(meta?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
+    expect(meta?.querySelector('[data-thread-child-state]')?.textContent).toBe('threadSidebarStateWorking')
+    expect(meta?.className).toContain('dshx:text-xs/4')
+    expect(meta?.className).toContain('dshx:text-muted-foreground')
+    // Line 2 starts under the title: the 16px glyph seat and line 1's 8px gap.
+    expect(meta?.className).toContain('dshx:pl-6')
+    expect(first?.querySelector('[data-thread-child-lead]')?.className).toContain('dshx:w-4')
+    expect(first?.textContent).not.toContain('dshx_fake_commandcode')
+    // No known model: one line, and its Failed word stays on it.
+    expect(second?.querySelector('[data-thread-child-meta]')).toBeNull()
+    expect(second?.querySelector('[data-slot="route-model"]')).toBeNull()
+    expect(second?.querySelector('[data-thread-child-head]')?.textContent).toContain('threadSidebarStateFailed')
+  })
 })

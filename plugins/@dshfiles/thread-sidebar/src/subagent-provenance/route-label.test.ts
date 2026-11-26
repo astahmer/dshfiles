@@ -34,4 +34,18 @@ describe('subagent route labels', () => {
     expect(SubagentRouteLabelModel.projectedRouteLabel('alex@example.com/gpt-6.1-luna')).toBeUndefined()
     expect(SubagentRouteLabelModel.projectedRouteLabel('openai/gpt-6.1-luna/other')).toBeUndefined()
   })
+
+  it('names the model a subagent runs on from its real route, then its descriptor, then its call; never a backend (council round 17 B1.1)', () => {
+    const inherited = { mode: 'continuable', provider: 'in-process', agentProvider: 'dshx_fake_commandcode', agentModel: 'gpt-6-luna' }
+    expect(SubagentRouteLabelModel.subagentRoute({ route: 'openai/gpt-6.2-astra', identity: inherited })).toEqual({ provider: 'openai', model: 'gpt-6.2-astra' })
+    // A held child has not answered yet: the route it was started on (the parent's) still names its model.
+    expect(SubagentRouteLabelModel.subagentRoute({ route: null, identity: inherited })).toEqual({ provider: 'dshx_fake_commandcode', model: 'gpt-6-luna' })
+    expect(
+      SubagentRouteLabelModel.subagentRoute({ route: undefined, identity: undefined, requested: { provider: 'anthropic', model: 'claude-opus-5-5' } }),
+    ).toEqual({ provider: 'anthropic', model: 'claude-opus-5-5' })
+    // "in-process" is the subagent backend, not a model: no mark, no guess.
+    expect(SubagentRouteLabelModel.subagentRoute({ route: null, identity: { mode: 'continuable', provider: 'in-process' } })).toBeUndefined()
+    expect(SubagentRouteLabelModel.subagentRoute({ route: null, identity: undefined, requested: { model: 'gpt-6-luna' } })).toBeUndefined()
+    expect(SubagentRouteLabelModel.subagentRoute({ route: 'alex@example.com/gpt-6.1-luna', identity: undefined })).toBeUndefined()
+  })
 })

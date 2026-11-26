@@ -1,6 +1,7 @@
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArrowUpRightIcon, BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
@@ -19,10 +20,11 @@ const ignoreTurnState = (): void => undefined
 const MAX_OPEN_ROWS = 3
 
 /**
- * One working child as one compact row, whatever it is doing: `glyph · name · current step · elapsed · Open`. The row
- * never turns into a card while a tool is in flight (the card/row flip of C2); opening it shows the live preview, the
- * model and Stop. With `runCards` off (the `subagentRunCards` setting, "show the step and clock") the child is never
- * held and the row shows its name only.
+ * One working child as one compact row, whatever it is doing: `glyph · name · [mark] model · current step · elapsed ·
+ * Open`. The model is on the row itself (council round 17 B1.1), not only in the opened detail. The row never turns into
+ * a card while a tool is in flight (the card/row flip of C2); opening it shows the live preview and Stop. With `runCards`
+ * off (the `subagentRunCards` setting, "show the step and clock") the child is never held and the row shows its name and
+ * model only.
  */
 const DockRow = (
   props: DockProps & { readonly parentId: string; readonly childId: string; readonly preview: SubagentPreviewBindings; readonly runCards: boolean },
@@ -60,6 +62,10 @@ const DockRow = (
           <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', open && 'dshx:rotate-90')} />
           <StatusGlyph label={stateLabel} status={waiting ? 'needs-you' : 'working'} />
           <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:font-medium">{label}</span>
+          {run.route === undefined ? null : (
+            // Shrinks after the step and the name (they give way first), then truncates its name; the mark stays.
+            <RouteModel provider={run.route.provider} model={run.route.model} className="dshx:ml-1 dshx:max-w-[45%] dshx:shrink-0" />
+          )}
           {step === undefined ? null : (
             <span
               className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', waiting ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}
@@ -85,11 +91,6 @@ const DockRow = (
       </div>
       {open ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:p-2">
-          {run.model === undefined ? null : (
-            <p className="dshx:text-muted-foreground" data-subagent-run-model="">
-              {run.model}
-            </p>
-          )}
           <SubagentLivePreview {...preview} childId={childId} state="working" onTurnState={ignoreTurnState} showOpenThread={false} />
         </div>
       ) : null}
