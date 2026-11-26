@@ -47,8 +47,8 @@ const buttonVariants = cva(
         'danger-text': 'dshx:bg-transparent dshx:text-danger-tint-foreground dshx:hover:bg-status-failed/12 dshx:active:bg-status-failed/18',
         /*
          * A popover trigger that shows a value, not an action (council round 7 A4: a date range, a purpose, a project
-         * picker): the look of `SelectTrigger`, the quiet trigger (council round 10 A1: the trigger fill, no edge at rest,
-         * the 3:1 field edge on hover, while open and on focus), the value in ink at the body weight and its chevron in
+         * picker): the look of `SelectTrigger`, the quiet trigger (council round 10 A1: the trigger fill, a 1px hairline at
+         * rest since council round 11 A2, the 3:1 field edge on hover, while open and on focus), the value in ink at the body weight and its chevron in
          * secondary ink. The kit focus ring and the press wash stay. A launcher that stands for a text field (Search
          * threads) adds `fieldLook` back. Outside `Button`, read it through `cn(buttonVariants({ variant: 'field' }))`
          * so the body weight replaces the base 500.

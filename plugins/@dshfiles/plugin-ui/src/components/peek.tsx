@@ -75,12 +75,13 @@ export const PeekCard = (props: PeekCardProps): React.JSX.Element => {
           <p className="dshx:break-words dshx:text-foreground">{props.question.text}</p>
           {props.question.choices.length === 0 ? null : (
             <div className="dshx:flex dshx:flex-wrap dshx:gap-1.5">
+              {/* Council round 11 C6: quiet triggers, the recommended answer by its attention tint only, both at 400. */}
               {props.question.choices.slice(0, 9).map((choice, index) => (
                 <Button
                   key={choice.id}
                   size="sm"
-                  variant={choice.recommended === true ? 'default' : 'outline'}
-                  className="dshx:max-w-full dshx:shrink"
+                  variant={choice.recommended === true ? 'attention' : 'field'}
+                  className="dshx:max-w-full dshx:shrink dshx:font-normal"
                   disabled={props.question?.busy === true}
                   onClick={() => props.question?.onAnswer(choice.id)}
                 >
