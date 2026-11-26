@@ -28786,10 +28786,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Cost over time\"",
+          "text": "expect text \"Usage over time\"",
           "action": "expect",
           "by": "text",
-          "name": "Cost over time",
+          "name": "Usage over time",
           "value": null
         },
         {
@@ -28865,10 +28865,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Cost over time\"",
+          "text": "expect text \"Usage over time\"",
           "action": "expect",
           "by": "text",
-          "name": "Cost over time",
+          "name": "Usage over time",
           "value": null
         },
         {
