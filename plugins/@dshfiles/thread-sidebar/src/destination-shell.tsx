@@ -520,8 +520,10 @@ const SectionButton = (props: {
           // The open page (round five T3, A1; council round 3 B2): the neutral selected wash and its leading marker, which
           // carries the accent, with an ink icon and label: the current place is lit once, here.
           props.selected && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
-          // A row led by its glyph or place seat draws no pill: the kit's selected edge outlines its wash (council round 12 B1).
-          props.selected && props.icon !== undefined && props.icon !== null && SELECTED_EDGE,
+          // A row led by a plain glyph draws no pill, so the kit's selected edge outlines its wash (council round 12 B1). A
+          // place-tile row (the Settings column, a side column's pages) takes no edge either (council round 13 B4): its
+          // toned tile, the wash and the 550 label carry the selection.
+          props.selected && props.icon !== undefined && props.icon !== null && props.place === undefined && SELECTED_EDGE,
         )}
       >
         {props.icon === undefined || props.icon === null ? null : props.place === undefined ? (

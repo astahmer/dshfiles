@@ -223,8 +223,9 @@ describe('DestinationShell', () => {
     const usage = screen.getByRole('button', { name: 'Usage' })
     expect(usage.className).toContain('dshx:bg-selected-wash')
     expect(usage.className).toContain('dshx:selected-marker')
-    // A glyph-led row draws no pill, so the kit's selected edge outlines its wash (council round 12 B1).
-    expect(usage.className).toContain('dshx:selected-edge')
+    // A place-tile row draws no edge (council round 13 B4): the toned tile, the wash and the 550 label carry the
+    // selection; the edge stays on thread, account and palette rows.
+    expect(usage.className).not.toContain('selected-edge')
     const seat = usage.querySelector<HTMLElement>('[data-section-icon]')
     expect(seat?.className).toContain('dshx:place-seat')
     expect(seat?.className).toContain('dshx:nav-tone-observe')
@@ -285,6 +286,11 @@ describe('DestinationShell', () => {
     expect(shell.toggleSidebar).not.toHaveBeenCalled()
     expect(document.querySelector('[data-stage-folded]')).toBeNull()
     expect(screen.getByRole('navigation', { name: 'Settings pages' })).toBeTruthy()
+    // The open category leads with its toned place tile, so it takes the wash and no edge (council round 13 B4).
+    const general = within(screen.getByRole('navigation', { name: 'Settings pages' })).getByRole('button', { name: 'General' })
+    expect(general.getAttribute('aria-current')).toBe('page')
+    expect(general.className).toContain('dshx:bg-selected-wash')
+    expect(general.className).not.toContain('selected-edge')
   })
 
   it('lists Settings categories and pages in one list, each once, and the page drops its own list (council round 4 B1)', () => {
