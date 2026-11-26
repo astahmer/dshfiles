@@ -331,7 +331,7 @@ work on any surface.
    that already holds its attention wash (a Needs-you or Failed thread row), the verb is `variant="attention-text"`
    (`variant="danger-text"` on a failed row): the same foreground on a transparent fill, the 12% tint only on hover
    and 18% pressed, at the size and hit area of `attention`; AA at rest, hover and press over the wash and every
-   surface. Inbox CTAs (card heads, the phone's full-width verbs) keep the filled tint. **Verbs on a head band**
+   surface. Inbox CTAs (card heads, desktop and phone) keep the filled tint. **Verbs on a head band**
    (council round 12 A2): on a card's coloured head band a 12% tint disappears into the band, so a verb there takes
    `Button band`: 20% at rest, 26% on hover, 32% pressed, attention and danger alike, with its text pulled further
    toward the ink (`text-attention-band-foreground` / `text-danger-band-foreground`: the status colour 60% in light,
@@ -583,9 +583,14 @@ has one right edge, not three (council round 17: 72ch in the well's mono 12px, t
 own width drew three). A phone is narrower than the measure, so its body runs the full card.
 
 **Failed card reason.** A failed card's body is its provider error line, `Error: <first line>`, mono 12/18 in the
-danger evidence well, desktop and phone; with none, no well (the meta line already says Turn failed). On the phone its Review becomes the same full-width 44px footer button as the approval card's (red-tinted) with
-only ⋯ in the head, when at 390×664 the failed card's title, reason and Review all show with at least 8px clear above
-the tab bar; otherwise it keeps the head pill and adds only the reason line.
+danger evidence well, desktop and phone; with none, no well (the meta line already says Turn failed).
+
+**Phone card actions** (council round 18, one pattern). On a phone (coarse pointer, phone shell) every card with a
+single verb, approval and failed alike, puts its 44pt Review pill in the card head beside ⋯; no card has a full-width
+foot row (a footer Review was tried twice and does not fit). A long title wraps beside the pill, two lines at most; the
+pill never moves to a footer. A question card keeps its answers in the body. Acceptance, measured at 390×664 in the
+rendered shot: the failed card's title, meta line and Review all sit above the tab bar with at least 8pt clear, in both
+schemes.
 
 **Phone dock.** On a phone the transcript scroller ends above the dock (composer and its docked rows), never under
 it: a fade one line-height tall (28px) ending exactly at the top edge of the dock's first card, so no line is half
@@ -815,8 +820,13 @@ the field look (page fill, 3:1 edge) on hover, while its list is open and while 
 **Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
 filter, a project picker) is `Button` `variant="field"`: that look, its value in ink at 400 and its chevron in
 secondary ink. **Filter row.** A filter row is one edged text field (the search) and calm filled triggers beside it
-(council round 10 reverses round 8's all-edged row, which read as wireframe); an action beside it (Refresh) stays
-`outline`. On a phone the thread list's filter row is one 44px row: the search field and one scope button (the
+(council round 10 reverses round 8's all-edged row, which read as wireframe); a page header action (Refresh) stays
+`outline`. **Secondary beside search** (council round 18 A3). Every action that sits beside a search field (Settings'
+Modified, the phone Settings ⋯, the phone "Filters", Backlog's View and Filter, the thread list's filters) is one
+look, the quiet secondary: `Button variant="quiet"` or `Toggle variant="quiet"` (`quietLook` in
+`components/ui/input`), the quiet trigger's fill and hairline with a centred label at 500 in secondary ink, ink on
+hover and while open; pressed (`aria-pressed`) takes the selection wash, the 3:1 field edge and ink. Header actions
+stay `outline`; a control that shows a value stays `field`. On a phone the thread list's filter row is one 44px row: the search field and one scope button (the
 funnel and "Filters", or the picked project's name, with an ink count of the filters that are on) that opens one
 popover holding project and status. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
 reader hears), never a number glued to a second control.
@@ -937,7 +947,7 @@ shows beside it as `RouteModel` (`components/model-mark`): the provider's 16px `
 name in secondary ink, 12px (`size="sm"`, the meta step) or 13px (`size="md"`, the UI step) where it has its own line.
 The surfaces: the transcript subagent row (the `subagent` tool card, in its head after the description), the desktop
 dock's subagent row (on the row itself, not only its expanded detail), the thread list's child row (line 2,
-`[mark] gpt-6.2-astra · Working`, in the `AttentionMeta` way) and the subagent thread's header lineage. One rule,
+`[mark] gpt-6.2-astra`, in the `AttentionMeta` way; the state word follows only for Needs you and Failed, which the glyph cannot name) and the subagent thread's header lineage. One rule,
 `modelIdentity(provider, model)`: the name is the model picker's (an account provider's own `<provider>/` prefix
 drops), the mark from the model id first and the provider id only as a fallback (route provider ids such as
 `codex_work_…` name no family); a family no token names draws the name with no mark, and no model draws nothing: a

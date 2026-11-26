@@ -160,7 +160,10 @@ wrap rule reads; the kit `CodeBlock` does it per line itself.
 **Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
 filter, a project picker) is `Button` `variant="field"`: the `SelectTrigger` look (`triggerLook`, the quiet trigger
 below), the value in ink at 400, its chevron in secondary ink. A filter row then reads as one text field with an edge
-and calm filled triggers beside it; action buttons (Refresh) stay `outline`. A launcher that stands for a text field
+and calm filled triggers beside it; page header actions (Refresh) stay `outline`. An action beside the search field
+(Modified, View, Filter, Filters, a toolbar ⋯) is the quiet secondary, `Button variant="quiet"` or `Toggle
+variant="quiet"` (`quietLook`, council round 18 A3): the same fill and hairline, a centred label at 500 in secondary
+ink, ink on hover, while open and pressed; pressed (`aria-pressed`) adds the selection wash and the field edge. A launcher that stands for a text field
 (Search threads) adds `fieldLook` back (`cn(fieldLook)` in its `className`). Outside `Button`, use
 `cn(buttonVariants({ variant: 'field' }))`. In a toolbar row beside an Input, SearchInput, Combobox or Select, give a
 field-look launcher or trigger `size="field"` (council round 9 A4): the one control height (32px, 44px on a coarse

@@ -387,7 +387,8 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       'the same 28px band-tinted pill',
       '**Failed card reason.**',
       '`Error: <first line>`, mono 12/18',
-      'at least 8px clear above the tab bar',
+      // Council round 18 moved the phone failed card's clearance into **Phone card actions**, measured in pt.
+      'above the tab bar with at least 8pt clear',
       '**The tally lives on the tab only**',
       '**One overflow glyph**',
       '`OverflowGlyph`',
@@ -467,5 +468,30 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     for (const module of ['model-mark']) expect(prose).toContain(`components/${module}`)
     // Retired by this pass: the palette's active result taking the selected edge.
     expect(prose).not.toContain("The current thread row, an account row and the palette's active result take it")
+  })
+
+  it('records the eighteenth council pass: phone card actions, the secondary beside search, the fitted field edge, change badge tones, the child row (council round 18 A5)', () => {
+    const prose = design.replace(/\s+/gu, ' ')
+    for (const text of [
+      '**Phone card actions**',
+      'puts its 44pt Review pill in the card head beside ⋯',
+      'the pill never moves to a footer',
+      'at least 8pt clear',
+      '**Secondary beside search**',
+      '`Button variant="quiet"`',
+      '`Toggle variant="quiet"`',
+      'Header actions stay `outline`',
+      '`fitFieldBorder`',
+      'the lightest edge that holds that 3:1',
+      'M amber (`warning`',
+      'R the secondary ink',
+      'the state word follows only for Needs you and Failed',
+    ])
+      expect(prose, text).toContain(text)
+    // Retired by this pass: the phone failed card's full-width footer Review, the ringed badge, the child row's Working.
+    expect(prose).not.toContain('full-width 44px footer button')
+    expect(prose).not.toContain("the phone's full-width verbs")
+    expect(prose).not.toContain('with a 1px edge in the letter\'s tone')
+    expect(prose).not.toContain('`[mark] gpt-6.2-astra · Working`')
   })
 })
