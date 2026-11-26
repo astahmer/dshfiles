@@ -2,12 +2,14 @@ import AgentRegistry from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { AttachmentId } from '@deepseek-ai/dsh-attachment'
 import LocalAttachmentStore from '@deepseek-ai/dsh-attachment-local'
+import LocalFileSystem from '@deepseek-ai/dsh-fs-local'
 import { LlmRuntime } from '@deepseek-ai/dsh-llm'
 import { SessionStore } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import TokenMeter from '@deepseek-ai/dsh-token-meter'
+import WorkingDirectoryService from '@deepseek-ai/dsh-working-directory'
 import { defineApi, dshxRegistryApi, method } from '@dshfiles/dshx/api'
 import { defineHost } from '@dshfiles/dshx/host'
 import { createTestHost } from '@dshfiles/dshx/testing'
@@ -48,13 +50,18 @@ const fakeProviders = (serve: typeof fetch) =>
     real => Effect.sync(() => (globalThis.fetch = real)),
   )
 
-/** A real test Host with sessions, an agent loop, the local attachment store and the local subprocess runtime for ffmpeg. */
+/**
+ * A real test Host with sessions, an agent loop, the local attachment store, the local subprocess runtime for ffmpeg, and
+ * the native working-directory service rooted at `dshHome` (where relative tool paths resolve).
+ */
 const agentHost = (dshHome: string) =>
   Effect.acquireRelease(
     Effect.promise(async () => {
       const host = await createTestHost()
       await host.ctx.plugin(SessionProjectionRegistry)
       await host.ctx.plugin(SessionStore)
+      await host.ctx.plugin(LocalFileSystem, { cwd: dshHome })
+      await host.ctx.plugin(WorkingDirectoryService, { defaultDirectory: dshHome })
       await host.ctx.plugin(LlmRuntime)
       await host.ctx.plugin(AgentRegistry)
       await host.ctx.plugin(TokenMeter)
@@ -179,8 +186,64 @@ describe('tweet context Host integration', () => {
         })
         const tools = (yield* Schema.decodeUnknownEffect(listingSchema)(listing)).result.value.output.tools
         expect(tools.find(tool => tool.name === 'tweet_context')).toMatchObject({ source: 'plugin', owner: '@dshfiles/tweet-context' })
+        expect(tools.find(tool => tool.name === 'animation_frames')).toMatchObject({ source: 'plugin', owner: '@dshfiles/tweet-context' })
         yield* Effect.promise(() => mounted.dispose())
-        expect(host.tools.schemas().some(tool => tool.name === 'tweet_context')).toBe(false)
+        expect(host.tools.schemas().some(tool => tool.name === 'tweet_context' || tool.name === 'animation_frames')).toBe(false)
+      }).pipe(Effect.provide(ffmpegLayer)),
+    60_000,
+  )
+
+  it.effect(
+    'reads an animation from a path relative to the thread folder for a scoped Agent and stores its key frames',
+    () =>
+      Effect.gen(function* () {
+        const temp = yield* scratch
+        const fs = yield* FileSystem.FileSystem
+        yield* fs.makeDirectory(temp.file('references'))
+        yield* ffmpegFixture([
+          '-f',
+          'lavfi',
+          '-i',
+          'color=c=white:s=320x180:r=25:d=2',
+          '-f',
+          'lavfi',
+          '-i',
+          'color=c=red:s=40x40:r=25:d=2',
+          '-filter_complex',
+          "[0:v][1:v]overlay=x='if(lt(t,0.5),0,if(lt(t,1.5),(t-0.5)*200,200))':y=60:shortest=1,fps=12.5,scale=160:-1",
+          '-y',
+          temp.file('references/slide.gif'),
+        ])
+        const host = yield* agentHost(temp.directory)
+        yield* Effect.promise(() => host.mount(hostDefinition, { packageId: '@dshfiles/tweet-context' }))
+        const handle = yield* Effect.acquireRelease(
+          Effect.promise(() =>
+            host.ctx.agents.create({ sessionId: SessionId('animation-frames-integration'), agentOptions: { provider: 'fixture', model: 'fixture' } }),
+          ),
+          created => Effect.promise(() => created.dispose()),
+        )
+        const run = (args: { readonly path: string; readonly maxFrames?: number }) =>
+          Effect.promise(() => host.runTool({ name: 'animation_frames', arguments: args, agent: handle.agent, signal: AbortSignal.timeout(60_000) }))
+        const result = yield* run({ path: 'references/slide.gif', maxFrames: 6 })
+        expect(result.isError, JSON.stringify(result.content)).toBe(false)
+        const text = result.content
+          .filter(block => block.type === 'text')
+          .map(block => block.text)
+          .join('\n')
+        expect(text).toContain('untrusted content')
+        expect(text).toMatch(/Motion 1: 0\.\d+–1\.\d+ s/u)
+        expect(text).toContain('Timeline: still')
+        const images = result.content.filter(block => block.type === 'image')
+        expect(images.length).toBeGreaterThanOrEqual(3)
+        expect(images.length).toBeLessThanOrEqual(6)
+        for (const image of images) {
+          if (image.type !== 'image') throw new Error('Expected an image block')
+          const stored = yield* Effect.promise(() => host.ctx.attachments.readImage(image.attachment))
+          expect(stored.data.byteLength).toBeGreaterThan(0)
+        }
+        const missing = yield* run({ path: 'references/absent.gif' })
+        expect(missing.isError).toBe(true)
+        expect(JSON.stringify(missing.content)).toContain("resolves from the thread's folder")
       }).pipe(Effect.provide(ffmpegLayer)),
     60_000,
   )

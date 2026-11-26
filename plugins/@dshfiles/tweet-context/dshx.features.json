@@ -114,6 +114,116 @@
           "testName": "records an ffmpeg sample span with the requested frame count"
         }
       ]
+    },
+    {
+      "id": "local-animation-reference",
+      "title": "Read the timing and key frames of a local video or GIF animation",
+      "summary": "Analyse a local screen recording, video or animated GIF: a still/motion timeline, each motion's start, duration, moving region, progress samples with the nearest CSS timing function or loop period, and key frames as images, so an Agent can rebuild the animation in code.",
+      "surfaces": ["host", "integration"],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tool: animation_frames",
+      "configuration": [],
+      "states": ["input-validation", "path-resolution", "probe", "scan", "motion-analysis", "frame-extraction", "attachment-save", "ready", "failed"],
+      "failureModes": [
+        "Only a local file is read: a relative path resolves from the thread folder; a missing path, a folder, a file over 100 MB, a file ffmpeg cannot decode and a file without a video stream are refused with what to pass instead.",
+        "At most 60 seconds are analysed per call, scanned at no more than 30 FPS, the source frame rate and 300 frames; timings are accurate to one scan frame, a long window lowers the scan rate, and a clip that does not report its length is read up to 300 scan frames with a warning giving the startSeconds to continue from.",
+        "Motion is measured from pixel changes on a 128 px scan: progress is a proxy for position, scale or opacity, not a distance; changes below the noise threshold and single-frame palette blips are ignored; transparency is flattened.",
+        "maxFrames defaults to 12 and is capped at 24; motions that do not fit keep their timings and are reported in a warning. ffmpeg must be on the DSH Host PATH, with frames capped at 16 million pixels and single allocations at 128 MB."
+      ],
+      "externalDependencies": [
+        {
+          "id": "ffmpeg-local-decoder",
+          "boundary": "The Host's ffmpeg binary probes, scans and extracts frames from the local file through the DSH subprocess provider, with the file protocol only.",
+          "deterministicFake": "Tests generate their reference clips with ffmpeg's lavfi sources (a box with a known position over time) and run the real probe, scan and extraction; a spawner stand-in reports a missing binary."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.slide-timing",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "times a slide in an MP4 and returns the frames before, during and after it as images"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.gif",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "reads an animated GIF at its own frame rate"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.stagger-window-loop",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "separates staggered motions, analyses only the requested window, and finds the period of a loop"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.unknown-length",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "reads a stream that does not report its length up to the frame budget and says where to continue"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.refusals",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "refuses unusable files and windows with a message that says what to do next"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.ffmpeg-missing",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "reports a missing ffmpeg binary with install steps"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.timing-functions",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-model.spec.ts",
+          "testName": "names linear and ease-in-out progress from the change per frame"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.key-frame-budget",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-model.spec.ts",
+          "testName": "keeps the resting frames around every motion and spreads the rest in proportion to motion length"
+        },
+        {
+          "kind": "unit-test",
+          "id": "animation-frames.agent-relative-path",
+          "file": "plugins/@dshfiles/tweet-context/tests/host-integration.test.ts",
+          "testName": "reads an animation from a path relative to the thread folder for a scoped Agent and stores its key frames"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "animation frames sample",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "records probe, scan and sample spans with counts and no file paths"
+        },
+        {
+          "kind": "custom",
+          "span": "ffmpeg probe",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "records probe, scan and sample spans with counts and no file paths"
+        },
+        {
+          "kind": "custom",
+          "span": "ffmpeg scan",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "records probe, scan and sample spans with counts and no file paths"
+        },
+        {
+          "kind": "custom",
+          "span": "ffmpeg sample",
+          "file": "plugins/@dshfiles/tweet-context/tests/animation-frames.spec.ts",
+          "testName": "records probe, scan and sample spans with counts and no file paths"
+        }
+      ]
     }
   ]
 }
