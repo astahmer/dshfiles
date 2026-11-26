@@ -370,6 +370,12 @@ surface, the phone dock clips 4+ rows, a child's phone header has no model or pa
 Stopped/Ready/Idle, a no-mark model name misaligns, and the transcript group miscounts. Fix list and a new multi-subagent
 capture for the council: `.cache/unslop-audit/r5/council/round-21-fixes.md`. Target: every deciding seat at 9.5 on the
 28-shot set plus the subagent shots, or stop after two rounds with no increase.
+All lanes done: A `vrrsxnln` (RouteModel `seat`, a same-family vendor prefix dropped); B1 `xtkkyvqv` … `ulzntyzp`
+(model ids with a vendor path, Failed from the Host's failed-turn record and `reason.kind`, the chat run counting a
+call kept outside Worked for, the empty seat on stacked rows, Failed in the header menu); B2 `vluloywk` … `nmvoyypy`
+(dock rows never shrink and the dock scrolls, a child's phone header with model, description and Back to the parent,
+Turn failed there); the lead `vqxwtlzv` (desktop dock dividers). New capture: `.cache/unslop-audit/r5/capture/multi-model.mjs`
+(shots 15–18). Restart when landing live: thread-sidebar's Host half (route projection version 3).
 
 ## Round four
 
