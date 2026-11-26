@@ -9,6 +9,7 @@ import { AGENTS_QUERY_ROOT, type Agent, type AgentThread } from './agent.js'
 import { AgentReference } from './agent-reference.js'
 import { AgentInlineReference } from './agent-inline-reference.js'
 import { installAgentMentionChips } from './agent-reference-links.js'
+import { AgentGlyph, AgentTone } from './agent-tone.js'
 import { agentsApi } from './api.js'
 
 const labelClass = 'dshx:text-2xs dshx:font-semibold dshx:uppercase dshx:tracking-wider dshx:text-muted-foreground'
@@ -41,7 +42,7 @@ const Detail = (props: { readonly label: string; readonly children: string }): J
   </div>
 )
 
-const AgentCard = (props: {
+export const AgentCard = (props: {
   readonly agent: Agent
   readonly threads: readonly AgentThread[]
   readonly openThread: (sessionId: string) => void
@@ -51,12 +52,7 @@ const AgentCard = (props: {
   return (
     <TooltipProvider>
       <header className="dshx:flex dshx:items-start dshx:gap-2.5">
-        <span
-          aria-hidden
-          className="dshx:flex dshx:size-9 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-xl dshx:border dshx:border-border dshx:bg-muted dshx:text-lg"
-        >
-          {agent.glyph === '' ? agent.name.slice(0, 1).toUpperCase() : agent.glyph}
-        </span>
+        <AgentGlyph glyph={agent.glyph} name={agent.name} slot={AgentTone.slotOf(agent)} size="large" />
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1">
           <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
             <span className="dshx:truncate dshx:text-sm dshx:font-semibold">{agent.name}</span>
@@ -125,6 +121,8 @@ export const AgentReferenceDecorations = (): null => {
   handlesRef.current = handles
   // A saved or removed agent changes which mentions are references; Chat re-renders the visible messages.
   useEffect(() => AgentInlineReference.setHandles(handles), [handles])
+  // A chip knows only its handle; the same list tells it the colour the agent chose.
+  useEffect(() => AgentTone.setAgents(list.data?.agents ?? []), [list.data])
   useEffect(() => installAgentMentionChips({ handles: () => handlesRef.current }), [])
   return null
 }

@@ -9,6 +9,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
 import { AGENT_GLYPHS, AgentEditor, type AgentField, type AgentFix, type AgentReview } from './agent-editor.js'
+import { AgentGlyph, AgentTone } from './agent-tone.js'
 import { agentLimits, Agents, type Agent, type AgentDraft } from './agent.js'
 import type { AgentPresetRow } from './api.js'
 import type { AgentModelOption } from './dispatch.js'
@@ -430,7 +431,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
                     aria-pressed={draft.delegation.handles.includes(agent.handle)}
                     onClick={() => togglePeer(agent.handle)}
                   >
-                    <span aria-hidden>{agent.glyph}</span>@{agent.handle}
+                    <AgentGlyph glyph={agent.glyph} name={agent.name} slot={AgentTone.slotOf(agent)} size="dense" />@{agent.handle}
                   </Button>
                 ))}
               </div>

@@ -16,15 +16,21 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { memo, useState } from 'react'
 
 import type { AgentTemplate } from './agent-editor.js'
+import { AgentGlyph, AgentTone } from './agent-tone.js'
 import type { Agent } from './agent.js'
 
 /** The list above which a filter field appears; a handful of agents reads faster without one. */
 const SEARCH_ABOVE = 6
 
-/** An agent's name with its glyph in front; the glyph is decoration, so the accessible name is the name alone. */
-export const AgentName = (props: { readonly glyph: string; readonly name: string }): JSX.Element => (
+/**
+ * An agent's name with its glyph in front; the glyph is decoration, so the accessible name is the name alone. With a
+ * `slot` (a saved or edited agent) the glyph sits on its colour tile; a template, not yet an agent, shows it bare.
+ */
+export const AgentName = (props: { readonly glyph: string; readonly name: string; readonly slot?: number | undefined }): JSX.Element => (
   <span className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5">
-    {props.glyph === '' ? null : (
+    {props.slot !== undefined ? (
+      <AgentGlyph glyph={props.glyph} name={props.name} slot={props.slot} />
+    ) : props.glyph === '' ? null : (
       <span aria-hidden className="dshx:shrink-0 dshx:leading-none">
         {props.glyph}
       </span>
@@ -77,7 +83,7 @@ const AgentListRows = (props: {
             selected={props.selected === agent.handle}
             className={cn(!agent.enabled && 'dshx:[&_[data-slot=entity-row-title]]:text-muted-foreground')}
             onSelect={() => props.actions.select(agent.handle)}
-            heading={<AgentName glyph={agent.glyph} name={agent.name} />}
+            heading={<AgentName glyph={agent.glyph} name={agent.name} slot={AgentTone.slotOf(agent)} />}
             meta={<span className="dshx:font-mono">@{agent.handle}</span>}
             description={`${agent.enabled ? props.routeLabel(agent) : 'Off · mentions ignore it'}${agent.threadCount > 0 ? ` · ${plural(agent.threadCount, 'thread')}` : ''}`}
             trailing={
