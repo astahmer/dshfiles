@@ -288,6 +288,25 @@ describe('the trailing column and the phone row (council round 17 B1.2)', () => 
     expect(menu?.querySelector('[data-slot="overflow-glyph"]')?.getAttribute('class')).toContain('dshx:size-4')
   })
 
+  it('selects a child row with the root row\'s wash and edge, and drops the edge on the phone list (council round 24, item 5)', async () => {
+    const child = rowSession({ id: SessionId('child-selected'), parentId: SessionId('s1'), origin: 'subagent', running: true })
+    const row = await renderRow({
+      childThreads: [child],
+      childrenOpen: true,
+      allChildrenShown: true,
+      selectedChildId: child.id,
+      childStatuses: new Map([[child.id, rowStatus({ status: 'working' })]]),
+    })
+    const button = row.querySelector<HTMLElement>(`ul [data-thread-id="${child.id}"]`)
+    expect(button?.getAttribute('data-selected')).toBe('true')
+    const classes = button?.className ?? ''
+    expect(classes).toContain('dshx:data-[selected=true]:bg-selected-wash')
+    expect(classes).toContain('dshx:data-[selected=true]:selected-edge')
+    expect(classes).toContain('dshx:phone:data-[selected=true]:shadow-none')
+    // A grey accent fill alone read as a hover, not the selection the root row's edge says.
+    expect(classes).not.toContain('dshx:data-[selected=true]:bg-accent')
+  })
+
   it('drops the selected edge on the phone list, keeping it on the desktop sidebar', async () => {
     const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'working' }) })
     const fill = classOf(row, 'article > div')

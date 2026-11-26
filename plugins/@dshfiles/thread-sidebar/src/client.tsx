@@ -892,7 +892,9 @@ const ChildThreadList = (props: {
           draggable
           className={cn(
             lineClass,
-            'dshx:data-[selected=true]:bg-accent',
+            // One look for "selected" in the list (council round 24, item 5): the root row's wash and its 1 px selected edge;
+            // the phone list keeps its no-edge rule (round 17 B1.2).
+            'dshx:data-[selected=true]:bg-selected-wash dshx:data-[selected=true]:selected-edge dshx:phone:data-[selected=true]:shadow-none',
             'dshx:relative dshx:data-[multi-selected=true]:bg-info/15 dshx:data-[multi-selected=true]:ring-1 dshx:data-[multi-selected=true]:ring-inset dshx:data-[multi-selected=true]:ring-info/40',
             // Two lines: line 1 keeps the row's height, line 2 its 16px, 2px apart from the row's edges.
             // Touch: 1px between them puts line 2 on the parent rows' 23pt title-to-meta pitch (council round 18 B1.3).
