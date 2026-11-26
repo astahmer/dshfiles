@@ -138,6 +138,15 @@ hover and 18% pressed, so the row shows one layer of colour. Same sizes and hit 
 press over the row wash and every surface (`tests/button-tint.test.tsx`). Inbox CTAs (card heads, phone full-width verbs)
 keep the filled tint.
 
+**Settings rows.** `dshx:settings-row` on each Settings row: an inset 1px hairline and a full-row hover/focus wash that
+bleeds 8px past the text (`dshx:bg-none` drops the last row's hairline); `dshx:settings-heading` (15/20 600, 32px
+above), `dshx:settings-label` (14/20 500) and `dshx:settings-description` (13/18 400, secondary ink). On a native row
+use the important form through an arbitrary variant (`dshx:[&_[class$=row]]:settings-row!`).
+
+**Wrapped code.** `CodeIndent` (`@dshfiles/plugin-ui/lib/code-indent`) hangs a wrapped line 2ch right of its own
+indent: `CodeIndent.mark(codeElement)` sets `--dshx-line-indent` on each highlighted `.line`, which the transcript's
+wrap rule reads; the kit `CodeBlock` does it per line itself.
+
 **Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
 filter, a project picker) is `Button` `variant="field"`: the `SelectTrigger` look (`fieldLook`: field boundary, page fill,
 8px), the value in ink at 400, its chevron in secondary ink, no hover fill. A filter row then shows one field edge:
@@ -153,14 +162,16 @@ inset shadow, so it follows a rounded row), and its title at `font-selected` (55
 `control-on`, the ink, with the tick or knob in `control-on-foreground`. Indigo is attention, the focus ring and links. The kit applies wash and marker to the selected
 `EntityRow` and the highlighted `CommandItem`, and the wash alone to a pressed `Toggle`/`ToggleGroupItem`; use the same
 classes for a settings category or list row. A chosen card or tile (a theme card, a starter, a plan option) takes
-`dshx:selected-card` instead: the wash, a 2px ink ring edge (its 1px border plus a 1px inset ring, both ink, so the
-box keeps its size) and a 16px ink check badge in the trailing top corner, with no leading marker. Give the card `border`
-and drop its own border colour while chosen (`chosen ? 'dshx:selected-card' : 'dshx:border-border'`). Hover stays the
+`dshx:selected-card` instead: a 2px ink ring edge (its 1px border plus a 1px inset ring, both ink, so the box keeps its
+size) and a 16px ink check badge in the trailing top corner, with no wash (council round 8 A2: the card keeps its own
+surface) and no leading marker. Give the card `border` and its normal fill, and drop its own border colour while chosen
+(`chosen ? 'dshx:selected-card' : 'dshx:border-border'`). Hover stays the
 ink wash (`bg-accent`). The page's segmented `TabsList` keeps its paper pill.
 
-**Navigation identity.** Each rail destination draws its icon in its own identity tone, glyph only:
-`--dshx-nav-tone-<id>` maps threads → identity-7, inbox → 2, land → 1, work → 3, agents → 4, observe → 6,
-knowledge → 8, and settings to the secondary ink (identity-5 green is left out: it sits beside the success green). Put
+**Navigation identity.** Each rail destination draws its icon in its own tone, glyph only: `--dshx-nav-tone-<id>`
+(council round 8 A4) is work 52, observe 118, land 180, threads 235, knowledge 305, agents 350, every hue 40° from the
+others and 25° from the status hues; inbox and settings take the secondary ink (Inbox's indigo `AttentionBadge` carries
+its colour). Put
 `dshx:nav-tone-<id>` on the item, `dshx:text-nav-tone` on its icon, and `dshx:bg-nav-tile` (the tone at 14%) on the
 active item's icon seat; the label stays ink (600 when active). The `text-`/`bg-` names keep them clear of the kit's
 `[&_svg:not([class*=text-])]` icon colour inside buttons and menu rows. Direct colours exist too:

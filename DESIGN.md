@@ -292,6 +292,10 @@ work on any surface.
    chosen card's ring and check, and the active tab bar (2px, page tabs and the window tab strip alike) are ink too.
    Fill on bg, panel, raised and the selection wash and tick on fill hold 3:1 (`plugin-ui/tests/control-on.test.tsx`).
    Never a button fill, never decoration. The primary button is ink.
+   **Off switch.** An enabled off switch draws its boundary in the field border (`--dshx-field-border`, 1px, 3:1 on
+   every surface), so an off toggle reads as a control beside the fields around it: the kit `Switch` in its own
+   transparent border box, the core switch as an inset ring that never moves its knob (`ui-styles/src/client.css`). A
+   disabled switch keeps the washed look with no edge.
 7. **Strength ladder: mark, text, tint, fill.** A mark is a glyph, dot or logo up to 16px (20px in a header). Text
    in a colour must hold AA. A tint is the colour at 12–16% alpha behind text in that colour. Fill is reserved for
    the destructive button, the on state of a control, a provider tile up to 44px, and chart marks. A row carries at
@@ -300,12 +304,17 @@ work on any surface.
    headers or body text. A row-level verb that answers what waits on you (Review, Answer, Rate…) is `Button`
    `variant="attention"`: Needs-you text on a 12% tint of it, no border; a failed row's verb is `variant="danger-tint"`.
    Their text is the status colour pulled 30% toward the ink so it holds AA on its own tint. A chip or band reuses
-   the pair (`bg-attention-tint text-attention-foreground`). A selection (the selected row, the settings category, a pressed
+   the pair (`bg-attention-tint text-attention-foreground`). **Text rung.** A row carries one layer of colour: on a row
+   that already holds its attention wash (a Needs-you or Failed thread row), the verb is `variant="attention-text"`
+   (`variant="danger-text"` on a failed row): the same foreground on a transparent fill, the 12% tint only on hover
+   and 18% pressed, at the size and hit area of `attention`; AA at rest, hover and press over the wash and every
+   surface. Inbox CTAs (card heads, the phone's full-width verbs) keep the filled tint. A selection (the selected row, the settings category, a pressed
    toggle, the palette's highlighted row, a chosen card) is `bg-selected-wash`, a neutral warm grey step with no accent
    hue, with ink text. Indigo fills mean attention only, and a selection's cue is ink too. A
    selected list row, nav item, palette row or account row adds `selected-marker` (a 2px ink bar,
    `--dsw-alias-label-primary`, inset on its leading edge, which follows a rounded row; 3:1 on the wash) and sets its title at `font-selected` (550); a chosen card or tile (a theme card, a starter) takes `selected-card`
-   instead: the wash, a 2px ink ring edge and an ink check badge in its trailing top corner, with no leading marker. The current
+   instead, nothing heavier: a 2px ink ring edge and an ink check badge in its trailing top corner (16px) in the
+   `control-on` ink, no wash, so the card keeps its own surface and its artwork; no leading marker. The current
    place shows strongly once: a leaf row takes the wash, marker and 550; its parent rail item only an ink label and its
    glyph in colour. Hover stays the ink wash.
    **Attention outranks selection.** A Needs-you row holds `bg-wash-needs-you` and a Failed row `bg-wash-failed` for as
@@ -341,19 +350,23 @@ work on any surface.
 11. **Navigation identity.** Each rail destination draws its glyph in its own identity tone, glyph only, and the
     active one adds a 14% tile of that tone behind the glyph with its ink label at 600; the label never takes the
     tone. `nav-tone-<id>` on the item, `text-nav-tone` on its icon and `bg-nav-tile` on the active seat
-    (`plugin-ui/src/color-roles.css`). The rail has its own seven tones, not the identity ramp: Threads cyan-blue 220,
-    Land teal 177, Work orange 52, Observe lime 118, Inbox violet 297, Knowledge magenta 324, Agents rose 351;
-    Settings neutral. **Nav tone constraints** (`tests/nav-tone.test.ts`): one hue per destination in both schemes;
-    light L 0.52–0.56 at chroma 0.14, dark L 0.78 at 0.13; a chroma floor of 0.12, or the sRGB edge where a hue ends
-    lower (teal and cyan in light, about 0.105), so no tone reads muddy; every hue 25° or more from the status hues
-    (25, 80, 150, 270); Threads at hue 235 or less and 30° or more from Land; every pair ΔE 0.06 or more; the glyph
+    (`plugin-ui/src/color-roles.css`). The rail has its own six tones, not the identity ramp: Work orange 52, Observe lime 118, Land teal 180, Threads blue 235, Knowledge violet 305, Agents rose 350.
+    Inbox is the attention destination: its glyph is the secondary ink, like Settings, and its indigo
+    `AttentionBadge` carries the colour. **Nav tone constraints** (`tests/nav-tone.test.ts`): one hue per destination
+    in both schemes; light L 0.52–0.56 at chroma 0.14, dark L 0.78 at 0.13; a chroma floor of 0.12, or the sRGB edge
+    where a hue ends lower (teal and blue in light, about 0.10 and 0.12), so no tone reads muddy; every hue 25° or more
+    from the status hues (25, 80, 150, 270) and 40° or more from every other; every pair ΔE 0.06 or more; the glyph
     3:1 on bg, panel, raised and its own 14% tile, the ink label AA on that tile. The phone tab bar uses the same tones.
     **Rail surface.** The rail is one surface in every state: the nav tone (`--dsw-specific-sidebar-fill`) beside a
     page on bg, whichever destination is open, whether its side column is open or folded. A destination never repaints
     the rail. **Active destination tab.** The active main tab of a destination page (Inbox, Backlog, Usage, Review,
     Settings, Plugins…) draws the destination's glyph in its nav tone (`text-nav-<id>`, or `nav-tone-<id>` with
     `text-nav-tone`); the label stays ink and the tab takes no tile or tint. A thread tab keeps its `ProjectMark`.
-    Settings navigation items carry a 16px muted glyph, and the phone Settings root list a 28px identity tile.
+    **Settings group tones.** Every Settings group has its own tone, on its desktop navigation glyphs (16px) and its
+    phone root tiles (28px) alike, so no group is grey: General sky 235, Models & accounts violet 300, Agents rose 350,
+    Tools copper 50, Projects olive 100, Plugins teal 195, Hosts azure 215, Security orchid 325, Notifications moss 122,
+    Pages aqua 170, About copper, Developer violet. Only ten hues clear the status bands, so two repeat, at least six
+    groups apart. Pages and Developer rows keep each page's own icon, drawn in the group tone by `SettingsToneMark`.
 
 Use semantic tokens only, never raw hex in plugin code. The exceptions are brand artwork
 (`ai-accounts/src/account-labels.ts`, `model-effort-picker/src/brand-marks.ts`) and a project colour the user
@@ -490,7 +503,11 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
 - Transcript measure: one 680px column. Prose reads at about 66ch at the transcript size, and cards and code blocks
   are at most 680px, aligned left with the prose. **Short code on narrow panes.** Below 448px of pane, a code block of
   12 lines or fewer soft-wraps at 12/18 mono with a continuation indent, so it reads without a sideways gesture; a
-  longer block keeps horizontal scroll with the right-edge fade; the Wrap toggle flips either way. A succeeded tool row shows a 16px kind glyph (`ToolCard` `kind`:
+  longer block keeps horizontal scroll with the right-edge fade; the Wrap toggle flips either way. **Wrapped code.** A
+  wrapped line continues 2ch right of its own statement's indent, never from column 0: the leading whitespace,
+  measured per line by `CodeIndent` (`@dshfiles/plugin-ui/lib/code-indent`), reaches the wrap rule as
+  `--dshx-line-indent` (the transcript's `.line` rule in `ui-styles/src/transcript.css`, the kit `CodeBlock`); without
+  it the hang is the plain 2ch. A succeeded tool row shows a 16px kind glyph (`ToolCard` `kind`:
   edit, shell and subagent in identity tones; read and search neutral). A work row (a turn's "Worked for" header, a
   tool call, a summary line) is as wide as its content and no wider than that column; its duration or count follows the label after 8px, and its
   hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
@@ -501,6 +518,12 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   Secrets, Plugins, Plugin market, Capabilities hub, Developer…). The General page has no in-page category list and
   no second "General" heading: the page header, then the selected category's fields, its sections headed with
   `text-heading`. Settings never folds the column; other one-page destinations (Inbox) may.
+- **Settings rows.** Rows stay on the 880 frame; the eye follows a label to its value through the row grammar
+  (`plugin-ui/src/settings-rows.css`): `settings-row` on each row draws a 1px hairline (`border-border`) inset to the
+  text edges and a full-row wash (the ghost hover fill) on hover, where a pointer hovers, and while a control inside
+  has keyboard focus; the row bleeds 8px past its text so the wash has room without moving it, and the last row drops
+  its hairline (`bg-none`). Type steps: `settings-heading` (section heading, 15/20 at 600, 32px above, none on the
+  first), `settings-label` (row label, 14/20 at 500, ink), `settings-description` (13/18 at 400, secondary ink).
 - Counts: the count beside a heading is the number of rows its list shows with no filter; a filter's count is what
   it would show; a zero is not drawn. A count the list cannot reproduce is a bug.
 - One name per destination: the rail row, the tab title, the palette row and the `h1` are the same words, with no
@@ -676,6 +699,11 @@ detail and its Stop verb; the transcript keeps a record row with the same glyph 
 ends the dock row leaves and the record row takes the final state and the total (`Done · 5m 02s`). The name is the
 task description its parent gave, the same string in the row, the list, the header and the tab: no generated handle,
 no route or account id. One thing is never a card and a row on the same screen.
+**Dock row grammar** (council round 8 C3): every dock row reads `› glyph · Label · detail · elapsed · worded link ↗`,
+with one leading chevron per row: the label 13/500 sans ("Running" for a job), the detail 13 regular (a job's command
+in mono). The desktop dock attaches to the composer: the composer fill (`--dsw-specific-input-major`), the dock's top
+corners at `--dsw-radius-lg` and its bottom square, the composer card's ring as the one shared edge, and the card's
+top corners square under the dock.
 
 **PageSection.** `h2` (section title) that names its `section` region, optional muted meta ("3 enabled") and actions.
 

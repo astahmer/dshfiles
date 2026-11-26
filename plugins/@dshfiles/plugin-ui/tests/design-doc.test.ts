@@ -177,4 +177,33 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('**Accent indigo means interaction.**')
     expect(design).not.toContain('a 2px accent bar')
   })
+
+  it('records the eighth council pass: text rung, selected card, off switch, rail tones, Settings rows, code hang (council round 8 A7)', () => {
+    for (const text of [
+      '**Text rung.**',
+      '`variant="attention-text"`',
+      '`variant="danger-text"`',
+      'the card keeps its own surface',
+      'a 2px ink ring edge and an ink check badge',
+      '**Off switch.**',
+      'Work orange 52, Observe lime 118, Land teal 180, Threads blue 235, Knowledge violet 305, Agents rose 350',
+      'Inbox is the attention destination',
+      '40° or more from every other',
+      '**Settings rows.**',
+      '`settings-row`',
+      '`settings-heading`',
+      '`settings-label`',
+      '`settings-description`',
+      '**Wrapped code.**',
+      '`--dshx-line-indent`',
+      '`@dshfiles/plugin-ui/lib/code-indent`',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: the round-four rail hues and the washed chosen card.
+    expect(design).not.toContain('Threads cyan-blue 220')
+    expect(design).not.toContain('Inbox violet 297')
+    expect(design).not.toContain('Threads at hue 235 or less')
+    expect(design).not.toContain('instead: the wash, a 2px ink ring edge')
+  })
 })
+
