@@ -384,6 +384,36 @@ describe('SubagentPreviewDock', () => {
     }
   })
 
+  it('says which of its edges can still scroll, so the phone fades only those, and none when the rows fit (council round 24, item 4)', () => {
+    // The phone dock faded both edges at every position, so the top faded at rest and the bottom at the end.
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 27.99rem)', addEventListener: () => undefined, removeEventListener: () => undefined }))
+    try {
+      render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={count => `${count} subagents`} />)
+      const dock = document.querySelector<HTMLElement>('[data-dshfiles-live-preview-dock="subagents"]')
+      if (dock === null) throw new Error('no dock')
+      // The composer's 117px frame over four 54px rows and their dividers.
+      let scrollHeight = 219
+      let scrollTop = 0
+      Object.defineProperty(dock, 'clientHeight', { configurable: true, get: () => 117 })
+      Object.defineProperty(dock, 'scrollHeight', { configurable: true, get: () => scrollHeight })
+      Object.defineProperty(dock, 'scrollTop', { configurable: true, get: () => scrollTop })
+      const edges = (position: number): readonly [boolean, boolean] => {
+        scrollTop = position
+        fireEvent.scroll(dock)
+        return [dock.hasAttribute('data-more-above'), dock.hasAttribute('data-more-below')]
+      }
+      expect(edges(0)).toEqual([false, true])
+      expect(edges(54)).toEqual([true, true])
+      expect(edges(102)).toEqual([true, false])
+      // A fractional end still reads as the end.
+      expect(edges(101.5)).toEqual([true, false])
+      scrollHeight = 117
+      expect(edges(0)).toEqual([false, false])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it("shows up to three rows, folds four or more into one closed row, and keeps the reader's choice", () => {
     const count = (n: number): string => `${n} subagents`
     const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'] })} foldLabel={count} />)

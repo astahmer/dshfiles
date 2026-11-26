@@ -7,7 +7,7 @@ import { ArrowUpRightIcon, BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { WORK_COUNT_SEPARATOR, workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
-import { useState, useSyncExternalStore } from 'react'
+import { useCallback, useRef, useState, useSyncExternalStore } from 'react'
 import { launchOrdered } from '../thread-children.js'
 import { ToolSteps } from '../tool-steps.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
@@ -35,6 +35,47 @@ const subscribeLiveWork = (notify: () => void): (() => void) => {
 }
 const readLiveWork = (): boolean => liveWorkQuery()?.matches ?? false
 const readLiveWorkOnServer = (): boolean => false
+
+/** A fractional scroll position within this of an end still counts as the end. */
+const EDGE_SLACK = 1
+
+/**
+ * Council round 24, item 4: the dock says which of its edges can still scroll, `data-more-above` and `data-more-below`,
+ * so the phone composer fades only an edge with more rows past it (none when the rows fit). A DOM attribute, not React
+ * state: scrolling re-renders nothing.
+ */
+const markScrollEdges = (element: HTMLElement): void => {
+  const rest = element.scrollHeight - element.clientHeight - element.scrollTop
+  element.toggleAttribute('data-more-above', element.scrollTop > EDGE_SLACK)
+  element.toggleAttribute('data-more-below', rest > EDGE_SLACK)
+}
+
+/** A callback ref that keeps the edges current on scroll, on a resize of the dock or any row, and as rows come and go. */
+const useScrollEdges = (): ((element: HTMLDivElement | null) => void) => {
+  const release = useRef<(() => void) | undefined>(undefined)
+  return useCallback((element: HTMLDivElement | null) => {
+    release.current?.()
+    release.current = undefined
+    if (element === null) return
+    const mark = (): void => markScrollEdges(element)
+    element.addEventListener('scroll', mark, { passive: true })
+    const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(mark) : undefined
+    const observeRows = (): void => {
+      sizes?.disconnect()
+      sizes?.observe(element)
+      for (const row of element.children) sizes?.observe(row)
+      mark()
+    }
+    const rows = typeof MutationObserver === 'function' ? new MutationObserver(observeRows) : undefined
+    rows?.observe(element, { childList: true })
+    observeRows()
+    release.current = () => {
+      element.removeEventListener('scroll', mark)
+      sizes?.disconnect()
+      rows?.disconnect()
+    }
+  }, [])
+}
 
 /**
  * One working child as one compact row, whatever it is doing: `glyph · name · [mark] model · current step · elapsed ·
@@ -208,6 +249,7 @@ export const SubagentPreviewDock = (
   // choice holds while children start and finish, and resets with the thread (the dock is keyed by its session).
   const [expanded, setExpanded] = useState(false)
   const underLiveWork = useSyncExternalStore(subscribeLiveWork, readLiveWork, readLiveWorkOnServer)
+  const scrollEdges = useScrollEdges()
   if (working === '') return null
   const list = working.split(ID_SEPARATOR)
   const folded = list.length > MAX_OPEN_ROWS
@@ -220,6 +262,7 @@ export const SubagentPreviewDock = (
   )
   return (
     <div
+      ref={scrollEdges}
       aria-label={props.preview.t('subagentPreviewDock')}
       role="region"
       className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-[calc(100%-var(--dsh-composer-side-clearance,0px)*2)] dshx:max-w-(--dsh-composer-card-max-width) dshx:flex-col dshx:overflow-y-auto"
