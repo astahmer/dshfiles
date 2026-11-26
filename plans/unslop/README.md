@@ -40,6 +40,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 11 (round-10 shots) | 8.5 | 8.5 | **9** | marker crowds leading glyphs, quiet triggers vanish at rest, light diff, Usage repeats, prose measure |
 | 12 (round-11 shots) | 8.5 | 8.5 | **9** | selection too quiet on glyph rows, dock edge regression, Inbox verbs, Usage table, phone tab tone |
 | 13 (round-12 shots) | 8.5 | 8.5 | **9** | palette dark selection, phone tab pill, chart headroom, New thread chips, send seat, phone Inbox fold |
+| 14 (round-13 shots) | 8.5 | 8.5 | **9** | all three: project names cut in attention rows, a stray dash on New thread; one attention meta wording |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -261,6 +262,11 @@ phone meter line hidden but reachable from the thread ⋯ sheet, location chip f
 `ryvyyuxn` … `nqzyktsw` (`.nice()` value axes, a carded distribution table, Share by, value-first inherited effort).
 Follow-ups: desktop attention rows truncate the project name at the default list width; Usage's lower sections
 (Daily calendar and below) still use top rules rather than cards.
+
+Round 14 findings, merged in `.cache/unslop-audit/r5/council/round-14-fixes.md`: one kit AttentionMeta formatter (mark,
+name, kind, age; never a stubbed name; marks on a rail in list rows) for the sidebar, phone list and both Inboxes; no New
+thread divider; a selected edge darker than the field edge; a 44 pt phone failed Review; child-line glyphs on Settings
+child rows; a hairline on the resting send circle; a softer dark dense checkbox; small Usage and Settings touches.
 
 ## Round four
 
