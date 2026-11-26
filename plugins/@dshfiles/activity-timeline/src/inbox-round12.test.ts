@@ -53,9 +53,8 @@ describe('the phone Inbox fold (council round 12 C3)', () => {
 })
 
 describe('"Write your own…" (council round 12 C3)', () => {
-  it('takes the resting trigger look of the answers beside it, a full-width row on a touch screen', () => {
-    expect(writeOwn).toContain('variant="field"')
-    expect(writeOwn).not.toContain('variant="ghost"')
+  it('takes the answers\' row, a full-width row on a touch screen', () => {
+    // Council round 17 C2 made it borderless (inbox-round17.test.ts); its words stay in ink, not secondary.
     expect(writeOwn).not.toContain('text-muted-foreground')
     expect(writeOwn).toContain('InboxView.ANSWER_ROW')
     const answer = answersRow.slice(answersRow.indexOf('item.choices.map('), answersRow.indexOf('data-inbox-recommended'))

@@ -26,6 +26,19 @@ describe('one Inbox card body measure (council round 17 C1)', () => {
     expect(panel).toContain('className={cn(InboxView.ANSWERS, InboxView.ANSWERS_MEASURE, InboxView.BODY_INSET)}')
   })
 
+  it('draws "Write your own…" borderless: a pencil and its words, no fill or edge at rest, its 44pt row kept (C2)', () => {
+    const writeOwn = element('data-inbox-write-own=""', 'Button')
+    expect(writeOwn).toContain('variant="ghost"')
+    expect(writeOwn).not.toContain('variant="field"')
+    expect(writeOwn).toContain('InboxView.WRITE_OWN')
+    expect(writeOwn).toContain('InboxView.ANSWER_ROW')
+    expect(InboxView.ANSWER_ROW).toContain('dshx:pointer-coarse:min-h-11')
+    // The pencil in secondary ink, the words in ink at the answers' 500.
+    expect(InboxView.WRITE_OWN).toBe('dshx:text-foreground dshx:[&_svg]:text-muted-foreground')
+    expect(writeOwn).toContain('InboxView.ANSWER,')
+    for (const edge of ['border', 'bg-', 'shadow']) expect(InboxView.WRITE_OWN).not.toContain(edge)
+  })
+
   it('says what the page is for in one plain sentence', () => {
     expect(locales).toContain("subtitle: 'Review approvals, answer questions, and inspect failures.',")
     expect(locales).not.toContain('Everything that needs you, in one place.')

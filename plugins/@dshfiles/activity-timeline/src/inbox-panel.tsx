@@ -449,10 +449,11 @@ const InboxRow = (props: {
                   <Button
                     key="write-own"
                     size="sm"
-                    variant="field"
+                    variant="ghost"
                     data-inbox-write-own=""
-                    // Council round 12 C3: the answers' resting trigger look and row, its pencil saying it opens the thread.
-                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW)}
+                    // Council round 17 C2: borderless, a pencil and its words on the answers' row and 44pt target, so the
+                    // boxed answers read as the choices and this as the way out to the thread's composer.
+                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW, InboxView.WRITE_OWN)}
                     onClick={() => props.onOpen(item)}
                   >
                     <PencilLineIcon aria-hidden />

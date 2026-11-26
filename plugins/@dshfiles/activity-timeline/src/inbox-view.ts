@@ -85,6 +85,12 @@ const ANSWER_ROW =
   'dshx:shrink dshx:max-w-full dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start dshx:pointer-coarse:h-auto dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:py-2.5 dshx:pointer-coarse:whitespace-normal'
 
 /**
+ * "Write your own…" after the answers (council round 17 C2): a ghost row, no fill or edge at rest, its pencil in
+ * secondary ink and its words in ink at the answers' 500; the hover wash and the answers' row and 44pt target stay.
+ */
+const WRITE_OWN = 'dshx:text-foreground dshx:[&_svg]:text-muted-foreground'
+
+/**
  * The answers under a question: 8px apart beside each other on a wide pane. Council round 12 C3: on a phone they stack
  * 4px apart and the card ends 4px under the last one (as Review ends the approval card), so the fold reaches the next
  * card's title.
@@ -539,6 +545,7 @@ export class InboxView {
   static readonly ANSWER = ANSWER
   static readonly RECOMMENDED = RECOMMENDED
   static readonly ANSWER_ROW = ANSWER_ROW
+  static readonly WRITE_OWN = WRITE_OWN
   static readonly ANSWERS = ANSWERS
   static readonly headVariant = headVariant
   static readonly onBand = onBand
