@@ -15,7 +15,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { panelOccurrence, useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
-import { ActivityIcon, CalendarIcon, ChevronDownIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import { ActivityIcon, CalendarIcon, ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -27,6 +27,7 @@ import { useState, useSyncExternalStore } from 'react'
 import { purposeSchema, usageApi, type ChartQuery } from './api.js'
 import { UsageCharts } from './charts.js'
 import { USAGE_PAGE_DESCRIPTION, indexedLogsLabel } from './page-copy.js'
+import { reindexAction } from './reindex-action.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
@@ -248,9 +249,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
           {indexState}
         </span>
       }
-      actions={[
-        { id: 'reindex', label: 'Re-index thread logs', icon: <RefreshCwIcon aria-hidden />, pending: refresh.isPending, onSelect: () => refresh.mutate() },
-      ]}
+      actions={[reindexAction({ healthy: indexError === null && refreshError === null, pending: refresh.isPending, onSelect: () => refresh.mutate() })]}
     >
       <Tabs
         value={preferences.tab}

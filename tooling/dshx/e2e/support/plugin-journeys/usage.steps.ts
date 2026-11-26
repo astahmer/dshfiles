@@ -95,7 +95,9 @@ When('the Usage analytics panel is opened on the range since {string}', async ({
   await page.getByRole('tab', { name: 'Requests', exact: true }).click()
   await page.getByRole('button', { name: 'Custom', exact: true }).click()
   await page.getByLabel('From date', { exact: true }).fill(from)
-  await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
+  // A healthy index keeps Re-index in the page ⋯ (council round 8, D1).
+  await page.getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Re-index thread logs', exact: true }).click()
   await expect(page.getByText(/ of the latest \d+ requests$/)).toBeVisible()
   await expect.poll(async () => logRows(page).count(), { timeout: 30_000 }).toBeGreaterThan(200)
 })

@@ -296,7 +296,9 @@ When('two synthetic work accounts and recorded account usage populate the dashbo
     }),
   )
   await openGlobalPanel(page, 'Usage')
-  await page.getByRole('button', { name: 'Re-index thread logs', exact: true }).click()
+  // A healthy index keeps Re-index in the page ⋯ (council round 8, D1).
+  await page.getByRole('button', { name: 'More actions', exact: true }).click()
+  await page.getByRole('menuitem', { name: 'Re-index thread logs', exact: true }).click()
   await expect.poll(() => page.getByRole('table').getByRole('row').count()).toBeGreaterThan(20)
   await page.reload()
   await openAccountsPanel(page)
