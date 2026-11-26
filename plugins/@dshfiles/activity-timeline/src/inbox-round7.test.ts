@@ -39,9 +39,10 @@ const trailingBar = phoneBar.slice(phoneBar.indexOf('data-inbox-phone-bar="trail
 
 describe('the phone Inbox (council round 7 C2)', () => {
   // Council round 9 C2 moved Start triage out of the top bar to a worded Triage button (inbox-round9.test.ts).
-  it('keeps the top bar to its menu, a 36px ⋯', () => {
+  it('keeps the top bar to its menu, a 44pt ⋯ seat (council round 17 C3)', () => {
     const menu = trailingBar.slice(trailingBar.indexOf('<DropdownMenuTrigger'), trailingBar.indexOf('aria-label={value.moreLabel}'))
-    expect(menu).toContain('dshx:size-9')
+    expect(menu).toContain('InboxView.PHONE_BAR_MENU')
+    expect(InboxView.PHONE_BAR_MENU).toContain('dshx:size-11')
     expect(trailingBar).not.toContain('primary')
   })
 

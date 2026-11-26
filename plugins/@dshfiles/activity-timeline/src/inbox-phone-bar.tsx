@@ -92,7 +92,7 @@ export const InboxPhoneBar = (): JSX.Element | null => {
           {value.actions.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button type="button" size="icon" variant="ghost" className="dshx:size-9 dshx:text-muted-foreground" aria-label={value.moreLabel}>
+                <Button type="button" size="icon" variant="ghost" className={InboxView.PHONE_BAR_MENU} aria-label={value.moreLabel}>
                   <EllipsisIcon aria-hidden />
                 </Button>
               </DropdownMenuTrigger>

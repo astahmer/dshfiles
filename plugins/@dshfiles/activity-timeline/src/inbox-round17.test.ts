@@ -39,6 +39,24 @@ describe('one Inbox card body measure (council round 17 C1)', () => {
     for (const edge of ['border', 'bg-', 'shadow']) expect(InboxView.WRITE_OWN).not.toContain(edge)
   })
 
+  it('seats the phone bar on the shell\'s one top-bar rule: 44pt seats 4pt from each edge, glyphs at x 26 and 364 (C3)', () => {
+    const bar = readFileSync(new URL('./inbox-phone-bar.tsx', import.meta.url), 'utf8')
+    // The seat insets the phone shell publishes (lane B2), with the 4px they hold when it has not yet.
+    expect(InboxView.PHONE_BAR_LEADING).toContain('dshx:left-[var(--dsh-phone-seat-left,4px)]')
+    expect(InboxView.PHONE_BAR).toContain('dshx:right-[var(--dsh-phone-seat-right,4px)]')
+    for (const rule of [InboxView.PHONE_BAR, InboxView.PHONE_BAR_LEADING]) {
+      expect(rule).not.toContain('max(12px')
+      expect(rule).toContain('dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)]')
+      expect(rule).toContain('dshx:h-11')
+    }
+    // ⋯ is the trailing seat: 44×44 with a 20px glyph, the last control in the bar, Triage before it.
+    const menu = bar.slice(bar.indexOf('<DropdownMenuTrigger asChild>'), bar.indexOf('</DropdownMenuTrigger>'))
+    expect(menu).toContain('className={InboxView.PHONE_BAR_MENU}')
+    expect(InboxView.PHONE_BAR_MENU).toBe('dshx:size-11 dshx:text-muted-foreground dshx:[&_svg]:size-5')
+    expect(bar.indexOf('data-inbox-phone-triage')).toBeLessThan(bar.indexOf('<DropdownMenu>'))
+    expect(bar.indexOf('</DropdownMenu>')).toBeGreaterThan(bar.lastIndexOf('</Button>'))
+  })
+
   it('says what the page is for in one plain sentence', () => {
     expect(locales).toContain("subtitle: 'Review approvals, answer questions, and inspect failures.',")
     expect(locales).not.toContain('Everything that needs you, in one place.')

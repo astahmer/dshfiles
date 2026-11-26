@@ -112,7 +112,7 @@ describe('Inbox on a phone (round five P2)', () => {
     expect(InboxView.PHONE_BAR).toContain('[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex')
     expect(InboxView.PHONE_BAR).toContain('dshx:hidden')
     expect(panel).toContain('dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden')
-    expect(InboxView.PHONE_BAR).toContain('dshx:right-[max(12px,env(safe-area-inset-right,0px))]')
+    expect(InboxView.PHONE_BAR).toContain('dshx:right-[var(--dsh-phone-seat-right,4px)]')
   })
 
   it('keeps the mark and kind in the phone head, on the line under the full title (council round 9 C1)', () => {

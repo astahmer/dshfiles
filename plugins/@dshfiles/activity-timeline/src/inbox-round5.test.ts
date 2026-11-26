@@ -67,7 +67,8 @@ describe('an Inbox card (round five C4, council round 5)', () => {
 
 describe('the Inbox phone top bar (round five C4, council round 5)', () => {
   it('seats the status button in the leading corner, left of the centred title, never beside Start triage', () => {
-    expect(InboxView.PHONE_BAR_LEADING).toContain('dshx:left-[max(12px,env(safe-area-inset-left,0px))]')
+    // Council round 17 C3: the shell's one seat rule (inbox-round17.test.ts).
+    expect(InboxView.PHONE_BAR_LEADING).toContain('dshx:left-[var(--dsh-phone-seat-left,4px)]')
     expect(InboxView.PHONE_BAR_LEADING).toContain('[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex')
     const leading = phoneBar.slice(phoneBar.indexOf('data-inbox-phone-bar="leading"'), phoneBar.indexOf('data-inbox-phone-bar="trailing"'))
     expect(leading).toContain('<status.value.Button />')

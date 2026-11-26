@@ -385,10 +385,12 @@ const titleCounts = (
 /**
  * The Inbox's header actions on a phone: a bar in the trailing corner of thread-sidebar's top bar, shown only while that
  * bar names the Inbox (`data-phone-stage` is the stage's panel id), so Start triage shares the title row instead of
- * taking a row of its own. Hidden everywhere else, including every wider screen.
+ * taking a row of its own. Hidden everywhere else, including every wider screen. Council round 17 C3: every phone top
+ * bar seats its leading and trailing 44pt controls 4pt from the edge (or at the safe-area inset), glyphs centred at x 26
+ * and x 364 at 390pt, from the insets the phone shell publishes; the 4px fallback is the same rule.
  */
 const PHONE_BAR =
-  'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:right-[max(12px,env(safe-area-inset-right,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:gap-1 dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
+  'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:right-[var(--dsh-phone-seat-right,4px)] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:gap-1 dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
 
 /**
  * The bar's leading seat (round five C4, council round 5): the frame's status button sits left of the centred "Inbox"
@@ -396,7 +398,10 @@ const PHONE_BAR =
  */
 
 const PHONE_BAR_LEADING =
-  'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:left-[max(12px,env(safe-area-inset-left,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
+  'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:left-[var(--dsh-phone-seat-left,4px)] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
+
+/** The bar's trailing ⋯: a 44pt seat with a 20px glyph in secondary ink, as the thread bar's menu (council round 17 C3). */
+const PHONE_BAR_MENU = 'dshx:size-11 dshx:text-muted-foreground dshx:[&_svg]:size-5'
 
 /**
  * The reason a card prints under its head band, or null when it only repeats the title the band already shows (a failed
@@ -583,6 +588,7 @@ export class InboxView {
   static readonly titleCounts = titleCounts
   static readonly PHONE_BAR = PHONE_BAR
   static readonly PHONE_BAR_LEADING = PHONE_BAR_LEADING
+  static readonly PHONE_BAR_MENU = PHONE_BAR_MENU
   static readonly bodyReason = bodyReason
   static readonly failureWell = failureWell
   static readonly clampsText = clampsText
