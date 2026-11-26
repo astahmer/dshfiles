@@ -11,7 +11,7 @@ colors:
   border-hairline: '#dedcda'
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
-  field-border: '#88827d'
+  field-border: '#89847f'
   # The quiet trigger's fill as it paints on the page (council round 10 A1: the ink at 5%; 5.2% dark).
   trigger-fill: '#f3f1ef'
   selected-wash: '#ebe9e6'
@@ -41,7 +41,7 @@ colors:
   surface-nav-dark: '#1e1b19'
   surface-raised-dark: '#23201d'
   border-hairline-dark: '#2f2c29'
-  field-border-dark: '#76706c'
+  field-border-dark: '#746f6a'
   trigger-fill-dark: '#201d1a'
   segment-thumb-dark: '#302c28'
   label-secondary-dark: '#a7a4a1'
@@ -252,7 +252,7 @@ No slate shell: navigation surfaces keep the warm stone.
 | 3 selected      | selected row, active nav             | —                            | `--dsw-specific-sidebar-nav-item-active`                       | `#e4e2e0` | `#292623` |
 | 4 line          | hairline border                      | `border`                     | `--dsw-alias-border-l2`                                        | `#dedcda` | `#2f2c29` |
 | 5 border        | quiet control edge (buttons, tabs)   | `input`                      | `--dsw-alias-border-l3`                                        | `#d6d4d2` | `#393633` |
-| field border    | field boundary, 3:1 on every surface | `field-border`               | `--dshx-field-border`                                          | `#88827d` | `#76706c` |
+| field border    | field boundary, 3:1 on every surface | `field-border`               | `--dshx-field-border`                                          | `#89847f` | `#746f6a` |
 | 6 border-strong | hover border, emphasis               | —                            | `--dsw-alias-border-l4`                                        | `#bfbdbb` | `#423f3c` |
 | 7 strong        | idle glyphs, scrollbars              | —                            | (ramp)                                                         | `#9f9e9d` | `#575552` |
 | 8 faint         | tertiary text, placeholder (AA)      | —                            | `--dsw-alias-label-tertiary`                                   | `#6a6967` | `#94928f` |
@@ -351,7 +351,7 @@ work on any surface.
    `components/selection`): a neutral 1px inset edge, `--dshx-selected-edge` (light `#67625d` oklch(0.50 0.01 65), dark `#9d9792`
    oklch(0.68 0.01 65); about 5:1 on the wash), at least 3:1 against the wash on the page, the nav column and a
    dialog, because the wash alone sits about 1.1:1 off the dark page. **Selected edge is not the field edge.** Since
-   council round 14 A2 it is its own token, a clear step past `--dshx-field-border` (`#88827d` / `#76706c`, about 3.1:1
+   council round 14 A2 it is its own token, a clear step past `--dshx-field-border` (`#89847f` / `#746f6a`, about 3.1:1
    on the wash), so a selected row never reads as a resting text field; text fields keep their 3:1 resting edge
    (tests/selected-edge). An inset shadow, so it moves nothing. **Selected edge only where it is needed.** The current
     thread row on desktop and an account row take it (council round 13); the command palette's active result does not
@@ -789,9 +789,13 @@ Finished / All) is a `ToggleGroup`.
 
 **Fields — one look.** Text-entry fields, `Input`, `Textarea` and `InputGroup` (so search), share `fieldLook`
 (`@dshfiles/plugin-ui/components/ui/input`): a 1px field boundary, the page fill, the 8px radius, no shadow and no dark
-fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#88827d`, dark
-`#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); checkbox and radio
-edges use it too. The selected-row edge is a separate, stronger token (`--dshx-selected-edge`, see **Selected edge is
+fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#89847f`, dark
+`#746f6a`), 3:1 against bg, panel, raised, the nav column, the dark dialog fill and a quiet trigger's chip (WCAG
+1.4.11); checkbox and radio edges use it too. Since council round 18 A1 it is the lightest edge that holds that 3:1: the
+palette starts at the council's lighter oklch(0.665) light / oklch(0.50) dark and steps back until every surface holds
+(`fitFieldBorder`, tests/field-edge). Light raised and the dark dialog fill are the limits, so the default moved only
+from oklch(0.61 / 0.55) to oklch(0.615 / 0.545); the council's values measure about 2.5:1 there and are not used. Focus
+keeps the ring. The selected-row edge is a separate, stronger token (`--dshx-selected-edge`, see **Selected edge is
 not the field edge**), so a selected row never reads as a resting field. A checkbox column in a dense table (AI accounts' "Show model") takes `Checkbox size="sm"` (council
 round 11 A5): the same 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke, no shadow; in light its
 checked fill is `control-on-dense`, `oklch(0.50 0.01 65)` (`#67625d`, council round 13 A1; 0.38 in round 12) with a

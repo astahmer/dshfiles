@@ -255,7 +255,7 @@ never fall to a serif face. The palette footer, a row's `KeyHint` and a menu sho
 dshx:surface-dialog` to its own card.
 
 **One field look.** Text-entry fields, `Input`, `Textarea` and `InputGroup` (so `SearchInput`), share `fieldLook`
-(`components/ui/input`): a 1px `border-field-border` boundary (`--dshx-field-border`, light `#88827d`, dark `#76706c`:
+(`components/ui/input`): a 1px `border-field-border` boundary (`--dshx-field-border`, light `#89847f`, dark `#746f6a`:
 3:1 on bg, panel, raised, the nav column and the dark dialog fill, WCAG 1.4.11; council round 6 A2), the page fill
 (`bg-background`), the 8px radius, no shadow and no dark fill. `Checkbox` and `RadioGroupItem` edges use the same
 boundary; a text field a plugin draws itself takes `dshx:border-field-border` too. A checkbox column in a dense table takes `Checkbox

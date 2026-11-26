@@ -74,8 +74,10 @@ export interface Palette {
   readonly failedWash: Oklch
   /**
    * A field's boundary (council round 6 A2, WCAG 1.4.11): the edge of an input, select, textarea, checkbox or radio,
-   * 3:1 against bg, panel, raised, the dark nav column and the dark dialog fill. Light about #88827D, dark #76706C,
-   * with the primary's warmth. Dividers and card hairlines keep the subtle border steps (4 and 5).
+   * 3:1 against bg, panel, raised, the dark nav column and the dark dialog fill, with the primary's warmth. Council
+   * round 18 A1: the lightest edge that still holds that 3:1 (`fitFieldBorder`), light #898480 (oklch 0.6175), dark
+   * #75706C (oklch 0.5475); raised (light) and the dialog fill (dark) are the surfaces that stop it. Dividers and card
+   * hairlines keep the subtle border steps (4 and 5).
    */
   readonly fieldBorder: Oklch
   /**
@@ -148,6 +150,16 @@ const TRIGGER_FILL_ALPHA = { light: 0.05, dark: 0.052 } as const
  */
 const SELECTED_EDGE_L = { light: 0.5, dark: 0.68 } as const
 
+/**
+ * Where the field edge starts before it is fitted back to 3:1 (council round 18 A1): the council's lighter resting edge
+ * (light 0.665, dark 0.50). `fitFieldBorder` steps it toward contrast until it holds 3:1 on every surface a field sits on,
+ * so the edge is as light as WCAG 1.4.11 allows and follows the contrast setting.
+ */
+const FIELD_BORDER_L = { light: 0.665, dark: 0.5 } as const
+
+/** The dark dialog fill (surfaces.css `--dshx-dialog-fill`); light dialogs take the page. */
+const DARK_DIALOG_FILL: Oklch = { l: 0.27, c: 0.006, h: 60 }
+
 /** Default warm-stone input (D1). */
 export const WARM_STONE = { hue: 65, chroma: 0.007, accentHue: 270, contrast: 1 } as const
 
@@ -187,6 +199,19 @@ function palette(input: PaletteInput): Palette {
   // The light primary's warmth: 0.01 for warm stone (grey chroma 0.007), none for a neutral preset.
   const primaryChroma = round(chroma / 0.7, 4)
   const selectedWash: Oklch = dark ? { l: 0.275, c: 0.006, h: 60 } : { l: 0.935, c: 0.004, h: 80 }
+  const navSurface: Oklch = dark ? { l: 0.225, c: 0.006, h: 60 } : panel
+  const triggerFill = withAlpha(neutral[10] ?? { l: dark ? 0.93 : 0.22, c: 0, h: hue }, TRIGGER_FILL_ALPHA[scheme])
+  // The field edge also bounds a quiet trigger on hover and while open, so it holds 3:1 on that chip's own fill too.
+  const chips = [bg, panel, navSurface].map(under => paintOver(under, triggerFill))
+  const fieldBorder = fitFieldBorder(
+    { l: round(clamp(base + (FIELD_BORDER_L[scheme] - base) * contrast, 0, 1), 4), c: primaryChroma, h: hue },
+    [bg, panel, raised, navSurface, ...(dark ? [DARK_DIALOG_FILL] : []), ...chips],
+    dark,
+  )
+  // A selected row never matches a resting field (council round 14 A2): the selected edge starts at least 0.08 L past it
+  // (0.085, so the 0.08 holds after rounding).
+  const selectedStart = round(clamp(base + (SELECTED_EDGE_L[scheme] - base) * contrast, 0, 1), 4)
+  const selectedL = dark ? Math.max(selectedStart, round(fieldBorder.l + 0.085, 4)) : Math.min(selectedStart, round(fieldBorder.l - 0.085, 4))
   const accentFg = fitAccent(dark ? { l: 0.72, c: 0.14, h: accentHue } : { l: 0.53, c: 0.19, h: accentHue - 2 }, raised, dark)
   const status = (h: number): Oklch => (dark ? { l: 0.75, c: 0.14, h } : { l: 0.5, c: 0.15, h })
   return {
@@ -200,7 +225,7 @@ function palette(input: PaletteInput): Palette {
     info: trio(accentFg),
     // Neutral (council round 3 A1): the fill carries no hue; the row marker is ink (council round 6 A1).
     selectedWash,
-    selectedEdge: fitSelectedEdge({ l: round(clamp(base + (SELECTED_EDGE_L[scheme] - base) * contrast, 0, 1), 4), c: 0.01, h: hue }, selectedWash, dark),
+    selectedEdge: fitSelectedEdge({ l: selectedL, c: 0.01, h: hue }, selectedWash, dark),
     // Light washes sit on the sRGB edge (council round 5 A8): at L 0.94 a 0.035 blue clipped to 0.029, so each light
     // wash takes the lowest L where faint text still holds AA and the most chroma that L renders unclipped.
     needsYouWash: dark ? { l: 0.29, c: 0.045, h: accentHue } : { l: 0.935, c: 0.032, h: accentHue },
@@ -208,10 +233,10 @@ function palette(input: PaletteInput): Palette {
     // Dark Failed is darker and calmer (council round 3 A2), so a red row does not glow beside a Needs-you one.
     failedWash: dark ? { l: 0.255, c: 0.032, h: STATUS_HUES.danger } : { l: 0.94, c: 0.031, h: STATUS_HUES.danger },
     readyMark: dark ? status(STATUS_HUES.success) : { l: 0.55, c: 0.13, h: STATUS_HUES.success },
-    navSurface: dark ? { l: 0.225, c: 0.006, h: 60 } : panel,
+    navSurface,
     promptFill: dark ? { l: 0.255, c: 0.018, h: 230 } : { l: 0.965, c: 0.012, h: 230 },
-    fieldBorder: { l: round(clamp(base + ((dark ? 0.55 : 0.61) - base) * contrast, 0, 1), 4), c: primaryChroma, h: hue },
-    triggerFill: withAlpha(neutral[10] ?? { l: dark ? 0.93 : 0.22, c: 0, h: hue }, TRIGGER_FILL_ALPHA[scheme]),
+    fieldBorder,
+    triggerFill,
     segmentThumb: dark ? { l: 0.296, c: round((chroma * 9) / 7, 4), h: hue } : bg,
     segmentEdge: dark ? { l: 1, c: 0, h: 0, alpha: 0.07 } : withAlpha(neutral[10] ?? { l: 0.22, c: 0, h: hue }, 0.1),
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
@@ -240,6 +265,27 @@ function fitSelectedEdge(edge: Oklch, wash: Oklch, dark: boolean): Oklch {
   const under = dark ? [wash, { ...wash, l: Math.max(wash.l, 0.3) }] : [wash]
   let fitted = edge
   for (let i = 0; i < 40 && Math.min(...under.map(back => contrastRatio(fitted, back))) < 3.05; i += 1) fitted = { ...fitted, l: round(fitted.l + (dark ? 0.01 : -0.01), 4) }
+  return fitted
+}
+
+/** `over` at its alpha on an opaque `under`, mixed in 8-bit gamma sRGB as a browser paints it. */
+function paintOver(under: Oklch, over: Oklch): Oklch {
+  const alpha = over.alpha ?? 1
+  const channels = (color: Oklch): readonly number[] => [1, 3, 5].map(at => Number.parseInt(toHex(color).slice(at, at + 2), 16))
+  const [u, o] = [channels(under), channels(over)]
+  return hexToOklch(`#${u.map((value, i) => Math.round(value * (1 - alpha) + (o[i] ?? 0) * alpha).toString(16).padStart(2, '0')).join('')}`)
+}
+
+/**
+ * Moves the field edge toward contrast until it holds 3:1 on every surface a field sits on (council round 18 A1), measured
+ * on the 8-bit colours a screen paints as well as on the exact ones, so the rendered edge never rounds under 3:1.
+ */
+function fitFieldBorder(edge: Oklch, surfaces: readonly Oklch[], dark: boolean): Oklch {
+  const painted = (color: Oklch): Oklch => hexToOklch(toHex(color))
+  const weakest = (color: Oklch): number =>
+    Math.min(...surfaces.flatMap(surface => [contrastRatio(color, surface), contrastRatio(painted(color), painted(surface))]))
+  let fitted = edge
+  for (let i = 0; i < 200 && weakest(fitted) < 3; i += 1) fitted = { ...fitted, l: round(fitted.l + (dark ? 0.0025 : -0.0025), 4) }
   return fitted
 }
 
