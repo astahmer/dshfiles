@@ -88,6 +88,17 @@ describe('Stop is quiet (council round 25, item 6)', () => {
     expect(squares).toEqual(['3 3 10 10', '3 3 10 10'])
   })
 
+  // A continuable child with a typed draft shows Stop beside Send: 32px circles 8px apart left a 40px pitch, so the two
+  // 44pt touch areas overlapped and a tap 20px right of Stop's centre landed on Send (measured at 390px in WebKit).
+  it('keeps Stop\'s and Send\'s 44pt touch areas apart on a coarse pointer, inside the phone\'s two-button seat', () => {
+    const gap = Number(/gap: (\d+)px;/.exec(rules('@media (pointer: coarse)', '.send'))?.[1])
+    const size = Number(/width: (\d+)px;/.exec(rules('@media (pointer: coarse)', '.primary'))?.[1])
+    expect(size + gap).toBeGreaterThanOrEqual(44)
+    // The scrolling chip line ends one seat short of the card edge: 8px inset, both circles and the gap, 8px clear.
+    const seat = Number(/--dsh-composer-send-seat: (\d+)px;/.exec(rules('@container (max-width: 560px)', '.row:has(.send > :nth-child(2))'))?.[1])
+    expect(8 + size + gap + size + 8).toBeLessThanOrEqual(seat)
+  })
+
   it.each(['light', 'dark'] as const)('keeps the edge at 3:1 and the square at 4.5:1 on the card and its hover fill (%s)', (scheme: Scheme) => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     for (const step of [0, 1, 2]) {

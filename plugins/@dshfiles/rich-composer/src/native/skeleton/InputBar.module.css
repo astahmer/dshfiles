@@ -764,6 +764,12 @@
     height: 32px;
   }
 
+  /* Stop beside Send (a continuable child with a typed draft): 12px apart, the circles' 44pt touch areas meet without
+     overlapping, and the pair still fills the phone's 92px two-button seat exactly (8 + 32 + 12 + 32 + 8). */
+  .send {
+    gap: 12px;
+  }
+
   /* Touch input never under 16px (visual refresh T3.5): WebKit zooms the page on focus below it. A larger
      Settings › Font size still wins. */
   .card {
