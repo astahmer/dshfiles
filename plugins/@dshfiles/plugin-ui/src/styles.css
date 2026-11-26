@@ -609,6 +609,16 @@
     font: var(--dshx-density-text-ui, 0.8125rem) / 1.45 var(--dsw-font-family, ui-sans-serif, system-ui, sans-serif);
     -webkit-font-smoothing: antialiased;
   }
+
+  /*
+   * A nav glyph seat's tone reaches a panel glyph that brings its own root (council round 17 A3). The Inbox glyph is a
+   * panel icon in its own `.dshx-root`, whose ink overrode the seat: the rail drew it in ink beside toned glyphs and the
+   * phone tab bar in ink beside tertiary ones. In a rail seat that is not current, and in every phone tab seat, the root
+   * takes the seat's colour: secondary on the rail, tertiary on a resting tab, ink on the current tab.
+   */
+  :where([role='tab']:not([aria-selected='true']) > [data-rail-icon], [data-phone-tab-seat]) .dshx-root {
+    color: inherit;
+  }
 }
 
 /*
