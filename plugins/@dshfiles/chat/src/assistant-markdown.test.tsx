@@ -10,13 +10,10 @@ import { AssistantMarkdown } from './native/chat/AssistantMarkdown.tsx'
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => {
   const MarkdownText = memo((props: { readonly text: string }) => <p>{props.text}</p>)
   const named: Record<string, unknown> = { MarkdownText, useMarkdownDelegate: () => ({}) }
-  return new Proxy(
-    named,
-    {
-      has: () => true,
-      get: (target, key) => (typeof key === 'string' && key in target ? target[key] : typeof key === 'string' && /^[A-Z]/u.test(key) ? () => null : undefined),
-    },
-  )
+  return new Proxy(named, {
+    has: () => true,
+    get: (target, key) => (typeof key === 'string' && key in target ? target[key] : typeof key === 'string' && /^[A-Z]/u.test(key) ? () => null : undefined),
+  })
 })
 
 afterEach(() => {

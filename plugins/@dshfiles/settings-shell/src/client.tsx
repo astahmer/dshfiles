@@ -808,7 +808,7 @@ export default defineClient({
     const probeNow = (): void => {
       if (reachability.getSnapshot().probing) return
       reachability.set(ReachabilityModel.started(reachability.getSnapshot()))
-      void probeHost().then((reachable) => {
+      void probeHost().then(reachable => {
         const next = ReachabilityModel.settled(reachability.getSnapshot(), reachable)
         reachability.set(next.state)
         if (next.recovered) connection.reconnect()

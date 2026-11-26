@@ -760,18 +760,13 @@
           "coveredBy": ["chat.annotation-quick-add"]
         }
       ],
-      "states": ["marker", "comment-open",     "comment-empty",
-    "sent",
-    "column",
-    "hover",
-    "inline",
-    "off"],
-        "failureModes": [
-    "An annotation whose assistant step the transcript window has not mounted shows no marker until that step is back on screen.",
-    "A marker and its comment leave the screen once the passage they quote scrolls out of the visible transcript.",
-    "A window with no room beside the transcript keeps markers and their popovers instead of the comments column.",
-    "Sent annotations live in the Host's per-session store: without the profile's storage-domain row they stay in this tab until reload, and a message trimmed out of the transcript hides its marker."
-  ],
+      "states": ["marker", "comment-open", "comment-empty", "sent", "column", "hover", "inline", "off"],
+      "failureModes": [
+        "An annotation whose assistant step the transcript window has not mounted shows no marker until that step is back on screen.",
+        "A marker and its comment leave the screen once the passage they quote scrolls out of the visible transcript.",
+        "A window with no room beside the transcript keeps markers and their popovers instead of the comments column.",
+        "Sent annotations live in the Host's per-session store: without the profile's storage-domain row they stay in this tab until reload, and a message trimmed out of the transcript hides its marker."
+      ],
       "externalDependencies": [],
       "verification": [
         {
@@ -786,24 +781,24 @@
           "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
           "testName": "sits in the gutter just past the quoted paragraph"
         },
-            {
-      "kind": "unit-test",
-      "id": "chat.annotation-column-stack",
-      "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
-      "testName": "pushes a card below the one above it"
-    },
-    {
-      "kind": "unit-test",
-      "id": "chat.annotation-out-of-view",
-      "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
-      "testName": "drops the marker once the quoted passage scrolled above the transcript"
-    },
-    {
-      "kind": "unit-test",
-      "id": "chat.annotation-hover-reveal",
-      "file": "plugins/@dshfiles/chat/tests/annotation-marks-hover.test.tsx",
-      "testName": "opens the comment on hover and takes it away once the pointer leaves"
-    },
+        {
+          "kind": "unit-test",
+          "id": "chat.annotation-column-stack",
+          "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
+          "testName": "pushes a card below the one above it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.annotation-out-of-view",
+          "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
+          "testName": "drops the marker once the quoted passage scrolled above the transcript"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.annotation-hover-reveal",
+          "file": "plugins/@dshfiles/chat/tests/annotation-marks-hover.test.tsx",
+          "testName": "opens the comment on hover and takes it away once the pointer leaves"
+        },
         {
           "kind": "unit-test",
           "id": "chat.annotation-quick-add",

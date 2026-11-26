@@ -33,7 +33,10 @@ declare module '@deepseek-ai/cordis' {
  * Declare always-visible tools for this plugin. Returns false when `@dshfiles/tool-search` is not loaded, so the
  * caller can retry (the plugin loads before some of the plugins that own tools, so an early call is expected).
  */
-export const declareVisibleTools = (ctx: { get(name: 'toolSearchVisibility'): ToolSearchVisibility | undefined }, declaration: ToolVisibilityDeclaration): boolean => {
+export const declareVisibleTools = (
+  ctx: { get(name: 'toolSearchVisibility'): ToolSearchVisibility | undefined },
+  declaration: ToolVisibilityDeclaration,
+): boolean => {
   const registry = ctx.get('toolSearchVisibility')
   if (registry === undefined) return false
   registry.declare(declaration)

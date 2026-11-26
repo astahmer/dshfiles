@@ -336,9 +336,7 @@ export class RemoteSessions extends Context.Service<
               // reason (an undecodable photo), which the not-staged message used to hide.
               const citesFiles = request.content.some(part => part.type === 'file')
               return new SessionPromptRefused({
-                reason: citesFiles
-                  ? RemotePromptGuard.attachmentNotStagedMessage(runtime.label)
-                  : `${runtime.label} refused the attachment: ${error.detail}`,
+                reason: citesFiles ? RemotePromptGuard.attachmentNotStagedMessage(runtime.label) : `${runtime.label} refused the attachment: ${error.detail}`,
               })
             }),
           )

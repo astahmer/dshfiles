@@ -25,13 +25,13 @@ Both halves are forked: the Host half registers the same routes and system-promp
 Provenance and path mappings live in [native-fork.json](native-fork.json). Vendored files stay byte-identical except
 the recorded delta.
 
-| File                                                                                       | Owned delta                                                                                           |
-| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- |
-| [host.ts](src/host.ts)                                                                     | Registers `api/changes.image` ([changed-image-route.ts](src/changed-image-route.ts)).                 |
-| [FileDiff.tsx](src/native/FileDiff.tsx)                                                    | Optional `imageUrl`: a binary or oversized image renders [ChangedImage](src/native/ChangedImage.tsx). |
-| [ChangedFiles.tsx](src/native/ChangedFiles.tsx), [ReviewTab.tsx](src/native/ReviewTab.tsx) | Pass the file's `api/changes.image` address to `FileDiff`.                                            |
+| File                                                                                       | Owned delta                                                                                                      |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
+| [host.ts](src/host.ts)                                                                     | Registers `api/changes.image` ([changed-image-route.ts](src/changed-image-route.ts)).                            |
+| [FileDiff.tsx](src/native/FileDiff.tsx)                                                    | Optional `imageUrl`: a binary or oversized image renders [ChangedImage](src/native/ChangedImage.tsx).            |
+| [ChangedFiles.tsx](src/native/ChangedFiles.tsx), [ReviewTab.tsx](src/native/ReviewTab.tsx) | Pass the file's `api/changes.image` address to `FileDiff`.                                                       |
 | [ReviewTab.tsx](src/native/ReviewTab.tsx)                                                  | The toolbar tooltips pass `portal`, so a Workbench pane (`contain: layout paint`) does not offset them (b:d5wg). |
-| [locales.ts](src/native/locales.ts)                                                        | `image.*` copy for the label and each refusal, in all eight dictionaries.                             |
+| [locales.ts](src/native/locales.ts)                                                        | `image.*` copy for the label and each refusal, in all eight dictionaries.                                        |
 
 ## Changed images
 

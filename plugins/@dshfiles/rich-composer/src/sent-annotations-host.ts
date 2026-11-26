@@ -4,9 +4,7 @@ import { pluginStorage } from '@dshfiles/dshx/host'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Effect, Option } from 'effect'
 import * as Schema from 'effect/Schema'
-import {
-  SENT_ANNOTATION_LIMIT, SentAnnotationSchema, sentAnnotationsApi, type SentAnnotation,
-} from './sent-annotations-api.ts'
+import { SENT_ANNOTATION_LIMIT, SentAnnotationSchema, sentAnnotationsApi, type SentAnnotation } from './sent-annotations-api.ts'
 
 /** One plugin namespace keeps every rich-composer record; sent histents live under this key prefix. */
 export const SENT_ANNOTATIONS_NAMESPACE = '@dshfiles/rich-composer'
@@ -31,7 +29,9 @@ const capped = (annotations: readonly SentAnnotation[]): readonly SentAnnotation
  * @returns the stored annotations, oldest first.
  */
 export const readSentAnnotations = async (ctx: Context, sessionId: string): Promise<readonly SentAnnotation[]> => {
-  const stored = await pluginStorage(ctx, SENT_ANNOTATIONS_NAMESPACE).get(keyOf(sessionId)).catch(() => undefined)
+  const stored = await pluginStorage(ctx, SENT_ANNOTATIONS_NAMESPACE)
+    .get(keyOf(sessionId))
+    .catch(() => undefined)
   if (stored === undefined) return []
   const decoded = Schema.decodeUnknownOption(StoredAnnotations)(stored.value)
   return Option.isSome(decoded) ? decoded.value : []
@@ -72,8 +72,11 @@ export const sentAnnotationHandlers = {
       const updated = yield* Effect.promise(async () => {
         const stored = await readSentAnnotations(host.ctx, input.sessionId)
         if (!stored.some(annotation => annotation.id === input.id)) return false
-        await writeSentAnnotations(host.ctx, input.sessionId, stored.map(annotation =>
-          (annotation.id === input.id ? { ...annotation, comment: input.comment } : annotation)))
+        await writeSentAnnotations(
+          host.ctx,
+          input.sessionId,
+          stored.map(annotation => (annotation.id === input.id ? { ...annotation, comment: input.comment } : annotation)),
+        )
         return true
       })
       return { updated }

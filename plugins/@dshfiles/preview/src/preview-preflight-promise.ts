@@ -27,14 +27,15 @@ const probeUrl = (raw: string): Effect.Effect<EmbedCheck> =>
     const url = normalizeProbeUrl(raw)
     if (url === undefined) return { url: raw, reachable: false, status: null, framing: 'allowed', detail: 'Not an http(s) address.' } satisfies EmbedCheck
     const response = yield* Effect.tryPromise({
-      try: () => fetch(url, {
-        method: 'GET',
-        redirect: 'follow',
-        credentials: 'omit',
-        cache: 'no-store',
-        headers: { 'user-agent': PREFLIGHT_USER_AGENT },
-        signal: timeoutSignal(),
-      }),
+      try: () =>
+        fetch(url, {
+          method: 'GET',
+          redirect: 'follow',
+          credentials: 'omit',
+          cache: 'no-store',
+          headers: { 'user-agent': PREFLIGHT_USER_AGENT },
+          signal: timeoutSignal(),
+        }),
       catch: error => error,
     }).pipe(Effect.option)
     if (response._tag === 'None') {

@@ -50,7 +50,9 @@ export const createComposerService = (ctx: Context): ComposerService => {
   }
   const annotations = (target?: ComposerTarget): Subscribable<readonly ComposerAnnotation[]> => {
     const listeners = new Set<() => void>()
-    const notify = (): void => { for (const listener of listeners) listener() }
+    const notify = (): void => {
+      for (const listener of listeners) listener()
+    }
     let boundShell: SessionInputShell | undefined
     let unsubscribeDraft: (() => void) | undefined
     let unsubscribeSent: (() => void) | undefined
@@ -77,22 +79,31 @@ export const createComposerService = (ctx: Context): ComposerService => {
       lastSent = sent
       lastView = [
         ...(sent ?? []).map(annotation => ({
-          id: `${SENT_ID_PREFIX}${annotation.id}`, text: annotation.text, comment: annotation.comment,
-          source: annotation.source, sent: true,
+          id: `${SENT_ID_PREFIX}${annotation.id}`,
+          text: annotation.text,
+          comment: annotation.comment,
+          source: annotation.source,
+          sent: true,
         })),
         ...(draft ?? []).map(annotation => ({
-          id: `${DRAFT_ID_PREFIX}${annotation.id}`, text: annotation.text, comment: annotation.comment,
-          source: annotation.source, sent: false,
+          id: `${DRAFT_ID_PREFIX}${annotation.id}`,
+          text: annotation.text,
+          comment: annotation.comment,
+          source: annotation.source,
+          sent: false,
         })),
       ]
       return lastView
     }
     return {
       get: read,
-      subscribe: (listener) => {
+      subscribe: listener => {
         listeners.add(listener)
         if (listeners.size === 1) {
-          unsubscribeCurrent = current.subscribe(() => { bind(); notify() })
+          unsubscribeCurrent = current.subscribe(() => {
+            bind()
+            notify()
+          })
           bind()
         }
         return () => {

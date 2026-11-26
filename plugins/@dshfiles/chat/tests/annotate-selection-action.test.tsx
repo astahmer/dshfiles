@@ -76,7 +76,10 @@ describe('AnnotateSelection quick add', () => {
     expect(attach).toHaveBeenCalledExactlyOnceWith({
       sessionId: 's1',
       attachment: {
-        kind: 'annotation', text: 'Alpha', source: 'step=step-1&block=0', comment: 'any fn that is business logic',
+        kind: 'annotation',
+        text: 'Alpha',
+        source: 'step=step-1&block=0',
+        comment: 'any fn that is business logic',
       },
     })
   })
