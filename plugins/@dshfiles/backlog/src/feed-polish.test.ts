@@ -83,7 +83,17 @@ describe('Backlog feed (council round 3, D2)', () => {
   it('gives each tag one fixed tone, whatever other tags are on screen', () => {
     expect(FeedLook).not.toHaveProperty('tagTones')
     expect(feed).not.toContain('tagTones')
-    expect(feed).toMatch(/tagTone=\{FeedLook\.tagTone\}/u)
+    // Round eight, lane T: the feed passes the user's chosen colours; an unpicked tag still gets the same hashed tone.
+    expect(feed).toMatch(/tagTone=\{tagColors\.tone\}/u)
+  })
+
+  it('paints a tag the user coloured in its chosen slot, and every other tag in its hashed one', () => {
+    const tone = FeedLook.tagToneOf(new Map([['billing', 5]]))
+    expect(tone('billing')).toBe('project-tone-balanced-5')
+    expect(tone('docs')).toBe(FeedLook.tagTone('docs'))
+    expect(FeedLook.tagToneOf(new Map())('billing')).toBe(FeedLook.tagTone('billing'))
+    expect(FeedLook.tagSlot(new Map([['billing', 2]]), 'billing')).toBe(2)
+    expect(`project-tone-balanced-${String(FeedLook.tagSlot(new Map(), 'docs'))}`).toBe(FeedLook.tagTone('docs'))
   })
 
   it("prints one time per run of consecutive same-minute rows, on the run's first row (council round 5, D4)", () => {

@@ -22,6 +22,7 @@ import { useBacklogActions } from './use-backlog-actions.js'
 import { BacklogReference } from './backlog-reference.js'
 import { BacklogMentionHandle } from './backlog-mention-handle.js'
 import { FeedLook } from './feed-look.js'
+import { useTagColors } from './use-tag-colors.js'
 import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 
 const DAY_MS = 86_400_000
@@ -113,7 +114,7 @@ const FeedEntry = (props: {
   readonly openThread: (sessionId: string) => void
   /** False when every row in the feed has the same author: the avatar would repeat one face down the page. */
   readonly showAuthor: boolean
-  /** A tag's fixed tone (`FeedLook.tagTone`). */
+  /** A tag's tone: its chosen slot, else its fixed hashed one (`useTagColors().tone`). */
   readonly tagTone: (tag: string) => string
   readonly timeShownAbove: boolean
 }): JSX.Element => {
@@ -313,6 +314,7 @@ export const FeedView = (props: {
 }): JSX.Element => {
   const now = props.now
   const menuActions = useBacklogActions()
+  const tagColors = useTagColors()
   const scroller = useRef<HTMLDivElement | null>(null)
   const atBottom = useRef(true)
   const ordered = useMemo(
@@ -379,7 +381,7 @@ export const FeedView = (props: {
           triageOff={props.triageOff}
           openThread={props.openThread}
           showAuthor={showAuthor}
-          tagTone={FeedLook.tagTone}
+          tagTone={tagColors.tone}
           timeShownAbove={!separator && FeedLook.timeShownAbove(times, index)}
         />
       </div>

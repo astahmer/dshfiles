@@ -28,6 +28,20 @@ export class FeedLook {
   static readonly tagTone = (tag: string): string => `project-tone-balanced-${String(projectToneIndex(tag))}`
 
   /**
+   * The tag tone with the user's choices (round eight, lane T): a tag picked in a chip's menu takes its slot of the
+   * active theme's identity palette; every other tag keeps its hashed `tagTone`.
+   */
+  static readonly tagToneOf =
+    (chosen: ReadonlyMap<string, number>) =>
+    (tag: string): string => {
+      const slot = chosen.get(tag)
+      return slot === undefined ? FeedLook.tagTone(tag) : `project-tone-balanced-${String(slot)}`
+    }
+
+  /** The slot a tag's chips use: its chosen one, else the hash `tagTone` reads. */
+  static readonly tagSlot = (chosen: ReadonlyMap<string, number>, tag: string): number => chosen.get(tag) ?? projectToneIndex(tag)
+
+  /**
    * Whether the row at `index` repeats the time of the row just above it: a run of consecutive rows captured in the
    * same minute prints its time once, on its first row (council round 5, D4). `times` are one day's rows, in order.
    */
