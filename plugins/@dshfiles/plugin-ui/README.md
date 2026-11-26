@@ -133,6 +133,13 @@ text is the status colour pulled 30% toward the ink, so it holds AA on its own t
 that is not a button uses the same pair: `bg-attention-tint text-attention-foreground`, `bg-danger-tint
 text-danger-tint-foreground`. Neither is a page primary: that stays the one ink button.
 
+**Verbs on a head band** (council round 12 A2). On a coloured head band (an Inbox card's Needs-you or Failed band) a
+12% tint disappears into the band, so pass `band`: `<Button variant="attention" size="sm" band>` (or `danger-tint`).
+The fill becomes 20% at rest, 26% on hover and 32% pressed, the text the band foreground (`text-attention-band-foreground`
+/ `text-danger-band-foreground`: the status colour 60% light / 50% dark with the ink, AA on every state over the band),
+and the button carries `data-on-band`. Height and padding never change: give both Review verbs the same `size`. Outside
+`Button`: `cn(buttonVariants({ variant: 'attention', band: true }))`, so the band fills replace the rest ones.
+
 On a row that already carries an attention wash (a Needs-you or Failed thread row), the verb is the text rung,
 `variant="attention-text"` or `variant="danger-text"`: the same foreground on a transparent fill, the 12% tint only on
 hover and 18% pressed, so the row shows one layer of colour. Same sizes and hit area as `attention`; AA at rest, hover and

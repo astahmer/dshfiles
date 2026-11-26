@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { cleanup, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Button, buttonVariants } from '../src/components/ui/button.js'
+import { cn } from '../src/lib/utils.js'
 import { PaletteMath, WARM_STONE, type Oklch, type Scheme } from '../src/theme/palette.ts'
 
 afterEach(cleanup)
@@ -95,6 +96,80 @@ describe('Button tint variants (round five K3)', () => {
       for (const alpha of alphas)
         for (const [surface, step] of Object.entries(surfaces))
           expect(PaletteMath.contrastRatio(text, composite(p.neutral[step]!, pair.fg, alpha)), `${pair.variant} at ${alpha} over ${surface}`).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+})
+
+describe('Button tint variants on a head band (council round 12 A2)', () => {
+  const bandClasses = (variant: 'attention' | 'danger-tint', band?: boolean): readonly string[] => cn(buttonVariants({ variant, size: 'sm', band })).split(/\s+/)
+  const bandAlphas = (variant: 'attention' | 'danger-tint', status: string): readonly number[] =>
+    bandClasses(variant, true).flatMap(name => {
+      const match = name.match(new RegExp(`^dshx:(?:hover:|active:)?bg-status-${status}/(\\d+)$`))
+      return match ? [Number(match[1]) / 100] : []
+    })
+  /** The ink share a `--dshx-<name>-band-foreground` token mixes into its status colour, per scheme. */
+  const bandInkShare = (name: string, status: string, scheme: Scheme): number => {
+    const block = scheme === 'dark' ? roles.slice(roles.indexOf('body[data-ds-dark-theme] {')) : roles.slice(0, roles.indexOf('body[data-ds-dark-theme] {'))
+    const pattern = new RegExp(`--dshx-${name}-band-foreground: color-mix\\(in oklab, var\\(--dsw-alias-state-${status}-primary\\) (\\d+)%, var\\(--dsw-alias-label-primary\\)\\);`)
+    return 1 - Number(block.match(pattern)?.[1] ?? 100) / 100
+  }
+
+  it('marks the verb on the band and swaps its tint to 20% at rest, 26% hover and 32% pressed', () => {
+    render(
+      <>
+        <Button variant="attention" size="sm" band>
+          Review
+        </Button>
+        <Button variant="danger-tint" size="sm" band>
+          Retry
+        </Button>
+      </>,
+    )
+    const review = screen.getByRole('button', { name: 'Review' })
+    expect(review.hasAttribute('data-on-band')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Retry' }).hasAttribute('data-on-band')).toBe(true)
+    for (const [variant, status, fg] of [
+      ['attention', 'needs-you', 'dshx:text-attention-band-foreground'],
+      ['danger-tint', 'failed', 'dshx:text-danger-band-foreground'],
+    ] as const) {
+      expect(bandAlphas(variant, status), variant).toEqual([0.2, 0.26, 0.32])
+      expect(bandClasses(variant, true), variant).toContain(fg)
+      // tailwind-merge keeps one fill per state: no 12/18/24 left beside the band tints.
+      expect(bandClasses(variant, true).filter(name => /bg-status-[a-z-]+\/(?:12|18|24)$/.test(name)), variant).toEqual([])
+    }
+    // Off the band nothing changes.
+    expect(screen.getByRole('button', { name: 'Review' }).className).toContain('dshx:bg-status-needs-you/20')
+    render(<Button variant="attention">Plain</Button>)
+    expect(screen.getByRole('button', { name: 'Plain' }).hasAttribute('data-on-band')).toBe(false)
+    expect(screen.getByRole('button', { name: 'Plain' }).className).toContain('dshx:bg-status-needs-you/12')
+  })
+
+  it('keeps the height and padding of the same verb off the band, so both Review verbs are one trigger', () => {
+    for (const size of ['default', 'xs', 'sm', 'lg'] as const)
+      for (const variant of ['attention', 'danger-tint'] as const) {
+        const box = (band: boolean): readonly string[] =>
+          cn(buttonVariants({ variant, size, band }))
+            .split(/\s+/)
+            .filter(name => /^dshx:(?:has-\[>svg\]:)?(?:h|px|py|size|gap)-/.test(name))
+        expect(box(true), `${variant} ${size}`).toEqual(box(false))
+        expect(box(true), `${variant} ${size}`).toEqual(cn(buttonVariants({ variant: 'attention', size, band: true })).split(/\s+/).filter(name => /^dshx:(?:has-\[>svg\]:)?(?:h|px|py|size|gap)-/.test(name)))
+      }
+  })
+
+  it.each(schemes)('holds AA text at rest, on hover and pressed over its head band and the plain surfaces (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const pairs = [
+      { variant: 'attention', status: 'business', name: 'attention', fg: p.accent.fg, css: 'needs-you', bands: { band: p.needsYouBandWash, row: p.needsYouWash } },
+      { variant: 'danger-tint', status: 'error', name: 'danger', fg: p.danger.fg, css: 'failed', bands: { band: p.failedWash } },
+    ] as const
+    for (const pair of pairs) {
+      const share = bandInkShare(pair.name, pair.status, scheme)
+      expect(share, `${pair.name} band ink share`).toBeGreaterThan(0)
+      const text = mixOklab(pair.fg, p.neutral[10]!, share)
+      const unders = { ...pair.bands, ...Object.fromEntries(Object.entries(surfaces).map(([name, step]) => [name, p.neutral[step]!])) }
+      for (const alpha of bandAlphas(pair.variant, pair.css))
+        for (const [surface, under] of Object.entries(unders))
+          expect(PaletteMath.contrastRatio(text, composite(under, pair.fg, alpha)), `${pair.variant} at ${alpha} over ${surface}`).toBeGreaterThanOrEqual(4.5)
     }
   })
 })

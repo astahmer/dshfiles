@@ -69,10 +69,35 @@ const buttonVariants = cva(
         'icon-sm': 'dshx:size-7',
         'icon-lg': 'dshx:size-9',
       },
+      /*
+       * A verb on a coloured head band (council round 12 A2: an Inbox card's Needs-you or Failed band, where a 12% tint
+       * disappeared into the band): `band` lifts the `attention` and `danger-tint` fills to 20% at rest, 26% on hover
+       * and 32% pressed, with the band foreground (the status colour pulled further toward the ink) so the text holds AA
+       * on every state over the band (tests/button-tint.test.tsx). Size and padding never change, so a band verb is the
+       * same trigger as its sibling. Other variants ignore it. Outside `Button`, read it through
+       * `cn(buttonVariants({ variant, band: true }))`, so the band fills replace the rest ones.
+       */
+      band: {
+        true: '',
+        false: '',
+      },
     },
+    compoundVariants: [
+      {
+        variant: 'attention',
+        band: true,
+        class: 'dshx:bg-status-needs-you/20 dshx:text-attention-band-foreground dshx:hover:bg-status-needs-you/26 dshx:active:bg-status-needs-you/32',
+      },
+      {
+        variant: 'danger-tint',
+        band: true,
+        class: 'dshx:bg-status-failed/20 dshx:text-danger-band-foreground dshx:hover:bg-status-failed/26 dshx:active:bg-status-failed/32',
+      },
+    ],
     defaultVariants: {
       variant: 'default',
       size: 'default',
+      band: false,
     },
   },
 )
@@ -84,12 +109,22 @@ type ButtonProps = React.ComponentPropsWithoutRef<'button'> &
 
 // forwardRef: React 18 drops `ref` on function components, and Radix triggers (`asChild`) need it.
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { className, variant = 'default', size = 'default', asChild = false, ...props },
+  { className, variant = 'default', size = 'default', band = false, asChild = false, ...props },
   ref,
 ) {
   const Comp = asChild ? Slot.Root : 'button'
 
-  return <Comp ref={ref} data-slot="button" data-variant={variant} data-size={size} className={cn(buttonVariants({ variant, size, className }))} {...props} />
+  return (
+    <Comp
+      ref={ref}
+      data-slot="button"
+      data-variant={variant}
+      data-size={size}
+      data-on-band={band ? '' : undefined}
+      className={cn(buttonVariants({ variant, size, band, className }))}
+      {...props}
+    />
+  )
 })
 
 export { Button, buttonVariants }

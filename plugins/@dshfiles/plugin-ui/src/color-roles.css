@@ -75,6 +75,12 @@
   --color-scrim: var(--dshx-scrim);
   --color-attention-foreground: var(--dshx-attention-foreground);
   --color-danger-tint-foreground: var(--dshx-danger-tint-foreground);
+  /*
+   * A verb on a head band (council round 12 A2: `Button band`): its 20/26/32% fill sits over the band's own wash, so its
+   * text is pulled further toward the ink, 40% in light and 50% in dark, to hold AA on every state (tests/button-tint).
+   */
+  --color-attention-band-foreground: var(--dshx-attention-band-foreground);
+  --color-danger-band-foreground: var(--dshx-danger-band-foreground);
   --color-attention-tint: color-mix(in oklab, var(--dsw-alias-state-business-primary) 12%, transparent);
   --color-danger-tint: color-mix(in oklab, var(--dsw-alias-state-error-primary) 12%, transparent);
   /* A destructive button's fill: white text holds 4.5:1 on it in both schemes (the dark danger text tone does not). */
@@ -365,6 +371,8 @@
     --dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);
     --dshx-attention-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 70%, var(--dsw-alias-label-primary));
     --dshx-danger-tint-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 70%, var(--dsw-alias-label-primary));
+    --dshx-attention-band-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 60%, var(--dsw-alias-label-primary));
+    --dshx-danger-band-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 60%, var(--dsw-alias-label-primary));
     --dshx-badge-attention-fill: var(--dsw-alias-state-business-primary);
     --dshx-badge-attention-foreground: oklch(1 0 0);
   }
@@ -399,6 +407,9 @@
     --dshx-control-on-foreground: var(--dsw-alias-label-primary-foreground);
     /* The dark danger tone is a light red for text on a dark surface; a fill under white text needs it darker. */
     --dshx-destructive-solid: color-mix(in oklch, var(--dsw-alias-state-error-primary) 62%, black);
+    /* A band verb's text (council round 12 A2): half ink in dark, where a 32% fill lifts the band toward the text. */
+    --dshx-attention-band-foreground: color-mix(in oklab, var(--dsw-alias-state-business-primary) 50%, var(--dsw-alias-label-primary));
+    --dshx-danger-band-foreground: color-mix(in oklab, var(--dsw-alias-state-error-primary) 50%, var(--dsw-alias-label-primary));
     /* The attention badge follows the accent hue (indigo 270 by default) at a fixed lightness and chroma. */
     --dshx-badge-attention-fill: oklch(from var(--dsw-alias-state-business-primary) 0.72 0.14 h);
     --dshx-badge-attention-foreground: oklch(from var(--dsw-alias-state-business-primary) 0.2 0.02 h);
