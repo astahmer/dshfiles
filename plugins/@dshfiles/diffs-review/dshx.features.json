@@ -41,7 +41,7 @@
         "click tab \"Land\"",
         "click button \"Review\"",
         "expect heading \"Review\"",
-        "expect textbox \"Base branch or bookmark\"",
+        "expect combobox \"Compare against\"",
         "expect text \"1 file\"",
         "expect text \"seeded-work.md*\"",
         "expect checkbox \"seeded-work.md*\"",

@@ -5,7 +5,6 @@ import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { ReviewLook } from './review-look.js'
@@ -15,7 +14,7 @@ import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { ProjectFolderPicker, type ProjectFolderSelection, type RegisteredProject, type WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useId, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { diffsReviewApi } from './api.js'
 import { jjIntegrationApi } from '@dshfiles/jj-integration/api'
 import type { ChangesRequest } from './changes-scope.js'
@@ -27,6 +26,7 @@ import { useRangeViewedMarks } from './viewed-marks.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import { reviewWithHistoryFallback } from './review-source.js'
 import { ReviewHeader } from './review-header.js'
+import { BaseCombobox } from './base-combobox.js'
 import type { SessionFocus } from './session-focus.js'
 
 /** Bring a thread on screen and open its Changes facet; false when it cannot. */
@@ -43,6 +43,8 @@ export interface DiffsReviewPanelProps {
 const noBody = (): undefined => undefined
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
+/** A control's label above it: 12/16 in secondary ink (council round 8, D3). */
+const REVIEW_CONTROL_LABEL = 'dshx:text-xs dshx:leading-4 dshx:text-muted-foreground'
 const SURFACE = 'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card'
 
 /** A counter in the UI sans with tabular figures: these are numbers to compare, not text to copy verbatim. */
@@ -95,6 +97,7 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
   const [selectedPath, setSelectedPath] = useState(() => pageReview?.workspacePath ?? '')
   const [baseRef, setBaseRef] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
+  const baseFieldId = useId()
   const projectsQuery = useQuery({
     queryKey: ['diffs-review', 'projects'],
     queryFn: ({ signal }) => runHostRequest({ signal, timeoutMs: 30_000, request: hostSignal => jjApi.projects({}, { signal: hostSignal }) }),
@@ -116,6 +119,18 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
     })),
   ]
   const selectedProject = pickerProjects.find(project => project.canonicalPath === reviewPath)
+  // The repository's bookmarks for the base list; an unregistered folder offers only its default.
+  const bookmarksQuery = useQuery({
+    queryKey: ['diffs-review', 'bookmarks', selectedProject?.workspaceId],
+    enabled: selectedProject !== undefined,
+    queryFn: ({ signal }) =>
+      runHostRequest({
+        signal,
+        timeoutMs: 30_000,
+        request: hostSignal => jjApi.destination({ workspaceId: selectedProject?.workspaceId ?? '' }, { signal: hostSignal }),
+      }),
+    staleTime: 60_000,
+  })
   // The project a thread workspace belongs to ("sample · thread-e4fde2" → "sample"): its ProjectMark leads the picker.
   const pickerProjectName = selectedProject === undefined ? undefined : selectedProject.title.split(' · ')[0]?.trim() || selectedProject.title
   const pickerLabel =
@@ -300,7 +315,12 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         mark={<GitMerge />}
         markTone="land"
         heading="Review"
-        description="Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers."
+        // Held to 62ch and wrapped with no one-word last line (council round 8, D3).
+        description={
+          <span className="dshx:block dshx:max-w-[62ch] dshx:text-pretty">
+            Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers.
+          </span>
+        }
         // The base is named once, in the branch control ("Base: main"), not again in a chip beside the title (round 5, D3).
         // Summarize is an outline action and Refresh sits in the overflow: the page has no filled primary (council round 4/5, D3).
         actions={[
@@ -336,19 +356,25 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         ]}
         className="dshx:shrink-0"
       >
-        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-          {/* It shows a value, so it takes the field look of the Base field beside it (council round 7, D4 / A4). */}
-          <Button
-            aria-label="Choose project or workspace"
-            className="dshx:min-w-48 dshx:max-w-full dshx:shrink"
-            onClick={() => setPickerOpen(true)}
-            type="button"
-            variant="field"
-          >
-            {pickerProjectName === undefined ? null : <ProjectMark name={pickerProjectName} size="dense" />}
-            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{pickerLabel}</span>
-            <ChevronDown aria-hidden className="dshx:size-4 dshx:shrink-0" />
-          </Button>
+        {/* Each control carries a 12/16 label above it, so the row reads without its values (council round 8, D3). */}
+        <div className="dshx:flex dshx:flex-wrap dshx:items-end dshx:gap-2">
+          <div className="dshx:flex dshx:min-w-0 dshx:max-w-full dshx:flex-col dshx:gap-1">
+            <span aria-hidden className={REVIEW_CONTROL_LABEL}>
+              Project or workspace
+            </span>
+            {/* It shows a value, so it takes the field look of the base field beside it (council round 7, D4 / A4). */}
+            <Button
+              aria-label="Choose project or workspace"
+              className="dshx:min-w-48 dshx:max-w-full dshx:shrink"
+              onClick={() => setPickerOpen(true)}
+              type="button"
+              variant="field"
+            >
+              {pickerProjectName === undefined ? null : <ProjectMark name={pickerProjectName} size="dense" />}
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{pickerLabel}</span>
+              <ChevronDown aria-hidden className="dshx:size-4 dshx:shrink-0" />
+            </Button>
+          </div>
           {pickerOpen ? (
             <ProjectFolderPicker
               directoryPicker={props.workspacePicker.directoryPicker}
@@ -365,21 +391,12 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
               showNativePicker={false}
             />
           ) : null}
-          {/* The effective base reads as the field's value ("Base: main", ink); typing a bookmark overrides it. */}
-          <div className="dshx:relative dshx:w-48 dshx:max-w-full" data-review-base>
-            <span
-              aria-hidden
-              className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:-translate-y-1/2 dshx:text-sm dshx:text-muted-foreground"
-            >
-              Base:
-            </span>
-            <Input
-              aria-label="Base branch or bookmark"
-              placeholder={base ?? 'default'}
-              value={baseRef}
-              onChange={event => setBaseRef(event.target.value)}
-              className={cn('dshx:w-full dshx:pl-12 dshx:tabular-nums', base !== undefined && 'dshx:placeholder:text-foreground')}
-            />
+          {/* The effective base reads as the field's value in ink with a "default" tag; a typed or chosen bookmark overrides it. */}
+          <div className="dshx:flex dshx:max-w-full dshx:flex-col dshx:gap-1" data-review-base>
+            <label htmlFor={baseFieldId} className={REVIEW_CONTROL_LABEL}>
+              Compare against
+            </label>
+            <BaseCombobox id={baseFieldId} base={base} value={baseRef} onValueChange={setBaseRef} bookmarks={bookmarksQuery.data?.bookmarks} />
           </div>
         </div>
         {/* The file toolbar over the diff card: what changed on the left, review progress on the right (round 4, D3). */}

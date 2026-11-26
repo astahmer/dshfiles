@@ -15,7 +15,7 @@ describe('Review change counts (council round 3, D5)', () => {
 
   it('sets the Review page and its diff cards on the wide data frame (council round 5 A2/D3)', () => {
     expect(read('panel.tsx')).toMatch(
-      /<Page\s+width="wide"\s+(?:\/\/[^\n]*\n\s*)*mark=\{<GitMerge \/>\}\s+markTone="land"\s+heading="Review"\s+description="Changed files/u,
+      /<Page\s+width="wide"\s+(?:\/\/[^\n]*\n\s*)*mark=\{<GitMerge \/>\}\s+markTone="land"\s+heading="Review"\s+(?:\/\/[^\n]*\n\s*)*description=\{\s*<span[^>]*>\s*Changed files/u,
     )
     // The cards sit outside Page, so they take the same frame: the same start inset and the same 1200 px cap.
     expect(read('panel.tsx')).toMatch(/<div className=\{cn\(PAGE_FRAME_CLASS\.wide, 'dshx:px-6 dshx:@max-pane-narrow:px-3'\)\} data-review-cards>/u)

@@ -23,7 +23,7 @@ const expectPanelReadsThreadWorkspace = async ({ page, base, range }: { page: Pa
   // The picker names the project or workspace; the absolute path stays out of the label.
   await expect(projectPicker).toContainText(threadWorkspacePathFor(page).split('/').filter(Boolean).at(-1) ?? '')
   await expect(projectPicker).not.toContainText(threadWorkspacePathFor(page))
-  const baseSelector = page.getByRole('textbox', { name: 'Base branch or bookmark', exact: true })
+  const baseSelector = page.getByRole('combobox', { name: 'Compare against', exact: true })
   await expect(baseSelector).toBeVisible()
   await baseSelector.fill(base)
   await expect(page.getByText(range, { exact: true })).toBeVisible({ timeout: 30_000 })

@@ -36,7 +36,8 @@ describe('the Review page controls (council round 2, D3)', () => {
     const stat = panel.slice(panel.indexOf('const Stat ='), panel.indexOf('/** The page'))
     expect(stat).toContain('dshx:tabular-nums')
     expect(stat).not.toContain('font-mono')
-    const base = panel.slice(panel.indexOf('aria-label="Base branch or bookmark"'), panel.indexOf('/>', panel.indexOf('aria-label="Base branch or bookmark"')))
+    const base = readFileSync(fileURLToPath(new URL('base-combobox.tsx', import.meta.url)), 'utf8')
+    expect(base).toContain('dshx:tabular-nums')
     expect(base).not.toContain('font-mono')
   })
 
@@ -55,14 +56,15 @@ describe('the Review page controls (council round 2, D3)', () => {
 
 describe('the Review page controls (council round 5, D3)', () => {
   const panel = readFileSync(fileURLToPath(new URL('panel.tsx', import.meta.url)), 'utf8')
-  const base = panel.slice(panel.indexOf('data-review-base'), panel.indexOf('/>', panel.indexOf('aria-label="Base branch or bookmark"')))
+  const base = panel.slice(panel.indexOf('data-review-base'), panel.indexOf('/>', panel.indexOf('<BaseCombobox')))
 
-  it('names the base once, in the branch control: "Base: main" in value ink, no "since" chip beside the title', () => {
+  it('names the base once, in the branch control, no "since" chip beside the title', () => {
     expect(panel).not.toContain('ReviewHeader.rangeLabel(result.range)')
     expect(panel).not.toMatch(/<Page[^>]*\smeta=/u)
-    expect(base).toMatch(/<span[^>]*>\s*Base:\s*<\/span>/u)
-    expect(base).toContain("placeholder={base ?? 'default'}")
-    expect(base).toContain('dshx:placeholder:text-foreground')
+    // Round 8 D3: the label above names the control ("Compare against"); the field shows the base in ink with a
+    // "default" tag (base-combobox.client.test.tsx).
+    expect(base).toContain('Compare against')
+    expect(base).toContain('base={base}')
     expect(base).not.toContain('Base branch (')
   })
 
