@@ -58,6 +58,7 @@ import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { LEADING_GLYPH_ATTRIBUTE, MARKER_KEEP } from '@dshfiles/plugin-ui/components/selection'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -1537,6 +1538,15 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const liveStartedAt = live ? props.liveTurn?.startedAt : undefined
   // The project name only when line 2 has nothing else to say: beside a reason or a step it was cut to "b…" (T1).
   const showProjectName = showProject && liveStep === undefined && statusDetail === undefined
+  // A line that names a kind (the ask, the failure, a working reason) reads through the kit's AttentionMeta (council
+  // round 14 B1): `[mark] project · kind`, the mark on the rail under the status glyph, the name whole or dropped,
+  // never cut to a stub. Without the project preference the mark keeps its own seat and the line names only the kind.
+  const metaKind = liveStep === undefined ? (attentionKind ?? statusDetail) : undefined
+  const metaRail = metaKind !== undefined && showProject
+  // A desktop attention row keeps the project's name before the kind: its status glyph and its verb already say the
+  // kind, and the sidebar is too narrow for both beside the verb. The phone list has room for both, and a working
+  // reason is the line's news, so those keep the kind.
+  const metaKeep = attentionKind !== undefined && !coarsePointer() ? 'name' : 'kind'
   const metaLine =
     liveStep !== undefined ||
     (showMark && props.workspacePath !== undefined) ||
@@ -1920,8 +1930,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    // Room for what sits at the end of this line: the verb, the subagent counter, or both.
-                    verbSeat === 'meta' ? (childCount > 0 ? 'dshx:pr-34' : 'dshx:pr-17.5') : childCount > 0 && (childCounterShown ? 'dshx:pr-16' : 'dshx:pr-8'),
+                    // Room for the subagent counter at this line's end; the verb beside it holds its own width through
+                    // the invisible copy at the line's end (council round 14 B1).
+                    childCount > 0 && (childCounterShown ? (verbSeat === 'meta' ? 'dshx:pr-18' : 'dshx:pr-16') : 'dshx:pr-8'),
                     // Touch: row 2 is at least the 28px verb it carries (round five B1).
                     verbSeat === 'meta' && 'dshx:pointer-coarse:min-h-7',
                   )}
@@ -1929,9 +1940,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 >
                   {/* Line 2 is where the thread runs (b:212a): the project mark sits in the seat under the status glyph,
                       so the project name lines up with the title. Its 8px gap matches line 1's. */}
-                  {leadSeat || showMark ? (
+                  {!metaRail && (leadSeat || showMark) ? (
                     <span className="dshx:mr-0.5 dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center">
-                      {showMark && attentionKind === undefined ? (
+                      {showMark ? (
                         <RowProjectMark
                           name={props.workspaceTitle}
                           tone={props.projectChipTone}
@@ -1943,6 +1954,25 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       ) : null}
                     </span>
                   ) : null}
+                  {metaKind === undefined ? null : (
+                    // The kind stays whole; the name beside the rail's mark is whole or gone (the kit measures it), so a
+                    // narrow column never shows "billing…". 12/16 in the secondary ink, the title being the row's ink.
+                    // The rail's 16px seat and 8px gap match line 1's glyph and gap, so the name starts under the title.
+                    <AttentionMeta
+                      data-testid="thread-row-status-kind"
+                      markSeat={metaRail ? 'rail' : 'inline'}
+                      project={metaRail ? props.workspaceTitle : undefined}
+                      kind={metaKind}
+                      keep={metaKeep}
+                      data-keep={metaKeep}
+                      mark={{
+                        tone: props.projectChipTone,
+                        color: rowStyle.projectColor ? props.projectChipColor : 'currentColor',
+                        palette: rowStyle.projectPalette,
+                        'data-thread-project-mark': props.workspaceTitle,
+                      }}
+                    />
+                  )}
                   {liveStep === undefined ? null : (
                     <LiveActivityLine
                       active={nearViewport}
@@ -1951,45 +1981,6 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       step={liveStep}
                       className="dshx:min-w-0 dshx:flex-1"
                     />
-                  )}
-                  {attentionKind === undefined ? null : (
-                    // The title is the row's ink; the kind and the project read under it in the secondary ink at 13/18
-                    // (council round 8 B3), on one line. The kind stays whole up to half the line (a long failure reason
-                    // truncates there); in a narrow column the project's name gives way after its mark.
-                    <span
-                      className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1 dshx:text-sm/[18px] dshx:text-muted-foreground dshx:pointer-coarse:text-xs/[18px]"
-                      data-testid="thread-row-status-kind"
-                    >
-                      <span className="dshx:max-w-1/2 dshx:shrink-0 dshx:truncate" data-testid="thread-row-status-detail">
-                        {attentionKind}
-                      </span>
-                      {showMark ? (
-                        <>
-                          <span aria-hidden="true">·</span>
-                          {props.workspaceTitle === undefined ? null : (
-                            <RowProjectMark
-                              name={props.workspaceTitle}
-                              tone={props.projectChipTone}
-                              color={props.projectChipColor}
-                              palette={rowStyle.projectPalette}
-                              coloured={rowStyle.projectColor}
-                              labelled={!showProject}
-                            />
-                          )}
-                          {showProject || props.workspaceTitle === undefined ? (
-                            <span className="dshx:min-w-0 dshx:truncate" data-testid="thread-row-project">
-                              {props.workspaceTitle ?? t('threadSidebarUnassigned')}
-                            </span>
-                          ) : null}
-                        </>
-                      ) : null}
-                    </span>
-                  )}
-                  {liveStep !== undefined || statusDetail === undefined || attentionKind !== undefined ? null : (
-                    // A working row's reason (Waiting on 1 subagent) takes the line beside the mark in its seat.
-                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" data-testid="thread-row-status-detail">
-                      {statusDetail}
-                    </span>
                   )}
                   {showProjectName ? (
                     // Muted: the tile carries the project's colour (round five T1). The first text to give way on a
@@ -2023,6 +2014,22 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {showPath && liveStep === undefined ? (
                     <span className="dshx:min-w-0 dshx:truncate" title={session.cwd}>
                       {session.cwd}
+                    </span>
+                  ) : null}
+                  {verbSeat === 'meta' && inlineVerb !== undefined ? (
+                    // The verb's seat, sized to the verb (council round 14 B1): an invisible copy of its label in the
+                    // button's xs metrics. The verb itself sits outside this button (a button cannot hold one); its
+                    // corner is 4px (touch: 8px) further out than this line's end, so the copy gives that back. Only its
+                    // width counts: it keeps the line's 16px, so line 2 never grows.
+                    <span
+                      aria-hidden="true"
+                      data-verb-reserve=""
+                      className={cn(
+                        'dshx:invisible dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:px-2 dshx:text-xs/4 dshx:font-medium dshx:whitespace-nowrap',
+                        childCount > 0 ? 'dshx:-mr-1' : 'dshx:-mr-1 dshx:pointer-coarse:-mr-2',
+                      )}
+                    >
+                      {t(inlineVerbLabelKeys[inlineVerb])}
                     </span>
                   ) : null}
                 </span>

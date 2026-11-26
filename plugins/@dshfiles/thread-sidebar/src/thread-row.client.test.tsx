@@ -103,8 +103,21 @@ describe('a row that needs you', () => {
     // Line 1 is the title at full width and the time: no verb seat there any more.
     expect(row.querySelector('[data-thread-time]')?.textContent).toBe('7m')
     expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
-    // Line 2 keeps the verb's width at its end; the kind and the project take the rest.
-    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-17.5')
+    // Line 2 keeps the verb's own width at its end (council round 14 B1), never a fixed 70px: an invisible copy of the
+    // verb's label holds its seat, so the project and the kind take the rest.
+    const where = row.querySelector<HTMLElement>('[data-thread-where]')
+    expect(where?.className).not.toMatch(/dshx:pr-(17\.5|34)\b/u)
+    const reserve = where?.querySelector<HTMLElement>(':scope > [data-verb-reserve]')
+    expect(reserve?.textContent).toBe(verb?.textContent)
+    expect(reserve?.getAttribute('aria-hidden')).toBe('true')
+    expect(reserve?.className).toContain('dshx:invisible')
+    expect(reserve?.className).toContain('dshx:shrink-0')
+    expect(reserve?.className).toContain('dshx:px-2')
+    expect(reserve?.className).toContain('dshx:text-xs')
+    expect(reserve?.className).toContain('dshx:font-medium')
+    // Only its width counts: it keeps line 2 at 16px instead of the verb's 24px, so the row never grows.
+    expect(reserve?.className).toContain('dshx:h-4')
+    expect(reserve?.className).not.toMatch(/dshx:(pointer-coarse:)?h-[67]\b/u)
     expect(row.querySelector('[data-testid="thread-row-status-kind"]')?.className).toContain('dshx:flex-1')
   })
 
@@ -125,11 +138,11 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-testid="thread-row-verb"]')?.getAttribute('data-variant')).toBe('danger-text')
   })
 
-  it('reads the kind or failure under the title in the secondary ink at 13/18 (council round 8 B3)', async () => {
+  it('reads the kind or failure under the title in the secondary ink at 12/16 (council round 14)', async () => {
     for (const workStatus of [asking.workStatus, rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' })]) {
       const row = await renderRow({ workStatus })
       const detail = row.querySelector<HTMLElement>('[data-testid="thread-row-status-kind"]')
-      expect(detail?.className).toContain('dshx:text-sm/[18px]')
+      expect(detail?.className).toContain('dshx:text-xs/4')
       expect(detail?.className).toContain('dshx:text-muted-foreground')
       expect(detail?.className).not.toContain('dshx:text-foreground')
     }
@@ -172,7 +185,11 @@ describe('a row that needs you', () => {
     const end = row.querySelector('[data-thread-row-end]')
     expect(end?.querySelector('[data-testid="thread-row-verb"]')).not.toBeNull()
     expect(end?.querySelector('[data-thread-children-toggle]')).not.toBeNull()
-    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:pr-34')
+    // The verb's own width (its invisible copy) plus the counter's 72px, not a fixed 136px.
+    const where = row.querySelector<HTMLElement>('[data-thread-where]')
+    expect(where?.className).not.toContain('dshx:pr-34')
+    expect(where?.className).toContain('dshx:pr-18')
+    expect(where?.querySelector('[data-verb-reserve]')?.textContent).toBe(end?.querySelector('[data-testid="thread-row-verb"]')?.textContent)
   })
 
   it('ends a touch row\'s verb label at the time column above it, the counter at the menu column (round nine B5)', async () => {
@@ -186,6 +203,9 @@ describe('a row that needs you', () => {
     const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
     const counted = await renderRow({ ...asking, childThreads: children })
     expect(counted.querySelector('[data-thread-row-end]')?.className).toContain('dshx:pointer-coarse:right-11')
+    // A touch row's reservation reaches 8px into the menu column like the verb does; beside a counter it does not.
+    expect(row.querySelector('[data-verb-reserve]')).toBeNull()
+    expect(counted.querySelector('[data-verb-reserve]')?.className).not.toContain('dshx:pointer-coarse:-mr-2')
   })
 
   it('keeps the attention verb to Needs-you and Failed rows: a Ready row carries no Land button', async () => {
@@ -197,7 +217,10 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
   })
 
-  it('names the kind, then the project as identity, `kind · [mark] project`, on every attention row (council round 13 B3)', async () => {
+  it('reads `[mark] project · kind` through the kit AttentionMeta, the mark on the rail under the glyph (council round 14 B1)', async () => {
+    const parts = (line: HTMLElement | null): (string | null)[] =>
+      Array.from(line?.querySelectorAll(':scope > [data-attention-meta-part]') ?? []).map(part => part.getAttribute('data-attention-meta-part'))
+    const text = (line: HTMLElement | null, part: string): string | undefined => line?.querySelector(`:scope > [data-attention-meta-part="${part}"]`)?.textContent ?? undefined
     for (const [workStatus, kind] of [
       [asking.workStatus, 'threadSidebarAskQuestion'],
       [rowStatus({ status: 'needs-you', verb: 'Approve', detail: 'git push --force origin main' }), 'threadSidebarAskApproval'],
@@ -206,18 +229,22 @@ describe('a row that needs you', () => {
     ] as const) {
       const row = await renderRow({ workStatus })
       const line = row.querySelector<HTMLElement>('[data-testid="thread-row-status-kind"]')
-      // One line on a desktop and a phone alike: never a cut excerpt, never two lines.
-      expect(line?.textContent).toBe(`${kind}·SAsample`)
-      expect(line?.className).not.toMatch(/pointer-coarse:(hidden|line-clamp)/u)
-      expect(line?.querySelector('[data-testid="thread-row-status-detail"]')?.className).toContain('dshx:truncate')
-      // The 16px mark sits in the line, between the dot and the name, not in the seat under the status glyph.
-      const mark = line?.querySelector<HTMLElement>('[data-slot="project-mark"]')
-      expect(mark?.getAttribute('data-size')).toBe('dense')
-      expect(mark?.nextElementSibling?.getAttribute('data-testid')).toBe('thread-row-project')
-      expect(row.querySelectorAll('[data-thread-where] [data-slot="project-mark"]')).toHaveLength(1)
-      // The kind stays whole (up to half the line); in a narrow column the project's name gives way after its mark.
-      expect(line?.querySelector('[data-testid="thread-row-status-detail"]')?.className).toContain('dshx:shrink-0')
-      expect(row.querySelector('[data-testid="thread-row-project"]')?.className).toContain('dshx:min-w-0 dshx:truncate')
+      expect(line?.getAttribute('data-slot')).toBe('attention-meta')
+      expect(line?.getAttribute('data-mark-seat')).toBe('rail')
+      // One formatter for every surface: the mark in its rail seat, then the name, then the kind.
+      expect(parts(line)).toEqual(['rail', 'name', 'sep', 'kind'])
+      expect(text(line, 'name')).toBe('sample')
+      expect(text(line, 'kind')).toBe(kind)
+      // On the desktop sidebar the name outlasts the kind: the glyph and the verb already say the kind (lead, round 14).
+      expect(line?.getAttribute('data-keep')).toBe('name')
+      // One mark on the line, in the rail seat under the status glyph, so every row's marks form one column.
+      const marks = row.querySelectorAll<HTMLElement>('[data-thread-where] [data-slot="project-mark"]')
+      expect(marks).toHaveLength(1)
+      expect(marks[0]?.parentElement?.getAttribute('data-attention-meta-part')).toBe('rail')
+      expect(marks[0]?.getAttribute('data-size')).toBe('dense')
+      // The line is the meta line itself, not a second seat beside one.
+      expect(line?.parentElement?.hasAttribute('data-thread-where')).toBe(true)
+      expect(row.querySelectorAll('[data-thread-where] > span.dshx\\:w-4')).toHaveLength(0)
       cleanup()
     }
   })
@@ -302,10 +329,16 @@ describe('the project on line 2', () => {
     expect(row.querySelector('[data-slot="project-mark"]')?.className).toContain('project-tone-balanced-4')
   })
 
-  it('drops the truncated name when line 2 carries a working reason, and names the tile instead', async () => {
+  it('reads a working reason through the same AttentionMeta, the mark on the rail (council round 14 B1)', async () => {
     const row = await renderRow({ workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) })
-    expect(row.querySelector('[data-testid="thread-row-project"]')).toBeNull()
-    expect(row.querySelector('[data-slot="project-mark"]')?.getAttribute('aria-label')).toBe('sample')
+    const line = row.querySelector<HTMLElement>('[data-thread-where] > [data-slot="attention-meta"]')
+    expect(line?.getAttribute('data-mark-seat')).toBe('rail')
+    expect(line?.querySelector(':scope > [data-attention-meta-part="kind"]')?.textContent).toBe('Waiting on 1 subagent')
+    // The reason is the line's news: it outlasts the name.
+    expect(line?.getAttribute('data-keep')).toBe('kind')
+    // The name shows while it fits and gives way, whole, to the mark when it does not (the kit measures it).
+    expect(line?.querySelector(':scope > [data-attention-meta-part="name"]')?.textContent).toBe('sample')
+    expect(line?.querySelector(':scope > [data-attention-meta-part="rail"] [data-slot="project-mark"]')).not.toBeNull()
   })
 })
 
@@ -321,11 +354,10 @@ describe('a thread that runs a background job', () => {
   it('drops the job chip when line 2 already says it waits on its subagents', async () => {
     const child = rowSession({ id: SessionId('c1'), parentId: SessionId('s1'), origin: 'subagent', running: true })
     const row = await renderRow({ runningJobs: 1, childThreads: [child], workStatus: rowStatus({ status: 'working', detail: 'Waiting on 1 subagent' }) })
-    const detail = row.querySelector('[data-testid="thread-row-status-detail"]')
-    expect(detail?.textContent).toBe('Waiting on 1 subagent')
-    // No project name follows a reason any more, so the reason takes the line instead of 60% of it.
+    const detail = row.querySelector('[data-thread-where] > [data-slot="attention-meta"]')
+    expect(detail?.querySelector(':scope > [data-attention-meta-part="kind"]')?.textContent).toBe('Waiting on 1 subagent')
+    // The reason's line takes the rest of line 2.
     expect(detail?.className).toContain('dshx:flex-1')
-    expect(detail?.className).not.toContain('dshx:max-w-[60%]')
     expect(row.querySelector('[data-thread-jobs]')).toBeNull()
   })
 
