@@ -18,13 +18,6 @@ const block = (selector: string): string => {
 }
 const classes = (element: Element | null): readonly string[] => element?.className.split(/\s+/u) ?? []
 
-/** `oklch(1 0 0 / alpha)` over an opaque colour, composited in sRGB as the browser does. */
-const whiteOver = (under: Oklch, alpha: number): Oklch => {
-  const channels = [1, 3, 5].map(at => Number.parseInt(PaletteMath.toHex(under).slice(at, at + 2), 16))
-  const mixed = channels.map(value => Math.round(value * (1 - alpha) + 255 * alpha))
-  return PaletteMath.hexToOklch(`#${mixed.map(value => value.toString(16).padStart(2, '0')).join('')}`)
-}
-
 describe('dialog and palette elevation (council round 3 A8)', () => {
   it('is a raised fill, a faint light edge and one deep shadow in dark; light keeps the page fill, hairline and s3', () => {
     expect(styles).toContain("@import './surfaces.css';")
@@ -69,24 +62,34 @@ describe('dialog and palette elevation (council round 3 A8)', () => {
     }
   })
 
-  it('draws a keycap as a faint light fill with a faint edge in dark, same box in both schemes', () => {
-    const dark = block('  body[data-ds-dark-theme]')
-    expect(dark).toContain('--dshx-kbd-fill: oklch(1 0 0 / 0.08);')
-    expect(dark).toContain('--dshx-kbd-border: oklch(1 0 0 / 0.12);')
+  it('draws one shortcut chip in both schemes: 20px, the raised step, a 1px hairline, UI sans with tabular numerals (council round 10 A5)', () => {
     const light = block('  body')
-    expect(light).toContain('--dshx-kbd-fill: var(--dsw-alias-bg-module-platform);')
-    expect(light).toContain('--dshx-kbd-border: transparent;')
-    const view = render(<Kbd>K</Kbd>)
-    expect(classes(view.container.querySelector('[data-slot="kbd"]'))).toEqual(
-      expect.arrayContaining(['dshx:border', 'dshx:border-(--dshx-kbd-border)', 'dshx:bg-(--dshx-kbd-fill)']),
+    expect(light).toContain('--dshx-kbd-fill: var(--dshx-tone-2, var(--dsw-alias-bg-module-platform));')
+    expect(light).toContain('--dshx-kbd-border: var(--dsw-alias-border-l2);')
+    // The platform symbol faces come before the generic fallback, so ⌘ ⌥ ⇧ never fall to a serif face.
+    expect(light).toMatch(/--dshx-kbd-font: var\(--dsw-font-family, ui-sans-serif, system-ui\), -apple-system, BlinkMacSystemFont, 'Segoe UI Symbol', [^;]*, sans-serif;/u)
+    // No dark override: the same chip in both schemes.
+    expect(block('  body[data-ds-dark-theme]')).not.toMatch(/--dshx-kbd-/u)
+    const view = render(<Kbd>⌘1</Kbd>)
+    const cap = classes(view.container.querySelector('[data-slot="kbd"]'))
+    expect(cap).toEqual(
+      expect.arrayContaining(['dshx:h-5', 'dshx:border', 'dshx:border-(--dshx-kbd-border)', 'dshx:bg-(--dshx-kbd-fill)', 'dshx:font-(family-name:--dshx-kbd-font)', 'dshx:tabular-nums']),
     )
+    expect(cap).not.toContain('dshx:font-sans')
+  })
+
+  it.each(['light', 'dark'] as const)('keeps keycap text at AA and its edge visible on the cap over every surface (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const cap = p.neutral[2]!
+    expect(PaletteMath.contrastRatio(p.neutral[9]!, cap)).toBeGreaterThanOrEqual(4.5)
+    // The hairline (step 4) stands off the cap.
+    expect(Math.abs(p.neutral[4]!.l - cap.l)).toBeGreaterThanOrEqual(0.04)
   })
 
   it('keeps ink, secondary and faint text at AA on the dark dialog, and keycap text at AA on its cap', () => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme: 'dark' })
     const fill: Oklch = { l: 0.27, c: 0.006, h: 60 }
     for (const step of [8, 9, 10]) expect(PaletteMath.contrastRatio(p.neutral[step]!, fill), `step ${step}`).toBeGreaterThanOrEqual(4.5)
-    expect(PaletteMath.contrastRatio(p.neutral[9]!, whiteOver(fill, 0.08)), 'keycap text').toBeGreaterThanOrEqual(4.5)
     // The dialog reads above the page it covers, and clearer than before over the 50% black scrim (round 4 A5).
     expect(fill.l).toBeGreaterThan(p.neutral[2]!.l)
     const scrimmed = (under: Oklch): Oklch => {

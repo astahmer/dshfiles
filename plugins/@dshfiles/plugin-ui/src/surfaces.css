@@ -6,8 +6,9 @@
  * page's selection wash (0.275), so inside a dark dialog the selection lifts to 0.30 and the faint text step to 0.68:
  * the highlighted row still stands off the fill, and faint text holds AA on it. A popover-level fill inside the dialog
  * (the palette's `Command` root, `bg-popover`) takes the dialog fill, so the card is one tone. Light keeps all three:
- * there the popover step already is the page fill. A keycap reads its fill and edge here too: in dark a faint light cap with a faint edge;
- * in light the muted fill with a transparent edge of the same width, so a `Kbd` has one box in both schemes.
+ * there the popover step already is the page fill. A keycap reads its look here too (council round 10 A5): one
+ * shortcut chip in both schemes and every surface, the raised step (`tone-2`) with a 1px hairline (`border-l2`), in
+ * the UI sans with the platform symbol faces before any generic fallback, so ⌘ ⌥ ⇧ never fall to a serif face.
  *
  * Declared on body, where the Host's `--dsw-*` tokens are defined (a `:root` var() of them resolves to nothing).
  * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
@@ -27,8 +28,9 @@
     --dshx-dialog-fill: var(--dsw-alias-bg-base);
     --dshx-dialog-border: var(--dsw-alias-border-l2);
     --dshx-elevation-dialog: var(--dshx-elevation-3);
-    --dshx-kbd-fill: var(--dsw-alias-bg-module-platform);
-    --dshx-kbd-border: transparent;
+    --dshx-kbd-fill: var(--dshx-tone-2, var(--dsw-alias-bg-module-platform));
+    --dshx-kbd-border: var(--dsw-alias-border-l2);
+    --dshx-kbd-font: var(--dsw-font-family, ui-sans-serif, system-ui), -apple-system, BlinkMacSystemFont, 'Segoe UI Symbol', 'Noto Sans Symbols 2', 'DejaVu Sans', sans-serif;
     --dshx-dialog-selected-wash: var(--dshx-selected-wash);
     --dshx-dialog-faint: var(--dsw-alias-label-tertiary);
   }
@@ -38,8 +40,6 @@
     --dshx-dialog-faint: oklch(from var(--dsw-alias-label-tertiary) max(l, 0.68) c h);
     --dshx-dialog-border: oklch(1 0 0 / 0.08);
     --dshx-elevation-dialog: 0 24px 64px rgb(0 0 0 / 0.55);
-    --dshx-kbd-fill: oklch(1 0 0 / 0.08);
-    --dshx-kbd-border: oklch(1 0 0 / 0.12);
   }
 }
 

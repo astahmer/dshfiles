@@ -225,8 +225,10 @@ section heading: a Settings category's sections, an Inbox card title. The page `
 (`oklch(0.27 0.006 60)`), a faint light edge (`oklch(1 0 0 / 0.08)`) and one deep shadow (`0 24px 64px rgb(0 0 0 / 0.55)`).
 Inside it, in dark, the selection wash lifts to L 0.30 and the faint text step to L 0.68 (AA on that selection), and
 `bg-popover` takes the dialog fill, so a `Command` inside is one tone with its card.
-`Kbd` reads `--dshx-kbd-fill`/`--dshx-kbd-border`: in dark a faint light cap (8%) with a 12% edge, in light the muted
-fill with a transparent edge, so the keycap keeps one box. A palette the kit does not draw adds `dshx:border
+`Kbd` is the one shortcut chip in both schemes and on every surface (council round 10 A5): 20px, the raised step
+(`--dshx-kbd-fill`, `tone-2`) with a 1px hairline (`--dshx-kbd-border`, `border-l2`), secondary ink at 12/500 with
+tabular numerals, in `--dshx-kbd-font`: the UI sans with the platform symbol faces before the generic fallback, so ⌘ ⌥ ⇧
+never fall to a serif face. The palette footer, a row's `KeyHint` and a menu shortcut all use it. A palette the kit does not draw adds `dshx:border
 dshx:surface-dialog` to its own card.
 
 **One field look.** Text-entry fields, `Input`, `Textarea` and `InputGroup` (so `SearchInput`), share `fieldLook`
