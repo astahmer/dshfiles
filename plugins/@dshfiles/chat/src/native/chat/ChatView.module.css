@@ -118,6 +118,36 @@
   }
 }
 
+/* dshfiles (council round 23, item 9): a turn a notice opened (a subagent's failed run) sits as far under the reply
+   before it as its own "Worked for" sits under the notice: 24px of ink each side. Below, 22px plus the notice's 2px
+   padding; above on a touch screen, 22px under the reply's visible actions row. */
+.flowItem[data-chat-flow-kind="turn-trigger"] + .flowItem[data-chat-flow-kind="turn-process"],
+.flowItem[data-chat-flow-kind="turn-tail"] + .flowItem[data-chat-flow-kind="turn-trigger"] {
+  --dsh-chat-flow-gap: 22px;
+}
+
+/* On a pointer device the reply's actions show only on hover, so an actions-only tail reserved a 32px blank row over
+   the notice (77px of ink above it, 18px below). It takes no height there: its actions row shrinks to its buttons at
+   the row's end and hangs over the gap, where the notice's short first line leaves room, above the notice so hovering
+   it still reveals them; the notice sits 24px of ink under the reply (3px under its last line, the tail's 12px, 7px,
+   the notice's 2px). */
+@media (hover: hover) {
+  .flowItem[data-chat-flow-kind="turn-tail"]:has(+ .flowItem[data-chat-flow-kind="turn-trigger"]):has([data-actions-reveal="hover"]):not(:has([data-actions-reveal] > [data-slot] > *)) {
+    height: 0;
+  }
+
+  .flowItem[data-chat-flow-kind="turn-tail"]:has(+ .flowItem[data-chat-flow-kind="turn-trigger"]) [data-actions-reveal="hover"]:not(:has(> [data-slot] > *)) {
+    position: relative;
+    z-index: 1;
+    width: fit-content;
+    margin-left: auto;
+  }
+
+  .flowItem[data-chat-flow-kind="turn-tail"]:has([data-actions-reveal="hover"]):not(:has([data-actions-reveal] > [data-slot] > *)) + .flowItem[data-chat-flow-kind="turn-trigger"] {
+    --dsh-chat-flow-gap: 7px;
+  }
+}
+
 /* dshfiles (visual refresh T2.2): consecutive tool rows read as one list of 24px lines, 2px apart. */
 .flowItem[data-chat-flow-kind="tool-call"] + .flowItem[data-chat-flow-kind="tool-call"] {
   --dsh-chat-flow-gap: 2px;
