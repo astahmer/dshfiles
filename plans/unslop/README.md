@@ -405,6 +405,10 @@ Open: the failed child row's model still truncates ("claude-sonnet…") at the d
 Round 24 findings, merged in `.cache/unslop-audit/r5/council/round-24-fixes.md`: the unknown model's seat and one model
 and outcome column in the transcript group, "Failed" on child rows so the model reads whole, the phone dock's end and
 edge fades, one selected look for child rows, one clock on the desktop child view.
+All lanes done: T `smloxzzl` … `rnqknptn` (the unknown model's seat and one model and one outcome column in the transcript
+group, "Failed" on child rows with the model whole, the root row's selected edge on child rows, no clock in the desktop
+child header); D `uzwozxru` … `xpznqqop` (a two-row phone dock frame whose last row rests on its edge, fades only on an
+edge that can still scroll, a fade under the phone top bar). The capture now opens the phone dock at its first row.
 
 ## Round four
 
