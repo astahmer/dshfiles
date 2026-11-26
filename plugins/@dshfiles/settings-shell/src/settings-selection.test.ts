@@ -72,17 +72,26 @@ describe('Settings › General controls in the kit field look (council round 3 B
     expect(general).toContain('dshx:[&_[class*=_stepper_]]:w-full!')
     expect(general).toContain('dshx:[&_[class*=_stepper_]]:col-start-2!')
     expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:col-start-3!')
-    // The disclosure reads under the description, in the label column, as a 13/500 link with no underline at rest.
+    // The disclosure reads under the description, in the label column.
     expect(general).toContain('dshx:[&_[class*=_expander_]]:col-start-1!')
     expect(general).toContain('dshx:[&_[class*=_expander_]]:row-start-2!')
     expect(general).not.toContain('dshx:[&_[class*=_expander_]]:col-span-full!')
-    expect(general).toContain('dshx:[&_[class*=_expander_]]:text-sm/4.5!')
-    expect(general).toContain('dshx:[&_[class*=_expander_]]:font-medium!')
-    expect(general).toContain('dshx:[&_[class*=_expander_]]:no-underline!')
     expect(general).not.toContain('dshx:[&_[class*=_expander_]]:underline!')
     expect(general).not.toContain('dshx:[&_[class*=_expander_]]:ml-1!')
-    // Still a 44px target on touch.
-    expect(general).toContain('dshx:pointer-coarse:[&_[class*=_expander_]]:min-h-11!')
+  })
+
+  it('draws More font settings as the kit disclosure link: link colour, 12px chevron, 13/500 (council round 15 B4)', () => {
+    const general = read('native/general-section.tsx')
+    // The kit utility owns the link colour (AA in both schemes), 13/18 at 500, the trailing 12px chevron 4px after the
+    // label, an underline only under the pointer, and 44px on touch.
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:disclosure-link!')
+    // It no longer reads as a label in the ink, and does not restate what the utility draws.
+    expect(general).not.toContain('dshx:[&_[class*=_expander_]]:text-foreground!')
+    expect(general).not.toContain('dshx:[&_[class*=_expander_]]:text-sm/4.5!')
+    expect(general).not.toContain('dshx:[&_[class*=_expander_]]:no-underline!')
+    // Core's own chevron icon stays hidden (the utility's ::after draws the one chevron); the label stays in ::before.
+    expect(general).toContain('dshx:[&_[class*=_expander_]>svg]:hidden!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]')
   })
 })
 
