@@ -126,7 +126,9 @@ describe('the new-thread hero centre (round six C5)', () => {
     // keys on the main body: under Workbench the content is not inside the `.root` that holds the header.
     const rule = blocks().find(block => block.selector === ".body:not(.embeddedBody)[data-content-phase='hero'] .composerHero")
     expect(rule?.context).toBe('@media (min-height: 800px) and (min-width: 640px)')
-    expect(rule?.body).toMatch(/padding-bottom: 36px;/)
+    // Council round 8 C6: in the rendered 1440x900 capture a 36px foot left 303px of pane above the block's ink and 307px
+    // below it; 32px gives both the same.
+    expect(rule?.body).toMatch(/padding-bottom: 32px;/)
     expect(css).not.toContain('.root:has(.headerBlank)')
   })
 })

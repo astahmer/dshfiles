@@ -984,10 +984,12 @@ button.crumbEditable {
 
   /* Round six C5: the main hero always sits under the blank header (36px, no rule), which reads as part of the pane, but
      the pair was centred in the scroll body under it: 366px below the tab strip and 329px above the status bar at
-     1440x900. A 36px foot gives half of it back. Keyed on the main body, not `.root`: under Workbench the content is
-     not inside the root that holds the header. An embedded body has no such header. */
+     1440x900. A foot gives half of it back. Keyed on the main body, not `.root`: under Workbench the content is
+     not inside the root that holds the header. An embedded body has no such header. Council round 8 C6: measured in
+     the rendered capture (ink from the tab strip's edge down, and up from the status bar), a 36px foot left the block
+     303px under the tab strip and 307px over the status bar; 32px puts the same space above and below it. */
   .body:not(.embeddedBody)[data-content-phase='hero'] .composerHero {
-    padding-bottom: 36px;
+    padding-bottom: 32px;
   }
 }
 
