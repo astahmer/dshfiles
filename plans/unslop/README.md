@@ -158,6 +158,15 @@ Round 7 findings, merged in `.cache/unslop-audit/r5/council/round-7-fixes.md`: i
 (checkboxes, switches, the chosen card, underline tabs); a destination glyph in its tone before each page title; one 880
 header frame (Settings rows widen to it, Inbox actually renders at it); the Settings nav header on every page; the phone
 Inbox, thread list and transcript fit their folds; short code wraps on narrow panes; filter triggers in the field look.
+All four lanes done: A kit 8 revisions `zrzxwxvx` … `twqlnmzt` (ink on-states and tab bars, page title mark, field
+trigger variant, diff collapsed-lines bar and visible dark diff bands, DESIGN.md, mark centred on the title line, Toggle
+labels centred); B 11 revisions `yqvrlpxt` … `zwvttnmn` (Settings on the 880 lane with right-aligned controls, column head
+on every page, h1 by category, Basics heading, field-edged search launcher, phone list fold, phone thread status line);
+C 6 revisions `wqvnrlmq` … `mmuvsnns` (Inbox title mark and one card head order, phone Inbox fits its fold, 36 px dock
+fade, short code wraps on phones, work strip without chevrons, dock edges and glyph column, New thread centred as one
+block); D 9 revisions `rszuruly` … `xlwzstml` (ink tab bars, compact effort selects, Plugins Refresh, page title marks,
+field-look filters, Usage stats footer and 190 px chart, coloured breakdown cards, one Mark reviewed edge). The Inbox
+lane is 960 px on its wider pane by rule, not narrower than Backlog.
 
 ## Round four
 
