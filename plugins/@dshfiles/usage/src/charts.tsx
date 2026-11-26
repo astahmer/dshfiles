@@ -4,7 +4,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { SlidingSegments, type SlidingSegmentOption } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, trendChartHeight, trendRows as buildTrendRows } from './chart-geometry.js'
+import { BAND_PADDING, BAR_GEOMETRY, CHART_GRID, VALUE_SCALE, singleBucketTotal, TrendChart, trendRows as buildTrendRows } from './chart-geometry.js'
 import { DATA_SERIES, FAILED_SERIES } from './data-series.js'
 import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -361,7 +361,7 @@ export const UsageCharts = (props: {
           ariaLabel={`${trendMetric} over time`}
           ariaDescription={`${trendMetric} per ${props.bucket}, grouped by ${props.groupBy}.`}
           definition={trendChart}
-          height={trendChartHeight(trendRows)}
+          height={TrendChart.height(trendRows)}
         />
       </ChartFrame>
 

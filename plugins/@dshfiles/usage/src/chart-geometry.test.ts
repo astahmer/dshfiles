@@ -9,7 +9,7 @@ import {
   TREND_CHART_HEIGHT,
   VALUE_SCALE,
   singleBucketTotal,
-  trendChartHeight,
+  TrendChart,
   trendRows,
 } from './chart-geometry.js'
 
@@ -90,12 +90,12 @@ describe('Usage trend chart height (council round 18, D2)', () => {
     return 2 * scene.chart.height
   }
   it('keeps the plot under 220 device px at 2× while fewer than three buckets hold data', () => {
-    expect(trendChartHeight([...plot(['a', 'b']), { label: 'c', value: 0 }])).toBe(SPARSE_TREND_CHART_HEIGHT)
-    expect(devicePlot(trendChartHeight(plot(['a'])))).toBeLessThanOrEqual(220)
+    expect(TrendChart.height([...plot(['a', 'b']), { label: 'c', value: 0 }])).toBe(SPARSE_TREND_CHART_HEIGHT)
+    expect(devicePlot(TrendChart.height(plot(['a'])))).toBeLessThanOrEqual(220)
   })
   it('keeps the readable height once three buckets hold data', () => {
-    expect(trendChartHeight(plot(['a', 'b', 'c']))).toBe(TREND_CHART_HEIGHT)
-    expect(read('charts.tsx')).toContain('height={trendChartHeight(trendRows)}')
+    expect(TrendChart.height(plot(['a', 'b', 'c']))).toBe(TREND_CHART_HEIGHT)
+    expect(read('charts.tsx')).toContain('height={TrendChart.height(trendRows)}')
   })
 })
 

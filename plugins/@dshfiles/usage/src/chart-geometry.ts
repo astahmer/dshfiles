@@ -42,9 +42,11 @@ export const TREND_CHART_HEIGHT = 190
  */
 export const SPARSE_TREND_CHART_HEIGHT = 140
 
-/** The trend chart's height for its rows: the sparse height while fewer than three buckets hold a value. */
-export const trendChartHeight = (rows: readonly { readonly label: string; readonly value: number }[]): number =>
-  new Set(rows.flatMap(row => (row.value > 0 ? [row.label] : []))).size < 3 ? SPARSE_TREND_CHART_HEIGHT : TREND_CHART_HEIGHT
+export class TrendChart {
+  /** The trend chart's height for its rows: the sparse height while fewer than three buckets hold a value. */
+  static readonly height = (rows: readonly { readonly label: string; readonly value: number }[]): number =>
+    new Set(rows.flatMap(row => (row.value > 0 ? [row.label] : []))).size < 3 ? SPARSE_TREND_CHART_HEIGHT : TREND_CHART_HEIGHT
+}
 
 export type TrendMetric = 'cost' | 'tokens' | 'requests'
 

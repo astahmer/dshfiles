@@ -24,7 +24,6 @@ const PANEL_ID = 'dshfiles-usage'
 const COST_FACET_ID = 'dshfiles-usage-cost'
 const TRACES_PANEL_ID = 'traces'
 
-const PanelGlyph = UsageGlyph
 
 export default defineClient({
   name: '@dshfiles/usage',
@@ -131,7 +130,7 @@ export default defineClient({
               order: 61,
               title: () => 'Cost',
               description: () => "This thread's route, cost per turn and requests.",
-              icon: PanelGlyph,
+              icon: UsageGlyph,
             },
           ],
         }),
@@ -159,7 +158,7 @@ export default defineClient({
         )),
       ),
     )
-    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Usage' }, PanelGlyph))
+    ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({ name: 'sidebar.panellist', id: PANEL_ID, order: 4, label: 'Usage' }, UsageGlyph))
     ctx.effect(
       () =>
         workbenchPanels().register({

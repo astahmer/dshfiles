@@ -108,7 +108,7 @@ describe('Usage page title mark (council round 7, D1; round 18, D2)', () => {
   it("marks the h1 with Usage's own bar-chart glyph, the left column entry's, in the Observe nav tone", () => {
     const page = read('panel.tsx').slice(read('panel.tsx').indexOf('<Page'), read('panel.tsx').indexOf('heading="Usage"'))
     expect(page).toContain('mark={<UsageGlyph />}')
-    expect(read('client.tsx')).toMatch(/const PanelGlyph = UsageGlyph\b/u)
+    expect(read('client.tsx')).toContain("label: 'Usage' }, UsageGlyph))")
     expect(page).toContain('markTone="observe"')
   })
 
@@ -171,7 +171,7 @@ describe('Usage overview chart (council round 7, D3)', () => {
     expect(header).toContain('trendCaption(')
     // 190 px once three buckets hold data; the sparse height below that (council round 18, D2; chart-geometry.test.ts).
     expect(read('chart-geometry.ts')).toMatch(/export const TREND_CHART_HEIGHT = 190\b/u)
-    expect(charts).toMatch(/definition=\{trendChart\}\s*height=\{trendChartHeight\(trendRows\)\}/u)
+    expect(charts).toMatch(/definition=\{trendChart\}\s*height=\{TrendChart\.height\(trendRows\)\}/u)
   })
   it('captions the bucket and the grouping as one short line', () => {
     expect(trendCaption({ bucket: 'day', groupBy: 'model', metric: 'tokens' })).toBe('Daily · by model')
