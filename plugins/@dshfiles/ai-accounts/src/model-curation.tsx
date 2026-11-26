@@ -80,6 +80,13 @@ export const ModelCuration = (props: {
   // When every row inherits, one caption above the table says so instead of an Inherited label on each row, and the
   // Source column goes (council round 10, D2).
   const allInherit = shown.every(model => !isOverridden(model))
+  // Inherited rows read "Auto"; the column header says once where Auto comes from (council round 17, D1).
+  const autoSources = new Set(
+    shown
+      .filter(model => model.efforts.length > 0 && !model.efforts.some(effort => effort.id === effective.reasoningDefaults[model.id]))
+      .map(model => (model.efforts.some(effort => effort.id === effective.defaultReasoningEffort) ? 'account' : 'provider')),
+  )
+  const autoNote = autoSources.size > 1 ? 'Auto: account or provider' : autoSources.has('account') ? 'Auto: account default' : 'Auto: provider default'
   const addModel = (): void => {
     if (customModelId === null || duplicate) return
     customize({ additionalModelIds: [...new Set([...account.additionalModelIds, customModelId])] })
@@ -160,10 +167,15 @@ export const ModelCuration = (props: {
       <div className="dshx:overflow-x-auto dshx:border-y">
         <table className="dshx:w-full dshx:min-w-[600px] dshx:border-collapse dshx:text-sm">
           <thead className="dshx:border-b dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-            <tr>
+            <tr className="dshx:align-top">
               {/* Starts on the names: the cell's 8 px, the 24 px star, the 16 px mark and two 8 px gaps (council round 10, D2). */}
               <th className="dshx:py-2 dshx:pr-3 dshx:pl-16 dshx:font-normal">Model</th>
-              <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
+              <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">
+                Reasoning effort
+                <span data-effort-auto-note className="dshx:block">
+                  {autoNote}
+                </span>
+              </th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show model</th>
               {allInherit ? null : <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>}
               <th className="dshx:w-10">
@@ -186,7 +198,8 @@ export const ModelCuration = (props: {
               const defaultSource = accountEffort === undefined ? 'Provider' : 'Account'
               const defaultValue = accountEffort?.name ?? nativeEffort?.name ?? 'Auto'
               const defaultLabel = `${defaultSource} default · ${defaultValue}`
-              // An inherited cell leads with its value, the source after it; the menu and the name keep the full provenance (council round 13, D2).
+              // An inherited cell reads "Auto" with its chevron; the menu and the name keep the full provenance (council round 17, D1).
+              const autoLabel = defaultValue === 'Auto' ? `Auto (${defaultSource} default)` : `Auto (${defaultLabel})`
               const inheritedEffort = validEffort === undefined && model.efforts.length > 0
               return (
                 <tr key={model.id} className="dshx:border-b dshx:last:border-b-0 dshx:hover:bg-muted/20">
@@ -217,24 +230,19 @@ export const ModelCuration = (props: {
                   </td>
                   <td className="dshx:px-3 dshx:py-1.5">
                     <Combobox
-                      label={`Default reasoning effort for ${model.name}${inheritedEffort ? `, ${defaultLabel}` : ''}`}
+                      label={`Default reasoning effort for ${model.name}${inheritedEffort ? `, ${autoLabel}` : ''}`}
                       searchLabel={`Default reasoning effort for ${model.name} search`}
                       trigger={
                         inheritedEffort ? (
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                            <span data-effort-value className="dshx:text-sm dshx:text-foreground">
-                              {defaultValue}
-                            </span>
-                            <span data-effort-source className="dshx:text-xs dshx:text-muted-foreground">
-                              {` · ${defaultSource}`}
-                            </span>
+                          <span data-effort-value className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">
+                            Auto
                           </span>
                         ) : undefined
                       }
                       value={validEffort ?? PROVIDER_DEFAULT}
                       disabled={model.efforts.length === 0}
                       options={[
-                        { value: PROVIDER_DEFAULT, label: model.efforts.length === 0 ? 'Not supported' : defaultLabel },
+                        { value: PROVIDER_DEFAULT, label: model.efforts.length === 0 ? 'Not supported' : autoLabel },
                         ...model.efforts.map(effort => ({ value: effort.id, label: effort.name })),
                       ]}
                       onValueChange={value => setEffort(model, value)}
