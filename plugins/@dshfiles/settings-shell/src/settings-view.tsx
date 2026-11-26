@@ -20,7 +20,7 @@ import type { SettingField } from './schema-form/schema-model.js'
 import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 import { SettingsNavigationModel } from './navigation-state.js'
-import { SettingsEntryTile } from './settings-icons.js'
+import { SettingsEntryGlyph, SettingsEntryTile } from './settings-icons.js'
 
 export interface SectionRow {
   readonly id: string
@@ -526,13 +526,18 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           )}
         >
           <div className={cn(headerWidth, 'dshx:@max-pane-compact:sr-only')} data-settings-page-header="">
-            {/* The Settings rail glyph in its tone marks the page (council round 7 B6). */}
-            <PageHeader
-              heading={<span id={props.titleId}>{title}</span>}
-              description={t('description')}
-              mark={<SettingsIcon />}
-              markTone="settings"
-            />
+            {/* A category page carries its column row's glyph in its group's tone (council round 17 B2.3: General is the
+                sliders in the Preferences tone); the search results, which span every category, keep the Settings
+                rail glyph in its tone (council round 7 B6). */}
+            {category === undefined || active === undefined ? (
+              <PageHeader heading={<span id={props.titleId}>{title}</span>} description={t('description')} mark={<SettingsIcon />} markTone="settings" />
+            ) : (
+              <PageHeader
+                heading={<span id={props.titleId}>{title}</span>}
+                description={t('description')}
+                mark={<SettingsEntryGlyph group={active.group} label={active.label} className="dshx:size-[18px]" />}
+              />
+            )}
           </div>
           {/* One 8px rhythm (council round 6 B2): the search grows, then Modified and the action group, all 32px. */}
           <div className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2', headerWidth)} data-settings-toolbar="">

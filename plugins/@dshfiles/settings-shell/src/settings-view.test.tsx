@@ -129,8 +129,25 @@ describe('settings view: the page title names the category (council round 7 B2)'
     appearance.unmount()
   })
 
-  it('marks the title with the Settings rail glyph in the settings tone (council round 7 B6)', () => {
+  it('marks a category page with the glyph and group tone its column row carries (council round 17 B2.3)', () => {
     const view = mount({ columnNavigation: true, activeId: 'general' })
+    const mark = view.host.querySelector('[data-settings-page-header] [data-slot="page-title-mark"]')
+    // General: the sliders in the Preferences tone, as its row; no Settings gear and no rail tone over it.
+    expect(mark?.className).not.toContain('dshx:text-nav-settings')
+    expect(mark?.querySelector('svg')?.getAttribute('class')).toContain('lucide-sliders-horizontal')
+    const glyph = mark?.querySelector<HTMLElement>('[data-settings-glyph]')
+    expect(glyph?.getAttribute('data-settings-glyph')).toBe('general')
+    expect(glyph?.className).toContain('dshx:text-(--settings-tone)')
+    expect(glyph?.style.getPropertyValue('--settings-tone')).toBe('var(--dshx-identity-7)')
+    view.unmount()
+    const appearance = mount({ columnNavigation: true, activeId: 'appearance' })
+    const palette = appearance.host.querySelector('[data-settings-page-header] [data-slot="page-title-mark"] svg')
+    expect(palette?.getAttribute('class')).toContain('lucide-palette')
+    appearance.unmount()
+  })
+
+  it('keeps the Settings rail glyph in the settings tone on the search results (council round 7 B6)', () => {
+    const view = mount({ columnNavigation: true, activeId: 'general', query: 'dark' })
     const mark = view.host.querySelector('[data-settings-page-header] [data-slot="page-title-mark"]')
     expect(mark?.className).toContain('dshx:text-nav-settings')
     expect(mark?.querySelector('svg')?.getAttribute('class')).toContain('lucide-settings')
