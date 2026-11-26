@@ -30,12 +30,18 @@
   gap: 4px;
 }
 
+/*
+ * The child's crumb at the parent crumb's 14/20 and the "/"'s size (council round 23, item 8): one size across the
+ * breadcrumb, the parent 400 muted, the child 600 ink.
+ */
 .switcherTrigger {
   gap: 4px;
   min-width: 0;
   max-width: 244px;
   color: var(--dsw-alias-label-primary);
-  font-weight: 500;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
 }
 
 .ancestorSwitcherTrigger {
