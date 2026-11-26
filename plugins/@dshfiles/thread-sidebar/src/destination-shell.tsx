@@ -6,6 +6,7 @@ import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { fieldLook } from '@dshfiles/plugin-ui/components/ui/input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { Popover, PopoverAnchor, PopoverContent } from '@dshfiles/plugin-ui/components/ui/popover'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
@@ -917,6 +918,9 @@ const ThreadsPane = (props: ListPaneProps): JSX.Element => {
             // outline `dark:border-input` replaces the field edge in dark; left-aligned, its label in placeholder ink.
             variant="field"
             className={cn(
+              // It stands for a text field, so it keeps the text field's 3:1 edge and paper fill where the value triggers
+              // beside it are quiet filled chips (council round 10 A1).
+              fieldLook,
               'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:text-muted-foreground',
               // On a phone its glyph starts on the 24px text edge (round nine B4).
               phone && 'dshx:gap-2 dshx:px-3',

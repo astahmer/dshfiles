@@ -631,6 +631,17 @@ describe('DestinationShell', () => {
     expect(screen.getByRole('button', { name: 'Search threads' }).className).toContain('dshx:h-(--dshx-control-h)')
     expect(screen.getByRole('button', { name: 'Search threads' }).className).not.toContain('dshx:h-7')
     expect(screen.getByRole('button', { name: 'Search threads' }).className).toContain('dshx:border-field-border')
+    // It stands for a text field (council round 10 A1): the text field's edge and paper at rest, not the quiet chip's
+    // transparent edge and fill that the project and Filter triggers beside it take.
+    for (const phone of [false, true]) {
+      cleanup()
+      setPhone(phone)
+      renderShell({ collapsed: false })
+      const launcher = screen.getByRole('button', { name: 'Search threads' }).className
+      expect(launcher).toContain('dshx:bg-background')
+      expect(launcher).not.toContain('dshx:bg-trigger-fill')
+      expect(launcher).not.toContain('dshx:border-transparent')
+    }
   })
 
   it('draws Search threads in the kit field look, left-aligned, with no outline edge to replace the field edge in dark (council round 8 B1)', () => {
