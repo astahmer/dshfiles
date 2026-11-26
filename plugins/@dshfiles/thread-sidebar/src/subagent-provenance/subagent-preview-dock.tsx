@@ -43,9 +43,11 @@ const DockRow = (
   const waiting = step?.waitsForAnswer === true
   const stateLabel = waiting ? preview.t('subagentRunWaiting') : subagentStateLabel(preview.t, 'working')
   return (
+    // A row never shrinks (round 21 D2): in the dock's max-h-72 column six rows squeezed to 31px over their 44px touch
+    // row; whole rows overflow the column, which scrolls under its sticky fold row instead.
     <section
       aria-label={`${preview.t('subagentPreviewKind')}: ${label}`}
-      className="dshx-root dshx:@container dshx:my-1 dshx:min-w-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:text-xs"
+      className="dshx-root dshx:@container dshx:my-1 dshx:min-w-0 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:text-xs"
       data-dshfiles-live-preview="agent"
       data-dshfiles-live-preview-seat="dock"
       data-state="working"

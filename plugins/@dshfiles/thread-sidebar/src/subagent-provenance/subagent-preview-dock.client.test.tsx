@@ -241,6 +241,19 @@ describe('SubagentPreviewDock', () => {
     expect(fold()?.textContent).not.toMatch(/[A-Za-z]/u)
   })
 
+  it('keeps every row whole and scrolls the dock instead, under its sticky fold row (round 21 D2)', () => {
+    // Six working children on a phone squeezed each 44px row into a 31px section (the default flex-shrink in the
+    // max-h-72 column), so the dock never scrolled and every row was clipped.
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d', 'child-e'] })} foldLabel={count => `${count} subagents`} />)
+    openFold()
+    const dock = document.querySelector<HTMLElement>('[data-dshfiles-live-preview-dock="subagents"]')
+    expect(dock?.className).toContain('dshx:max-h-72')
+    expect(dock?.className).toContain('dshx:overflow-y-auto')
+    expect(fold()?.className).toContain('dshx:sticky')
+    expect(rows()).toHaveLength(4)
+    for (const row of rows()) expect(row.classList.contains('dshx:shrink-0')).toBe(true)
+  })
+
   it("shows up to three rows, folds four or more into one closed row, and keeps the reader's choice", () => {
     const count = (n: number): string => `${n} subagents`
     const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'] })} foldLabel={count} />)
