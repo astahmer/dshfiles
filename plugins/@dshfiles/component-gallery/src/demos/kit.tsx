@@ -11,6 +11,14 @@ import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { PlaceGlyph, type PlaceTone } from '@dshfiles/plugin-ui/components/ui/place-glyph'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
+import {
+  IDENTITY_SLOT_COUNT,
+  identitySlotName,
+  identityToneClass,
+  identityToneIndex,
+  PalettePicker,
+  useIdentityPaletteNames,
+} from '@dshfiles/plugin-ui/components/palette-picker'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { HealthDot, StatusDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
@@ -207,7 +215,13 @@ function NavToneDemo() {
     <div className="dshx:flex dshx:flex-wrap dshx:gap-3">
       <nav aria-label="Destinations" className="dshx:flex dshx:w-44 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:bg-card dshx:p-1.5">
         {navItems.map(([label, Icon, tone]) => (
-          <button key={label} type="button" aria-current={current === label ? 'page' : undefined} onClick={() => setCurrent(label)} className={placeRow(current === label)}>
+          <button
+            key={label}
+            type="button"
+            aria-current={current === label ? 'page' : undefined}
+            onClick={() => setCurrent(label)}
+            className={placeRow(current === label)}
+          >
             <PlaceGlyph tone={tone}>
               <Icon aria-hidden />
             </PlaceGlyph>
@@ -217,7 +231,13 @@ function NavToneDemo() {
       </nav>
       <nav aria-label="Settings groups" className="dshx:flex dshx:w-52 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:bg-card dshx:p-1.5">
         {settingsItems.map(([label, Icon, tone]) => (
-          <button key={label} type="button" aria-current={group === label ? 'page' : undefined} onClick={() => setGroup(label)} className={placeRow(group === label)}>
+          <button
+            key={label}
+            type="button"
+            aria-current={group === label ? 'page' : undefined}
+            onClick={() => setGroup(label)}
+            className={placeRow(group === label)}
+          >
             <PlaceGlyph toneColor={tone}>
               <Icon aria-hidden strokeWidth={1.5} />
             </PlaceGlyph>
@@ -233,6 +253,51 @@ const healthLabels = { ok: 'Connected', limited: 'Rate limited', down: 'Signed o
 
 /** One project per tone, in palette order, so each of the six project hues shows as a mark. */
 const projectNames = ['billing-api', 'web-app', 'docs-site', 'dshfiles', 'mobile shell', 'infra'] as const
+
+/**
+ * The identity palette (round eight): one picker, and the three things that wear the choice (a project mark, a tag chip,
+ * an agent's glyph tile). Each slot is listed in its own ink under the theme's name for it; switch the theme and both
+ * the colours and the names follow.
+ */
+function IdentityPaletteDemo() {
+  const names = useIdentityPaletteNames()
+  const fallback = identityToneIndex('billing-api')
+  const [slot, setSlot] = React.useState<number | undefined>(undefined)
+  const [tagSlot, setTagSlot] = React.useState<number | undefined>(4)
+  const tone = slot ?? fallback
+  return (
+    <div className="dshx:flex dshx:flex-col dshx:gap-4">
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-2">
+        <span className="dshx:text-sm dshx:text-muted-foreground">Project colour</span>
+        <PalettePicker label="Project colour" value={slot} defaultSlot={fallback} onChange={setSlot} />
+        <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-sm dshx:text-muted-foreground">
+          <ProjectMark name="billing-api" tone={tone} />
+          billing-api
+        </span>
+        <span
+          aria-hidden
+          className={`dshx:inline-flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-current/18 ${identityToneClass(tone)}`}
+        >
+          <BotIcon className="dshx:size-3.5" />
+        </span>
+      </div>
+      <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-2">
+        <span className="dshx:text-sm dshx:text-muted-foreground">Tag colour</span>
+        <PalettePicker label="Tag colour" size="sm" value={tagSlot} onChange={setTagSlot} />
+        <span className={`dshx:rounded-sm dshx:bg-current/18 dshx:px-1.5 dshx:py-0.5 dshx:text-xs dshx:font-medium ${identityToneClass(tagSlot ?? 0)}`}>
+          <span className="dshx-project-mark-letters">design</span>
+        </span>
+      </div>
+      <ul aria-label="Palette slots" className="dshx:flex dshx:flex-wrap dshx:gap-x-4 dshx:gap-y-1 dshx:text-sm dshx:font-medium">
+        {Array.from({ length: IDENTITY_SLOT_COUNT }, (_, n) => (
+          <li key={n} className={identityToneClass(n)}>
+            {n} · {identitySlotName(n, names)}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
 
 function ColourRolesDemo() {
   return (
@@ -282,7 +347,8 @@ export const kitDemos: readonly GalleryDemo[] = [
   {
     id: 'kit-button',
     title: 'Button',
-    description: 'One black primary per page; outline in headers, ghost in rows, the attention tint on a row verb that waits on you, its text rung on a row that already carries a wash.',
+    description:
+      'One black primary per page; outline in headers, ghost in rows, the attention tint on a row verb that waits on you, its text rung on a row that already carries a wash.',
     source: "import { Button } from '@dshfiles/plugin-ui/components/ui/button'",
     static: true,
     render: () => (
@@ -355,7 +421,14 @@ export const kitDemos: readonly GalleryDemo[] = [
     render: () => (
       <EntityList>
         {workStatusValues.map(status => (
-          <EntityRow key={status} role="listitem" status={status} heading={workStatusLabels[status]} meta={<span>{status}</span>} selected={status === 'idle'} />
+          <EntityRow
+            key={status}
+            role="listitem"
+            status={status}
+            heading={workStatusLabels[status]}
+            meta={<span>{status}</span>}
+            selected={status === 'idle'}
+          />
         ))}
       </EntityList>
     ),
@@ -454,6 +527,15 @@ export const kitDemos: readonly GalleryDemo[] = [
     static: true,
     wide: true,
     render: () => <ColourRolesDemo />,
+  },
+  {
+    id: 'kit-identity-palette',
+    title: 'Identity palette',
+    description:
+      'The six colours a user picks for a project, a Backlog tag or an agent; a choice stores the slot, so the colour and its name follow the theme.',
+    source: "import { PalettePicker } from '@dshfiles/plugin-ui/components/palette-picker'",
+    static: true,
+    render: () => <IdentityPaletteDemo />,
   },
   {
     id: 'kit-selection',
