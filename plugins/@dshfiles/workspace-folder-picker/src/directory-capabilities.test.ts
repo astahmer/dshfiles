@@ -40,7 +40,12 @@ const mountedPicker = (
       host.ctx.provide('workspaceController', {} as never),
       host.ctx.provide('workspaceRegistry', { list: () => workspaces } as never),
       // The Host registers the project names and colours namespace; these tests never read or write it.
-      host.ctx.provide('settings', { configure: () => () => undefined, describe: () => [], update: async () => undefined, replace: async () => undefined } as never),
+      host.ctx.provide('settings', {
+        configure: () => () => undefined,
+        describe: () => [],
+        update: async () => undefined,
+        replace: async () => undefined,
+      } as never),
     ]
     yield* Effect.addFinalizer(() => Effect.sync(() => releaseServices.forEach(release => release())))
     const picker =
