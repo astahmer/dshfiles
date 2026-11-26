@@ -889,9 +889,39 @@ describe('DestinationShell', () => {
     renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race' })
     expect(document.querySelector('[data-phone-bar-layout]')?.getAttribute('data-phone-bar-layout')).toBe('leading')
     const chevron = screen.getByRole('button', { name: 'Back to Threads' })
-    // 28px wide (the title starts 12px after the glyph), with a 44px touch area.
-    expect(chevron.className).toContain('dshx:w-7')
-    expect(chevron.className).toContain('dshx:after:w-11')
+    // The 44px leading seat (council round 17 B2.2), the glyph centred in it; the title starts where the seat ends,
+    // 12px after the glyph, with no gap.
+    expect(chevron.className).toContain('dshx:w-11')
+    expect(chevron.className).toContain('dshx:justify-center')
+    expect(chevron.className).not.toContain('dshx:w-7')
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).not.toMatch(/dshx:gap-/u)
+  })
+
+  it('gives every phone bar one seat rule: 44px leading and trailing seats 4px in from the edges, published for pages (council round 17 B2.2)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const root = document.documentElement.style
+    expect(root.getPropertyValue('--dsh-phone-seat-left')).toBe('max(4px, env(safe-area-inset-left, 0px))')
+    expect(root.getPropertyValue('--dsh-phone-seat-right')).toBe('max(4px, env(safe-area-inset-right, 0px))')
+    const header = (): string => document.querySelector('header[data-phone-top-bar]')?.className ?? ''
+    // Threads: the bar pads by the published insets on both sides, the + is a 44px seat.
+    expect(header()).toContain('dshx:pl-[var(--dsh-phone-seat-left,4px)]')
+    expect(header()).toContain('dshx:pr-[var(--dsh-phone-seat-right,4px)]')
+    expect(header()).not.toMatch(/(^| )dshx:pr-1( |$)/u)
+    expect(document.querySelector('[data-phone-new]')?.className).toContain('dshx:size-11')
+    cleanup()
+    // Settings: Back's chevron centres in the leading seat (12px in, a 20px glyph), its label after it.
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+    const back = screen.getByRole('button', { name: 'Back to More' })
+    expect(back.className).toContain('dshx:pl-3')
+    expect(back.className).toContain('dshx:min-w-11')
+    expect(back.className).toContain('dshx:h-11')
+    cleanup()
+    // A thread keeps the trailing corner for its menu bar, which sits on the same right inset.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race' })
+    expect(header()).toContain('dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+var(--dsh-phone-seat-right,4px))]')
+    cleanup()
+    expect(document.documentElement.style.getPropertyValue('--dsh-phone-seat-left')).toBe('')
   })
 
   it('on a phone, titles a thread 17/600 on one 44px line, its status glyph before the title, no subagent line (council round 13 B6)', () => {

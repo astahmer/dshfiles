@@ -147,6 +147,14 @@ const PHONE_NAV_HEIGHT = 'calc(56px + env(safe-area-inset-bottom, 0px))'
 const PHONE_NAV_HIDDEN_HEIGHT = 'env(safe-area-inset-bottom, 0px)'
 /** The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px). */
 const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px))'
+/**
+ * The phone top bar's one seat rule (council round 17 B2.2): every bar has a leading and a trailing 44 x 44 seat on its
+ * 44px row under the status bar, 4px in from the screen edge (the safe-area inset when that is larger), so a 20px glyph
+ * centres 26px from its edge on every root screen. Published on the root, so a page or a plugin that draws into the bar
+ * (the Inbox's gauge, Triage and menu; a thread's menu) takes the same x: `left: var(--dsh-phone-seat-left, 4px)`.
+ */
+const PHONE_SEAT_LEFT = 'max(4px, env(safe-area-inset-left, 0px))'
+const PHONE_SEAT_RIGHT = 'max(4px, env(safe-area-inset-right, 0px))'
 
 export const usePhoneLayout = (): boolean => useSyncExternalStore(PhoneLayout.subscribe, PhoneLayout.matches, () => false)
 
@@ -1328,6 +1336,8 @@ const PhoneNavigation = (
     root.setAttribute('data-shell-phone-nav', '')
     root.style.setProperty('--dsh-phone-nav-height', PHONE_NAV_HEIGHT)
     root.style.setProperty('--dsh-phone-top-height', PHONE_TOP_HEIGHT)
+    root.style.setProperty('--dsh-phone-seat-left', PHONE_SEAT_LEFT)
+    root.style.setProperty('--dsh-phone-seat-right', PHONE_SEAT_RIGHT)
     // Safe-area insets only resolve under viewport-fit=cover; the bars pad by them (home indicator, notch, landscape).
     const meta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]')
     const previous = meta?.getAttribute('content') ?? null
@@ -1336,6 +1346,8 @@ const PhoneNavigation = (
       root.removeAttribute('data-shell-phone-nav')
       root.style.removeProperty('--dsh-phone-nav-height')
       root.style.removeProperty('--dsh-phone-top-height')
+      root.style.removeProperty('--dsh-phone-seat-left')
+      root.style.removeProperty('--dsh-phone-seat-right')
       if (meta !== null && previous !== null) meta.setAttribute('content', previous)
     }
   }, [])
@@ -1761,10 +1773,12 @@ const PhoneNavigation = (
         data-phone-top-bar=""
         data-phone-stage={listOpen && !drawer ? undefined : stageBar.thread ? 'thread' : (props.activePanelId ?? 'none')}
         className={cn(
-          'dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pl-[max(4px,env(safe-area-inset-left,0px))] dshx:text-foreground',
+          'dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pl-[var(--dsh-phone-seat-left,4px)] dshx:text-foreground',
           // A thread on the stage puts its Changes pill and one `⋯` menu (rich-composer, T1.4/T3.2) in the trailing
           // corner, publishing that bar's width; the status strip is a pill above the tab bar (frame-layout, T1.6).
-          stageBar.thread && (drawer || !listOpen) ? 'dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+4px)]' : 'dshx:pr-1',
+          stageBar.thread && (drawer || !listOpen)
+            ? 'dshx:pr-[calc(var(--dsh-phone-bar-width,44px)+var(--dsh-phone-seat-right,4px))]'
+            : 'dshx:pr-[var(--dsh-phone-seat-right,4px)]',
         )}
         style={{ height: PHONE_TOP_HEIGHT }}
       >
@@ -1775,7 +1789,8 @@ const PhoneNavigation = (
           className={cn(
             // Back and title read at 17px (council round 4 B3); the title adds the weight.
             'dshx:h-11 dshx:w-full dshx:min-w-0 dshx:items-center dshx:text-[17px] dshx:leading-[22px]',
-            centred ? 'dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,1fr)] dshx:gap-1' : 'dshx:flex dshx:gap-0.5',
+            // A thread's title starts 12px after the chevron's glyph: the 44px seat ends 12px past it, so no gap.
+            centred ? 'dshx:grid dshx:grid-cols-[minmax(0,1fr)_minmax(0,auto)_minmax(0,1fr)] dshx:gap-1' : 'dshx:flex',
           )}
         >
           <div className={centred ? 'dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-self-start' : 'dshx:contents'}>
@@ -1811,12 +1826,11 @@ const PhoneNavigation = (
               aria-label={`Back to ${bar.back.label}`}
               onClick={back}
               className={cn(
-                'dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:pl-1 dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent',
-                // On a thread the chevron alone goes back, as in other chat apps: 28px wide so the title starts 12px after
-                // the glyph, with a 44px touch area that reaches under the title's first pixels.
-                bar.thread
-                  ? "dshx:w-7 dshx:after:absolute dshx:after:inset-y-0 dshx:after:left-0 dshx:after:w-11 dshx:after:content-['']"
-                  : 'dshx:min-w-11 dshx:max-w-full dshx:pr-2',
+                'dshx:relative dshx:flex dshx:h-11 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:bg-accent',
+                // The chevron sits in the leading seat (council round 17 B2.2), centred where the Threads and Inbox bars
+                // centre their gauge. On a thread the chevron alone goes back, as in other chat apps; a page's Back names
+                // where it goes after it.
+                bar.thread ? 'dshx:w-11 dshx:justify-center' : 'dshx:min-w-11 dshx:max-w-full dshx:pr-2 dshx:pl-3',
               )}
             >
               <ChevronLeftIcon className="dshx:size-5 dshx:shrink-0" aria-hidden="true" />
