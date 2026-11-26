@@ -215,7 +215,7 @@ import { UsageLimitRowsModel, type QuotaContinuation, type UsageLimitRow } from 
 import { ResumeAttentionModel } from './resume-attention.js'
 import { usageLimitRefetchInterval } from './usage-limit-poll.js'
 import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.js'
-import { groupThreadChildren, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
+import { groupThreadChildren, launchOrdered, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, pageLoadThreadRoute, readThreadUrl } from './thread-url.js'
 import { PHONE_HISTORY_SELF_POP_EVENT } from '@dshfiles/workbench/phone-history'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
@@ -679,6 +679,8 @@ export interface ThreadRowProps {
   readonly childThreads: readonly SessionSummary[]
   /** Finished subagents folded behind the "N finished" line; empty unless the setting collapses them. */
   readonly finishedChildThreads: readonly SessionSummary[]
+  /** The parent's subagent catalog ids in launch order (council round 22, item 12); undefined until it loads. */
+  readonly childLaunchOrder?: readonly string[] | undefined
   readonly childrenOpen: boolean
   readonly allChildrenShown: boolean
   /** Set only when the open thread is one of this row's children, so other rows skip re-rendering. */
@@ -824,6 +826,8 @@ const ChildThreadList = (props: {
   readonly parentId: string
   readonly childThreads: readonly SessionSummary[]
   readonly finishedChildThreads: readonly SessionSummary[]
+  /** The parent's catalog ids in launch order: the list reads launch order, failed last (council round 22, item 12). */
+  readonly launchOrder?: readonly string[] | undefined
   readonly unreadSessionIds: ReadonlySet<SessionSummary['id']>
   readonly allShown: boolean
   readonly selectedChildId: SessionSummary['id'] | undefined
@@ -835,8 +839,18 @@ const ChildThreadList = (props: {
 }): JSX.Element => {
   const t = props.actions.translate
   const [finishedShown, setFinishedShown] = useState(false)
+  // One child order on every subagent surface (council round 22, item 12): launch order, failed last.
+  const { childStatuses, launchOrder } = props
+  const childThreads = useMemo(
+    () => launchOrdered({ children: props.childThreads, launchOrder, isFailed: child => childStatuses?.get(child.id)?.status === 'failed' }),
+    [props.childThreads, launchOrder, childStatuses],
+  )
+  const finishedChildThreads = useMemo(
+    () => launchOrdered({ children: props.finishedChildThreads, launchOrder, isFailed: child => childStatuses?.get(child.id)?.status === 'failed' }),
+    [props.finishedChildThreads, launchOrder, childStatuses],
+  )
   const { shown, hiddenCount } = visibleChildren({
-    children: props.childThreads,
+    children: childThreads,
     limit: props.rowStyle.maxChildren,
     showAll: props.allShown,
     selectedId: props.selectedChildId,
@@ -983,11 +997,11 @@ const ChildThreadList = (props: {
             aria-expanded={finishedShown}
             onClick={() => setFinishedShown(current => !current)}
           >
-            {finishedShown ? t('threadSidebarHideFinishedChildren') : `${props.finishedChildThreads.length} ${t('threadSidebarFinishedChildren')}`}
+            {finishedShown ? t('threadSidebarHideFinishedChildren') : `${finishedChildThreads.length} ${t('threadSidebarFinishedChildren')}`}
           </button>
         </li>
       ) : null}
-      {finishedShown ? props.finishedChildThreads.map(renderChild) : null}
+      {finishedShown ? finishedChildThreads.map(renderChild) : null}
     </ul>
   )
 }
@@ -2246,6 +2260,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             parentId={session.id}
             childThreads={props.childThreads}
             finishedChildThreads={props.finishedChildThreads}
+            launchOrder={props.childLaunchOrder}
             unreadSessionIds={props.unreadSessionIds}
             allShown={props.allChildrenShown}
             selectedChildId={props.selectedChildId}
@@ -5590,6 +5605,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const childRowCacheRef = useRef<ThreadChildRowCache | null>(null)
   childRowCacheRef.current ??= createThreadChildRowCache()
   const childRowCache = childRowCacheRef.current
+  const launchOrderCache = useRef(new Map<SessionSummary['id'], readonly string[]>())
 
   const orderedVisibleThreadIds = (list: HTMLElement): string[] => ThreadListNavigationModel.visibleRows(list).map(row => row.id)
 
@@ -6193,6 +6209,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (!isPrimarySurface) return
     return PaletteBridge.addProjectColors(PaletteProjectColorsModel.sourceOf({ savedChipOf: savedProjectChipOf, palette: preferences.projectColorPalette }))
   }, [isPrimarySurface, preferences.projectColorPalette, savedProjectChipOf])
+  // Each parent's subagent catalog in launch order, the same array while it is unchanged so the row's memo holds.
+  const childLaunchOrder = (parentId: SessionSummary['id']): readonly string[] | undefined => {
+    const catalog = sessionState.projectionsBySession[parentId]?.values.subagentCatalog
+    if (catalog === undefined) return undefined
+    const next = [...catalog].sort((left, right) => left.createdAt - right.createdAt).map(entry => entry.id)
+    const cached = launchOrderCache.current.get(parentId)
+    if (cached !== undefined && cached.length === next.length && cached.every((id, index) => id === next[index])) return cached
+    launchOrderCache.current.set(parentId, next)
+    return next
+  }
   const renderThreadRow = (session: SessionSummary, attentionLabel: ThreadRowProps['attentionLabel'], section?: SidebarSection): JSX.Element => {
     const lineage = SidebarOrganization.sessionLineage(session, sessionState.byId)
     const workspaceId = SidebarOrganization.workspaceForLineage(session, sessionState.byId, workspaceBySession)
@@ -6255,6 +6281,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         rowActions={rowActionButtons}
         childThreads={childRow.live}
         finishedChildThreads={childRow.finished}
+        childLaunchOrder={childLaunchOrder(session.id)}
         childrenOpen={shouldOpenChildThreadList({ children: childRow.listed, override: childrenOpenOverrides.get(session.id) })}
         allChildrenShown={expandedParents.has(session.id)}
         selectedChildId={childRow.selectedChildId}

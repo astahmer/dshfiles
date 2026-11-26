@@ -570,6 +570,24 @@ describe('a subagent row under its parent', () => {
     expect(button?.querySelector('[data-thread-child-lead] [data-status="failed"]')).not.toBeNull()
     expect(button?.querySelector('[data-thread-child-meta]')?.textContent).toBe('claude-sonnet-5-5·Turn failed')
   })
+
+  it('lists its children in launch order with the failed ones last, whatever their activity (council round 22, item 12)', async () => {
+    // The tree hands children newest-updated first, so a parent's list reshuffled as children worked.
+    const ids = ['c-credit', 'c-ledger', 'c-csv', 'c-audit']
+    const children = ['c-csv', 'c-audit', 'c-ledger', 'c-credit'].map(id =>
+      rowSession({ id: SessionId(id), parentId: SessionId('s1'), origin: 'subagent', running: id !== 'c-ledger' }),
+    )
+    const row = await renderRow({
+      childThreads: children,
+      childLaunchOrder: ids,
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false, maxChildren: 10 },
+      childStatuses: new Map(children.map(child => [child.id, rowStatus({ status: child.id === 'c-ledger' ? 'failed' : 'working' })])),
+    })
+    const order = Array.from(row.querySelectorAll<HTMLElement>('ul [data-thread-main-action]')).map(button => button.getAttribute('data-thread-id'))
+    expect(order).toEqual(['c-credit', 'c-csv', 'c-audit', 'c-ledger'])
+  })
 })
 
 describe('the phone list (council round 18 B1.3)', () => {

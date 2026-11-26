@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { test } from 'vitest'
+import { describe, expect, it, test } from 'vitest'
 import { ThreadChildrenModel, type ThreadNode } from './thread-children.js'
 
 const thread = (id: string, updatedAt: number, parentId?: string): ThreadNode => (parentId === undefined ? { id, updatedAt } : { id, updatedAt, parentId })
@@ -150,4 +150,19 @@ test('the open child stays live while finished ones fold away or disappear', () 
   const selectedStaysLive = ThreadChildrenModel.partitionFinishedChildren({ children, mode: 'collapse', isFinished: () => true, selectedId: 'b' })
   assert.deepEqual(ids(selectedStaysLive.live), ['b'])
   assert.deepEqual(ids(selectedStaysLive.finished), ['a', 'open'])
+})
+
+describe('launchOrdered (council round 22, item 12)', () => {
+  const child = (id: string) => ({ id })
+  it('orders children by launch, failed last, unknown ones after the launched in their own order', () => {
+    const children = ['d', 'x', 'b', 'a', 'y', 'c'].map(child)
+    const ordered = ThreadChildrenModel.launchOrdered({ children, launchOrder: ['a', 'b', 'c', 'd'], isFailed: thread => thread.id === 'b' })
+    expect(ordered.map(thread => thread.id)).toEqual(['a', 'c', 'd', 'x', 'y', 'b'])
+  })
+
+  it('returns the same array when nothing moves, so the row keeps its props', () => {
+    const children = ['a', 'b'].map(child)
+    expect(ThreadChildrenModel.launchOrdered({ children, launchOrder: ['a', 'b'], isFailed: () => false })).toBe(children)
+    expect(ThreadChildrenModel.launchOrdered({ children, launchOrder: undefined, isFailed: () => false })).toBe(children)
+  })
 })
