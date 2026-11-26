@@ -53,6 +53,9 @@ import { AddPanelButton, EntryMenu, FolderDialog, FolderGlyph, FolderMenu, Folde
 import { SidebarTrees, type ResolvedEntry } from './sidebar-tree.js'
 import { PhoneTopBarModel, SETTINGS_PANEL_ID, useSoftwareKeyboard, useStandaloneStatusBar } from './phone-shell.js'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
+import { usePhoneThreadMenu } from '@dshfiles/rich-composer/phone-thread-menu'
+import type { PhoneStageMeta } from './phone-thread-meta.js'
 import { PhoneLayout } from './phone-layout.js'
 import { useEdgeSwipe } from './edge-swipe.js'
 import { runStackMotion } from './stack-motion.js'
@@ -195,6 +198,8 @@ export interface DestinationShellProps {
   readonly pendingTitle?: string | undefined
   /** The stage thread or one of its subagents works: the phone thread bar's glyph before its title (council round 13 B6). */
   readonly stageWorking?: boolean | undefined
+  /** The phone thread header's meta line under the title: project, status, subagents (council round 17 B2.2). */
+  readonly stageMeta?: PhoneStageMeta | undefined
   /** Opens or closes the thread panel (a bottom sheet on a phone); null when no owner serves it. */
   readonly togglePanels?: (() => void) | null
   /** A swipe in from the right edge, inside a thread, opens the thread panel (Settings › phoneEdgeSwipePanels). */
@@ -1519,9 +1524,11 @@ const PhoneNavigation = (
   const stageBar = drawer ? PhoneTopBarModel.resolve({ ...stack, listOpen: false, moreOpen: false }) : bar
   // A page or a list centres its title (council round 4 B3); a thread's title leads, after the back chevron.
   const centred = !(stageBar.thread && (drawer || !listOpen))
-  // A thread's bar is one 44px line (council round 13 B6): the working glyph before the title while it or a subagent
-  // works. The Live work strip counts the subagents, so the bar no longer says "1 subagent" under the title.
-  const working = !centred && props.stageWorking === true
+  // A thread's bar names its project, status and working subagents on a 13px line under the title (council round 17
+  // B2.2), `[mark] billing-api · Working · 1 subagent`, inside the one 44px row. Without that line (no thread facts yet)
+  // the working glyph leads the title instead (council round 13 B6).
+  const meta = centred ? undefined : props.stageMeta
+  const working = !centred && meta === undefined && props.stageWorking === true
   // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
   const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
   const backToPage = (): void => {
@@ -1604,6 +1611,18 @@ const PhoneNavigation = (
     return () => root.removeAttribute('data-phone-in-thread')
   }, [inThread, tabBar])
   const togglePanels = props.togglePanels ?? null
+  // The thread panel opens from the thread's ⋯ menu (council round 17 B2.2): an unlabelled glyph beside ⋯ said nothing,
+  // and a label did not fit beside the title. Without rich-composer's menu the bar keeps its labelled-for-AT button.
+  const { service: threadMenu, snapshot: threadMenuState } = usePhoneThreadMenu()
+  const menuReader = threadMenuState.launcherReader
+  const panelsInMenu = threadMenu !== undefined
+  const togglePanelsLatest = useRef(togglePanels)
+  togglePanelsLatest.current = togglePanels
+  const panelsOffered = stageBar.thread && togglePanels !== null
+  useLayoutEffect(() => {
+    if (!panelsOffered || threadMenu === undefined || menuReader === null) return
+    return threadMenu.registerTool({ id: 'thread-sidebar.thread-panels', readerId: menuReader, label: 'Thread panels', open: () => togglePanelsLatest.current?.() })
+  }, [panelsOffered, threadMenu, menuReader])
   // The thread panel from the right edge (opt-in); an open sheet is modal, so the swipe never closes it again.
   useEdgeSwipe({ side: 'right', enabled: inThread && props.edgeSwipePanels === true && togglePanels !== null, onSwipe: () => togglePanels?.() })
   // Tapping the row of the thread (or the page) already on the stage changes no selection, so the effect above would
@@ -1850,6 +1869,22 @@ const PhoneNavigation = (
                 {stageBar.title}
               </span>
             </h1>
+          ) : meta !== undefined ? (
+            <div data-phone-title-block="" className={cn('dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:justify-center', !drawer && bar.back === null && 'dshx:pl-2.5')}>
+              {/* 17/20 over 13/16: 36px of text centred in the 44px row, 4px clear above and below. */}
+              <h1 data-phone-title="" className={cn(PHONE_TITLE_CLASS, 'dshx:leading-5')}>
+                {stageBar.title}
+              </h1>
+              {/* 13/16 in the secondary ink: the list row's line 2, its project mark and its status word. */}
+              <AttentionMeta
+                data-phone-subtitle=""
+                className="dshx:flex-none dshx:text-sm/4"
+                project={meta.project}
+                kind={meta.status}
+                age={meta.subagents}
+                {...(meta.mark === undefined ? {} : { mark: meta.mark })}
+              />
+            </div>
           ) : (
             <h1
               data-phone-title=""
@@ -1874,7 +1909,7 @@ const PhoneNavigation = (
               <PlusIcon className="dshx:size-5" strokeWidth={1.75} aria-hidden="true" />
             </button>
           ) : null}
-          {stageBar.thread && togglePanels !== null ? (
+          {panelsOffered && !panelsInMenu ? (
             <button
               type="button"
               data-phone-panels=""

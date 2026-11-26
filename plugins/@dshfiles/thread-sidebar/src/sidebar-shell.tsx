@@ -4,7 +4,7 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
+import { plural, useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
 import { SettingsNavigation } from '@dshfiles/settings-shell/settings-navigation'
 import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
 import {
@@ -70,6 +70,12 @@ import {
   type Ref,
 } from 'react'
 import { PendingPick, SETTINGS_PANEL_ID } from './phone-shell.js'
+import { PhoneThreadMeta, type PhoneStageMeta } from './phone-thread-meta.js'
+import { STATUS_WORD_KEYS } from './palette-thread-statuses.js'
+import { useSavedProjectChip } from './project-colors.js'
+import { HostSnapshotsModel } from './snapshots.js'
+import { threadWorkStatusStore } from './thread-work-status-store.js'
+import { useThreadDirectories } from './use-thread-directories.js'
 import { StageCover } from './stage-cover.js'
 import { SidebarOrganization, type OrderedSidebarEntry, type SidebarPreferences, type ThreadRowAction } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
@@ -276,6 +282,49 @@ const focusComposer = (): void => {
   selection?.addRange(range)
 }
 
+/**
+ * The phone thread header's meta line (council round 17 B2.2, phone-thread-meta.ts): the stage thread's project, its
+ * list status word and its working subagents. Every read is a primitive or a stable snapshot, so a streaming Session
+ * list does not re-render the shell.
+ */
+const usePhoneStageMeta = (
+  props: SidebarShellProps,
+  stageThread: string | undefined,
+  preferences: Pick<SidebarPreferences, 'projectColorPalette' | 'threadRowProjectColor'>,
+): PhoneStageMeta | undefined => {
+  const lineageKey = props.useSessions(state => {
+    const ids: string[] = []
+    for (let cursor = stageThread; cursor !== undefined && ids.length < 64; cursor = Object.values(state.byId).find(session => session.id === cursor)?.parentId) ids.push(cursor)
+    return ids.join('\n')
+  })
+  const running = props.useSessions(state => stageThread !== undefined && Object.values(state.byId).some(session => session.id === stageThread && session.running))
+  const subagents = props.useSessions(state => (stageThread === undefined ? 0 : Object.values(state.byId).filter(session => session.parentId === stageThread && session.running).length))
+  const workspaces = props.useWorkspaces(state => HostSnapshotsModel.selectStableWorkspaceItems(state.items))
+  const threadDirectories = useThreadDirectories(workspaces)
+  const savedChipOf = useSavedProjectChip()
+  const status = useSyncExternalStore(threadWorkStatusStore.subscribe, () => (stageThread === undefined ? undefined : threadWorkStatusStore.getSnapshot()?.get(stageThread)))
+  const t = props.t
+  return useMemo(
+    () =>
+      lineageKey === ''
+        ? undefined
+        : PhoneThreadMeta.resolve({
+            lineage: lineageKey.split('\n'),
+            workspaces,
+            threadDirectories,
+            status,
+            running,
+            subagents,
+            wordOf: word => t(STATUS_WORD_KEYS[word]),
+            subagentsLabel: count => plural(t, 'subagentCount', count),
+            savedChipOf,
+            palette: preferences.projectColorPalette,
+            coloured: preferences.threadRowProjectColor,
+          }),
+    [lineageKey, workspaces, threadDirectories, status, running, subagents, t, savedChipOf, preferences.projectColorPalette, preferences.threadRowProjectColor],
+  )
+}
+
 const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const { collapsed, readFooterSnapshot, renderSlot, selectPanel, startSession, subscribeFooterSnapshot, toggleSidebar } = props
   // History steps stamp their settle window from the gesture, not from render.
@@ -301,6 +350,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stageWorking = props.useSessions(
     state => stageThread !== undefined && Object.values(state.byId).some(session => (session.id === stageThread || session.parentId === stageThread) && session.running),
   )
+  const stageMeta = usePhoneStageMeta(props, stageThread, preferences)
   // The stage Session follows a tap only once the thread opens; until then the bar names the pick from the list.
   const [pickSeen, setPickSeen] = useState({ pick: pickedThread, stage: stageSession })
   if (pickSeen.pick !== pickedThread) setPickSeen({ pick: pickedThread, stage: stageSession })
@@ -1426,6 +1476,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             folderUi={folderUi}
             stageTitle={stageTitle}
             stageWorking={stageWorking}
+            stageMeta={stageMeta}
             pendingTitle={pendingTitle}
             // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}

@@ -7,13 +7,24 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { DestinationSelection, DestinationShell, PHONE_TAB_PILL, type DestinationShellProps } from './destination-shell.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
+import type { PhoneMenuSnapshot, PhoneMenuTool, PhoneThreadMenuService } from '@dshfiles/rich-composer/phone-thread-menu'
+import { createContext } from 'react'
 
 /** frame-layout's phone status button (council round 3 B6): absent unless a test provides it. */
 type PhoneStatusStub = { Button: (() => JSX.Element) | undefined }
 const phoneStatus: PhoneStatusStub = { Button: undefined }
+/** rich-composer's phone thread menu (its `⋯` sheet): absent unless a test provides it. */
+interface ThreadMenuStub {
+  service: PhoneThreadMenuService | undefined
+}
+const threadMenu: ThreadMenuStub = { service: undefined }
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({
   ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
-  useContract: () => (phoneStatus.Button === undefined ? { status: 'inactive' } : { status: 'active', value: { Button: phoneStatus.Button } }),
+  useContract: (token: { readonly id: string }) => {
+    if (token.id === '@dshfiles/rich-composer.phone-thread-menu')
+      return threadMenu.service === undefined ? { status: 'inactive' } : { status: 'active', value: threadMenu.service }
+    return phoneStatus.Button === undefined ? { status: 'inactive' } : { status: 'active', value: { Button: phoneStatus.Button } }
+  },
 }))
 
 const panels = [
@@ -895,6 +906,80 @@ describe('DestinationShell', () => {
     expect(chevron.className).toContain('dshx:justify-center')
     expect(chevron.className).not.toContain('dshx:w-7')
     expect(document.querySelector('[data-phone-bar-layout]')?.className).not.toMatch(/dshx:gap-/u)
+  })
+
+  it('names the thread\'s project, status and working subagents on a 13px line under its title (council round 17 B2.2)', () => {
+    setPhone(true)
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'session-1',
+      stageThreadId: 'session-1',
+      stageTitle: 'Fix invoice tax rounding',
+      stageWorking: true,
+      stageMeta: { project: 'billing-api', mark: { tone: 3, palette: 'balanced' }, status: 'Working', subagents: '1 subagent' },
+    })
+    const block = document.querySelector('[data-phone-title-block]')
+    expect(block?.querySelector('[data-phone-title]')?.textContent).toBe('Fix invoice tax rounding')
+    // 17/20 over 13/16: both lines fit the 44px row with 4px clear.
+    expect(block?.querySelector('[data-phone-title]')?.className).toContain('dshx:leading-5')
+    const line = block?.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect(line?.className).toContain('dshx:text-sm/4')
+    expect(line?.className).toContain('dshx:text-muted-foreground')
+    expect([...(line?.querySelectorAll('[data-attention-meta-part]') ?? [])].filter(part => part.getAttribute('data-attention-meta-part') !== 'sep').map(part => [part.getAttribute('data-attention-meta-part'), part.textContent])).toEqual([
+      ['mark', 'BA'],
+      ['name', 'billing-api'],
+      ['kind', 'Working'],
+      ['age', '1 subagent'],
+    ])
+    // The line says Working: no second status glyph before the title, and the bar stays one 44px row.
+    expect(document.querySelector('[data-phone-title] [data-status]')).toBeNull()
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:h-11')
+    cleanup()
+    // An unknown project draws no mark and no name; a page never draws the line.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', stageMeta: { project: undefined, mark: undefined, status: 'Idle', subagents: undefined } })
+    expect(document.querySelector('[data-phone-subtitle] [data-attention-meta-part="mark"]')).toBeNull()
+    expect(document.querySelector('[data-phone-subtitle]')?.textContent).toContain('Idle')
+    cleanup()
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageMeta: { project: 'billing-api', mark: undefined, status: 'Working', subagents: undefined } })
+    expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
+  })
+
+  it('moves Thread panels into the thread\'s ⋯ menu, keeping the bar button only without that menu (council round 17 B2.2)', () => {
+    setPhone(true)
+    const togglePanels = vi.fn()
+    const thread = { collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix the login race', togglePanels } as const
+    renderShell(thread)
+    expect(screen.getByRole('button', { name: 'Thread panels' })).toBeTruthy()
+    cleanup()
+    const tools: PhoneMenuTool[] = []
+    const snapshot: PhoneMenuSnapshot = { readers: [{ id: 'reader-1', sessionId: 'session-1' }], tools: [], launcherReader: 'reader-1', openReader: null, closeReason: 'dismiss' }
+    threadMenu.service = {
+      scope: createContext<string | null>(null),
+      state: { get: () => snapshot, subscribe: () => () => undefined },
+      registerReader: () => () => undefined,
+      registerTool: tool => {
+        tools.push(tool)
+        return () => tools.splice(tools.indexOf(tool), 1)
+      },
+      attachLauncher: () => () => undefined,
+      toggle: () => undefined,
+      returnFocus: () => false,
+      close: () => undefined,
+      pick: tool => tool.open(),
+    }
+    try {
+      renderShell(thread)
+      expect(document.querySelector('[data-phone-panels]')).toBeNull()
+      expect(tools.map(tool => [tool.id, tool.label, tool.readerId])).toEqual([['thread-sidebar.thread-panels', 'Thread panels', 'reader-1']])
+      tools[0]?.open()
+      expect(togglePanels).toHaveBeenCalledTimes(1)
+      cleanup()
+      // A page offers no thread panel.
+      renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', togglePanels })
+      expect(tools).toEqual([])
+    } finally {
+      threadMenu.service = undefined
+    }
   })
 
   it('gives every phone bar one seat rule: 44px leading and trailing seats 4px in from the edges, published for pages (council round 17 B2.2)', () => {
