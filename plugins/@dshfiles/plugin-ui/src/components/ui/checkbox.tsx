@@ -3,18 +3,26 @@ import { cn } from '../../lib/utils.js'
 import { CheckIcon } from 'lucide-react'
 import { Checkbox as CheckboxPrimitive } from 'radix-ui'
 
-function Checkbox({ className, ...props }: React.ComponentProps<typeof CheckboxPrimitive.Root>) {
+/**
+ * `size="sm"` is the dense checkbox (council round 11 A5) for a table column (AI accounts' "Show model"): the same
+ * 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke inset 2px, and no shadow, so a column of
+ * checked boxes reads as small crisp marks. `default` keeps the 14px tick and the shadow.
+ */
+function Checkbox({ className, size = 'default', ...props }: React.ComponentProps<typeof CheckboxPrimitive.Root> & { readonly size?: 'default' | 'sm' }) {
+  const dense = size === 'sm'
   return (
     <CheckboxPrimitive.Root
       data-slot="checkbox"
+      data-size={size}
       className={cn(
-        'dshx:peer dshx:size-4 dshx:shrink-0 dshx:rounded-sm dshx:border dshx:border-field-border dshx:shadow-xs dshx:transition-[background-color,border-color,box-shadow] dshx:duration-(--dshx-duration-fade) dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:data-[state=checked]:border-control-on dshx:data-[state=checked]:bg-control-on dshx:data-[state=checked]:text-control-on-foreground dshx:dark:bg-input/30 dshx:dark:aria-invalid:ring-destructive/40 dshx:dark:data-[state=checked]:bg-control-on',
+        'dshx:peer dshx:size-4 dshx:shrink-0 dshx:rounded-sm dshx:border dshx:border-field-border dshx:transition-[background-color,border-color,box-shadow] dshx:duration-(--dshx-duration-fade) dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:data-[state=checked]:border-control-on dshx:data-[state=checked]:bg-control-on dshx:data-[state=checked]:text-control-on-foreground dshx:dark:bg-input/30 dshx:dark:aria-invalid:ring-destructive/40 dshx:dark:data-[state=checked]:bg-control-on',
+        !dense && 'dshx:shadow-xs',
         className,
       )}
       {...props}
     >
       <CheckboxPrimitive.Indicator data-slot="checkbox-indicator" className="dshx:grid dshx:place-content-center dshx:text-current dshx:transition-none">
-        <CheckIcon className="dshx:size-3.5" />
+        {dense ? <CheckIcon size={12} strokeWidth={1.5} absoluteStrokeWidth /> : <CheckIcon className="dshx:size-3.5" />}
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   )

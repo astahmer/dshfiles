@@ -241,7 +241,9 @@ dshx:surface-dialog` to its own card.
 (`components/ui/input`): a 1px `border-field-border` boundary (`--dshx-field-border`, light `#88827d`, dark `#76706c`:
 3:1 on bg, panel, raised, the nav column and the dark dialog fill, WCAG 1.4.11; council round 6 A2), the page fill
 (`bg-background`), the 8px radius, no shadow and no dark fill. `Checkbox` and `RadioGroupItem` edges use the same
-boundary; a text field a plugin draws itself takes `dshx:border-field-border` too. Dividers and card hairlines stay
+boundary; a text field a plugin draws itself takes `dshx:border-field-border` too. A checkbox column in a dense table takes `Checkbox
+size="sm"` (council round 11 A5): the same 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke, no
+shadow. Dividers and card hairlines stay
 `border-border`. **The quiet trigger** (council round 10 A1): a control that opens a list and shows a value, the
 `Select` and `Combobox` triggers, `Button variant="field"` and `select-look`, shares `triggerLook`: `bg-trigger-fill`
 (`--dshx-trigger-fill`, the ink at 5% light / 5.2% dark, so it paints `oklch(0.955 0.004 65)` / `oklch(0.235 0.006 65)`
