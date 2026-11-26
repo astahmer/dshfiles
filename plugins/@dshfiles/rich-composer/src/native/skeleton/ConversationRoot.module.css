@@ -908,6 +908,23 @@ button.crumbEditable {
   :global(html[data-shell-phone-nav]) .body:not(.embeddedBody) {
     --dsh-composer-side-clearance: 12px;
   }
+
+  /* Council round 24, item 4: the scroller's top edge, right under the phone top bar's hairline, sliced the line
+     scrolling past it into glyph slivers (17). An 8px fade sticks to that edge: it takes no room, catches no touch, and
+     sits over the transcript's text but under its sticky code banners, pinned header and turn rail (z-index 6, 7). A
+     view's composer overlay leaves this box unscrolled, so it draws none there. */
+  :global(html[data-shell-phone-nav]) .body[data-content-phase='active']:not(.embeddedBody) .scrollBody:not(:has([data-conversation-composer-overlay]))::before {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: block;
+    flex: none;
+    height: 8px;
+    margin-bottom: -8px;
+    content: '';
+    pointer-events: none;
+    background: linear-gradient(180deg, var(--dsw-alias-bg-base), color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent));
+  }
 }
 
 .scrollBody {
