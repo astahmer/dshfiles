@@ -11,6 +11,9 @@ import { Slot } from 'radix-ui'
  *
  * One control height and one radius (council round 5 A1): the default size is `--dshx-control-h` (32px, 44px on a
  * coarse pointer), the height of every field and the segmented root, and every size shares the fields' 8px radius.
+ * `size="field"` (council round 9 A4) is that height at the compact toolbar type (13px, 14px glyph): a field-look
+ * launcher or value trigger in a toolbar row (Search threads, a filter, a project picker) beside an Input or a
+ * Combobox, so the whole row is 32px on desktop and 44px on a coarse pointer instead of a 28px `sm` among them.
  */
 const buttonVariants = cva(
   'dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:justify-center dshx:gap-2 dshx:rounded-lg dshx:text-sm dshx:font-medium dshx:whitespace-nowrap dshx:transition-[color,background-color,border-color,box-shadow,scale] dshx:duration-(--dshx-duration-hover) dshx:pointer-coarse:motion-safe:active:scale-[0.97] dshx:outline-none dshx:focus-visible:border-ring dshx:focus-visible:ring-[3px] dshx:focus-visible:ring-ring/50 dshx:disabled:pointer-events-none dshx:disabled:opacity-50 dshx:aria-invalid:border-destructive dshx:aria-invalid:ring-destructive/20 dshx:dark:aria-invalid:ring-destructive/40 dshx:[&_svg]:pointer-events-none dshx:[&_svg]:shrink-0 dshx:[&_svg:not([class*=size-])]:size-4',
@@ -58,6 +61,7 @@ const buttonVariants = cva(
         default: 'dshx:h-(--dshx-control-h) dshx:px-3 dshx:py-1.5 dshx:has-[>svg]:px-2.5',
         xs: 'dshx:h-6 dshx:gap-1 dshx:px-2 dshx:text-xs dshx:has-[>svg]:px-1.5 dshx:[&_svg:not([class*=size-])]:size-3',
         sm: 'dshx:h-7 dshx:gap-1.5 dshx:px-2.5 dshx:text-xs dshx:has-[>svg]:px-2 dshx:[&_svg:not([class*=size-])]:size-3.5',
+        field: 'dshx:h-(--dshx-control-h) dshx:gap-1.5 dshx:px-2.5 dshx:text-sm dshx:[&_svg:not([class*=size-])]:size-3.5',
         lg: 'dshx:h-9 dshx:px-5 dshx:has-[>svg]:px-4',
         icon: 'dshx:size-8',
         'icon-xs': 'dshx:size-6 dshx:[&_svg:not([class*=size-])]:size-3',

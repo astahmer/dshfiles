@@ -152,7 +152,10 @@ wrap rule reads; the kit `CodeBlock` does it per line itself.
 filter, a project picker) is `Button` `variant="field"`: the `SelectTrigger` look (`fieldLook`: field boundary, page fill,
 8px), the value in ink at 400, its chevron in secondary ink, no hover fill. A filter row then shows one field edge:
 selects and value triggers alike; action buttons (Refresh) stay `outline`. Outside `Button`, use
-`cn(buttonVariants({ variant: 'field' }))`.
+`cn(buttonVariants({ variant: 'field' }))`. In a toolbar row beside an Input, SearchInput, Combobox or Select, give a
+field-look launcher or trigger `size="field"` (council round 9 A4): the one control height (32px, 44px on a coarse
+pointer) at 13px with a 14px glyph, so the row is one height; `size="sm"` (28px) never sits among fields, and never
+override a Combobox trigger's height.
 
 **Selection: the selected wash and marker.** A selection is a neutral wash: `bg-selected-wash`
 (`--dshx-selected-wash`, a warm grey step with no accent hue: light `oklch(0.935 0.004 80)`, dark

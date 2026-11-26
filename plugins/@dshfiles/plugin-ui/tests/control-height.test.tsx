@@ -81,6 +81,33 @@ describe('one control height (council round 5 A1)', () => {
     for (const name of ['Summarize', 'Refresh']) expect(page.getByRole('button', { name }).getAttribute('data-size')).toBe('default')
   })
 
+  it('gives toolbar field-look triggers a shared hook at that height (council round 9 A4)', () => {
+    const view = render(
+      <div>
+        <Button variant="field" size="field">
+          <svg />
+          Search threads
+        </Button>
+        <Button variant="field" size="field" aria-label="Filter: All">
+          All
+        </Button>
+        <Combobox label="project" options={[]} value="" onValueChange={vi.fn()} />
+        <Input aria-label="query" />
+      </div>,
+    )
+    const launcher = view.getByRole('button', { name: 'Search threads' })
+    const filter = view.getByRole('button', { name: 'Filter: All' })
+    for (const trigger of [launcher, filter]) {
+      expect(trigger.getAttribute('data-size')).toBe('field')
+      expect(classes(trigger)).toEqual(expect.arrayContaining([H, 'dshx:rounded-lg', 'dshx:text-sm', 'dshx:border-field-border']))
+      // Never the 28px `sm` height in a toolbar row.
+      expect(classes(trigger)).not.toContain('dshx:h-7')
+    }
+    // The Combobox trigger and the Input sit on the same height, so the row is one line of 32px (44px coarse).
+    expect(classes(view.getByRole('combobox', { name: 'project' }))).toContain(H)
+    expect(classes(view.getByRole('textbox', { name: 'query' }))).toContain(H)
+  })
+
   it('sizes the segmented root by it with items inset 3px; underline tabs keep their own height', () => {
     const view = render(
       <Tabs defaultValue="a">
