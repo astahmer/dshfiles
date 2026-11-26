@@ -157,11 +157,12 @@ export const GENERAL_HEADINGS = [
 ] as const
 
 /**
- * One General group heading: the kit's Settings heading step, 15/20 at 600 with 32px above it (council round 8 B4), no
- * divider of its own (the row above keeps its own). The `first` heading opens the page and starts at its top.
+ * One General group heading: the kit's Settings heading step (18/24 at 600, 40px above and 12px below, council round 10
+ * A6), with no spacing of its own, no divider (the row above keeps its own). The `first` heading opens the page and
+ * starts at its top.
  */
 export const GeneralGroupHeading = (props: { readonly label: string; readonly first?: boolean }): JSX.Element => (
-  <h3 className={cn('dshx:min-w-0 dshx:settings-heading dshx:pb-1', props.first === true && 'dshx:mt-0!')} data-settings-general-heading="">
+  <h3 className={cn('dshx:min-w-0 dshx:settings-heading', props.first === true && 'dshx:mt-0!')} data-settings-general-heading="">
     {props.label}
   </h3>
 )

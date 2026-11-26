@@ -66,6 +66,11 @@ describe('Settings › General groups its transcript rows (council round 6 B5)',
     expect(heading?.className).not.toContain('dshx:pt-6')
     expect(heading?.className).not.toContain('dshx:mt-0!')
     expect(heading?.hasAttribute('data-settings-general-heading')).toBe(true)
+    // The kit step owns the spacing (council round 10 A6): 12px under the heading, nothing added or cancelled here.
+    expect(heading?.className).not.toMatch(/dshx:(?:pb|mb)-/u)
+    const form = readFileSync('src/schema-form/settings-form.tsx', 'utf8')
+    expect(form).toContain('<h4 className="dshx:settings-heading dshx:first:mt-0">')
+    expect(form).not.toMatch(/<h4 className="[^"]*dshx:mb-0[^"]*settings-heading/u)
   })
 
   it('puts every native row on the kit Settings row grammar, the last row and the captioned Language row without a hairline (council round 8 B4)', async () => {
