@@ -1255,16 +1255,15 @@ button.crumbEditable {
      still showed its cap tops as a half-clipped strip on the Live work card's edge. The band is one 28px line-height,
      opaque exactly at the card's top, on an even ease (30/62/88% at 7/14/21px), so a line resting in the band fades as
      a whole instead of keeping its top and losing its foot; Chat's phone end padding gives the 12px back, so the last
-     line still ends 40px above the card at the tail. */
+     line still ends 40px above the card at the tail. Council round 17 C4 (Astra): the 28px band greyed a whole line of
+     prose over the dock while the transcript scrolled. The fade is the last 8px above the card; Chat's phone end
+     padding takes the 20px back (32px), so the last line still ends 40px above the card at the tail. */
   :global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat {
-    padding-top: 28px;
+    padding-top: 8px;
     background: linear-gradient(
       180deg,
       color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
-      color-mix(in srgb, var(--dsw-alias-bg-base) 30%, transparent) 7px,
-      color-mix(in srgb, var(--dsw-alias-bg-base) 62%, transparent) 14px,
-      color-mix(in srgb, var(--dsw-alias-bg-base) 88%, transparent) 21px,
-      var(--dsw-alias-bg-base) 28px
+      var(--dsw-alias-bg-base) 8px
     );
   }
 

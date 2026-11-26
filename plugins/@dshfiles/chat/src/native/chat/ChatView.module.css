@@ -537,10 +537,11 @@
    bare text (prose, lists, "Worked for", the turn summary) 12px further, at 24px, like every phone page. Fills pull
    back out to the 12px edge (AssistantMarkdown's code cards, MessageItem's prompt bubble). */
 @media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
-  /* Council round 10 C1: the composer seat's fade above the dock grew from 16px to one 28px line; the end padding gives
-     those 12px back, so at the tail the last line still ends 40px above the Live work card. */
+  /* Council round 10 C1: the composer seat's fade above the dock grew from 16px to one 28px line; the end padding gave
+     those 12px back. Council round 17 C4: the fade is 8px, so the end padding is 32px and at the tail the last line
+     still ends 40px above the Live work card. */
   :global(html[data-shell-phone-nav]) .scroll {
     padding-inline: calc(var(--dsh-composer-side-clearance) + 12px);
-    padding-bottom: 12px;
+    padding-bottom: 32px;
   }
 }

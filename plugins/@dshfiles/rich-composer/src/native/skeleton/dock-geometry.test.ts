@@ -181,22 +181,19 @@ describe('the new-thread hero centre (round six C5)', () => {
   })
 })
 
-describe('the phone transcript fade above the dock (council round 7 C3, round 8 C5, round 10 C1)', () => {
-  it('fades over one 28px line, opaque exactly where the dock surface starts, so no line shows half-clipped', () => {
+describe('the phone transcript fade above the dock (council round 7 C3, round 8 C5, round 10 C1, round 17 C4)', () => {
+  it('fades only the last 8px above the Live work card, opaque exactly where the dock surface starts', () => {
     const rule = blocks().find(
       block =>
         block.selector === ":global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat" &&
         block.context.startsWith('@media (max-width: 639.98px)'),
     )
-    expect(rule?.body).toMatch(/padding-top: 28px;/)
+    // Council round 17 C4 (Astra): the 28px band greyed a whole line of prose over the dock; the fade is the last 8px.
+    expect(rule?.body).toMatch(/padding-top: 8px;/)
+    expect(rule?.body).not.toMatch(/padding-top: 28px;/)
     // The last stop is the seat's padding edge, the Live work card's top: the band never ends early or late.
-    expect(rule?.body).toMatch(/var\(--dsw-alias-bg-base\) 28px\s*\)/)
-    expect(rule?.body).not.toMatch(/36px/)
-    expect(rule?.body).not.toMatch(/var\(--dsw-alias-bg-base\) 16px\s*\)/)
-    // An even ease over the whole line: a band solid from 24px faded a line's top and erased its foot, so a line resting
-    // in the band read as sliced in the rendered capture.
-    expect(rule?.body).not.toMatch(/var\(--dsw-alias-bg-base\) 2[0-7]px/)
-    expect(rule?.body).toMatch(/30%, transparent\) 7px,[\s\S]*62%, transparent\) 14px,[\s\S]*88%, transparent\) 21px,/)
+    expect(rule?.body).toMatch(/color-mix\(in srgb, var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,\s*var\(--dsw-alias-bg-base\) 8px\s*\)/)
+    for (const longer of ['36px', '28px', '21px', '14px']) expect(rule?.body).not.toContain(longer)
   })
 })
 
