@@ -449,13 +449,13 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '`modelIdentity(provider, model)`',
       'the mark from the model id first',
       'the transcript subagent row',
-      'the thread list\'s child row',
-      'the subagent thread\'s header lineage',
+      "the thread list's child row",
+      "the subagent thread's header lineage",
       'at 85% brightness',
       '**Change badge.**',
       '`ChangeBadge`',
       'M, A, D, R',
-      'takes the seat\'s colour',
+      "takes the seat's colour",
       '**Palette selection.**',
       'the wash and ↵ only',
       '`oklch(0.925 0.004 70)`',
@@ -495,7 +495,15 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     // Retired by this pass: the phone failed card's full-width footer Review, the ringed badge, the child row's Working.
     expect(prose).not.toContain('full-width 44px footer button')
     expect(prose).not.toContain("the phone's full-width verbs")
-    expect(prose).not.toContain('with a 1px edge in the letter\'s tone')
+    expect(prose).not.toContain("with a 1px edge in the letter's tone")
     expect(prose).not.toContain('`[mark] gpt-6.2-astra · Working`')
+  })
+
+  it('records the identity palette: slots the user picks from the theme (owner decision, 2026-11-26)', () => {
+    expect(design).toContain('**Identity palette (owner decision, 2026-11-26).**')
+    expect(design).toContain('`PalettePicker`')
+    expect(design).toContain('a choice stores the slot, never a colour')
+    expect(design).toContain('`--dshx-project-balanced-<n>`')
+    expect(design).toContain('This widens colour restraint for identity only')
   })
 })

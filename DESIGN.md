@@ -306,6 +306,18 @@ work on any surface.
    `chart-1..5`. A project shows as one `ProjectMark` (`components/ui/project-mark`): a 20px tile (16px dense), 4px
    radius, its tone at 18% behind two letters in that tone, with the project name beside it in muted text. The six
    project tones (hues 225, 110, 55, 305, 340, 195) keep 25° or more from every status hue.
+   **Identity palette (owner decision, 2026-11-26).** Projects, Backlog tags and configured agents take a colour the
+   user picks from the active theme's palette: six slots (0–5), one `PalettePicker`
+   (`components/palette-picker`), and a choice stores the slot, never a colour, so switching theme recolours every
+   choice to match. The default theme's slots are the six project tones above (azure, olive, copper, violet,
+   magenta, teal); a theme may give its own `palette` and `paletteNames` (Dracula and Alucard: cyan, green, orange,
+   purple, pink, yellow from the spec), and a theme without one derives six from its syntax, accent and info colours,
+   preferring hues 25° from its danger, warning and success and moving lightness only until each tone holds 4.5:1 on
+   bg, panel and raised (`theme/identity-derivation.ts`). The theme writes them over `--dshx-project-balanced-<n>`
+   and `--dshx-project-cool-<n>`, so every existing consumer follows. This widens colour restraint for identity only:
+   the chosen colour sits where a project mark already puts it (the tone on its 18% wash in a small chip or tile, or
+   the tone as text or glyph ink), never on a row, surface or header, and never says state. New pickers are
+   palette-only; projects keep their custom `#rrggbb` beside the swatches.
 6. **Indigo is attention, focus and links; every on state is ink.** Indigo marks Needs you, the focus ring, links and
    text selection, nothing else. The on state of a switch, checkbox or radio is `control-on`, the ink (light
    `#1b1a19`) with its tick or knob in `control-on-foreground` (white in light, `#15120f` in dark). **Dark on state.**

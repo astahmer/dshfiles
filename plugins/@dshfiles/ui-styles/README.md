@@ -41,6 +41,16 @@ plugin's classes), and the owner of the theme.
   animations only: `url()`, `@import` and braces in a layer are refused, so a theme never loads anything, and
   `prefers-reduced-motion` stops its animations. Any grey, accent or contrast override drops the pins and the backdrop
   in favour of the generated palette.
+- **Identity palette.** The six colours a user picks for a project, a Backlog tag or an agent come from the active
+  theme: a choice stores a slot (0–5), the kit `PalettePicker` paints the slots, and the theme CSS writes each
+  scheme's slots over `--dshx-project-balanced-<n>` and `--dshx-project-cool-<n>` (light guarded so it never shows in
+  dark), so every project tone, `ProjectMark` and tag chip follows the theme. A theme gives `palette` (six
+  `#rrggbb`, each meant to hold 4.5:1 on `bg`, `panel` and `raised`; `contrastWarnings` reports one that does not) and
+  `paletteNames` per scheme; Dracula and Alucard ship the spec's cyan, green, orange, purple, pink and yellow. A theme
+  without a palette (every gallery theme) derives six from its syntax, accent and info colours, away from its status
+  hues, lightness fitted to text contrast (`plugin-ui/src/theme/identity-derivation.ts`). The client publishes the slot
+  names on `<html>` (`data-dshx-palette-names`) for the swatch names. The default theme and the generated presets
+  write nothing, so the `oklch` slots in `plugin-ui/src/styles.css` stay exact; clearing the theme removes both.
 - **Gallery themes.** Sixteen built-in themes paint the twenty animated scenes of Claude Code's `theme-examples`
   plugin (Honu Lagoon, Koi Mosaic, Night Reef, Snow Pines, Aurora, Blueprint…; the four drawn for both kinds of window
   are paired into one light-and-dark theme). The scene code is vendored unchanged under `src/vendor/theme-examples`
