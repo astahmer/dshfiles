@@ -10575,12 +10575,21 @@ importers:
       '@effect/vitest':
         specifier: 'catalog:'
         version: 4.1.2(effect@4.1.2)(vitest@4.1.12)
+      '@testing-library/dom':
+        specifier: 'catalog:'
+        version: 10.4.2
+      '@testing-library/react':
+        specifier: 'catalog:'
+        version: 16.3.3(@testing-library/dom@10.4.2)(@types/react-dom@18.3.7)(@types/react@18.3.31)(react-dom@18.3.1)(react@18.3.1)
       '@types/node':
         specifier: 22.20.5
         version: 22.20.5
       '@types/react':
         specifier: 'catalog:'
         version: 18.3.31
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 18.3.7(@types/react@18.3.31)
       jsdom:
         specifier: 'catalog:'
         version: 26.1.0
@@ -10593,6 +10602,9 @@ importers:
       react:
         specifier: 'catalog:'
         version: 18.3.1
+      react-dom:
+        specifier: 'catalog:'
+        version: 18.3.1(react@18.3.1)
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
