@@ -491,6 +491,26 @@ describe('SubagentProvenanceToolRow', () => {
     }
   })
 
+  it('leads a run fold\'s rows with the task in primary ink at weight 500, as in the dock (council round 25, item 3)', async () => {
+    // In the group the task read in the tertiary ink, quieter than its model; the dock names the same task in primary ink.
+    const seat = document.createElement('div')
+    seat.setAttribute('data-chat-flow-key', 'lead-1')
+    document.body.append(seat)
+    try {
+      render(<SubagentProvenanceToolRow {...settled({ running: true })} />, { container: seat })
+      // Outside a group the row stays a quiet transcript record.
+      expect(screen.getByTestId('row-title').className).not.toContain('dshx:font-medium')
+      act(() => seat.setAttribute('data-run-fold-member', 'member'))
+      await waitFor(() => expect(screen.getByTestId('row-title').className).toContain('dshx:font-medium'))
+      // The native title's `color: inherit` is unlayered, so the kit's ink needs `!`.
+      expect(screen.getByTestId('row-title').className).toContain('dshx:text-foreground!')
+      // The model and the clock stay secondary.
+      expect(screen.getByTestId('header-accessory').querySelector('[data-slot="route-model"]')?.className).toContain('dshx:text-muted-foreground')
+    } finally {
+      seat.remove()
+    }
+  })
+
   it('keeps the prefix in a run fold when the call names no task, so the row never reads empty', () => {
     const seat = document.createElement('div')
     seat.setAttribute('data-chat-flow-key', 'row-1')

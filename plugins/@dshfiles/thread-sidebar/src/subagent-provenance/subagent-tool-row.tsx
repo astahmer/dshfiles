@@ -209,8 +209,10 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
       titleColumn === undefined
         ? undefined
         : 'dshx:w-[calc(var(--dshfiles-subagent-title-column)_+_28px_+_var(--dsh-content-font-delta,0px))] dshx:@max-pane-narrow:w-auto',
-    // The title always truncates (council round 25, item 1): without a column it was cut mid-glyph by the row's edge.
-    titleClassName: 'dshx:min-w-0! dshx:shrink! dshx:truncate',
+    // The title always truncates (council round 25, item 1): without a column it was cut mid-glyph by the row's edge. In a
+    // run fold the task leads in primary ink at weight 500, as in the dock, over its secondary model and clock (round 25,
+    // item 3); the native title's `color: inherit` is unlayered, so the ink takes `!`.
+    titleClassName: cn('dshx:min-w-0! dshx:shrink! dshx:truncate', runSeat.inRun && 'dshx:font-medium dshx:text-foreground!'),
     // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; then
     // the outcome: the failure word in failed ink, the live clock or the settled ending in the tertiary ink.
     headerAccessory:
