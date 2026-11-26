@@ -299,6 +299,13 @@ grammar, one evidence well and a failed well only with a real error line, a Draf
 Owner decision (round 16): don't fork core's Plugins page to list installed plugins first. Core's
 `@deepseek-ai/dsh-client-ui-plugin-manager` fixes the section order (`PluginManagerPage.tsx:1855-1857`) and no slot
 reaches it; the route, if ever wanted, is a whole-package native fork (follow-up, not this PR).
+All lanes done: A kit 2 revisions `llvmzzvk` … `svxxztxp` (EvidenceWell, DESIGN.md); B 2 revisions `zwwzrkql` …
+`wltyvrml` (one palette row grammar, a Drafts count chip); C 4 revisions `mtonmzlr` … `oqkuluqv` (one composer location
+chip with a jj-integration default marker, a 54 px writing area, light starters, a quiet Open thread, a 44 pt phone
+Review, Inbox bodies on the evidence well, a failed well only with a real error line); D no change (Plugins order is
+core's). The Settings "Open configuration file" chevron stays: it opens a real menu. Review's collapsed-line bars can't
+expand (patch text only; follow-up: the Host would have to send full file contents). Trade-off: the phone failed card
+starts 16 pt lower; only its title clears the tab bar, the Needs you tab's ✕ 1 still flags it.
 
 ## Round four
 
