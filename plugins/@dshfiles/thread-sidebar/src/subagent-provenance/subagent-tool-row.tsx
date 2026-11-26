@@ -10,6 +10,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { JsonText } from '../json-text.js'
 import { SubagentFeedModel, type SubagentTerminal } from './subagent-feed.js'
@@ -44,8 +45,8 @@ const resultText = (props: SubagentToolRowProps): string | undefined => {
 }
 
 /**
- * How a record row ends once its child stopped working; a working child says it with the row's spinner, not a word. A
- * failure is not part of the title: it ends the row in failed ink ({@link failureWordOf}).
+ * How a record row ends once its child stopped working, after its model; a working child says it with the row's ring and
+ * its live clock. A failure ends the row in failed ink instead ({@link failureWordOf}).
  */
 const endingOf = (
   t: SubagentPreviewBindings['t'],
@@ -94,9 +95,12 @@ const failureWordOf = (t: SubagentPreviewBindings['t'], state: ReturnType<typeof
 }
 
 /**
- * A delegation's record row in the transcript: `Subagent · {description}`, the same glyph and name as its dock row and
- * no clock, then the model it runs on as the kit's mark and name, with no empty mark seat inline (council round 17 B1.1, round 22 item 8). It ends as `Done · 5m 02s`,
- * `Failed` or `Stopped`; it never shows a generated handle or the provider id.
+ * A delegation's record row in the transcript: `Subagent · {description}`, the same name as its dock row, then the model
+ * it runs on as the kit's mark and name, with no empty mark seat inline (council round 17 B1.1, round 22 item 8). The
+ * outcome ends the row (council round 23, item 1): a working child leads with the list's Working ring and ends with its
+ * live clock, as in the dock; a settled one ends `Done · 5m 02s` or `Stopped`, a failed one `Turn failed` after its ✕.
+ * The row prints its own time, so the tool row's call duration ("1s": the call returned once the child started) never
+ * shows. It never shows a generated handle or the provider id.
  */
 export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const call = props.phase === 'preparing' ? null : props.phase === 'result' ? props.block.call : props.block
@@ -133,31 +137,48 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const inRun = useInRunFold(rootRef)
   // In a run fold the summary names the kind; a row with no task keeps it, so it never reads empty.
   const kind = inRun && task !== undefined ? undefined : props.preview.t('subagentPreviewKind')
-  const title = [kind, task, ...endingOf(props.preview.t, state, child.settledMs)]
-    .filter(part => part !== undefined)
-    .join(' · ')
+  const title = [kind, task].filter(part => part !== undefined).join(' · ')
+  const ending = endingOf(props.preview.t, state, child.settledMs).join(' · ')
   const failure = failureWordOf(props.preview.t, state)
+  const working = state === 'working' || (state === 'starting' && props.phase !== 'result')
+  const since = state === 'working' ? child.since : undefined
   const disclosure = props.useDisclosure()
   const prompt = args?.prompt?.trim()
   const expandable = (prompt !== undefined && prompt !== '') || output !== undefined || childId !== undefined
   /** The native row names its visible header through `title`; that is a heading, not hover help. */
   const disclosureProps: ComponentProps<typeof DisclosureRow> = {
-    // A failed row leads with the red cross the group's "2 failed" and the list use, not the agent mark.
-    icon: failure === undefined ? <IconAgentPresetOutlineRegular /> : <StatusGlyph status="failed" decorative />,
+    // A failed row leads with the red cross the group's "✕ 1 failed" and the list use, a working one with the list's
+    // Working ring; a settled one keeps the agent mark.
+    icon:
+      failure !== undefined ? (
+        <StatusGlyph status="failed" decorative />
+      ) : working ? (
+        <StatusGlyph status="working" decorative />
+      ) : (
+        <IconAgentPresetOutlineRegular />
+      ),
     title,
     open: disclosure.expanded,
     expandable,
     onToggle: disclosure.toggle,
     running: props.phase === 'preparing' || props.phase === 'start' || state === 'working',
-    // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; a
-    // failed row ends with its failure word.
+    // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; then
+    // the outcome: the failure word in failed ink, the live clock or the settled ending in the tertiary ink.
     headerAccessory:
-      route === undefined && failure === undefined ? undefined : (
+      route === undefined && failure === undefined && ending === '' && since === undefined ? undefined : (
         <>
           {route === undefined ? null : <RouteModel provider={route.provider} model={route.model} size="md" className="dshx:max-w-[45%] dshx:shrink-0" />}
           {failure === undefined ? null : (
             <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
               {failure}
+            </span>
+          )}
+          {since === undefined ? null : (
+            <LiveElapsed active since={since} className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-muted-foreground" />
+          )}
+          {ending === '' ? null : (
+            <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:tabular-nums dshx:text-muted-foreground" data-subagent-ending={state}>
+              {ending}
             </span>
           )}
         </>
@@ -171,6 +192,8 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
       data-dshfiles-subagent-row=""
       data-dshfiles-live-preview={childId === undefined ? undefined : 'agent'}
       data-state={childId === undefined ? undefined : (state ?? 'unknown')}
+      // The row prints its own time, so tool-meta draws no call duration beside it.
+      data-tool-card-timing="own"
     >
       <DisclosureRow {...disclosureProps}>
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3">

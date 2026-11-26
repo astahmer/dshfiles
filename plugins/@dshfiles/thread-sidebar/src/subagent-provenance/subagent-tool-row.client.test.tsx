@@ -140,6 +140,8 @@ const settled = (input: {
   /** The result text; core names the child by its handle (`started subagent agent-1`). */
   readonly resultText?: string
   readonly settledMs?: number
+  /** Browser clock of the child's open turn's start (`subagentTiming.active.since`). */
+  readonly since?: number
 }): Props => {
   const base = props({ provider: 'openai', model: 'gpt-6.1-luna', expanded: input.expanded ?? false })
   if (base.phase !== 'start') throw new Error('fixture starts from the start phase')
@@ -151,7 +153,17 @@ const settled = (input: {
   } as unknown as Extract<Props, { phase: 'result' }>['block']
   const statuses = new Map([[CHILD, { running: input.running === true }]])
   const list = {
-    byId: { [CHILD]: { projectionValues: { subagentTiming: { lastTurnCompleted: input.lastTurnCompleted, settledMs: input.settledMs } } } },
+    byId: {
+      [CHILD]: {
+        projectionValues: {
+          subagentTiming: {
+            lastTurnCompleted: input.lastTurnCompleted,
+            settledMs: input.settledMs,
+            active: input.since === undefined ? undefined : { since: input.since },
+          },
+        },
+      },
+    },
     projectionsBySession: {
       'session-1': { values: { subagentCatalog: [{ id: CHILD, name: 'agent-1', mode: 'continuable', label: 'Long child', createdAt: 1 }] } },
     },
@@ -170,6 +182,9 @@ const settled = (input: {
 }
 
 const previewRoot = () => document.querySelector('[data-dshfiles-live-preview="agent"]')
+/** The outcome at the row's end, after the model. */
+const ending = () => screen.queryByTestId('header-accessory')?.querySelector('[data-subagent-ending]')?.textContent
+const leadingStatus = () => screen.getByTestId('leading').querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')
 
 afterEach(() => {
   cleanup()
@@ -277,13 +292,38 @@ describe('SubagentProvenanceToolRow', () => {
     expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: true, settledMs: 302_400 })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('finished')
-    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewFinished · 5m 02s')).not.toBeNull()
+    // Council round 23, item 1: the outcome ends the row, after the model; the title stays the task.
+    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+    expect(ending()).toBe('subagentPreviewFinished · 5m 02s')
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
-    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewInterrupted')).not.toBeNull()
+    expect(ending()).toBe('subagentPreviewInterrupted')
     rerender(<SubagentProvenanceToolRow {...settled({})} />)
     expect(previewRoot()?.getAttribute('data-state')).not.toBe('idle')
     expect(document.body.textContent).not.toMatch(/idle/iu)
+  })
+
+  it('leads a working row with the Working ring and ends it with the live clock, never the call duration (council round 23, item 1)', () => {
+    // The rows read "Audit other rounding call sites  gpt-6-luna  1s": the call's own duration, which reads as finished.
+    const since = Date.now() - 26_000
+    render(<SubagentProvenanceToolRow {...settled({ running: true, since })} />)
+    expect(leadingStatus()).toBe('working')
+    const accessory = screen.getByTestId('header-accessory')
+    const clock = accessory.querySelector('[data-live-elapsed]')
+    expect(clock?.getAttribute('role')).toBe('timer')
+    expect(clock?.className).toContain('dshx:tabular-nums')
+    // The clock ends the row, after the model.
+    expect(accessory.lastElementChild).toBe(clock)
+    // The row prints its own time: tool-meta draws no call duration beside a card that carries this mark.
+    expect(document.querySelector('[data-dshfiles-subagent-row]')?.getAttribute('data-tool-card-timing')).toBe('own')
+  })
+
+  it('leads a starting call with the Working ring and a settled one with the agent mark', () => {
+    const { rerender } = render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description: 'Audit' })} />)
+    expect(leadingStatus()).toBe('working')
+    rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: true, settledMs: 2_000 })} />)
+    expect(screen.getByTestId('leading').querySelector('[data-slot="status-glyph"]')).toBeNull()
+    expect(document.querySelector('[data-live-elapsed]')).toBeNull()
   })
 
   it('says Failed for a child whose turn failed, and keeps Stopped for one the user stopped (round 21 D4)', () => {
@@ -300,7 +340,7 @@ describe('SubagentProvenanceToolRow', () => {
     failedTurns.clear()
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false, preview: previewBindings() })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
-    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewInterrupted')).not.toBeNull()
+    expect(ending()).toBe('subagentPreviewInterrupted')
     // A stopped child is no failure: its mark stays the agent's, and nothing reads in failed ink.
     expect(screen.getByTestId('leading').querySelector('[data-slot="status-glyph"]')).toBeNull()
     expect(document.querySelector('[data-subagent-failure]')).toBeNull()
