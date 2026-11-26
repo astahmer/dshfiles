@@ -214,6 +214,36 @@ describe('SubagentProvenanceToolRow', () => {
     expect(model?.getAttribute('data-model-family')).toBe('claude')
   })
 
+  it('drops the "Subagent ·" prefix inside a run fold, whose summary names the kind (council round 22, item 9)', async () => {
+    const seat = document.createElement('div')
+    seat.setAttribute('data-chat-flow-key', 'row-1')
+    document.body.append(seat)
+    try {
+      render(<SubagentProvenanceToolRow {...settled({ running: true })} />, { container: seat })
+      expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+      expect(document.querySelector('[data-dshfiles-subagent-row]')).not.toBeNull()
+      act(() => seat.setAttribute('data-run-fold-member', 'member'))
+      await waitFor(() => expect(screen.getByText('Long child')).not.toBeNull())
+      act(() => seat.removeAttribute('data-run-fold-member'))
+      await waitFor(() => expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull())
+    } finally {
+      seat.remove()
+    }
+  })
+
+  it('keeps the prefix in a run fold when the call names no task, so the row never reads empty', () => {
+    const seat = document.createElement('div')
+    seat.setAttribute('data-chat-flow-key', 'row-1')
+    seat.setAttribute('data-run-fold-member', 'absorbed')
+    document.body.append(seat)
+    try {
+      render(<SubagentProvenanceToolRow {...settled({ isError: true })} />, { container: seat })
+      expect(screen.getByText('subagentPreviewKind')).not.toBeNull()
+    } finally {
+      seat.remove()
+    }
+  })
+
   it('falls back to the catalog label when the call gave no description', () => {
     render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
     expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()

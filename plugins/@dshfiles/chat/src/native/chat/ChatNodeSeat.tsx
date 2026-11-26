@@ -31,6 +31,8 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly useGroupAction: ChatFlowSlotProps['useGroupAction']
   /** dshfiles (b:7rv2): this row's place in a folded run of background jobs or subagents. */
   readonly runFold?: RunFoldPlacement | undefined
+  /** dshfiles (round 21 D6): a failed call kept outside a process group that the group's run counts. */
+  readonly runFoldAbsorbed?: boolean | undefined
 }
 
 type RoutedChatNodeOwner = {
@@ -61,7 +63,7 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
   nodeKey, groupPart, useChatNode, useChatNodeProcess, usePresentation,
   cwd, openFile, inspectCall, forkAt,
   loadImage, useProjection, useStore, actions, renderSlot, t, useChatNodeBottom, deferCollapse, useGroupAction,
-  nodeStore, runFold,
+  nodeStore, runFold, runFoldAbsorbed,
 }: ChatNodeSeatProps) {
   const bottom = useChatNodeBottom(nodeKey)
   const node = useChatNode(nodeKey)
@@ -206,7 +208,8 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-chat-step={stepOf(routedNode)}
       data-turn-process-member={processMember || undefined}
       data-turn-process-hidden={processHidden || undefined}
-      data-run-fold-member={runFold === undefined ? undefined : runHead === undefined ? 'member' : 'head'}
+      // A row a run took in from after its group is a member too: its row reads as one of the run's (round 22, item 9).
+      data-run-fold-member={runFold === undefined ? (runFoldAbsorbed === true ? 'absorbed' : undefined) : runHead === undefined ? 'member' : 'head'}
       data-chat-final-answer={finalAnswer || undefined}
       data-routine-context-hidden={routineContextHidden || undefined}
     >

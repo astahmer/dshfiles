@@ -1,4 +1,4 @@
-import { useMemo, useState, type ComponentProps } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
 import * as Result from 'effect/Result'
 import * as Schema from 'effect/Schema'
 import { DisclosureRow, IconAgentPresetOutlineRegular, IconInspectOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -57,6 +57,32 @@ const endingOf = (
   return []
 }
 
+/** Chat's mark on a seat whose row belongs to a run fold: a member, the head, or a failed call the run took in. */
+const RUN_FOLD_MEMBER = 'data-run-fold-member'
+
+/**
+ * Whether the row sits in a transcript run fold ("8 calls · 6 working · …"), whose summary already names the kind, so
+ * the row drops its "Subagent ·" prefix (council round 22, item 9). Chat inlines its own copy of the run-fold module,
+ * so no React context reaches this row; the seat's attribute is the contract, read before paint and on every change.
+ */
+const useInRunFold = (ref: RefObject<HTMLElement | null>): boolean => {
+  const [inRun, setInRun] = useState(false)
+  useLayoutEffect(() => {
+    const seat = ref.current?.closest('[data-chat-flow-key]')
+    if (seat === null || seat === undefined) return undefined
+    const read = (): void => {
+      setInRun(seat.hasAttribute(RUN_FOLD_MEMBER))
+    }
+    read()
+    const observer = new MutationObserver(read)
+    observer.observe(seat, { attributes: true, attributeFilter: [RUN_FOLD_MEMBER] })
+    return () => {
+      observer.disconnect()
+    }
+  }, [ref])
+  return inRun
+}
+
 /**
  * The word a failed row ends with, in failed ink after its model (council round 22, item 2): "Turn failed" for a child
  * whose turn failed, "Didn't start" for a call that never started one.
@@ -103,7 +129,11 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     terminal: feedTurn ?? child.terminal,
   })
   const task = args?.description?.trim() || catalogLabel?.trim() || undefined
-  const title = [props.preview.t('subagentPreviewKind'), task, ...endingOf(props.preview.t, state, child.settledMs)]
+  const rootRef = useRef<HTMLDivElement>(null)
+  const inRun = useInRunFold(rootRef)
+  // In a run fold the summary names the kind; a row with no task keeps it, so it never reads empty.
+  const kind = inRun && task !== undefined ? undefined : props.preview.t('subagentPreviewKind')
+  const title = [kind, task, ...endingOf(props.preview.t, state, child.settledMs)]
     .filter(part => part !== undefined)
     .join(' · ')
   const failure = failureWordOf(props.preview.t, state)
@@ -138,7 +168,12 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   }
 
   return (
-    <div className="dshx-root" {...(childId === undefined ? {} : { 'data-dshfiles-live-preview': 'agent', 'data-state': state ?? 'unknown' })}>
+    <div
+      ref={rootRef}
+      className="dshx-root"
+      data-dshfiles-subagent-row=""
+      {...(childId === undefined ? {} : { 'data-dshfiles-live-preview': 'agent', 'data-state': state ?? 'unknown' })}
+    >
       <DisclosureRow {...disclosureProps}>
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3">
           {prompt === undefined || prompt === '' ? null : (
