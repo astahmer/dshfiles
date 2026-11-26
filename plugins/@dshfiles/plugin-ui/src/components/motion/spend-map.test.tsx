@@ -102,8 +102,8 @@ describe('SpendMap › active node and connectors (council round 8, D1)', () => 
   const html = render('var(--dshx-data-2)')
   const opening = (anchor: string): string => new RegExp(`<button[^>]*data-node-anchor="${anchor}"[^>]*>`, 'u').exec(html)?.[0] ?? ''
 
-  it('draws the active nodes on the card surface with a 1.5 px edge in their series colour, no grey fill or shadow', () => {
-    for (const anchor of ['dim:model', 'leaf:model:a']) {
+  it('draws the active leaf on the card surface with a 1.5 px edge in its series colour, no grey fill or shadow', () => {
+    for (const anchor of ['leaf:model:a']) {
       const node = opening(anchor)
       expect(node).toContain('aria-checked="true"')
       expect(node).toContain('outline-color:var(--dshx-data-2)')
@@ -115,6 +115,16 @@ describe('SpendMap › active node and connectors (council round 8, D1)', () => 
       // The base list's outline-none gives way to the edge (cn merges the outline style).
       expect(node).not.toContain('dshx:outline-none')
     }
+  })
+
+  it('edges only the selected leaf: the selected dimension card shows its selection through its connector (council round 9, D1)', () => {
+    const node = opening('dim:model')
+    expect(node).toContain('aria-checked="true"')
+    expect(node).not.toContain('outline-solid')
+    expect(node).not.toContain('outline-color')
+    expect(node).toContain('dshx:border-border dshx:bg-card')
+    // The full-strength route into the card still marks it.
+    expect(html).toContain('data-spend-link-active="root:model"')
   })
 
   it('falls back to ink when the node has no series colour', () => {

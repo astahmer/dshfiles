@@ -371,7 +371,7 @@ function arcPath(radius: number): string {
 }
 
 /**
- * The active node (council round 8, D1): the card surface itself, no grey fill or shadow, edged 1.5 px in its series
+ * The active leaf (council round 8, D1; only the leaf since round 9, D1): the card surface itself, no grey fill or shadow, edged 1.5 px in its series
  * colour at full strength, so it holds 3:1 on the card (60 % fell to about 2.1:1 in light). The edge is an outline laid over the 1 px border (offset inward by its own width), so selecting a node
  * never moves its content. The full-strength 2 px route into it stays the selection's 3:1 cue.
  */
@@ -404,10 +404,11 @@ function DimensionCard({
       aria-checked={selected}
       data-node-anchor={`dim:${dimension.id}`}
       onClick={onSelect}
-      style={selected ? nodeEdge(topColor) : undefined}
+      // One edged node per map: the selected card keeps its hairline and shows its selection through the coloured route
+      // into it and its coloured strip; only the selected leaf is edged (council round 9, D1).
       className={cn(
-        'dshx:flex dshx:w-full dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-2.5 dshx:py-2 dshx:text-left dshx:outline-none dshx:transition-[background-color,outline-color] dshx:duration-200 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-        selected ? ACTIVE_NODE : 'dshx:hover:bg-accent/50',
+        'dshx:flex dshx:w-full dshx:flex-col dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-2.5 dshx:py-2 dshx:text-left dshx:outline-none dshx:transition-[background-color] dshx:duration-200 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
+        !selected && 'dshx:hover:bg-accent/50',
       )}
     >
       <span className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:text-xs dshx:font-medium dshx:text-foreground dshx:[&_svg]:size-3.5 dshx:[&_svg]:text-muted-foreground">
