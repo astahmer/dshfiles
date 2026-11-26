@@ -1911,8 +1911,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 <span
                   className={cn(
                     'dshx:flex dshx:min-h-4 dshx:min-w-0 dshx:gap-1.5 dshx:text-xs dshx:text-muted-foreground',
-                    // A two-line question keeps the project mark on its first line.
-                    ask === 'question' && askSubtitle === undefined && liveStep === undefined && statusDetail !== undefined ? 'dshx:items-start' : 'dshx:items-center',
+                    // A two-line question (touch only) keeps the project mark on its first line.
+                    ask === 'question' && askSubtitle === undefined && liveStep === undefined && statusDetail !== undefined
+                      ? 'dshx:items-center dshx:pointer-coarse:items-start'
+                      : 'dshx:items-center',
                     // Room for what sits at the end of this line: the verb, the subagent counter, or both.
                     verbSeat === 'meta' ? (childCount > 0 ? 'dshx:pr-34' : 'dshx:pr-17.5') : childCount > 0 && (childCounterShown ? 'dshx:pr-16' : 'dshx:pr-8'),
                     // Touch: row 2 is at least the 28px verb it carries (round five B1).
@@ -1949,10 +1951,14 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     <span
                       className={cn(
                         // The reason takes the line: the project name no longer follows it (the tile names the project).
-                        // A Needs-you row's question or command may take a second line (round five B4): it is what you
-                        // decide on, so more of it reads before you open the thread.
-                        'dshx:min-w-0 dshx:flex-1',
-                        ask === 'question' && askSubtitle === undefined ? 'dshx:line-clamp-2 dshx:break-words' : 'dshx:truncate',
+                        // On a desktop every attention row is two lines tall, so the question truncates to one line like
+                        // the failed reason (council round 11 B1), cut at a character so as much of it as fits reads. On
+                        // touch it may take a second line (round five B4): it is what you decide on, so more of it reads
+                        // before you open the thread.
+                        'dshx:min-w-0 dshx:flex-1 dshx:truncate',
+                        ask === 'question' &&
+                          askSubtitle === undefined &&
+                          'dshx:pointer-coarse:line-clamp-2 dshx:pointer-coarse:whitespace-normal dshx:pointer-coarse:break-words',
                         // The title is the row's ink; what it asks, runs or failed on reads under it in the secondary
                         // ink at 13/18 (council round 8 B3).
                         (askSubtitle !== undefined || workStatus?.status === 'needs-you' || workStatus?.status === 'failed') &&

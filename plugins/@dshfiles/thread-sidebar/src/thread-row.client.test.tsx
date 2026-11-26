@@ -219,12 +219,19 @@ describe('a row that needs you', () => {
     expect(row.querySelector('[data-thread-head]')?.className).not.toContain('dshx:pr-17.5')
   })
 
-  it('lets the question take two lines and keeps a failed reason to one (round five B4)', async () => {
+  it('keeps a desktop question to one line, lets a touch question take two, and keeps a failed reason to one (council round 11 B1)', async () => {
     const row = await renderRow(asking)
     const detail = row.querySelector<HTMLElement>('[data-testid="thread-row-status-detail"]')
-    expect(detail?.className).toContain('dshx:line-clamp-2')
-    expect(detail?.className).not.toContain('dshx:truncate')
-    expect(row.querySelector('[data-thread-where]')?.className).toContain('dshx:items-start')
+    // Every desktop attention row is the same two lines tall: the question truncates to one line like the failed
+    // reason, cut at a character rather than a word so as much of it as fits still reads.
+    expect(detail?.className).toMatch(/(^| )dshx:truncate( |$)/u)
+    expect(detail?.className).not.toMatch(/(^| )dshx:line-clamp-[12]/u)
+    // A phone row keeps two lines of the question (round five B4): more of it reads before you open the thread.
+    expect(detail?.className).toContain('dshx:pointer-coarse:line-clamp-2')
+    expect(detail?.className).toContain('dshx:pointer-coarse:whitespace-normal')
+    const where = row.querySelector('[data-thread-where]')?.className
+    expect(where).toMatch(/(^| )dshx:items-center/u)
+    expect(where).toContain('dshx:pointer-coarse:items-start')
     cleanup()
     const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', detail: 'Turn failed' }) })
     expect(failed.querySelector('[data-testid="thread-row-status-detail"]')?.className).toContain('dshx:truncate')
