@@ -252,6 +252,15 @@ minimum-for-9 lists: a visible dark palette selection, one neutral active pill o
 desktop attention slot, a roomier phone Inbox fold, `.nice()` chart domains and a carded distribution table, one chip
 style on New thread, a seated send button, the selected edge only where no place tile shows selection, a one-line phone
 thread header, and two AA fixes (composer hint, side-column hover labels).
+All four lanes done: A kit 5 revisions `pyylpkxx` … `qpumlzss` (AA faint ink on nav hover, a lighter dense checkbox, a
+grey modified glyph, `Button variant="bar"`, DESIGN.md); B 8 revisions `rpymllzy` … `lmlypnrq` (palette selected edge,
+one neutral phone tab pill, kind · project attention rows, 12 px group gaps, no edge on place-tile rows, quieter Settings
+group heads, one-line phone thread bar, matching hero chips); C 9 revisions `mrvwqvlw` … `qkkstwlr` (one New thread chip
+style, AA composer hint, a seated Send, a bar-text Triage with Runs inline, an Open verb on question cards, the passive
+phone meter line hidden but reachable from the thread ⋯ sheet, location chip flags in jujutsu); D 5 revisions
+`ryvyyuxn` … `nqzyktsw` (`.nice()` value axes, a carded distribution table, Share by, value-first inherited effort).
+Follow-ups: desktop attention rows truncate the project name at the default list width; Usage's lower sections
+(Daily calendar and below) still use top rules rather than cards.
 
 ## Round four
 
