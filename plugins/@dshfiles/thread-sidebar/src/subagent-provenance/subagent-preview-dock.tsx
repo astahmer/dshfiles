@@ -53,33 +53,71 @@ const DockRow = (
       data-state="working"
       data-waiting={waiting ? '' : undefined}
     >
-      <div className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:pointer-coarse:h-11" data-subagent-dock-row="">
+      {/* Council round 22, item 1: on a narrow pane (a phone) one line gave the name ~60px ("Check cr…") beside the model
+          and clock. There the row is two lines: line 1 the ring, the title over the whole width and ↗; line 2 at the
+          title's x the mark, model and · elapsed. 54px tall, over the 44pt touch row. */}
+      <div
+        className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:pointer-coarse:h-11 dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:min-h-[54px] dshx:@max-pane-narrow:items-stretch dshx:@max-pane-narrow:pointer-coarse:h-auto"
+        data-subagent-dock-row=""
+      >
         <button
           type="button"
           aria-expanded={open}
           aria-label={preview.t('subagentPreviewToggle', { label })}
-          className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:pl-2 dshx:text-left dshx:hover:bg-accent"
+          className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:pl-2 dshx:text-left dshx:hover:bg-accent dshx:@max-pane-narrow:grid dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:grid-cols-[auto_minmax(0,1fr)] dshx:@max-pane-narrow:content-center dshx:@max-pane-narrow:gap-x-2 dshx:@max-pane-narrow:gap-y-0.5 dshx:@max-pane-narrow:py-2 dshx:@max-pane-narrow:pl-3"
           onClick={() => setOpen(value => !value)}
         >
-          <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', open && 'dshx:rotate-90')} />
+          <ChevronRightIcon
+            aria-hidden
+            className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:hidden', open && 'dshx:rotate-90')}
+          />
           <StatusGlyph label={stateLabel} status={waiting ? 'needs-you' : 'working'} />
-          <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:font-medium">{label}</span>
-          {run.route === undefined ? null : (
-            // Shrinks after the step and the name (they give way first), then truncates its name; the mark stays.
-            <RouteModel provider={run.route.provider} model={run.route.model} seat className="dshx:ml-1 dshx:max-w-[45%] dshx:shrink-0" />
-          )}
-          {step === undefined ? null : (
-            <span
-              className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate', waiting ? 'dshx:text-foreground' : 'dshx:text-muted-foreground')}
-              data-subagent-run-step=""
-            >
-              {waiting ? stateLabel : step.words}
-            </span>
-          )}
-          <span className="dshx:flex-1" />
-          {!runCards || state.since === undefined ? null : (
-            <LiveElapsed active className="dshx:shrink-0 dshx:pr-1 dshx:text-muted-foreground" since={state.since} />
-          )}
+          <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:font-medium dshx:@max-pane-narrow:text-sm" data-subagent-dock-title="">
+            {label}
+          </span>
+          {/* One line with the title on a wide pane (`contents`), its own line under the title on a narrow one. */}
+          <span
+            className="dshx:contents dshx:@max-pane-narrow:col-start-2 dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:text-muted-foreground"
+            data-subagent-dock-meta=""
+          >
+            {run.route === undefined ? null : (
+              // Shrinks after the step and the name (they give way first), then truncates its name; the mark stays.
+              <RouteModel
+                provider={run.route.provider}
+                model={run.route.model}
+                seat
+                className="dshx:ml-1 dshx:max-w-[45%] dshx:shrink-0 dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:max-w-none dshx:@max-pane-narrow:shrink"
+              />
+            )}
+            {step === undefined ? null : (
+              <>
+                {/* On line 2 the step follows the clock, so the clock never truncates. */}
+                <span aria-hidden className="dshx:hidden dshx:@max-pane-narrow:order-last dshx:@max-pane-narrow:inline">
+                  ·
+                </span>
+                <span
+                  className={cn(
+                    'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:@max-pane-narrow:order-last',
+                    waiting ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
+                  )}
+                  data-subagent-run-step=""
+                >
+                  {waiting ? stateLabel : step.words}
+                </span>
+              </>
+            )}
+            <span className="dshx:flex-1 dshx:@max-pane-narrow:hidden" />
+            {!runCards || state.since === undefined ? null : (
+              <>
+                {run.route === undefined ? null : (
+                  <span aria-hidden className="dshx:hidden dshx:@max-pane-narrow:inline" data-subagent-dock-separator="">
+                    ·
+                  </span>
+                )}
+                <LiveElapsed active className="dshx:shrink-0 dshx:pr-1 dshx:text-muted-foreground" since={state.since} />
+              </>
+            )}
+          </span>
         </button>
         {/* Council round 18 B1.2: one fixed action column across the dock (a job row's "Open in Processes ↗", 132px wide,
             takes the same 8.5rem, right-aligned), so every row's tabular clock ends on one edge. A narrow pane drops the
@@ -87,7 +125,7 @@ const DockRow = (
         <Button
           size="xs"
           variant="ghost"
-          className="dshx:mr-1 dshx:min-w-34 dshx:justify-end dshx:text-muted-foreground dshx:@max-pane-narrow:min-w-0"
+          className="dshx:mr-1 dshx:min-w-34 dshx:justify-end dshx:text-muted-foreground dshx:@max-pane-narrow:mr-0 dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:min-w-11 dshx:@max-pane-narrow:items-start dshx:@max-pane-narrow:justify-center dshx:@max-pane-narrow:self-stretch dshx:@max-pane-narrow:rounded-none dshx:@max-pane-narrow:pt-3"
           data-live-work-action=""
           onClick={() => preview.openChild(childId)}
         >

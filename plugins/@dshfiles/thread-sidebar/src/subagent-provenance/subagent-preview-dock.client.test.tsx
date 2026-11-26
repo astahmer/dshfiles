@@ -150,8 +150,8 @@ describe('SubagentPreviewDock', () => {
       // The job row's "Open in Processes ↗" renders 132px at 1440px: the column is 8.5rem, 136px (measured, round 18).
       expect(action?.className).toContain('dshx:min-w-34')
       expect(action?.className).toContain('dshx:justify-end')
-      // A narrow pane shows the action as its arrow alone: the column gives way with the label.
-      expect(action?.className).toContain('dshx:@max-pane-narrow:min-w-0')
+      // A narrow pane shows the action as its arrow alone: the column gives way to a 44px target.
+      expect(action?.className).toContain('dshx:@max-pane-narrow:min-w-11')
       expect(action?.classList.contains('dshx:shrink')).toBe(false)
       expect(row.querySelector('[data-live-elapsed]')?.className).toContain('dshx:tabular-nums')
     }
@@ -167,7 +167,7 @@ describe('SubagentPreviewDock', () => {
     const model = row.querySelector('[data-subagent-dock-row] [data-slot="route-model"]')
     expect(model?.textContent).toBe('gpt-6.1-luna')
     expect(model?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
-    const order = [...(row.querySelector('[data-subagent-dock-row] button')?.children ?? [])].map(
+    const order = [...(row.querySelector('[data-subagent-dock-row] [data-subagent-dock-meta]')?.children ?? [])].map(
       child => (child.hasAttribute('data-subagent-run-step') ? 'step' : child.getAttribute('data-slot')) ?? child.tagName,
     )
     expect(order.indexOf('route-model')).toBeLessThan(order.indexOf('step'))
@@ -175,6 +175,32 @@ describe('SubagentPreviewDock', () => {
     fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
     expect(row.querySelectorAll('[data-slot="route-model"]')).toHaveLength(1)
     expect(row.textContent).not.toContain('openai/')
+  })
+
+  it('splits a row into two lines on a narrow pane, so the task name keeps the full width (council round 22, item 1)', async () => {
+    // Phone rows read "Check cr…" beside "deepseek-v4-flash 49s": the name, model and clock shared one 366px line.
+    const bindings = preview({ retainChild: childInTool().retainChild })
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
+    await waitFor(() => expect(document.querySelector('[data-subagent-run-step]')).not.toBeNull())
+    const row = rowOf('Review')
+    const line = row.querySelector<HTMLElement>('[data-subagent-dock-row]')
+    const toggle = line?.querySelector<HTMLElement>('button')
+    // Line 1: ring and the title over the whole width; line 2 at the title's x: mark, model, · elapsed.
+    expect(toggle?.className).toContain('dshx:@max-pane-narrow:grid')
+    expect(toggle?.className).toContain('dshx:@max-pane-narrow:grid-cols-[auto_minmax(0,1fr)]')
+    expect(toggle?.querySelector('svg[aria-hidden]')?.getAttribute('class')).toContain('dshx:@max-pane-narrow:hidden')
+    const meta = toggle?.querySelector<HTMLElement>('[data-subagent-dock-meta]')
+    expect(meta?.className).toContain('dshx:contents')
+    expect(meta?.className).toContain('dshx:@max-pane-narrow:col-start-2')
+    expect(meta?.className).toContain('dshx:@max-pane-narrow:flex')
+    expect(meta?.querySelector('[data-slot="route-model"]')).not.toBeNull()
+    expect(meta?.querySelector('[data-live-elapsed]')?.className).toContain('dshx:tabular-nums')
+    expect(meta?.querySelector('[data-subagent-dock-separator]')?.textContent).toBe('·')
+    // The title stays outside the meta line, so it spans line 1.
+    expect(meta?.contains(toggle?.querySelector('[data-subagent-dock-title]') ?? null)).toBe(false)
+    // Two lines stay a whole touch row: at least 44pt.
+    expect(line?.className).toContain('dshx:@max-pane-narrow:min-h-[54px]')
+    expect(line?.querySelector('[data-live-work-action]')?.className).toContain('dshx:@max-pane-narrow:self-stretch')
   })
 
   it('names the model with the step setting off, and none when the route is unknown', () => {
