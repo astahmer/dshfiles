@@ -1227,6 +1227,12 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
 
 /** Phone tab bar (productivity pass E8): Threads, Inbox (with its count), Land, More; New is the `+` in the Threads header. */
 export const PHONE_TABS = ['threads', 'inbox', 'land', 'more'] as const
+/**
+ * The current phone tab's seat (council round 13 B2): one neutral pill on every tab, the secondary ink at 14% (what
+ * Inbox already drew), so the selection never changes colour between tabs. The glyph on it carries the tab's tone;
+ * Inbox and More, the neutral destinations, draw ink. Tone glyphs keep 3:1 on it (list-colour-contrast.test.ts).
+ */
+export const PHONE_TAB_PILL = 'dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-secondary)_14%,transparent)]'
 type PhoneTab = (typeof PHONE_TABS)[number]
 /** The destinations with a tab of their own; More lists the rest. */
 const TABBED_DESTINATIONS: readonly DestinationId[] = ['threads', 'inbox', 'land']
@@ -1882,7 +1888,7 @@ const PhoneNavigation = (
                 'dshx:flex dshx:h-14 dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:items-center dshx:justify-center dshx:gap-0.5 dshx:text-(--dsw-alias-label-tertiary) dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:focus-visible:ring-inset dshx:active:text-foreground',
                 // Colour on the current tab only (council round 12 B3, reversing round nine B3): a tinted glyph reads as
                 // "selected" on a phone, so the others rest in tertiary ink. The current glyph takes its destination's tone
-                // on that tone's 14% tile, with an ink label at 600. Inbox and More carry the neutral (ink) tone. The
+                // on one neutral pill (round 13 B2), with an ink label at 600; Inbox and More draw ink. The
                 // desktop rail keeps its always-toned glyphs: a launcher, not a tab bar.
                 NAV_TONE[tab === 'more' ? 'settings' : tab],
                 current === tab && 'dshx:text-foreground',
@@ -1891,7 +1897,9 @@ const PhoneNavigation = (
               <span
                 className={cn(
                   'dshx:inline-flex dshx:h-7 dshx:w-11 dshx:items-center dshx:justify-center dshx:rounded-full',
-                  current === tab ? 'dshx:bg-nav-tile dshx:text-nav-tone' : 'dshx:text-(--dsw-alias-label-tertiary)',
+                  current === tab
+                    ? cn(PHONE_TAB_PILL, tab === 'inbox' || tab === 'more' ? 'dshx:text-foreground' : 'dshx:text-nav-tone')
+                    : 'dshx:text-(--dsw-alias-label-tertiary)',
                 )}
                 aria-hidden="true"
                 data-phone-tab-seat=""

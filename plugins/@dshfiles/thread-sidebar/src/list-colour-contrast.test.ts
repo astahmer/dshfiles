@@ -63,4 +63,13 @@ describe.each(schemes)('thread list colour (%s)', scheme => {
   it('keeps the active rail and page icon at 3:1 on the selected wash', () => {
     expect(PaletteMath.contrastRatio(p.accent.fg, p.selectedWash)).toBeGreaterThanOrEqual(3)
   })
+
+  it('keeps every current phone tab glyph at 3:1 on the one neutral pill (council round 13 B2)', () => {
+    // PHONE_TAB_PILL: the secondary ink at 14% over the tab bar's nav fill (tone-1). The tab tones from color-roles.css.
+    const pill = composite(p.neutral[1]!, secondary, 0.14)
+    const tones = scheme === 'light' ? { threads: { l: 0.56, c: 0.124, h: 235 }, land: { l: 0.56, c: 0.102, h: 180 } } : { threads: { l: 0.78, c: 0.13, h: 235 }, land: { l: 0.78, c: 0.13, h: 180 } }
+    for (const [tab, tone] of Object.entries({ ...tones, ink: ink })) expect(PaletteMath.contrastRatio(tone, pill), tab).toBeGreaterThanOrEqual(3)
+    // The 600 label sits under the pill on the bar itself.
+    expect(PaletteMath.contrastRatio(ink, p.neutral[1]!)).toBeGreaterThanOrEqual(4.5)
+  })
 })

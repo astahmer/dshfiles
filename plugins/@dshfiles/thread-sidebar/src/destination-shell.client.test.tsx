@@ -4,7 +4,7 @@ import { ListHeaderExtras } from './list-header-extras.js'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DestinationSelection, DestinationShell, type DestinationShellProps } from './destination-shell.js'
+import { DestinationSelection, DestinationShell, PHONE_TAB_PILL, type DestinationShellProps } from './destination-shell.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
 import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
 
@@ -586,7 +586,7 @@ describe('DestinationShell', () => {
     const more = within(bar).getByRole('button', { name: 'More' })
     expect(more.getAttribute('aria-current')).toBe('page')
     expect(more.className).toContain('dshx:nav-tone-settings')
-    expect(more.querySelector('[data-phone-tab-seat]')?.className).toContain('dshx:bg-nav-tile')
+    expect(more.querySelector('[data-phone-tab-seat]')?.className).toContain(PHONE_TAB_PILL)
     expect(within(more).getByText('More').className).toContain('dshx:font-semibold')
     const threads = within(bar).getByRole('button', { name: 'Threads' })
     expect(threads.getAttribute('aria-current')).toBeNull()
@@ -595,7 +595,7 @@ describe('DestinationShell', () => {
     // phone, so the others rest in tertiary ink; the current glyph takes its tone on its tile.
     for (const tab of within(bar).getAllByRole('button')) {
       const seat = tab.querySelector('[data-phone-tab-seat]')?.className
-      if (tab === more) expect(seat).toContain('dshx:text-nav-tone')
+      if (tab === more) expect(seat).toContain('dshx:text-foreground')
       else {
         expect(seat).not.toContain('dshx:text-nav-tone')
         expect(seat).toContain('dshx:text-(--dsw-alias-label-tertiary)')
@@ -603,6 +603,22 @@ describe('DestinationShell', () => {
     }
     expect(threads.className).toContain('dshx:nav-tone-threads')
     cleanup()
+    // One neutral selected pill on every current tab (council round 13 B2): the tone's own tile read blue on Threads and
+    // grey on Inbox. The glyph carries the tone; Inbox and More, the neutral destinations, draw ink.
+    const inboxPanels = [...panels, { id: 'attention-inbox', label: 'Activity Timeline: Inbox', order: 1 }]
+    for (const destination of ['threads', 'inbox', 'more'] as const) {
+      localStorage.clear()
+      if (destination === 'inbox') DestinationSelection.set('inbox')
+      if (destination === 'more') renderShell({ collapsed: true, activePanelId: 'dshfiles-settings' })
+      else renderShell({ panels: inboxPanels, collapsed: false })
+      const tab = within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: { threads: 'Threads', inbox: 'Inbox', more: 'More' }[destination] })
+      expect(tab.getAttribute('aria-current'), destination).toBe('page')
+      const seat = tab.querySelector('[data-phone-tab-seat]')?.className ?? ''
+      expect(seat, destination).toContain(PHONE_TAB_PILL)
+      expect(seat, destination).not.toContain('dshx:bg-nav-tile')
+      expect(seat, destination).toContain(destination === 'threads' ? 'dshx:text-nav-tone' : 'dshx:text-foreground')
+      cleanup()
+    }
     // Another destination's page reached through More keeps More lit too.
     renderShell({ collapsed: true, activePanelId: 'dshfiles-usage' })
     expect(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'More' }).getAttribute('aria-current')).toBe('page')
