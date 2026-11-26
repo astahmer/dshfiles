@@ -439,6 +439,18 @@ hex; the default theme's six tones are unchanged. This widens colour restraint f
 `.cache/unslop-audit/r5/council/round-8-palette.md`. Lanes: K (kit picker, theme palette data, derivation, application),
 P (project pickers), T (Backlog tag colours), A (agent colours).
 
+Round eight, done (one line, `qrxqqlyq` … `ypnzplmz`): K the kit `PalettePicker` and identity helpers, theme
+`palette`/`paletteNames` with validation and `theme_define`, a derived text-safe palette for every theme without one,
+Dracula/Alucard's official palettes (Alucard's yellow darkened to `#7d6706` for 4.5:1), the slots applied and cleared with
+the theme (default `oklch` tones pinned by a test), a gallery demo and DESIGN.md; P every project picker on the kit picker
+with #287's custom hex beside it, and the Host now registers the plugin's settings (since #287 no project colour or name
+could be saved); T tag colours in Backlog settings, a chip colour menu and `backlog_set_tag_color`; A an agent `tone`
+slot, the editor picker, the glyph tile, chips, preview card and the composer's draft chip, `agents_save` accepts it;
+the lead, Backlog's @ completion tile reads the agent's choice. Restart when landing live: the Host halves of ui-styles,
+workspace-folder-picker, backlog and agents. Follow-ups: browser scenarios for tag and agent colours, `theme_get`
+returning the palette, raw `@{luna}` in thread titles and the Resume bar, three stale workspace-folder-picker reach
+steps.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
