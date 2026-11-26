@@ -209,6 +209,8 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-wash-failed', PaletteMath.toCss(p.failedWash))
   push('--dshx-field-border', PaletteMath.toCss(p.fieldBorder))
   push('--dshx-trigger-fill', PaletteMath.toCss(p.triggerFill))
+  push('--dshx-segment-thumb', PaletteMath.toCss(p.segmentThumb))
+  push('--dshx-segment-edge', PaletteMath.toCss(p.segmentEdge))
   push('--dshx-prompt-fill', PaletteMath.toCss(p.promptFill))
   push('--dshx-tone-nav', PaletteMath.toCss(p.navSurface))
   push('--dshx-ready-mark', PaletteMath.toCss(p.readyMark))

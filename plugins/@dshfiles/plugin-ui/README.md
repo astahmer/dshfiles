@@ -174,7 +174,14 @@ classes for a settings category or list row. A chosen card or tile (a theme card
 size) and a 16px ink check badge in the trailing top corner, with no wash (council round 8 A2: the card keeps its own
 surface) and no leading marker. Give the card `border` and its normal fill, and drop its own border colour while chosen
 (`chosen ? 'dshx:selected-card' : 'dshx:border-border'`). Hover stays the
-ink wash (`bg-accent`). The page's segmented `TabsList` keeps its paper pill.
+ink wash (`bg-accent`).
+
+**One selected segment** (council round 10 A3). The segmented `TabsList`, the page's sliding tab indicator and
+`SlidingSegments` share `segment-thumb`: paper (`#FEFCFA`) on the `#EBE9E7` track in light, a raised `#302C28` on the
+`#23201D` track in dark (`--dshx-segment-thumb`), inset 3px at a 6px radius, a quiet 1px edge (`--dshx-segment-edge`:
+the ink at 10% light, white at 7% dark) and no shadow; the selected label is the ink at 550. Give the element a 1px
+`border` and add `dshx:segment-thumb`. A text label sits in `SegmentLabel` (`components/ui/tabs`; `TabsTrigger` wraps a
+plain string itself), which reserves its 550 width, so selecting a segment never moves its neighbours.
 
 **Navigation identity.** Each rail destination draws its icon in its own tone, glyph only: `--dshx-nav-tone-<id>`
 (council round 8 A4) is work 52, observe 118, land 180, threads 235, knowledge 305, agents 350, every hue 40° from the

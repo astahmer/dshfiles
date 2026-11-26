@@ -4,7 +4,7 @@ import { cn } from '../lib/utils.js'
 import { Button } from './ui/button.js'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu.js'
 import { Spinner } from './ui/spinner.js'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.js'
+import { SegmentLabel, Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.js'
 import { StatusCount, type WorkStatus } from './work-status.js'
 import { useSlidingIndicator } from '../motion/react.js'
 
@@ -414,8 +414,9 @@ export const Page = React.forwardRef<HTMLDivElement, PageProps>(function Page(
 })
 
 /**
- * The page's segmented tabs. The white pill is one element that springs to the selected tab instead of each tab
- * painting its own background, so switching views reads as one motion. It sits in a positioned wrapper before the
+ * The page's segmented tabs. The selected segment (council round 10 A3: `segment-thumb`, paper in light and a raised
+ * #302C28 in dark) is one element that springs to the selected tab instead of each tab painting its own background, so
+ * switching views reads as one motion. It sits in a positioned wrapper before the
  * list: the list's grey track paints under it and the (positioned) triggers over it.
  */
 function PageTabList({ tabs }: { readonly tabs: PageTabs }) {
@@ -455,7 +456,7 @@ function SegmentedTabList({ tabs }: { readonly tabs: PageTabs }) {
       <span
         aria-hidden
         ref={indicatorRef}
-        className="dshx:pointer-events-none dshx:absolute dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-background dshx:opacity-0 dshx:shadow-sm dshx:dark:border-input dshx:dark:bg-input/30"
+        className="dshx:pointer-events-none dshx:absolute dshx:border dshx:segment-thumb dshx:opacity-0"
       />
       <TabsList aria-label={tabs.label}>
         {tabs.items.map(tab => (
@@ -463,9 +464,9 @@ function SegmentedTabList({ tabs }: { readonly tabs: PageTabs }) {
             key={tab.value}
             value={tab.value}
             data-indicator-key={tab.value}
-            className="dshx:flex-none dshx:data-[state=active]:bg-transparent! dshx:data-[state=active]:shadow-none! dshx:dark:data-[state=active]:border-transparent!"
+            className="dshx:flex-none dshx:data-[state=active]:border-transparent! dshx:data-[state=active]:bg-transparent! dshx:data-[state=active]:shadow-none!"
           >
-            {tab.label}
+            <SegmentLabel label={tab.label} />
             <TabCount count={tab.count} />
           </TabsTrigger>
         ))}

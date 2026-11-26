@@ -140,6 +140,41 @@
 }
 
 /*
+ * The selected segment (council round 10 A3): one rule for the kit's segmented `TabsList`, the page's sliding tab
+ * indicator and `SlidingSegments`. Paper (#FEFCFA) on the #EBE9E7 track in light, a raised #302C28 on the #23201D
+ * track in dark, a 6px radius inside the track's 3px inset and a quiet 1px edge (the ink at 10% light, white at 7%
+ * dark), no shadow. The element carries its own 1px `border` (width), so the edge never changes its box; the label on
+ * it is the ink at 550 (`font-selected`). Ink holds AA on the thumb and secondary text on the track (tests/segments).
+ */
+@utility segment-thumb {
+  border-color: var(--dshx-segment-edge, var(--dsw-alias-border-l2));
+  border-radius: var(--dsw-radius-sm, 6px);
+  background-color: var(--dshx-segment-thumb, var(--dsw-alias-bg-base));
+  box-shadow: none;
+}
+
+/*
+ * A segment label that turns 550 when selected keeps the width of its 550 form at rest (council round 10 A3), so
+ * selecting a segment never moves its neighbours: `segment-label` on a span with `data-label` (the label text) reserves
+ * that width with a zero-height, invisible pseudo-element. No text is duplicated in the DOM.
+ */
+@utility segment-label {
+  display: inline-flex;
+  flex-direction: column;
+  &::before {
+    /* Empty alternative text: the reserve is never part of the accessible name. */
+    content: attr(data-label) / '';
+    height: 0;
+    overflow: hidden;
+    visibility: hidden;
+    font-weight: 550;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
+/*
  * The chosen card or tile (council round 3 A1): `dshx:selected-card` on a bordered card (a theme card, a starter tile,
  * a plan option). A 1.5px edge in the ink at 80% (council round 9 A3: its own 1px border plus a 0.5px inset ring, so
  * the box never changes size; ink since council round 7 A1, lighter than the 2px pure ink it was) and a 16px check badge

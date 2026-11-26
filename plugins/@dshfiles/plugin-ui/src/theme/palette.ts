@@ -79,6 +79,14 @@ export interface Palette {
    */
   readonly triggerFill: Oklch
   /**
+   * The selected segment (council round 10 A3), one rule for the kit's segmented Tabs, the page's sliding tab indicator
+   * and `SlidingSegments`: paper on the raised track in light (#FEFCFA on #EBE9E7), a raised #302C28 on the #23201D track
+   * in dark, inset 3px at a 6px radius under a 550 ink label.
+   */
+  readonly segmentThumb: Oklch
+  /** The selected segment's quiet 1px edge: the ink at 10% in light, white at 7% in dark. */
+  readonly segmentEdge: Oklch
+  /**
    * The user prompt bubble (council round 6 A5): a faint cool tint at hue 230, 40° from the default attention indigo,
    * so your own words read apart from the agent's without saying attention. Ink, secondary and faint text and links hold
    * AA on it. Fixed hue: a prompt is neither the accent nor a status.
@@ -188,6 +196,8 @@ function palette(input: PaletteInput): Palette {
     promptFill: dark ? { l: 0.255, c: 0.018, h: 230 } : { l: 0.965, c: 0.012, h: 230 },
     fieldBorder: { l: round(clamp(base + ((dark ? 0.55 : 0.61) - base) * contrast, 0, 1), 4), c: primaryChroma, h: hue },
     triggerFill: withAlpha(neutral[10] ?? { l: dark ? 0.93 : 0.22, c: 0, h: hue }, TRIGGER_FILL_ALPHA[scheme]),
+    segmentThumb: dark ? { l: 0.296, c: round((chroma * 9) / 7, 4), h: hue } : bg,
+    segmentEdge: dark ? { l: 1, c: 0, h: 0, alpha: 0.07 } : withAlpha(neutral[10] ?? { l: 0.22, c: 0, h: hue }, 0.1),
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
     primaryHover: dark
       ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue }
