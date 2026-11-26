@@ -85,6 +85,32 @@ describe('usage history views', () => {
     expect(markup).toContain('Codex-Alex')
   })
 
+  it('aligns each header with its values, reserves the sort-arrow slot and drops the header band (council round 12, D1)', () => {
+    const markup = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="model" onShowRequests={() => 'opened'} />)
+    // The variant follows the prefix: `first:dshx:…` is not a utility Tailwind generates.
+    expect(markup).not.toMatch(/\bfirst:dshx:/u)
+    const headers = markup.match(/<th [^>]*>.*?<\/th>/gsu) ?? []
+    expect(headers).toHaveLength(11)
+    for (const header of headers) {
+      expect(header).toContain('dshx:first:text-left')
+      // The sort control is a bare button: no padding of its own pushes the label off the column's value edge.
+      expect(header).not.toContain('data-slot="button"')
+      expect(header).not.toMatch(/<button[^>]*dshx:px-[0-9]/u)
+      // The arrow seat is always there, so sorting never shifts the label.
+      expect(header).toMatch(/data-sort-slot=""/u)
+    }
+    // Numeric columns put the seat before the label, so the label ends on the values' right edge.
+    expect(headers[1]).toMatch(/data-sort-slot=""[^>]*><\/span>Requests/u)
+    expect(headers[0]).toMatch(/Model<span[^>]*data-sort-slot=""/u)
+    expect(headers.at(-1)).toMatch(/data-sort-slot=""[^>]*>↓<\/span>Cost/u)
+    expect(markup).toMatch(/<th [^>]*aria-sort="descending"[^>]*>.*?Cost<\/button>/su)
+    expect(markup).not.toContain('dshx:bg-muted/30')
+    expect(markup).toMatch(/<table class="[^"]*dshx:text-sm/u)
+    // The Model cell no longer repeats the cost share as a bar: the Cost share column says it.
+    expect(markup).not.toContain('dshx:bg-data-1')
+    expect(markup).not.toContain('priced share*')
+  })
+
   it('renders daily cells for a year range in the measure the chart shows, with no switch of its own', () => {
     const from = new Date(2026, 0, 1).getTime()
     const markup = renderToStaticMarkup(<UsageCalendar view={view} metric="tokens" range={{ from, to: from + 365 * 86_400_000 }} />)

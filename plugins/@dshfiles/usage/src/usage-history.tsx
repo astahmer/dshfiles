@@ -1,4 +1,3 @@
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { useState } from 'react'
 import { UsageFormattingModel } from './format.js'
 import type { ChartQuery, ChartView } from './api.js'
@@ -67,7 +66,6 @@ export const UsageBreakdownTable = (props: {
   const [sort, setSort] = useState<{ column: TableColumn | 'group'; direction: 'asc' | 'desc' }>({ column: 'cost', direction: 'desc' })
   const rows = props.view.breakdown[props.groupBy] ?? []
   const totalCost = props.view.summary.missingUsage === 0 && props.view.summary.unpriced === 0 ? props.view.summary.cost : null
-  const totals = rows.reduce((sum, row) => sum + row.cost, 0)
   const sorted = [...rows].sort((left, right) => {
     const a = sort.column === 'group' ? left.key.toLocaleLowerCase() : sortableValue(left, sort.column)
     const b = sort.column === 'group' ? right.key.toLocaleLowerCase() : sortableValue(right, sort.column)
@@ -78,20 +76,52 @@ export const UsageBreakdownTable = (props: {
   const toggleSort = (column: TableColumn | 'group'): void => {
     setSort(current => ({ column, direction: current.column === column && current.direction === 'desc' ? 'asc' : 'desc' }))
   }
-  const heading = (column: TableColumn | 'group', label: string): JSX.Element => (
-    <th key={column} className="dshx:whitespace-nowrap dshx:px-2 dshx:py-2 dshx:text-right dshx:font-medium dshx:text-muted-foreground first:dshx:text-left">
-      <Button size="xs" variant="ghost" onClick={() => toggleSort(column)} aria-label={`Sort by ${label}`}>
-        {label}
-        {sort.column === column ? (sort.direction === 'asc' ? ' ↑' : ' ↓') : ''}
-      </Button>
-    </th>
-  )
+  /**
+   * A bare sort control on the cell's own inset, so each label sits on its column's value edge, with a fixed arrow seat
+   * (on the outer side: after the left-aligned first label, before the right-aligned numeric ones) so sorting never
+   * moves a label (council round 12, D1).
+   */
+  const heading = (column: TableColumn | 'group', label: string): JSX.Element => {
+    const active = sort.column === column
+    const arrow = (
+      <span aria-hidden data-sort-slot="" className="dshx:inline-block dshx:w-3 dshx:shrink-0 dshx:text-center">
+        {active ? (sort.direction === 'asc' ? '↑' : '↓') : ''}
+      </span>
+    )
+    return (
+      <th
+        key={column}
+        scope="col"
+        aria-sort={active ? (sort.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+        className="dshx:whitespace-nowrap dshx:px-2 dshx:py-2 dshx:text-right dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:first:text-left"
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(column)}
+          aria-label={`Sort by ${label}`}
+          className="dshx:inline-flex dshx:min-h-6 dshx:items-center dshx:gap-0.5 dshx:rounded-sm dshx:hover:text-foreground"
+        >
+          {column === 'group' ? (
+            <>
+              {label}
+              {arrow}
+            </>
+          ) : (
+            <>
+              {arrow}
+              {label}
+            </>
+          )}
+        </button>
+      </th>
+    )
+  }
   return (
     <section className="dshx:min-w-0 dshx:border-t dshx:border-border dshx:pt-4">
       <h3 className="dshx:mb-2 dshx:text-sm dshx:font-semibold">Usage distribution</h3>
       <div className="dshx:overflow-x-auto">
-        <table className="dshx:w-full dshx:text-xs">
-          <thead className="dshx:border-b dshx:bg-muted/30">
+        <table className="dshx:w-full dshx:text-sm">
+          <thead className="dshx:border-b dshx:border-border">
             <tr>
               {heading('group', props.groupBy === 'provider' ? 'Provider / account' : props.groupBy[0]?.toUpperCase() + props.groupBy.slice(1))}
               {TABLE_COLUMNS.map(column => heading(column, columnLabels[column]))}
@@ -106,26 +136,16 @@ export const UsageBreakdownTable = (props: {
               </tr>
             ) : (
               sorted.map(row => {
-                const share = totalCost === null || totalCost <= 0 ? null : row.cost / totalCost
-                const knownCostShare = totals > 0 ? row.cost / totals : null
+                // The group cell is the name alone: the Cost share column already states the share (council round 12, D1).
                 return (
                   <tr key={row.key}>
                     <td className="dshx:min-w-40 dshx:max-w-64 dshx:px-2 dshx:py-2">
                       <button
                         type="button"
                         onClick={() => props.onShowRequests(row.key, props.groupBy)}
-                        className="dshx:w-full dshx:text-left dshx:hover:underline"
+                        className="dshx:block dshx:w-full dshx:truncate dshx:rounded-sm dshx:text-left dshx:hover:underline"
                       >
-                        <span className="dshx:block dshx:truncate">{row.key}</span>
-                        <span className="dshx:mt-1 dshx:flex dshx:items-center dshx:gap-2 dshx:text-2xs dshx:text-muted-foreground">
-                          <span className="dshx:h-1.5 dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
-                            <span
-                              className="dshx:block dshx:h-full dshx:rounded-full dshx:bg-data-1"
-                              style={{ width: `${Math.min(100, (knownCostShare ?? 0) * 100)}%` }}
-                            />
-                          </span>
-                          {share === null ? 'priced share*' : UsageFormattingModel.formatPercent(share)}
-                        </span>
+                        {row.key}
                       </button>
                     </td>
                     {TABLE_COLUMNS.map(column => (
