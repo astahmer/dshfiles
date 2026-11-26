@@ -62,7 +62,9 @@ describe('Inbox card (round five C4)', () => {
     // The verbs are built before the row (round five C3, council round 4: a compact Failed item carries them in the band).
     const entity = row.slice(row.indexOf('<EntityRow'), row.indexOf('</EntityRow>'))
     expect(entity).not.toMatch(/\bdescription=\{/u)
-    expect(entity).toContain('data-inbox-card-body')
+    // Council round 8 C2: the body (evidence, then its verbs) is built before the row and drawn under the band.
+    expect(entity).toContain('data-inbox-card-evidence')
+    expect(row).toContain('data-inbox-card-body')
   })
 
   it('labels the recommended answer in words, not only in its tint', () => {
@@ -111,9 +113,10 @@ describe('Inbox on a phone (round five P2)', () => {
     expect(InboxView.PHONE_BAR).toContain('dshx:right-[max(12px,env(safe-area-inset-right,0px))]')
   })
 
-  it('keeps the phone head band to one line: the type label leaves narrow panes', () => {
-    expect(row).toContain('<span className="dshx:@max-pane-narrow:hidden">{head.kind}</span>')
-    expect(row).toMatch(/data-inbox-project="" className="[^"]*dshx:@max-pane-narrow:hidden/u)
+  it('keeps the phone head band to one line: the title truncates, the mark and kind stay (council round 8 C1)', () => {
+    expect(row).toMatch(/data-inbox-head-part="kind" className=\{InboxView\.HEAD_PART\}/u)
+    expect(row).toContain('data-inbox-project-name=""')
+    expect(row).toContain('InboxView.HEAD_ONE_LINE')
   })
 
   it('draws answer options as full-width 44 px rows with an 8 px radius, not 48 px pills', () => {

@@ -14,9 +14,9 @@ describe('an Inbox card (round five C4, council round 5)', () => {
     expect(stack).not.toContain('dshx:gap-2')
   })
 
-  it('puts the verbs in the head row, trailing, before the menu, on every card', () => {
-    // Every card, not only a bodyless Failed one, hands its verbs to the row's trailing seat.
-    expect(row).toMatch(/trailing=\{props\.actionRow === false && !compact \? undefined : headVerbs\}/u)
+  it('keeps the head row for the menu and a bodyless card verb (council round 8 C2)', () => {
+    // Council round 8 C2: a card with a body draws its verbs after its evidence; only a bodyless Failed card keeps them here.
+    expect(row).toMatch(/trailing=\{\(props\.actionRow === false && !compact\) \|\| \(footed && !hasMenu\) \? undefined : headVerbs\}/u)
     // Round six C1: one set of verb buttons, drawn in the head (and, on a compact pane, at the foot of a card's body).
     const verbs = between('const verbButtons = ', 'const answers = ')
     expect(verbs).toContain('data-inbox-row-actions="band"')

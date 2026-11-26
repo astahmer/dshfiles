@@ -11,6 +11,7 @@ import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogPortal } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import type { PageAction } from '@dshfiles/plugin-ui/components/page'
 import { EllipsisIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useId, useSyncExternalStore } from 'react'
@@ -78,10 +79,10 @@ export const InboxPhoneBar = (): JSX.Element | null => {
           </div>
         ) : null}
         <div data-inbox-phone-bar="trailing" className={InboxView.PHONE_BAR}>
-          {/* Council round 7 C2: Start triage is a quiet 36px outline button (44px hit), not the screen's heaviest object,
-              and the page menu takes the trailing edge, as on every other top bar. Its 12px label and the 36px ⋯ (the
-              kit keeps 44px hit areas) leave the centred "Inbox" title clear at 390px. */}
-          {primary === undefined ? null : (
+          {/* Council round 8 C1: Start triage (or Resume all) is a 44x44 icon-only button named by its aria-label and
+              tooltip, before the page menu on the trailing edge, as on every other top bar; a worded button ran into the
+              centred "Inbox" title. An action without a glyph keeps its words. */}
+          {primary === undefined ? null : primary.icon === undefined ? (
             <Button
               type="button"
               size="sm"
@@ -91,9 +92,30 @@ export const InboxPhoneBar = (): JSX.Element | null => {
               disabled={primary.disabled === true || primary.pending === true}
               onClick={primary.onSelect}
             >
-              {primary.icon ?? null}
               {primary.label}
             </Button>
+          ) : (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="ghost"
+                    className="dshx:size-11 dshx:text-foreground dshx:[&_svg]:size-5!"
+                    data-page-action={primary.id}
+                    aria-label={primary.label}
+                    disabled={primary.disabled === true || primary.pending === true}
+                    onClick={primary.onSelect}
+                  >
+                    {primary.icon}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="dshx-root">
+                  {primary.label}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
           {value.actions.length === 0 ? null : (
             <DropdownMenu>

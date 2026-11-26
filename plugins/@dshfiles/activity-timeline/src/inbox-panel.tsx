@@ -164,6 +164,13 @@ const openLabelOf = (item: AttentionItem, opener: AttentionSubjectOpener | undef
   return openAction === 'review' ? t('reviewThread') : openAction === 'thread' ? t('openThread') : t('openSubject', { label: opener?.label ?? '' })
 }
 
+/** The muted "·" before a card head's part (council round 8 C2); decorative, the parts read in order without it. */
+const HeadSep = (): JSX.Element => (
+  <span aria-hidden data-inbox-head-sep="" className={InboxView.HEAD_SEP}>
+    ·
+  </span>
+)
+
 const InboxRow = (props: {
   readonly item: AttentionItem
   readonly view: AttentionView
@@ -243,15 +250,16 @@ const InboxRow = (props: {
       ? null
       : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
   /**
-   * The card's verbs (round five C4, council round 5): in its head row, trailing, before the menu, on a wide pane. On a
-   * compact pane a card with a body draws them at the bottom of its body as full-width 44px buttons instead (round six
-   * C1), so the title owns its row; a bodyless Failed card keeps its one verb in the head, under a short name.
+   * The card's verbs (council round 8 C2): in its body, right after the evidence they act on (an approval's command, a
+   * question's answers), on every width; a bodyless Failed card keeps its one verb in the head, under a short name on a
+   * compact pane. The head holds glyph · title · project · kind · time and the menu.
    */
   const hasVerbs =
     (open && PROVIDER_VERBS.some(verb => item.verbs.includes(verb))) || (open && props.onReview !== undefined) || (openable && !answerable) || undo !== null
   const footed = InboxView.footsVerbs(compact)
-  const verbButtons = (place: 'head' | 'foot'): JSX.Element => {
-    const size = place === 'head' ? cn('dshx:shrink', InboxView.HEAD_VERB) : InboxView.FOOT_VERB
+  const hasMenu = doneable || snoozable || quickReplies.length > 0 || mutable
+  const verbButtons = (place: 'head' | 'body'): JSX.Element => {
+    const size = place === 'head' ? cn('dshx:shrink', InboxView.HEAD_VERB) : InboxView.BODY_VERB
     const shortLabel = place === 'head' && !footed ? t(InboxView.shortOpenLabelKey(InboxView.openActionOf(item))) : null
     return (
       <>
@@ -314,9 +322,9 @@ const InboxRow = (props: {
   }
   const headVerbs = (
         <div data-inbox-row-actions="band" className={InboxView.HEAD_SEAT}>
-          {footed ? <span className={InboxView.HEAD_VERBS_WIDE}>{verbButtons('head')}</span> : verbButtons('head')}
+          {footed ? null : verbButtons('head')}
           {/* Utility verbs live in the card's menu (round five P2): the row shows the one verb it asks for. */}
-          {doneable || snoozable || quickReplies.length > 0 || mutable ? (
+          {hasMenu ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -427,8 +435,50 @@ const InboxRow = (props: {
                   </Button>
                 ) : null,
               ]}
+          {/* Any other verb a question card offers follows its answers (council round 8 C2). */}
+          {footed && hasVerbs && props.actionRow !== false ? verbButtons('body') : null}
         </div>
   )
+  /**
+   * What the card acts on, first in its body (council round 8 C2): a question's "Asks: …" in ink at body size, an
+   * approval's "Runs: `command`" (12/16, the command in ink mono), any other note muted.
+   */
+  const evidence =
+    reason === null && card.detail === null ? null : (
+      <div
+        data-inbox-card-body=""
+        className={cn(
+          'dshx:flex dshx:min-w-0 dshx:flex-[0_1_auto] dshx:flex-col dshx:gap-0.5',
+          answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
+        )}
+      >
+        {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
+        {card.detail === null ? null : card.command ? (
+          <span data-inbox-runs="" className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.LEAD_IN, InboxView.TEXT_MEASURE)}>
+            {t('runs')}{' '}
+            <code className={InboxView.COMMAND}>
+              {InboxView.commandWords(card.detail).map((word, index) => (
+                <span key={index}>
+                  {index === 0 ? null : ' '}
+                  {word.keep ? <span className="dshx:whitespace-nowrap">{word.text}</span> : word.text}
+                </span>
+              ))}
+            </code>
+          </span>
+        ) : (
+          <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', answerable && 'dshx:text-xs dshx:text-muted-foreground', InboxView.TEXT_MEASURE)}>
+            {card.detail}
+          </span>
+        )}
+      </div>
+    )
+  /** The verbs, right after the evidence they act on; a question's verbs follow its answers instead. */
+  const bodyVerbs =
+    props.actionRow === false || !footed || !hasVerbs || answers !== null ? null : (
+      <div data-inbox-row-actions="body" className={InboxView.BODY_VERBS}>
+        {verbButtons('body')}
+      </div>
+    )
   const row = (
     <EntityRow
       role="listitem"
@@ -448,8 +498,9 @@ const InboxRow = (props: {
         'dshx:relative',
         // The verbs and the menu share the head row with the title on every width (round five C4, council round 5).
         InboxView.CARD_HEAD,
-        // A bodyless Failed card's verb and menu sit beside its title line, its age under the title (round six C1).
-        !footed && InboxView.COMPACT_SEAT,
+        // A bodyless Failed card's verb and menu sit beside its title line, its age under the title (round six C1); a card
+        // with a body keeps its head to one line on a phone (council round 8 C1).
+        footed ? InboxView.HEAD_ONE_LINE : cn(InboxView.COMPACT_SEAT, InboxView.HEAD_META_UNDER),
         phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
         InboxView.headerBand(status),
       )}
@@ -458,81 +509,80 @@ const InboxRow = (props: {
       status={status}
       statusLabel={statusLabel}
       heading={<span className={InboxView.TITLE}>{title}</span>}
-      trailing={props.actionRow === false && !compact ? undefined : headVerbs}
+      trailing={(props.actionRow === false && !compact) || (footed && !hasMenu) ? undefined : headVerbs}
       meta={
         <>
-          {/* On a phone the band keeps one line (title and age): the body says what is asked ("Asks:", or an approval's command).
-              Every head reads title · project · kind · time (council round 7 C1); a finished turn's project replaces its
-              "Thread turns" kind (round five C4). */}
+          {/* Every head reads glyph · title · project · kind · time with muted "·" separators (council round 7 C1, round 8
+              C2); a finished turn's project replaces its "Thread turns" kind (round five C4). On a phone the head of a card
+              with a body stays one line (InboxView.HEAD_ONE_LINE): the project's mark and the kind stay, the title
+              truncates and the age shows only where it fits. */}
           {head.project === undefined ? null : (
-            <span data-inbox-project="" className="dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:@max-pane-narrow:hidden">
+            <span data-inbox-head-part="project" data-inbox-project="" className={InboxView.HEAD_PART}>
+              <HeadSep />
               <ProjectMark name={head.project} size="dense" />
-              <span className="dshx:truncate">{head.project}</span>
+              <span data-inbox-project-name="" className="dshx:truncate dshx:pl-1.5">
+                {head.project}
+              </span>
             </span>
           )}
-          {head.kind === undefined ? null : <span className="dshx:@max-pane-narrow:hidden">{head.kind}</span>}
-          {referencedThreadId === null ? null : (
-            <button
-              type="button"
-              className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline dshx:pointer-coarse:min-h-11"
-              onClick={() => props.onOpenThread(referencedThreadId)}
-            >
-              <MessagesSquareIcon aria-hidden className="dshx:size-3" />
-              {t('openThread')}
-            </button>
+          {head.kind === undefined ? null : (
+            <span data-inbox-head-part="kind" className={InboxView.HEAD_PART}>
+              <HeadSep />
+              {head.shortKind === undefined ? (
+                head.kind
+              ) : (
+                <>
+                  <span data-inbox-kind-long="">{head.kind}</span>
+                  <span data-inbox-kind-short="">{head.shortKind}</span>
+                </>
+              )}
+            </span>
           )}
-          <span>{InboxView.relativeAge(item.openedAt, props.now)}</span>
-          {item.occurrences > 1 ? <Badge variant="outline">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
-          {item.resolvedAt !== null ? <Badge variant="secondary">{t('resolved')}</Badge> : null}
+          {referencedThreadId === null ? null : (
+            <span data-inbox-head-part="thread" className={InboxView.HEAD_PART}>
+              <HeadSep />
+              <button
+                type="button"
+                className="dshx:inline-flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:font-medium dshx:text-info dshx:underline-offset-2 dshx:hover:underline dshx:pointer-coarse:min-h-11"
+                onClick={() => props.onOpenThread(referencedThreadId)}
+              >
+                <MessagesSquareIcon aria-hidden className="dshx:size-3" />
+                {t('openThread')}
+              </button>
+            </span>
+          )}
+          <span data-inbox-head-part="age" className={InboxView.HEAD_PART}>
+            {/* Zero wide: an age that does not fit beside it wraps away on a phone (InboxView.HEAD_ONE_LINE). */}
+            <span aria-hidden className="dshx:w-0" />
+            <HeadSep />
+            <span data-inbox-age="">{InboxView.relativeAge(item.openedAt, props.now)}</span>
+          </span>
+          {item.occurrences > 1 ? <Badge variant="outline" className="dshx:ml-2">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
+          {item.resolvedAt !== null ? <Badge variant="secondary" className="dshx:ml-2">{t('resolved')}</Badge> : null}
           {props.view === 'snoozed' ? (
-            <Badge variant="outline">
+            <Badge variant="outline" className="dshx:ml-2">
               {item.snoozeUntilChange ? t('snoozedUntilChange') : `${t('snoozedUntil')} ${new Date(item.snoozedUntil ?? 0).toLocaleString()}`}
             </Badge>
           ) : null}
         </>
       }
     >
-      {reason === null && card.detail === null ? null : (
+      {evidence === null && bodyVerbs === null ? null : (
         <div
-          data-inbox-card-body=""
+          data-inbox-card-evidence=""
           className={cn(
-            'dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-0.5 dshx:px-3 dshx:pt-2',
+            InboxView.EVIDENCE,
             InboxView.BODY_INSET,
-            answerable ? 'dshx:text-sm dshx:text-foreground' : 'dshx:text-xs dshx:text-muted-foreground',
-            // The body ends the card unless answers follow it.
+            // The body ends the card unless answers follow it; a phone's verb ends it 8px from the edge (council round 7 C2).
             (answers === null || props.actionRow === false) && 'dshx:pb-3',
-            // A phone's foot verbs sit 8px under the body (council round 7 C2).
-            answers === null && footed && hasVerbs && props.actionRow !== false && 'dshx:@max-pane-narrow:pb-2',
+            answers === null && bodyVerbs !== null && 'dshx:@max-pane-narrow:pb-2',
           )}
         >
-          {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
-          {card.detail === null ? null : (
-            <span
-              className={cn(
-                clamped && 'dshx:line-clamp-2',
-                'dshx:break-words',
-                answerable && 'dshx:text-xs dshx:text-muted-foreground',
-                card.command && InboxView.COMMAND,
-                InboxView.TEXT_MEASURE,
-              )}
-            >
-              {card.detail}
-            </span>
-          )}
+          {evidence}
+          {bodyVerbs}
         </div>
       )}
       {props.actionRow === false ? null : answers}
-      {props.actionRow === false || !footed || !hasVerbs ? null : (
-        <div data-inbox-row-actions="foot" className={cn(
-            InboxView.FOOT_VERBS,
-            // 12px from what is above: the body's or the answers' own padding gives it, a bodyless card adds it here.
-            reason === null && card.detail === null && answers === null && 'dshx:pt-3',
-            answers !== null && openable && 'dshx:@max-pane-narrow:pointer-coarse:pt-3',
-          )}
-        >
-          {verbButtons('foot')}
-        </div>
-      )}
       {/* Land rebases the thread's work onto the bookmark and moves it: say what lands before it runs (never one click). */}
       <AlertDialog open={confirmingLand} onOpenChange={setConfirmingLand}>
         <AlertDialogContent className="dshx-root">

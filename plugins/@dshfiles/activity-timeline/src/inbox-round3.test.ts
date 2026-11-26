@@ -26,7 +26,7 @@ describe('the Inbox title (round five C3, council round 3)', () => {
 describe('an Inbox card on a phone (round five C3, council round 3)', () => {
   it('insets the body 16px from the card edge, not under the 36px glyph indent', () => {
     expect(InboxView.BODY_INSET).toBe('dshx:pl-9 dshx:@max-pane-narrow:px-4')
-    const body = row.slice(row.indexOf('data-inbox-card-body'), row.indexOf('data-inbox-card-body') + 400)
+    const body = row.slice(row.indexOf('data-inbox-card-evidence'), row.indexOf('data-inbox-card-evidence') + 400)
     const answers = row.slice(row.indexOf('data-inbox-row-actions=""'), row.indexOf('data-inbox-row-actions=""') + 400)
     expect(body).toContain('InboxView.BODY_INSET')
     expect(answers).toContain('InboxView.BODY_INSET')

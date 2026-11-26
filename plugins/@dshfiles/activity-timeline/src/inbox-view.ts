@@ -19,6 +19,15 @@ const SOURCE_LABELS = new Map([
 
 const sourceLabel = (source: string): string => SOURCE_LABELS.get(source) ?? source
 
+/**
+ * The kind a phone's one-line card head prints where the full name would leave the title a few letters (council round 8
+ * C1): "Thread question" took ~90px of a 390px head and cut "Reconcile Stripe payouts" to "Reconcile Str…".
+ */
+const SHORT_SOURCE_LABELS = new Map([
+  ['agent-questions.child-question', 'Question'],
+  ['agent-questions.native-question', 'Question'],
+])
+
 export type SnoozeChoice = 'hour' | 'four-hours' | 'tomorrow' | 'change'
 
 /** Tomorrow at 09:00 local time. */
@@ -92,7 +101,39 @@ const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
  * wrapping under it (the kit drops it to a line of its own on a narrow pane): the title owns the row with its age and ⋯.
  */
 const CARD_HEAD =
-  'dshx:@max-pane-narrow:[&>div:first-child]:items-center dshx:@max-pane-narrow:[&>div:first-child]:px-4 dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto'
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-center dshx:@max-pane-narrow:[&>div:first-child]:px-4 dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto' +
+  // Council round 8 C2: the head's parts are spaced by their muted "·" separators (6px each side), not by flex gaps.
+  ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
+  // A kind with a short name shows it on a compact pane (council round 8 C1).
+  ' dshx:[&_[data-inbox-kind-short]]:hidden dshx:@max-pane-narrow:[&_[data-inbox-kind-short]]:inline dshx:@max-pane-narrow:[&_[data-inbox-kind-long]]:hidden'
+
+/** The muted "·" before each head part after the title (council round 8 C2): 6px each side. */
+const HEAD_SEP = 'dshx:px-1.5 dshx:text-muted-foreground'
+
+/** One head part (project, kind, link, age): it keeps its words on one line and never shrinks; the title does. */
+const HEAD_PART = 'dshx:inline-flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap'
+
+/**
+ * A card head with a body on a compact pane (council round 8 C1) is one line: glyph · title · project mark · kind, the
+ * title truncating, the ⋯ trailing. The project shows its dense mark only ("BA · Approval"). The age takes the space
+ * left before the ⋯ and shows only when it fits there: its part leads with a zero-width anchor, so an age wider than
+ * the space wraps to a second line that the part's 16px height clips.
+ */
+const HEAD_ONE_LINE =
+  'dshx:@max-pane-narrow:[&>div:first-child]:flex-nowrap dshx:@max-pane-narrow:[&_span:has(>[data-slot=entity-row-title])]:flex-nowrap' +
+  ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-title]]:truncate dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:contents' +
+  ' dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden' +
+  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:h-4 dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:flex-[1_1_0]' +
+  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:flex-wrap dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:justify-end' +
+  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:overflow-hidden dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]>[data-inbox-head-sep]]:hidden' +
+  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]>[data-inbox-age]]:pl-2'
+
+/**
+ * A bodyless (compact) card on a compact pane keeps its full title; its project and age take a line of their own under
+ * it, so that line does not open on a separator.
+ */
+const HEAD_META_UNDER =
+  'dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:basis-full dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]>[data-inbox-head-part]:first-child>[data-inbox-head-sep]]:hidden'
 
 /**
  * The head row's seat: 28px controls pulled 4px into the row's padding on a wide pane; on a compact pane the 44pt ⋯ sits
@@ -102,19 +143,26 @@ const CARD_HEAD =
 const HEAD_SEAT =
   'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-3!'
 
-/** A card with a body hands its verbs to the foot on a compact pane; a bodyless (compact) Failed card keeps them in its head. */
+/** A card with a body draws its verbs in the body, after its evidence; a bodyless (compact) Failed card keeps them in its head. */
 const footsVerbs = (compactCard: boolean): boolean => !compactCard
 
-/** The head's verbs of a card that foots them: shown on a wide pane only. */
-const HEAD_VERBS_WIDE = 'dshx:contents dshx:@max-pane-narrow:hidden'
+/**
+ * One card structure (council round 8 C2): the body opens with its evidence (an approval's "Runs: `command`", a
+ * question's "Asks: …") and the verb follows it, on every width. On a wide pane the verb sits beside the evidence, 12px
+ * after it; on a compact pane under it, 8px below, as a full-width button (round six C1), so a phone fits the failed card.
+ */
+const EVIDENCE =
+  'dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-2 dshx:px-3 dshx:pt-2 dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:items-stretch dshx:@max-pane-narrow:gap-2'
+
+/** The body's verbs: a row after the evidence; on a compact pane a stack of full-width buttons. */
+const BODY_VERBS = 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:items-stretch dshx:@max-pane-narrow:gap-2'
 
 /**
- * The verbs at the bottom of a card's body on a compact pane (round six C1): each a full-width button, so the title never
- * wraps for a button. Hidden on a wide pane, where the head holds them. Council round 7 C2: 36px tall (the kit's ::after
- * keeps a 44px hit area), 8px from the text above and from the card's edge, so a phone fits the failed card.
+ * A body verb: 28px beside the evidence (a 44pt target on a touch screen); on a compact pane 36px over the full width
+ * (council round 7 C2; the kit's ::after keeps a 44px hit area).
  */
-const FOOT_VERBS = 'dshx:hidden dshx:flex-col dshx:gap-2 dshx:px-4 dshx:pb-2 dshx:@max-pane-narrow:flex'
-const FOOT_VERB = 'dshx:w-full dshx:h-9!'
+const FOOT_VERB = 'dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:h-9!'
+const BODY_VERB = `dshx:shrink dshx:h-7 dshx:pointer-coarse:h-11 ${FOOT_VERB}`
 
 /**
  * A bodyless (compact) card on a compact pane: its verb and menu keep to the title line, top-aligned, and the age wraps
@@ -151,18 +199,35 @@ export interface InboxHeadMeta {
   readonly project: string | undefined
   /** The item's kind in words ("Approval"), unless the project already names the card. */
   readonly kind: string | undefined
+  /** A shorter name for the kind on a compact pane ("Question"), when it has one. */
+  readonly shortKind?: string
 }
 
-const headMeta = (source: string, project: string | undefined): InboxHeadMeta => ({
-  project,
-  kind: project !== undefined && namesProject(source) ? undefined : sourceLabel(source),
-})
+const headMeta = (source: string, project: string | undefined): InboxHeadMeta => {
+  const kind = project !== undefined && namesProject(source) ? undefined : sourceLabel(source)
+  const shortKind = kind === undefined ? undefined : SHORT_SOURCE_LABELS.get(source)
+  return shortKind === undefined ? { project, kind } : { project, kind, shortKind }
+}
+
+/**
+ * A command's words, so it wraps only between them (council round 8 C1): a phone broke `--env` after its dashes. A word
+ * longer than about one phone line keeps the ordinary breaks.
+ */
+const COMMAND_WORD_MAX = 40
+const commandWords = (command: string): readonly { readonly text: string; readonly keep: boolean }[] =>
+  command.split(' ').map(text => ({ text, keep: text.length <= COMMAND_WORD_MAX }))
 
 /** A card's title at the kit's contextual heading step, 15/20 at 600 (council round 4, A4/C3). */
 const TITLE = 'dshx:text-heading'
 
-/** A command an approval would run: 12/16 secondary mono under the title. */
-const COMMAND = 'dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-muted-foreground'
+/**
+ * A command an approval would run (council round 8 C2): 12/16 mono in ink after its muted "Runs:" lead-in, so the
+ * evidence the user reviews reads at full contrast.
+ */
+const COMMAND = 'dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground'
+
+/** The lead-in before an approval's command: 12/16 sans, muted. */
+const LEAD_IN = 'dshx:font-sans dshx:text-xs dshx:leading-4 dshx:text-muted-foreground'
 
 const APPROVAL_SOURCE = 'thread-sidebar.approval'
 const APPROVE_LEAD_IN = /^Approve:\s*/u
@@ -365,18 +430,25 @@ export class InboxView {
   static readonly BODY_INSET = BODY_INSET
   static readonly HEAD_VERB = HEAD_VERB
   static readonly CARD_HEAD = CARD_HEAD
+  static readonly HEAD_SEP = HEAD_SEP
+  static readonly HEAD_PART = HEAD_PART
+  static readonly HEAD_ONE_LINE = HEAD_ONE_LINE
+  static readonly HEAD_META_UNDER = HEAD_META_UNDER
   static readonly HEAD_SEAT = HEAD_SEAT
   static readonly footsVerbs = footsVerbs
-  static readonly HEAD_VERBS_WIDE = HEAD_VERBS_WIDE
-  static readonly FOOT_VERBS = FOOT_VERBS
+  static readonly EVIDENCE = EVIDENCE
+  static readonly BODY_VERBS = BODY_VERBS
+  static readonly BODY_VERB = BODY_VERB
   static readonly FOOT_VERB = FOOT_VERB
   static readonly shortOpenLabelKey = shortOpenLabelKey
   static readonly COMPACT_SEAT = COMPACT_SEAT
   static readonly SHORT_VERB = SHORT_VERB
   static readonly namesProject = namesProject
   static readonly headMeta = headMeta
+  static readonly commandWords = commandWords
   static readonly TITLE = TITLE
   static readonly COMMAND = COMMAND
+  static readonly LEAD_IN = LEAD_IN
   static readonly cardText = cardText
   static readonly compact = compact
   static readonly titleCounts = titleCounts

@@ -18,16 +18,12 @@ describe('a phone Inbox card (round six C1)', () => {
 
   it('moves the verb of a card with a body to a full-width button at the bottom of the body (36px since council round 7 C2)', () => {
     expect(InboxView.footsVerbs(false)).toBe(true)
-    expect(InboxView.FOOT_VERBS).toContain('dshx:hidden')
-    expect(InboxView.FOOT_VERBS).toContain('dshx:@max-pane-narrow:flex')
-    expect(InboxView.FOOT_VERBS).toContain('dshx:px-4')
-    expect(InboxView.FOOT_VERBS).toContain('dshx:pb-2')
-    expect(InboxView.FOOT_VERB).toContain('dshx:w-full')
-    expect(InboxView.FOOT_VERB).toContain('dshx:h-9!')
-    // The head keeps the verbs on a wide pane and only the menu on a compact one.
-    expect(InboxView.HEAD_VERBS_WIDE).toContain('dshx:@max-pane-narrow:hidden')
-    const foot = between('data-inbox-row-actions="foot"', '</div>')
-    expect(foot).toContain("verbButtons('foot')")
+    // Council round 8 C2: the verbs follow the evidence in the body on every width, full-width under it on a phone.
+    expect(InboxView.BODY_VERBS).toContain('dshx:@max-pane-narrow:flex-col')
+    expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:w-full')
+    expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:h-9!')
+    const body = between('data-inbox-row-actions="body"', '</div>')
+    expect(body).toContain("verbButtons('body')")
     expect(row).toContain("verbButtons('head')")
   })
 
@@ -44,7 +40,7 @@ describe('a phone Inbox card (round six C1)', () => {
     // Its verb and menu keep to the title line, top-aligned; the age wraps under the title.
     expect(InboxView.COMPACT_SEAT).toContain('dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start')
     expect(InboxView.COMPACT_SEAT).toContain('dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0')
-    expect(row).toContain('!footed && InboxView.COMPACT_SEAT')
+    expect(row).toContain('footed ? InboxView.HEAD_ONE_LINE : cn(InboxView.COMPACT_SEAT, InboxView.HEAD_META_UNDER)')
   })
 
   it('stacks phone cards 8px apart (16px on a wide pane) and drops the padding under a 44pt "Write your own…"', () => {

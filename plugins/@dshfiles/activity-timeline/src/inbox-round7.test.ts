@@ -24,7 +24,7 @@ describe('the Inbox page (council round 7 C1)', () => {
 
   it('names the project on every thread card and the kind unless a project already says it', () => {
     expect(InboxView.headMeta('thread-sidebar.approval', 'billing-api')).toEqual({ project: 'billing-api', kind: 'Approval' })
-    expect(InboxView.headMeta('agent-questions.native-question', 'billing-api')).toEqual({ project: 'billing-api', kind: 'Thread question' })
+    expect(InboxView.headMeta('agent-questions.native-question', 'billing-api')).toMatchObject({ project: 'billing-api', kind: 'Thread question' })
     expect(InboxView.headMeta('thread-sidebar.finished-turn', 'web-app')).toEqual({ project: 'web-app', kind: undefined })
     // With no project known a finished turn still says what it is.
     expect(InboxView.headMeta('thread-sidebar.finished-turn', undefined)).toEqual({ project: undefined, kind: 'Thread turns' })
@@ -40,13 +40,10 @@ describe('the phone Inbox (council round 7 C2)', () => {
     expect(trailingBar.indexOf('aria-label={value.moreLabel}')).toBeGreaterThan(trailingBar.indexOf('data-page-action={primary.id}'))
   })
 
-  it('draws Start triage as a quiet 36px outline button with a 44px hit area, not the ink primary', () => {
-    const primary = trailingBar.slice(trailingBar.indexOf('{primary === undefined ? null : ('), trailingBar.indexOf('data-page-action={primary.id}'))
-    expect(primary).toContain('variant="outline"')
-    expect(primary).toContain('dshx:h-9')
-    expect(primary).toContain('dshx-hit-44')
-    // The 12px small label keeps it clear of the centred "Inbox" title at 390px; the bar's ⋯ is 36px too.
-    expect(primary).not.toContain('dshx:text-sm')
+  it('draws Start triage as a quiet button, not the ink primary (an icon since council round 8 C1)', () => {
+    const primary = trailingBar.slice(trailingBar.indexOf('{primary === undefined ? null'), trailingBar.indexOf('</TooltipProvider>'))
+    expect(primary).toContain('variant="ghost"')
+    expect(primary).not.toContain('variant="default"')
     const menu = trailingBar.slice(trailingBar.indexOf('<DropdownMenuTrigger'), trailingBar.indexOf('aria-label={value.moreLabel}'))
     expect(menu).toContain('dshx:size-9')
     expect(menu).not.toContain('dshx:size-11')
@@ -55,16 +52,16 @@ describe('the phone Inbox (council round 7 C2)', () => {
   it('takes 8px, not 12, from the non-interactive gaps on a phone: page top, tabs to list, body to verb, card end', () => {
     expect(page).toContain('dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]]:pt-2')
     expect(page).toContain('dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:gap-2')
-    expect(InboxView.FOOT_VERBS).toContain('dshx:pb-2')
-    expect(InboxView.FOOT_VERBS).not.toContain('dshx:pb-3')
-    expect(row).toContain("footed && hasVerbs && props.actionRow !== false && 'dshx:@max-pane-narrow:pb-2'")
+    // Council round 8 C2: the verb follows the evidence 8px under it on a phone, and the card ends 8px under the verb.
+    expect(InboxView.EVIDENCE).toContain('dshx:@max-pane-narrow:gap-2')
+    expect(row).toContain("answers === null && bodyVerbs !== null && 'dshx:@max-pane-narrow:pb-2'")
     // Answers stay 8px apart.
     expect(row.slice(row.indexOf('const answers = '), row.indexOf('const row = '))).toContain('dshx:gap-2')
   })
 
   it('draws a foot verb 36px tall over the full width; the kit keeps its 44px hit area', () => {
-    expect(InboxView.FOOT_VERB).toContain('dshx:w-full')
-    expect(InboxView.FOOT_VERB).toContain('dshx:h-9!')
+    expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:w-full')
+    expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:h-9!')
     expect(InboxView.FOOT_VERB).not.toContain('dshx:h-11')
   })
 

@@ -13,8 +13,8 @@ const approval = {
 
 describe('an Inbox card (round five C3, council round 4)', () => {
   it('keeps the card menu in the head band on every width, not on the row of verbs', () => {
-    // Round five C4 (council round 5): the menu ends the head row's trailing seat, beside the verbs, at every width.
-    expect(row).toMatch(/trailing=\{props\.actionRow === false && !compact \? undefined : headVerbs\}/u)
+    // Round five C4 (council round 5): the menu ends the head row's trailing seat at every width.
+    expect(row).toMatch(/trailing=\{\(props\.actionRow === false && !compact\) \|\| \(footed && !hasMenu\) \? undefined : headVerbs\}/u)
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
     expect(row).toContain('InboxView.CARD_HEAD')
   })
@@ -36,8 +36,8 @@ describe('an Inbox card (round five C3, council round 4)', () => {
     expect(question).toEqual({ reason: 'Asks: Which rate?', detail: null, command: false })
   })
 
-  it('draws an approval command as 12/16 secondary mono', () => {
-    expect(InboxView.COMMAND).toBe('dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-muted-foreground')
+  it('draws an approval command as 12/16 mono, in ink after its muted lead-in since council round 8 C2', () => {
+    expect(InboxView.COMMAND).toBe('dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground')
     expect(row).toContain('InboxView.COMMAND')
   })
 
@@ -51,8 +51,8 @@ describe('an Inbox card (round five C3, council round 4)', () => {
     expect(InboxView.compact('failed', { reason: 'Turn failed: HTTP 529', detail: null })).toBe(false)
     expect(InboxView.compact('needs-you', { reason: null, detail: null })).toBe(false)
     // The recovery verbs ride the band's trailing seat instead of a row of their own under an empty body (every card's
-    // verbs do since round five C4, council round 5; triage keeps a compact card's).
-    expect(row).toMatch(/trailing=\{props\.actionRow === false && !compact \? undefined : headVerbs\}/u)
+    // verbs did since round five C4, a bodyless card's still do since council round 8 C2; triage keeps a compact card's).
+    expect(row).toMatch(/trailing=\{\(props\.actionRow === false && !compact\) \|\| \(footed && !hasMenu\) \? undefined : headVerbs\}/u)
     expect(row).toMatch(/\{props\.actionRow === false \? null : answers\}/u)
   })
 })
