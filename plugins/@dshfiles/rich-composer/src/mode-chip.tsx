@@ -103,10 +103,10 @@ export const ModeChip = (props: ModeChipProps & { readonly host: ModeChipHost; r
           <Button
             aria-label={`Access mode, current: ${label}`}
             className={cn(
-              'dshx-root dshx:h-7 dshx:min-w-0 dshx:max-w-56 dshx:shrink dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:hover:text-foreground dshx:data-[state=open]:bg-accent dshx:data-[state=open]:text-foreground',
+              // Council round 10 C3: the value in ink at 500 like every chip in the bar, its glyphs in the secondary ink.
+              'dshx-root dshx:h-7 dshx:min-w-0 dshx:max-w-56 dshx:shrink dshx:gap-1.5 dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-foreground dshx:[&>svg]:text-muted-foreground dshx:data-[state=open]:bg-accent',
               // Compact bar: the chip keeps its words and stops shrinking, so the model name truncates first.
               'dshx:in-data-model-compact:shrink-0 dshx:in-data-model-icon:shrink',
-              current === 'danger-full-access' && 'dshx:text-foreground',
             )}
             data-composer-mode-chip=""
             data-plan-mode={planOn ? 'on' : 'off'}
@@ -125,7 +125,7 @@ export const ModeChip = (props: ModeChipProps & { readonly host: ModeChipHost; r
             <span className="dshx:min-w-0 dshx:truncate dshx:in-data-model-icon:hidden dshx:in-data-model-mark-tight:hidden" data-composer-mode-label="">
               {label}
             </span>
-            <ChevronDownIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:opacity-60 dshx:in-data-model-compact:hidden" />
+            <ChevronDownIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:in-data-model-compact:hidden" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent

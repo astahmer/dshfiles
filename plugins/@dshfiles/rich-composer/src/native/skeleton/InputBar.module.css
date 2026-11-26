@@ -1045,3 +1045,11 @@
     top: 6px;
   }
 }
+
+/* Council round 10 C3: one rule for the bar's chips. A value reads in ink at 500 and the run pickers' 13px (the mode
+   chip and the model chip were 12px, the mode chip in the secondary ink, so "Can edit" read as disabled); glyphs take
+   the secondary ink (the mode chip's own classes, the model picker's), brand marks keep their colour. */
+.row :is(:global([data-composer-mode-chip]), :global([data-model-trigger])) {
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+  font-weight: 500;
+}
