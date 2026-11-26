@@ -60,16 +60,26 @@ describe('Settings › General controls in the kit field look (council round 3 B
     expect(general).toContain('dshx:[&_[class*=_expander_]]:before:content-[attr(aria-label)]')
   })
 
-  it('aligns the font size field to the select column, with More font settings as a link under it (council round 10 B3)', () => {
+  it('aligns the font size field to the select column, with More font settings under the description (council round 14 B3)', () => {
     const general = read('native/general-section.tsx')
-    // The control is the selects' 176px wide and the field fills it.
-    expect(general).toContain('dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:w-44!')
-    expect(general).toContain('dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:grid-cols-[minmax(0,1fr)_auto]!')
+    const row = '[&_[class$=row]:has([class*=_expander_])]'
+    // The Font size row is a grid: the label column, then the field and its unit filling the selects' 176px (140 + 36).
+    expect(general).toContain(`dshx:${row}:grid!`)
+    expect(general).toContain(`dshx:${row}:grid-cols-[minmax(0,1fr)_8.75rem_2.25rem]!`)
+    // The control box steps aside so the disclosure can leave the field's column for the label's.
+    expect(general).toContain('dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:contents!')
+    expect(general).not.toContain('dshx:[&_[class*=_control_]:has(>[class*=_stepper_])]:w-44!')
     expect(general).toContain('dshx:[&_[class*=_stepper_]]:w-full!')
-    // The disclosure takes its own line under the field, on its start edge, underlined like a link.
-    expect(general).toContain('dshx:[&_[class*=_expander_]]:col-span-full!')
-    expect(general).toContain('dshx:[&_[class*=_expander_]]:justify-start!')
-    expect(general).toContain('dshx:[&_[class*=_expander_]]:underline!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]]:col-start-2!')
+    expect(general).toContain('dshx:[&_[class*=_stepper_]+[class*=_unit_]]:col-start-3!')
+    // The disclosure reads under the description, in the label column, as a 13/500 link with no underline at rest.
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:col-start-1!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:row-start-2!')
+    expect(general).not.toContain('dshx:[&_[class*=_expander_]]:col-span-full!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:text-sm/4.5!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:font-medium!')
+    expect(general).toContain('dshx:[&_[class*=_expander_]]:no-underline!')
+    expect(general).not.toContain('dshx:[&_[class*=_expander_]]:underline!')
     expect(general).not.toContain('dshx:[&_[class*=_expander_]]:ml-1!')
     // Still a 44px target on touch.
     expect(general).toContain('dshx:pointer-coarse:[&_[class*=_expander_]]:min-h-11!')
