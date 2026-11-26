@@ -98,6 +98,10 @@
       "types": "./src/theme/gallery.ts",
       "default": "./src/theme/gallery.ts"
     },
+    "./theme/identity": {
+      "types": "./src/theme/identity-palette.ts",
+      "default": "./src/theme/identity-palette.ts"
+    },
     "./theme/readability": {
       "types": "./src/theme/readability.ts",
       "default": "./src/theme/readability.ts"
