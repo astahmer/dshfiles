@@ -584,28 +584,45 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     // A Host-registry row shows the binding the user has now, already presented by the Host (⌘ ⇧ P).
     const hostCaps =
       row.kind === 'destination' && keys.length === 0 && row.destination.shortcutId !== undefined ? (props.hostKeys?.(row.destination.shortcutId) ?? []) : []
-    if (index < 0 && keys.length === 0 && hostCaps.length === 0) return null
+    const hasHint = index >= 0 || keys.length > 0 || hostCaps.length > 0
+    // The hint seat (council round 12 B2): the active row shows an ink ↵ in place of its own hint, so the selection
+    // reads on rows that start with a glyph. Both share one grid cell, so the seat keeps the wider one's width; opacity, not
+    // visibility, keeps the row's own binding in its accessible name while it steps aside.
     return (
-      <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
-        {/* The kit's one shortcut chip at full strength (council round 10 A5, B4): a 70% chip fell under AA. */}
-        {keys.length > 0 ? <KeyHint keys={keys} mac={props.mac} /> : null}
-        {hostCaps.length > 0 ? (
-          <KbdGroup>
-            {hostCaps.map(cap => (
-              <Kbd key={cap}>{cap}</Kbd>
-            ))}
-          </KbdGroup>
-        ) : null}
-        {index < 0 ? null : (
-          // One keycap, on the highlighted row and under the pointer only (round five B6): a column of ⌘ 1…⌘ 8 on
-          // every row read as noise. It keeps its width while hidden, so nothing moves when it shows.
-          <Kbd
-            data-palette-number=""
-            className="dshx:opacity-0 dshx:transition-opacity dshx:duration-(--dshx-duration-hover) dshx:group-hover/item:opacity-100 dshx:group-data-[selected=true]/item:opacity-100"
+      <span className="dshx:ml-auto dshx:grid dshx:shrink-0 dshx:items-center dshx:justify-items-end">
+        {hasHint ? (
+          <span
+            data-palette-hint=""
+            className="dshx:col-start-1 dshx:row-start-1 dshx:flex dshx:items-center dshx:gap-2 dshx:group-data-[selected=true]/item:opacity-0"
           >
-            {`${props.mac ? '⌘' : 'Ctrl+'}${String(index + 1)}`}
-          </Kbd>
-        )}
+            {/* The kit's one shortcut chip at full strength (council round 10 A5, B4): a 70% chip fell under AA. */}
+            {keys.length > 0 ? <KeyHint keys={keys} mac={props.mac} /> : null}
+            {hostCaps.length > 0 ? (
+              <KbdGroup>
+                {hostCaps.map(cap => (
+                  <Kbd key={cap}>{cap}</Kbd>
+                ))}
+              </KbdGroup>
+            ) : null}
+            {index < 0 ? null : (
+              // One keycap, under the pointer only (round five B6): a column of ⌘ 1…⌘ 8 on every row read as noise. It
+              // keeps its width while hidden, so nothing moves when it shows.
+              <Kbd
+                data-palette-number=""
+                className="dshx:opacity-0 dshx:transition-opacity dshx:duration-(--dshx-duration-hover) dshx:group-hover/item:opacity-100 dshx:group-data-[selected=true]/item:opacity-100"
+              >
+                {`${props.mac ? '⌘' : 'Ctrl+'}${String(index + 1)}`}
+              </Kbd>
+            )}
+          </span>
+        ) : null}
+        <Kbd
+          data-palette-enter=""
+          aria-hidden="true"
+          className="dshx:col-start-1 dshx:row-start-1 dshx:text-foreground dshx:opacity-0 dshx:group-data-[selected=true]/item:opacity-100"
+        >
+          ↵
+        </Kbd>
       </span>
     )
   }
@@ -635,7 +652,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
           {destination.icon ?? <CommandIcon className="dshx:size-4" />}
         </span>
-        <span className="dshx:truncate dshx:text-sm">{destination.label}</span>
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm">{destination.label}</span>
         {destination.isSelected?.(props.context) === true ? <CheckIcon className="dshx:ml-auto dshx:size-4 dshx:text-primary" aria-hidden="true" /> : null}
         {shortcut(row)}
       </CommandItem>

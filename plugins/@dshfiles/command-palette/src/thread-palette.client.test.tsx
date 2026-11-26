@@ -749,13 +749,31 @@ describe('ThreadPalette goes to threads', () => {
   it('draws one ⌘N keycap per recent, shown on the highlighted row and under the pointer only (round five B6)', async () => {
     render(palette())
     const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
-    const caps = row.querySelectorAll('[data-slot="kbd"]')
+    const caps = row.querySelectorAll('[data-palette-hint] [data-slot="kbd"]')
     expect(caps).toHaveLength(1)
     expect(caps[0]?.textContent).toBe('⌘1')
     expect(caps[0]?.className).toContain('dshx:opacity-0')
     expect(caps[0]?.className).toContain('dshx:group-data-[selected=true]/item:opacity-100')
     expect(caps[0]?.className).toContain('dshx:group-hover/item:opacity-100')
     expect(row.className).toContain('dshx:group/item')
+  })
+
+  it('shows an ink ↵ in the active row’s hint seat, in place of its own hint (council round 12 B2)', async () => {
+    render(palette())
+    const row = await screen.findByRole('option', { name: /Fake provider seeds/ })
+    const enter = row.querySelector<HTMLElement>('[data-palette-enter]')
+    expect(enter?.textContent).toBe('↵')
+    expect(enter?.getAttribute('aria-hidden')).toBe('true')
+    // Ink, not the chip's secondary face, and only on the active row.
+    expect(enter?.className).toContain('dshx:text-foreground')
+    expect(enter?.className).toContain('dshx:opacity-0')
+    expect(enter?.className).toContain('dshx:group-data-[selected=true]/item:opacity-100')
+    // The row's own hint steps aside while active; both share one grid cell, so the seat keeps its width.
+    const hint = row.querySelector<HTMLElement>('[data-palette-hint]')
+    expect(hint?.textContent).toBe('⌘1')
+    expect(hint?.className).toContain('dshx:group-data-[selected=true]/item:opacity-0')
+    expect(enter?.parentElement).toBe(hint?.parentElement)
+    expect(enter?.parentElement?.className).toContain('dshx:grid')
   })
 
   it('draws every hint as the kit shortcut chip, unfaded and unrestyled (council round 10 A5, B4)', () => {
