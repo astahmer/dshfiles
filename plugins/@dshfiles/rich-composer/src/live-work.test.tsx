@@ -260,6 +260,31 @@ describe('one header for live subagents on a phone (council round 22, item 5)', 
     expect(only).toMatch(/display:\s*none/)
   })
 
+  it('draws the rows as one card with 1px dividers, capped near 3.5 rows so one row peeks', () => {
+    const card = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}`)
+    expect(card).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
+    expect(card).toMatch(/border-radius: var\(--dsw-radius-lg\);/)
+    expect(card).toMatch(/background: var\(--dsw-specific-input-major\);/)
+    // thread-sidebar's two-line row is 54px: three whole rows, half of the fourth, three dividers and the card's edges.
+    expect(card).toMatch(/max-height: calc\(3\.5 \* 54px \+ 3px \+ 2px\);/)
+    const row = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold]))`)
+    for (const flat of [/margin-block: 0;/, /border: 0;/, /border-radius: 0;/]) expect(row).toMatch(flat)
+    const divider = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global([data-dshfiles-live-preview]) ~ :global([data-dshfiles-live-preview])`)
+    expect(divider).toMatch(/border-top: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+  })
+
+  it('makes the sticky fold row an opaque, square, full-width plate with a bottom hairline (17b)', () => {
+    // Its 4px margin let row text scroll into view above it, and its own rounded card let row borders show at its corners.
+    const plate = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global([data-dshfiles-live-preview-fold])`)
+    expect(plate).toMatch(/top: 0;/)
+    expect(plate).toMatch(/width: 100%;/)
+    expect(plate).toMatch(/background: var\(--dsw-specific-input-major\);/)
+    expect(plate).toMatch(/box-shadow: 0 1px 0 var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+    // Beside jobs the plate shows: the cap makes room for its 44px.
+    const cap = ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}`)
+    expect(cap).toMatch(/max-height: calc\(44px \+ 3\.5 \* 54px \+ 3px \+ 2px\);/)
+  })
+
   it('keeps the fold row beside running jobs, and its closed state hides the rows behind it', () => {
     const closed = ruleIn(
       NARROW,

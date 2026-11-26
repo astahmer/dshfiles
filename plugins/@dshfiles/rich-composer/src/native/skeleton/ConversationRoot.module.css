@@ -1442,6 +1442,42 @@ button.crumbEditable {
     display: none;
   }
 
+  /* Council round 22, item 5: the subagent rows are one card with 1px dividers, as on desktop (each row was its own
+     outlined card), on the composer's fill with its field edge. The list stops near 3.5 rows (thread-sidebar's two-line
+     row is 54px) so half a row peeks and says the list scrolls. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(3.5 * 54px + 3px + 2px);
+    background: var(--dsw-specific-input-major);
+    border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
+    border-radius: var(--dsw-radius-lg);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold])) {
+    margin-block: 0;
+    border: 0;
+    border-radius: 0;
+    background: var(--dsw-specific-input-major);
+  }
+
+  /* Between rows only: a row after the (hidden or sticky) fold row takes the plate's hairline instead. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview]) ~ :global([data-dshfiles-live-preview]) {
+    border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  /* Beside running jobs the fold row stays: a sticky, opaque, square, full-width plate whose bottom hairline is drawn
+     over the rows under it, so no row text or border shows through or above it (17b: its 4px margin let row text
+     scroll into view above it, its own rounded card showed row borders at its corners). */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview-fold]) {
+    top: 0;
+    width: 100%;
+    background: var(--dsw-specific-input-major);
+    box-shadow: 0 1px 0 var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(44px + 3.5 * 54px + 3px + 2px);
+  }
+
   /* A dock holding only live work leaves no empty seat (and no stack gap) while the summary is closed. */
   :global(html[data-shell-phone-nav]) .composerStack:has(> .dockHead > .liveWork):not([data-live-work-open]) > :global([data-slot='conversation.input.dock']):not(:has(> :not([data-dshfiles-live-preview-dock]))) {
     display: none !important;
