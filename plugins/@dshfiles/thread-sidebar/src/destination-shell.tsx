@@ -1978,15 +1978,20 @@ const PhoneNavigation = (
                 // model's name truncates first; the state word stays whole.
                 <span data-phone-subtitle="" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:text-sm/4 dshx:whitespace-nowrap dshx:text-muted-foreground">
                   <RouteModel provider={meta.route.provider} model={meta.route.model} className="dshx:text-sm/4" />
-                  <span className="dshx:shrink-0 dshx:px-1">
-                    <span aria-hidden="true">·</span>
-                    <span className="dshx:sr-only">, </span>
-                  </span>
-                  <AttentionMeta
-                    className="dshx:flex-none dshx:text-sm/4"
-                    kind={meta.status}
-                    kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
-                  />
+                  {/* No state word when the children count says it works: the count brings its own "·". */}
+                  {meta.status === undefined ? null : (
+                    <>
+                      <span className="dshx:shrink-0 dshx:px-1">
+                        <span aria-hidden="true">·</span>
+                        <span className="dshx:sr-only">, </span>
+                      </span>
+                      <AttentionMeta
+                        className="dshx:flex-none dshx:text-sm/4"
+                        kind={meta.status}
+                        kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
+                      />
+                    </>
+                  )}
                   <PhoneChildCount parts={meta.children} />
                 </span>
               )}

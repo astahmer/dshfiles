@@ -29,7 +29,24 @@ const base = {
 describe('phone thread meta line (council round 17 B2.2)', () => {
   it('names the project the list names, its status word and its working subagents', () => {
     const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], status: { status: 'working', detail: 'Waiting on 1 subagent' }, subagents: 1 })
-    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Working', working: true, children: [{ key: 'working', count: 1, text: '1 working', tone: 'plain' }] })
+    // The count says it works, so the Working word and its ring go (round 22 follow-up): `BA billing-api · 1 working`.
+    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: undefined, working: false, children: [{ key: 'working', count: 1, text: '1 working', tone: 'plain' }] })
+  })
+
+  it('leaves out the Working word only where the count says the thread works (round 22 follow-up)', () => {
+    // `BA · 6 working · ✕ 1 failed`, not `Working · 6 working · ✕ 1 failed`.
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], running: true, subagents: 6, failedSubagents: 1 })).toMatchObject({ status: undefined, working: false })
+    // Working with no child working keeps its word and ring, a failed child or not.
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], running: true })).toMatchObject({ status: 'Working', working: true })
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], running: true, failedSubagents: 1 })).toMatchObject({ status: 'Working', working: true })
+    // A word the count does not say stays: an attention kind, Turn failed, Ready, Idle.
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 2, status: { status: 'needs-you', detail: undefined, kind: 'Approval' } }).status).toBe('Approval')
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 2, status: { status: 'failed', detail: undefined, kind: 'Turn failed' } }).status).toBe('Turn failed')
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 2, status: { status: 'ready', detail: undefined } }).status).toBe('Ready')
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], failedSubagents: 2 }).status).toBe('Idle')
+    // A child with children of its own reads the same way after its model.
+    const child = { parentTitle: 'Audit money rounding', label: 'Check credit note rounding', route: { provider: 'p', model: 'm' } }
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], running: true, subagents: 1, child })).toMatchObject({ status: undefined, working: false })
   })
 
   it('counts its children in the one formula, failed ones in the failed tone (round 22 items 2 and 3)', () => {
@@ -57,7 +74,7 @@ describe('phone thread meta line (council round 17 B2.2)', () => {
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], status: { status: 'needs-you', detail: undefined, kind: 'Approval' } }).working).toBe(false)
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], running: true }).status).toBe('Working')
     // Inside a thread the list is closed and publishes no status: a parent waiting on a working subagent still works.
-    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 1 })).toMatchObject({ status: 'Working', working: true, children: [{ text: '1 working' }] })
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 1 })).toMatchObject({ status: undefined, working: false, children: [{ text: '1 working' }] })
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).status).toBe('Idle')
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).children).toEqual([])
   })

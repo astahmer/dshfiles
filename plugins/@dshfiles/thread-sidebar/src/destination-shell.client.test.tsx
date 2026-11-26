@@ -990,6 +990,45 @@ describe('DestinationShell', () => {
     expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
   })
 
+  it('draws no state word or ring where the children count says the thread works (round 22 follow-up)', () => {
+    setPhone(true)
+    const children = [
+      { key: 'working', count: 6, text: '6 working', tone: 'plain' },
+      { key: 'failed', count: 1, text: '1 failed', tone: 'failed' },
+    ] as const
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'session-1',
+      stageThreadId: 'session-1',
+      stageTitle: 'Audit money rounding',
+      stageMeta: { project: 'billing-api', mark: { tone: 3, palette: 'balanced' }, status: undefined, working: false, children },
+    })
+    // `BA billing-api · 6 working · ✕ 1 failed`: no kind part, no ring.
+    const line = document.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect(line?.querySelector('[data-attention-meta-part="kind"]')).toBeNull()
+    expect(line?.querySelector('[data-status="working"]')).toBeNull()
+    expect(line?.querySelector('[data-phone-children]')?.textContent).toBe('·, 6 working·, 1 failed')
+    cleanup()
+    // A subagent with working children of its own: the count follows the model with one "·".
+    renderShell({
+      collapsed: true,
+      selectedThreadId: 'child-1',
+      stageThreadId: 'child-1',
+      stageTitle: 'Fix',
+      stageMeta: {
+        project: undefined,
+        mark: undefined,
+        route: { provider: 'dshx_fake_commandcode', model: 'claude-sonnet-5-5' },
+        status: undefined,
+        working: false,
+        children: [children[0]],
+      },
+    })
+    const route = document.querySelector<HTMLElement>('[data-phone-subtitle]')
+    expect([...(route?.children ?? [])].map(part => part.getAttribute('data-slot') ?? part.getAttribute('data-phone-children') ?? part.textContent)).toEqual(['route-model', ''])
+    expect(route?.textContent).toBe('claude-sonnet-5-5·, 6 working')
+  })
+
   it('names a subagent by its call, its model on line 2, and goes Back to its parent thread in a 44px seat (round 21 D3)', async () => {
     setPhone(true)
     const openThread = vi.fn()

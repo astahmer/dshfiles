@@ -18,6 +18,9 @@ import { WorkspacePaths } from './workspace-paths.js'
  * The count is the one formula every surface that summarises children reads (round 22 items 2 and 3): `6 working ·
  * 2 failed`, a zero part left out, the failed part drawn in the failed ink after its ✕. Failed counts the children
  * whose turn failed (the Host's failed-turn record), the same on every surface; a call that never started is no child.
+ * When the count says `N working`, the thread's own Working word and its ring go (`BA · 6 working · ✕ 2 failed`, not
+ * `Working · 6 working`); a word the count does not say stays: an attention kind, Turn failed, Ready, Idle, or Working
+ * with no child working.
  *
  * A subagent's header (round 21 D3) says what the desktop lineage says: line 2 reads `[mark] model · state` (the model
  * stands where the project would), the bar's Back opens its parent thread, and the title is the name its parent gave it
@@ -26,7 +29,8 @@ import { WorkspacePaths } from './workspace-paths.js'
 export interface PhoneStageMeta {
   readonly project: string | undefined
   readonly mark: { readonly tone?: number; readonly color?: string; readonly palette: ProjectColorPalette } | undefined
-  readonly status: string
+  /** The status word; undefined when the children count already says the thread works (`6 working`). */
+  readonly status: string | undefined
   /** The status word says Working (not an attention kind): the header draws the list's working ring before it. */
   readonly working: boolean
   /** The children summary's clauses (`6 working`, `2 failed`), in the formula's order; empty with none to name. */
@@ -104,17 +108,24 @@ const resolve = (input: {
   const status = input.status?.kind ?? input.wordOf(work)
   const working = input.status?.kind === undefined && work === 'working'
   const children = workCountParts({ working: input.subagents, failed: input.failedSubagents ?? 0 }, input.countWords)
+  // `Working · 6 working` says it twice: the count's working clause stands for the word and its ring.
+  const countSaysWorking = working && children.some(part => part.key === 'working')
   const parentId = input.lineage[1]
   const child = input.child
-  if (parentId === undefined || child === undefined) return { project, mark, status, working, children }
+  if (parentId === undefined || child === undefined)
+    return countSaysWorking ? { project, mark, status: undefined, working: false, children } : { project, mark, status, working, children }
   const parentTitle = child.parentTitle?.trim() || undefined
   const title = child.label?.trim() || undefined
   // The list's own status wins when it publishes one; inside a thread it does not, and a failed child read Idle.
-  const childStatus = input.status === undefined && work !== 'working' && child.terminal === 'failed' ? (child.failedLabel ?? status) : status
+  const childStatus = countSaysWorking
+    ? undefined
+    : input.status === undefined && work !== 'working' && child.terminal === 'failed'
+      ? (child.failedLabel ?? status)
+      : status
   const meta: { -readonly [Key in keyof PhoneStageMeta]: PhoneStageMeta[Key] } =
     child.route === undefined
-      ? { project, mark, status: childStatus, working, children }
-      : { project: undefined, mark: undefined, route: child.route, status: childStatus, working, children }
+      ? { project, mark, status: childStatus, working: working && !countSaysWorking, children }
+      : { project: undefined, mark: undefined, route: child.route, status: childStatus, working: working && !countSaysWorking, children }
   if (parentTitle !== undefined) meta.parent = { id: parentId, title: parentTitle }
   if (title !== undefined) meta.title = title
   return meta
