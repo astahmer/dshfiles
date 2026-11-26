@@ -372,14 +372,14 @@ function arcPath(radius: number): string {
 
 /**
  * The active node (council round 8, D1): the card surface itself, no grey fill or shadow, edged 1.5 px in its series
- * colour at 60 %. The edge is an outline laid over the 1 px border (offset inward by its own width), so selecting a node
+ * colour at full strength, so it holds 3:1 on the card (60 % fell to about 2.1:1 in light). The edge is an outline laid over the 1 px border (offset inward by its own width), so selecting a node
  * never moves its content. The full-strength 2 px route into it stays the selection's 3:1 cue.
  */
 const ACTIVE_NODE = 'dshx:outline-[length:1.5px] dshx:outline-solid dshx:-outline-offset-[1.5px]'
 
-/** The active edge colour: the node's series colour at 60 %, ink at 60 % when it has none. */
+/** The active edge colour: the node's series colour, or ink when it has none. */
 const nodeEdge = (color: string | undefined): React.CSSProperties => ({
-  outlineColor: `color-mix(in oklab, ${color ?? 'var(--dsw-alias-label-primary)'} 60%, transparent)`,
+  outlineColor: color ?? 'var(--dsw-alias-label-primary)',
 })
 
 function DimensionCard({

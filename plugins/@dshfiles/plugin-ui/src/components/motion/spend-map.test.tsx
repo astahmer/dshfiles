@@ -102,11 +102,11 @@ describe('SpendMap › active node and connectors (council round 8, D1)', () => 
   const html = render('var(--dshx-data-2)')
   const opening = (anchor: string): string => new RegExp(`<button[^>]*data-node-anchor="${anchor}"[^>]*>`, 'u').exec(html)?.[0] ?? ''
 
-  it('draws the active nodes on the card surface with a 1.5 px edge in their series colour at 60 %, no grey fill or shadow', () => {
+  it('draws the active nodes on the card surface with a 1.5 px edge in their series colour, no grey fill or shadow', () => {
     for (const anchor of ['dim:model', 'leaf:model:a']) {
       const node = opening(anchor)
       expect(node).toContain('aria-checked="true"')
-      expect(node).toContain('outline-color:color-mix(in oklab, var(--dshx-data-2) 60%, transparent)')
+      expect(node).toContain('outline-color:var(--dshx-data-2)')
       // An outline drawn over the 1 px border: 1.5 px without moving the content (no layout shift).
       expect(node).toContain('dshx:outline-[length:1.5px] dshx:outline-solid dshx:-outline-offset-[1.5px]')
       expect(node).toContain('dshx:bg-card')
@@ -117,9 +117,9 @@ describe('SpendMap › active node and connectors (council round 8, D1)', () => 
     }
   })
 
-  it('falls back to ink at 60 % when the node has no series colour', () => {
+  it('falls back to ink when the node has no series colour', () => {
     const node = /<button[^>]*aria-checked="true"[^>]*data-node-anchor="leaf:model:a"[^>]*>/u.exec(render())?.[0] ?? ''
-    expect(node).toContain('outline-color:color-mix(in oklab, var(--dsw-alias-label-primary) 60%, transparent)')
+    expect(node).toContain('outline-color:var(--dsw-alias-label-primary)')
   })
 
   it('keeps inactive nodes on the plain 1 px hairline', () => {
