@@ -12550,10 +12550,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect textbox \"Base branch or bookmark\"",
+          "text": "expect combobox \"Compare against\"",
           "action": "expect",
-          "by": "textbox",
-          "name": "Base branch or bookmark",
+          "by": "combobox",
+          "name": "Compare against",
           "value": null
         },
         {
@@ -28708,9 +28708,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Re-index thread logs\"",
+          "text": "click button \"More actions\"",
           "action": "click",
           "by": "button",
+          "name": "More actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Re-index thread logs\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Re-index thread logs",
           "value": null
         },
@@ -28772,9 +28779,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Re-index thread logs\"",
+          "text": "click button \"More actions\"",
           "action": "click",
           "by": "button",
+          "name": "More actions",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Re-index thread logs\"",
+          "action": "click",
+          "by": "menuitem",
           "name": "Re-index thread logs",
           "value": null
         },
