@@ -267,6 +267,13 @@ Round 14 findings, merged in `.cache/unslop-audit/r5/council/round-14-fixes.md`:
 name, kind, age; never a stubbed name; marks on a rail in list rows) for the sidebar, phone list and both Inboxes; no New
 thread divider; a selected edge darker than the field edge; a 44 pt phone failed Review; child-line glyphs on Settings
 child rows; a hairline on the resting send circle; a softer dark dense checkbox; small Usage and Settings touches.
+All four lanes done: A kit 5 revisions `xrqzvnkv` … `ssqlwmvq` (AttentionMeta with measured drop steps and a
+`keep="name"` mode, a selected edge darker than the field edge, the dark dense checkbox, DESIGN.md); B 4 revisions
+`ynowuupw` … `qpozmpxp` (thread rows read through AttentionMeta on a mark rail with the verb's seat sized to the verb,
+child-line glyph on Settings child rows, More font settings under its description); C 6 revisions `nvpqmvsm` …
+`ovnkwvnq` (Inbox cards on AttentionMeta, a 44 pt phone failed Review, Open thread and a desktop tally, no New thread
+divider, a rimmed resting send); D 2 revisions `ynkkrztu` … `owzvsmss` (provider marks in the distribution table,
+Custom with a chevron). Full project names read in the sidebar, the phone list and both Inboxes.
 
 ## Round four
 
