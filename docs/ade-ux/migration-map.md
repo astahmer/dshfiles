@@ -191,7 +191,7 @@ rail destination; 23 features.
 | agent-questions/parent-child-question: Ask and answer a subagent's question | attentionProvider | agent tool: ask_parent_question / answer_parent_question |
 | ai-accounts/quota-auto-retry: Retry exhausted quota when its reset arrives | attentionProvider | transcript: usage-limit turn tail › Resume |
 | ai-accounts/quota-inbox-items: Quota-blocked threads in the Inbox, resumable in place | attentionProvider | left-nav: Inbox › ai-accounts.quota-continuation |
-| backlog/attention-inbox: Items that need you | attentionProvider | left-nav: Backlog › Inbox filter (links to the Inbox) |
+| backlog/attention-inbox: Items that need you | attentionProvider | left-nav: Backlog › Triage view (links to the Inbox) |
 | backlog/backlog-inbox-items: Backlog requests in the Inbox | attentionProvider | left-nav: Inbox › backlog.attention |
 | hmr-gate/deferred-update-inbox-item: Plugin updates waiting for a restart in the Inbox | attentionProvider | left-nav: Inbox › hmr-gate.deferred-update |
 | jj-integration/land-inbox-items: Blocked and ready-to-land workspaces in the Inbox | attentionProvider | left-nav: Inbox › jj-integration.land-blocked / jj-integration.ready-to-land |
