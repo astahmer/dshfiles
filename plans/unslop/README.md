@@ -41,6 +41,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 12 (round-11 shots) | 8.5 | 8.5 | **9** | selection too quiet on glyph rows, dock edge regression, Inbox verbs, Usage table, phone tab tone |
 | 13 (round-12 shots) | 8.5 | 8.5 | **9** | palette dark selection, phone tab pill, chart headroom, New thread chips, send seat, phone Inbox fold |
 | 14 (round-13 shots) | 8.5 | 8.5 | **9** | all three: project names cut in attention rows, a stray dash on New thread; one attention meta wording |
+| 15 (round-14 shots) | 8.5 | **9** | **9** | Sol and Mistral at target; Opus: rail marks clipped (regression), Inbox tally and verbs, palette wording |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -274,6 +275,11 @@ child-line glyph on Settings child rows, More font settings under its descriptio
 `ovnkwvnq` (Inbox cards on AttentionMeta, a 44 pt phone failed Review, Open thread and a desktop tally, no New thread
 divider, a rimmed resting send); D 2 revisions `ynkkrztu` … `owzvsmss` (provider marks in the distribution table,
 Custom with a chevron). Full project names read in the sidebar, the phone list and both Inboxes.
+
+Round 15 findings, merged in `.cache/unslop-audit/r5/council/round-15-fixes.md`: a 20 px rail seat so marks are never
+clipped, the Inbox tally on the tab only, a two-line desktop Inbox head, one Inbox verb style, a reason well on failed
+cards, AttentionMeta wording in the palette, a link-styled More font settings, glyphs on every group count, one overflow
+glyph. The next council round seats GPT-6.2 Astra instead of Sol (owner's request), once that route is available.
 
 ## Round four
 
