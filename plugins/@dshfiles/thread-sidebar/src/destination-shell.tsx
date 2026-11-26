@@ -820,11 +820,12 @@ const FolderIndex = (props: {
   )
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index={folder.id}>
-      {/* The right padding keeps the folder's ⋯ clear of the pane's own top-right Show tab row control (b:952m). */}
+      {/* The right padding keeps the folder's ⋯ clear of the pane's own top-right Show tab row control (b:952m). On a
+          desktop column 8px over the 20px title line put its ink 12px under the brand hairline (council round 19 B1). */}
       <header
         className={cn(
-          'dshx:flex dshx:shrink-0 dshx:items-start dshx:gap-1 dshx:pt-1 dshx:pb-2 dshx:pl-3',
-          props.phone === true ? 'dshx:pr-3' : 'dshx:pr-9',
+          'dshx:flex dshx:shrink-0 dshx:items-start dshx:gap-1 dshx:pb-2 dshx:pl-3',
+          props.phone === true ? 'dshx:pt-1 dshx:pr-3' : 'dshx:pt-2 dshx:pr-9',
         )}
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
@@ -947,7 +948,9 @@ const ThreadsPane = (props: ListPaneProps): JSX.Element => {
   const [scopeSlot, setScopeSlot] = useState<HTMLElement | null>(null)
   const phone = props.phone === true
   return (
-    <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index="threads">
+    // A desktop column starts its search field 12px under the brand hairline (council round 19 B1); a phone list pads
+    // itself under its top bar.
+    <div className={cn('dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col', !phone && 'dshx:pt-3')} data-destination-index="threads">
       <ThreadsHeaderExtras
         entries={props.folder.entries}
         activePanelId={props.activePanelId}
@@ -1193,7 +1196,8 @@ export const DestinationShell = (props: DestinationShellProps): JSX.Element => {
       <nav
         aria-label="Destinations"
         className={cn(
-          'dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pb-2 dshx:[scrollbar-width:none]',
+          'dshx:flex dshx:min-h-0 dshx:shrink-0 dshx:flex-col dshx:overflow-y-auto dshx:pt-2 dshx:pb-2 dshx:[scrollbar-width:none]',
+          // Its first tile stands 12px under the brand hairline (council round 19 B1): 8px above, the button's own 4px.
           // One width open and folded: the frame's folded track (60px, frame-layout's SIDEBAR_COLLAPSED) holds the rail
           // whole (round five B1, B3). Unpadded buttons: "Knowledge", the longest destination, fits whole at the label
           // size (productivity pass Q5, T5.3).
