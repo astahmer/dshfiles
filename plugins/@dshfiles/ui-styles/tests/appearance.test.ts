@@ -3,6 +3,7 @@ import { join } from 'node:path'
 import { DEFAULT_APPEARANCE, DEFAULT_FONT_STACKS, SCENE_FRAME_RATE, THEME_PRESETS } from '@dshfiles/plugin-ui/theme/appearance'
 import { Settings } from '@dshfiles/dshx/effect/settings'
 import { Effect, Layer } from 'effect'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { themeApi } from '../src/api.ts'
 import { RuntimeTheme, RUNTIME_CACHE_KEY, RUNTIME_STYLE_ID } from '../src/runtime-theme.ts'
@@ -224,6 +225,11 @@ describe('theme tools', () => {
     const { define, remove } = themeApi.methods
     expect(define.tool).toMatchObject({ name: 'theme_define', readOnly: false })
     expect(define.description).toMatch(/only when the user asked/u)
+    // Round eight: a theme can carry the identity palette users pick project, tag and agent colours from.
+    expect(define.description).toMatch(/palette gives the six identity colours/u)
+    const scheme = JSON.stringify(Schema.isSchema(define.input) ? Schema.toJsonSchemaDocument(define.input) : null)
+    expect(scheme).toContain('"palette"')
+    expect(scheme).toContain('"paletteNames"')
     expect(remove.tool).toMatchObject({ name: 'theme_remove', readOnly: false })
     expect(remove.description).toMatch(/confirm: true/u)
   })

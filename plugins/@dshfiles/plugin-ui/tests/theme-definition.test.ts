@@ -49,7 +49,8 @@ describe('theme definitions', () => {
 
   it('keeps a backdrop self-contained: no url(), @import or a brace that escapes its layer', () => {
     const withLayer = (layer: string, keyframes?: string) =>
-      ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, backdrop: keyframes === undefined ? { layers: [layer] } : { layers: [layer], keyframes } } }).errors
+      ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, backdrop: keyframes === undefined ? { layers: [layer] } : { layers: [layer], keyframes } } })
+        .errors
     expect(withLayer('background: url(https://evil.test/x.png)')).toHaveLength(1)
     expect(withLayer('color: red } body { display: none')).toHaveLength(1)
     expect(withLayer('opacity: 1', '@import "x.css";')).not.toHaveLength(0)
@@ -76,6 +77,34 @@ describe('theme definitions', () => {
     // Only dark was given: light keeps the generated palette, with no pins and no backdrop.
     expect(css).not.toContain(`${RUNTIME_LIGHT_SELECTOR} {\n  --dshx-tone-0: #`)
     expect(css).toContain('@media (prefers-reduced-motion: reduce)')
+  })
+
+  it('keeps an identity palette and its names, and refuses a malformed one (round eight)', () => {
+    const palette = ['#88C0D0', '#a3be8c', '#d08770', '#b48ead', '#ebcb8b', '#8fbcbb'] as const
+    const names = ['frost', 'green', 'orange', 'purple', 'yellow', ' teal '] as const
+    const parsed = ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, palette, paletteNames: names } })
+    expect(parsed.errors).toEqual([])
+    expect(parsed.definition?.dark?.palette).toEqual(['#88c0d0', '#a3be8c', '#d08770', '#b48ead', '#ebcb8b', '#8fbcbb'])
+    expect(parsed.definition?.dark?.paletteNames).toEqual(['frost', 'green', 'orange', 'purple', 'yellow', 'teal'])
+    const errors = (scheme: object) => ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, ...scheme } }).errors
+    expect(errors({ palette: palette.slice(0, 5) })).toEqual(['dark.palette: exactly 6 #rrggbb colours, one per slot'])
+    expect(errors({ palette: [...palette.slice(0, 5), 'teal'] })).toEqual(['dark.palette[5]: a #rrggbb colour is required'])
+    expect(errors({ paletteNames: names })).toEqual(['dark.paletteNames: give palette too (names follow its order)'])
+    expect(errors({ palette, paletteNames: [...names.slice(0, 5), 'x'.repeat(25)] })).toEqual([
+      'dark.paletteNames[5]: a name of 1 to 24 characters is required',
+    ])
+    // A theme without a palette is still valid: one is derived from its colours.
+    expect(ThemeDefinitionModel.parse(NORD).definition?.dark?.palette).toBeUndefined()
+  })
+
+  it('warns about an identity colour that does not read as text on bg, panel or raised', () => {
+    const palette = ['#2e3440', '#a3be8c', '#ebcb8b', '#88c0d0', '#8fbcbb', '#e5e9f0'] as const
+    const warnings = ThemeDefinitionModel.contrastWarnings({ ...NORD, dark: { ...NORD.dark!, palette } })
+    expect(warnings.filter(warning => warning.includes('palette'))).toEqual([
+      'dark: palette[0] on bg is 1.00:1 (needs 4.5:1)',
+      'dark: palette[0] on panel is 1.00:1 (needs 4.5:1)',
+      'dark: palette[0] on raised is 1.00:1 (needs 4.5:1)',
+    ])
   })
 
   it('falls back to the preset when the chosen theme is missing or invalid', () => {

@@ -7,6 +7,7 @@
  * (read from its background and accent), then the definition pins the eleven steps, the accent and status colours and
  * the Shiki tokens it gives. A scheme the definition leaves out keeps the generated palette.
  */
+import { IDENTITY_SLOT_COUNT } from './identity-palette.ts'
 import { PaletteMath, type PaletteInput, type Scheme } from './palette.ts'
 import { ReadabilityModel, type Rgb, type VeilInput } from './readability.ts'
 import { SCENE_IDS, SceneCatalog, type SceneGlass } from './scene-catalog.ts'
@@ -66,10 +67,27 @@ export interface Backdrop {
   readonly glass?: SceneGlass
 }
 
+/** Six values, one per identity slot (0–5). */
+export type IdentityTuple = readonly [string, string, string, string, string, string]
+
+/**
+ * What the identity palette is, for the agent tool description and the docs (owner decision of 2026-11-26): the six
+ * colours a user picks for a project, a Backlog tag or an agent. A choice stores the slot, so a theme recolours it.
+ */
+export const PALETTE_GUIDE = {
+  palette:
+    'six #rrggbb identity colours (slots 0–5) users pick for projects, Backlog tags and agents; each must read as text (4.5:1) on bg, panel and raised and should stay clear of the success, warning and danger hues. Left out, six are derived from the theme’s syntax and accent colours.',
+  paletteNames: 'six short names for the palette slots, in the same order (the swatch names a screen reader and the picker show); needs palette.',
+} as const
+
 export interface SchemeTheme {
   readonly colours: Readonly<Record<ColourRole, string>>
   readonly syntax?: Readonly<Partial<Record<SyntaxRole, string>>>
   readonly backdrop?: Backdrop
+  /** The identity palette (`PALETTE_GUIDE.palette`); derived from the theme's own colours when left out. */
+  readonly palette?: IdentityTuple
+  /** A name per palette slot (`PALETTE_GUIDE.paletteNames`). */
+  readonly paletteNames?: IdentityTuple
 }
 
 export interface ThemeDefinition {
@@ -87,6 +105,7 @@ export const MAX_BACKDROP_LAYERS = 3
 const MAX_BACKDROP_ITEMS = 4
 const MAX_LAYER_LENGTH = 8_000
 const MAX_KEYFRAMES_LENGTH = 4_000
+const MAX_PALETTE_NAME_LENGTH = 24
 const HEX = /^#[0-9a-f]{6}$/iu
 const ID = /^[a-z0-9][a-z0-9-]{0,47}$/u
 const FORBIDDEN = /url\s*\(|@import|expression\s*\(|javascript:|<\/?style/iu
@@ -120,6 +139,52 @@ function checkKeyframes(text: string, errors: string[], where: string): void {
     index += 1
   }
   if (depth !== 0) errors.push(`${where}: keyframes have unbalanced braces`)
+}
+
+/** Six entries, or undefined when the list is not six of them (its error is recorded). */
+function sixOf(
+  value: unknown,
+  where: string,
+  errors: string[],
+  check: (entry: unknown) => string | undefined,
+  what: { readonly list: string; readonly entry: string },
+): IdentityTuple | undefined {
+  if (!Array.isArray(value) || value.length !== IDENTITY_SLOT_COUNT) {
+    errors.push(`${where}: exactly ${IDENTITY_SLOT_COUNT} ${what.list}, one per slot`)
+    return undefined
+  }
+  const entries: string[] = []
+  value.forEach((entry: unknown, index) => {
+    const parsed = check(entry)
+    if (parsed === undefined) errors.push(`${where}[${index}]: ${what.entry} is required`)
+    else entries.push(parsed)
+  })
+  const [a, b, c, d, e, f] = entries
+  return a === undefined || b === undefined || c === undefined || d === undefined || e === undefined || f === undefined ? undefined : [a, b, c, d, e, f]
+}
+
+const hexEntry = (entry: unknown): string | undefined => (typeof entry === 'string' && HEX.test(entry) ? entry.toLowerCase() : undefined)
+const nameEntry = (entry: unknown): string | undefined => {
+  const name = typeof entry === 'string' ? entry.trim() : ''
+  return name === '' || name.length > MAX_PALETTE_NAME_LENGTH ? undefined : name
+}
+
+/** The identity palette and its names, checked; names need a palette (a derived one has no order to name). */
+function checkPalette(value: UntrustedObject, where: string, errors: string[]): Pick<SchemeTheme, 'palette' | 'paletteNames'> {
+  const palette =
+    value.palette === undefined ? undefined : sixOf(value.palette, `${where}.palette`, errors, hexEntry, { list: '#rrggbb colours', entry: 'a #rrggbb colour' })
+  const paletteNames =
+    value.paletteNames === undefined
+      ? undefined
+      : sixOf(value.paletteNames, `${where}.paletteNames`, errors, nameEntry, {
+          list: 'names',
+          entry: `a name of 1 to ${MAX_PALETTE_NAME_LENGTH} characters`,
+        })
+  if (value.paletteNames !== undefined && value.palette === undefined) errors.push(`${where}.paletteNames: give palette too (names follow its order)`)
+  let out: Pick<SchemeTheme, 'palette' | 'paletteNames'> = {}
+  if (palette !== undefined) out = { ...out, palette }
+  if (paletteNames !== undefined) out = { ...out, paletteNames }
+  return out
 }
 
 function checkScheme(value: unknown, where: string, errors: string[]): SchemeTheme | undefined {
@@ -177,11 +242,14 @@ function checkScheme(value: unknown, where: string, errors: string[]): SchemeThe
       backdrop = parsed
     }
   }
+  const identity = checkPalette(value, where, errors)
   const full = completeColours(colours)
   if (full === undefined) return undefined
   let scheme: SchemeTheme = { colours: full }
   if (Object.keys(syntax).length > 0) scheme = { ...scheme, syntax }
   if (backdrop !== undefined) scheme = { ...scheme, backdrop }
+  if (identity.palette !== undefined) scheme = { ...scheme, palette: identity.palette }
+  if (identity.paletteNames !== undefined) scheme = { ...scheme, paletteNames: identity.paletteNames }
   return scheme
 }
 
@@ -271,6 +339,7 @@ function contrastWarnings(definition: ThemeDefinition): string[] {
     for (const role of ['accent', 'success', 'warning', 'danger', 'info'] as const) check(role, c[role], 4.5)
     const onAccent = ratio(c.onAccent, c.accent)
     if (onAccent < 4.5) warnings.push(`${scheme}: onAccent on accent is ${onAccent.toFixed(2)}:1 (needs 4.5:1)`)
+    theme.palette?.forEach((colour, slot) => check(`palette[${slot}]`, colour, 4.5))
     for (const [role, colour] of Object.entries(theme.syntax ?? {})) {
       if (role === 'comment') continue
       const value = ratio(colour, c.panel)
