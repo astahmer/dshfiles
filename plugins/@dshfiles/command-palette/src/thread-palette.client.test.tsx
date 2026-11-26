@@ -728,6 +728,18 @@ describe('ThreadPalette goes to threads', () => {
     expect(screen.getAllByRole('option').some(option => option.textContent?.includes('Settings: Projects'))).toBe(true)
   })
 
+  it('marks every row\'s leading glyph or tile, so the selected row shows one cue and no pill beside the tile (council round 11 B3)', async () => {
+    render(palette())
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'fake' } })
+    await waitFor(() => expect(screen.getAllByRole('option').some(option => option.textContent?.includes('Settings: Projects'))).toBe(true))
+    const options = screen.getAllByRole('option')
+    expect(options.length).toBeGreaterThan(1)
+    for (const option of options) expect(option.firstElementChild?.hasAttribute('data-leading-glyph')).toBe(true)
+    // The prefix help and the other glyph-led rows reach the rule in the source as well.
+    const source = readFileSync('src/thread-palette.tsx', 'utf8')
+    expect(source.match(/\{\.\.\.LEADING_GLYPH_ATTRIBUTE\}/gu)?.length).toBeGreaterThanOrEqual(9)
+  })
+
   it('leads with recent threads on an empty query', async () => {
     // The empty palette led with Go to file, Export and Import (F26).
     render(palette())

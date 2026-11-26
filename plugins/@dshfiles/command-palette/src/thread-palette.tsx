@@ -6,6 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/t
 import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { ProjectMark, type ProjectMarkProps } from '@dshfiles/plugin-ui/components/ui/project-mark'
+import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -631,7 +632,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     const row: PaletteRow = { kind: 'destination', destination }
     return (
       <CommandItem key={destination.id} value={rowValue(row)} className={itemClass} disabled={runningAction} onSelect={() => void activate(row)}>
-        <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+        <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
           {destination.icon ?? <CommandIcon className="dshx:size-4" />}
         </span>
         <span className="dshx:truncate dshx:text-sm">{destination.label}</span>
@@ -663,7 +664,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             const listed = props.threadStatusOf?.(thread)
             return (
               <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                <span className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true">
+                <span className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
                   {thread.project.length > 0 ? (
                     <ProjectMark name={project} data-palette-project-mark="" {...projectMarkPaint(props.projectColorOf?.(thread))} />
                   ) : (
@@ -847,7 +848,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               // On the phone the search row's trailing edge is Cancel, so Ask DSH leads the results instead.
               <CommandGroup>
                 <CommandItem value="ask-dsh-entry" className={itemClass} onSelect={() => sendNavigation({ type: 'ask.enter' })}>
-                  <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+                  <span className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
                     <MessageSquareIcon className="dshx:size-4" />
                   </span>
                   <span className="dshx:truncate dshx:text-sm">{props.copy.ask}</span>
@@ -858,7 +859,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               <CommandGroup heading={props.copy.backlog}>
                 {backlogRows.map(row => (
                   <CommandItem key={rowValue(row)} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                    <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                    <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                     <span className="dshx:truncate dshx:text-sm">
                       {row.kind === 'backlog' && row.text.length > 0 ? `${props.copy.backlogOpen}: ${row.text}` : props.copy.backlogOpen}
                     </span>
@@ -874,6 +875,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                     <span
                       className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:text-muted-foreground"
                       aria-hidden="true"
+                      {...LEADING_GLYPH_ATTRIBUTE}
                     >
                       <MessageSquareIcon className="dshx:size-4" />
                     </span>
@@ -889,7 +891,10 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   return (
                     <CommandItem key={help.prefix} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
                       {/* A prefix is typed, on a phone keyboard too: a chip, not a keycap (the kit hides keycaps on touch). */}
-                      <span className="dshx:inline-flex dshx:h-5 dshx:min-w-7 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground">
+                      <span
+                        className="dshx:inline-flex dshx:h-5 dshx:min-w-7 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:font-mono dshx:text-xs dshx:text-muted-foreground"
+                        {...LEADING_GLYPH_ATTRIBUTE}
+                      >
                         {help.prefix === '' ? '∅' : help.prefix}
                       </span>
                       <span className="dshx:truncate dshx:text-sm">{help.label}</span>
@@ -902,7 +907,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             {line === null ? null : (
               <CommandGroup heading={props.copy.viewLine}>
                 <CommandItem value={rowValue({ kind: 'line', line })} className={itemClass} onSelect={() => void activate({ kind: 'line', line })}>
-                  <ListOrderedIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                  <ListOrderedIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                   <span className="dshx:truncate dshx:text-sm">{`${props.copy.goToLine} ${line}`}</span>
                   {shortcut({ kind: 'line', line })}
                 </CommandItem>
@@ -918,7 +923,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const project = hit.thread.project.length === 0 ? props.copy.unassigned : projectLabel(hit.thread.project)
                   return (
                     <CommandItem key={hit.thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                      <HashIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{hit.thread.title}</span>
                         <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden dshx:text-xs dshx:text-muted-foreground">
@@ -963,7 +968,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                   const slash = path.lastIndexOf('/')
                   return (
                     <CommandItem key={path} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
-                      <FileIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                      <FileIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE} />
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-2">
                         <span className="dshx:truncate dshx:text-sm dshx:font-medium">{path.slice(slash + 1)}</span>
                         {slash > 0 ? (
