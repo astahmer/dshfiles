@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -6,6 +8,7 @@ import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 import type { SubagentPreviewBindings } from './subagent-live-preview.js'
 import { SubagentProvenanceToolRow } from './subagent-tool-row.js'
+import rowCss from './subagent-tool-row.module.css'
 
 /** The Host's failed-turn record the row reads (round 21 D4); a test fills it per case. */
 const failedTurns = vi.hoisted(() => new Map<string, { readonly sessionId: string; readonly failedAt: number; readonly reason: 'error' | 'max-tokens' }>())
@@ -239,6 +242,21 @@ describe('SubagentProvenanceToolRow', () => {
     expect(separator?.className).toContain('dshx:hidden')
     expect(separator?.className).toContain('dshx:@max-pane-narrow:inline')
     expect(separator?.nextElementSibling?.getAttribute('data-subagent-failure')).toBe('failed-to-start')
+  })
+
+  it('sets the model and the outcome in the title\'s size, one size per role (council round 25, item 2)', () => {
+    // On the phone the model read ~15 px beside the 13 px task, and "Didn't start" was larger than the notice's "Turn failed".
+    // The row's module sets the size on the meta line; it is unlayered, so it wins over the model's kit `text-sm`.
+    const source = readFileSync(resolve(process.cwd(), 'src/subagent-provenance/subagent-tool-row.module.css'), 'utf8').replaceAll(/\/\*[\s\S]*?\*\//gu, '')
+    expect(/\.meta\s*\{([^}]*)\}/u.exec(source)?.[1]).toMatch(/font-size:\s*var\(--dsh-content-font-size-secondary,\s*13px\)/u)
+    expect(/\.meta \[data-slot='route-model'\]\s*\{([^}]*)\}/u.exec(source)?.[1]).toMatch(/font-size:\s*inherit/u)
+    render(<SubagentProvenanceToolRow {...settled({ isError: true, description: 'Check refund rounding' })} />)
+    const meta = screen.getByTestId('header-accessory').querySelector<HTMLElement>('[data-subagent-row-meta]')
+    expect(meta?.classList.contains(rowCss.meta ?? 'missing')).toBe(true)
+    // The failure word, the clock and the ending inherit the line's size.
+    for (const part of meta?.querySelectorAll<HTMLElement>('[data-subagent-failure], [data-subagent-ending], [data-live-elapsed]') ?? []) {
+      expect(part.className).not.toMatch(/dshx:text-(xs|sm|base)/u)
+    }
   })
 
   it('shows the model it runs on after the description: the kit mark and the name, never the provider (council round 17 B1.1)', () => {

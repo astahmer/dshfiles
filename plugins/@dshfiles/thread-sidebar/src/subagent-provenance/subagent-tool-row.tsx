@@ -19,6 +19,7 @@ import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings }
 import { useSubagentState } from './subagent-state.js'
 import { SubagentRouteLabelModel } from './route-label.js'
 import { TITLE_COLUMN_PROPERTY, useSubagentTitleColumn } from './subagent-title-column.js'
+import css from './subagent-tool-row.module.css'
 
 const subagentArgumentsSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -112,9 +113,11 @@ const STACK_ON_NARROW_PANE =
 /**
  * The model and the outcome: inline items of the header on a wide pane (`contents`), on a narrow one line 2 at the
  * title's x (16 px leading + 6 px gap), the whole model, then · and the outcome, as the notice's "model · Turn failed".
+ * Both in the title's size (`css.meta`; council round 25, item 2: one type size per role, the model read 15 px on a
+ * phone beside the 13 px task); line 2 is 20 px, as the notice's.
  */
 const META_LINE =
-  'dshx:contents dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:basis-full dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:pl-[calc(22px+var(--dsh-content-font-delta,0px))]'
+  'dshx:contents dshx:@max-pane-narrow:leading-[calc(20px+var(--dsh-content-font-delta-secondary,0px))] dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:basis-full dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:pl-[calc(22px+var(--dsh-content-font-delta,0px))]'
 
 /**
  * The word a failed row ends with, in failed ink after its model (council round 22, item 2): "Turn failed" for a child
@@ -212,7 +215,7 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     // the outcome: the failure word in failed ink, the live clock or the settled ending in the tertiary ink.
     headerAccessory:
       route === undefined && failure === undefined && ending === '' && since === undefined ? undefined : (
-        <span className={META_LINE} data-subagent-row-meta="">
+        <span className={cn(css.meta, META_LINE)} data-subagent-row-meta="">
           {route === undefined ? null : (
             // In a shared title column the names stack, so an unknown family keeps its empty mark seat and its name starts on
             // the others' x, as in the dock (council round 24, item 1); inline, a lone row draws no seat (round 22, item 8).

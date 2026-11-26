@@ -1,0 +1,11 @@
+/* Council round 25, item 2: one type size per role in a transcript subagent row. The model and the outcome take the
+   title's size (the native title's step, one under the body), not the kit's `text-sm`, which is 15 px on a phone beside
+   the 13 px task. This module is unlayered, so it wins over the kit's layered utilities on the model. */
+.meta {
+  font-size: var(--dsh-content-font-size-secondary, 13px);
+}
+
+.meta [data-slot='route-model'] {
+  font-size: inherit;
+  line-height: inherit;
+}

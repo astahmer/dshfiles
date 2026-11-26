@@ -1,4 +1,6 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -82,6 +84,15 @@ describe('the failed subagent notice (council round 23, item 7)', () => {
     expect(header.querySelector('time')).toBeNull()
     fireEvent.click(header)
     expect(document.querySelector('[data-turn-trigger] time')).not.toBeNull()
+  })
+
+  it('sets the model in the line\'s size, the title\'s, not the kit\'s 15 px phone step (council round 25, item 2)', () => {
+    // On the phone "claude-sonnet-5-5" read ~15 px between the 13 px task and "Turn failed". The module class is unlayered,
+    // so it wins over the kit's layered `text-sm`.
+    const css = readFileSync(resolve(process.cwd(), 'src/native/chat/TurnTriggerNodeView.module.css'), 'utf8')
+    const model = /\.model\s*\{([^}]*)\}/u.exec(css)?.[1] ?? ''
+    expect(model).toMatch(/font-size:\s*inherit/u)
+    expect(model).toMatch(/line-height:\s*inherit/u)
   })
 
   it('says only why when no provider knows the model, never a guess', () => {

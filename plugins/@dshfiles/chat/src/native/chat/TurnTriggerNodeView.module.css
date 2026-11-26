@@ -55,7 +55,8 @@
   max-width: 100%;
   white-space: nowrap;
 }
-.model { min-width: 0; }
+/* dshfiles (council round 25, item 2): the model in the line's size, the title's, over the kit's 15 px phone step. */
+.model { min-width: 0; font-size: inherit; line-height: inherit; }
 .srOnly {
   position: absolute;
   width: 1px;
