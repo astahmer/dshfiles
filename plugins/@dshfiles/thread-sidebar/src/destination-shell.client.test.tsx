@@ -569,6 +569,21 @@ describe('DestinationShell', () => {
     expect(screen.getByRole('button', { name: 'Search threads' }).className).toContain('dshx:border-field-border')
   })
 
+  it('draws Search threads in the kit field look, left-aligned, with no outline edge to replace the field edge in dark (council round 8 B1)', () => {
+    for (const phone of [false, true]) {
+      setPhone(phone)
+      renderShell({ collapsed: false })
+      const search = screen.getByRole('button', { name: 'Search threads' })
+      expect(search.getAttribute('data-variant')).toBe('field')
+      // The outline variant's `dark:border-input` beat the field edge in dark: 1.43:1 rendered (#393633 on #1e1b19).
+      expect(search.className).not.toContain('dshx:dark:border-input')
+      expect(search.className).not.toContain('dshx:dark:bg-input/30')
+      expect(search.className).toContain('dshx:justify-start')
+      expect(search.className).not.toContain('dshx:justify-between')
+      cleanup()
+    }
+  })
+
   it('reclaims the search\'s extra 16px from the gaps around the filter row and the group heads on touch (council round 6 B8)', () => {
     const source = readFileSync('src/client.tsx', 'utf8')
     // The project and Filter row sits 4px under the search and directly over the first group head on touch.

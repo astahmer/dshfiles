@@ -833,10 +833,11 @@ const ListPane = (
         <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1">
           <Button
             size="sm"
-            variant="outline"
+            // A launcher that looks like a field is drawn as one (council round 8 B1): the kit field look, so no
+            // outline `dark:border-input` replaces the field edge in dark; left-aligned, its label in placeholder ink.
+            variant="field"
             className={cn(
-              // A launcher that looks like a field takes the field edge (council round 7 B3).
-              'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:border-field-border dshx:font-normal dshx:text-muted-foreground',
+              'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:text-muted-foreground',
               // A phone's search is a 44px control (council round 6 B8); the list's touch gaps give the height back.
               props.phone === true && 'dshx:h-11 dshx:gap-2 dshx:px-3 dshx:text-base',
             )}
