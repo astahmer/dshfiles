@@ -517,7 +517,8 @@ string (`patch`) or pre-parsed `files` (`parsePatchFiles(patch).flatMap(p => p.f
 megabyte patches stay responsive; give it a bounded height through `className`. Light/dark follows
 `body[data-ds-dark-theme]`. It highlights with the `dshx-syntax` theme (Shiki `css-variables`), so a diff and the
 transcript's code blocks share one syntax pair (`--shiki-token-*`, fitted per scheme in `theme/theme-css.ts`); its
-body sits on the ramp with 12% add and delete tints, `+`/`−` gutter marks and a quiet collapsed-lines bar, all set by
+body sits on the ramp with add and delete tints (light: 16% lines, 34% changed words, council round 11 A3; dark: fixed
+bands), `+`/`−` gutter marks and a quiet collapsed-lines bar, all set by
 `PatchLook.style()` as inherited custom properties over the theme tones (`theme/diff-look.ts`); a caller adds no diff
 colours of its own. Every file renders in its own shadow root
 with adopted stylesheets, so no library CSS leaks into the page; style it only through inherited `--diffs-*`

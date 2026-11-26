@@ -115,8 +115,9 @@ export class PatchLook {
     '[data-separator=line-info] [data-expand-button] { min-width: 0; border-radius: 0; } ' +
     '[data-expand-button] [data-icon] { width: 14px; height: 14px; } ' +
     '[data-unmodified-lines] { font-family: var(--diffs-header-font-family, var(--diffs-header-font-fallback)); } ' +
-    // Dark diff lines paint their band as is (council round 7 A6, theme/diff-look.ts): the library's dark 20% mix off.
-    '[data-line], [data-no-newline], [data-gutter-buffer], [data-column-number] { --mix-dark: 0%; }'
+    // Diff lines paint their band as is (theme/diff-look.ts): the library's own line mix off, dark since council round 7
+    // A6 (its 20% mix), light since round 11 A3 (its 12% mix capped the light tint below the 16% the council asked for).
+    '[data-line], [data-no-newline], [data-gutter-buffer], [data-column-number] { --mix-dark: 0%; --mix-light: 0%; }'
 
   /**
    * The bar's label in our words (council round 7 A3): "Show N unchanged lines" where it expands, "N unchanged lines"
