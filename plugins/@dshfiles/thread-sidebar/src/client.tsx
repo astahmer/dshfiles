@@ -91,6 +91,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ListHeaderExtras } from './list-header-extras.js'
+import { ThreadListScope } from './list-scope.js'
 import { PresetChips, PresetDeleteDialog, PresetNameDialog, type PresetNamePrompt } from './filter-presets.js'
 import { ProjectAddFlow } from '@dshfiles/workspace-folder-picker/project-add-flow'
 import { Empty, EmptyTitle } from '@dshfiles/plugin-ui/components/ui/empty'
@@ -113,6 +114,7 @@ import {
   CircleDashedIcon,
   CirclePauseIcon,
   EllipsisIcon,
+  FolderIcon,
   GripVerticalIcon,
   GitBranchIcon,
   LayersIcon,
@@ -126,6 +128,7 @@ import {
   PinIcon,
   PinOffIcon,
   PlayIcon,
+  PlusIcon,
   RefreshCwIcon,
   RotateCcwIcon,
   SaveIcon,
@@ -157,6 +160,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from 'react'
+import { createPortal } from 'react-dom'
 import * as Result from 'effect/Result'
 import * as Schema from 'effect/Schema'
 import {
@@ -6333,6 +6337,357 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       />
     )
 
+  // The list's one Filter menu: beside the project picker on a desktop, the scope button in the search row on a phone
+  // (council round 10 B1), where it also holds the project.
+  const scopeSlot = headerExtras.scopeSlot
+  const scopeInput = {
+    view: listFiltered ? (presetsOn ? activeViewShortLabel : activeFilterSummary) : null,
+    project: projectFilterValue === ALL_PROJECTS ? null : projectFilterLabel,
+    all: props.tSidebar('threadSidebarAllShort'),
+  }
+  const filterMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          // The field look whether or not a filter is on: its value names the active filter.
+          variant="field"
+          size="field"
+          data-thread-list-filter=""
+          data-filtered={listFiltered ? '' : undefined}
+          // The list's keyboard model treats the view control as the way into the rows (thread-list-navigation.ts).
+          data-thread-list-view-button=""
+          // Arrow keys from the trigger move into the list, as the former view tabs did; Enter or Space opens it.
+          // Radix's trigger opens its menu on ArrowDown unless the event is prevented first.
+          onKeyDown={event => {
+            if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
+            navigateThreadList(event.nativeEvent)
+            event.preventDefault()
+          }}
+          className={
+            scopeSlot === null
+              ? 'dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3'
+              : // The phone scope button: the funnel and the scope in words, as wide as its words, at most 45% of the row.
+                'dshx:w-full dshx:min-w-0 dshx:gap-2 dshx:px-3'
+          }
+          // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
+          // filters it holds; the Status and Source rows inside the menu still spell those out. The phone scope button
+          // adds the project it holds.
+          aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}${scopeSlot === null || scopeInput.project === null ? '' : ` · ${scopeInput.project}`}`}
+          data-preset-edited={presetEdited ? '' : undefined}
+          data-thread-list-scope-button={scopeSlot === null ? undefined : ''}
+          data-scope-narrowed={scopeSlot !== null && ThreadListScope.narrowed(scopeInput) ? '' : undefined}
+        >
+          <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+          <span className="dshx:truncate">
+            {scopeSlot === null ? (presetsOn ? activeViewShortLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
+          </span>
+          {scopeSlot === null ? null : ThreadListScope.narrowed(scopeInput) ? (
+            // A narrowed scope (a view, a filter or a project) shows one ink dot; the status views' own dots stay in the menu.
+            <span aria-hidden="true" data-testid="thread-scope-dot" className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary" />
+          ) : null}
+          {scopeSlot !== null ? null : presetEdited ? (
+            <span
+              aria-hidden="true"
+              data-testid="thread-preset-edited-dot"
+              className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary"
+            />
+          ) : null}
+          {scopeSlot !== null || activeViewTab?.attentionLabel === undefined ? null : (
+            <StatusDot
+              size="sm"
+              data-testid="thread-view-attention-dot"
+              className={cn(
+                ThreadAttentionPresentationModel.attentionDotClass({
+                  attentionLabel: activeViewTab.attentionLabel,
+                  attentionColors: preferences.attentionColors,
+                  unread: false,
+                  running: false,
+                }),
+              )}
+            />
+          )}
+          {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
+          {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-56 dshx:overflow-y-auto"
+      >
+        {scopeSlot === null ? null : (
+          // The phone scope (council round 10 B1): the project first, then the status views below it.
+          <DropdownMenuGroup aria-label={props.tSidebar('threadSidebarProjectFilter')} data-thread-scope-project="">
+            <DropdownMenuLabel>{props.tSidebar('threadSidebarGroupProject')}</DropdownMenuLabel>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarProjectFilter')}: ${projectFilterLabel}`}>
+                <FolderIcon aria-hidden="true" />
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{projectFilterLabel}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent
+                className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-52 dshx:overflow-y-auto"
+                aria-label={props.tSidebar('threadSidebarProjectFilter')}
+              >
+                <DropdownMenuRadioGroup value={projectFilterValue} onValueChange={selectProject}>
+                  {projectOptions
+                    .filter(option => option.group === undefined)
+                    .map(option => (
+                      <DropdownMenuRadioItem key={option.value} value={option.value}>
+                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{option.label}</span>
+                      </DropdownMenuRadioItem>
+                    ))}
+                </DropdownMenuRadioGroup>
+                {projectOptions.some(option => option.group !== undefined) ? <DropdownMenuSeparator /> : null}
+                {projectOptions
+                  .filter(option => option.group !== undefined)
+                  .map(option => (
+                    <DropdownMenuItem key={option.value} onSelect={() => selectProject(option.value)}>
+                      <PlusIcon aria-hidden="true" />
+                      {option.label}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+          </DropdownMenuGroup>
+        )}
+        {presetsOn ? (
+          // Filter presets (b:xpvk): first in the menu, one click to apply, the active one checked.
+          <DropdownMenuGroup aria-label={props.tSidebar('threadSidebarPresets')} data-thread-presets="">
+            <DropdownMenuLabel>{props.tSidebar('threadSidebarPresets')}</DropdownMenuLabel>
+            <DropdownMenuRadioGroup value={presetEdited ? '' : listThreadView.id} onValueChange={selectThreadViewPreset}>
+              {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => (
+                <DropdownMenuRadioItem
+                  key={view.id}
+                  value={view.id}
+                  // The former view tab's accessible name: "Done (1), Turn finished".
+                  aria-label={
+                    attentionLabel === undefined && visibleCount === null
+                      ? label
+                      : `${label}${visibleCount === null ? '' : ` (${visibleCount})`}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
+                  }
+                  data-thread-list-view-button=""
+                  data-preset-active={view.id === listThreadView.id ? '' : undefined}
+                  // An edited preset stays marked as the one the edits started from.
+                  className={cn(presetEdited && view.id === listThreadView.id && 'dshx:font-medium')}
+                >
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{label}</span>
+                  {presetEdited && view.id === listThreadView.id ? (
+                    <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarPresetEditedShort')}</span>
+                  ) : null}
+                  {attentionLabel === undefined ? null : (
+                    <StatusDot
+                      size="sm"
+                      data-testid="thread-view-attention-dot"
+                      className={cn(
+                        ThreadAttentionPresentationModel.attentionDotClass({
+                          attentionLabel,
+                          attentionColors: preferences.attentionColors,
+                          unread: false,
+                          running: false,
+                        }),
+                      )}
+                    />
+                  )}
+                  {visibleCount === null ? null : <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{visibleCount}</span>}
+                </DropdownMenuRadioItem>
+              ))}
+            </DropdownMenuRadioGroup>
+            {presetEdited ? (
+              <>
+                <DropdownMenuItem data-preset-save-changes="" onSelect={() => savePresetChanges()}>
+                  <SaveIcon aria-hidden="true" />
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                    {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => selectThreadViewPreset(listThreadView.id)}>
+                  <RotateCcwIcon aria-hidden="true" />
+                  {props.tSidebar('threadSidebarPresetDiscardChanges')}
+                </DropdownMenuItem>
+              </>
+            ) : null}
+            <DropdownMenuItem
+              onSelect={() =>
+                threadViewSettings.views.length >= MAX_THREAD_VIEWS
+                  ? setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
+                  : setPresetPrompt({ mode: 'create' })
+              }
+            >
+              <BookmarkPlusIcon aria-hidden="true" />
+              {props.tSidebar('threadSidebarPresetSaveAs')}
+            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarPresetOptions')}: ${activeViewTab?.label ?? ''}`}>
+                <PencilIcon aria-hidden="true" />
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarPresetOptions')}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
+                <DropdownMenuLabel className="dshx:truncate">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setPresetPrompt({
+                      mode: 'rename',
+                      viewId: listThreadView.id,
+                      name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
+                    })
+                  }
+                >
+                  {props.tSidebar('threadSidebarPresetRename')}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
+                  {props.tSidebar('threadSidebarPresetUpdate')}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  variant="destructive"
+                  disabled={threadViewSettings.views.length === 1 || viewTabs.length === 1}
+                  onSelect={() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' })}
+                >
+                  {props.tSidebar('threadSidebarPresetDelete')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
+                  onSelect={clearActiveViewUnread}
+                >
+                  {props.tSidebar('threadSidebarMarkViewRead')}
+                </DropdownMenuItem>
+                <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
+                  {props.tSidebar('threadSidebarMarkViewUnread')}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => setViewsManagerOpen(true)}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSeparator />
+          </DropdownMenuGroup>
+        ) : (
+          <>
+            <DropdownMenuItem
+              disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
+              onSelect={clearActiveViewUnread}
+            >
+              {props.tSidebar('threadSidebarMarkViewRead')}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
+              {props.tSidebar('threadSidebarMarkViewUnread')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
+        {showGroupControl ? (
+          // One click to see the list by project (polish pass b:r4et); unchecking returns to the default Status grouping.
+          <DropdownMenuCheckboxItem
+            checked={threadView.groupBy === 'project'}
+            data-thread-group-by-project=""
+            onCheckedChange={checked => selectThreadGroupBy(checked ? 'project' : 'state')}
+          >
+            {/* No icon: the check takes the icon column, so the label lines up with its neighbours. */}
+            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarGroupByProject')}</span>
+          </DropdownMenuCheckboxItem>
+        ) : null}
+        {showGroupControl ? (
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger
+              aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
+            >
+              <LayersIcon aria-hidden="true" />
+              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                {props.tSidebar('threadSidebarGroup')}: {props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}
+              </span>
+            </DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarGroupBy')}>
+              <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
+                {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
+                  <DropdownMenuRadioItem key={groupBy} value={groupBy}>
+                    {props.tSidebar(threadGroupLabelKeys[groupBy])}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+        ) : null}
+        {showFilterControl ? (
+          <>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarFilterStatus')}: ${statusFilterSummary}`}>
+                <ListFilterIcon aria-hidden="true" />
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                  {props.tSidebar('threadSidebarFilterStatus')}: {statusFilterSummary}
+                </span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent
+                className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-52 dshx:overflow-y-auto"
+                aria-label={props.tSidebar('threadSidebarFilterStatus')}
+              >
+                <DropdownMenuCheckboxItem
+                  checked={threadView.statusFilters.length === 0}
+                  onCheckedChange={checked => selectThreadStatusFilter('all', checked)}
+                  onSelect={event => event.preventDefault()}
+                >
+                  {props.tSidebar(threadStatusFilterLabelKeys.all)}
+                </DropdownMenuCheckboxItem>
+                {THREAD_STATUS_FILTER_GROUPS.map(group => (
+                  <div key={group.id}>
+                    <DropdownMenuLabel>{props.tSidebar(threadStatusFilterGroupLabelKeys[group.id])}</DropdownMenuLabel>
+                    {group.filters.map(filter => (
+                      <DropdownMenuCheckboxItem
+                        checked={threadView.statusFilters.includes(filter)}
+                        key={filter}
+                        onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
+                        onSelect={event => event.preventDefault()}
+                      >
+                        {props.tSidebar(threadStatusFilterLabelKeys[filter])}
+                      </DropdownMenuCheckboxItem>
+                    ))}
+                  </div>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger
+                aria-label={`${props.tSidebar('threadSidebarFilterSource')}: ${props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}`}
+              >
+                <UsersIcon aria-hidden="true" />
+                <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                  {props.tSidebar('threadSidebarFilterSource')}: {props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}
+                </span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarFilterSource')}>
+                <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
+                  {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
+                    <DropdownMenuRadioItem key={filter} value={filter}>
+                      {props.tSidebar(threadSourceFilterLabelKeys[filter])}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+          </>
+        ) : null}
+        <DropdownMenuSeparator />
+        {headerExtras.sections.map(section => (
+          <DropdownMenuItem key={section.panelId} data-section={section.panelId} onSelect={section.open}>
+            <span className="dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center" aria-hidden="true">
+              {section.icon}
+            </span>
+            {section.label}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuItem onSelect={() => setSettingsOpen(current => !current)}>
+          <Settings2Icon aria-hidden="true" />
+          {props.tSidebar('threadSidebarThreadListSettings')}
+        </DropdownMenuItem>
+        {headerExtras.customize === undefined ? null : (
+          <DropdownMenuItem onSelect={headerExtras.customize.toggle}>
+            <SlidersHorizontalIcon aria-hidden="true" />
+            {headerExtras.customize.label}
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+
   return (
     <TooltipProvider delayDuration={500}>
       <section
@@ -6618,9 +6973,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // On touch the row sits 4px under the 44px search and directly over the first group head (council round 6 B8).
           // The phone shell grid (round nine B4): fields fill from the 12px gutter, 8px under the search (its own padding)
           // and about 12px over the first group head's label (6px here, the head's own half-leading the rest).
-          <header className="dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0 dshx:phone:px-3 dshx:phone:pb-1.5">
+          // On a phone (council round 10 B1) the row is gone: the Filter menu is the scope button in the search row, and
+          // the header keeps only the preset chips when they are on.
+          <header
+            className={
+              scopeSlot === null ? 'dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0 dshx:phone:px-3 dshx:phone:pb-1.5' : 'dshx:px-3 dshx:pb-1.5 dshx:empty:hidden'
+            }
+          >
             {/* Filter-row grammar (council round 8 B2): beside the search field, both value-showing triggers take the field
                 look, 8px apart; their values in ink at the body weight. */}
+            {scopeSlot !== null ? createPortal(filterMenu, scopeSlot) : (
             <div className="dshx:flex dshx:items-center dshx:gap-2">
               <Combobox
                 contentClassName="dshx:w-(--radix-popover-trigger-width) dshx:min-w-56"
@@ -6644,297 +7006,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 }
                 value={projectFilterValue}
               />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    // The field look whether or not a filter is on: its value names the active filter.
-                    variant="field"
-                    size="field"
-                    data-thread-list-filter=""
-                    data-filtered={listFiltered ? '' : undefined}
-                    // The list's keyboard model treats the view control as the way into the rows (thread-list-navigation.ts).
-                    data-thread-list-view-button=""
-                    // Arrow keys from the trigger move into the list, as the former view tabs did; Enter or Space opens it.
-                    // Radix's trigger opens its menu on ArrowDown unless the event is prevented first.
-                    onKeyDown={event => {
-                      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-                      navigateThreadList(event.nativeEvent)
-                      event.preventDefault()
-                    }}
-                    className="dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3"
-                    // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
-                    // filters it holds; the Status and Source rows inside the menu still spell those out.
-                    aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}`}
-                    data-preset-edited={presetEdited ? '' : undefined}
-                  >
-                    <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
-                    <span className="dshx:truncate">{presetsOn ? activeViewShortLabel : activeFilterSummary}</span>
-                    {presetEdited ? (
-                      <span
-                        aria-hidden="true"
-                        data-testid="thread-preset-edited-dot"
-                        className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary"
-                      />
-                    ) : null}
-                    {activeViewTab?.attentionLabel === undefined ? null : (
-                      <StatusDot
-                        size="sm"
-                        data-testid="thread-view-attention-dot"
-                        className={cn(
-                          ThreadAttentionPresentationModel.attentionDotClass({
-                            attentionLabel: activeViewTab.attentionLabel,
-                            attentionColors: preferences.attentionColors,
-                            unread: false,
-                            running: false,
-                          }),
-                        )}
-                      />
-                    )}
-                    {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
-                    {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="end"
-                  className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-56 dshx:overflow-y-auto"
-                >
-                  {presetsOn ? (
-                    // Filter presets (b:xpvk): first in the menu, one click to apply, the active one checked.
-                    <DropdownMenuGroup aria-label={props.tSidebar('threadSidebarPresets')} data-thread-presets="">
-                      <DropdownMenuLabel>{props.tSidebar('threadSidebarPresets')}</DropdownMenuLabel>
-                      <DropdownMenuRadioGroup value={presetEdited ? '' : listThreadView.id} onValueChange={selectThreadViewPreset}>
-                        {viewTabs.map(({ view, label, attentionLabel, visibleCount }) => (
-                          <DropdownMenuRadioItem
-                            key={view.id}
-                            value={view.id}
-                            // The former view tab's accessible name: "Done (1), Turn finished".
-                            aria-label={
-                              attentionLabel === undefined && visibleCount === null
-                                ? label
-                                : `${label}${visibleCount === null ? '' : ` (${visibleCount})`}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`
-                            }
-                            data-thread-list-view-button=""
-                            data-preset-active={view.id === listThreadView.id ? '' : undefined}
-                            // An edited preset stays marked as the one the edits started from.
-                            className={cn(presetEdited && view.id === listThreadView.id && 'dshx:font-medium')}
-                          >
-                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{label}</span>
-                            {presetEdited && view.id === listThreadView.id ? (
-                              <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarPresetEditedShort')}</span>
-                            ) : null}
-                            {attentionLabel === undefined ? null : (
-                              <StatusDot
-                                size="sm"
-                                data-testid="thread-view-attention-dot"
-                                className={cn(
-                                  ThreadAttentionPresentationModel.attentionDotClass({
-                                    attentionLabel,
-                                    attentionColors: preferences.attentionColors,
-                                    unread: false,
-                                    running: false,
-                                  }),
-                                )}
-                              />
-                            )}
-                            {visibleCount === null ? null : <span className="dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground">{visibleCount}</span>}
-                          </DropdownMenuRadioItem>
-                        ))}
-                      </DropdownMenuRadioGroup>
-                      {presetEdited ? (
-                        <>
-                          <DropdownMenuItem data-preset-save-changes="" onSelect={() => savePresetChanges()}>
-                            <SaveIcon aria-hidden="true" />
-                            <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                              {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
-                            </span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onSelect={() => selectThreadViewPreset(listThreadView.id)}>
-                            <RotateCcwIcon aria-hidden="true" />
-                            {props.tSidebar('threadSidebarPresetDiscardChanges')}
-                          </DropdownMenuItem>
-                        </>
-                      ) : null}
-                      <DropdownMenuItem
-                        onSelect={() =>
-                          threadViewSettings.views.length >= MAX_THREAD_VIEWS
-                            ? setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
-                            : setPresetPrompt({ mode: 'create' })
-                        }
-                      >
-                        <BookmarkPlusIcon aria-hidden="true" />
-                        {props.tSidebar('threadSidebarPresetSaveAs')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarPresetOptions')}: ${activeViewTab?.label ?? ''}`}>
-                          <PencilIcon aria-hidden="true" />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarPresetOptions')}</span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
-                          <DropdownMenuLabel className="dshx:truncate">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              setPresetPrompt({
-                                mode: 'rename',
-                                viewId: listThreadView.id,
-                                name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
-                              })
-                            }
-                          >
-                            {props.tSidebar('threadSidebarPresetRename')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
-                            {props.tSidebar('threadSidebarPresetUpdate')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            variant="destructive"
-                            disabled={threadViewSettings.views.length === 1 || viewTabs.length === 1}
-                            onSelect={() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' })}
-                          >
-                            {props.tSidebar('threadSidebarPresetDelete')}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
-                            onSelect={clearActiveViewUnread}
-                          >
-                            {props.tSidebar('threadSidebarMarkViewRead')}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
-                            {props.tSidebar('threadSidebarMarkViewUnread')}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onSelect={() => setViewsManagerOpen(true)}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSeparator />
-                    </DropdownMenuGroup>
-                  ) : (
-                    <>
-                      <DropdownMenuItem
-                        disabled={!attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId))}
-                        onSelect={clearActiveViewUnread}
-                      >
-                        {props.tSidebar('threadSidebarMarkViewRead')}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem disabled={!attention.available || activeViewThreadIds.length === 0} onSelect={markActiveViewUnread}>
-                        {props.tSidebar('threadSidebarMarkViewUnread')}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
-                  {showGroupControl ? (
-                    // One click to see the list by project (polish pass b:r4et); unchecking returns to the default Status grouping.
-                    <DropdownMenuCheckboxItem
-                      checked={threadView.groupBy === 'project'}
-                      data-thread-group-by-project=""
-                      onCheckedChange={checked => selectThreadGroupBy(checked ? 'project' : 'state')}
-                    >
-                      {/* No icon: the check takes the icon column, so the label lines up with its neighbours. */}
-                      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.tSidebar('threadSidebarGroupByProject')}</span>
-                    </DropdownMenuCheckboxItem>
-                  ) : null}
-                  {showGroupControl ? (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger
-                        aria-label={`${props.tSidebar('threadSidebarGroup')}: ${props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}`}
-                      >
-                        <LayersIcon aria-hidden="true" />
-                        <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                          {props.tSidebar('threadSidebarGroup')}: {props.tSidebar(threadGroupLabelKeys[threadView.groupBy])}
-                        </span>
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarGroupBy')}>
-                        <DropdownMenuRadioGroup value={threadView.groupBy} onValueChange={selectThreadGroupBy}>
-                          {THREAD_GROUP_BY_OPTIONS.map(groupBy => (
-                            <DropdownMenuRadioItem key={groupBy} value={groupBy}>
-                              {props.tSidebar(threadGroupLabelKeys[groupBy])}
-                            </DropdownMenuRadioItem>
-                          ))}
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuSub>
-                  ) : null}
-                  {showFilterControl ? (
-                    <>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger aria-label={`${props.tSidebar('threadSidebarFilterStatus')}: ${statusFilterSummary}`}>
-                          <ListFilterIcon aria-hidden="true" />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                            {props.tSidebar('threadSidebarFilterStatus')}: {statusFilterSummary}
-                          </span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent
-                          className="dshx-root dshx:max-h-(--radix-dropdown-menu-content-available-height) dshx:min-w-52 dshx:overflow-y-auto"
-                          aria-label={props.tSidebar('threadSidebarFilterStatus')}
-                        >
-                          <DropdownMenuCheckboxItem
-                            checked={threadView.statusFilters.length === 0}
-                            onCheckedChange={checked => selectThreadStatusFilter('all', checked)}
-                            onSelect={event => event.preventDefault()}
-                          >
-                            {props.tSidebar(threadStatusFilterLabelKeys.all)}
-                          </DropdownMenuCheckboxItem>
-                          {THREAD_STATUS_FILTER_GROUPS.map(group => (
-                            <div key={group.id}>
-                              <DropdownMenuLabel>{props.tSidebar(threadStatusFilterGroupLabelKeys[group.id])}</DropdownMenuLabel>
-                              {group.filters.map(filter => (
-                                <DropdownMenuCheckboxItem
-                                  checked={threadView.statusFilters.includes(filter)}
-                                  key={filter}
-                                  onCheckedChange={checked => selectThreadStatusFilter(filter, checked)}
-                                  onSelect={event => event.preventDefault()}
-                                >
-                                  {props.tSidebar(threadStatusFilterLabelKeys[filter])}
-                                </DropdownMenuCheckboxItem>
-                              ))}
-                            </div>
-                          ))}
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                      <DropdownMenuSub>
-                        <DropdownMenuSubTrigger
-                          aria-label={`${props.tSidebar('threadSidebarFilterSource')}: ${props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}`}
-                        >
-                          <UsersIcon aria-hidden="true" />
-                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
-                            {props.tSidebar('threadSidebarFilterSource')}: {props.tSidebar(threadSourceFilterLabelKeys[threadView.sourceFilter])}
-                          </span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className="dshx-root dshx:min-w-48" aria-label={props.tSidebar('threadSidebarFilterSource')}>
-                          <DropdownMenuRadioGroup value={threadView.sourceFilter} onValueChange={selectThreadSourceFilter}>
-                            {THREAD_SOURCE_FILTER_OPTIONS.map(filter => (
-                              <DropdownMenuRadioItem key={filter} value={filter}>
-                                {props.tSidebar(threadSourceFilterLabelKeys[filter])}
-                              </DropdownMenuRadioItem>
-                            ))}
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    </>
-                  ) : null}
-                  <DropdownMenuSeparator />
-                  {headerExtras.sections.map(section => (
-                    <DropdownMenuItem key={section.panelId} data-section={section.panelId} onSelect={section.open}>
-                      <span className="dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center" aria-hidden="true">
-                        {section.icon}
-                      </span>
-                      {section.label}
-                    </DropdownMenuItem>
-                  ))}
-                  <DropdownMenuItem onSelect={() => setSettingsOpen(current => !current)}>
-                    <Settings2Icon aria-hidden="true" />
-                    {props.tSidebar('threadSidebarThreadListSettings')}
-                  </DropdownMenuItem>
-                  {headerExtras.customize === undefined ? null : (
-                    <DropdownMenuItem onSelect={headerExtras.customize.toggle}>
-                      <SlidersHorizontalIcon aria-hidden="true" />
-                      {headerExtras.customize.label}
-                    </DropdownMenuItem>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {filterMenu}
             </div>
+            )}
             {presetsOn && threadViewSettings.showPresetChips ? (
               <PresetChips
                 presets={viewTabs.map(tab => ({ id: tab.view.id, label: tab.label }))}

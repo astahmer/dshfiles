@@ -17,9 +17,14 @@ export interface ListHeaderSection {
 export interface ListHeaderExtrasValue {
   readonly sections: readonly ListHeaderSection[]
   readonly customize: { readonly label: string; readonly expanded: boolean; readonly toggle: () => void } | undefined
+  /**
+   * On a phone (council round 10 B1) the search row ends in this seat and the list draws its one scope button there:
+   * search and scope share one 44px row. Null on a desktop, where the list keeps its own project and Filter row.
+   */
+  readonly scopeSlot: HTMLElement | null
 }
 
-const EMPTY: ListHeaderExtrasValue = { sections: [], customize: undefined }
+const EMPTY: ListHeaderExtrasValue = { sections: [], customize: undefined, scopeSlot: null }
 let current: ListHeaderExtrasValue = EMPTY
 const listeners = new Set<() => void>()
 

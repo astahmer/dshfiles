@@ -842,8 +842,9 @@ const ThreadsHeaderExtras = (props: {
   readonly openEntry: (entry: ResolvedEntry) => void
   readonly renderPanelIcon: DestinationShellProps['renderPanelIcon']
   readonly customizeThreads: DestinationShellProps['customizeThreads']
+  readonly scopeSlot: HTMLElement | null
 }): null => {
-  const { entries, activePanelId, openEntry, renderPanelIcon, customizeThreads } = props
+  const { entries, activePanelId, openEntry, renderPanelIcon, customizeThreads, scopeSlot } = props
   useLayoutEffect(
     () =>
       ListHeaderExtras.publish({
@@ -855,16 +856,20 @@ const ThreadsHeaderExtras = (props: {
           open: () => openEntry(entry),
         })),
         customize: customizeThreads,
+        scopeSlot,
       }),
-    [entries, activePanelId, openEntry, renderPanelIcon, customizeThreads],
+    [entries, activePanelId, openEntry, renderPanelIcon, customizeThreads, scopeSlot],
   )
   return null
 }
 
-const ListPane = (
-  props: DestinationShellProps & { readonly folder: RailFolder; readonly openEntry: (entry: ResolvedEntry) => void; readonly phone?: boolean },
-): JSX.Element =>
-  props.folder.id === 'threads' ? (
+type ListPaneProps = DestinationShellProps & { readonly folder: RailFolder; readonly openEntry: (entry: ResolvedEntry) => void; readonly phone?: boolean }
+
+const ThreadsPane = (props: ListPaneProps): JSX.Element => {
+  // The phone's one toolbar row (council round 10 B1): the list draws its scope button into this seat after the search.
+  const [scopeSlot, setScopeSlot] = useState<HTMLElement | null>(null)
+  const phone = props.phone === true
+  return (
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:flex-col" data-destination-index="threads">
       <ThreadsHeaderExtras
         entries={props.folder.entries}
@@ -872,12 +877,14 @@ const ListPane = (
         openEntry={props.openEntry}
         renderPanelIcon={props.renderPanelIcon}
         customizeThreads={props.customizeThreads}
+        scopeSlot={phone && props.searchThreads !== null ? scopeSlot : null}
       />
       {/* One search entry above the list (T5.3/T5.4): Board and Customize live in the list's Filter menu. */}
       {props.searchThreads === null ? null : (
-        // The phone gutter (round nine B4): fields fill from 12px, their text and glyphs start at 24px; 8px over the
-        // project row.
-        <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1', props.phone === true && 'dshx:px-3 dshx:pb-2')}>
+        // The phone gutter (round nine B4): fields fill from 12px, their text and glyphs start at 24px. On a phone the row
+        // is the list's one toolbar (council round 10 B1): the search and the list's scope button, 8px apart, 6px over the
+        // first group head (its own half-leading makes about 12px to the label).
+        <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:px-2 dshx:pb-1', phone && 'dshx:gap-2 dshx:px-3 dshx:pb-1.5')}>
           <Button
             // The one control height (round nine B5, kit A4): 32px beside the project and Filter fields, 44px on touch.
             size="field"
@@ -887,17 +894,24 @@ const ListPane = (
             className={cn(
               'dshx:min-w-0 dshx:flex-1 dshx:justify-start dshx:text-muted-foreground',
               // On a phone its glyph starts on the 24px text edge (round nine B4).
-              props.phone === true && 'dshx:gap-2 dshx:px-3',
+              phone && 'dshx:gap-2 dshx:px-3',
             )}
             onClick={props.searchThreads}
           >
             <SearchIcon className="dshx:size-3.5" aria-hidden="true" />
             {props.labels.searchThreads}
           </Button>
+          {phone ? <div ref={setScopeSlot} data-thread-list-scope="" className="dshx:flex dshx:max-w-[45%] dshx:min-w-0 dshx:shrink-0 dshx:empty:hidden" /> : null}
         </div>
       )}
       <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-hidden dshx:*:w-full dshx:*:min-w-0">{props.threadList}</div>
     </div>
+  )
+}
+
+const ListPane = (props: ListPaneProps): JSX.Element =>
+  props.folder.id === 'threads' ? (
+    <ThreadsPane {...props} />
   ) : (
     <FolderIndex
       folder={props.folder}

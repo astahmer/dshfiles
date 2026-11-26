@@ -618,11 +618,31 @@ describe('DestinationShell', () => {
     }
   })
 
+  it('ends the phone search row in the list\'s scope seat, one 44px toolbar row, and publishes it (council round 10 B1)', () => {
+    setPhone(true)
+    renderShell({ collapsed: false })
+    const list = document.querySelector<HTMLElement>('[data-phone-list]')
+    const search = within(list ?? document.body).getByRole('button', { name: 'Search threads' })
+    const seat = search.parentElement?.querySelector<HTMLElement>('[data-thread-list-scope]')
+    if (seat == null) throw new Error('Phone scope seat missing')
+    // After the search, in the same row, 8px apart; the row stands 6px over the first group head.
+    expect(search.compareDocumentPosition(seat)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(search.parentElement?.className).toContain('dshx:gap-2')
+    expect(search.parentElement?.className).toContain('dshx:pb-1.5')
+    expect(ListHeaderExtras.get().scopeSlot).toBe(seat)
+    cleanup()
+    // A desktop column keeps the list's own project and Filter row: no seat.
+    setPhone(false)
+    renderShell({ collapsed: false })
+    expect(document.querySelector('[data-thread-list-scope]')).toBeNull()
+    expect(ListHeaderExtras.get().scopeSlot).toBeNull()
+  })
+
   it('reclaims the search\'s extra 16px from the gaps around the filter row and the group heads on touch (council round 6 B8)', () => {
     const source = readFileSync('src/client.tsx', 'utf8')
     // The project and Filter row sits 4px under the search and directly over the first group head on touch; the phone
     // shell grid (round nine B4) puts it on the 12px gutter, 6px over the first head.
-    expect(source).toContain("<header className=\"dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0 dshx:phone:px-3 dshx:phone:pb-1.5\">")
+    expect(source).toContain("scopeSlot === null ? 'dshx:px-2 dshx:py-1 dshx:pointer-coarse:py-0 dshx:phone:px-3 dshx:phone:pb-1.5'")
     // Groups stand flush on touch: the 2px each group added above its head is gone.
     expect(source).toContain('dshx:pointer-coarse:not-first:mt-0 dshx:pointer-coarse:first:mt-0')
     expect(source).not.toContain('dshx:pointer-coarse:not-first:mt-0.5')
@@ -640,8 +660,8 @@ describe('DestinationShell', () => {
     const source = readFileSync('src/client.tsx', 'utf8')
     // The project and Filter fields are 44px on a phone like the search, 32px beside it on a desktop.
     expect(source).toContain('triggerClassName="dshx:min-w-0 dshx:flex-1 dshx:px-2.5 dshx:phone:px-3"')
-    expect(source).toContain('size="field"\n                    data-thread-list-filter=""')
-    expect(source).toContain('className="dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3"')
+    expect(source).toContain('size="field"\n          data-thread-list-filter=""')
+    expect(source).toContain("'dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3'")
     expect(source).not.toContain('dshx:px-2.5 dshx:pointer-coarse:h-7"')
     // Rows and the scroll area sit on the same gutter, the group heads' labels on the 24px text edge.
     expect(source).toContain('dshx:px-2 dshx:pb-6 dshx:pointer-coarse:pb-3.5 dshx:phone:px-3')
