@@ -2,6 +2,7 @@ import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.js'
 import { Toggle as TogglePrimitive } from 'radix-ui'
+import { quietLook } from './input.js'
 
 /**
  * `leading-none` (council round 7, lane B): the 13px label's inherited 18.85px line box set every Toggle label about 1px
@@ -14,6 +15,8 @@ const toggleVariants = cva(
       variant: {
         default: 'dshx:bg-transparent',
         outline: 'dshx:border dshx:border-input dshx:bg-transparent dshx:shadow-xs dshx:hover:bg-accent dshx:hover:text-accent-foreground',
+        /** The quiet secondary beside a search field (council round 18 A3, `quietLook` in input): a Modified filter. */
+        quiet: quietLook,
       },
       size: {
         default: 'dshx:h-8 dshx:min-w-8 dshx:px-2',

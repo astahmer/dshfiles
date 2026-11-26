@@ -15,6 +15,7 @@ import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { HealthDot, StatusDot, healthTextClass } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
+import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { UnitInput } from '@dshfiles/plugin-ui/components/ui/unit-input'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -29,7 +30,9 @@ import {
   GitMergeIcon,
   InboxIcon,
   LibraryIcon,
+  ListFilterIcon,
   ListTodoIcon,
+  MoreHorizontalIcon,
   MessagesSquareIcon,
   PlusIcon,
   RefreshCwIcon,
@@ -43,9 +46,24 @@ const row = 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2'
 function ControlsDemo() {
   const [on, setOn] = React.useState(true)
   const [checked, setChecked] = React.useState(true)
+  const [modified, setModified] = React.useState(false)
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-3">
       <Input placeholder="Text input" aria-label="Text input" />
+      {/* The quiet secondary beside a search field (council round 18 A3): one chip look for every action there. */}
+      <div className={row}>
+        <Input placeholder="Search settings" aria-label="Search settings" className="dshx:min-w-0 dshx:flex-1" />
+        <Toggle variant="quiet" pressed={modified} onPressedChange={setModified}>
+          Modified
+        </Toggle>
+        <Button variant="quiet">
+          <ListFilterIcon aria-hidden />
+          Filters
+        </Button>
+        <Button variant="quiet" size="icon" aria-label="More actions">
+          <MoreHorizontalIcon aria-hidden />
+        </Button>
+      </div>
       <div className={row}>
         <Select defaultValue="system">
           <SelectTrigger aria-label="Theme" className="dshx:min-w-40">

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.js'
-import { triggerLook } from './input.js'
+import { quietLook, triggerLook } from './input.js'
 import { Slot } from 'radix-ui'
 
 /**
@@ -64,6 +64,11 @@ const buttonVariants = cva(
          * reads as a second title or a chip. Outside `Button`, read it through `cn(buttonVariants({ variant: 'bar' }))`.
          */
         bar: 'dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:active:bg-(--dsw-alias-interactive-bg-active)',
+        /*
+         * The quiet secondary (council round 18 A3, `quietLook` in input): an action beside a search field, the quiet
+         * trigger's chip with a 500 label in secondary ink, centred, ink on hover, while open and pressed.
+         */
+        quiet: cn(quietLook, 'dshx:active:bg-(--dsw-alias-interactive-bg-active)'),
       },
       size: {
         default: 'dshx:h-(--dshx-control-h) dshx:px-3 dshx:py-1.5 dshx:has-[>svg]:px-2.5',

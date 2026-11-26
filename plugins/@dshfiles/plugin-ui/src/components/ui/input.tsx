@@ -29,6 +29,17 @@ export const triggerLook =
  * `Input rest="trigger"`, or put the class string on a wrapper that holds the input (an `InputGroup`): `focus-within`
  * reaches the wrapper too. The box never changes size.
  */
+/**
+ * The quiet secondary (council round 18 A3): one look for every action beside a search field (a Modified filter, a View
+ * or Filter menu, a Filters sheet, a toolbar ⋯). It is the quiet trigger's chip (the trigger fill and the 1px hairline,
+ * the 3:1 field edge on hover and while open), with the label and glyph in secondary ink at 500, ink on hover and while
+ * open. A pressed toggle (`aria-pressed`, which Radix Toggle sets too) takes the selection wash, the field edge and ink,
+ * so on reads apart from off without colour alone. Header actions stay `outline`; a control that shows a value stays
+ * `field`. Use it as `Button variant="quiet"` or `Toggle variant="quiet"`; outside them, read
+ * `cn(buttonVariants({ variant: 'quiet' }))`.
+ */
+export const quietLook = `${triggerLook} dshx:text-muted-foreground dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:aria-expanded:text-foreground dshx:data-[state=open]:text-foreground dshx:aria-pressed:border-field-border dshx:aria-pressed:bg-selected-wash dshx:aria-pressed:text-foreground`
+
 export const typeableTriggerLook =
   'dshx:rounded-lg dshx:border dshx:border-border dshx:bg-trigger-fill dshx:not-disabled:hover:border-field-border dshx:aria-expanded:border-field-border dshx:focus-within:border-field-border dshx:focus-within:bg-background'
 
