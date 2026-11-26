@@ -66,6 +66,7 @@ import { StageFold, type StageFoldState } from './stage-fold.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
 import { SettingsColumn, type SettingsColumnRow } from './settings-column.js'
+import { SettingsColumnScroll } from './settings-column-scroll.js'
 import { SettingsEntryGlyph, SettingsIcons, SettingsToneMark } from '@dshfiles/settings-shell/settings-icons'
 
 const ICONS = {
@@ -696,13 +697,22 @@ const SettingsColumnList = (props: {
   const state: SettingsNavigationState = useSyncExternalStore(navigation.state.subscribe, navigation.state.get, navigation.state.get)
   useEffect(() => navigation.attach(), [navigation])
   const { groups, rest } = useMemo(() => SettingsColumn.merge({ state, entries: props.entries }), [state, props.entries])
+  // The current row comes into view at its nearest edge, with the label of a group the top edge cuts (council round 18
+  // B2.4), whenever the current place changes; a frame later, once a category's nested row has laid out.
+  const column = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      if (column.current !== null) SettingsColumnScroll.reveal(column.current)
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [state.activeId, props.activePanelId])
   const open = (row: SettingsColumnRow): void => {
     if (row.page === undefined) navigation.select(row.id)
     else if (row.entry !== undefined) props.openEntry(row.entry)
     else props.selectPanel(row.page)
   }
   return (
-    <nav aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col" data-settings-column="">
+    <nav ref={column} aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col" data-settings-column="">
       {groups.map(group => (
         <div
           key={group.id}

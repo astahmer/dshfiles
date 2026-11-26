@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs'
 // @vitest-environment jsdom
 import { ListHeaderExtras } from './list-header-extras.js'
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DestinationSelection, DestinationShell, PHONE_TAB_PILL, type DestinationShellProps } from './destination-shell.js'
 import { MovedTo, MovedToDialog } from './moved-to-dialog.js'
+import { SettingsColumnScroll } from './settings-column-scroll.js'
 import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
 import type { PhoneMenuSnapshot, PhoneMenuTool, PhoneThreadMenuService } from '@dshfiles/rich-composer/phone-thread-menu'
 import { createContext } from 'react'
@@ -302,6 +303,19 @@ describe('DestinationShell', () => {
     expect(general.getAttribute('aria-current')).toBe('page')
     expect(general.className).toContain('dshx:bg-selected-wash')
     expect(general.className).not.toContain('selected-edge')
+  })
+
+  it('brings the current Settings row into view at its nearest edge, its group label shown (council round 18 B2.4)', async () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const reveal = vi.spyOn(SettingsColumnScroll, 'reveal').mockImplementation(() => undefined)
+    try {
+      renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(settingsState) })
+      const column = screen.getByRole('navigation', { name: 'Settings pages' })
+      await waitFor(() => expect(reveal).toHaveBeenCalledWith(column))
+    } finally {
+      reveal.mockRestore()
+    }
   })
 
   it('heads each Settings group 12/600 in the tertiary ink, +0.01em, 20px under the group above and 4px over its first row (council round 13 B5)', () => {
