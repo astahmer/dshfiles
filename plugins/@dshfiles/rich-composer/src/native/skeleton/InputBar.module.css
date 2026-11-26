@@ -723,6 +723,21 @@
   cursor: default;
 }
 
+/* Council round 25, item 6: Stop is quiet. Ink is the colour of the one thing to do next (send); stopping a running
+   turn is a ghost circle on the card's fill, rimmed with the 3:1 field edge (drawn inside, no layout shift) around a
+   10px ink square. Send's seat and the separate Stop a continuable child keeps beside a typed draft look the same. */
+.primary:is([data-send-mode='stop'], [data-stop]):not(:disabled) {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3));
+  color: var(--dshx-tone-text, var(--dsw-alias-label-primary));
+}
+
+@media (hover: hover) {
+  .primary:is([data-send-mode='stop'], [data-stop]):not(:disabled):hover {
+    background: var(--dsw-specific-selector, var(--dshx-tone-raised));
+  }
+}
+
 /* The glyph enters with a short scale-and-fade when the mode changes (the glyph is keyed by mode). */
 .sendGlyph {
   animation: send-glyph-in var(--dshx-duration-fade, 120ms) var(--dshx-motion-ease-enter, ease) both;

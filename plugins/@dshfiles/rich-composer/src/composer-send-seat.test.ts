@@ -67,3 +67,32 @@ describe('the composer send seat (council round 13 C3)', () => {
     for (const step of scheme === 'light' ? [2] : [2, 3, 4]) expect(PaletteMath.contrastRatio(p.neutral[8]!, p.neutral[step]!)).toBeGreaterThanOrEqual(3)
   })
 })
+
+describe('Stop is quiet (council round 25, item 6)', () => {
+  const STOP = '.primary:is([data-send-mode=\'stop\'], [data-stop]):not(:disabled)'
+
+  it('is a ghost circle on the card fill with the 3:1 field edge drawn inside, and an ink glyph', () => {
+    const stop = rules('', STOP)
+    expect(stop).toMatch(/background: transparent;/)
+    expect(stop).toMatch(/box-shadow: inset 0 0 0 1px var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
+    expect(stop).toMatch(/color: var\(--dshx-tone-text, var\(--dsw-alias-label-primary\)\);/)
+    // Hover lifts the ghost to the raised fill, never back to the solid ink disc.
+    expect(rules('@media (hover: hover)', `${STOP}:hover`)).toMatch(/background: var\(--dsw-specific-selector, var\(--dshx-tone-raised\)\);/)
+  })
+
+  it('draws a 10px ink square in both Stop glyphs', () => {
+    const source = readFileSync(resolve(here, 'native/skeleton/InputBar.tsx'), 'utf8')
+    const squares = [...source.matchAll(/data-stop-glyph[^>]*>\s*<rect x="([\d.]+)" y="([\d.]+)" width="([\d.]+)" height="([\d.]+)"/g)].map(match =>
+      match.slice(1).join(' '),
+    )
+    expect(squares).toEqual(['3 3 10 10', '3 3 10 10'])
+  })
+
+  it.each(['light', 'dark'] as const)('keeps the edge at 3:1 and the square at 4.5:1 on the card and its hover fill (%s)', (scheme: Scheme) => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    for (const step of [0, 1, 2]) {
+      expect(PaletteMath.contrastRatio(p.fieldBorder, p.neutral[step]!)).toBeGreaterThanOrEqual(3)
+      expect(PaletteMath.contrastRatio(p.neutral[10]!, p.neutral[step]!)).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+})

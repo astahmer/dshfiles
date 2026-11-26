@@ -105,9 +105,10 @@ const ComposerAlert = ({ text, onDone }: { readonly text: string; readonly onDon
  */
 function SendGlyph({ mode }: { readonly mode: 'stop' | 'steer' | 'queue' | 'send' }) {
   if (mode === 'stop') {
+    // Council round 25, item 6: a 10px ink square in the quiet ghost circle.
     return (
-      <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-        <rect x="3.5" y="3.5" width="9" height="9" rx="2" fill="currentColor" />
+      <svg className={css.sendGlyph} viewBox="0 0 16 16" width="16" height="16" aria-hidden data-stop-glyph="">
+        <rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor" />
       </svg>
     )
   }
@@ -631,10 +632,13 @@ export const InputBar = memo(function InputBar({
   // button (no pending upload) over a non-empty draft that is neither a
   // claimed command nor a `/` line headed for adjudication — so it never
   // describes a delivery the click cannot or does not perform; every other
-  // state keeps plain Send. A continuable child keeps Send primary and
-  // exposes Stop independently, and so does a running session while a
-  // message waits for the Host.
-  const primaryStops = running && subagent === null && !sending && (empty || blocked !== undefined)
+  // state keeps plain Send. A continuable child exposes Stop independently
+  // once a draft brings Send back, and so does a running session while a
+  // message waits for the Host. dshfiles (council round 25, item 6): with
+  // nothing to send, a running continuable child shows the one Stop in
+  // Send's seat too, not a Stop beside a disabled Send; what a click, Enter
+  // or a typed draft does is unchanged.
+  const primaryStops = running && (subagent === null || continuable) && !sending && (empty || blocked !== undefined)
   const primaryRetries = !running && subagent === null && empty && retryableFailure !== undefined
     && !pendingHumanInput && historyOpen && !submissionPending && !disabled && input.queue.length === 0
     && input.phase === 'plain' && retry !== undefined
@@ -898,18 +902,19 @@ export const InputBar = memo(function InputBar({
               />
             )}
             <div className={css.send}>
-            {interruptible && !cancelDenied && (
+            {interruptible && !primaryStops && !cancelDenied && (
               <Tooltip label={t('input.stop')} shortcutKeys={stopKeys} side="top" delayMs={500} disabled={stopAction === undefined} portal>
                 <button
                   type="button"
                   className={css.primary}
                   aria-label={t('input.stop')}
+                  data-stop=""
                   disabled={stopAction === undefined}
                   onMouseDown={keepFocus}
                   onClick={stopAction}
                 >
-                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden>
-                    <rect x="3" y="3" width="10" height="10" rx="3" fill="currentColor" />
+                  <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden data-stop-glyph="">
+                    <rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor" />
                   </svg>
                 </button>
               </Tooltip>
