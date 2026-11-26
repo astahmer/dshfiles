@@ -1,9 +1,18 @@
 import { ModelMark } from '@dshfiles/plugin-ui/components/model-mark'
-import { useState } from 'react'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { useId, useState } from 'react'
+import { STATS_MORE_LINK } from './cost-summary.js'
 import { UsageFormattingModel } from './format.js'
 import type { ChartQuery, ChartView } from './api.js'
 
-const TABLE_COLUMNS = ['requests', 'sessions', 'averageTokens', 'input', 'cacheRead', 'cacheWrite', 'output', 'cacheShare', 'costShare', 'cost'] as const
+/**
+ * The table summarizes first: requests, threads, tokens and cost; token composition and the shares open under "Show
+ * breakdown" (council round 17, D2).
+ */
+const SUMMARY_COLUMNS = ['requests', 'sessions', 'tokens', 'cost'] as const
+const TABLE_COLUMNS = ['requests', 'sessions', 'tokens', 'averageTokens', 'input', 'cacheRead', 'cacheWrite', 'output', 'cacheShare', 'costShare', 'cost'] as const
 
 type TableColumn = (typeof TABLE_COLUMNS)[number]
 type CalendarMetric = 'tokens' | 'cost' | 'requests'
@@ -11,6 +20,7 @@ type CalendarMetric = 'tokens' | 'cost' | 'requests'
 const columnLabels = {
   requests: 'Requests',
   sessions: 'Threads',
+  tokens: 'Tokens',
   averageTokens: 'Avg tokens / req',
   input: 'Input',
   cacheRead: 'Cache read',
@@ -27,6 +37,7 @@ const sortableValue = (row: ChartView['breakdown']['model'][number], column: Tab
   if (column === 'requests') return row.requests
   if (column === 'sessions') return row.sessions ?? null
   if (column === 'cost') return row.cost
+  if (column === 'tokens') return row.tokens
   if (column === 'costShare') return row.cost
   if (column === 'averageTokens') return row.missingUsage === 0 && row.requests > 0 ? row.tokens / row.requests : null
   if (column === 'input') return row.missingUsage === 0 ? (row.input ?? null) : null
@@ -40,6 +51,7 @@ const sortableValue = (row: ChartView['breakdown']['model'][number], column: Tab
 const cellValue = (row: ChartView['breakdown']['model'][number], column: TableColumn, totalCost: number | null): string => {
   if (column === 'requests') return numberValue(row.requests)
   if (column === 'sessions') return numberValue(row.sessions)
+  if (column === 'tokens') return row.missingUsage === 0 ? numberValue(row.tokens) : `${numberValue(row.tokens)}*`
   if (column === 'averageTokens') {
     const average = sortableValue(row, column)
     return average === null ? '—' : numberValue(average)
@@ -63,8 +75,18 @@ export const UsageBreakdownTable = (props: {
   readonly view: ChartView
   readonly groupBy: ChartQuery['groupBy']
   readonly onShowRequests: (search: string, groupBy: ChartQuery['groupBy']) => void
+  /** Opens with the token composition and shares showing. */
+  readonly defaultBreakdown?: boolean
 }): JSX.Element => {
   const [sort, setSort] = useState<{ column: TableColumn | 'group'; direction: 'asc' | 'desc' }>({ column: 'cost', direction: 'desc' })
+  const [breakdown, setBreakdown] = useState(props.defaultBreakdown === true)
+  const tableId = useId()
+  const columns: readonly TableColumn[] = breakdown ? TABLE_COLUMNS : SUMMARY_COLUMNS
+  const toggleBreakdown = (): void => {
+    // Closing the breakdown never leaves the rows sorted by a column that is no longer on screen.
+    if (breakdown && sort.column !== 'group' && !SUMMARY_COLUMNS.some(column => column === sort.column)) setSort({ column: 'cost', direction: 'desc' })
+    setBreakdown(!breakdown)
+  }
   const rows = props.view.breakdown[props.groupBy] ?? []
   const totalCost = props.view.summary.missingUsage === 0 && props.view.summary.unpriced === 0 ? props.view.summary.cost : null
   const sorted = [...rows].sort((left, right) => {
@@ -123,19 +145,29 @@ export const UsageBreakdownTable = (props: {
     // The hairline card the totals, trend and "Where it went" above take, so the page keeps one rhythm; the cells' own
     // 8 px inset is pulled back so the first column starts on the title's edge (council round 13, D1).
     <section className="dshx:min-w-0 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:pt-3.5 dshx:pb-2 dshx:@max-pane-narrow:px-3">
-      <h3 className="dshx:mb-1 dshx:text-sm dshx:font-semibold">Usage distribution</h3>
-      <div className="dshx:-mx-2 dshx:overflow-x-auto">
+      {/* The header line the Totals card has: the title, then the disclosure at its end (council round 17, D2). */}
+      <div className="dshx:mb-1 dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-3" data-usage-distribution-header>
+        <h3 className="dshx:text-sm dshx:font-semibold">Usage distribution</h3>
+        <Button aria-controls={tableId} aria-expanded={breakdown} className={STATS_MORE_LINK} onClick={toggleBreakdown} type="button" variant="link">
+          {breakdown ? 'Hide breakdown' : 'Show breakdown'}
+          <ChevronDownIcon
+            aria-hidden
+            className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', breakdown && 'dshx:rotate-180')}
+          />
+        </Button>
+      </div>
+      <div className="dshx:-mx-2 dshx:overflow-x-auto" id={tableId}>
         <table className="dshx:w-full dshx:text-sm">
           <thead className="dshx:border-b dshx:border-border">
             <tr>
               {heading('group', props.groupBy === 'provider' ? 'Provider / account' : props.groupBy[0]?.toUpperCase() + props.groupBy.slice(1))}
-              {TABLE_COLUMNS.map(column => heading(column, columnLabels[column]))}
+              {columns.map(column => heading(column, columnLabels[column]))}
             </tr>
           </thead>
           <tbody className="dshx:divide-y dshx:divide-border/50">
             {sorted.length === 0 ? (
               <tr>
-                <td colSpan={TABLE_COLUMNS.length + 1} className="dshx:p-5 dshx:text-center dshx:text-muted-foreground">
+                <td colSpan={columns.length + 1} className="dshx:p-5 dshx:text-center dshx:text-muted-foreground">
                   No usage recorded.
                 </td>
               </tr>
@@ -154,7 +186,7 @@ export const UsageBreakdownTable = (props: {
                         <span className="dshx:min-w-0 dshx:truncate">{row.key}</span>
                       </button>
                     </td>
-                    {TABLE_COLUMNS.map(column => (
+                    {columns.map(column => (
                       <td key={column} className="dshx:whitespace-nowrap dshx:px-2 dshx:py-2 dshx:text-right dshx:tabular-nums">
                         {cellValue(row, column, totalCost)}
                       </td>

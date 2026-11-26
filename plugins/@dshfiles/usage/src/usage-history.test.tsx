@@ -76,7 +76,7 @@ const view: ChartView = {
 
 describe('usage history views', () => {
   it('renders sortable group metrics and cache/cost distribution shares', () => {
-    const markup = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="provider" onShowRequests={() => 'opened'} />)
+    const markup = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="provider" onShowRequests={() => 'opened'} defaultBreakdown />)
     expect(markup).toContain('Provider / account')
     expect(markup).toContain('Avg tokens / req')
     expect(markup).toContain('Cache share')
@@ -86,11 +86,11 @@ describe('usage history views', () => {
   })
 
   it('aligns each header with its values, reserves the sort-arrow slot and drops the header band (council round 12, D1)', () => {
-    const markup = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="model" onShowRequests={() => 'opened'} />)
+    const markup = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="model" onShowRequests={() => 'opened'} defaultBreakdown />)
     // The variant follows the prefix: `first:dshx:…` is not a utility Tailwind generates.
     expect(markup).not.toMatch(/\bfirst:dshx:/u)
     const headers = markup.match(/<th [^>]*>.*?<\/th>/gsu) ?? []
-    expect(headers).toHaveLength(11)
+    expect(headers).toHaveLength(12)
     for (const header of headers) {
       expect(header).toContain('dshx:first:text-left')
       // The sort control is a bare button: no padding of its own pushes the label off the column's value edge.
@@ -117,7 +117,7 @@ describe('usage history views', () => {
     for (const token of ['dshx:rounded-lg', 'dshx:border', 'dshx:border-border', 'dshx:bg-card', 'dshx:px-4', 'dshx:pt-3.5']) expect(section.split(' ')).toContain(token)
     expect(section).not.toContain('dshx:border-t')
     // The cells' own 8 px inset is pulled back, so the first column's text starts on the title's edge.
-    expect(markup).toMatch(/<div class="[^"]*dshx:-mx-2[^"]*"><table/u)
+    expect(markup).toMatch(/<div class="[^"]*dshx:-mx-2[^"]*"[^>]*><table/u)
   })
 
   describe('the distribution table reads like "Where it went" (council round 14, D1)', () => {
@@ -141,13 +141,49 @@ describe('usage history views', () => {
     })
 
     it('keeps the headers at 12/500 in secondary ink: the cell sets the type and its sort button inherits it', () => {
-      const markup = renderToStaticMarkup(<UsageBreakdownTable view={branded} groupBy="model" onShowRequests={() => 'opened'} />)
+      const markup = renderToStaticMarkup(<UsageBreakdownTable view={branded} groupBy="model" onShowRequests={() => 'opened'} defaultBreakdown />)
       const headers = [...markup.matchAll(/<th [^>]*class="([^"]*)"[^>]*><button[^>]*class="([^"]*)"/gsu)]
-      expect(headers).toHaveLength(11)
+      expect(headers).toHaveLength(12)
       for (const [, cell = '', button = ''] of headers) {
         for (const token of ['dshx:text-xs', 'dshx:font-medium', 'dshx:text-muted-foreground']) expect(cell.split(' ')).toContain(token)
         expect(button).not.toMatch(/dshx:(?:text-(?:sm|base|foreground)|font-(?:normal|semibold))\b/u)
       }
+    })
+  })
+
+  describe('the distribution table summarizes first (council round 17, D2)', () => {
+    const headerLabels = (markup: string): string[] =>
+      [...markup.matchAll(/<th [^>]*>.*?<\/th>/gsu)].map(([header]) => header.replace(/<[^>]*>|[↑↓]/gu, ''))
+
+    it('shows model, requests, threads, tokens and cost by default', () => {
+      const markup = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="model" onShowRequests={() => 'opened'} />)
+      expect(headerLabels(markup)).toEqual(['Model', 'Requests', 'Threads', 'Tokens', 'Cost'])
+      for (const hidden of ['Avg tokens / req', 'Cache read', 'Cache share', 'Cost share']) expect(markup).not.toContain(hidden)
+      // The row's tokens: input, cache and output together.
+      expect(markup).toMatch(/<td[^>]*>200<\/td>/u)
+    })
+
+    it('puts token composition and shares under "Show breakdown", a disclosure link on the card header line', () => {
+      const closed = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="model" onShowRequests={() => 'opened'} />)
+      const header = closed.slice(closed.indexOf('data-usage-distribution-header'), closed.indexOf('<table'))
+      expect(header).toContain('Usage distribution')
+      expect(header).toMatch(/<button[^>]*aria-expanded="false"[^>]*>Show breakdown/u)
+      const open = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="model" onShowRequests={() => 'opened'} defaultBreakdown />)
+      expect(open).toMatch(/<button[^>]*aria-expanded="true"[^>]*>Hide breakdown/u)
+      expect(headerLabels(open)).toEqual([
+        'Model',
+        'Requests',
+        'Threads',
+        'Tokens',
+        'Avg tokens / req',
+        'Input',
+        'Cache read',
+        'Cache write',
+        'Output',
+        'Cache share',
+        'Cost share',
+        'Cost',
+      ])
     })
   })
 
