@@ -7,7 +7,7 @@ import {
   DropdownMenuShortcut,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { CalendarIcon, CheckIcon, FolderIcon, RepeatIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarIcon, CheckIcon, ChevronDownIcon, FolderIcon, RepeatIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
@@ -79,11 +79,17 @@ const StatusPicker = (props: {
     value={props.status}
     values={BacklogItems.statuses}
     onPick={props.onPick}
-    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-sm' : 'dshx:size-6 dshx:justify-center'}
+    // Without its name the square glyph alone read as a checkbox: an 8 px chevron beside it in a 28 × 30 px seat says
+    // it opens a menu (council round 9, D2). It overhangs its 24 px line by 2 px each way, so rows keep their height.
+    triggerClassName={props.withLabel === true ? 'dshx:h-7 dshx:px-2 dshx:text-sm' : 'dshx:-my-0.5 dshx:h-7 dshx:w-[30px] dshx:justify-center dshx:gap-0.5'}
     trigger={
       <>
         <ItemGlyphs.StatusIcon status={props.status} stale={props.stale === true} />
-        {props.withLabel === true ? <span>{ItemGlyphs.statusLabels[props.status]}</span> : null}
+        {props.withLabel === true ? (
+          <span>{ItemGlyphs.statusLabels[props.status]}</span>
+        ) : (
+          <ChevronDownIcon aria-hidden strokeWidth={3} className="dshx:size-2 dshx:shrink-0 dshx:text-muted-foreground" />
+        )}
       </>
     }
     render={status => (

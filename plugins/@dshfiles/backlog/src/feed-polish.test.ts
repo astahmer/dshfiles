@@ -63,7 +63,7 @@ describe('Backlog feed (council round 2, D2)', () => {
 
   it('lays each row on one grid: 52 px time gutter, 16 px status, title, author, with tags 4 px under the title', () => {
     expect(feed).toContain(
-      'dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[52px_16px_minmax(0,1fr)_auto] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1',
+      'dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[52px_30px_minmax(0,1fr)_auto] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1',
     )
     expect(feed).toMatch(/data-feed-entry-chips="" className="dshx:col-span-2 dshx:col-start-3/u)
   })
@@ -114,7 +114,7 @@ describe('Backlog feed (council round 3, D2)', () => {
   it('gives a one-line row 44 px, its line centred; a two-line row grows from there', () => {
     // A 44 px floor rather than padding alone: the title line height follows the density scale.
     expect(feed).toContain('dshx:min-h-[44px] dshx:rounded-lg dshx:px-2 dshx:py-[10px] dshx:transition-colors')
-    expect(feed).toContain('dshx:grid-cols-[52px_16px_minmax(0,1fr)_auto] dshx:content-center')
+    expect(feed).toContain('dshx:grid-cols-[52px_30px_minmax(0,1fr)_auto] dshx:content-center')
   })
 })
 
@@ -129,7 +129,7 @@ describe('Backlog feed lane (council round 3, D2)', () => {
 describe('Backlog feed times (council round 6, D3)', () => {
   const feed = read('feed-view.tsx')
   it('sets each time as an 11 px tabular run label in a stable leading gutter, before the status seat', () => {
-    const row = feed.slice(feed.indexOf('dshx:grid-cols-[52px_16px_minmax(0,1fr)_auto]'), feed.indexOf('<ItemPickers.Status'))
+    const row = feed.slice(feed.indexOf('dshx:grid-cols-[52px_30px_minmax(0,1fr)_auto]'), feed.indexOf('<ItemPickers.Status'))
     expect(row).toContain('<FeedEntryTime item={item} timeShownAbove={props.timeShownAbove} />')
     const gutter = /data-feed-entry-gutter=""\s*className="([^"]*)"/u.exec(feed)?.[1] ?? ''
     for (const look of ['dshx:text-2xs', 'dshx:tabular-nums', 'dshx:whitespace-nowrap']) expect(gutter).toContain(look)

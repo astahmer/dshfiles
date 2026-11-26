@@ -166,12 +166,13 @@ const FeedEntry = (props: {
         ) : null}
         {props.showAuthor ? <ItemGlyphs.ActorAvatar actorId={author} className="dshx:mt-0.5 dshx:size-7 dshx:text-2xs dshx:ring-0" /> : null}
         {/*
-         * One grid for every row (council round 2, D2): a 52 px time gutter (council round 6, D3), 16 px status seat,
-         * title, then the author when rows differ; the rest sits under the title.
+         * One grid for every row (council round 2, D2): a 52 px time gutter (council round 6, D3), the 30 px status
+         * menu seat (glyph and chevron, council round 9, D2), title, then the author when rows differ; the rest sits
+         * under the title.
          */}
-        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[52px_16px_minmax(0,1fr)_auto] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1">
+        <div className="dshx:grid dshx:min-w-0 dshx:flex-1 dshx:grid-cols-[52px_30px_minmax(0,1fr)_auto] dshx:content-center dshx:items-center dshx:gap-x-2.5 dshx:gap-y-1">
           <FeedEntryTime item={item} timeShownAbove={props.timeShownAbove} />
-          <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:w-4 dshx:justify-center">
+          <span onClick={event => event.stopPropagation()} className="dshx:flex dshx:w-[30px] dshx:justify-center">
             <ItemPickers.Status
               itemLabel={BacklogReference.labelOf(item)}
               status={item.status}
