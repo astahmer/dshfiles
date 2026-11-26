@@ -333,6 +333,16 @@ Round 18 findings, merged in `.cache/unslop-audit/r5/council/round-18-fixes.md`:
 the head on every card, so the failed card clears the tab bar), a lighter field edge still at 3:1, one quiet secondary
 beside search, an aligned AI accounts effort column, a child row that gives its title the room, the composer's model
 mark in its provider colour, dock and phone-list alignment, change-badge tones, and small shell, Usage and Backlog fixes.
+All lanes done: A kit 7 revisions `znlzmzsv` … `yttwzxvo` (a quiet secondary, the field edge at the lightest value that
+holds 3:1, toned change badges, AttentionMeta kindMark, DESIGN.md); B1 5 `nmypxvtz` … `pyxprorx` (child row without its
+state word, a fixed dock action column, one phone-list grid, quiet filters); B2 6 `kplrxkos` … `pmpuqpwt` (one inactive tab
+ink, the brand block on the strip, one phone canvas, the dark palette fill, quiet Settings controls, the nav keeps its
+group label, the Working ring); C 6 `mxynywxx` … `zuryrxkq` (every phone single-verb card's Review in its head, the failed
+card clears the tab bar by 34–41 pt, a trailing Recommended, the composer mark through the kit, one Live work seam); D 6
+`tnvrwlqp` … `xvrnpyzr` (Backlog quiet View/Filter and a divider, Usage title glyph, a sparse chart height, an 8 px share
+bar, an aligned effort column, Model actions). The lead added the background-jobs dock column, a Usage tab glyph through
+TabPlaceGlyphs and three lint fixes. Follow-ups: a preview-tab cue that does not use ink; the folded sidebar's brand
+overhang; Plugins experimental copy is core's.
 
 ## Round four
 
