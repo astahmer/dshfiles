@@ -50,6 +50,7 @@ import { requestPanelAside } from './panel-aside.js'
 import { saveTabs, storedTabs } from './tabs-storage.js'
 import { createMissingThreads } from './missing-threads.js'
 import './client.css'
+import { ThreadTabTitle } from './thread-tab-title.js'
 
 const THREAD_TAB_KEEP_EVENT = 'dshfiles:main-tabs:keep-thread'
 const THREAD_TAB_FOCUS_EVENT = 'dshfiles:main-tabs:focus-thread'
@@ -497,7 +498,7 @@ export default defineClient({
               unread: session !== undefined && attentionSessionIds.has(session.id),
               listed: session === undefined ? undefined : listedStatuses?.get(session.id)?.status,
             })
-            const title = session?.title ?? (session === undefined || session.blank ? translate('untitledThread') : session.displayTitle)
+            const title = ThreadTabTitle.of(session, translate('untitledThread'))
             const workspaceId = workspaceForThread(sessionId)
             const threadTab = {
               ...base,
