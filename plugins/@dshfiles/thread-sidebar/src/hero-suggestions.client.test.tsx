@@ -45,5 +45,10 @@ describe('the New thread Inbox chip', () => {
     // The 16px icon rule reaches only the chip's own icon, not the badges' glyphs.
     expect(chip?.className).toContain('dshx:[&>svg]:size-4')
     expect(chip?.className).not.toContain('dshx:[&_svg]:size-4')
+    // The one New-thread chip style the starters use (council round 13 B7, C6): 32px, radius 8, the raised fill, no
+    // border, 12px padding; 44px on touch.
+    for (const token of ['dshx:h-8', 'dshx:rounded-lg', 'dshx:border-0', 'dshx:bg-secondary', 'dshx:px-3', 'dshx:hover:bg-(--dshx-tone-selected)', 'dshx:pointer-coarse:h-11'])
+      expect(chip?.className.split(' ')).toContain(token)
+    for (const gone of ['dshx:border', 'dshx:border-border', 'dshx:bg-transparent', 'dshx:h-9', 'dshx:rounded-md']) expect(chip?.className.split(' ')).not.toContain(gone)
   })
 })

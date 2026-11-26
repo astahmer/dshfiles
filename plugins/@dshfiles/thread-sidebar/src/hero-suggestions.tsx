@@ -101,10 +101,11 @@ export interface HeroSuggestionActions {
   readonly openInbox: () => void
 }
 
-// Flat cards on a hairline (the composer stays the only elevated object); 48pt rows on touch. The 16px rule reaches the
-// card's own icon only, so a StatusCount badge keeps its small glyph.
+// The one New-thread chip style, the starters' own (council round 13 B7, C6): 32px, radius 8, the raised fill, no
+// border, 12px padding, 44px on touch. The 16px rule reaches the chip's own icon only, so a StatusCount badge keeps its
+// small glyph.
 const CARD =
-  'dshx-root dshx:inline-flex dshx:h-9 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-12 dshx:pointer-coarse:text-base dshx:[&>svg]:size-4 dshx:[&>svg]:flex-none'
+  'dshx-root dshx:inline-flex dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-0 dshx:bg-secondary dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-(--dshx-tone-selected) dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:text-base dshx:[&>svg]:size-4 dshx:[&>svg]:flex-none'
 
 /** The cards for one hero; nothing when no card has real data. */
 export const HeroSuggestionCards = (props: {
