@@ -16,6 +16,7 @@ import {
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1462,7 +1463,7 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]]:pt-2 dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:gap-2',
         // Council round 9 C2: the tabs root frames the phone's Triage button on the switcher's row; the strip keeps clear of it.
         'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:relative',
-        triageable && 'dshx:in-data-shell-phone-nav:[&_[data-slot=page-tab-strip]]:pr-20',
+        triageable && 'dshx:in-data-shell-phone-nav:[&_[data-slot=page-tab-strip]]:pr-13',
       )}
       // The kit's list lane (920px): header and list share one container, so Start triage ends on the list's edge.
       width="lane"
@@ -1477,10 +1478,17 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       }}
     >
       {triageable ? (
-        <Button type="button" variant="outline" onClick={() => void startTriage()} className={InboxView.PHONE_TRIAGE} data-inbox-phone-triage="">
-          <ListChecksIcon aria-hidden />
-          {t('triage')}
-        </Button>
+        // The glyph alone names it on screen; the tooltip names it where a pointer can hover (a narrow desktop window).
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button type="button" variant="outline" aria-label={t('triage')} onClick={() => void startTriage()} className={InboxView.PHONE_TRIAGE} data-inbox-phone-triage="">
+                <ListChecksIcon aria-hidden />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{t('triage')}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       ) : null}
       {notice === null ? null : (
         <Alert variant={notice.tone === 'error' ? 'destructive' : 'default'} role={notice.tone === 'error' ? 'alert' : 'status'}>
