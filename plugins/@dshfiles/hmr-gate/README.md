@@ -111,7 +111,8 @@ API: `hmr_gate_status` returns `{ deferred: [{ id, reason }], watched }`.
 
 Settings → Plugins gains an **HMR updates** row (the `plugins.item` seat), and
 thread-sidebar's restart status item lists the same packages with its restart
-verbs. The row's summary line names how many plugins wait for a Host restart; its
+verbs. The row's summary line names how many plugins wait for a Host restart (with
+nothing pending: "See which rebuilt plugins wait for a DSH restart."); its
 page lists them and says what a restart applies. This is the notice, not a gate
 bypass: the browser keeps running the last-good code either way.
 

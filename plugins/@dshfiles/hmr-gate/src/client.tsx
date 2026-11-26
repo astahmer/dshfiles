@@ -7,6 +7,7 @@ import { useSyncExternalStore } from 'react'
 import { hmrGateApi } from './api.js'
 import { decodeFrame, type DeferredPackage, type HmrFrame } from './frames.js'
 import { createPendingReread } from './reread.js'
+import { rowSummary } from './row-summary.js'
 import { SlotCrashRecovery } from './slot-crash-recovery.js'
 import { createQuietReload, SwapGuard } from './swap-guard.js'
 import { HeldUpdates, UpdateDeferral, type ApplyUpdates, type HeldFrame, type PageMoment } from './update-deferral.js'
@@ -66,19 +67,11 @@ const subscribe = (listener: () => void): (() => void) => {
 
 const snapshot = (): readonly DeferredPackage[] => current
 
-/** One line that says what a restart would apply; undefined while nothing is pending. */
-const summaryText = (packages: readonly DeferredPackage[]): string | undefined => {
-  if (packages.length === 0) return undefined
-  if (packages.length === 1) return `${packages[0]?.id ?? 'A plugin'} applies after DSH restarts.`
-  return `${String(packages.length)} plugins apply after DSH restarts.`
-}
-
 const HmrGateRow = (props: { readonly view: 'summary' | 'page' }): JSX.Element | null => {
   const packages = useSyncExternalStore(subscribe, snapshot, snapshot)
-  const summary = summaryText(packages)
 
   if (props.view === 'summary') {
-    return summary === undefined ? null : <span className="dshx:text-muted-foreground dshx:text-sm">{summary}</span>
+    return <span className="dshx:text-muted-foreground dshx:text-sm">{rowSummary(packages.map(entry => entry.id))}</span>
   }
 
   return (
