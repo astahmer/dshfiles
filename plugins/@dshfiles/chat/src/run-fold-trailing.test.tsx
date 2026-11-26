@@ -122,3 +122,19 @@ describe('a run beside a failed call kept outside "Worked for" (round 21 D6)', (
     expect(rows()).toEqual(failed)
   })
 })
+
+describe('the run summary row (council round 23, items 1 and 2)', () => {
+  it('leads the failed clause with the cross and ends on the count, with no glyph after it', () => {
+    kinds()
+    status.set('c2', 'failed')
+    render(<Flow nodeStore={store(['c1', 'c2', 'c3'], new Set())} inside={['c1', 'c2', 'c3']} trailing={[]} />)
+    const row = screen.getByRole('button')
+    expect(row.getAttribute('aria-label')).toBe('3 subagents · 2 working · 1 failed')
+    // The failed clause reads "✕ 1 failed" in the failed ink, as every other count does.
+    const failedClause = row.querySelector('[data-work-count-tone="failed"]')
+    expect(failedClause?.textContent).toBe('1 failed')
+    expect(failedClause?.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
+    // Nothing trails the count: a red ✕ there read as a dismiss control.
+    expect(row.querySelectorAll('[data-slot="status-glyph"]')).toHaveLength(1)
+  })
+})

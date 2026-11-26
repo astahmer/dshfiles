@@ -6,7 +6,7 @@
 import { createContext, memo, useCallback, useContext, useId, useLayoutEffect, useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { ChevronDownIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
-import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { WorkCountText } from '@dshfiles/plugin-ui/components/work-count'
 import { LiveElapsed, formatElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import type { RunFoldCall, RunFoldKind, RunFoldMemberState, RunFoldRuntime } from '../../run-folds.ts'
 import { RunFoldKinds } from '../../run-fold-kinds.ts'
@@ -316,13 +316,10 @@ const SummaryRow = memo(function SummaryRow({ runKey, results, t }: { readonly r
           <kind.Icon className={css.iconSvg} />
         </span>
       ))}
+      {/* Council round 23, items 1 and 2: the failed clause leads with the list's ✕ (the one count treatment), and no
+          glyph trails the count: a red ✕ at the row's end read as a dismiss control. */}
       <span className={css.label} aria-hidden="true">
-        {parts.map((part, index) => (
-          <span key={`${String(index)}:${part.text}`} className={part.tone === 'plain' ? undefined : css[part.tone === 'failed' ? 'failed' : 'needsYou']}>
-            {index === 0 ? '' : ' · '}
-            {part.text}
-          </span>
-        ))}
+        <WorkCountText parts={parts} />
         {longest === undefined ? null : (
           <span className={css.elapsed}>
             {' · '}
@@ -334,7 +331,6 @@ const SummaryRow = memo(function SummaryRow({ runKey, results, t }: { readonly r
           </span>
         )}
       </span>
-      <StatusGlyph status={RunFoldModel.glyph(counts)} decorative className={css.glyph} />
     </button>
   )
 })
