@@ -47,6 +47,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 18 (round-17 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | Round six, target 9.5; all seats pass the subagent model; shared: phone failed Inbox card, AI accounts column, secondary buttons |
 | 19 (round-18 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | No increase (first). Shared: the Inbox's folded brand overhang; Opus: sidebar content presses against the new brand hairline (regression) |
 | 20 (round-19 shots) | **9.5** | **9.5** (Astra) | **9.5** (Fable, for Mistral) | **Round six target met.** Mistral's provider failed every request this round; Fable held its seat |
+| 22 (round-20 shots + subagent shots) | 9 | 9 (Astra) | 9 (Fable, for Mistral) | Round seven. 01–14 hold 9.5; subagent shots 7.5–9: phone dock rows lose task names, failures hard to see, four counts, phone child doesn't name its parent |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -376,6 +377,10 @@ call kept outside Worked for, the empty seat on stacked rows, Failed in the head
 (dock rows never shrink and the dock scrolls, a child's phone header with model, description and Back to the parent,
 Turn failed there); the lead `vqxwtlzv` (desktop dock dividers). New capture: `.cache/unslop-audit/r5/capture/multi-model.mjs`
 (shots 15–18). Restart when landing live: thread-sidebar's Host half (route projection version 3).
+Round 22 findings, merged in `.cache/unslop-audit/r5/council/round-22-fixes.md`: two-line phone dock rows, one dock
+header and card with a clean sticky edge, failed rows marked (Turn failed / Didn't start) and the failure notice named,
+one count formula (`6 working · 2 failed`), the phone child names its parent, a fade under the dock, the desktop child
+header state after the model, one child order, a dock model column, a merged list footer.
 
 ## Round four
 
