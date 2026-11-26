@@ -8,7 +8,7 @@ const between = (from: string, to: string): string => row.slice(row.indexOf(from
 
 describe('a phone Inbox card (round six C1)', () => {
   it('pads the head row 12px (11px before the glyph, 8px after the seat) and gives the title its own line', () => {
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-2')
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-1.5')
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px]')
     expect(InboxView.CARD_HEAD).not.toContain('py-0')
     expect(InboxView.CARD_HEAD).not.toContain('min-h-11')
@@ -42,10 +42,11 @@ describe('a phone Inbox card (round six C1)', () => {
     expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0')
   })
 
-  it('stacks phone cards 8px apart (16px on a wide pane) and drops the padding under a 44pt "Write your own…"', () => {
+  it('stacks phone cards 8px apart (16px on a wide pane) and ends a phone question card 4px under its last answer (council round 12 C3)', () => {
     const stack = /const INBOX_STACK = '([^']*)'/u.exec(panel)?.[1] ?? ''
     expect(stack).toContain('dshx:gap-4')
     expect(stack).toContain('dshx:@max-pane-narrow:gap-2')
-    expect(between('const answers = ', 'const row = ')).toContain("openable && 'dshx:@max-pane-narrow:pointer-coarse:pb-0'")
+    expect(between('const answers = ', 'const row = ')).toContain('InboxView.ANSWERS')
+    expect(InboxView.ANSWERS).toContain('dshx:@max-pane-narrow:pb-1')
   })
 })

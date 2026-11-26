@@ -76,7 +76,8 @@ describe('question options (council round 11 C6)', () => {
   it('draws unselected answers as quiet triggers and the recommended one by its tint only, at one weight', () => {
     expect(InboxView.answerVariant(false)).toBe('field')
     expect(InboxView.answerVariant(true)).toBe('attention')
-    expect(InboxView.ANSWER).toBe('dshx:font-normal')
+    // Council round 12 C3: that one weight is 500 (inbox-round12.test.ts).
+    expect(InboxView.ANSWER).toBe('dshx:font-medium')
     const answers = panel.slice(panel.indexOf('item.choices.map('), panel.indexOf('data-inbox-recommended'))
     expect(answers).toContain('variant={InboxView.answerVariant(choice.recommended === true)}')
     expect(answers).toContain('InboxView.ANSWER,')

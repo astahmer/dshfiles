@@ -387,12 +387,7 @@ const InboxRow = (props: {
   const answers = !answerable ? null : (
         <div
           data-inbox-row-actions=""
-          className={cn(
-            'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2 dshx:pb-3',
-            // A 44pt "Write your own…" ends a phone card: its own target already leaves 14px under its words (round six C1).
-            openable && 'dshx:@max-pane-narrow:pointer-coarse:pb-0',
-            InboxView.BODY_INSET,
-          )}
+          className={cn(InboxView.ANSWERS, InboxView.BODY_INSET)}
         >
           {[
                 ...item.choices.map((choice, index) => (
@@ -400,15 +395,8 @@ const InboxRow = (props: {
                     key={choice.id}
                     size="sm"
                     variant={InboxView.answerVariant(choice.recommended === true)}
-                    // On a phone each option is a full-width row of at least 44 px: a long answer wraps inside it and
-                    // reads in full (round five C3), and the row is easy to hit.
-                    className={cn(
-                      'dshx:shrink dshx:max-w-full',
-                      INBOX_CHIP,
-                      InboxView.ANSWER,
-                      'dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start',
-                      'dshx:pointer-coarse:h-auto dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:py-2.5 dshx:pointer-coarse:whitespace-normal',
-                    )}
+                    // On a phone each option is a full-width row of at least 44 px (InboxView.ANSWER_ROW).
+                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW)}
                     disabled={props.busy}
                     onClick={() => props.onAct(item, 'Answer', choice.id)}
                   >
@@ -416,7 +404,7 @@ const InboxRow = (props: {
                     <span className="dshx:truncate dshx:pointer-coarse:whitespace-normal dshx:pointer-coarse:text-left">{choice.label}</span>
                     {/* The recommendation reads in words, not only in the tint (round five C4). */}
                     {choice.recommended === true ? (
-                      <span data-inbox-recommended="" className="dshx:shrink-0 dshx:text-xs dshx:font-normal dshx:pointer-coarse:ml-auto">
+                      <span data-inbox-recommended="" className={InboxView.RECOMMENDED}>
                         {t('recommended')}
                       </span>
                     ) : null}
@@ -427,10 +415,10 @@ const InboxRow = (props: {
                   <Button
                     key="write-own"
                     size="sm"
-                    variant="ghost"
+                    variant="field"
                     data-inbox-write-own=""
-                    // Not a full-width row on a phone: it reads as a link to the thread, not a third answer.
-                    className={cn('dshx:shrink dshx:max-w-full dshx:text-muted-foreground', INBOX_CHIP)}
+                    // Council round 12 C3: the answers' resting trigger look and row, its pencil saying it opens the thread.
+                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW)}
                     onClick={() => props.onOpen(item)}
                   >
                     <PencilLineIcon aria-hidden />
@@ -1467,6 +1455,11 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         'dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden',
         // Council round 7 C2: 8px, not 12, above the segmented control and under it, so the failed card clears the tab bar.
         'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]]:pt-2 dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:gap-2',
+        // Council round 12 C3: the segmented control spans the row; its segments grow from one basis, so they are equal
+        // wherever a segment's words fit (Needs you keeps its tally's width).
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]>div]:w-full',
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]_[data-slot=tabs-list]]:w-full',
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]>[data-slot=page-tab-strip]_[data-slot=tabs-trigger]]:flex-[1_1_0]',
       )}
       // The kit's list lane (920px): header and list share one container, so Start triage ends on the list's edge.
       width="lane"

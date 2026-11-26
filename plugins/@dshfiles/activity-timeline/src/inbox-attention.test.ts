@@ -126,8 +126,9 @@ describe('Inbox on a phone (round five P2)', () => {
     expect(INBOX_CHIP).toContain('dshx:pointer-coarse:rounded-lg')
     expect(INBOX_CHIP).not.toContain('rounded-full')
     const choices = row.slice(row.indexOf('item.choices.map('), row.indexOf('const row = '))
-    expect(choices).toContain('dshx:pointer-coarse:w-full')
-    expect(choices).toContain('dshx:pointer-coarse:justify-start')
+    expect(choices).toContain('InboxView.ANSWER_ROW')
+    expect(InboxView.ANSWER_ROW).toContain('dshx:pointer-coarse:w-full')
+    expect(InboxView.ANSWER_ROW).toContain('dshx:pointer-coarse:justify-start')
   })
 
   it('never clamps a question the card can answer', () => {

@@ -17,8 +17,8 @@ describe('the phone "Needs you" segment (council round 10 C2)', () => {
 })
 
 describe('the phone Inbox card (council round 10 C2)', () => {
-  it('pads its head 8px tighter (8px above and below, not 12) and keeps the 44pt seat inside that padding', () => {
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-2')
+  it('pads its head 8px tighter (8px above and below, not 12; 6px since council round 12 C3) and keeps the 44pt seat inside that padding', () => {
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-1.5')
     expect(InboxView.CARD_HEAD).not.toContain('[&>div:first-child]:py-3')
     expect(InboxView.HEAD_SEAT).toContain('dshx:@max-pane-narrow:-my-2!')
     expect(InboxView.HEAD_SEAT).not.toContain('-my-3!')

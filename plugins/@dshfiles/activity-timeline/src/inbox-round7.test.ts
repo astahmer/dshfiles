@@ -49,8 +49,9 @@ describe('the phone Inbox (council round 7 C2)', () => {
     // below (inbox-round11.test.ts).
     expect(InboxView.EVIDENCE).toContain('dshx:@max-pane-narrow:gap-2')
     expect(row).toContain('answers === null && bodyVerbs !== null && InboxView.VERB_MARGIN,')
-    // Answers stay 8px apart.
-    expect(row.slice(row.indexOf('const answers = '), row.indexOf('const row = '))).toContain('dshx:gap-2')
+    // Answers stay 8px apart side by side; a phone stacks them 4px apart (council round 12 C3).
+    expect(row.slice(row.indexOf('const answers = '), row.indexOf('const row = '))).toContain('InboxView.ANSWERS')
+    expect(InboxView.ANSWERS).toContain('dshx:gap-2')
   })
 
   it('draws a foot verb 36px tall over the full width; the kit keeps its 44px hit area', () => {
@@ -61,7 +62,7 @@ describe('the phone Inbox (council round 7 C2)', () => {
 
   it("seats a failed card's Review and ⋯ 8px inside the card edge (44pt seats since council round 9 C1)", () => {
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pr-2')
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-2')
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-1.5')
     expect(row).toContain('data-inbox-card-menu=""')
   })
 })

@@ -74,10 +74,28 @@ const attentionVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'ou
 /**
  * A question's answers (council round 11 C6): each is the kit's quiet trigger (`field`: the trigger fill and its
  * hairline at rest, the 3:1 edge on hover), and the recommended one differs by its tint only (`attention`). Both at
- * the body weight, so the tint is the one difference; the recommendation is also said in words.
+ * one weight, so the tint is the one difference; the recommendation is also said in words. Council round 12 C3: that
+ * weight is 500, and "Recommended" is a 12/400 annotation in secondary ink 12px after the answer (the button's 6px gap
+ * plus 6px), not a second label in the tint pushed to the row's end.
  */
 const answerVariant = (recommended: boolean): 'attention' | 'field' => (recommended ? 'attention' : 'field')
-const ANSWER = 'dshx:font-normal'
+const ANSWER = 'dshx:font-medium'
+const RECOMMENDED = 'dshx:shrink-0 dshx:ml-1.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground'
+
+/**
+ * One answer row (and "Write your own…", council round 12 C3: the same resting trigger look): on a touch screen a
+ * full-width row of at least 44px, a long answer wrapping inside it and reading in full (round five C3).
+ */
+const ANSWER_ROW =
+  'dshx:shrink dshx:max-w-full dshx:pointer-coarse:w-full dshx:pointer-coarse:justify-start dshx:pointer-coarse:h-auto dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:py-2.5 dshx:pointer-coarse:whitespace-normal'
+
+/**
+ * The answers under a question: 8px apart beside each other on a wide pane. Council round 12 C3: on a phone they stack
+ * 4px apart and the card ends 4px under the last one (as Review ends the approval card), so the fold reaches the next
+ * card's title.
+ */
+const ANSWERS =
+  'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:@max-pane-narrow:gap-y-1 dshx:@max-pane-narrow:pb-1'
 
 /**
  * The verb in a card's head sits on its wash (council round 9 C3): a Failed head is already red, so its verb is red
@@ -120,8 +138,9 @@ const CARD_HEAD =
   // Council round 9 C1: the seat is top-aligned with the title's first line, and its 44px controls sit 8px inside the
   // card's edge, so the ⋯ glyph is 22px from it on every card. The glyph leads 11px inside the border, 24px from the
   // screen's edge (lane B's phone gutter).
-  // Council round 10 C2: 8px above and below the head, not 12, so each card is 8px shorter.
-  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-2' +
+  // Council round 10 C2: 8px above and below the head, not 12, so each card is 8px shorter. Council round 12 C3: 6px,
+  // so a head whose title holds one line is 52px (6 + 20 + 2 + 18 + 6).
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-1.5' +
   ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start' +
   // Council round 8 C2: the head's parts are spaced by their muted "·" separators (6px each side), not by flex gaps.
   ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
@@ -150,8 +169,9 @@ const HEAD_TWO_LINES =
 
 /**
  * The head row's seat: 28px controls pulled 4px into the row's padding on a wide pane; on a compact pane its 44pt
- * controls sit inside the 8px padding (council round 10 C2), centred on the title's first line (important: the touch rule `my-0` is emitted after the container
- * query and would otherwise win on a phone).
+ * controls take 8px above and below the title's first line (council round 10 C2), centred on it; since council round 12
+ * C3 the head's padding is 6px, so the seat reaches 2px past the band's top, inside the card's clip (important: the
+ * touch rule `my-0` is emitted after the container query and would otherwise win on a phone).
  */
 const HEAD_SEAT =
   'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-2!'
@@ -257,10 +277,11 @@ const COMMAND_BLOCK =
   'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:pl-[2ch] dshx:@max-pane-narrow:-indent-[2ch] dshx:@max-pane-narrow:leading-4.5'
 
 /**
- * The approval's evidence on a compact pane (council round 11 C1): one muted block, 6px radius, 8px by 10px inside,
- * "Runs" as its 12/16 muted caption on the first line and the command under it. A wide pane keeps "Runs: command" inline.
+ * The approval's evidence on a compact pane (council round 11 C1): one muted block, 6px radius, 6px by 10px inside
+ * (council round 12 C3: 6px, not 8, top and bottom), "Runs" as its 12/16 muted caption on the first line and the
+ * command under it. A wide pane keeps "Runs: command" inline.
  */
-const RUNS_BLOCK = 'dshx:@max-pane-narrow:block dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted dshx:@max-pane-narrow:px-2.5 dshx:@max-pane-narrow:py-2'
+const RUNS_BLOCK = 'dshx:@max-pane-narrow:block dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted dshx:@max-pane-narrow:px-2.5 dshx:@max-pane-narrow:py-1.5'
 
 /** The block's caption: "Runs" with no colon, 12/16, on its own line (the inline "Runs:" hides there). */
 const RUNS_CAPTION = 'dshx:hidden dshx:@max-pane-narrow:block dshx:@max-pane-narrow:mb-0.5'
@@ -477,6 +498,9 @@ export class InboxView {
   static readonly attentionVariant = attentionVariant
   static readonly answerVariant = answerVariant
   static readonly ANSWER = ANSWER
+  static readonly RECOMMENDED = RECOMMENDED
+  static readonly ANSWER_ROW = ANSWER_ROW
+  static readonly ANSWERS = ANSWERS
   static readonly headVariant = headVariant
   static readonly headerBand = headerBand
   static readonly CARD = CARD

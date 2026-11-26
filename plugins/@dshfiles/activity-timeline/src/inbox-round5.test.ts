@@ -45,7 +45,8 @@ describe('an Inbox card (round five C4, council round 5)', () => {
     expect(answers).not.toContain('<DropdownMenu')
     expect(answers).not.toContain('{openLabel}')
     // Answers sit 8px under the question.
-    expect(answers).toContain('dshx:pt-2 dshx:pb-3')
+    expect(answers).toContain('InboxView.ANSWERS')
+    expect(InboxView.ANSWERS).toContain('dshx:pt-2 dshx:pb-3')
   })
 
   it('names a finished turn\'s project (its mark and name), not the source\'s "Thread turns"', () => {
