@@ -561,8 +561,10 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   secondary chips hide or wrap, primary text truncates, and only then does a row wrap.
 - No horizontal page overflow at 390px. Filter rows scroll sideways (`overflow-x-auto`) instead of wrapping into a
   column of chips.
-- Transcript measure: one 680px column. Prose reads at about 66ch at the transcript size, and cards and code blocks
-  are at most 680px, aligned left with the prose. **Short code on narrow panes.** Below 448px of pane, a code block of
+- Transcript measure: one 680px column. Assistant prose stops at 36em (about 72 characters at the transcript size),
+  left-aligned (council round 11 C5); code blocks, cards, tool rows and the composer keep the 680px column, aligned
+  left with the prose. The composer card takes the 3:1 field edge (`border-field-border`), so the main input reads as
+  editable as any field. **Short code on narrow panes.** Below 448px of pane, a code block of
   12 lines or fewer soft-wraps at 12/18 mono with a continuation indent, so it reads without a sideways gesture; a
   longer block keeps horizontal scroll with the right-edge fade; the Wrap toggle flips either way. **Wrapped code.** A
   wrapped line continues 2ch right of its own statement's indent, never from column 0: the leading whitespace,

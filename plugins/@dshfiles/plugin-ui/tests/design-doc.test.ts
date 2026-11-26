@@ -280,6 +280,8 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '`MARKER_KEEP`',
       'a selected Needs-you or Failed row keeps it',
       'with an ink count of the filters that are on',
+      'Assistant prose stops at 36em (about 72 characters',
+      'The composer card takes the 3:1 field edge',
       'Only plain-text\n   rows keep the pill',
       'a quiet 1px hairline at rest (`border-border`, `--dsw-alias-border-l2`',
       '**A typeable combobox**',
@@ -296,5 +298,6 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('a 12% tint of success and danger')
     expect(design).not.toContain('gives the pill back')
     expect(design).not.toContain('with a tinted dot')
+    expect(design).not.toContain('Prose reads at about 66ch')
   })
 })
