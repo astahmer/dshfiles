@@ -363,6 +363,14 @@ Backlog toolbar air above its hairline, two account menus side by side, Usage's 
 palette scrim, a preview-tab cue that does not use ink. Restart when landing live: thread-sidebar's Host half (route
 projection version 2), plus earlier rounds' restarts.
 
+## Round seven: several subagents on different models
+
+A scratch check with five children on different models found six defects: model ids with a "/" show no model on any
+surface, the phone dock clips 4+ rows, a child's phone header has no model or parent link, a failed child reads
+Stopped/Ready/Idle, a no-mark model name misaligns, and the transcript group miscounts. Fix list and a new multi-subagent
+capture for the council: `.cache/unslop-audit/r5/council/round-21-fixes.md`. Target: every deciding seat at 9.5 on the
+28-shot set plus the subagent shots, or stop after two rounds with no increase.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
