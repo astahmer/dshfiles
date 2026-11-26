@@ -1891,6 +1891,8 @@ const PhoneNavigation = (
                 className="dshx:flex-none dshx:text-sm/4"
                 project={meta.project}
                 kind={meta.status}
+                // The list's 12px working ring before "Working" (council round 18 B2.3), as the row's glyph says it.
+                kindMark={meta.working ? <StatusGlyph status="working" decorative className="dshx:size-3" /> : undefined}
                 age={meta.subagents}
                 {...(meta.mark === undefined ? {} : { mark: meta.mark })}
               />

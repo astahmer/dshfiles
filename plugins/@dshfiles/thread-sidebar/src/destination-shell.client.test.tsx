@@ -930,7 +930,7 @@ describe('DestinationShell', () => {
       stageThreadId: 'session-1',
       stageTitle: 'Fix invoice tax rounding',
       stageWorking: true,
-      stageMeta: { project: 'billing-api', mark: { tone: 3, palette: 'balanced' }, status: 'Working', subagents: '1 subagent' },
+      stageMeta: { project: 'billing-api', mark: { tone: 3, palette: 'balanced' }, status: 'Working', working: true, subagents: '1 subagent' },
     })
     const block = document.querySelector('[data-phone-title-block]')
     expect(block?.querySelector('[data-phone-title]')?.textContent).toBe('Fix invoice tax rounding')
@@ -939,22 +939,31 @@ describe('DestinationShell', () => {
     const line = block?.querySelector<HTMLElement>('[data-phone-subtitle]')
     expect(line?.className).toContain('dshx:text-sm/4')
     expect(line?.className).toContain('dshx:text-muted-foreground')
-    expect([...(line?.querySelectorAll('[data-attention-meta-part]') ?? [])].filter(part => part.getAttribute('data-attention-meta-part') !== 'sep').map(part => [part.getAttribute('data-attention-meta-part'), part.textContent])).toEqual([
+    // The parts on screen (the kit's hidden measure copy aside).
+    expect([...(line?.querySelectorAll('[data-attention-meta-part]') ?? [])].filter(part => part.getAttribute('data-attention-meta-part') !== 'sep' && part.closest('[data-attention-meta-measure]') === null).map(part => [part.getAttribute('data-attention-meta-part'), part.textContent])).toEqual([
       ['mark', 'BA'],
       ['name', 'billing-api'],
       ['kind', 'Working'],
+      ['kind-mark', ''],
       ['age', '1 subagent'],
     ])
-    // The line says Working: no second status glyph before the title, and the bar stays one 44px row.
+    // The line says Working after the list's 12px working ring (council round 18 B2.3): one glyph, in the kind, none
+    // before the title, and the bar stays one 44px row.
+    const ring = line?.querySelector<HTMLElement>('[data-attention-meta-part="kind"] [data-attention-meta-part="kind-mark"] [data-slot="status-glyph"]')
+    expect(ring?.getAttribute('data-status')).toBe('working')
+    expect(ring?.getAttribute('aria-hidden')).toBe('true')
+    expect(ring?.className).toContain('dshx:size-3')
     expect(document.querySelector('[data-phone-title] [data-status]')).toBeNull()
     expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:h-11')
     cleanup()
     // An unknown project draws no mark and no name; a page never draws the line.
-    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', stageMeta: { project: undefined, mark: undefined, status: 'Idle', subagents: undefined } })
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', stageMeta: { project: undefined, mark: undefined, status: 'Idle', working: false, subagents: undefined } })
     expect(document.querySelector('[data-phone-subtitle] [data-attention-meta-part="mark"]')).toBeNull()
+    // Not working: no ring before the word.
+    expect(document.querySelector('[data-phone-subtitle] [data-attention-meta-part="kind-mark"]')).toBeNull()
     expect(document.querySelector('[data-phone-subtitle]')?.textContent).toContain('Idle')
     cleanup()
-    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageMeta: { project: 'billing-api', mark: undefined, status: 'Working', subagents: undefined } })
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageMeta: { project: 'billing-api', mark: undefined, status: 'Working', working: true, subagents: undefined } })
     expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
   })
 

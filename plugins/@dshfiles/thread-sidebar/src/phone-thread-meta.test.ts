@@ -28,7 +28,7 @@ const base = {
 describe('phone thread meta line (council round 17 B2.2)', () => {
   it('names the project the list names, its status word and its working subagents', () => {
     const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], status: { status: 'working', detail: 'Waiting on 1 subagent' }, subagents: 1 })
-    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Working', subagents: '1 subagent' })
+    expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Working', working: true, subagents: '1 subagent' })
   })
 
   it('reads the project a thread workspace was cut from, and a subagent its parent\'s', () => {
@@ -38,9 +38,11 @@ describe('phone thread meta line (council round 17 B2.2)', () => {
 
   it('says an attention thread\'s kind, and falls back to Working or Idle without a list status', () => {
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], status: { status: 'needs-you', detail: undefined, kind: 'Approval' } }).status).toBe('Approval')
+    // An attention kind is no working state: the header draws no working ring before it (council round 18 B2.3).
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], status: { status: 'needs-you', detail: undefined, kind: 'Approval' } }).working).toBe(false)
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], running: true }).status).toBe('Working')
     // Inside a thread the list is closed and publishes no status: a parent waiting on a working subagent still works.
-    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 1 })).toMatchObject({ status: 'Working', subagents: '1 subagent' })
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], subagents: 1 })).toMatchObject({ status: 'Working', working: true, subagents: '1 subagent' })
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).status).toBe('Idle')
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'] }).subagents).toBeUndefined()
   })

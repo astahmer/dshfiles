@@ -16,6 +16,8 @@ export interface PhoneStageMeta {
   readonly project: string | undefined
   readonly mark: { readonly tone?: number; readonly color?: string; readonly palette: ProjectColorPalette } | undefined
   readonly status: string
+  /** The status word says Working (not an attention kind): the header draws the list's working ring before it. */
+  readonly working: boolean
   readonly subagents: string | undefined
 }
 
@@ -60,8 +62,10 @@ const resolve = (input: {
   const mark = project === undefined ? undefined : markOf(chip, input.palette, input.coloured)
   // The list's status store is empty while the phone list is closed, as it is inside a thread: then the thread works while
   // it or one of its subagents runs, the bar's own working rule (council round 13 B6).
-  const status = input.status?.kind ?? input.wordOf(input.status?.status ?? (input.running || input.subagents > 0 ? 'working' : 'idle'))
-  return { project, mark, status, subagents: input.subagents > 0 ? input.subagentsLabel(input.subagents) : undefined }
+  const work = input.status?.status ?? (input.running || input.subagents > 0 ? 'working' : 'idle')
+  const status = input.status?.kind ?? input.wordOf(work)
+  const working = input.status?.kind === undefined && work === 'working'
+  return { project, mark, status, working, subagents: input.subagents > 0 ? input.subagentsLabel(input.subagents) : undefined }
 }
 
 export const PhoneThreadMeta = { resolve }
