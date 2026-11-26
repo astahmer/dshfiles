@@ -29,12 +29,13 @@ function subagentTitle(reason: unknown): ChatKey {
 
 /**
  * dshfiles (council round 22, item 2): the reason a subagent's run failed, for a notice that names the child. A stop
- * (`aborted`) and a finish are no failure; a missing reason is not known to be one.
+ * (`aborted`) and a finish are no failure; a missing reason is not known to be one. A failed turn reads "Turn failed",
+ * the words its transcript row, dock row and the list use (council round 23, item 7).
  */
 function subagentFailureReason(reason: unknown): ChatKey | undefined {
   switch (reason) {
     case undefined: case '': case 'completed': case 'aborted': return undefined
-    case 'error': return 'message.trigger.subagent.reason.error'
+    case 'error': return 'message.turnProcess.turnFailed'
     case 'max-tokens': return 'message.trigger.subagent.reason.maxTokens'
     case 'refusal': return 'message.trigger.subagent.reason.refusal'
     default: return typeof reason === 'string' ? 'message.trigger.subagent.reason.unknown' : undefined

@@ -3,6 +3,7 @@ import type { RunFoldKind, RunFoldMemberState, RunFoldStatus } from '@dshfiles/c
 import { plural } from '@dshfiles/dshx/client'
 import { BotIcon } from '@dshfiles/plugin-ui/icons'
 import { useMemo } from 'react'
+import { SubagentRouteLabelModel } from './route-label.js'
 import { useSubagentFailedTurns } from './subagent-failed-turns.js'
 import { SubagentFeedModel, type SubagentPreviewState } from './subagent-feed.js'
 import { subagentStateLabel, type SubagentPreviewTranslate } from './subagent-live-preview.js'
@@ -99,4 +100,13 @@ export const subagentRunFold = (input: { readonly t: SubagentPreviewTranslate; r
     active: subagentStateLabel(input.t, 'working').toLocaleLowerCase(),
     done: subagentStateLabel(input.t, 'finished').toLocaleLowerCase(),
   }),
+  // The model a child runs on, for the notice that reports its failed run (council round 23, item 7): the same route
+  // projection, then identity, the transcript row and the dock read; unknown stays unknown.
+  useChildRoute: ({ childSessionId, useSessions }) => {
+    const label = useSessions(list => {
+      const values = list.byId[SessionId(childSessionId)]?.projectionValues
+      return SubagentRouteLabelModel.displayedAgentRouteLabel(values?.threadSidebarModelRoute, values?.subagent)
+    })
+    return useMemo(() => SubagentRouteLabelModel.routeOf(label), [label])
+  },
 })

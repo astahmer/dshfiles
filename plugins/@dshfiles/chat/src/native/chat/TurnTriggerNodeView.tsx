@@ -1,10 +1,13 @@
 /** Recorded Turn triggers and compact manual-continuation receipts. */
-import { useId, useState } from 'react'
+import { useId, useState, useSyncExternalStore } from 'react'
 import {
   BotIcon, ChevronDownIcon, ClockIcon, FileInputIcon, GitBranchIcon, GlobeIcon, GoalIcon, ListOrderedIcon, PlayIcon,
   PlugIcon, SendIcon, type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
+import { RunFoldKinds } from '../../run-fold-kinds.ts'
+import type { RunFoldChildRoute, RunFoldKind } from '../../run-folds.ts'
 import type { ChatNodeViewProps } from '../contract/slots.ts'
 import { formatMessageClock } from './message-chrome.ts'
 import { NoticeBody } from './ContextBody.tsx'
@@ -43,6 +46,37 @@ const useChildLabel = (props: TurnTriggerProps, childSessionId: string | undefin
   )
 }
 
+type ChildRouteHook = NonNullable<RunFoldKind['useChildRoute']>
+
+/**
+ * dshfiles (council round 23, item 7): line 2 of a failed subagent notice, "[mark] claude-sonnet-5-5 · Turn failed". The
+ * model comes from the transcript's subagent kind (thread-sidebar provides it through `@dshfiles/chat/run-folds`, the
+ * contract Chat owns), which reads the child's route projection; without a provider or a known model the line is the
+ * reason alone.
+ */
+const FailureDetail = (props: { readonly route: RunFoldChildRoute | undefined; readonly reason: string }) => (
+  <span className={css.detail} data-turn-trigger-detail>
+    {props.route === undefined ? null : (
+      <>
+        <RouteModel provider={props.route.provider} model={props.route.model} size="md" className={css.model} />
+        <span aria-hidden>·</span>
+      </>
+    )}
+    <span className={css.failed}>{props.reason}</span>
+  </span>
+)
+
+/** A separate component per provider, so the provider's hook keeps one call position. */
+const RoutedFailureDetail = (props: {
+  readonly useChildRoute: ChildRouteHook
+  readonly childSessionId: string
+  readonly useSessions: NonNullable<TurnTriggerProps['useSessions']>
+  readonly reason: string
+}) => <FailureDetail route={props.useChildRoute({ childSessionId: props.childSessionId, useSessions: props.useSessions })} reason={props.reason} />
+
+const useChildRouteKind = (): RunFoldKind | undefined =>
+  useSyncExternalStore(RunFoldKinds.subscribe, RunFoldKinds.get).find(kind => kind.useChildRoute !== undefined)
+
 /** Render recorded trigger attribution above the whole-Turn disclosure. */
 export function TurnTriggerNodeView(props: TurnTriggerProps) {
   const { node, t } = props
@@ -52,6 +86,7 @@ export function TurnTriggerNodeView(props: TurnTriggerProps) {
   const TriggerIcon = TRIGGER_ICONS[details.icon]
   const failure = details.failure
   const childLabel = useChildLabel(props, failure?.childSessionId)
+  const routeKind = useChildRouteKind()
   if (details.compact) return (
     <div className={css.continuation} data-generation-continuation>
       <span className={css.icon} aria-hidden><TriggerIcon size={14} strokeWidth={1.5} /></span>
@@ -60,23 +95,52 @@ export function TurnTriggerNodeView(props: TurnTriggerProps) {
   )
   const date = new Date(node.data.time)
   const time = formatMessageClock(node.data.time, t)
-  // A failed subagent run names its child and why, with the red cross the failed rows use: "Check refund rounding ·
-  // failed before it finished". Its name still starts with the notice's own title.
-  const named = failure === undefined || childLabel === undefined ? undefined : `${childLabel} · ${t(failure.reason)}`
+  if (failure !== undefined) {
+    // Council round 23, item 7: a failed subagent run reads on two lines, as its transcript row and dock row do:
+    // "✕ Diff the ledger export against totals" over "[mark] claude-sonnet-5-5 · Turn failed", on a desktop and a phone.
+    // The time moves into the disclosure, so line 1 keeps the child's name whole on a phone.
+    const reason = t(failure.reason)
+    const title = childLabel ?? t(details.title)
+    const { useSessions } = props
+    const useChildRoute = routeKind?.useChildRoute
+    return (
+      <section className={css.root} data-turn-trigger data-turn-trigger-failure="">
+        <button
+          className={`${css.header} ${css.failureHeader}`}
+          type="button"
+          aria-expanded={open}
+          aria-controls={bodyId}
+          onClick={() => { setOpen(!open) }}
+        >
+          <span className={css.icon} aria-hidden><StatusGlyph status="failed" decorative /></span>
+          {/* The name read aloud starts with what happened; the two lines say the rest. */}
+          <span className={css.srOnly}>{`${t(details.title)}: `}</span>
+          <span className={css.title}>{title}</span>
+          <ChevronDownIcon strokeWidth={1.5} size={12} className={open ? css.openChevron : css.chevron} />
+          {useChildRoute === undefined || useSessions === undefined || failure.childSessionId === ''
+            ? <FailureDetail route={undefined} reason={reason} />
+            : <RoutedFailureDetail key={routeKind?.id} useChildRoute={useChildRoute} childSessionId={failure.childSessionId} useSessions={useSessions} reason={reason} />}
+        </button>
+        {open && <div id={bodyId} className={css.body}>
+          <p className={css.explanation}>
+            <time dateTime={date.toISOString()}>{time}</time> · {t('message.trigger.explanation')}
+          </p>
+          <div className={css.content}><NoticeBody content={node.data.content} source={node.data.source} t={t} /></div>
+        </div>}
+      </section>
+    )
+  }
   return (
-    <section className={css.root} data-turn-trigger data-turn-trigger-failure={failure === undefined ? undefined : ''}>
+    <section className={css.root} data-turn-trigger>
       <button
         className={css.header}
         type="button"
         aria-expanded={open}
         aria-controls={bodyId}
-        {...(named === undefined ? {} : { 'aria-label': `${t(details.title)}: ${named}, ${time}` })}
         onClick={() => { setOpen(!open) }}
       >
-        <span className={css.icon} aria-hidden>
-          {failure === undefined ? <TriggerIcon size={14} strokeWidth={1.5} /> : <StatusGlyph status="failed" decorative />}
-        </span>
-        <span className={css.title}>{named ?? t(details.title)}</span>
+        <span className={css.icon} aria-hidden><TriggerIcon size={14} strokeWidth={1.5} /></span>
+        <span className={css.title}>{t(details.title)}</span>
         <time className={css.time} dateTime={date.toISOString()}>{time}</time>
         <ChevronDownIcon strokeWidth={1.5} size={12} className={open ? css.openChevron : css.chevron} />
       </button>

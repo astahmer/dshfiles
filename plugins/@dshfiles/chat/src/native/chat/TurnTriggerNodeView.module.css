@@ -35,6 +35,36 @@
   overflow-wrap: anywhere;
 }
 .title { min-width: 0; overflow-wrap: anywhere; }
+/* dshfiles (council round 23, item 7): a failed subagent run on two lines, the child's name over its model and why;
+   line 2 starts at the name's x, as a list row's second line does. */
+.failureHeader {
+  position: relative;
+  display: grid;
+  /* The name takes its own width (it wraps on a narrow pane) and the chevron follows it, as on the one-line notice. */
+  grid-template-columns: auto minmax(0, max-content) 1fr;
+  column-gap: 6px;
+  row-gap: 0;
+  justify-items: start;
+}
+.detail {
+  grid-column: 2 / -1;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+}
+.model { min-width: 0; }
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.failed { flex: none; color: var(--dsw-alias-state-error-primary); }
 .time { flex: none; color: inherit; font: var(--dsw-font-xxs-12); }
 .chevron, .openChevron { flex: none; color: inherit; }
 .openChevron { transform: rotate(180deg); }

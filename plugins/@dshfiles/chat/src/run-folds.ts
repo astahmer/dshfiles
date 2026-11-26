@@ -70,6 +70,17 @@ export interface RunFoldText {
   readonly notStarted?: (count: number) => string
 }
 
+/** The provider and model a child session runs on, both safe to show; what the kit's `RouteModel` draws. */
+export interface RunFoldChildRoute {
+  readonly provider: string
+  readonly model: string
+}
+
+export interface RunFoldChildRouteInput {
+  readonly childSessionId: string
+  readonly useSessions: UseSessions
+}
+
 export interface RunFoldKind {
   /** Stable id; a run of one kind folds as that kind, a run of several kinds as one combined row. */
   readonly id: string
@@ -85,6 +96,12 @@ export interface RunFoldKind {
   readonly useStates: (input: RunFoldStatesInput) => readonly RunFoldMemberState[]
   /** A hook returning this kind's words. */
   readonly useText: () => RunFoldText
+  /**
+   * For a kind whose calls start child sessions: the model a child runs on, so the notice that reports a child's failed
+   * run names it beside the child (council round 23, item 7). A hook: return an equal value while nothing changed;
+   * undefined when the model is unknown, never a guess.
+   */
+  readonly useChildRoute?: (input: RunFoldChildRouteInput) => RunFoldChildRoute | undefined
 }
 
 export const TranscriptRunFolds = defineRegistry<RunFoldKind>('@dshfiles/chat.transcript-run-fold')

@@ -43,4 +43,17 @@ describe('subagent run fold (council round 22, item 3)', () => {
     expect(result.current.calls?.(1)).toBe('1 call')
     expect(result.current.notStarted?.(1)).toBe('1 didn’t start')
   })
+
+  it('names the model a child runs on for its failure notice, from its route projection (council round 23, item 7)', () => {
+    const routed: SessionListState = {
+      ...list,
+      // SAFETY: the hook reads only the child's projection values of its summary.
+      byId: { [SessionId('child-1')]: { projectionValues: { threadSidebarModelRoute: 'anthropic/claude-sonnet-5-5' } } } as never,
+    }
+    const { result } = renderHook(() => kind.useChildRoute?.({ childSessionId: 'child-1', useSessions: select => select(routed) }))
+    expect(result.current).toEqual({ provider: 'anthropic', model: 'claude-sonnet-5-5' })
+    // An unknown child names no model.
+    const { result: unknown } = renderHook(() => kind.useChildRoute?.({ childSessionId: 'child-2', useSessions: select => select(routed) }))
+    expect(unknown.current).toBeUndefined()
+  })
 })
