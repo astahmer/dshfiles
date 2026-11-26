@@ -225,11 +225,31 @@ describe('SpendMap › a breakdown with one entry (council round 11, D1)', () =>
     expect(single).toContain('data-spend-single=""')
   })
 
-  it('keeps the label, a 6 px share bar and "amount · share", with the footer action beside them', () => {
+  it('keeps the label, a share bar and "amount · share", with the footer action beside them', () => {
     const row = /<div[^>]*data-spend-single=""[^>]*>.*?Show requests<\/button>/su.exec(single)?.[0] ?? ''
     expect(row).toContain('>Acme</span>')
-    expect(row).toMatch(/dshx:h-1\.5[^"]*"><span data-spend-share=""/u)
+    expect(row).toMatch(/dshx:h-2[^"]*"><span data-spend-share=""/u)
     expect(row).toContain('10K</span> · 100%')
+  })
+
+  it('draws the share on a track that frames it, so a 100 % share still reads as a bar (council round 12, D1)', () => {
+    const track = /<span aria-hidden="true" class="([^"]*)"><span data-spend-share=""/u.exec(single)?.[1] ?? ''
+    // A 2 px inset on a muted track: the bar sits inside a visible rim even at full width.
+    expect(track).toContain('dshx:p-0.5')
+    expect(track).toContain('dshx:h-2')
+    expect(track).toContain('dshx:bg-muted')
+    expect(single).toMatch(/data-spend-share=""[^>]*style="width:100%/u)
+    // A muted-ink track: the card-coloured `bg-muted` rim vanished on the dark card.
+    expect(track).toContain('dshx:bg-muted-foreground/30')
+  })
+
+  it('wraps the footer action under the share on a narrow card instead of clipping it (council round 12, D1)', () => {
+    const row = /<div data-spend-single="" class="([^"]*)"/u.exec(single)?.[1] ?? ''
+    expect(row).toContain('dshx:flex-wrap')
+    expect(row).toContain('dshx:gap-y-2')
+    const seat = /<span class="([^"]*)"><button type="button">Show requests/u.exec(single)?.[1] ?? ''
+    // Alone on its line, it sits at the row's end.
+    expect(seat).toContain('dshx:ml-auto')
     expect(single).not.toContain('<footer')
   })
 

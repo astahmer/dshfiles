@@ -548,13 +548,14 @@ function LeafSeat({ leaf }: { readonly leaf: SpendLeaf }) {
   )
 }
 
-/** One line: the label in full, a 6 px bar of the entry's share, then its amount and share. */
+/** One line: the label in full, a 4 px bar of the entry's share on an 8 px track, then its amount and share. */
 function ShareLine({ leaf, format }: { readonly leaf: SpendLeaf; readonly format: (value: number) => string }) {
   return (
     <>
       <span className="dshx:shrink-0 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground">{leaf.label}</span>
-      {/* The share as a bar on a quiet track, in the entry's series colour (ink without one). */}
-      <span aria-hidden className="dshx:h-1.5 dshx:min-w-12 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
+      {/* The share as a bar inside a quiet track, in the entry's series colour (ink without one). The track's 2 px rim
+          frames the bar, so a 100 % share still reads as a measure, not a slab (council round 12, D1). */}
+      <span aria-hidden className="dshx:h-2 dshx:min-w-12 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted-foreground/30 dshx:p-0.5">
         <span
           data-spend-share=""
           className={cn('dshx:block dshx:h-full dshx:rounded-full', leaf.color === undefined && 'dshx:bg-foreground')}
@@ -589,11 +590,12 @@ function LeafFlag({ leaf }: { readonly leaf: SpendLeaf }) {
  */
 function SingleLeafRow({ leaf, format, footer }: { readonly leaf: SpendLeaf; readonly format: (value: number) => string; readonly footer: React.ReactNode }) {
   return (
-    <div data-spend-single="" className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-4 dshx:pb-3.5">
+    // On a narrow card the footer action wraps under the share, at the row's end, instead of running off the card.
+    <div data-spend-single="" className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-2 dshx:px-4 dshx:pb-3.5">
       <LeafSeat leaf={leaf} />
       <ShareLine leaf={leaf} format={format} />
       <LeafFlag leaf={leaf} />
-      {footer ? <span className="dshx:ml-2 dshx:flex dshx:shrink-0 dshx:items-center">{footer}</span> : null}
+      {footer ? <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:pl-2">{footer}</span> : null}
     </div>
   )
 }
