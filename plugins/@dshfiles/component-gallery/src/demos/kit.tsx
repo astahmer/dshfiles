@@ -394,7 +394,8 @@ export const kitDemos: readonly GalleryDemo[] = [
   {
     id: 'kit-route-model',
     title: 'RouteModel',
-    description: "A subagent's model: the provider's 16px mark and the picker's name in secondary ink. No family, no mark; no model, nothing.",
+    description:
+      "A subagent's model: the provider's 16px mark and the picker's name in secondary ink. No family, no mark (stacked rows pass `seat` to keep an empty seat); no model, nothing.",
     source: "import { RouteModel, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'",
     static: true,
     render: () => (
@@ -409,6 +410,11 @@ export const kitDemos: readonly GalleryDemo[] = [
             <RouteModel provider="local" model="step-5-preview" />
           </div>
         ))}
+        <div className="dshx:grid dshx:gap-1 dshx:rounded-md dshx:bg-card dshx:px-2 dshx:py-1.5">
+          <RouteModel provider="dshx_fake_commandcode" model="deepseek/deepseek-v4-flash" seat />
+          <RouteModel provider="dshx_fake_commandcode" model="google/gemini-3.8-flash" seat />
+          <RouteModel provider="local" model="step-5-preview" seat />
+        </div>
       </div>
     ),
   },

@@ -109,16 +109,28 @@ export interface ModelIdentity {
 /**
  * A route's model identity (council round 17 A1): the mark and name every subagent surface shows. The name is the model
  * picker's: an account provider's `<provider>/` prefix says nothing under its provider and drops (`deepseek` +
- * `deepseek/deepseek-v4-flash` → `deepseek-v4-flash`). The mark is the model's family, else the provider's
- * (`anthropic` + `opus-next`), else none. No model → `undefined`: a provider alone is not a model name, and nothing is
- * guessed. Callers pass route parts they may show (thread-sidebar's `visibleRoutePart` screens secrets out first).
+ * `deepseek/deepseek-v4-flash` → `deepseek-v4-flash`). A vendor prefix that names the same family as the rest of the
+ * id says only what the mark says and drops too (round 21 D1: `dshx_fake_commandcode` + `google/gemini-3.8-flash` →
+ * `gemini-3.8-flash`); any other prefix stays (`meta-llama/llama-5-70b`). The mark is the model's family, else the
+ * provider's (`anthropic` + `opus-next`), else none. No model → `undefined`: a provider alone is not a model name, and
+ * nothing is guessed. Callers pass route parts they may show (thread-sidebar's `visibleRoutePart` screens secrets out
+ * first).
  */
 export const modelIdentity = (provider?: string, model?: string): ModelIdentity | undefined => {
   const providerId = provider?.trim() ?? ''
   const modelId = model?.trim() ?? ''
-  const name = providerId.length > 0 && modelId.startsWith(`${providerId}/`) ? modelId.slice(providerId.length + 1) : modelId
+  const name = withoutVendorPrefix(providerId.length > 0 && modelId.startsWith(`${providerId}/`) ? modelId.slice(providerId.length + 1) : modelId)
   if (name.length === 0) return undefined
   return { mark: modelFamily(name) ?? (providerId.length > 0 ? modelFamily(providerId) : undefined), name }
+}
+
+/** `google/gemini-3.8-flash` → `gemini-3.8-flash`: the first segment drops only when it names the rest's family. */
+const withoutVendorPrefix = (modelId: string): string => {
+  const separator = modelId.indexOf('/')
+  if (separator <= 0) return modelId
+  const vendor = modelFamily(modelId.slice(0, separator))
+  const rest = modelId.slice(separator + 1)
+  return vendor !== undefined && modelFamily(rest) === vendor ? rest : modelId
 }
 
 export interface RouteModelProps {
@@ -129,17 +141,22 @@ export interface RouteModelProps {
    * a row's own line or a header. The mark is 16 px in both.
    */
   readonly size?: 'sm' | 'md' | undefined
+  /**
+   * Keep an empty 16 px mark seat when no family is known (round 21 D5), so names in stacked rows (the list's child
+   * rows, the dock, the transcript rows) share one start edge. Off by default: inline, an unknown family draws no seat.
+   */
+  readonly seat?: boolean | undefined
   readonly className?: string | undefined
 }
 
 /**
  * A route's model as a subagent surface shows it (council round 17 A1): the 16 px brand mark and the display name in
- * secondary ink, 6px apart. The name truncates; the mark never shrinks. An unknown family draws no mark (no empty seat,
- * no guess); no model renders nothing. In light the mark is drawn at 85% brightness: the brand colours sit at 2.4–3.6:1
+ * secondary ink, 6px apart. The name truncates; the mark never shrinks. An unknown family draws no mark (no guess) and,
+ * unless `seat` asks for an empty 16 px seat, no seat; no model renders nothing. In light the mark is drawn at 85% brightness: the brand colours sit at 2.4–3.6:1
  * on the light fills, and a row that shows a subagent can be panel, raised or selected; at 85% every mark holds 3:1 on
  * all four fills (tests/route-model). Dark keeps the brand colour (4.1:1 or more).
  */
-export const RouteModel = ({ provider, model, size = 'sm', className }: RouteModelProps): JSX.Element | null => {
+export const RouteModel = ({ provider, model, size = 'sm', seat = false, className }: RouteModelProps): JSX.Element | null => {
   const identity = modelIdentity(provider, model)
   if (identity === undefined) return null
   return (
@@ -152,6 +169,7 @@ export const RouteModel = ({ provider, model, size = 'sm', className }: RouteMod
         className,
       )}
     >
+      {identity.mark === undefined && seat ? <span aria-hidden data-model-mark="none" className="dshx:inline-flex dshx:size-4 dshx:shrink-0" /> : null}
       {identity.mark === undefined ? null : (
         <span
           aria-hidden

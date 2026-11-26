@@ -10,8 +10,15 @@ describe('A route model identity (council round 17 A1: the subagent model is eas
     expect(modelIdentity('claude-code', 'claude-opus-5-5')).toEqual({ mark: 'claude', name: 'claude-opus-5-5' })
     // An account provider prefixes its model ids with its own id; under its provider the prefix says nothing.
     expect(modelIdentity('deepseek', 'deepseek/deepseek-v4-flash')).toEqual({ mark: 'deepseek', name: 'deepseek-v4-flash' })
-    // Another prefix stays: it is part of the model's own id.
-    expect(modelIdentity('openrouter', 'anthropic/claude-sonnet-5-5')).toEqual({ mark: 'claude', name: 'anthropic/claude-sonnet-5-5' })
+    // A vendor prefix whose family the rest of the id names says only what the mark says, and drops (round 21 D1):
+    // a route provider id such as `dshx_fake_commandcode` serves `deepseek/…` and `google/…` ids.
+    expect(modelIdentity('dshx_fake_commandcode', 'deepseek/deepseek-v4-flash')).toEqual({ mark: 'deepseek', name: 'deepseek-v4-flash' })
+    expect(modelIdentity('dshx_fake_commandcode', 'google/gemini-3.8-flash')).toEqual({ mark: 'google', name: 'gemini-3.8-flash' })
+    expect(modelIdentity('openrouter', 'anthropic/claude-sonnet-5-5')).toEqual({ mark: 'claude', name: 'claude-sonnet-5-5' })
+    // Any other prefix stays: it is part of the model's own id (no family, or a different family from the rest).
+    expect(modelIdentity('openrouter', 'meta-llama/llama-5-70b')).toEqual({ mark: undefined, name: 'meta-llama/llama-5-70b' })
+    expect(modelIdentity('openrouter', 'mistral/step-5-preview')).toEqual({ mark: 'mistral', name: 'mistral/step-5-preview' })
+    expect(modelIdentity('openrouter', 'deepseek/')).toEqual({ mark: 'deepseek', name: 'deepseek/' })
     // The provider names the family when the model id does not.
     expect(modelIdentity('anthropic', 'opus-next')).toEqual({ mark: 'claude', name: 'opus-next' })
     // No token names a family: the name alone, no mark.
@@ -36,6 +43,18 @@ describe('A route model identity (council round 17 A1: the subagent model is eas
     expect(unknown).not.toContain('data-model-mark')
     expect(unknown).toContain('>step-5-preview</span>')
     expect(renderToStaticMarkup(<RouteModel provider="openai" />)).toBe('')
+  })
+
+  it('keeps an empty 16 px seat for an unknown family with `seat`, so stacked names share one start edge (round 21 D5)', () => {
+    const seated = renderToStaticMarkup(<RouteModel provider="local" model="step-5-preview" seat />)
+    expect(seated).toMatch(
+      /^<span data-slot="route-model" data-model-family="none" class="[^"]*dshx:gap-1\.5[^"]*"><span aria-hidden="true" data-model-mark="none" class="dshx:inline-flex dshx:size-4 dshx:shrink-0[^"]*"><\/span><span class="dshx:min-w-0 dshx:truncate">step-5-preview<\/span><\/span>$/u,
+    )
+    // A known family draws the same mark with or without `seat`; no model still renders nothing.
+    expect(renderToStaticMarkup(<RouteModel provider="openai-codex" model="gpt-6.2-astra" seat />)).toBe(
+      renderToStaticMarkup(<RouteModel provider="openai-codex" model="gpt-6.2-astra" />),
+    )
+    expect(renderToStaticMarkup(<RouteModel provider="openai" seat />)).toBe('')
   })
 
   const fills = ['bg', 'panel', 'raised', 'selected'] as const

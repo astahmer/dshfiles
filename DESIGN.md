@@ -952,9 +952,12 @@ The surfaces: the transcript subagent row (the `subagent` tool card, in its head
 dock's subagent row (on the row itself, not only its expanded detail), the thread list's child row (line 2,
 `[mark] gpt-6.2-astra`, in the `AttentionMeta` way; the state word follows only for Needs you and Failed, which the glyph cannot name) and the subagent thread's header lineage. One rule,
 `modelIdentity(provider, model)`: the name is the model picker's (an account provider's own `<provider>/` prefix
-drops), the mark from the model id first and the provider id only as a fallback (route provider ids such as
-`codex_work_…` name no family); a family no token names draws the name with no mark, and no model draws nothing: a
-provider id is never shown as a model, and nothing is guessed. The name truncates and the mark never shrinks. The brand
+drops, and so does a vendor prefix that names the same family as the rest of the id: `deepseek/deepseek-v4-flash`
+→ `deepseek-v4-flash`), the mark from the model id first and the provider id only as a fallback (route provider ids
+such as `codex_work_…` name no family); a family no token names draws the name with no mark, and no model draws
+nothing: a provider id is never shown as a model, and nothing is guessed. Stacked rows (the list's child rows, the
+dock, the transcript rows) pass `seat`: an unknown family keeps an empty 16px mark seat there, so every name starts
+on one edge (round 21 D5). The name truncates and the mark never shrinks. The brand
 colours sit at 2.4–3.6:1 on the light fills, so in light the mark is drawn at 85% brightness, 3:1 on bg, panel,
 raised and the selected wash; dark keeps the brand colour (`plugin-ui/tests/route-model`).
 **Dock row grammar** (council round 8 C3): every dock row reads `› glyph · Label · detail · elapsed · worded link ↗`,
