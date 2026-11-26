@@ -315,6 +315,12 @@ measure, one phone action-foot grammar for failed cards, palette selection as wa
 no current-thread edge on the phone list, a phone thread header meta line, the sidebar's ragged trailing column, Plugins
 header buttons at 500, the unselected Inbox glyph in secondary ink, the phone transcript fade limited to 6–8 px.
 
+## Round six: toward 10
+
+Goal: every deciding seat (Opus, Astra, Mistral; Claude Fable stands in if Mistral's provider fails) at ≥ 9.5, or
+stop after two rounds with no score increase. Owner request: a subagent's model must be easy to read wherever a subagent
+appears (provider mark plus model name). First fix list: `.cache/unslop-audit/r5/council/round-17-fixes.md`.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
