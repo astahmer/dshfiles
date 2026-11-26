@@ -1,4 +1,4 @@
-import { getFiletypeFromFileName, parsePatchFiles, registerCustomTheme, type FileDiffMetadata } from '@pierre/diffs'
+import { getFiletypeFromFileName, parsePatchFiles, registerCustomTheme, type ChangeTypes, type FileDiffMetadata } from '@pierre/diffs'
 import { FileDiff, Virtualizer } from '@pierre/diffs/react'
 import { useEffect, useMemo, useRef, useSyncExternalStore, type ComponentProps, type CSSProperties, type ReactNode } from 'react'
 import { DiffStat } from './components/diff-stat.js'
@@ -88,6 +88,36 @@ const DIFF_FONT_STYLE = {
 const THEME = 'dshx-syntax'
 registerCustomTheme(THEME, () => Promise.resolve(createCssVariablesTheme({ name: THEME, variablePrefix: '--shiki-' })))
 
+/** Each change type's letter and its words; a rename that also edits the file says both. */
+const CHANGE_BADGE = {
+  change: { letter: 'M', label: 'Modified', tone: 'dshx:text-muted-foreground' },
+  new: { letter: 'A', label: 'Added', tone: 'dshx:text-success' },
+  deleted: { letter: 'D', label: 'Deleted', tone: 'dshx:text-destructive' },
+  'rename-pure': { letter: 'R', label: 'Renamed', tone: 'dshx:text-muted-foreground' },
+  'rename-changed': { letter: 'R', label: 'Renamed and modified', tone: 'dshx:text-muted-foreground' },
+} as const satisfies Record<ChangeTypes, { readonly letter: string; readonly label: string; readonly tone: string }>
+
+/**
+ * A file's change as a letter badge before its name (council round 17 A2): M modified and R renamed in the secondary
+ * ink, A added in the success tone, D deleted in the danger tone, each AA on the diff header. A 16px box with a 1px edge
+ * in the same tone, 11/16 at 600, so it reads as a status letter, not a radio button. A screen reader hears the word.
+ */
+export const ChangeBadge = (props: { readonly type: ChangeTypes }): JSX.Element => {
+  const badge = CHANGE_BADGE[props.type]
+  return (
+    <span
+      data-change-badge={props.type}
+      className={cn(
+        'dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-[4px] dshx:border dshx:border-current dshx:font-sans dshx:text-[11px]/4 dshx:font-semibold',
+        badge.tone,
+      )}
+    >
+      <span aria-hidden="true">{badge.letter}</span>
+      <span className="dshx:sr-only">{badge.label}</span>
+    </span>
+  )
+}
+
 /** Diff options and inherited style shared by every `PatchView`. */
 export class PatchLook {
   static readonly THEME = THEME
@@ -118,7 +148,7 @@ export class PatchLook {
     // Diff lines paint their band as is (theme/diff-look.ts): the library's own line mix off, dark since council round 7
     // A6 (its 20% mix), light since round 11 A3 (its 12% mix capped the light tint below the 16% the council asked for).
     '[data-line], [data-no-newline], [data-gutter-buffer], [data-column-number] { --mix-dark: 0%; --mix-light: 0%; } ' +
-    // The "modified" glyph in the secondary ink (council round 13 A2, theme/diff-look.ts).
+    // The library's change glyph is hidden: the prefix slot draws the kit ChangeBadge (council round 17 A2).
     DiffLook.CHANGE_GLYPH_CSS
 
   /**
@@ -161,6 +191,19 @@ export class PatchLook {
       <span className="dshx:flex dshx:items-center dshx:gap-3" data-patch-header-metadata="">
         <DiffStat added={added} removed={removed} />
         {extra}
+      </span>
+    )
+  }
+
+  /**
+   * A file header's leading slot: what the caller adds, then the file's `ChangeBadge` where the library's glyph was. One
+   * row, like the metadata slot, which stacks bare children.
+   */
+  static headerPrefix(file: FileDiffMetadata, extra: ReactNode): ReactNode {
+    return (
+      <span className="dshx:flex dshx:items-center dshx:gap-2" data-patch-header-prefix="">
+        {extra}
+        <ChangeBadge type={file.type} />
       </span>
     )
   }
@@ -223,7 +266,7 @@ export const PatchView = (props: PatchViewProps): JSX.Element => {
               fileDiff={file}
               options={diffOptions(file)}
               renderHeaderMetadata={file => PatchLook.headerMetadata(file, props.renderHeaderMetadata?.(file))}
-              renderHeaderPrefix={file => props.renderHeaderPrefix?.(file)}
+              renderHeaderPrefix={file => PatchLook.headerPrefix(file, props.renderHeaderPrefix?.(file))}
             />
           </div>
         ))}
