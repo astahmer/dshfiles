@@ -1285,7 +1285,8 @@ button.crumbEditable {
     width: auto;
   }
 
-  /* A 44px seat at the row's trailing end; empty, it takes no room. */
+  /* A 44px seat at the row's trailing end; empty, it takes no room. Council round 8 C4: after Live work a hairline
+     parts the strip's text from the control, so the control reads as the strip's end, not a word in the row. */
   :global(html[data-shell-phone-nav]) .jumpSeat {
     display: flex;
     flex: none;
@@ -1294,6 +1295,19 @@ button.crumbEditable {
     width: 44px;
     height: 44px;
     margin-left: auto;
+  }
+
+  :global(html[data-shell-phone-nav]) .dockHead:has(> [data-live-work-summary]) > .jumpSeat {
+    width: auto;
+    gap: 6px;
+  }
+
+  :global(html[data-shell-phone-nav]) .dockHead:has(> [data-live-work-summary]) > .jumpSeat::before {
+    content: '';
+    flex: none;
+    width: 1px;
+    height: 20px;
+    background: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   }
 
   :global(html[data-shell-phone-nav]) .jumpSeat:empty {

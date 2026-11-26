@@ -170,6 +170,14 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
     expect(opaqueAt).toBeLessThanOrEqual(16)
   })
 
+  it('ends the Live work strip with the jump control after a hairline (council round 8 C4)', () => {
+    const seat = ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:has(> [data-live-work-summary]) > .jumpSeat::before`)
+    expect(seat).toMatch(/width:\s*1px/)
+    expect(seat).toMatch(/height:\s*20px/)
+    expect(seat).toMatch(/background: var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\)/)
+    expect(ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:has(> [data-live-work-summary]) > .jumpSeat`)).toMatch(/gap:\s*6px/)
+  })
+
   it('gives the jump control a trailing seat in the dock head, beside Live work', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 27.99rem)', addEventListener: () => undefined, removeEventListener: () => undefined }))
     const host = document.createElement('div')
