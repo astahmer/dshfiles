@@ -51,8 +51,9 @@ describe('the Failed card (council round 9 C3)', () => {
     expect(row).toContain("InboxView.headMeta(item.source, project, status === 'failed')")
   })
 
-  it('reads "Review" (named "Review thread") as danger text on the red head, never a red fill on a red row', () => {
-    expect(InboxView.headVariant('failed')).toBe('danger-text')
+  it('reads "Review" (named "Review thread") on the red head in the band tint (council round 12 C2)', () => {
+    // Council round 12 C2: the band tint, the same trigger as the approval's Review (inbox-round12.test.ts).
+    expect(InboxView.headVariant('failed')).toBe('danger-tint')
     expect(InboxView.headVariant('needs-you')).toBe('attention')
     expect(verbs).toContain("place === 'head' ? InboxView.headVariant(status) : InboxView.attentionVariant(status)")
     // The short name shows on every width now; the long one is the accessible name.

@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { describe, expect, it } from 'vitest'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { InboxView } from './inbox-view.js'
+import { INBOX_CHIP } from './triage-stage.js'
 
 /** `colour` at `alpha` composited over `under`, as the browser paints a `bg-status-needs-you/12` fill (sRGB). */
 const over = (colour: Oklch, alpha: number, under: Oklch): string => {
@@ -60,6 +62,27 @@ describe('"Write your own…" (council round 12 C3)', () => {
     expect(answer).toContain('InboxView.ANSWER_ROW')
     expect(InboxView.ANSWER_ROW).toContain('dshx:pointer-coarse:w-full')
     expect(InboxView.ANSWER_ROW).toContain('dshx:pointer-coarse:min-h-11')
+  })
+})
+
+describe('the two Review verbs on head bands (council round 12 C2)', () => {
+  const verbs = panel.slice(panel.indexOf('const verbButtons = '), panel.indexOf('const headVerbs = '))
+  const open = verbs.slice(verbs.indexOf('{openable && !answerable ? ('), verbs.indexOf('</Button>', verbs.indexOf('{openable && !answerable ? (')))
+
+  it('draws an approval and a failed card head verb as the same tinted trigger, the band tint on both', () => {
+    // Failed was red text on the red band; Needs you a 12% tint that vanished into its band.
+    expect(InboxView.headVariant('failed')).toBe('danger-tint')
+    expect(InboxView.headVariant('needs-you')).toBe('attention')
+    expect(InboxView.onBand('failed')).toBe(true)
+    expect(InboxView.onBand('needs-you')).toBe(true)
+    expect(InboxView.onBand('ready')).toBe(false)
+    expect(open).toContain("band={place === 'head' && InboxView.onBand(status)}")
+    // Drawn 28px on every pointer: a 44pt band fill hung from the card's top; the kit's ::after keeps the 44pt hit area.
+    expect(InboxView.HEAD_VERB).toBe('dshx:h-7 dshx:pointer-coarse:h-7')
+    // In the merged class list the 28px touch height replaces the chip's 44pt one.
+    expect(cn(INBOX_CHIP, cn('dshx:shrink', InboxView.HEAD_VERB))).not.toContain('pointer-coarse:h-11')
+    // One size and padding for both: the same chip, size and short-verb inset whatever the status.
+    expect(open).toContain('className={cn(\'dshx:max-w-full\', INBOX_CHIP, size, shortLabel !== null && InboxView.SHORT_VERB)}')
   })
 })
 

@@ -302,6 +302,7 @@ const InboxRow = (props: {
               variant={
                 open && !item.verbs.includes('Answer') ? (place === 'head' ? InboxView.headVariant(status) : InboxView.attentionVariant(status)) : 'ghost'
               }
+              band={place === 'head' && InboxView.onBand(status)}
               className={cn('dshx:max-w-full', INBOX_CHIP, size, shortLabel !== null && InboxView.SHORT_VERB)}
               aria-label={openLabel}
               onClick={() => props.onOpen(item)}

@@ -98,11 +98,16 @@ const ANSWERS =
   'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:px-3 dshx:pt-2 dshx:pb-3 dshx:@max-pane-narrow:gap-y-1 dshx:@max-pane-narrow:pb-1'
 
 /**
- * The verb in a card's head sits on its wash (council round 9 C3): a Failed head is already red, so its verb is red
- * text, not a red fill on a red row.
+ * The verb in a card's head sits on its wash. Council round 12 C2: an approval's Review and a failed card's Review are
+ * the same trigger (one size and padding), each in its status tint at the kit's band strength (`band`, kit A2: 20% at
+ * rest, 26% hover, 32% pressed), where red text on the red band (council round 9 C3) and a 12% tint lost on the
+ * indigo band read as two different controls.
  */
-const headVariant = (status: WorkStatus): 'attention' | 'danger-text' | 'outline' =>
-  status === 'failed' ? 'danger-text' : status === 'needs-you' ? 'attention' : 'outline'
+const headVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'outline' =>
+  status === 'failed' ? 'danger-tint' : status === 'needs-you' ? 'attention' : 'outline'
+
+/** Whether a card's head carries a coloured band (headerBand), so a verb in it takes the band tint. */
+const onBand = (status: WorkStatus): boolean => status === 'needs-you' || status === 'failed'
 
 /**
  * The head band of a waiting card (round five C4): glyph, title, type and age on the kit's attention wash (A2), flush
@@ -125,9 +130,11 @@ const BODY_INSET = 'dshx:pl-9 dshx:@max-pane-narrow:px-[11px]'
 
 /**
  * The verb a card asks for sits in its head row, trailing, before the menu (round five C4, council round 5): 28px on a
- * wide pane, pulled 4px into the row's padding so the 36px band keeps its height; a 44pt target on a touch screen.
+ * wide pane, pulled 4px into the row's padding so the 36px band keeps its height. Council round 12 C2: drawn 28px on a
+ * touch screen too, now that it carries the band tint (a 44pt fill hung from the card's top edge); the kit's ::after
+ * keeps its 44pt hit area (`pointer-coarse:h-7` replaces INBOX_CHIP's touch height in `cn`).
  */
-const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
+const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-7'
 
 /**
  * The head row's trailing seat (the menu, and on a wide pane the verbs) is an ordinary part of the row at every width.
@@ -502,6 +509,7 @@ export class InboxView {
   static readonly ANSWER_ROW = ANSWER_ROW
   static readonly ANSWERS = ANSWERS
   static readonly headVariant = headVariant
+  static readonly onBand = onBand
   static readonly headerBand = headerBand
   static readonly CARD = CARD
   static readonly BODY_INSET = BODY_INSET
