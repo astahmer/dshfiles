@@ -186,16 +186,25 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
     // Desktop drew no fade above the dock (the seat's own 36px band sat behind the opaque dock), so a line resting on the
     // dock's top edge ("Answered by …" in 15) was sliced in full ink; the phone's 8px band was shorter than a cap height.
     const band = /\n\.body\[data-content-phase='active'\] \.composerSeat::before \{([^}]*)\}/u.exec(css)?.[1] ?? ''
-    expect(band).toMatch(/height: 16px;/)
     expect(band).toMatch(/bottom: calc\(100% - var\(--dsh-composer-seat-fade-inset, 0px\)\);/)
     expect(band).toMatch(/pointer-events: none;/)
-    expect(band).toMatch(/linear-gradient\(\s*180deg,\s*color-mix\(in srgb, var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,\s*var\(--dsw-alias-bg-base\) 16px\s*\)/)
+    expect(band).toMatch(/linear-gradient\(\s*180deg,\s*color-mix\(in srgb, var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,\s*var\(--dsw-alias-bg-base\) 16px,/)
     // Over the text column only, so the back-to-bottom control in the gutter stays whole.
     expect(band).toMatch(/width: min\(calc\(100% - var\(--dsh-composer-side-clearance, 0px\) \* 2\), var\(--dsh-composer-card-max-width\)\);/)
     // On the phone it ends at the dock, 8px into the seat, under the seat's clear top band.
     expect(ruleIn(PHONE, `${phone} .body[data-content-phase='active'] .composerSeat`)).toMatch(/--dsh-composer-seat-fade-inset: 8px;/)
     // A view's composer overlay sits over the view, not a transcript: no fade there.
     expect(css).toMatch(/\.scrollBody:has\(\[data-conversation-composer-overlay\]\) > \.composerSeat::before \{\s*display: none;\s*\}/)
+  })
+
+  it('hides the transcript fully 8px before the desktop dock edge, so nothing rests cut on it (council round 23, item 4)', () => {
+    // The 16px fade turned opaque exactly at the dock's top edge: "Answered by USED38" still showed faint, sliced by it.
+    const band = /\n\.body\[data-content-phase='active'\] \.composerSeat::before \{([^}]*)\}/u.exec(css)?.[1] ?? ''
+    // 16px of fade, then a solid band of --dsh-composer-seat-fade-solid (8px by default) down to the dock's edge.
+    expect(band).toMatch(/height: calc\(16px \+ var\(--dsh-composer-seat-fade-solid, 8px\)\);/)
+    expect(band).toMatch(/var\(--dsw-alias-bg-base\) 16px,\s*var\(--dsw-alias-bg-base\) 100%/)
+    // The phone already ended its fade on the Live work card's top under a clear 8px band (council round 22, item 6).
+    expect(ruleIn(PHONE, `${phone} .body[data-content-phase='active'] .composerSeat`)).toMatch(/--dsh-composer-seat-fade-solid: 0px;/)
   })
 
   it('ends the Live work strip with the jump control after a hairline (council round 8 C4)', () => {
