@@ -1,12 +1,8 @@
-import { Context, Duration, Effect, FileSystem, Layer, Path, Schema, Stream } from 'effect'
-import { ChildProcess, ChildProcessSpawner } from 'effect/process'
-import { boundedBytes } from './bounded-bytes.js'
+import { Context, Effect, FileSystem, Layer, Path, Schema } from 'effect'
 import { FrameSamplingFailed } from './errors.js'
+import { boundedInputArgs, Ffmpeg } from './ffmpeg.js'
 import { TweetContextModel, TweetLimits } from './tweet-model.js'
 
-const FFMPEG_TIMEOUT = Duration.seconds(30)
-const FFMPEG_MAX_ALLOC_BYTES = 128_000_000
-const FFMPEG_MAX_PIXELS = 16_000_000
 const FRAME_EDGE_PIXELS = 960
 const SCAN_OUTPUT_LIMIT = TweetLimits.videoScanEdge * TweetLimits.videoScanHeight * 3 * TweetLimits.maxScanCandidates + 1_000
 const isFrameName = Schema.is(Schema.String.check(Schema.isPattern(/^frame-\d{2}\.jpg$/u)))
@@ -25,25 +21,6 @@ export interface SampleRequest {
   readonly endSeconds?: number | undefined
 }
 
-/** A non-zero start is an input seek, so ffmpeg decodes the window instead of every frame before it. */
-const boundedInputArgs = (input: { readonly videoPath: string; readonly startSeconds: number }) => [
-  '-nostdin',
-  '-hide_banner',
-  '-loglevel',
-  'error',
-  '-threads',
-  '1',
-  '-max_alloc',
-  String(FFMPEG_MAX_ALLOC_BYTES),
-  '-max_pixels',
-  String(FFMPEG_MAX_PIXELS),
-  '-protocol_whitelist',
-  'file',
-  ...(input.startSeconds > 0 ? ['-ss', String(input.startSeconds)] : []),
-  '-i',
-  input.videoPath,
-]
-
 const windowFilter = (window: { readonly windowSeconds: number; readonly scanFps: number }) =>
   `trim=duration=${String(window.windowSeconds)},setpts=PTS-STARTPTS,fps=${String(window.scanFps)}:eof_action=pass`
 
@@ -55,37 +32,21 @@ export class FrameSampler extends Context.Service<
   static readonly layer = Layer.effect(
     FrameSampler,
     Effect.gen(function* () {
-      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+      const runner = yield* Ffmpeg
       const fs = yield* FileSystem.FileSystem
       const path = yield* Path.Path
 
-      /** One ffmpeg run with a 30 s deadline and a stdout cap; a missing binary and a failed decode stay distinct. */
+      /** A missing binary keeps its own reason; every other failed run is the pass's failure. */
       const ffmpeg = (input: { readonly args: ReadonlyArray<string>; readonly maxOutputBytes: number; readonly failure: 'scan-failed' | 'decode-failed' }) =>
-        Effect.gen(function* () {
-          const handle = yield* spawner.spawn(ChildProcess.make('ffmpeg', input.args, { stdin: 'ignore', forceKillAfter: Duration.seconds(1) }))
-          const [stdout, exitCode] = yield* Effect.all(
-            [
-              boundedBytes({ stream: handle.stdout, maxBytes: input.maxOutputBytes, onOverflow: () => new FrameSamplingFailed({ reason: input.failure }) }),
-              handle.exitCode,
-              Stream.runDrain(handle.stderr),
-            ],
-            { concurrency: 'unbounded' },
-          )
-          yield* Effect.annotateCurrentSpan({ 'process.exit.code': exitCode })
-          if (exitCode !== 0) return yield* new FrameSamplingFailed({ reason: input.failure })
-          return stdout
-        }).pipe(
-          Effect.scoped,
-          Effect.catchTag('PlatformError', cause =>
-            Effect.fail(new FrameSamplingFailed({ reason: cause.reason._tag === 'NotFound' ? 'ffmpeg-missing' : input.failure, cause })),
-          ),
-          Effect.timeoutOrElse({ duration: FFMPEG_TIMEOUT, orElse: () => Effect.fail(new FrameSamplingFailed({ reason: input.failure })) }),
+        runner.run(input).pipe(
+          Effect.map(result => result.stdout),
+          Effect.mapError(cause => new FrameSamplingFailed({ reason: cause.reason === 'missing' ? 'ffmpeg-missing' : input.failure, cause })),
         )
 
       const scan = (input: { readonly videoPath: string; readonly startSeconds: number; readonly windowSeconds: number; readonly scanFps: number }) =>
         ffmpeg({
           args: [
-            ...boundedInputArgs(input),
+            ...boundedInputArgs({ inputPath: input.videoPath, startSeconds: input.startSeconds }),
             '-t',
             String(input.windowSeconds),
             '-vf',
@@ -116,7 +77,7 @@ export class FrameSampler extends Context.Service<
         const select = input.frameIndexes.map(index => `eq(n\\,${String(index)})`).join('+')
         return ffmpeg({
           args: [
-            ...boundedInputArgs(input),
+            ...boundedInputArgs({ inputPath: input.videoPath, startSeconds: input.startSeconds }),
             '-t',
             String(input.windowSeconds),
             '-vf',
@@ -181,5 +142,5 @@ export class FrameSampler extends Context.Service<
         }),
       })
     }),
-  )
+  ).pipe(Layer.provide(Ffmpeg.layer))
 }
