@@ -51,6 +51,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 23 (round-21 shots + subagent shots) | 9 | 9 (Astra) | **9.5** (Fable, for Mistral) | Child views at 9.5; the parent views hold 9: transcript group shows no live state, failed count drawn four ways, text cut under the desktop dock, the phone dock is three boxes |
 | 24 (round-22 shots + subagent shots) | 9 | **9.5** (Astra) | **9.5** (Fable, for Mistral) | Astra and Fable at target; Opus: transcript model/outcome columns, the failed child's model, the phone dock end, one selected look, one clock |
 | 25 (round-23 shots + subagent shots) | 9 | 9 (Astra) | 9 (Fable, for Mistral) | No increase (first). All three: the phone transcript row for the call that never started clips its title |
+| 26 (round-24 shots + subagent shots) | **9.5** | **9.5** (Astra) | **9.5** (Fable, for Mistral) | **Round seven target met.** All three answer the owner's question yes on desktop and phone |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -419,6 +420,14 @@ prefix whenever it has a task; one 13 px size for title, model and outcome; task
 `tunqsqmv` (AI accounts shows the kit model name, the full id in tooltip and screen-reader text); C `klttnunn` …
 `yzonlszy` (one quiet Stop in Send's seat with an empty draft, every desktop dock row 33 px, Stop and Send touch areas
 apart). The capture adds 17c (the phone transcript group) and keeps rows off the phone top bar.
+
+Round 26: every deciding seat scored the round-24 set (28 standard + 12 subagent shots) 9.5/10 (Opus, Astra, Claude Fable in
+Mistral's seat; Mistral failed every request from round 17 on). Follow-ups named for 10, not done: the phone transcript row
+outside the run fold ("didn't start") takes the group's primary-ink 500 title (`subagent-tool-row.tsx:215` gates it on
+`runSeat.inRun`); the phone dock shows no cue that rows are hidden at rest (a 2.5-row peek or a bottom fade); a phone
+thread-list shot with the seven children; the desktop child prompt bubble clamped like the phone's; the dock's columns on
+the group's grid; the child order between transcript and dock; a phone dock title size. Restart when landing live:
+thread-sidebar's Host half (route projection version 3).
 
 ## Round four
 
