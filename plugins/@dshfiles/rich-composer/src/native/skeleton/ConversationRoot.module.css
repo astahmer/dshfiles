@@ -1165,15 +1165,17 @@ button.crumbEditable {
      the last line above the band. The curve eases out, opaque from 20px, so the next line's cap tops never show as
      a row of grey dashes on the dock's edge. Council round 7 C3: that band was shorter than one 24px line, so a line
      still showed as a half-faded strip over the dock. The band is 36px (1.5 lines) and turns opaque exactly where the
-     dock surface starts: the line above the dock dissolves through the whole band instead of being sliced. */
+     dock surface starts: the line above the dock dissolves through the whole band instead of being sliced. Council
+     round 8 C5: 36px greyed the last readable line as well. The band is 16px: it only overlaps text while the
+     transcript continues under the dock (at the end, Chat's end padding keeps the last line above it, in full ink),
+     and the line above it stays full ink. */
   :global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat {
-    padding-top: 36px;
+    padding-top: 16px;
     background: linear-gradient(
       180deg,
       color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
-      color-mix(in srgb, var(--dsw-alias-bg-base) 45%, transparent) 12px,
-      color-mix(in srgb, var(--dsw-alias-bg-base) 85%, transparent) 24px,
-      var(--dsw-alias-bg-base) 36px
+      color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 8px,
+      var(--dsw-alias-bg-base) 16px
     );
   }
 
