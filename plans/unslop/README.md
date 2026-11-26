@@ -44,6 +44,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 15 (round-14 shots) | 8.5 | **9** | **9** | Sol and Mistral at target; Opus: rail marks clipped (regression), Inbox tally and verbs, palette wording |
 | 16 (round-15 shots) | **9** | 8.5 (Astra) | 8.5 | Opus at target; Astra (new GPT seat): composer, answer-first Inbox, installed plugins first; Mistral: colour (owner kept the restraint) |
 | 17 (round-16 shots) | **9** | **9** (Astra) | **9** (Fable, for Mistral) | **Target met.** Mistral's provider failed every request; the owner seated Claude Fable 5.2 for this round |
+| 18 (round-17 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | Round six, target 9.5; all seats pass the subagent model; shared: phone failed Inbox card, AI accounts column, secondary buttons |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -328,6 +329,10 @@ General title mark); C 5 revisions `otlqrmor` … `knmlnoou` (one Inbox body mea
 phone fade, Inbox bars on the seat rule); D 6 revisions `rrzswuzq` … `nsuvmmxw` (a short Review subtitle, Plugins
 buttons at 500, an HMR updates description, Auto explained once, a summarised Usage table). Restart: thread-sidebar's
 Host half (its route projection is now version 2). The Mistral provider still fails; Claude Fable takes that seat.
+Round 18 findings, merged in `.cache/unslop-audit/r5/council/round-18-fixes.md`: one phone Inbox card action pattern (Review in
+the head on every card, so the failed card clears the tab bar), a lighter field edge still at 3:1, one quiet secondary
+beside search, an aligned AI accounts effort column, a child row that gives its title the room, the composer's model
+mark in its provider colour, dock and phone-list alignment, change-badge tones, and small shell, Usage and Backlog fixes.
 
 ## Round four
 
