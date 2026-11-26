@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ActionHint } from './panel-primitives.js'
-import { ModelMark } from '@dshfiles/plugin-ui/components/model-mark'
+import { ModelMark, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
 import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, InfoIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
@@ -214,6 +214,10 @@ export const ModelCuration = (props: {
               // An inherited cell reads "Auto" with its chevron; the menu and the name keep the full provenance (council round 17, D1).
               const autoLabel = defaultValue === 'Auto' ? `Auto (${defaultSource} default)` : `Auto (${defaultLabel})`
               const inheritedEffort = validEffort === undefined && model.efforts.length > 0
+              // The name every subagent surface shows (council round 25, item 4): a same-family vendor prefix drops; the
+              // tooltip, screen readers, the row's controls and the search keep the full id.
+              const shownName = modelIdentity(account.instanceId, model.name)?.name ?? model.name
+              const droppedPrefix = model.name.endsWith(shownName) ? model.name.slice(0, model.name.length - shownName.length) : ''
               return (
                 <tr key={model.id} className="dshx:border-b dshx:last:border-b-0 dshx:hover:bg-muted/20">
                   <td className="dshx:px-2 dshx:py-2">
@@ -233,7 +237,8 @@ export const ModelCuration = (props: {
                       <ActionHint label={model.id}>
                         {/* A span at 500: the Host's unlayered strong weight would outrank the utility (council round 10, D2). */}
                         <span tabIndex={0} className="dshx:min-w-0 dshx:truncate dshx:font-medium">
-                          {model.name}
+                          {droppedPrefix === '' ? null : <span className="dshx:sr-only">{droppedPrefix}</span>}
+                          {shownName}
                         </span>
                       </ActionHint>
                       {custom ? (

@@ -172,6 +172,32 @@ describe('reference Models table', () => {
     expect(container.querySelector('tbody td > div')?.className).toContain('dshx:gap-2')
     expect(container.querySelector('tbody td')?.className).toContain('dshx:px-2')
   })
+
+  it('names models the way subagent surfaces do: a same-family vendor prefix drops, the full id stays findable (council round 25, item 4)', async () => {
+    const routed = ['deepseek/deepseek-v4-flash', 'google/gemini-3.8-flash', 'meta-llama/llama-5-70b'].map(id => ({ id, name: id, efforts: [], defaultEffort: null }))
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false }, false, routed)
+    // What the row shows: the name cell's text without its screen-reader-only part.
+    const names = (): string[] =>
+      [...container.querySelectorAll('tbody span[tabindex="0"]')].map(name => {
+        const shown = name.cloneNode(true)
+        if (shown instanceof Element) for (const hidden of shown.querySelectorAll('.dshx\\:sr-only')) hidden.remove()
+        return shown.textContent ?? ''
+      })
+    // The kit's modelIdentity name: `deepseek/` and `google/` say only what the mark says; another vendor's prefix stays.
+    expect(names()).toEqual(['deepseek-v4-flash', 'gemini-3.8-flash', 'meta-llama/llama-5-70b'])
+    // The dropped prefix stays in the accessible text, and row controls keep the full id.
+    expect([...container.querySelectorAll('tbody span[tabindex="0"]')].map(name => name.textContent)).toEqual(routed.map(model => model.id))
+    expect(container.querySelector('tbody span[tabindex="0"] .dshx\\:sr-only')?.textContent).toBe('deepseek/')
+    expect(container.querySelector('[aria-label="Star google/gemini-3.8-flash"]')).not.toBeNull()
+    // The search still finds a model by its full id.
+    const search = container.querySelector<HTMLInputElement>('input[aria-label="Search models"]')
+    if (search === null) throw new Error('Expected the model search')
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(search, 'google/gemini')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect(names()).toEqual(['gemini-3.8-flash'])
+  })
 })
 
 describe('Models table cells (council round 11, D2)', () => {
