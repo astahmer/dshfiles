@@ -265,6 +265,7 @@ describe('JobPreviewDock', () => {
   })
 
   it("ends in the dock's fixed action column, so its clock lines up with a subagent row's (council round 18, B1.2)", () => {
+    // SAFETY: the dock treats the job id as an opaque key; a fresh id has no title from an earlier card.
     renderDock(fakeJobs([row({ id: 'bash-col' as JobView['id'] })]))
     const link = dockCards()[0]?.querySelector('[data-job-open-processes]')
     if (!(link instanceof HTMLElement)) throw new Error('no Open in Processes')
