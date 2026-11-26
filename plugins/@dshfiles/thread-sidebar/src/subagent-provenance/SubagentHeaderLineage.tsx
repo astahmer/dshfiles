@@ -734,8 +734,9 @@ export function SubagentCatalogAction({
 const NO_IDS: readonly string[] = []
 
 /**
- * A running child's live state right after its model: `… deepseek-v4-flash · ○ Working · 38s` (council round 22, item 7),
- * not in the header's utilities seat, where it floated mid-bar. The same signal and live-turn read as a root thread's.
+ * A running child's live state right after its model: `… deepseek-v4-flash · ○ Working` (council round 22, item 7), not
+ * in the header's utilities seat, where it floated mid-bar. The same signal and live-turn read as a root thread's, with
+ * no clock: the transcript's "Working for 33s" is the child view's one clock, as on the phone (council round 24, item 6).
  */
 const ChildLiveState = (props: {
   readonly sessionId: SubagentHeaderLineageProps['sessionId']
@@ -751,13 +752,14 @@ const ChildLiveState = (props: {
   const ids = useMemo(() => (running ? [props.sessionId] : NO_IDS), [props.sessionId, running])
   const turns = useLiveTurns(ids, phaseReady)
   const waitingOnYou = props.useSessionStatus(statuses => statuses.get(props.sessionId)?.pendingInteraction !== undefined)
+  const turn = turns.get(props.sessionId)
   if (!running) return null
   return (
     <span className={cn('dshx-root', css.childLiveState)} data-subagent-live-state="">
       <span aria-hidden="true" className={css.childLiveSeparator}>
         ·
       </span>
-      <HeaderLiveSignal turn={turns.get(props.sessionId)} waitingOnYou={waitingOnYou} labels={props.labels} />
+      <HeaderLiveSignal turn={turn === undefined ? undefined : { ...turn, startedAt: undefined }} waitingOnYou={waitingOnYou} labels={props.labels} />
     </span>
   )
 }

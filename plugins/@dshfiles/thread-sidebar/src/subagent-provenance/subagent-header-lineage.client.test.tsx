@@ -196,6 +196,10 @@ describe('SubagentHeaderLineage route provenance', () => {
     // Document order: the model, then its state.
     expect(model.compareDocumentPosition(state)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     expect(state.querySelector('[data-testid="thread-header-live-activity"]')?.textContent).toContain('Working')
+    // One clock on the child view (council round 24, item 6): the transcript says "Working for 33s", so the header
+    // reads "deepseek-v4-flash · ○ Working", as the phone does.
+    expect(state.querySelector('[data-live-elapsed]')).toBeNull()
+    expect(state.querySelector('[data-live-elapsed-separator]')).toBeNull()
     // An idle child names no state there.
     cleanup()
     const idle = render(<SubagentHeaderLineage {...props()} />)
