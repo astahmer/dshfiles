@@ -578,3 +578,11 @@
   height: 0.5px;
   background: var(--dsw-alias-border-l2);
 }
+
+/* Council round 9 (lane B's phone gutter, B4): the prompt bubble is a fill, so on a phone it ends at the 12px fill edge,
+   out of the transcript's 24px text column (ChatView.module.css). */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .userStack {
+    margin-right: -12px;
+  }
+}

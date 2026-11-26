@@ -203,3 +203,11 @@
 .root[data-filler] :global([data-dsh-markdown]) {
   color: inherit;
 }
+
+/* Council round 9 (lane B's phone gutter, B4): a code card is a fill, so on a phone it starts at the 12px fill edge,
+   out of the transcript's 24px text column (ChatView.module.css). */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .body :global([data-dsh-markdown] .md-code-block) {
+    margin-inline: -12px;
+  }
+}

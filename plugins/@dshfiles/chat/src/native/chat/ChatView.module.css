@@ -531,3 +531,12 @@
   align-items: center;
   gap: 8px;
 }
+
+/* Council round 9 (lane B's phone gutter, B4): on a phone the composer and the transcript's fills start 12px in, and
+   bare text (prose, lists, "Worked for", the turn summary) 12px further, at 24px, like every phone page. Fills pull
+   back out to the 12px edge (AssistantMarkdown's code cards, MessageItem's prompt bubble). */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .scroll {
+    padding-inline: calc(var(--dsh-composer-side-clearance) + 12px);
+  }
+}

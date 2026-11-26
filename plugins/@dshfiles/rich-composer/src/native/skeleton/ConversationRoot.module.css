@@ -892,6 +892,14 @@ button.crumbEditable {
   --dsh-composer-dock-inset: 8px;
 }
 
+/* Council round 9 (lane B's phone gutter, B4): every phone screen fills from 12px and sets its text at 24px. The
+   composer card, its dock and the transcript column fill from 12px; chat sets bare transcript text 12px further in. */
+@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  :global(html[data-shell-phone-nav]) .body:not(.embeddedBody) {
+    --dsh-composer-side-clearance: 12px;
+  }
+}
+
 .scrollBody {
   display: flex;
   flex: 1;
