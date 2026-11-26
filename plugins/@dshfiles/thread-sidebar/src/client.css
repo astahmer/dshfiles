@@ -18,6 +18,14 @@ html[data-dshfiles-zen] [data-sidebar-brand-overhang] {
   display: none;
 }
 
+/* The overhang is the open brand row (the Workbench strip's height and rule); main-tabs' strip is 38px with a 10px top
+   inset and no rule, so there it keeps that strip's line (council round 19 B2). */
+html[data-main-tabs] [data-sidebar-brand-overhang] {
+  height: 38px;
+  padding-top: 10px;
+  box-shadow: none;
+}
+
 html:is([data-main-tabs], [data-workbench-main-strip]:not([data-workbench-main-tabs='hidden'])):not([data-dshfiles-zen]) [data-sidebar-brand-fallback] {
   visibility: hidden;
 }

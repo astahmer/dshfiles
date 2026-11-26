@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 const sidebarShell = readFileSync(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
 const destinationShell = readFileSync(new URL('./destination-shell.tsx', import.meta.url), 'utf8')
 const dockviewTheme = readFileSync(new URL('../../workbench/src/dockview-theme.css', import.meta.url), 'utf8')
+const clientCss = readFileSync(new URL('./client.css', import.meta.url), 'utf8')
 
 /** The px a `dshx:<side>-<n>` spacing token in `classes` adds (Tailwind's 4px step), 0 when it is absent. */
 const spacing = (classes: string, side: 'pt' | 'py'): number => {
@@ -63,6 +64,22 @@ describe('room under the brand hairline (council round 19 B1)', () => {
     expect(spacing(header?.[2] ?? '', 'pt')).toBe(8)
     // The phone list hides the title and keeps its own 12px under the top bar.
     expect(spacing(header?.[1] ?? '', 'pt')).toBe(4)
+  })
+})
+
+describe('the folded brand overhang (council round 19 B2)', () => {
+  it('draws the overhang as the open brand row: the strip\'s height and hairline, the logo on the same line', () => {
+    const brand = classesNear(sidebarShell, 'ref={brandRef}')
+    const overhang = classesNear(sidebarShell, 'data-sidebar-brand-overhang=""')
+    for (const token of ['dshx:h-bar', 'dshx:items-center', 'dshx:shadow-[inset_0_-1px_0_var(--dshx-tone-line,var(--dsw-alias-border-l2))]']) {
+      expect(brand).toContain(token)
+      expect(overhang).toContain(token)
+    }
+    // 38px with a 10px top inset put the logo 6px under every other page's and left no bottom edge.
+    expect(overhang).not.toContain('dshx:h-[38px]')
+    expect(overhang).not.toContain('dshx:pt-2.5')
+    // main-tabs' own strip is 38px with a 10px inset and no rule: there the overhang keeps that strip's line.
+    expect(clientCss).toMatch(/html\[data-main-tabs\] \[data-sidebar-brand-overhang\] \{\s*height: 38px;\s*padding-top: 10px;\s*box-shadow: none;\s*\}/u)
   })
 })
 

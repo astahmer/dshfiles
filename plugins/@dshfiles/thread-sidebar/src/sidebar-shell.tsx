@@ -1426,9 +1426,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           ? createPortal(
               <div
                 data-sidebar-brand-overhang=""
-                // The strip's height and top inset (main-tabs): the row's controls sit on the tabs' centre line, where
-                // the open column's 48px row centres them.
-                className="dshx-root dshx:@container/brand dshx:fixed dshx:z-[16] dshx:flex dshx:h-[38px] dshx:items-center dshx:gap-1 dshx:border-r-[0.5px] dshx:border-(--dsw-alias-border-l3) dshx:bg-(--dsw-specific-sidebar-fill) dshx:px-1.5 dshx:pt-2.5 dshx:text-foreground"
+                // The open brand row's height and hairline (council round 19 B2): the logo and controls sit where every
+                // other page has them, on the strip's centre line, and the row ends on the strip's rule. main-tabs' own
+                // 38px strip keeps its line (client.css).
+                className="dshx-root dshx:@container/brand dshx:fixed dshx:z-[16] dshx:flex dshx:h-bar dshx:items-center dshx:gap-1 dshx:border-r-[0.5px] dshx:border-(--dsw-alias-border-l3) dshx:bg-(--dsw-specific-sidebar-fill) dshx:px-1.5 dshx:text-foreground dshx:shadow-[inset_0_-1px_0_var(--dshx-tone-line,var(--dsw-alias-border-l2))]"
                 style={{ left: overhangAt.left, top: overhangAt.top, width: overhangWidth }}
               >
                 {brandContent(true)}
