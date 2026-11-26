@@ -6,6 +6,9 @@ import { PaletteMath, WARM_STONE, type Scheme } from '../src/theme/palette.ts'
 import { ThemeCss } from '../src/theme/theme-css.ts'
 
 const schemes: readonly Scheme[] = ['light', 'dark']
+/** The dark bands (council round 10 A4: L 0.25, chroma 0.04) as sRGB. */
+const DARK_ADDITION_HEX = '#132717'
+const DARK_DELETION_HEX = '#321a18'
 const STATUS_HUES = [25, 80, 150] as const
 const hueDistance = (a: number, b: number): number => Math.min(Math.abs(a - b), 360 - Math.abs(a - b))
 
@@ -21,21 +24,26 @@ describe('diff surfaces (round five A4)', () => {
       expect(s.deletion).toEqual(DiffLook.mixOklab(s.body, p.danger.fg, 0.12))
     } else {
       // Council round 7 A6: a 12% tint over the dark panel moved L by about 0.005 and barely separated from the page.
-      // The dark bands are their own step, L 0.27 at chroma 0.045 in the success and danger hues.
-      expect(s.addition).toEqual({ l: 0.27, c: 0.045, h: p.success.fg.h })
-      expect(s.deletion).toEqual({ l: 0.27, c: 0.045, h: p.danger.fg.h })
+      // The dark bands are their own step in the success and danger hues; council round 10 A4 calmed them to L 0.25 at
+      // chroma 0.04 and lifted a changed word clearly above its line, to L 0.34 at 0.075.
+      expect(s.addition).toEqual({ l: 0.25, c: 0.04, h: p.success.fg.h })
+      expect(s.deletion).toEqual({ l: 0.25, c: 0.04, h: p.danger.fg.h })
+      expect(s.additionEmphasis).toEqual({ l: 0.34, c: 0.075, h: p.success.fg.h })
+      expect(s.deletionEmphasis).toEqual({ l: 0.34, c: 0.075, h: p.danger.fg.h })
       for (const band of [s.addition, s.deletion]) {
-        expect(band.l - s.body.l).toBeGreaterThanOrEqual(0.05)
+        expect(band.l - s.body.l).toBeGreaterThanOrEqual(0.04)
         expect(band.c).toBeGreaterThanOrEqual(0.04)
       }
-      // A changed word still reads one step above its line.
-      expect(s.additionEmphasis.l).toBeGreaterThan(s.addition.l)
-      expect(s.deletionEmphasis.c).toBeGreaterThan(s.deletion.c)
+      // A changed word reads clearly above its line: at least 0.08 of lightness and more chroma.
+      for (const [word, line] of [[s.additionEmphasis, s.addition], [s.deletionEmphasis, s.deletion]] as const) {
+        expect(word.l - line.l).toBeGreaterThanOrEqual(0.08)
+        expect(word.c).toBeGreaterThan(line.c)
+      }
     }
     // The collapsed-lines bar is a 3% ink wash: a quiet band, not a grey slab.
     expect(PaletteMath.contrastRatio(s.separator, s.body)).toBeLessThan(1.09)
-    expect(PaletteMath.toHex(s.addition)).toBe(scheme === 'light' ? '#e2ece1' : '#152d1a')
-    expect(PaletteMath.toHex(s.deletion)).toBe(scheme === 'light' ? '#f6e4e1' : '#3a1d1b')
+    expect(PaletteMath.toHex(s.addition)).toBe(scheme === 'light' ? '#e2ece1' : DARK_ADDITION_HEX)
+    expect(PaletteMath.toHex(s.deletion)).toBe(scheme === 'light' ? '#f6e4e1' : DARK_DELETION_HEX)
   })
 
   it.each(schemes)('are CSS the theme resolves where the diff renders, never a fixed colour (%s)', scheme => {
@@ -50,9 +58,10 @@ describe('diff surfaces (round five A4)', () => {
       expect(style['--diffs-bg-addition-emphasis-override']).toBe(`color-mix(in oklab, var(--dshx-tone-success) 20%, ${body})`)
     } else {
       // Dark lines are the band itself: PatchLook turns the library's dark mix off, so the override is what paints.
-      expect(style['--diffs-bg-addition-override']).toBe('oklch(from var(--dshx-tone-success) 0.27 0.045 h)')
-      expect(style['--diffs-bg-deletion-override']).toBe('oklch(from var(--dshx-tone-danger) 0.27 0.045 h)')
-      expect(style['--diffs-bg-addition-emphasis-override']).toBe('oklch(from var(--dshx-tone-success) 0.32 0.065 h)')
+      expect(style['--diffs-bg-addition-override']).toBe('oklch(from var(--dshx-tone-success) 0.25 0.04 h)')
+      expect(style['--diffs-bg-deletion-override']).toBe('oklch(from var(--dshx-tone-danger) 0.25 0.04 h)')
+      expect(style['--diffs-bg-addition-emphasis-override']).toBe('oklch(from var(--dshx-tone-success) 0.34 0.075 h)')
+      expect(style['--diffs-bg-deletion-emphasis-override']).toBe('oklch(from var(--dshx-tone-danger) 0.34 0.075 h)')
       expect(PatchLook.options(true).unsafeCSS).toMatch(/\[data-line\], \[data-no-newline\], \[data-gutter-buffer\], \[data-column-number\] \{ --mix-dark: 0%; \}/u)
     }
     expect(style['--diffs-bg-addition-number-override']).toBe(style['--diffs-bg-addition-override'])
@@ -70,6 +79,12 @@ describe('diff surfaces (round five A4)', () => {
     // Comments (faint), punctuation (secondary) and the gutter's +/− numbers read on every line band.
     for (const surface of ['body', 'addition', 'deletion'] as const)
       for (const [name, color] of Object.entries({ comment: ThemeCss.commentColor(p), punctuation: p.neutral[9]!, added: p.success.fg, removed: p.danger.fg }))
+        expect(PaletteMath.contrastRatio(color, s[surface]), `${name} on ${surface}`).toBeGreaterThanOrEqual(4.5)
+    // Dark (council round 10 A4): punctuation and plain code (the ink) inside a changed word. Light's secondary step sits
+    // at 4.41:1 on its 20% addition word (unchanged round-five tint), so this holds for dark only.
+    if (scheme === 'dark')
+    for (const surface of ['additionEmphasis', 'deletionEmphasis'] as const)
+      for (const [name, color] of Object.entries({ punctuation: p.neutral[9]!, ink: p.neutral[10]! }))
         expect(PaletteMath.contrastRatio(color, s[surface]), `${name} on ${surface}`).toBeGreaterThanOrEqual(4.5)
   })
 

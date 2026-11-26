@@ -8,7 +8,9 @@
  * - Light: added and removed lines are a 12% tint of the success and danger tones over the body; a changed word inside
  *   them 20%. The library mixes its line override into the body itself (12% in light), so the override is the tone.
  * - Dark (council round 7 A6): a 12% tint over the dark panel moved L by about 0.005 and barely separated from the
- *   page, so each band is its own step in the tone's hue, L 0.27 at chroma 0.045 (a changed word L 0.32 at 0.065).
+ *   page, so each band is its own step in the tone's hue. Council round 10 A4 calmed the line to L 0.25 at chroma 0.04
+ *   and lifted a changed word clearly off it, to L 0.34 at 0.075 (it was 0.27 / 0.32); every syntax colour is fitted
+ *   to 4.6:1 on both (theme-css.ts).
  *   `PatchLook` turns the library's dark mix off (`--mix-dark: 0%`), so the override is exactly what paints.
  * - Line numbers take the same band.
  * - The collapsed-lines bar is a 3% ink wash: a quiet band, not a grey slab.
@@ -35,9 +37,9 @@ const BODY_STEP = { light: 0, dark: 1 } as const satisfies Record<Scheme, number
 const LINE_TINT = 0.12
 const EMPHASIS_TINT = 0.2
 const SEPARATOR_INK = 0.03
-/** The dark line bands and changed-word fills (council round 7 A6), in the success and danger hues. */
-const DARK_BAND = { l: 0.27, c: 0.045 } as const
-const DARK_EMPHASIS = { l: 0.32, c: 0.065 } as const
+/** The dark line bands and changed-word fills (council round 7 A6, round 10 A4), in the success and danger hues. */
+const DARK_BAND = { l: 0.25, c: 0.04 } as const
+const DARK_EMPHASIS = { l: 0.34, c: 0.075 } as const
 /** How much of a line override `@pierre/diffs` mixes into the body (`--mix-light` 88%, `--mix-dark` 80%). */
 const LIBRARY_LINE_MIX = { light: 0.12, dark: 0.2 } as const satisfies Record<Scheme, number>
 
