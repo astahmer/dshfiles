@@ -35,7 +35,7 @@ describe('Usage controls', () => {
     const panel = read('panel.tsx')
     const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("preferences.tab === 'log' ?"))
     expect(row).toContain('aria-label="Time range"')
-    expect(row).toMatch(/<SelectTrigger aria-label="Group by time"/u)
+    expect(row).toMatch(/<SelectTrigger aria-label=\{`Grain: /u)
     expect(row).toContain('<DropdownMenuCheckboxItem')
     expect(row).toMatch(/aria-label=\{`Purpose: \$\{purposeSummary\}`\}/u)
     expect(row).not.toContain('>Purpose</span>')
@@ -44,7 +44,7 @@ describe('Usage controls', () => {
   it('picks the chart grouping from a select on the filter row, not on the chart card', () => {
     const panel = read('panel.tsx')
     const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("preferences.tab === 'log' ?"))
-    expect(row).toMatch(/<SelectTrigger aria-label="Group by"/u)
+    expect(row).toMatch(/<SelectTrigger aria-label=\{`Group: /u)
     expect(read('charts.tsx')).not.toContain('aria-label="Group by"')
   })
 
@@ -77,7 +77,9 @@ describe('Usage control row and chart header (council round 4, D1)', () => {
     expect(charts).not.toContain('role="toolbar" aria-label="Chart options"')
     const header = /<header className="([^"]*)" data-usage-chart-header>([\s\S]*?)<\/header>/u.exec(charts)
     expect(header?.[1]).not.toContain('dshx:justify-between')
-    const titleRow = /<span className="[^"]*" data-usage-chart-title-row>([\s\S]*?)<\/span>\s*<span className="[^"]*dshx:text-xs[^"]*">/u.exec(header?.[2] ?? '')
+    const titleRow = /<span className="[^"]*" data-usage-chart-title-row>([\s\S]*?)<\/span>\s*<span className="[^"]*dshx:text-xs[^"]*">/u.exec(
+      header?.[2] ?? '',
+    )
     expect(titleRow?.[1]).toContain('Usage over time')
     expect(titleRow?.[1]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
     // The chart is its own hairline card (council round 6, D1): no loose hairline right under the stats card.
@@ -120,6 +122,29 @@ describe('Usage filter triggers (council round 7, D3 / A4)', () => {
     const purpose = /<DropdownMenuTrigger asChild>\s*<Button([^>]*?)>/u.exec(row)?.[1] ?? ''
     expect(purpose).toContain('variant="field"')
     expect(row).not.toContain('variant="outline"')
+  })
+})
+
+describe('Usage filter labels and spacing (council round 11, D1)', () => {
+  const panel = read('panel.tsx')
+  const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("{preferences.tab === 'log' ? ("))
+
+  it('names every trigger in one grammar: "Grain: Daily", "Group: Model", "Purpose: All"', () => {
+    const labels = [...row.matchAll(/<span className="dshx:text-muted-foreground">([^<]+)<\/span>/gu)].map(match => match[1])
+    expect(labels).toEqual(['Grain:', 'Group:', 'Purpose:'])
+    expect(row).not.toContain('>By</span>')
+    // The accessible name says what the trigger shows.
+    expect(row).toContain('aria-label={`Grain: ${BUCKET_LABELS[preferences.bucket]}`}')
+    expect(row).toMatch(/aria-label=\{`Group: \$\{[^}]+\}`\}/u)
+  })
+
+  it('sets the range (segments and Custom) 16 px from the triggers, 8 px inside each group', () => {
+    expect(/aria-label="Filters"/u.test(row)).toBe(true)
+    const outer = /className="([^"]*)"\s*role="group"\s*aria-label="Filters"/u.exec(panel)?.[1] ?? ''
+    expect(outer).toContain('dshx:gap-x-4')
+    const groups = [...row.matchAll(/<div className="([^"]*)" data-usage-filter-group="(range|view)">/gu)].map(match => [match[2], match[1]] as const)
+    expect(groups.map(([name]) => name)).toEqual(['range', 'view'])
+    for (const [, className] of groups) expect(className).toContain('dshx:gap-2')
   })
 })
 

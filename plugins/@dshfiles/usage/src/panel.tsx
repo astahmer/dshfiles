@@ -223,6 +223,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
   const onlyPurpose = purposes?.length === 1 ? purposes[0] : undefined
   const purposeSummary =
     purposes === undefined ? 'All' : onlyPurpose === undefined ? `${String(purposes.length)} selected` : UsageFormattingModel.purposeLabels[onlyPurpose]
+  const groupByLabel = GROUP_BY_OPTIONS.find(option => option.value === preferences.groupBy)?.label ?? 'Model'
 
   const indexState =
     status === undefined
@@ -287,123 +288,130 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
             <UsageQuota.Tab panelId={props.panelId} />
           ) : (
             <>
+              {/* Two groups, 16 px apart: the range (segments and Custom), then the view triggers, each named in one
+                  grammar ("Grain: Daily", "Group: Model", "Purpose: All") (council round 11, D1). */}
               <div
-                className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto dshx:@max-pane-narrow:pb-0.5"
+                className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-4 dshx:gap-y-2 dshx:@max-pane-narrow:flex-nowrap dshx:@max-pane-narrow:overflow-x-auto dshx:@max-pane-narrow:pb-0.5"
                 role="group"
                 aria-label="Filters"
               >
-                <SlidingSegments<(typeof PRESETS)[number]>
-                  aria-label="Time range"
-                  // A custom range checks no preset: remount without the pill instead of leaving it on the last preset.
-                  key={preferences.preset === 'custom' ? 'custom' : 'preset'}
-                  className={preferences.preset === 'custom' ? 'dshx:[&>span[aria-hidden]]:hidden' : undefined}
-                  options={PRESET_OPTIONS}
-                  value={preferences.preset}
-                  onValueChange={preset =>
-                    update({
-                      preset,
-                      bucket: preset === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
-                    })
-                  }
-                />
-                {/* A trigger that shows a value (the range) takes the field look of the selects beside it; the range
+                <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2" data-usage-filter-group="range">
+                  <SlidingSegments<(typeof PRESETS)[number]>
+                    aria-label="Time range"
+                    // A custom range checks no preset: remount without the pill instead of leaving it on the last preset.
+                    key={preferences.preset === 'custom' ? 'custom' : 'preset'}
+                    className={preferences.preset === 'custom' ? 'dshx:[&>span[aria-hidden]]:hidden' : undefined}
+                    options={PRESET_OPTIONS}
+                    value={preferences.preset}
+                    onValueChange={preset =>
+                      update({
+                        preset,
+                        bucket: preset === 'today' ? 'hour' : preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+                      })
+                    }
+                  />
+                  {/* A trigger that shows a value (the range) takes the field look of the selects beside it; the range
                     replacing "Custom" is the pressed cue (council round 7, D3 / A4). */}
-                <Popover open={customOpen} onOpenChange={setCustomOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="field"
-                      aria-pressed={preferences.preset === 'custom'}
-                      onClick={() => {
-                        if (preferences.preset === 'custom') return
-                        update({
-                          preset: 'custom',
-                          bucket: preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
-                          ...(preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
-                        })
-                      }}
-                    >
-                      <CalendarIcon aria-hidden />
-                      {preferences.preset === 'custom' ? `${formatShortDay(range.from)} – ${formatShortDay(range.to - 1)}` : 'Custom'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent align="start" className="dshx-root dshx:flex dshx:w-auto dshx:items-center dshx:gap-2 dshx:p-3 dshx:text-xs">
-                    <Input
-                      type="date"
-                      aria-label="From date"
-                      className="dshx:h-8 dshx:w-36"
-                      value={preferences.customFrom}
-                      onChange={event => update({ preset: 'custom', customFrom: event.target.value })}
-                    />
-                    <span aria-hidden>→</span>
-                    <Input
-                      type="date"
-                      aria-label="To date"
-                      className="dshx:h-8 dshx:w-36"
-                      value={preferences.customTo}
-                      onChange={event => update({ preset: 'custom', customTo: event.target.value })}
-                    />
-                  </PopoverContent>
-                </Popover>
-                <Select value={preferences.bucket} onValueChange={value => update({ bucket: BUCKETS.find(bucket => bucket === value) ?? 'day' })}>
-                  <SelectTrigger aria-label="Group by time" className="dshx:w-28">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="dshx-root">
-                    {BUCKETS.map(bucket => (
-                      <SelectItem key={bucket} value={bucket}>
-                        {BUCKET_LABELS[bucket]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {preferences.tab === 'charts' ? (
-                  <Select
-                    value={preferences.groupBy}
-                    onValueChange={value => update({ groupBy: GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model' })}
-                  >
-                    <SelectTrigger aria-label="Group by" className="dshx:justify-start dshx:gap-1.5">
-                      <span className="dshx:text-muted-foreground">By</span>
+                  <Popover open={customOpen} onOpenChange={setCustomOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="field"
+                        aria-pressed={preferences.preset === 'custom'}
+                        onClick={() => {
+                          if (preferences.preset === 'custom') return
+                          update({
+                            preset: 'custom',
+                            bucket: preferences.bucket === 'hour' && preferences.preset === 'today' ? 'day' : preferences.bucket,
+                            ...(preferences.customFrom === '' && { customFrom: dateInputValue(range.from), customTo: dateInputValue(moveDays(range.to, -1)) }),
+                          })
+                        }}
+                      >
+                        <CalendarIcon aria-hidden />
+                        {preferences.preset === 'custom' ? `${formatShortDay(range.from)} – ${formatShortDay(range.to - 1)}` : 'Custom'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="dshx-root dshx:flex dshx:w-auto dshx:items-center dshx:gap-2 dshx:p-3 dshx:text-xs">
+                      <Input
+                        type="date"
+                        aria-label="From date"
+                        className="dshx:h-8 dshx:w-36"
+                        value={preferences.customFrom}
+                        onChange={event => update({ preset: 'custom', customFrom: event.target.value })}
+                      />
+                      <span aria-hidden>→</span>
+                      <Input
+                        type="date"
+                        aria-label="To date"
+                        className="dshx:h-8 dshx:w-36"
+                        value={preferences.customTo}
+                        onChange={event => update({ preset: 'custom', customTo: event.target.value })}
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="dshx:flex dshx:shrink-0 dshx:flex-wrap dshx:items-center dshx:gap-2" data-usage-filter-group="view">
+                  <Select value={preferences.bucket} onValueChange={value => update({ bucket: BUCKETS.find(bucket => bucket === value) ?? 'day' })}>
+                    <SelectTrigger aria-label={`Grain: ${BUCKET_LABELS[preferences.bucket]}`} className="dshx:justify-start dshx:gap-1.5">
+                      <span className="dshx:text-muted-foreground">Grain:</span>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="dshx-root">
-                      {GROUP_BY_OPTIONS.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
+                      {BUCKETS.map(bucket => (
+                        <SelectItem key={bucket} value={bucket}>
+                          {BUCKET_LABELS[bucket]}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                ) : null}
-                {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="field" aria-label={`Purpose: ${purposeSummary}`}>
-                      <span className="dshx:text-muted-foreground">Purpose:</span>
-                      {purposeSummary}
-                      <ChevronDownIcon aria-hidden />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="start" className="dshx-root">
-                    <DropdownMenuCheckboxItem
-                      checked={purposes === undefined}
-                      onSelect={event => event.preventDefault()}
-                      onCheckedChange={() => update({ purposes: [] })}
+                  {preferences.tab === 'charts' ? (
+                    <Select
+                      value={preferences.groupBy}
+                      onValueChange={value => update({ groupBy: GROUP_BY_OPTIONS.find(option => option.value === value)?.value ?? 'model' })}
                     >
-                      All
-                    </DropdownMenuCheckboxItem>
-                    <DropdownMenuSeparator />
-                    {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
+                      <SelectTrigger aria-label={`Group: ${groupByLabel}`} className="dshx:justify-start dshx:gap-1.5">
+                        <span className="dshx:text-muted-foreground">Group:</span>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="dshx-root">
+                        {GROUP_BY_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                  {/* Seven purposes as chips took a row of their own; a named menu keeps the filters on one line. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="field" aria-label={`Purpose: ${purposeSummary}`}>
+                        <span className="dshx:text-muted-foreground">Purpose:</span>
+                        {purposeSummary}
+                        <ChevronDownIcon aria-hidden />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="dshx-root">
                       <DropdownMenuCheckboxItem
-                        key={purpose}
-                        checked={purposes?.includes(purpose) ?? false}
+                        checked={purposes === undefined}
                         onSelect={event => event.preventDefault()}
-                        onCheckedChange={checked => togglePurpose(purpose, checked)}
+                        onCheckedChange={() => update({ purposes: [] })}
                       >
-                        {UsageFormattingModel.purposeLabels[purpose]}
+                        All
                       </DropdownMenuCheckboxItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                      <DropdownMenuSeparator />
+                      {UsageFoldModel.REQUEST_PURPOSES.map(purpose => (
+                        <DropdownMenuCheckboxItem
+                          key={purpose}
+                          checked={purposes?.includes(purpose) ?? false}
+                          onSelect={event => event.preventDefault()}
+                          onCheckedChange={checked => togglePurpose(purpose, checked)}
+                        >
+                          {UsageFormattingModel.purposeLabels[purpose]}
+                        </DropdownMenuCheckboxItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
               </div>
 
               {preferences.tab === 'log' ? (
