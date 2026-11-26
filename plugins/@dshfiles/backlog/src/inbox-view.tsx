@@ -77,7 +77,7 @@ export const InboxView = (props: {
   return (
     <div className="dshx:flex dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
       <section
-        aria-label="Inbox"
+        aria-label="Triage"
         className="dshx:flex dshx:w-[400px] dshx:max-w-full dshx:shrink-0 dshx:flex-col dshx:border-r dshx:border-border dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-r-0"
       >
         <InboxFilters countOf={countOf} filter={filter} onChange={setFilter} />

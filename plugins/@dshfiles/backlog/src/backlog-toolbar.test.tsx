@@ -38,7 +38,8 @@ test('every Backlog view is a labelled tab, and one labelled select stands in on
   render(<BacklogViewSwitch view="items" onSelect={() => undefined} modifierHeld={false} />)
   const nav = document.querySelector('nav[aria-label="Backlog views"]')
   const tabs = [...(nav?.querySelectorAll('button') ?? [])]
-  expect(tabs.map(tab => tab.textContent)).toEqual(['Feed', 'Inbox', 'Items', 'Board', 'Projects', 'Shipped', 'Ready'])
+  // The view of items waiting on a decision is Triage: Inbox is the app's one Inbox (council round 9, D2).
+  expect(tabs.map(tab => tab.textContent)).toEqual(['Feed', 'Triage', 'Items', 'Board', 'Projects', 'Shipped', 'Ready'])
   expect(nav?.querySelector('svg')).toBeNull()
   expect(tabs.find(tab => tab.getAttribute('aria-current') === 'page')?.textContent).toBe('Items')
   expect(byName('combobox', 'Backlog view')).toBeDefined()

@@ -20,7 +20,7 @@
         "click button \"Projects\"",
         "click button \"New\"",
         "expect textbox \"Capture\"",
-        "click button \"Inbox\"",
+        "click button \"Triage\"",
         "click button \"New\"",
         "expect textbox \"Capture\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
@@ -46,7 +46,7 @@
         "click button \"New\"",
         "expect textbox \"Capture\"",
         "click combobox \"Backlog view\"",
-        "click option \"Inbox\"",
+        "click option \"Triage\"",
         "click button \"New\"",
         "expect textbox \"Capture\"",
         "attach \"tooling/dshx/e2e/fixtures/attachments/red.png\"",
@@ -1458,20 +1458,20 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "attentionProvider",
       "destination": "inbox",
-      "currentSurface": "left-nav: Backlog \u203a Inbox filter (links to the Inbox)",
+      "currentSurface": "left-nav: Backlog \u203a Triage view (links to the Inbox)",
       "configuration": [],
       "states": ["unread", "acknowledged", "resolved", "snoozed"],
       "failureModes": [
         "Without thread-sidebar's attention API the Inbox shows backlog items only.",
         "Without the Inbox (activity-timeline) the link only fails to select a panel; the filter view itself is unchanged."
       ],
-      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Inbox\"", "expect text \"Needs you\""],
+      "reach": ["click tab \"Work\"", "click button \"Backlog\"", "click button \"Triage\"", "expect text \"Needs you\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Work Backlog items and schedules that start threads.\"",
         "click button \"Backlog\"",
         "click combobox \"Backlog view\"",
-        "click option \"Inbox\"",
+        "click option \"Triage\"",
         "expect text \"Needs you\""
       ],
       "externalDependencies": [

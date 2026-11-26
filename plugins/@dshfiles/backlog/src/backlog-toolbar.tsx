@@ -31,7 +31,8 @@ type SavedView = BacklogSettings['savedViews'][number]
 
 export const viewLabels = {
   feed: 'Feed',
-  inbox: 'Inbox',
+  // The items waiting on a decision: the app's one Inbox keeps its name (council round 9, D2).
+  inbox: 'Triage',
   ready: 'Ready',
   items: 'Items',
   board: 'Board',

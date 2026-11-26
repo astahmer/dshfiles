@@ -119,8 +119,8 @@ Then('the Items view row of b:{int} shows the due chip {string}', async ({ page 
 })
 
 When('the Inbox is opened on its {string} tab', async ({ page }: { page: Page }, tab: string) => {
-  await viewButton(page, 'Inbox').click()
-  await page.getByRole('region', { name: 'Inbox', exact: true }).getByRole('radio', { name: new RegExp(`^${tab}`, 'u') }).click()
+  await viewButton(page, 'Triage').click()
+  await page.getByRole('region', { name: 'Triage', exact: true }).getByRole('radio', { name: new RegExp(`^${tab}`, 'u') }).click()
 })
 
 Then('the Inbox lists {string} as overdue', async ({ page }: { page: Page }, title: string) => {

@@ -1532,14 +1532,14 @@ Then('the capture composer offers a project picker', async ({ page }: { page: Pa
 })
 
 When('the Backlog Inbox is opened', async ({ page }: { page: Page }) => {
-  const inbox = page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name: 'Inbox' })
+  const inbox = page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name: 'Triage' })
   await inbox.click()
   await expect(inbox).toHaveAttribute('aria-current', 'page')
 })
 
 Then('the Inbox lists {string} under {string}', async ({ page }: { page: Page }, title: string, filter: string) => {
   await recordAssertion(page, 'backlog-attention-inbox', async () => {
-    const inbox = page.getByRole('region', { name: 'Inbox', exact: true })
+    const inbox = page.getByRole('region', { name: 'Triage', exact: true })
     const filterTab = inbox.getByRole('radio', { name: new RegExp(`^${filter}`) })
     await filterTab.click()
     await expect(filterTab).toHaveAttribute('aria-checked', 'true')

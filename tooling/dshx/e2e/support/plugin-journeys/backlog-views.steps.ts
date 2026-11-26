@@ -16,7 +16,7 @@ const searchInput = (page: Page) => page.getByRole('textbox', { name: 'Search ba
 const searchResults = (page: Page) => page.getByRole('list', { name: 'Search results' })
 const capture = (page: Page) => page.getByRole('textbox', { name: 'Capture', exact: true })
 const captureSuggestions = (page: Page) => page.getByRole('listbox', { name: 'Suggestions', exact: true })
-const inbox = (page: Page) => page.getByRole('region', { name: 'Inbox', exact: true })
+const inbox = (page: Page) => page.getByRole('region', { name: 'Triage', exact: true })
 const inboxRow = async (page: Page, id: number) => inbox(page).getByRole('listitem', { name: `Item ${await backlogLabel(page, id)}`, exact: true })
 const itemsTable = (page: Page) => page.getByRole('table', { name: 'Backlog items' })
 const viewButton = (page: Page, name: string) => page.getByRole('navigation', { name: 'Backlog views' }).getByRole('button', { name, exact: true })

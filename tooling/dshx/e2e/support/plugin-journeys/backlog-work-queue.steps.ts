@@ -154,7 +154,7 @@ const backgroundThreads = new WeakMap<Page, { readonly sessionId: string; readon
 const BACKGROUND_THREAD_TITLE = 'Claiming agent'
 const createdThread = Schema.Struct({ sessionId: Schema.String })
 const attentionState = Schema.Struct({ sessions: Schema.Array(Schema.Struct({ sessionId: Schema.String })) })
-const inboxRegion = (page: Page) => page.getByRole('region', { name: 'Inbox', exact: true })
+const inboxRegion = (page: Page) => page.getByRole('region', { name: 'Triage', exact: true })
 const sidebarApi = (page: Page, apiId: string) => connectDshxApi({ url: profileFor(page).url, packageId: '@dshfiles/thread-sidebar', apiId, version: 1 })
 
 When('the backlog Inbox also lists finished threads', async ({ page }: { page: Page }) => {

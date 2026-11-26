@@ -48,7 +48,7 @@ idle things sink, and the tracker parts (status, actors, links, search, board) c
 
 Open work: [plans/backlog](../../../plans/backlog/README.md). Shipped design: [docs/redesign.md](docs/redesign.md).
 
-Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped, Ready and Inbox remain the page’s own view controls.
+Open the reusable **Backlog** view from navigation or the Workbench chooser. Items, Board, Projects, Shipped, Ready and Triage remain the page’s own view controls.
 
 ## Capture
 
@@ -99,7 +99,7 @@ saving on blur, and takes focus back when the tool is done.
 
 ## Feed, board and freshness
 
-The feed lists pinned items first, then newest activity by default. Use the sort menu on Feed, Inbox or Items to
+The feed lists pinned items first, then newest activity by default. Use the sort menu on Feed, Triage or Items to
 choose last update or creation date; each view remembers its choice across reloads. A chip row above the feed and
 the Items list narrows both to one status or several at once; the picks persist across reloads and `All` clears them.
 Freshness is derived on read and never stored:
@@ -112,7 +112,7 @@ Freshness is derived on read and never stored:
 | `done` / `dropped` | archived after 7 days                       |
 | pinned             | never                                       |
 
-**Agent items** in the header of every view (Feed, Inbox, Items, Board, Projects and the search results) hides
+**Agent items** in the header of every view (Feed, Triage, Items, Board, Projects and the search results) hides
 items an agent captured that you never touched. It is on by default and each view remembers its own choice; its
 badge counts what the current view hides. Editing, moving, commenting on or pinning such an item makes it yours
 and it shows again; one asking for attention or waiting on a triage suggestion always shows. The Host does the
@@ -135,7 +135,7 @@ loaded, a Reveal button beside it shows the value through the Catalog's own reve
 after its configured seconds); the Backlog never stores or receives the value. The Catalog provides that
 control through the `@dshfiles/backlog/secret-link-reveal` contract.
 
-Feed, Inbox, Items, Board, search results and project item groups share Cmd/Ctrl-click toggles and inclusive
+Feed, Triage, Items, Board, search results and project item groups share Cmd/Ctrl-click toggles and inclusive
 Shift-click ranges. Plain clicks keep the existing open behavior and clear the batch. Right-click a selected
 item to apply the menu's counted actions to the entire selection, including the existing explicit permanent-delete
 confirmation. Filter changes and collapsed Items groups remove hidden targets; project overview groups keep separate
@@ -239,7 +239,7 @@ changes and can be reverted), never parsed out of its description.
   month, or any date), the item menu, `backlog_capture` or `backlog_update` `due`. Rows and cards show a chip that warns
   a day ahead and turns red once an open item is past it. Items sorts by due date and groups by **Due date**
   (Overdue, Today, Next 7 days, Later, No due date). Overdue is derived on read from the Host calendar, never stored:
-  an open overdue item lands in the Inbox under its own **Overdue** tab.
+  an open overdue item lands in Triage under its own **Overdue** tab.
 - **Recurring items**: **Repeat** (inspector) or **Make recurring** (item menu) sets `recurrence` to daily, weekly,
   monthly or `cron:<min hour day month weekday>`. When the item reaches done the Host itself creates the next
   occurrence: same title, body, kind, priority, tags, project and parent, criteria unchecked, due one step after the
@@ -714,7 +714,7 @@ reference external provider.
 
 ## Search and saved views
 
-Typing in the header search filters the view you are on: the feed, Items, Board, Inbox and Projects keep
+Typing in the header search filters the view you are on: the feed, Items, Board, Triage and Projects keep
 their layout and show only matching items (dormant ones stay hidden unless the filter menu includes them). Press
 `Enter` to open the full results view, which ranks by relevance and says where each result matched (title,
 tag, description, comment, original capture, project, link), with the matching words highlighted, and covers
@@ -774,18 +774,18 @@ with `backlog_summarize_shipped`, which calls the model and so runs only when th
 
 ## Project scope
 
-The header's searchable project filter narrows the feed, Inbox, Items, Board and search to any number of
+The header's searchable project filter narrows the feed, Triage, Items, Board and search to any number of
 projects, including `No project`; `All projects` clears the selection. It persists like the status chips
 and presets the capture box when exactly one project is selected. Paths inside the current user's home are
 displayed as `~/...` where shown. Candidates are the projects items already name plus every registered
 workspace, with isolated thread workspaces (`…/threads/thread-…`) left out, so the picker offers `dshfiles`
 and not the checkout a thread runs in. The same single-select picker sits on the item's details line and in
-every right-click menu's **Project** submenu, and every feed entry, Inbox row, Items row, board card and
+every right-click menu's **Project** submenu, and every feed entry, Triage row, Items row, board card and
 search result labels the item's project.
 
-## Inbox and the rest of the ADE
+## Triage and the rest of the ADE
 
-The Inbox holds open items whose `attention` is set (`needs-input`, `blocked`, `waiting`, set by agents with
+The **Triage** view (named so since the app has one Inbox, which it links to) holds open items whose `attention` is set (`needs-input`, `blocked`, `waiting`, set by agents with
 `backlog_update` or by you) and open items with a triage suggestion. Closing an item clears agent/system attention
 and its suggestion. Each open item appears once, combining its attention, suggestion and linked unread
 thread reasons. With `inboxThreads` (`failures` by default), blocked or errored turns add their open linked

@@ -4540,10 +4540,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click button \"Triage\"",
           "action": "click",
           "by": "button",
-          "name": "Inbox",
+          "name": "Triage",
           "value": null
         },
         {
@@ -4710,10 +4710,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"Inbox\"",
+          "text": "click option \"Triage\"",
           "action": "click",
           "by": "option",
-          "name": "Inbox",
+          "name": "Triage",
           "value": null
         },
         {
@@ -6200,7 +6200,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Items that need you",
       "summary": "A filtered view of open items that need you, with triage suggestions and unread linked threads.",
       "destination": "inbox",
-      "currentSurface": "left-nav: Backlog › Inbox filter (links to the Inbox)",
+      "currentSurface": "left-nav: Backlog › Triage view (links to the Inbox)",
       "reach": [
         {
           "text": "click tab \"Work\"",
@@ -6217,10 +6217,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Inbox\"",
+          "text": "click button \"Triage\"",
           "action": "click",
           "by": "button",
-          "name": "Inbox",
+          "name": "Triage",
           "value": null
         },
         {
@@ -6261,10 +6261,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click option \"Inbox\"",
+          "text": "click option \"Triage\"",
           "action": "click",
           "by": "option",
-          "name": "Inbox",
+          "name": "Triage",
           "value": null
         },
         {
