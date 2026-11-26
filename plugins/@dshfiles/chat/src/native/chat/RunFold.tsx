@@ -26,9 +26,17 @@ export interface RunFoldScope {
 
 export const RunFoldContext = createContext<RunFoldScope | null>(null)
 
-/** A seat's place in a run; the head seat also renders the summary row. */
-export interface RunFoldPlacement {
+/**
+ * The run a row belongs to and how many rows it holds; the seat publishes both (`data-run-fold-run`,
+ * `data-run-fold-size`) so a row can line up with the other rows of its run (council round 23, item 1).
+ */
+export interface RunFoldMembership {
   readonly runKey: string
+  readonly size: number
+}
+
+/** A seat's place in a run; the head seat also renders the summary row. */
+export interface RunFoldPlacement extends RunFoldMembership {
   readonly head: { readonly memberKeys: readonly string[] } | undefined
 }
 
@@ -123,16 +131,25 @@ const NO_KEYS: readonly string[] = []
 // ---------------------------------------------------------------------------------------------------------------------
 // Rows a process group's run took from after the group (round 21 D6): the flow leaves them out of its own runs.
 
-const absorbedByOwner = new Map<string, readonly string[]>()
-let absorbedSnapshot: ReadonlySet<string> = new Set()
+interface AbsorbedRows {
+  readonly keys: readonly string[]
+  readonly run: RunFoldMembership | undefined
+}
+
+const NO_ABSORBED: AbsorbedRows = { keys: NO_KEYS, run: undefined }
+const absorbedByOwner = new Map<string, AbsorbedRows>()
+let absorbedSnapshot: ReadonlyMap<string, RunFoldMembership> = new Map()
 const absorbedListeners = new Set<() => void>()
 
-const setAbsorbed = (owner: string, keys: readonly string[]): void => {
-  const previous = absorbedByOwner.get(owner) ?? NO_KEYS
-  if (previous.length === keys.length && previous.every((key, index) => key === keys[index])) return
-  if (keys.length === 0) absorbedByOwner.delete(owner)
-  else absorbedByOwner.set(owner, keys)
-  absorbedSnapshot = new Set([...absorbedByOwner.values()].flat())
+const setAbsorbed = (owner: string, next: AbsorbedRows): void => {
+  const previous = absorbedByOwner.get(owner) ?? NO_ABSORBED
+  const sameRun = previous.run?.runKey === next.run?.runKey && previous.run?.size === next.run?.size
+  if (sameRun && previous.keys.length === next.keys.length && previous.keys.every((key, index) => key === next.keys[index])) return
+  if (next.keys.length === 0 || next.run === undefined) absorbedByOwner.delete(owner)
+  else absorbedByOwner.set(owner, next)
+  absorbedSnapshot = new Map(
+    [...absorbedByOwner.values()].flatMap(({ keys, run }) => (run === undefined ? [] : keys.map(key => [key, run] as const))),
+  )
   for (const listener of absorbedListeners) listener()
 }
 
@@ -143,8 +160,11 @@ const subscribeAbsorbed = (listener: () => void): (() => void) => {
   }
 }
 
-/** The rows kept outside a process group that its run counts; they keep their own seat and never fold again. */
-export const useRunFoldAbsorbed = (): ReadonlySet<string> => useSyncExternalStore(subscribeAbsorbed, () => absorbedSnapshot)
+/**
+ * The rows kept outside a process group that its run counts, with the run that took each; they keep their own seat and
+ * never fold again.
+ */
+export const useRunFoldAbsorbed = (): ReadonlyMap<string, RunFoldMembership> => useSyncExternalStore(subscribeAbsorbed, () => absorbedSnapshot)
 
 /**
  * Place every row of a list: undefined for a row outside any run, else its run and, for the first row, the summary.
@@ -180,27 +200,30 @@ export function useRunFoldPlacements(
   const signature = useToolRowsSignature(nodeStore, toolKeys, read)
   const sessionId = scope?.sessionId
   const layout = useMemo(() => {
-    if (!enabled || signature === '' || sessionId === undefined) return { placements: NO_PLACEMENTS, absorbed: NO_KEYS }
+    if (!enabled || signature === '' || sessionId === undefined) return { placements: NO_PLACEMENTS, absorbed: NO_ABSORBED }
     const claimed = signature.split(SEPARATOR).map(kind => (kind === '' ? undefined : kind))
     const { runs, absorbed } = RunFoldModel.partitionWithTrailing(claimed.slice(0, keys.length), claimed.slice(keys.length), true)
     const placements: (RunFoldPlacement | undefined)[] = keys.map(() => undefined)
+    let last: RunFoldMembership | undefined
     for (const run of runs) {
       const memberKeys = all.slice(run.start, run.end).filter((key): key is string => key !== undefined)
       const first = memberKeys[0]
       if (first === undefined) continue
       const runKey = `${sessionId}${SEPARATOR}${first}`
-      placements[run.start] = { runKey, head: { memberKeys } }
+      const size = memberKeys.length
+      last = { runKey, size }
+      placements[run.start] = { runKey, size, head: { memberKeys } }
       // A taken trailing row keeps its own seat outside the group, so it has no placement here and never hides.
-      for (let index = run.start + 1; index < Math.min(run.end, keys.length); index += 1) placements[index] = { runKey, head: undefined }
+      for (let index = run.start + 1; index < Math.min(run.end, keys.length); index += 1) placements[index] = { runKey, size, head: undefined }
     }
-    return { placements, absorbed: absorbed === 0 ? NO_KEYS : trailing.slice(0, absorbed) }
+    return { placements, absorbed: absorbed === 0 ? NO_ABSORBED : { keys: trailing.slice(0, absorbed), run: last } }
   }, [enabled, signature, sessionId, keys, all, trailing])
   // Tell the flow which rows this group's run took, before paint, so they never fold twice.
   const owner = useId()
   useLayoutEffect(() => {
     setAbsorbed(owner, layout.absorbed)
   }, [owner, layout.absorbed])
-  useLayoutEffect(() => () => setAbsorbed(owner, NO_KEYS), [owner])
+  useLayoutEffect(() => () => setAbsorbed(owner, NO_ABSORBED), [owner])
   return layout.placements
 }
 

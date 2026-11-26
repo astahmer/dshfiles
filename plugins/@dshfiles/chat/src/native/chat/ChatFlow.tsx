@@ -112,7 +112,7 @@ const ChatFlowRows = memo(function ChatFlowRows({
     switch (entry.kind) {
       case 'node':
         return <ChatNodeSeat {...seatProps} key={chatRenderKey(entry)} nodeKey={entry.key}
-          runFold={placements[index]} runFoldAbsorbed={absorbed.has(entry.key)}
+          runFold={placements[index]} runFoldAbsorbed={absorbed.get(entry.key)}
           {...entry.groupPart === undefined ? {} : { groupPart: entry.groupPart }} />
       case 'group':
         return <ChatGroupSeat {...seatProps} key={chatRenderKey(entry)} groupKey={entry.key}

@@ -11,7 +11,7 @@ import { turnProcessAlwaysOpen } from '../contract/turn-process.ts'
 import { turnProcessOpen } from '../stores.ts'
 import { isRoutineContextNode, showsRoutineContext } from './context-rows.ts'
 import { hiddenOrCollapsing } from './flow-motion.ts'
-import { revealRun, RunFoldSummary, useRunFoldHidden, type RunFoldPlacement } from './RunFold.tsx'
+import { revealRun, RunFoldSummary, useRunFoldHidden, type RunFoldMembership, type RunFoldPlacement } from './RunFold.tsx'
 import { SinceYouLeftContext } from './SinceYouLeftCard.tsx'
 import css from './ChatView.module.css'
 
@@ -31,8 +31,8 @@ interface ChatNodeSeatProps extends ChatNodeOwnerProps {
   readonly useGroupAction: ChatFlowSlotProps['useGroupAction']
   /** dshfiles (b:7rv2): this row's place in a folded run of background jobs or subagents. */
   readonly runFold?: RunFoldPlacement | undefined
-  /** dshfiles (round 21 D6): a failed call kept outside a process group that the group's run counts. */
-  readonly runFoldAbsorbed?: boolean | undefined
+  /** dshfiles (round 21 D6): a failed call kept outside a process group that the group's run counts, and that run. */
+  readonly runFoldAbsorbed?: RunFoldMembership | undefined
 }
 
 type RoutedChatNodeOwner = {
@@ -209,7 +209,10 @@ export const ChatNodeSeat = memo(function ChatNodeSeat({
       data-turn-process-member={processMember || undefined}
       data-turn-process-hidden={processHidden || undefined}
       // A row a run took in from after its group is a member too: its row reads as one of the run's (round 22, item 9).
-      data-run-fold-member={runFold === undefined ? (runFoldAbsorbed === true ? 'absorbed' : undefined) : runHead === undefined ? 'member' : 'head'}
+      data-run-fold-member={runFold === undefined ? (runFoldAbsorbed === undefined ? undefined : 'absorbed') : runHead === undefined ? 'member' : 'head'}
+      // Council round 23, item 1: the run and its size, so the rows of a run of three or more share a title column.
+      data-run-fold-run={(runFold ?? runFoldAbsorbed)?.runKey}
+      data-run-fold-size={(runFold ?? runFoldAbsorbed)?.size}
       data-chat-final-answer={finalAnswer || undefined}
       data-routine-context-hidden={routineContextHidden || undefined}
     >

@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react'
+import { useLayoutEffect, useMemo, useRef, useState, type ComponentProps, type CSSProperties, type RefObject } from 'react'
 import * as Result from 'effect/Result'
 import * as Schema from 'effect/Schema'
 import { DisclosureRow, IconAgentPresetOutlineRegular, IconInspectOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -17,6 +17,7 @@ import { SubagentFeedModel, type SubagentTerminal } from './subagent-feed.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
 import { useSubagentState } from './subagent-state.js'
 import { SubagentRouteLabelModel } from './route-label.js'
+import { TITLE_COLUMN_PROPERTY, useSubagentTitleColumn } from './subagent-title-column.js'
 
 const subagentArgumentsSchema = Schema.StructWithRest(
   Schema.Struct({
@@ -58,30 +59,47 @@ const endingOf = (
   return []
 }
 
-/** Chat's mark on a seat whose row belongs to a run fold: a member, the head, or a failed call the run took in. */
+/** Chat's marks on a seat whose row belongs to a run fold: a member, the head, or a failed call the run took in. */
 const RUN_FOLD_MEMBER = 'data-run-fold-member'
+/** The run's key and its row count, so the rows of a run of three or more share a title column (round 23, item 1). */
+const RUN_FOLD_RUN = 'data-run-fold-run'
+const RUN_FOLD_SIZE = 'data-run-fold-size'
+
+interface RunFoldSeat {
+  readonly inRun: boolean
+  readonly runKey: string | undefined
+  readonly size: number
+}
+
+const OUTSIDE_RUN: RunFoldSeat = { inRun: false, runKey: undefined, size: 0 }
 
 /**
  * Whether the row sits in a transcript run fold ("8 calls · 6 working · …"), whose summary already names the kind, so
- * the row drops its "Subagent ·" prefix (council round 22, item 9). Chat inlines its own copy of the run-fold module,
- * so no React context reaches this row; the seat's attribute is the contract, read before paint and on every change.
+ * the row drops its "Subagent ·" prefix (council round 22, item 9), and which run. Chat inlines its own copy of the
+ * run-fold module, so no React context reaches this row; the seat's attributes are the contract, read before paint and
+ * on every change.
  */
-const useInRunFold = (ref: RefObject<HTMLElement | null>): boolean => {
-  const [inRun, setInRun] = useState(false)
+const useRunFoldSeat = (ref: RefObject<HTMLElement | null>): RunFoldSeat => {
+  const [seatState, setSeatState] = useState(OUTSIDE_RUN)
   useLayoutEffect(() => {
     const seat = ref.current?.closest('[data-chat-flow-key]')
     if (seat === null || seat === undefined) return undefined
     const read = (): void => {
-      setInRun(seat.hasAttribute(RUN_FOLD_MEMBER))
+      const inRun = seat.hasAttribute(RUN_FOLD_MEMBER)
+      const runKey = seat.getAttribute(RUN_FOLD_RUN) ?? undefined
+      const size = Number(seat.getAttribute(RUN_FOLD_SIZE) ?? 0) || 0
+      setSeatState(previous =>
+        previous.inRun === inRun && previous.runKey === runKey && previous.size === size ? previous : { inRun, runKey, size },
+      )
     }
     read()
     const observer = new MutationObserver(read)
-    observer.observe(seat, { attributes: true, attributeFilter: [RUN_FOLD_MEMBER] })
+    observer.observe(seat, { attributes: true, attributeFilter: [RUN_FOLD_MEMBER, RUN_FOLD_RUN, RUN_FOLD_SIZE] })
     return () => {
       observer.disconnect()
     }
   }, [ref])
-  return inRun
+  return seatState
 }
 
 /**
@@ -134,10 +152,12 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   })
   const task = args?.description?.trim() || catalogLabel?.trim() || undefined
   const rootRef = useRef<HTMLDivElement>(null)
-  const inRun = useInRunFold(rootRef)
+  const runSeat = useRunFoldSeat(rootRef)
   // In a run fold the summary names the kind; a row with no task keeps it, so it never reads empty.
-  const kind = inRun && task !== undefined ? undefined : props.preview.t('subagentPreviewKind')
+  const kind = runSeat.inRun && task !== undefined ? undefined : props.preview.t('subagentPreviewKind')
   const title = [kind, task].filter(part => part !== undefined).join(' · ')
+  // In a run of three or more rows the titles share one column, so every model starts on one x, as in the dock.
+  const titleColumn = useSubagentTitleColumn({ rootRef, runKey: runSeat.runKey, size: runSeat.size, title })
   const ending = endingOf(props.preview.t, state, child.settledMs).join(' · ')
   const failure = failureWordOf(props.preview.t, state)
   const working = state === 'working' || (state === 'starting' && props.phase !== 'result')
@@ -162,6 +182,10 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     expandable,
     onToggle: disclosure.toggle,
     running: props.phase === 'preparing' || props.phase === 'start' || state === 'working',
+    // The shared column sizes the title area (leading 16 px + 6 px gap, then the title); a longer title truncates in it,
+    // and a narrow pane still shrinks the area. Without a column the row keeps its content width.
+    rowClassName: titleColumn === undefined ? undefined : 'dshx:w-[calc(var(--dshfiles-subagent-title-column)_+_22px_+_var(--dsh-content-font-delta,0px))]',
+    titleClassName: titleColumn === undefined ? undefined : 'dshx:min-w-0! dshx:shrink! dshx:truncate',
     // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; then
     // the outcome: the failure word in failed ink, the live clock or the settled ending in the tertiary ink.
     headerAccessory:
@@ -194,6 +218,9 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
       data-state={childId === undefined ? undefined : (state ?? 'unknown')}
       // The row prints its own time, so tool-meta draws no call duration beside it.
       data-tool-card-timing="own"
+      data-subagent-title-column={titleColumn}
+      // SAFETY: React's style type lists no custom properties; this one is a plain length the row's class reads.
+      style={titleColumn === undefined ? undefined : ({ [TITLE_COLUMN_PROPERTY]: `${String(titleColumn)}px` } as CSSProperties)}
     >
       <DisclosureRow {...disclosureProps}>
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3">

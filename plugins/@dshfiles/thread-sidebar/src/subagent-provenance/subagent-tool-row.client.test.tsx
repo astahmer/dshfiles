@@ -19,6 +19,8 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
     headerAccessory,
     open,
     children,
+    rowClassName,
+    titleClassName,
   }: {
     icon: ReactNode
     title: string
@@ -26,10 +28,21 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
     headerAccessory?: ReactNode
     open: boolean
     children?: ReactNode
+    rowClassName?: string
+    titleClassName?: string
   }) => (
     <div>
-      <div data-testid="leading">{icon}</div>
-      <div>{title}</div>
+      {/* The native row's shape: the leading box, then the text area whose content box holds the title first. */}
+      <div data-disclosure-row="" className={rowClassName}>
+        <span data-testid="leading">{icon}</span>
+        <span>
+          <span>
+            <span data-testid="row-title" className={titleClassName}>
+              {title}
+            </span>
+          </span>
+        </span>
+      </div>
       {headerAccessory === undefined ? null : <div data-testid="header-accessory">{headerAccessory}</div>}
       {collapsedContent === undefined ? null : <div data-testid="collapsed-content">{collapsedContent}</div>}
       {open ? <div data-testid="expanded-content">{children}</div> : null}
@@ -243,6 +256,123 @@ describe('SubagentProvenanceToolRow', () => {
       await waitFor(() => expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull())
     } finally {
       seat.remove()
+    }
+  })
+
+  it('lines the titles of a run of three or more rows up in one column, capped at 320 px (council round 23, item 1)', () => {
+    // jsdom lays nothing out: a title is 10 px per character.
+    const width = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'row-title' ? (this.textContent ?? '').length * 10 : 0
+    })
+    const seats: HTMLElement[] = []
+    const seatOf = (runKey: string, size: number): HTMLElement => {
+      const seat = document.createElement('div')
+      seat.setAttribute('data-chat-flow-key', `row-${String(seats.length)}`)
+      seat.setAttribute('data-run-fold-member', 'member')
+      seat.setAttribute('data-run-fold-run', runKey)
+      seat.setAttribute('data-run-fold-size', String(size))
+      document.body.append(seat)
+      seats.push(seat)
+      return seat
+    }
+    const row = (description: string, seat: HTMLElement) =>
+      render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description })} />, { container: seat })
+    const columnOf = (seat: HTMLElement) => seat.querySelector<HTMLElement>('[data-dshfiles-subagent-row]')?.style.getPropertyValue('--dshfiles-subagent-title-column')
+    try {
+      const run = [seatOf('run-1', 3), seatOf('run-1', 3), seatOf('run-1', 3)]
+      row('Audit', run[0]!)
+      row('Check credit note rounding', run[1]!)
+      row('Review currency', run[2]!)
+      // The widest title (26 characters) sets the column for every row, so each model starts on one x.
+      for (const seat of run) expect(columnOf(seat)).toBe('260px')
+      expect(run[0]!.querySelector('[data-disclosure-row]')?.className).toContain('--dshfiles-subagent-title-column')
+      // A longer title truncates in the 320 px cap instead of pushing every model right.
+      const long = seatOf('run-1', 4)
+      act(() => {
+        row('Diff the ledger export against the monthly totals', long)
+      })
+      for (const seat of [...run, long]) expect(columnOf(seat)).toBe('320px')
+      expect(long.querySelector('[data-testid="row-title"]')?.className).toContain('dshx:truncate')
+      // A run of two keeps each row's own width.
+      const pair = [seatOf('run-2', 2), seatOf('run-2', 2)]
+      row('Audit', pair[0]!)
+      row('Check credit note rounding', pair[1]!)
+      for (const seat of pair) expect(columnOf(seat)).toBe('')
+    } finally {
+      cleanup()
+      for (const seat of seats) seat.remove()
+      width.mockRestore()
+    }
+  })
+
+  it('rounds a fractional title width up, so the widest title is never cut by a fraction of a pixel', () => {
+    // In the scratch: "Diff the ledger export against totals" laid out 210.375 px wide, scrollWidth said 210, and the
+    // 210 px column ended it "against tota…".
+    const width = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'row-title' ? Math.floor((this.textContent ?? '').length * 10.125) : 0
+    })
+    const rect = function (this: Range) {
+      const length = this.startContainer.textContent?.length ?? 0
+      // SAFETY: the column reads only `width`; jsdom has no DOMRect constructor to build one.
+      return { width: length * 10.125, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect
+    }
+    Object.defineProperty(Range.prototype, 'getBoundingClientRect', { configurable: true, value: rect })
+    const seats: HTMLElement[] = []
+    try {
+      for (const description of ['Audit', 'Diff the ledger export', 'Review currency']) {
+        const seat = document.createElement('div')
+        seat.setAttribute('data-chat-flow-key', `fraction-${String(seats.length)}`)
+        seat.setAttribute('data-run-fold-member', 'member')
+        seat.setAttribute('data-run-fold-run', 'run-fraction')
+        seat.setAttribute('data-run-fold-size', '3')
+        document.body.append(seat)
+        seats.push(seat)
+        render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description })} />, { container: seat })
+      }
+      // 22 characters at 10.125 px: 222.75 px of text, so a 223 px column; the rounded scrollWidth said 222.
+      for (const seat of seats) {
+        expect(seat.querySelector<HTMLElement>('[data-dshfiles-subagent-row]')?.style.getPropertyValue('--dshfiles-subagent-title-column')).toBe('223px')
+      }
+    } finally {
+      cleanup()
+      for (const seat of seats) seat.remove()
+      Reflect.deleteProperty(Range.prototype, 'getBoundingClientRect')
+      width.mockRestore()
+    }
+  })
+
+  it('measures the titles again once web fonts load, so the widest title is never cut by a column set before them', () => {
+    // The widest title was measured in the fallback font; truncated in the column, its box never resized as it widened.
+    let scale = 10
+    const width = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'row-title' ? (this.textContent ?? '').length * scale : 0
+    })
+    const fonts = Object.assign(new EventTarget(), { ready: new Promise<never>(() => undefined) })
+    Object.defineProperty(document, 'fonts', { configurable: true, value: fonts })
+    const seats: HTMLElement[] = []
+    try {
+      for (const description of ['Audit', 'Diff the ledger export', 'Review currency']) {
+        const seat = document.createElement('div')
+        seat.setAttribute('data-chat-flow-key', `font-${String(seats.length)}`)
+        seat.setAttribute('data-run-fold-member', 'member')
+        seat.setAttribute('data-run-fold-run', 'run-fonts')
+        seat.setAttribute('data-run-fold-size', '3')
+        document.body.append(seat)
+        seats.push(seat)
+        render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description })} />, { container: seat })
+      }
+      const columnOf = (seat: HTMLElement) => seat.querySelector<HTMLElement>('[data-dshfiles-subagent-row]')?.style.getPropertyValue('--dshfiles-subagent-title-column')
+      expect(columnOf(seats[0]!)).toBe('220px')
+      scale = 12
+      act(() => {
+        fonts.dispatchEvent(new Event('loadingdone'))
+      })
+      for (const seat of seats) expect(columnOf(seat)).toBe('264px')
+    } finally {
+      cleanup()
+      for (const seat of seats) seat.remove()
+      Reflect.deleteProperty(document, 'fonts')
+      width.mockRestore()
     }
   })
 

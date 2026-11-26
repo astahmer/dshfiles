@@ -121,6 +121,30 @@ describe('a run beside a failed call kept outside "Worked for" (round 21 D6)', (
     expect(summary()).toBe('7 subagents · 1 working · 6 failed')
     expect(rows()).toEqual(failed)
   })
+
+  it('names the run and its size for every row, the taken failed call included (council round 23, item 1)', () => {
+    kinds()
+    status.set('c7', 'failed')
+    type Seen = { readonly inside: readonly unknown[]; readonly absorbed: ReturnType<typeof useRunFoldAbsorbed> }
+    const reads: Seen[] = []
+    const nodeStore = store([...inside, 'c7'], new Set(['c7']))
+    const Probe = (props: { readonly onRead: (seen: Seen) => void }) => {
+      const absorbed = useRunFoldAbsorbed()
+      const placements = useRunFoldPlacements(nodeStore, inside, ['c7'])
+      props.onRead({ inside: placements.map(placement => (placement === undefined ? undefined : { runKey: placement.runKey, size: placement.size })), absorbed })
+      return null
+    }
+    render(
+      <RunFoldContext.Provider value={scope}>
+        <Probe onRead={seen => reads.push(seen)} />
+      </RunFoldContext.Provider>,
+    )
+    const seen = reads.at(-1)
+    const run = { runKey: 'session-1\nc1', size: 7 }
+    // Every row of the run shares one key and the count of its rows, so the rows can share a title column.
+    expect(seen?.inside).toEqual(inside.map(() => run))
+    expect(seen?.absorbed.get('c7')).toEqual(run)
+  })
 })
 
 describe('the run summary row (council round 23, items 1 and 2)', () => {

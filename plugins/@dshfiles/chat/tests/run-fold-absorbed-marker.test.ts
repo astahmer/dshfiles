@@ -10,8 +10,10 @@ const source = (file: string): string => readFileSync(new URL(`../src/native/cha
  */
 describe('run fold member marker', () => {
   it('marks a seat the run took in from after its group as absorbed', () => {
-    expect(source('ChatFlow.tsx')).toMatch(/runFoldAbsorbed=\{absorbed\.has\(entry\.key\)\}/)
-    expect(source('ChatNodeSeat.tsx')).toMatch(/data-run-fold-member=\{runFold === undefined \? \(runFoldAbsorbed === true \? 'absorbed' : undefined\)/)
+    // Council round 23, item 1: the seat gets the run that took it in, so its row shares that run's title column.
+    expect(source('ChatFlow.tsx')).toMatch(/runFoldAbsorbed=\{absorbed\.get\(entry\.key\)\}/)
+    expect(source('ChatNodeSeat.tsx')).toMatch(/data-run-fold-member=\{runFold === undefined \? \(runFoldAbsorbed === undefined \? undefined : 'absorbed'\)/)
+    expect(source('ChatNodeSeat.tsx')).toMatch(/data-run-fold-run=\{\(runFold \?\? runFoldAbsorbed\)\?\.runKey\}/)
   })
 })
 
