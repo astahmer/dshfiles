@@ -60,6 +60,12 @@
    */
   --color-field-border: var(--dshx-field-border, var(--dsw-alias-border-l3));
   /*
+   * A quiet trigger's fill (council round 10 A1): `bg-trigger-fill` under `triggerLook` (Select, Combobox, `Button
+   * variant="field"`) and `select-look`. Light oklch(0.955 0.004 65), dark oklch(0.235 0.006 65); ink, secondary and
+   * faint text hold AA on it (tests/field-look). Falls back to the raised step without ui-styles.
+   */
+  --color-trigger-fill: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));
+  /*
    * The user prompt bubble (council round 6 A5): `bg-prompt-fill`, or `var(--dshx-prompt-fill)` in a CSS module (chat's
    * MessageItem bubble). A faint cool tint at hue 230; ink, secondary and faint text and links hold AA on it
    * (tests/prompt-fill). Falls back to the Host bubble fill without ui-styles.

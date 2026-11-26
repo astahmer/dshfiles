@@ -208,6 +208,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-wash-needs-you-band', PaletteMath.toCss(p.needsYouBandWash))
   push('--dshx-wash-failed', PaletteMath.toCss(p.failedWash))
   push('--dshx-field-border', PaletteMath.toCss(p.fieldBorder))
+  push('--dshx-trigger-fill', PaletteMath.toCss(p.triggerFill))
   push('--dshx-prompt-fill', PaletteMath.toCss(p.promptFill))
   push('--dshx-tone-nav', PaletteMath.toCss(p.navSurface))
   push('--dshx-ready-mark', PaletteMath.toCss(p.readyMark))

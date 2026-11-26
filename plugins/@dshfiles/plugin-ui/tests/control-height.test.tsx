@@ -99,7 +99,8 @@ describe('one control height (council round 5 A1)', () => {
     const filter = view.getByRole('button', { name: 'Filter: All' })
     for (const trigger of [launcher, filter]) {
       expect(trigger.getAttribute('data-size')).toBe('field')
-      expect(classes(trigger)).toEqual(expect.arrayContaining([H, 'dshx:rounded-lg', 'dshx:text-sm', 'dshx:border-field-border']))
+      // The quiet trigger (council round 10 A1): its field edge shows on hover and while open.
+      expect(classes(trigger)).toEqual(expect.arrayContaining([H, 'dshx:rounded-lg', 'dshx:text-sm', 'dshx:not-disabled:hover:border-field-border']))
       // Never the 28px `sm` height in a toolbar row.
       expect(classes(trigger)).not.toContain('dshx:h-7')
     }

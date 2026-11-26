@@ -10,6 +10,16 @@ import { cn } from '../../lib/utils.js'
  */
 export const fieldLook = 'dshx:rounded-lg dshx:border dshx:border-field-border dshx:bg-background'
 
+/**
+ * The quiet trigger (council round 10 A1): a control that opens a list or a popover and shows a value (the Select and
+ * Combobox triggers, `Button variant="field"`) is a filled chip, `bg-trigger-fill` (light oklch 0.955, dark 0.235),
+ * with a transparent 1px edge at rest, so a filter row reads as calm chips beside the one edged text field. The 3:1
+ * `border-field-border` edge appears on hover and while the list is open; on focus each control's edge takes the accent
+ * (`focus-visible:border-ring`) under the kit's 2px accent outline. The edge is always there in the box model, so nothing moves. Text-entry fields keep `fieldLook`.
+ */
+export const triggerLook =
+  'dshx:rounded-lg dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:not-disabled:hover:border-field-border dshx:data-[state=open]:border-field-border dshx:aria-expanded:border-field-border'
+
 const Input = React.forwardRef<HTMLInputElement, React.ComponentPropsWithoutRef<'input'>>(function Input({ className, type, ...props }, ref) {
   return (
     <input

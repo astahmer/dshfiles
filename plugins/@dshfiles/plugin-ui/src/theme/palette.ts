@@ -71,6 +71,14 @@ export interface Palette {
    */
   readonly fieldBorder: Oklch
   /**
+   * A quiet trigger's fill (council round 10 A1): a select, combobox or value-picker trigger (`Button variant="field"`)
+   * is a filled chip with no edge at rest, so a filter row stops reading as wireframe; the 3:1 `fieldBorder` edge shows
+   * on hover and while open. Text-entry fields keep the edge at rest. The ink at 5% (5.2% dark), so it paints the
+   * council's oklch(0.955 0.004 65) light and oklch(0.235 0.006 65) dark on the page and stays one step off every other
+   * surface it sits on (the light nav column at 0.962 would swallow an opaque 0.955; a dark dialog at 0.27 would sink it).
+   */
+  readonly triggerFill: Oklch
+  /**
    * The user prompt bubble (council round 6 A5): a faint cool tint at hue 230, 40° from the default attention indigo,
    * so your own words read apart from the agent's without saying attention. Ink, secondary and faint text and links hold
    * AA on it. Fixed hue: a prompt is neither the accent nor a status.
@@ -111,6 +119,12 @@ const LIGHTNESS = {
 } as const satisfies Record<Scheme, readonly number[]>
 
 const STATUS_HUES = { success: 150, warning: 80, danger: 25 } as const
+
+/**
+ * The quiet trigger's ink share (council round 10 A1): over the page it paints L 0.959 light, 0.233 dark (the council's
+ * 0.955 / 0.235 within one 8-bit step), and secondary text holds AA on it over every surface up to the selection wash.
+ */
+const TRIGGER_FILL_ALPHA = { light: 0.05, dark: 0.052 } as const
 
 /** Default warm-stone input (D1). */
 export const WARM_STONE = { hue: 65, chroma: 0.007, accentHue: 270, contrast: 1 } as const
@@ -173,6 +187,7 @@ function palette(input: PaletteInput): Palette {
     navSurface: dark ? { l: 0.225, c: 0.006, h: 60 } : panel,
     promptFill: dark ? { l: 0.255, c: 0.018, h: 230 } : { l: 0.965, c: 0.012, h: 230 },
     fieldBorder: { l: round(clamp(base + ((dark ? 0.55 : 0.61) - base) * contrast, 0, 1), 4), c: primaryChroma, h: hue },
+    triggerFill: withAlpha(neutral[10] ?? { l: dark ? 0.93 : 0.22, c: 0, h: hue }, TRIGGER_FILL_ALPHA[scheme]),
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
     primaryHover: dark
       ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue }

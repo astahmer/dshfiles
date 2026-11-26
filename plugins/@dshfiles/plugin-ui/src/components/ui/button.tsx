@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '../../lib/utils.js'
-import { fieldLook } from './input.js'
+import { triggerLook } from './input.js'
 import { Slot } from 'radix-ui'
 
 /**
@@ -47,13 +47,14 @@ const buttonVariants = cva(
         'danger-text': 'dshx:bg-transparent dshx:text-danger-tint-foreground dshx:hover:bg-status-failed/12 dshx:active:bg-status-failed/18',
         /*
          * A popover trigger that shows a value, not an action (council round 7 A4: a date range, a purpose, a project
-         * picker): the field look of `SelectTrigger` (field boundary, page fill, 8px), the value in ink at the body weight
-         * and its chevron in secondary ink, so a filter row never mixes the field edge with the quiet button edge. No
-         * hover fill, as a select trigger has none; the kit focus ring and the press wash stay. Outside `Button`, read it
-         * through `cn(buttonVariants({ variant: 'field' }))` so the body weight replaces the base 500.
+         * picker): the look of `SelectTrigger`, the quiet trigger (council round 10 A1: the trigger fill, no edge at rest,
+         * the 3:1 field edge on hover, while open and on focus), the value in ink at the body weight and its chevron in
+         * secondary ink. The kit focus ring and the press wash stay. A launcher that stands for a text field (Search
+         * threads) adds `fieldLook` back. Outside `Button`, read it through `cn(buttonVariants({ variant: 'field' }))`
+         * so the body weight replaces the base 500.
          */
         field: cn(
-          fieldLook,
+          triggerLook,
           'dshx:justify-between dshx:font-normal dshx:text-foreground dshx:active:bg-(--dsw-alias-interactive-bg-active) dshx:[&_svg:not([class*=text-])]:text-muted-foreground',
         ),
       },

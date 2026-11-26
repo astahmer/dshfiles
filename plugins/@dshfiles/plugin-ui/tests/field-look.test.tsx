@@ -4,14 +4,15 @@ import { join } from 'node:path'
 import { cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Button, buttonVariants } from '../src/components/ui/button.js'
-import { Input, fieldLook } from '../src/components/ui/input.js'
+import { Input, fieldLook, triggerLook } from '../src/components/ui/input.js'
 import { InputGroup } from '../src/components/ui/input-group.js'
 import { Select, SelectTrigger, SelectValue, selectLook } from '../src/components/ui/select.js'
+import { Combobox } from '../src/components/ui/combobox.js'
 import { Textarea } from '../src/components/ui/textarea.js'
 import { UnitInput } from '../src/components/ui/unit-input.js'
 import { Checkbox } from '../src/components/ui/checkbox.js'
 import { RadioGroup, RadioGroupItem } from '../src/components/ui/radio-group.js'
-import { PaletteMath, WARM_STONE, type Scheme } from '../src/theme/palette.ts'
+import { PaletteMath, WARM_STONE, type Oklch, type Scheme } from '../src/theme/palette.ts'
 import { ThemeCss } from '../src/theme/theme-css.ts'
 
 afterEach(cleanup)
@@ -22,13 +23,23 @@ const roles = readFileSync(join(process.cwd(), 'src/color-roles.css'), 'utf8')
 const combobox = readFileSync(join(process.cwd(), 'src/components/ui/combobox.tsx'), 'utf8')
 const classes = (element: Element | null): readonly string[] => element?.className.split(/\s+/u) ?? []
 const schemes: readonly Scheme[] = ['light', 'dark']
+/** `over` at `alpha` on an opaque `under`, composited in gamma sRGB as a browser paints it. */
+const composite = (under: Oklch, over: Oklch, alpha: number): Oklch => {
+  const channels = (color: Oklch): readonly number[] =>
+    PaletteMath.toHex(color)
+      .slice(1)
+      .match(/../gu)!
+      .map(pair => Number.parseInt(pair, 16))
+  const [u, o] = [channels(under), channels(over)]
+  return PaletteMath.hexToOklch(`#${u.map((value, i) => Math.round(value * (1 - alpha) + o[i]! * alpha).toString(16).padStart(2, '0')).join('')}`)
+}
 
 describe('one field look (council round 3 A4)', () => {
   it('is a 1px control border, the page fill and the 8px radius, with no shadow and no dark fill', () => {
     expect(fieldLook.split(' ')).toEqual(['dshx:rounded-lg', 'dshx:border', 'dshx:border-field-border', 'dshx:bg-background'])
   })
 
-  it('draws the select trigger at the one control height (32px) in that look, with a full-strength chevron', () => {
+  it('draws the select trigger at the one control height (32px) as the quiet trigger, with a full-strength chevron', () => {
     const view = render(
       <Select>
         <SelectTrigger aria-label="Theme">
@@ -37,9 +48,9 @@ describe('one field look (council round 3 A4)', () => {
       </Select>,
     )
     const trigger = view.container.querySelector('[data-slot="select-trigger"]')!
-    expect(classes(trigger)).toEqual(expect.arrayContaining([...fieldLook.split(' '), 'dshx:data-[size=default]:h-(--dshx-control-h)']))
+    expect(classes(trigger)).toEqual(expect.arrayContaining([...triggerLook.split(' '), 'dshx:data-[size=default]:h-(--dshx-control-h)']))
     expect(trigger.className).not.toMatch(/dark:bg-input|dark:hover:bg-input|shadow-xs|bg-transparent|rounded-md/u)
-    expect(selectLook).toContain(fieldLook)
+    expect(selectLook).toContain(triggerLook)
     // The chevron is the control's glyph: muted ink at full strength (3:1), not 50% opacity.
     const chevron = trigger.querySelector('svg')!
     expect(chevron.getAttribute('class')).not.toContain('opacity-50')
@@ -60,17 +71,19 @@ describe('one field look (council round 3 A4)', () => {
     }
   })
 
-  it('offers select-look for a control the kit does not draw (a Host select): 32px, 1px border, page fill, 8px', () => {
+  it('offers select-look for a control the kit does not draw (a Host select): the quiet trigger at 32px, 8px', () => {
     expect(styles).toContain("@import './field-look.css';")
-    const rule = /@utility select-look \{([^}]*)\}/u.exec(looks)?.[1] ?? ''
+    const rule = /@utility select-look \{([\s\S]*?)\n\}/u.exec(looks)?.[1] ?? ''
     for (const declaration of [
       'height: var(--dshx-control-h, 32px);',
-      'border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));',
+      'border: 1px solid transparent;',
       'border-radius: var(--dsw-radius-md, 8px);',
-      'background-color: var(--dsw-alias-bg-base);',
+      'background-color: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));',
       'box-shadow: none;',
     ])
       expect(rule, declaration).toContain(declaration)
+    // The 3:1 edge on hover and focus only.
+    expect(rule).toMatch(/&:hover:not\(:disabled\),\s*&:focus-visible \{\s*border-color: var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/u)
   })
 
   it.each(schemes)('draws the chevron and the field text at their contrast on the fill (%s)', scheme => {
@@ -81,7 +94,7 @@ describe('one field look (council round 3 A4)', () => {
 })
 
 describe('field trigger (council round 7 A4)', () => {
-  it('draws a popover trigger that shows a value in the field look, beside the select trigger in a filter row', () => {
+  it('draws a popover trigger that shows a value in the quiet trigger look, beside the select trigger in a filter row', () => {
     const view = render(
       <>
         <Button variant="field" aria-label="Range">
@@ -96,17 +109,17 @@ describe('field trigger (council round 7 A4)', () => {
     )
     const trigger = view.getByRole('button', { name: 'Range' })
     expect(trigger.getAttribute('data-variant')).toBe('field')
-    expect(classes(trigger)).toEqual(expect.arrayContaining([...fieldLook.split(' '), 'dshx:font-normal', 'dshx:text-foreground', 'dshx:h-(--dshx-control-h)']))
+    expect(classes(trigger)).toEqual(expect.arrayContaining([...triggerLook.split(' '), 'dshx:font-normal', 'dshx:text-foreground', 'dshx:h-(--dshx-control-h)']))
     expect(classes(trigger)).not.toContain('dshx:font-medium')
     // Not the quiet button edge: no shadow, no dark input fill, no default border colour.
     expect(trigger.className).not.toMatch(/shadow-xs|dark:bg-input|dark:border-input|hover:bg-accent/u)
     // Its glyph is the select chevron's muted ink, unless the caller colours it.
     expect(classes(trigger)).toContain('dshx:[&_svg:not([class*=text-])]:text-muted-foreground')
-    // The same edge as the select trigger in the same row.
+    // The same look as the select trigger in the same row.
     const select = view.container.querySelector('[data-slot="select-trigger"]')!
-    for (const part of fieldLook.split(' ')) expect(classes(select)).toContain(part)
+    for (const part of triggerLook.split(' ')) expect(classes(select)).toContain(part)
     // A trigger the kit does not render as a Button reads the same classes.
-    expect(buttonVariants({ variant: 'field' })).toContain('dshx:border-field-border')
+    expect(buttonVariants({ variant: 'field' })).toContain('dshx:bg-trigger-fill')
   })
 })
 
@@ -135,7 +148,7 @@ describe('field boundary (council round 6 A2, WCAG 1.4.11)', () => {
     expect(PaletteMath.contrastRatio(p.neutral[5]!, p.neutral[0]!)).toBeLessThan(3)
   })
 
-  it('edges the checkbox, the radio and the combobox trigger with it too', () => {
+  it('edges the checkbox and the radio with it too', () => {
     const view = render(
       <>
         <Checkbox aria-label="Agree" />
@@ -149,7 +162,84 @@ describe('field boundary (council round 6 A2, WCAG 1.4.11)', () => {
       expect(classes(element), slot).toContain('dshx:border-field-border')
       expect(classes(element), slot).not.toContain('dshx:border-input')
     }
-    expect(combobox).toMatch(/const triggerClass =\s*'[^']*dshx:border-field-border/u)
+    expect(combobox).toMatch(/const triggerClass = cn\(\s*triggerLook,/u)
+  })
+})
+
+describe('quiet trigger (council round 10 A1)', () => {
+  const rest = (element: Element): readonly string[] => classes(element).filter(name => !/:(hover|focus|data-|aria-|not-)/u.test(name.replace(/^dshx:/u, '')))
+
+  it('is a filled chip with a transparent edge at rest and the 3:1 field edge on hover and while open', () => {
+    expect(triggerLook.split(' ')).toEqual([
+      'dshx:rounded-lg',
+      'dshx:border',
+      'dshx:border-transparent',
+      'dshx:bg-trigger-fill',
+      'dshx:not-disabled:hover:border-field-border',
+      'dshx:data-[state=open]:border-field-border',
+      'dshx:aria-expanded:border-field-border',
+    ])
+    expect(roles).toContain('--color-trigger-fill: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));')
+  })
+
+  it('draws Select, Combobox and Button field triggers quiet, and keeps the edge on text-entry fields', () => {
+    const view = render(
+      <>
+        <Select>
+          <SelectTrigger aria-label="Theme">
+            <SelectValue placeholder="Theme" />
+          </SelectTrigger>
+        </Select>
+        <Combobox label="Project" value="" options={[{ value: 'a', label: 'A' }]} onValueChange={() => undefined} />
+        <Button variant="field" aria-label="Range">
+          Custom
+        </Button>
+        <Input aria-label="Name" />
+        <Textarea aria-label="Notes" />
+      </>,
+    )
+    const triggers = [
+      view.container.querySelector('[data-slot="select-trigger"]')!,
+      view.getByRole('combobox', { name: 'Project' }),
+      view.getByRole('button', { name: 'Range' }),
+    ]
+    for (const trigger of triggers) {
+      expect(rest(trigger), trigger.getAttribute('aria-label') ?? '').toEqual(expect.arrayContaining(['dshx:border-transparent', 'dshx:bg-trigger-fill']))
+      expect(rest(trigger), trigger.getAttribute('aria-label') ?? '').not.toContain('dshx:border-field-border')
+      expect(classes(trigger)).toContain('dshx:not-disabled:hover:border-field-border')
+    }
+    for (const field of [view.getByRole('textbox', { name: 'Name' }), view.getByRole('textbox', { name: 'Notes' })])
+      expect(rest(field)).toEqual(expect.arrayContaining(['dshx:border-field-border', 'dshx:bg-background']))
+  })
+
+  it.each(schemes)('paints the round-10 fill on the page and one step off every other surface, text AA and edges 3:1 on it (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const dark = scheme === 'dark'
+    expect(ThemeCss.blockDeclarations(WARM_STONE, scheme)).toContain(`  --dshx-trigger-fill: ${PaletteMath.toCss(p.triggerFill)};`)
+    const surfaces = {
+      bg: p.neutral[0]!,
+      panel: p.neutral[1]!,
+      raised: p.neutral[2]!,
+      nav: p.navSurface,
+      selected: p.selectedWash,
+      dialog: dark ? { l: 0.27, c: 0.006, h: 60 } : p.neutral[0]!,
+    }
+    const fill = (under: Oklch): Oklch => composite(under, p.triggerFill, p.triggerFill.alpha ?? 1)
+    // The council's values on the page: oklch(0.955 0.004 65) light, oklch(0.235 0.006 65) dark (8-bit rounding).
+    expect(fill(surfaces.bg).l).toBeCloseTo(dark ? 0.235 : 0.955, 2)
+    for (const [name, under] of Object.entries(surfaces)) {
+      const chip = fill(under)
+      // A visible step off its surface, darker in light and lighter in dark: never swallowed, never sunk.
+      expect(dark ? chip.l - under.l : under.l - chip.l, name).toBeGreaterThanOrEqual(0.03)
+      // Ink and secondary text (the chevron and a placeholder).
+      for (const step of [10, 9]) expect(PaletteMath.contrastRatio(p.neutral[step]!, chip), `${name} step ${step}`).toBeGreaterThanOrEqual(4.5)
+      // The focus cue (WCAG 2.4.11): the 2px accent outline, 3:1 against the chip and the surface around it.
+      expect(PaletteMath.contrastRatio(p.accent.fg, chip), `${name} focus`).toBeGreaterThanOrEqual(3)
+      expect(PaletteMath.contrastRatio(p.accent.fg, under), `${name} focus`).toBeGreaterThanOrEqual(3)
+    }
+    // Where filter rows live (the page, a panel, the nav column) the hover and open edge holds 3:1 on both sides. A
+    // placeholder is the secondary step (`data-[placeholder]:text-muted-foreground`), checked above.
+    for (const under of [surfaces.bg, surfaces.panel, surfaces.nav]) expect(PaletteMath.contrastRatio(p.fieldBorder, fill(under))).toBeGreaterThanOrEqual(3)
   })
 })
 

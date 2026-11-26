@@ -149,9 +149,10 @@ indent: `CodeIndent.mark(codeElement)` sets `--dshx-line-indent` on each highlig
 wrap rule reads; the kit `CodeBlock` does it per line itself.
 
 **Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
-filter, a project picker) is `Button` `variant="field"`: the `SelectTrigger` look (`fieldLook`: field boundary, page fill,
-8px), the value in ink at 400, its chevron in secondary ink, no hover fill. A filter row then shows one field edge:
-selects and value triggers alike; action buttons (Refresh) stay `outline`. Outside `Button`, use
+filter, a project picker) is `Button` `variant="field"`: the `SelectTrigger` look (`triggerLook`, the quiet trigger
+below), the value in ink at 400, its chevron in secondary ink. A filter row then reads as one text field with an edge
+and calm filled triggers beside it; action buttons (Refresh) stay `outline`. A launcher that stands for a text field
+(Search threads) adds `fieldLook` back (`cn(fieldLook)` in its `className`). Outside `Button`, use
 `cn(buttonVariants({ variant: 'field' }))`. In a toolbar row beside an Input, SearchInput, Combobox or Select, give a
 field-look launcher or trigger `size="field"` (council round 9 A4): the one control height (32px, 44px on a coarse
 pointer) at 13px with a 14px glyph, so the row is one height; `size="sm"` (28px) never sits among fields, and never
@@ -216,12 +217,16 @@ Inside it, in dark, the selection wash lifts to L 0.30 and the faint text step t
 fill with a transparent edge, so the keycap keeps one box. A palette the kit does not draw adds `dshx:border
 dshx:surface-dialog` to its own card.
 
-**One field look.** `Input`, `Textarea`, `InputGroup` (so `SearchInput`) and the `Select` trigger share `fieldLook`
+**One field look.** Text-entry fields, `Input`, `Textarea` and `InputGroup` (so `SearchInput`), share `fieldLook`
 (`components/ui/input`): a 1px `border-field-border` boundary (`--dshx-field-border`, light `#88827d`, dark `#76706c`:
 3:1 on bg, panel, raised, the nav column and the dark dialog fill, WCAG 1.4.11; council round 6 A2), the page fill
-(`bg-background`), the 8px radius, no shadow and no dark fill. The `Combobox` trigger, `Checkbox` and `RadioGroupItem`
-edges and `select-look` use the same boundary; a field-like control a plugin draws itself takes
-`dshx:border-field-border` too. Dividers and card hairlines stay `border-border`. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
+(`bg-background`), the 8px radius, no shadow and no dark fill. `Checkbox` and `RadioGroupItem` edges use the same
+boundary; a text field a plugin draws itself takes `dshx:border-field-border` too. Dividers and card hairlines stay
+`border-border`. **The quiet trigger** (council round 10 A1): a control that opens a list and shows a value, the
+`Select` and `Combobox` triggers, `Button variant="field"` and `select-look`, shares `triggerLook`: `bg-trigger-fill`
+(`--dshx-trigger-fill`, the ink at 5% light / 5.2% dark, so it paints `oklch(0.955 0.004 65)` / `oklch(0.235 0.006 65)`
+on the page and stays a visible step on a panel, the nav column, raised or a dialog), a transparent 1px edge at rest,
+the 3:1 field edge on hover and while open, and the accent edge plus the kit ring on focus; the box never changes size. **One control height** (council round 5 A1): `--dshx-control-h` (`dshx:h-control-h`), 32px and 44px on a
 coarse pointer, sizes `Input`, `InputGroup`, `Combobox`, the default `Select` trigger, `select-look`, the segmented
 `TabsList` (items inset 3px) and default-size `Button`s (so `Page` header actions); every `Button` size shares the 8px
 radius. The trigger takes that height (`size="sm"` 28px for a dense toolbar) with the chevron in secondary ink at full strength;

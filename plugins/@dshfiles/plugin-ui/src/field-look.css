@@ -1,10 +1,11 @@
 /*
  * One field look (council round 3 A4; DESIGN.md › Components). Kit fields share it through `fieldLook`
  * (components/ui/input): the 1px field boundary (`--dshx-field-border`, 3:1 on every surface; council round 6 A2), the page fill and the 8px radius, no shadow and no dark fill.
- * `dshx:select-look` is the same look at the one control height (`--dshx-control-h`, 32px; 44px coarse) for a control the kit does not draw, such as a Host
- * select inside a native settings row, reached with an arbitrary variant
- * (`dshx:[&_[class*=_select]]:select-look`). It never sets a font family or the focus ring: the kit sheet draws the one
- * ring for every control.
+ * Triggers (a select, a combobox, a value picker) take the quiet trigger instead (council round 10 A1, `triggerLook`).
+ * `dshx:select-look` is that quiet trigger at the one control height (`--dshx-control-h`, 32px; 44px coarse) for a
+ * control the kit does not draw, such as a Host select inside a native settings row, reached with an arbitrary variant
+ * (`dshx:[&_[class*=_select]]:select-look`): the trigger fill, a transparent 1px edge at rest and the 3:1 field edge on
+ * hover and focus. It never sets a font family or the focus ring: the kit sheet draws the one ring for every control.
  *
  * Kept in its own file, imported by one line of styles.css, so the kit's base token block stays as upstream wrote it.
  */
@@ -12,10 +13,14 @@
   box-sizing: border-box;
   height: var(--dshx-control-h, 32px);
   padding-inline: 10px;
-  border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
+  border: 1px solid transparent;
   border-radius: var(--dsw-radius-md, 8px);
-  background-color: var(--dsw-alias-bg-base);
+  background-color: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));
   color: var(--dsw-alias-label-primary);
   font-size: var(--dshx-density-text-ui, 0.8125rem);
   box-shadow: none;
+  &:hover:not(:disabled),
+  &:focus-visible {
+    border-color: var(--dshx-field-border, var(--dsw-alias-border-l3));
+  }
 }
