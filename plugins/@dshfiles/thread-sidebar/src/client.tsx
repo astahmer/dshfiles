@@ -1768,6 +1768,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             // A row led by its status glyph draws no pill, so the kit's selected edge (a neutral 1px inset, 3:1 on the
             // wash) outlines the wash (council round 12 B1): the wash alone measured 1.10:1 off the dark list.
             rowWash === undefined && 'dshx:group-data-[selected=true]/row:bg-selected-wash dshx:group-data-[selected=true]/row:selected-edge',
+            // The phone list is a list you leave for the thread (council round 17 B1.2): its current row keeps the wash and
+            // the 550 title, not the outline, which read as a focus ring on a phone.
+            rowWash === undefined && 'dshx:phone:group-data-[selected=true]/row:shadow-none',
             swipe.offset === 0 ? 'dshx:transition-transform dshx:duration-150' : 'dshx:bg-(--dsw-specific-sidebar-fill)',
             swipe.offset === 0 && rowWash === 'needs-you' && 'dshx:bg-wash-needs-you',
             swipe.offset === 0 && rowWash === 'failed' && 'dshx:bg-wash-failed',
@@ -2028,14 +2031,15 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {verbSeat === 'meta' && inlineVerb !== undefined ? (
                     // The verb's seat, sized to the verb (council round 14 B1): an invisible copy of its label in the
                     // button's xs metrics. The verb itself sits outside this button (a button cannot hold one); its
-                    // corner is 4px (touch: 8px) further out than this line's end, so the copy gives that back. Only its
-                    // width counts: it keeps the line's 16px, so line 2 never grows.
+                    // corner is 8px further out than this line's end (its label ends where the age does, council round
+                    // 17 B1.2; touch: beside a counter 4px), so the copy gives that back. Only its width counts: it keeps
+                    // the line's 16px, so line 2 never grows.
                     <span
                       aria-hidden="true"
                       data-verb-reserve=""
                       className={cn(
                         'dshx:invisible dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:px-2 dshx:text-xs/4 dshx:font-medium dshx:whitespace-nowrap',
-                        childCount > 0 ? 'dshx:-mr-1' : 'dshx:-mr-1 dshx:pointer-coarse:-mr-2',
+                        childCount > 0 ? 'dshx:-mr-2 dshx:pointer-coarse:-mr-1' : 'dshx:-mr-2',
                       )}
                     >
                       {t(inlineVerbLabelKeys[inlineVerb])}
@@ -2047,14 +2051,18 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           )}
           {childCount > 0 || (verbSeat === 'meta' && !props.renaming) ? (
             // Line 2's trailing edge: the verb, then the subagent counter. The 24px verb centres on line 2 (6px under a
-            // comfortable row, 2px under a compact one); touch moves it left of the row menu button's column.
+            // comfortable row, 2px under a compact one); touch moves it left of the row menu button's column. The verb's
+            // label and the chevron's glyph both sit 8px inside this box, so it stands 8px outside the row's padding:
+            // the age, the verb and the chevron end on one edge (council round 17 B1.2).
             <div
               data-thread-row-end=""
               data-verb-seat={verbSeat === 'meta' ? 'meta' : undefined}
               className={cn(
-                'dshx:absolute dshx:right-1.5 dshx:flex dshx:items-center dshx:gap-1',
+                'dshx:absolute dshx:flex dshx:items-center dshx:gap-1',
+                compact ? 'dshx:right-0' : 'dshx:right-0.5',
                 verbSeat !== 'meta' || props.renaming
-                  ? 'dshx:bottom-1'
+                  ? // Touch: a chevron alone stays centred under the row menu button.
+                    'dshx:bottom-1 dshx:pointer-coarse:right-1.5'
                   : // Touch: the verb's label ends where the time above it does (round nine B5: its 8px padding reaches into
                     // the row menu's column), and stands on the row's 4px bottom padding, so it fills row 2 and never meets
                     // the time (round five B1). Beside a subagent counter the counter ends the line, left of that column.
@@ -2165,7 +2173,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               data-testid="thread-row-menu"
               aria-label={t('threadSidebarContextMenu')}
               aria-haspopup="menu"
-              className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-muted-foreground dshx:pointer-coarse:inline-flex"
+              // The row's only menu on a phone, so it stays; in the tertiary ink it no longer reads as row content
+              // beside the age (council round 17 B1.2).
+              className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-(--dsw-alias-label-tertiary) dshx:pointer-coarse:inline-flex"
               onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
             >
               <OverflowGlyph />

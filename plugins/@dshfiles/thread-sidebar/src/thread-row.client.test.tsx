@@ -250,6 +250,52 @@ describe('a row that needs you', () => {
   })
 })
 
+describe('the trailing column and the phone row (council round 17 B1.2)', () => {
+  const asking = { workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) }
+  const children = ['c1'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+  const classOf = (row: HTMLElement, selector: string): string => row.querySelector<HTMLElement>(selector)?.className ?? ''
+
+  it('ends the age, the verb label and the chevron glyph on one edge: the time column\'s', async () => {
+    // Comfortable rows pad their content 10px: the age ends 10px in. The verb's 8px padding and the chevron's 8px of
+    // seat and glyph inset need their box 2px in, not 6px (the 4–5px ragged column the council measured).
+    const comfortable = { ...rowProps().rowStyle, density: 'comfortable' as const }
+    const row = await renderRow({ ...asking, childThreads: children, rowStyle: comfortable })
+    expect(classOf(row, '[data-thread-main-action]')).toContain('dshx:px-2.5')
+    const end = classOf(row, '[data-thread-row-end]')
+    expect(end).toContain('dshx:right-0.5')
+    expect(end).not.toMatch(/(?<![:-])dshx:right-1\.5\b/u)
+    // Touch keeps its columns: the counter at the menu column.
+    expect(end).toContain('dshx:pointer-coarse:right-11')
+    // The verb's invisible copy follows it 8px past line 2's end.
+    expect(classOf(row, '[data-verb-reserve]')).toContain('dshx:-mr-2')
+    cleanup()
+    // A compact row pads 8px: its trailing parts sit on the row's edge box.
+    const compact = await renderRow({ ...asking, rowStyle: { ...rowProps().rowStyle, density: 'compact' } })
+    expect(classOf(compact, '[data-thread-main-action]')).toContain('dshx:px-2')
+    expect(classOf(compact, '[data-thread-row-end]').split(' ')).toContain('dshx:right-0')
+    cleanup()
+    // A chevron alone keeps its touch seat under the row menu button.
+    const plain = await renderRow({ childThreads: children, workStatus: rowStatus({ status: 'idle' }), rowStyle: comfortable })
+    expect(classOf(plain, '[data-thread-row-end]')).toContain('dshx:right-0.5')
+    expect(classOf(plain, '[data-thread-row-end]')).toContain('dshx:pointer-coarse:right-1.5')
+  })
+
+  it('draws the touch row menu ⋯ in the tertiary ink at 16px', async () => {
+    const row = await renderRow()
+    const menu = row.querySelector<HTMLElement>('[data-testid="thread-row-menu"]')
+    expect(menu?.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(menu?.className).not.toContain('dshx:text-muted-foreground')
+    expect(menu?.querySelector('[data-slot="overflow-glyph"]')?.getAttribute('class')).toContain('dshx:size-4')
+  })
+
+  it('drops the selected edge on the phone list, keeping it on the desktop sidebar', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'working' }) })
+    const fill = classOf(row, 'article > div')
+    expect(fill).toContain('dshx:group-data-[selected=true]/row:selected-edge')
+    expect(fill).toContain('dshx:phone:group-data-[selected=true]/row:shadow-none')
+  })
+})
+
 describe('the glyph column (council round 15 B1)', () => {
   const SEAT = 'dshx:w-[var(--attention-meta-rail-seat,20px)]'
 
