@@ -348,6 +348,10 @@ Round 19 findings, merged in `.cache/unslop-audit/r5/council/round-19-fixes.md`:
 (regression), the folded Inbox overhang on the strip, one phone Inbox meta grammar with a drawn 34–36 pt pill, group
 chevrons on the row axis, the phone Threads search inset, one dock and composer edge, the AI accounts ⋯. If round 20 brings
 no score increase, round six stops (two rounds without one).
+All lanes done: B 4 revisions `soukssur` … `qnkomyxy` (12 px under the brand hairline on column and rail, the folded
+overhang as the open brand row, group chevrons as the row chevron on the time edge, the phone search 8 pt under the bar);
+C 3 `uyurvzlk` … `wyokynzx` (the dock's outer edge as the field edge, one phone card meta with a compact age, a 36 pt
+drawn pill with a 44 pt hit); D 1 `uzsuvosn` (quiet search-side ⋯, ghost header ⋯).
 
 ## Round four
 
