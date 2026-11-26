@@ -1,4 +1,5 @@
 import { CircleHelpIcon } from '@dshfiles/plugin-ui/icons'
+import { ModelMark, modelFamily } from '@dshfiles/plugin-ui/components/model-mark'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { BRAND_MARKS, type BrandKey } from './brand-marks.js'
@@ -10,8 +11,19 @@ const TONE_FILL = {
   warning: 'dshx:bg-warning',
 } as const
 
-/** The model family's mark: vendored brand artwork, or its initial when the family is unknown. */
+/**
+ * Council round 18 C3: a family the kit draws takes the kit's 16 px mark in its brand colour, deepened in light as
+ * RouteModel does on the dock and list rows (3:1 on every row fill, plugin-ui tests/route-model), so the composer's
+ * model reads the same there; the picker's label stays neutral. Follow-up (lane A): let `ModelMark` take that tone.
+ */
+const KIT_MARK_TONE = 'dshx:brightness-85 dshx:dark:brightness-100'
+
+/**
+ * The model family's mark: the kit's ModelMark for the families it draws, else vendored brand artwork, or its initial
+ * when the family is unknown. The kit mark is always 16 px; `className` sizes the picker's own artwork.
+ */
 export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey | undefined; readonly name: string; readonly className?: string }) => {
+  if (brand !== undefined && modelFamily(brand) !== undefined) return <ModelMark modelId={brand} className={KIT_MARK_TONE} />
   if (brand === undefined)
     return (
       <span
