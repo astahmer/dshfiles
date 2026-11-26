@@ -131,6 +131,19 @@ describe('the Review file header (council round 6, D2)', () => {
   })
 })
 
+describe('Review page copy (council round 17, D4)', () => {
+  const panel = readFileSync(fileURLToPath(new URL('panel.tsx', import.meta.url)), 'utf8')
+
+  it('says what the page shows in one short line, and keeps the persistence note on the control it explains', () => {
+    const header = panel.slice(panel.indexOf('heading="Review"', panel.indexOf('width="wide"')), panel.indexOf('actions={[', panel.indexOf('width="wide"')))
+    expect(header).toContain('Changed files, most important first.')
+    expect(header).not.toContain('Marks are kept')
+    const control = panel.slice(panel.indexOf('const reviewControls ='), panel.indexOf('const failure ='))
+    expect(control).toMatch(/<TooltipContent[^>]*>[^<]*kept across browsers/u)
+    expect(control).toContain('>Mark reviewed</span>')
+  })
+})
+
 describe('Review page title mark (council round 7, D1)', () => {
   const panel = readFileSync(fileURLToPath(new URL('panel.tsx', import.meta.url)), 'utf8')
   it('marks both Review pages with the Land destination glyph in its nav tone', () => {

@@ -56,12 +56,12 @@ describe('Review › Compare against (council round 8, D3)', () => {
     expect(input.getAttribute('aria-expanded')).toBe('false')
   })
 
-  it('is what the page renders, under 12/16 labels, with the description held to 62ch', () => {
+  it('is what the page renders, under 12/16 labels, with a one-line description (council round 17, D4)', () => {
     const panel = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'panel.tsx'), 'utf8')
     expect(panel).toContain('<BaseCombobox')
     for (const label of ['Project or workspace', 'Compare against']) expect(panel).toMatch(new RegExp(`className=\\{REVIEW_CONTROL_LABEL\\}[^>]*>\\s*${label}\\s*<`, 'u'))
     expect(panel).toMatch(/const REVIEW_CONTROL_LABEL = 'dshx:text-xs dshx:leading-4 dshx:text-muted-foreground'/u)
-    expect(panel).toContain('dshx:max-w-[62ch] dshx:text-pretty')
+    expect(panel).toContain('description="Changed files, most important first."')
   })
 })
 

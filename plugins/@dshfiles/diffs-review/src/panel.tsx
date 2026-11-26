@@ -6,6 +6,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { PatchView, parsePatchFiles } from '@dshfiles/plugin-ui/diff'
 import { ReviewLook } from './review-look.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
@@ -79,7 +80,11 @@ export const DiffsReviewPanel = (props: DiffsReviewPanelProps): ReactNode => {
   if (pageReview?.revisions !== undefined && pageReview.workspacePath !== undefined) {
     return <CombinedReviewPage revisions={pageReview.revisions} workspacePath={pageReview.workspacePath} />
   }
-  return <WorkspaceReview {...props} />
+  return (
+    <TooltipProvider>
+      <WorkspaceReview {...props} />
+    </TooltipProvider>
+  )
 }
 
 const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
@@ -258,20 +263,26 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
   }, [images, packageJson.textFiles])
   /**
    * One reviewed control per file (council round 2, D3): a checkbox labelled Reviewed; Shift-click marks a range. It is
-   * a bounded 32 px box on the file row, so the target reads as one (council round 4, D3).
+   * a bounded 32 px box on the file row, so the target reads as one (council round 4, D3). The persistence note lives on
+   * this control, not in the page subtitle (council round 17, D4).
    */
   const reviewControls = (path: string): ReactNode => (
-    <label className={ReviewLook.REVIEWED_TOGGLE}>
-      <Checkbox
-        aria-label={`Reviewed: ${path}`}
-        checked={reviewedPaths.has(path)}
-        onClick={event => {
-          event.preventDefault()
-          toggleReviewed(path, event.shiftKey)
-        }}
-      />
-      <span aria-hidden>Mark reviewed</span>
-    </label>
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <label className={ReviewLook.REVIEWED_TOGGLE}>
+          <Checkbox
+            aria-label={`Reviewed: ${path}`}
+            checked={reviewedPaths.has(path)}
+            onClick={event => {
+              event.preventDefault()
+              toggleReviewed(path, event.shiftKey)
+            }}
+          />
+          <span aria-hidden>Mark reviewed</span>
+        </label>
+      </TooltipTrigger>
+      <TooltipContent side="bottom">Marks are kept across browsers. Shift-click marks a range.</TooltipContent>
+    </Tooltip>
   )
 
   const failure = (message: string, retry: () => void): ReactNode => (
@@ -315,12 +326,8 @@ const WorkspaceReview = (props: DiffsReviewPanelProps): ReactNode => {
         mark={<GitMerge />}
         markTone="land"
         heading="Review"
-        // Held to 62ch and wrapped with no one-word last line (council round 8, D3).
-        description={
-          <span className="dshx:block dshx:max-w-[62ch] dshx:text-pretty">
-            Changed files of a project or workspace against its base, ordered by importance. Marks are kept across browsers.
-          </span>
-        }
+        // One short line; the persistence note sits on Mark reviewed (council round 17, D4).
+        description="Changed files, most important first."
         // The base is named once, in the branch control ("Base: main"), not again in a chip beside the title (round 5, D3).
         // Summarize is an outline action and Refresh sits in the overflow: the page has no filled primary (council round 4/5, D3).
         actions={[
