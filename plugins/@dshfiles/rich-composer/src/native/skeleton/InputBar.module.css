@@ -133,6 +133,13 @@
     max-width: 45%;
   }
 
+  /* Council round 11 C4: the location clips its own overflow here, which cut the "·" pulled 8px out of its box, so a
+     phone read "billing-api   In the project". The dot sits inside the box, 6px before the words. */
+  .dock:not([data-meter-expanded]):has(> :global([data-run-summary])) :global([data-composer-meta='location'])::before {
+    margin-left: 0;
+    margin-right: 6px;
+  }
+
   .dock:not([data-meter-expanded]) :global([data-composer-stat]) {
     display: none;
   }

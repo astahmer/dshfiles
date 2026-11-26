@@ -1395,14 +1395,27 @@ button.crumbEditable {
      top, as the desktop dock is (council round 8 C3): the card's fill and hairline, 1px wider on each side to take the
      card's ring edges, its bottom edge on the card's top, so the card's 1px ring is the one divider. Only the strip's top
      corners are rounded and the card's top corners square off under it. Open, the strip stays flat on the page above
-     the rows it lists. */
+     the rows it lists. Council round 11 C4: the strip sits on the nav surface (#F4F2F0 light, the nav step in dark), a
+     status band above the composer's own fill, inside the card's 3:1 edge (C3), so the card's ring is its one
+     separator from the input. */
   :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) {
     margin-inline: calc(var(--dsh-composer-side-clearance, 0px) - 1px);
     margin-bottom: calc(-1 * var(--dsh-composer-stack-gap) - 1px);
-    background: var(--dsw-specific-input-major);
-    border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+    background: var(--dshx-surface-nav, var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1)));
+    border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
     border-bottom-width: 0;
     border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+  }
+
+  /* On the nav surface the jump control's selector fill matched the strip in light: it takes the composer's own fill
+     and the kit's at-rest hairline (a quiet trigger), so its circle reads as a control in both schemes. */
+  :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button) {
+    background: var(--dsw-specific-input-major);
+    box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button:active) {
+    background: var(--dsw-alias-interactive-bg-hover-solid);
   }
 
   /* The row takes the shared fill and the desktop dock rows' 8px inset. */

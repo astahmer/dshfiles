@@ -38,3 +38,12 @@ describe('the composer card edge (council round 11 C3)', () => {
     expect(rule(root, `${desk} > * + *`)).toContain('border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));')
   })
 })
+
+describe('the phone meter line (council round 11 C4)', () => {
+  it('keeps the "·" between the project and its state when the line truncates its location', () => {
+    // The location clips its own overflow on a narrow bar, so the dot sits inside its box, not pulled 8px out of it.
+    const narrow = rule(inputBar, ".dock:not([data-meter-expanded]):has(> :global([data-run-summary])) :global([data-composer-meta='location'])::before")
+    expect(narrow).toContain('margin-left: 0;')
+    expect(narrow).toContain('margin-right: 6px;')
+  })
+})

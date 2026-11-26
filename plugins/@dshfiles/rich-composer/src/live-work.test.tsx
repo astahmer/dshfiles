@@ -223,8 +223,9 @@ describe('Live work attached to the composer on a phone (council round 9 C4)', (
 
   it('draws the strip as the composer card\'s top: its fill and hairline, 1px wider, meeting the card\'s ring', () => {
     const head = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary])`)
-    expect(head).toMatch(/background: var\(--dsw-specific-input-major\);/)
-    expect(head).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+    // Council round 11 C4: the nav surface inside the card's 3:1 edge (below).
+    expect(head).toMatch(/background: var\(--dshx-surface-nav, /)
+    expect(head).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
     expect(head).toMatch(/border-bottom-width: 0;/)
     expect(head).toMatch(/border-radius: var\(--dsw-radius-lg\) var\(--dsw-radius-lg\) 0 0;/)
     expect(head).toMatch(/margin-inline: calc\(var\(--dsh-composer-side-clearance, 0px\) - 1px\);/)
@@ -239,5 +240,25 @@ describe('Live work attached to the composer on a phone (council round 9 C4)', (
     const card = ruleIn(NARROW, `${attached}:has(> .dockHead > [data-live-work-summary]) :global([data-composer-card])`)
     expect(card).toMatch(/border-top-left-radius: 0;/)
     expect(card).toMatch(/border-top-right-radius: 0;/)
+  })
+})
+
+describe('the phone Live work strip on the nav surface (council round 11 C4)', () => {
+  const NARROW = '@media (max-width: 27.99rem)'
+  const phone = ':global(html[data-shell-phone-nav])'
+  const attached = `${phone} .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+
+  it('sits on the nav surface above the composer fill, with the card edge round it and the card ring as its one separator', () => {
+    const head = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary])`)
+    expect(head).toMatch(/background: var\(--dshx-surface-nav, var\(--dsw-specific-sidebar-fill, var\(--dsw-alias-bg-layer-1\)\)\);/)
+    expect(head).not.toMatch(/--dsw-specific-input-major/)
+    expect(head).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
+    expect(head).toMatch(/border-bottom-width: 0;/)
+  })
+
+  it('fills the jump control with the composer fill and a hairline, so it does not vanish into the strip in light', () => {
+    const jump = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button)`)
+    expect(jump).toMatch(/background: var\(--dsw-specific-input-major\);/)
+    expect(jump).toMatch(/box-shadow: inset 0 0 0 1px var\(--dsw-alias-border-l2\);/)
   })
 })
