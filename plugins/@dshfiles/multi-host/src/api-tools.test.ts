@@ -1,6 +1,7 @@
 import * as Schema from 'effect/Schema'
 import { describe, expect, test } from 'vitest'
 import type { ApiSchema } from '@dshfiles/dshx/api'
+import type { JsonObject, JsonValue } from '@dshfiles/dshx/json'
 import { multiHostApi, resourceSnapshotSchema } from './api.js'
 
 /** Decode unknown input with Effect Schema's own defaults (excess properties ignored). */
@@ -30,7 +31,7 @@ const standard = (schema: ApiSchema) => {
   }
 }
 
-type JsonSchemaDocument = Record<string, unknown>
+type JsonSchemaDocument = JsonObject
 type JsonSchemaInput = (options: { readonly target: 'draft-2020-12' }) => object
 type JsonSchemaConverter = { readonly input: JsonSchemaInput }
 
@@ -114,7 +115,7 @@ describe('multi-host tool exposure', () => {
   test('project origin lookup bounds local and remote path batches', async () => {
     const inputSchema = multiHostApi.methods.projectOrigins.input
     if (inputSchema === undefined) throw new Error('The project origin API must define an input schema.')
-    const accepts = async (input: unknown): Promise<boolean> => {
+    const accepts = async (input: JsonValue): Promise<boolean> => {
       const result = await standard(inputSchema).validate(input)
       return !('issues' in result)
     }
@@ -207,7 +208,7 @@ describe('multi-host tool exposure', () => {
   })
 
   test('session ID tools validate strictly and publish their input JSON Schema', async () => {
-    const inputs: { readonly schema: ApiSchema | undefined; readonly valid: Readonly<Record<string, unknown>> }[] = [
+    const inputs: { readonly schema: ApiSchema | undefined; readonly valid: JsonObject }[] = [
       { schema: multiHostApi.methods.sessionJjRepositories.input, valid: { sessionId: 'session-1' } },
       {
         schema: multiHostApi.methods.runtimeFileReferences.input,

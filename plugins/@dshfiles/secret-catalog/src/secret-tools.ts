@@ -111,8 +111,9 @@ const secretRun = Tool.make({
     if (cwd === null)
       return { exitCode: 1, timedOut: false, stdout: '', stderr: '', injectedAliases: [], error: 'secret_run needs a Session workspace folder.' }
     const environment = input.environment ?? DEFAULT_SECRET_ENVIRONMENT
+    const timeoutSeconds = input.timeoutSeconds
     return yield* SecretMcp.use(mcp =>
-      mcp.run({ command: input.command, cwd, environment, ...(input.timeoutSeconds === undefined ? {} : { timeoutSeconds: input.timeoutSeconds }) }),
+      mcp.run(timeoutSeconds === undefined ? { command: input.command, cwd, environment } : { command: input.command, cwd, environment, timeoutSeconds }),
     ).pipe(
       Effect.map(result => ({ ...result, injectedAliases: [...result.injectedAliases] })),
       Effect.catchTag('SecretMcpError', (error: SecretMcpError) =>

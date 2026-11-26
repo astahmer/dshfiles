@@ -10,7 +10,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Exit, Fiber, Layer, Option, Schema, Stream } from 'effect'
 import { defineApi, method } from '../src/api/index.js'
-import { connectCommunicationClient, startHostCommunicationBridge } from '../src/communication/bridge.js'
+import { startHostCommunicationBridge } from '../src/communication/bridge.js'
 import { createCommunicationService } from '../src/communication/service.js'
 import { Communication, CommunicationFailed } from '../src/effect/communication.js'
 import { DshxEffect } from '../src/effect/index.js'
@@ -35,7 +35,7 @@ const temporaryDirectory = (prefix: string) =>
     directory => Effect.promise(() => rm(directory, { recursive: true, force: true })),
   )
 
-const cordisHost = (packageId: string, setup: (ctx: CordisContext) => PromiseLike<unknown>) =>
+const cordisHost = (packageId: string, setup: (ctx: CordisContext) => PromiseLike<void>) =>
   Layer.effect(
     HostContext,
     Effect.acquireRelease(
@@ -405,7 +405,9 @@ describe('Communication', () => {
 })
 
 describe.skipIf(process.platform === 'win32')('HostTerminal', () => {
-  const terminalHost = cordisHost('@test/terminal', ctx => ctx.plugin(LocalSubprocessRuntime))
+  const terminalHost = cordisHost('@test/terminal', async ctx => {
+    await ctx.plugin(LocalSubprocessRuntime)
+  })
   it.layer(HostTerminal.layer.pipe(Layer.provide(terminalHost)))(layer => {
     layer.effect('resolves executables and reports the terminal environment of the real provider', () =>
       Effect.gen(function* () {

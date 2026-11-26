@@ -15,7 +15,7 @@ export interface SettledSessionState {
 }
 
 /** Keep only the timestamps still backed by a settled id, so the settings document cannot grow. */
-const withOnlySettledIds = (settledAt: Readonly<Record<string, number>>, settledSessionIds: readonly string[]): Record<string, number> => {
+const withOnlySettledIds = (settledAt: Readonly<Record<string, number>>, settledSessionIds: readonly string[]): SettledStatus['settledAt'] => {
   const kept: Record<string, number> = {}
   for (const sessionId of settledSessionIds) {
     const at = settledAt[sessionId]

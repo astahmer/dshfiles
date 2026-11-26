@@ -47,7 +47,7 @@ const defer = <T>(run: () => Promise<T>): Promise<T> => Promise.resolve().then(r
 /** One bounded, ephemeral owner per Host. Nothing here is a saved account until commitConnection. */
 export const createAccountSetupService = (input: {
   readonly store: Pick<AccountStorePromise, 'readAccountFile' | 'createSetupAccount' | 'commitConnection' | 'connectionMetadata'>
-  readonly verify: (input: SetupVerificationInput) => Promise<unknown>
+  readonly verify: (input: SetupVerificationInput) => Promise<void>
   readonly observeExisting?: (draft: AccountDraft) => Promise<AccountProfile | undefined>
   readonly resolveCredential: CredentialValueResolver
   readonly saveKey: (reference: string, owner: string, value: string, live: () => boolean) => Promise<void>

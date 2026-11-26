@@ -11,7 +11,8 @@ import { useObservable } from './use-observable.js'
 const NARROW = '(max-width: 720px)'
 
 /** The desktop keeps its sidebar indicator; a phone, or a window as narrow as one, has no sidebar to show it. */
-const narrowLayout = (): boolean => isMobileDevice() || (typeof matchMedia === 'function' && matchMedia(NARROW).matches)
+const narrowLayout = (): boolean =>
+  isMobileDevice() || (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia(NARROW).matches)
 
 export const ConnectionBanner = (props: {
   readonly t: ShellTranslate

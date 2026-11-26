@@ -3,7 +3,7 @@ import { recordSpans } from '@dshfiles/dshx/tracing'
 import { afterAll, beforeAll, describe, expect, it } from '@effect/vitest'
 import { Effect } from 'effect'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
-import { embedVerdict } from './embed-policy.js'
+import { EmbedPolicy } from './embed-policy.js'
 import { PreviewPreflight } from './preview-preflight-promise.js'
 
 const listen = (handler: (request: IncomingMessage, response: ServerResponse) => void) =>
@@ -37,11 +37,11 @@ describe('PreviewPreflight', () => {
     Effect.gen(function* () {
       const denied = yield* probe(`${framingDenied.origin}/`)
       expect(denied).toMatchObject({ reachable: true, status: 200, framing: 'denied', detail: 'X-Frame-Options: deny' })
-      expect(embedVerdict(denied)).toBe('refused')
+      expect(EmbedPolicy.verdict(denied)).toBe('refused')
 
       const open = yield* probe(`${plain.origin}/`)
       expect(open).toMatchObject({ reachable: true, status: 200, framing: 'allowed', detail: null })
-      expect(embedVerdict(open)).toBe('open')
+      expect(EmbedPolicy.verdict(open)).toBe('open')
     }),
   )
 
@@ -49,7 +49,7 @@ describe('PreviewPreflight', () => {
     Effect.gen(function* () {
       const check = yield* probe(`${stoppedOrigin}/`)
       expect(check).toMatchObject({ reachable: false, status: null, framing: 'allowed' })
-      expect(embedVerdict(check)).toBe('unreachable')
+      expect(EmbedPolicy.verdict(check)).toBe('unreachable')
     }),
   )
 
@@ -57,7 +57,7 @@ describe('PreviewPreflight', () => {
     Effect.gen(function* () {
       const check = yield* probe('file:///etc/passwd')
       expect(check).toMatchObject({ reachable: false, framing: 'allowed', detail: 'Not an http(s) address.' })
-      expect(embedVerdict(check)).toBe('unreachable')
+      expect(EmbedPolicy.verdict(check)).toBe('unreachable')
     }),
   )
 

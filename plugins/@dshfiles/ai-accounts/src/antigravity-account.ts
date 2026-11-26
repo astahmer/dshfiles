@@ -255,13 +255,9 @@ export class AntigravityAccountModel {
       .filter(line => line.startsWith('{'))
     const rawLine = lines.at(-1)
     if (rawLine === undefined) return { status: 'error', detail: 'Antigravity CLI returned no JSON for /usage.' }
-    let parsedJson: unknown
-    try {
-      parsedJson = JSON.parse(rawLine)
-    } catch {
-      return { status: 'error', detail: 'Antigravity CLI returned unreadable JSON for /usage.' }
-    }
-    const decoded = AiAccountsSchema.decodeResult(usageCommandOutputSchema, parsedJson)
+    const parsedJson = Schema.decodeUnknownResult(Schema.fromJsonString(Schema.Json))(rawLine)
+    if (parsedJson._tag !== 'Success') return { status: 'error', detail: 'Antigravity CLI returned unreadable JSON for /usage.' }
+    const decoded = AiAccountsSchema.decodeResult(usageCommandOutputSchema, parsedJson.success)
     if (decoded._tag !== 'Success') return { status: 'error', detail: 'Antigravity CLI returned an unsupported /usage payload.' }
     const output = decoded.success
     if (output.status !== 'SUCCESS' || output.command?.name !== 'usage' || output.command.data === undefined) {

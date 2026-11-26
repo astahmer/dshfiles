@@ -64,7 +64,7 @@ import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } fro
 import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
-import { shellMachine, type FieldTarget } from './shell-machine.js'
+import { shellMachine, type FieldTarget, type ShellEvent } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
 import {
   createSettingsHubRouter,
@@ -238,11 +238,12 @@ export default defineClient({
     ctx.inject(['remote.pluginManager'], scoped => {
       // The Host caches these labels: core's listBundles reads every plugin's files on each call. A Host started before
       // that method existed is asked the old way.
-      void labelsApi.safe.bundleLabels().then(async cached => {
+      void (async () => {
+        const cached = await labelsApi.safe.bundleLabels()
         if (cached.ok) return installLabels(cached.value)
         const result = await scoped.remote.pluginManager.listBundles()
         if (result.ok) installLabels(bundleLabelsOf(result.value))
-      })
+      })()
     })
 
     const describe = ctx.configForms.describe()
@@ -697,10 +698,12 @@ export default defineClient({
     // A request that still names the retired dialog surface opens the page: there is no other place left.
     const openRequest = (request: OpenSettingsRequest): void => {
       if (request.setting !== undefined && openSettingsTarget(request.setting)) return
-      const openEvent: { type: 'open'; sectionId?: string; target?: string; query?: string } = { type: 'open' }
-      if (request.section !== undefined) openEvent.sectionId = request.section
-      if (request.target !== undefined) openEvent.target = request.target
-      if (request.query !== undefined) openEvent.query = request.query
+      const openEvent: Extract<ShellEvent, { type: 'open' }> = {
+        type: 'open',
+        ...(request.section !== undefined && { sectionId: request.section }),
+        ...(request.target !== undefined && { target: request.target }),
+        ...(request.query !== undefined && { query: request.query }),
+      }
       if (hubRouter.open(openEvent)) return
       actor.send(openEvent)
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
@@ -808,13 +811,14 @@ export default defineClient({
     const probeNow = (): void => {
       if (reachability.getSnapshot().probing) return
       reachability.set(ReachabilityModel.started(reachability.getSnapshot()))
-      void probeHost().then(reachable => {
+      void (async () => {
+        const reachable = await probeHost()
         const next = ReachabilityModel.settled(reachability.getSnapshot(), reachable)
         reachability.set(next.state)
         if (next.recovered) connection.reconnect()
         // One miss is not an outage yet (a phone just woke); confirm it soon instead of a full interval later.
         if (!reachable && next.state.probe !== 'unreachable') setTimeout(probeNow, REACHABILITY_CONFIRM_MS)
-      })
+      })()
     }
     ctx.effect(() => {
       const visible = (): boolean => document.visibilityState === 'visible'

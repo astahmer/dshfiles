@@ -13,8 +13,17 @@ const Layer = (props: { readonly open: boolean; readonly onClose: () => void }):
   return <div />
 }
 
-const installFakeCloseWatcher = (): { readonly watchers: { oncancel: ((event: Event) => void) | null; destroy: () => void }[] } => {
-  const watchers: { oncancel: ((event: Event) => void) | null; destroy: () => void }[] = []
+interface FakeWatcher {
+  oncancel: ((event: Event) => void) | null
+  destroy: () => void
+}
+
+interface FakeCloseWatcherInstall {
+  readonly watchers: FakeWatcher[]
+}
+
+const installFakeCloseWatcher = (): FakeCloseWatcherInstall => {
+  const watchers: FakeWatcher[] = []
   class FakeCloseWatcher {
     oncancel: ((event: Event) => void) | null = null
     readonly destroy = vi.fn()

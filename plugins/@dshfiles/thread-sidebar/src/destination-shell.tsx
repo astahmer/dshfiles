@@ -928,7 +928,10 @@ const PhoneNavigation = (
   // Only the Threads list resolves a page loaded on a thread link, and it is unmounted while the stage covers it: a
   // reload inside a thread restored the previous stage (often a New thread) and ignored the link. Show the list first;
   // resolving the link selects the thread, which pushes the stage like a tap.
+  const pageLoadSeen = useRef(false)
   useLayoutEffect(() => {
+    if (pageLoadSeen.current) return
+    pageLoadSeen.current = true
     const linked = pageLoadThreadRoute.pending(window.location.href)
     // The drawer's home is the stage: a page load starts with it closed, its list mounted hidden for a thread link.
     if (drawer) {
@@ -943,7 +946,7 @@ const PhoneNavigation = (
     if (listOpenRef.current) return
     listOpenRef.current = true
     toggleSidebar()
-  }, [])
+  }, [drawer, toggleSidebar, props])
   // A frame reveal (Reset layout, a palette "Go to…", recovery) expands the column: in drawer mode that opens the drawer
   // on the list it chose, and the column folds back. The page-load fold above is not a reveal.
   const revealSeen = useRef(false)

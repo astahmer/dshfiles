@@ -187,8 +187,14 @@ const failed = (error: unknown) =>
       ? { code: failureCodeOf(error), message: error.message }
       : { code: 'runtime-unavailable', message: 'The runtime request failed. Check the host status and reconnect if needed.' }
 
+interface UnavailableFailure {
+  readonly ok: false
+  readonly code: string
+  readonly message: string
+}
+
 /** The failure a Host service reports, as a value a client shows: its wire code and message. */
-const unavailable = (): { readonly ok: false; readonly code: string; readonly message: string } => ({
+const unavailable = (): UnavailableFailure => ({
   ok: false,
   code: 'runtime-unavailable',
   message: 'The runtime request failed. Check the host status and reconnect if needed.',
@@ -262,7 +268,7 @@ const withRuntime = <A, E>(
   Effect.gen(function* () {
     const pool = yield* RuntimePool
     const marker = new GatewayUnreachable()
-    const last = { value: undefined as A | undefined }
+    let last: A | undefined
     return yield* pool
       .use(
         runtimeId,
@@ -270,7 +276,7 @@ const withRuntime = <A, E>(
           request(gateway).pipe(
             Effect.flatMap(value => {
               if (options.broken?.(value) !== true) return Effect.succeed(value)
-              last.value = value
+              last = value
               return Effect.fail(marker)
             }),
           ),
@@ -279,7 +285,7 @@ const withRuntime = <A, E>(
       .pipe(
         Effect.catchIf(
           error => error === marker,
-          () => (last.value === undefined ? Effect.fail(marker) : Effect.succeed(last.value)),
+          () => (last === undefined ? Effect.fail(marker) : Effect.succeed(last)),
         ),
       )
   })
@@ -513,6 +519,9 @@ type ThreadStartInput = {
   readonly model?: ModelSelection | undefined
 }
 
+/** The Session a start reports to its failure path once the runtime created it. */
+type StartedSession = { sessionId: string | undefined }
+
 /** A failed fetch never blocks the thread: the thread starts on what the host has and the result says why. */
 const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* (input: { readonly sshTarget: string; readonly cwd: string }) {
   return yield* RemoteExec.run({ sshTarget: input.sshTarget, command: RemoteCheckout.fetchBeforeThreadCommand(input.cwd), timeoutMs: 60_000 }).pipe(
@@ -621,7 +630,7 @@ const startRemoteThread = Effect.fn('multi-host thread start')(function* (input:
     host?.fetchBeforeThread === true && host.connector.kind === 'ssh'
       ? yield* fetchBeforeThread({ sshTarget: host.connector.sshTarget, cwd: input.cwd })
       : undefined
-  const state: { sessionId: string | undefined } = { sessionId: undefined }
+  const state: StartedSession = { sessionId: undefined }
   return yield* withRuntime(
     runtime.id,
     gateway =>
@@ -1243,7 +1252,7 @@ const handlers = Api.handlers(multiHostApi, {
     const threads = yield* RemoteThreads
     const runtime = yield* directory.findRuntime(input.runtimeId)
     if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
-    const state: { sessionId: string | undefined } = { sessionId: undefined }
+    const state: StartedSession = { sessionId: undefined }
     return yield* withRuntime(
       runtime.id,
       gateway =>
@@ -1683,7 +1692,7 @@ const launchUrlOf = Effect.gen(function* () {
   const connection = host.ctx.get('connection')
   if (webServer === undefined) return undefined
   const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.port}`)
-  return typeof launchUrl === 'string' ? launchUrl : undefined
+  return launchUrl
 })
 
 /** Publish this runtime's launch URL whenever the Host provides a web server, and withdraw it on unload. */

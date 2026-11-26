@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { accountProfileSchema, type AccountProfile, type UsageCard } from './api.js'
 import { accountUsageCard } from './account-usage-card.js'
 
-const profile = (input: { readonly useExtraUsage?: boolean }): AccountProfile =>
-  Schema.decodeUnknownSync(accountProfileSchema)({
+const profile = (input: { readonly useExtraUsage?: boolean }): AccountProfile => {
+  const fields = {
     instanceId: 'claude_work',
     kind: 'claude',
     displayName: 'ClaudeWork',
@@ -23,8 +23,9 @@ const profile = (input: { readonly useExtraUsage?: boolean }): AccountProfile =>
     state: 'healthy',
     loginHint: '',
     detail: null,
-    ...(input.useExtraUsage === undefined ? {} : { useExtraUsage: input.useExtraUsage }),
-  })
+  }
+  return Schema.decodeUnknownSync(accountProfileSchema)(input.useExtraUsage === undefined ? fields : { ...fields, useExtraUsage: input.useExtraUsage })
+}
 
 const providerExtraUsageOn: UsageCard = {
   status: 'ok',

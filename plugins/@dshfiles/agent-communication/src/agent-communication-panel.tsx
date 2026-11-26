@@ -1,27 +1,16 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { AgentRoster, type RosterAgent } from '@dshfiles/plugin-ui/components/motion/agent-roster'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { HashIcon, MessageSquareIcon, RefreshCwIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
+import { MessageSquareIcon, RefreshCwIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'

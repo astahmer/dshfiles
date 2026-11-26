@@ -53,7 +53,13 @@ export interface LinkEmbedPortHandle {
   readonly sayIfRefused: (url: string) => void
 }
 
-export const linkEmbedMessage = (check: LinkEmbedCheck): { readonly title: string; readonly description: string } => {
+/** What a toast says about one refused or dead link. */
+export interface LinkEmbedMessage {
+  readonly title: string
+  readonly description: string
+}
+
+export const linkEmbedMessage = (check: LinkEmbedCheck): LinkEmbedMessage => {
   const host = URL.canParse(check.url) ? new URL(check.url).host : check.url
   if (check.verdict === 'refused')
     return {
@@ -145,10 +151,12 @@ export const createLinkEmbedPort = (input: {
     },
     check: url => memory.ask(url, input.probe),
     sayIfRefused: url => {
-      void memory.ask(url, input.probe).then(check => {
+      const report = async (): Promise<void> => {
+        const check = await memory.ask(url, input.probe)
         if (check === undefined || check.verdict === 'open') return
         say(url, check)
-      })
+      }
+      void report()
     },
   }
 }
@@ -161,7 +169,7 @@ declare global {
 /** The one port Chat's link handling uses; a missing port keeps today's behavior. */
 export class LinkEmbedPort {
   static readonly create = createLinkEmbedPort
-  static readonly check = (raw: unknown): LinkEmbedCheck | undefined => decodeCheck(raw)
+  static readonly check = decodeCheck
 
   static readonly set = (port: LinkEmbedPortHandle | null): void => {
     globalThis.__dshfilesChatLinkEmbed = port

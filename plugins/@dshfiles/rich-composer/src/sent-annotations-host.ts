@@ -4,7 +4,7 @@ import { pluginStorage } from '@dshfiles/dshx/host'
 import { HostContext } from '@dshfiles/dshx/effect'
 import { Effect, Option } from 'effect'
 import * as Schema from 'effect/Schema'
-import { SENT_ANNOTATION_LIMIT, SentAnnotationSchema, sentAnnotationsApi, type SentAnnotation } from './sent-annotations-api.ts'
+import { SENT_ANNOTATION_LIMIT, SentAnnotationSchema, type SentAnnotation } from './sent-annotations-api.ts'
 
 /** One plugin namespace keeps every rich-composer record; sent histents live under this key prefix. */
 export const SENT_ANNOTATIONS_NAMESPACE = '@dshfiles/rich-composer'
@@ -94,6 +94,3 @@ export const sentAnnotationHandlers = {
       return { removed }
     }),
 }
-
-export type { SentAnnotation } from './sent-annotations-api.ts'
-export { sentAnnotationsApi }

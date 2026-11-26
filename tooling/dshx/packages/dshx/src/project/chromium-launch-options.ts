@@ -13,5 +13,5 @@ export const chromiumLaunchOptions = async (
 ): Promise<Pick<LaunchOptions, 'executablePath'> & { readonly locale: string }> => {
   const executablePath = await resolveExecutableOverride('DSHX_CHROMIUM_EXECUTABLE', environment)
   const locale = environment.DSHX_LOCALE === undefined || environment.DSHX_LOCALE === '' ? 'en-US' : environment.DSHX_LOCALE
-  return { ...(executablePath === undefined ? {} : { executablePath }), locale }
+  return executablePath === undefined ? { locale } : { locale, executablePath }
 }

@@ -76,7 +76,7 @@ const embedNotice = (check: EmbedCheck, input: { readonly tabOpened: boolean } =
   if (check.framing === 'denied') {
     const host = hostOf(check.url)
     const policy = check.detail ?? 'its framing headers'
-    return {
+    const refused = {
       kind: 'embed',
       url: check.url,
       verdict: 'refused',
@@ -84,8 +84,9 @@ const embedNotice = (check: EmbedCheck, input: { readonly tabOpened: boolean } =
         ? `${host} refuses to be embedded (${policy}), so it was opened in a browser tab instead of the blank Browser tab.`
         : `${host} refuses to be embedded (${policy}), so the Browser tab can only show a blank page for it.`,
       fix: 'Sites that send X-Frame-Options or a frame-ancestors policy can only be shown in a browser tab, not beside the thread.',
-      ...(input.tabOpened ? {} : { action: { label: 'Open in browser tab', run: () => newBrowserTab(check.url) } }),
-    }
+    } satisfies EmbedNotice
+    if (input.tabOpened) return refused
+    return { ...refused, action: { label: 'Open in browser tab', run: () => newBrowserTab(check.url) } }
   }
   if (check.reachable) return null
   const host = hostOf(check.url)

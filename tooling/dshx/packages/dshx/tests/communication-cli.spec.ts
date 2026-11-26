@@ -9,6 +9,7 @@ import { connectCommunicationClient, startHostCommunicationBridge } from '../src
 import { runCommunicationCommand } from '../src/communication/cli.js'
 import { CommunicationService } from '../src/communication/service.js'
 import { communicationDiagnosticsSchema, type CommunicationPrincipal } from '../src/communication/types.js'
+import { decodeJson } from '../src/json.js'
 
 const temporaryRoots: string[] = []
 
@@ -52,7 +53,7 @@ describe('communication diagnostic CLI', () => {
         connect: options => connectCommunicationClient({ ...options, stateHome: root }),
       })
 
-      const envelope = Schema.decodeUnknownSync(communicationDiagnosticsSchema)(JSON.parse(output).data)
+      const envelope = decodeJson(Schema.Struct({ data: communicationDiagnosticsSchema }), output).data
       expect(exitCode).toBe(0)
       expect(errorOutput).toBe('')
       expect(envelope).toMatchObject({ agentCount: 1, messageCount: 1, activity: { retainedCount: 1 } })

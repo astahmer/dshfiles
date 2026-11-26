@@ -1,7 +1,6 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import type { ComposerService } from '@dshfiles/dshx/client'
 import { AnnotateSelection } from '../src/native/chat/AnnotateSelection.tsx'
 
 const attach = vi.fn(() => true)
@@ -12,7 +11,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({ isMobileDevice: () => 
 
 vi.mock('@dshfiles/dshx/client', () => ({
   Composer: {},
-  useContract: () => ({ status: 'active', value: composer as unknown as ComposerService }),
+  useContract: () => ({ status: 'active', value: composer }),
 }))
 
 beforeAll(() => {

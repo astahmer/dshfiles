@@ -1,10 +1,10 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it } from 'vitest'
 import { CommunicationService } from '../src/communication/service.js'
 import { communicationStateSchema, type CommunicationPrincipal } from '../src/communication/types.js'
+import { decodeJson } from '../src/json.js'
 
 const temporaryRoots: string[] = []
 
@@ -115,7 +115,7 @@ describe('communication diagnostics', () => {
     expect(await readFile(path, 'utf8')).toBe(beforeReport)
 
     await service.send({ sender: principal, toAgentId: 'agent-sender', text: 'upgrade trigger' })
-    const upgraded = Schema.decodeUnknownSync(communicationStateSchema)(JSON.parse(await readFile(path, 'utf8')))
+    const upgraded = decodeJson(communicationStateSchema, await readFile(path, 'utf8'))
     expect(upgraded).toMatchObject({ schemaVersion: 5, activityStartedAt: null, activityEvents: [] })
     expect(upgraded).not.toHaveProperty('notifications')
     expect(upgraded).not.toHaveProperty('subscriptions')

@@ -13,7 +13,7 @@ export interface FieldTarget {
   readonly fieldPath: readonly string[]
 }
 
-type ShellEvent =
+export type ShellEvent =
   | {
       readonly type: 'open'
       readonly sectionId?: string

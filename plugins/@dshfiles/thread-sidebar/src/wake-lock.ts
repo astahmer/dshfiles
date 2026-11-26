@@ -60,10 +60,10 @@ export const createScreenWakeLock = (host: ScreenWakeLockHost): ScreenWakeLockSe
     wanted = false
     stopVisibility?.()
     stopVisibility = undefined
-    const current = sentinel
+    const releasing = sentinel?.release()
     sentinel = undefined
     publish()
-    await current?.release()
+    await releasing
   }
   return {
     available: host.available,
@@ -95,8 +95,8 @@ export const createScreenWakeLock = (host: ScreenWakeLockHost): ScreenWakeLockSe
 }
 
 const navigatorWakeLock = (): WakeLock | undefined => {
-  if (typeof navigator === 'undefined') return undefined
-  return navigator.wakeLock
+  if (typeof globalThis.navigator === 'undefined') return undefined
+  return globalThis.navigator.wakeLock
 }
 
 /** The page's one lock: the thread menu toggles it, and it outlives that menu. */

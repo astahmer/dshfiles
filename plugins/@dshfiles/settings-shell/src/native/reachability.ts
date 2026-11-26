@@ -19,6 +19,12 @@ export interface ReachabilityState {
 
 export type ReachabilityView = 'online' | 'checking' | 'offline'
 
+/** A probe answer: the state it leaves, and whether it found the Host again after an outage. */
+export interface SettledProbe {
+  readonly state: ReachabilityState
+  readonly recovered: boolean
+}
+
 export const FAILED_PROBES_FOR_OFFLINE = 2
 
 export class ReachabilityModel {
@@ -27,7 +33,7 @@ export class ReachabilityModel {
   static readonly started = (state: ReachabilityState): ReachabilityState => ({ ...state, probing: true })
 
   /** A probe answer; `recovered` says the Host came back after an outage, so a stale socket should reconnect. */
-  static readonly settled = (state: ReachabilityState, reachable: boolean): { readonly state: ReachabilityState; readonly recovered: boolean } => {
+  static readonly settled = (state: ReachabilityState, reachable: boolean): SettledProbe => {
     if (reachable) return { state: { probe: 'reachable', misses: 0, probing: false }, recovered: state.probe === 'unreachable' }
     const misses = state.misses + 1
     return { state: { probe: misses >= FAILED_PROBES_FOR_OFFLINE ? 'unreachable' : state.probe, misses, probing: false }, recovered: false }

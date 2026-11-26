@@ -147,7 +147,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     for (const listener of listeners.get(name) ?? []) listener(payload)
   }
   const agents = [makeAgent('one', options.restored), makeAgent('two')]
-  const providers = new Map<string, unknown>()
+  const providers = new Map<string, ToolSearchVisibility>()
   const root = {
     tools: {
       schemas: (scope?: TestAgent) => (scope === undefined ? [...schemas.values()] : visibleGlobals(scope)),
@@ -158,7 +158,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
       },
     },
     agents: { list: () => agents },
-    provide: (name: string, value: unknown) => {
+    provide: (name: string, value: ToolSearchVisibility) => {
       providers.set(name, value)
     },
     get: (name: string) => providers.get(name),
@@ -176,7 +176,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     },
   }
   const dispose = await plugin.apply(root, { mode: 'progressive', maxResults: 3, ...(options.config ?? {}) })
-  const visibility = providers.get('toolSearchVisibility') as ToolSearchVisibility | undefined
+  const visibility = providers.get('toolSearchVisibility')
   const searchTool = (agent: TestAgent): RegisteredTool => {
     const tool = scopedTools.get(agent)?.get('tool_search')
     if (tool === undefined) throw new Error('tool_search was not registered')

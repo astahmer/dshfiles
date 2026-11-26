@@ -9,7 +9,11 @@ import { AssistantMarkdown } from './native/chat/AssistantMarkdown.tsx'
 // Native primitives eagerly import an unavailable simple-icons peer in this fixture.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => {
   const MarkdownText = memo((props: { readonly text: string }) => <p>{props.text}</p>)
-  const named: Record<string, unknown> = { MarkdownText, useMarkdownDelegate: () => ({}) }
+  type MockedPrimitive = typeof MarkdownText | (() => Record<string, never>)
+  interface MockedPrimitives {
+    readonly [name: string]: MockedPrimitive
+  }
+  const named: MockedPrimitives = { MarkdownText, useMarkdownDelegate: () => ({}) }
   return new Proxy(named, {
     has: () => true,
     get: (target, key) => (typeof key === 'string' && key in target ? target[key] : typeof key === 'string' && /^[A-Z]/u.test(key) ? () => null : undefined),

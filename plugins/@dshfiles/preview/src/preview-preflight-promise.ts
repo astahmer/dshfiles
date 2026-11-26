@@ -6,8 +6,13 @@
  * (the body is cancelled), a short timeout, and no credentials, cookies or caching. Callers fall back to a browser tab
  * instead of opening a pane that would only ever show Chrome's dead grey page.
  */
-import { Context, Duration, Effect, Layer } from 'effect'
-import { classifyFraming, normalizeProbeUrl, type EmbedCheck } from './embed-policy.js'
+import { Context, Duration, Effect, Layer, Schema } from 'effect'
+import { EmbedPolicy, type EmbedCheck } from './embed-policy.js'
+
+/** One probe the Host could not even send (refused connection, DNS failure, timeout): the caller treats it as nothing answering. */
+class PreviewProbeError extends Schema.TaggedError<PreviewProbeError>()('PreviewProbeError', {
+  cause: Schema.optional(Schema.Defect()),
+}) {}
 
 /** Bounds one Host-side check; a dev server that does not answer in time is not running. */
 const PREFLIGHT_TIMEOUT = Duration.seconds(5)
@@ -24,7 +29,7 @@ const timeoutSignal = (): AbortSignal => AbortSignal.timeout(Duration.toMillis(P
  */
 const probeUrl = (raw: string): Effect.Effect<EmbedCheck> =>
   Effect.gen(function* () {
-    const url = normalizeProbeUrl(raw)
+    const url = EmbedPolicy.normalizeProbeUrl(raw)
     if (url === undefined) return { url: raw, reachable: false, status: null, framing: 'allowed', detail: 'Not an http(s) address.' } satisfies EmbedCheck
     const response = yield* Effect.tryPromise({
       try: () =>
@@ -36,7 +41,7 @@ const probeUrl = (raw: string): Effect.Effect<EmbedCheck> =>
           headers: { 'user-agent': PREFLIGHT_USER_AGENT },
           signal: timeoutSignal(),
         }),
-      catch: error => error,
+      catch: cause => new PreviewProbeError({ cause }),
     }).pipe(Effect.option)
     if (response._tag === 'None') {
       // A refused connection, DNS failure or timeout: nothing answered there.
@@ -45,11 +50,11 @@ const probeUrl = (raw: string): Effect.Effect<EmbedCheck> =>
     const answer = response.value
     // The document is never needed: the headers decide, and a dev server may stream forever.
     yield* Effect.tryPromise(() => answer.body?.cancel() ?? Promise.resolve()).pipe(Effect.ignore)
-    const framing = classifyFraming({
+    const framing = EmbedPolicy.classifyFraming({
       xFrameOptions: answer.headers.get('x-frame-options'),
       contentSecurityPolicy: answer.headers.get('content-security-policy'),
     })
-    const final = normalizeProbeUrl(answer.url) ?? url
+    const final = EmbedPolicy.normalizeProbeUrl(answer.url) ?? url
     return { url: final, reachable: true, status: answer.status, framing: framing.framing, detail: framing.detail } satisfies EmbedCheck
   })
 
@@ -62,8 +67,8 @@ export class PreviewPreflight extends Context.Service<
 >()('@dshfiles/preview/PreviewPreflight') {
   static readonly layer = Layer.effect(
     PreviewPreflight,
-    Effect.gen(function* () {
-      return PreviewPreflight.of({
+    Effect.sync(() =>
+      PreviewPreflight.of({
         probe: input =>
           probeUrl(input.url).pipe(
             Effect.withSpan('preview preflight', {
@@ -74,7 +79,7 @@ export class PreviewPreflight extends Context.Service<
               },
             }),
           ),
-      })
-    }),
+      }),
+    ),
   )
 }

@@ -152,12 +152,14 @@ export const DevServersChip = (props: {
     if (opener.openPort(port) === null && hostOnly(port.url)) watchInstead(port.url)
   }
 
-  const servers = serversQuery.data?.servers ?? []
+  const listedServers = serversQuery.data?.servers
+  const servers = useMemo(() => listedServers ?? [], [listedServers])
   const ports = useMemo(() => servers.flatMap(server => server.ports), [servers])
+  const warmPorts = opener.warmPorts
   // The Host answers before the click: a refused page or a stopped port then never reaches the pane.
   useEffect(() => {
-    opener.warmPorts(ports)
-  }, [opener.warmPorts, ports])
+    warmPorts(ports)
+  }, [warmPorts, ports])
 
   const pages = pagesQuery.data?.pages ?? []
   if (servers.length === 0 && pages.length === 0) return null

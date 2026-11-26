@@ -19,12 +19,13 @@ import { PreviewNoticeView } from './preview-notice.js'
 const ServerRows = (props: { readonly sessionId: string; readonly servers: readonly DevServerView[] }): JSX.Element => {
   const api = useApi(previewApi)
   const opener = PreviewOpener.use()
+  const warmPorts = opener.warmPorts
   const OpenIcon = opener.paneAvailable ? PanelRightIcon : ExternalLinkIcon
   // The Host answers before the click: a refused page or a stopped port then never reaches the pane.
   const ports = useMemo(() => props.servers.flatMap(server => server.ports), [props.servers])
   useEffect(() => {
-    opener.warmPorts(ports)
-  }, [opener.warmPorts, ports])
+    warmPorts(ports)
+  }, [warmPorts, ports])
   const queryClient = useQueryClient()
   const [armed, setArmed] = useState<number | null>(null)
   const stop = useMutation({

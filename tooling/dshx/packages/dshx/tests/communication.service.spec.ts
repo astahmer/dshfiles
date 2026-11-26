@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createCommunicationService } from '../src/communication/service.js'
+import { decodeJson } from '../src/json.js'
 import type { CommunicationPrincipal } from '../src/communication/types.js'
 
 const temporaryRoots: string[] = []
@@ -45,8 +46,7 @@ const persistedStateSchema = Schema.Struct({
 })
 type PersistedState = Schema.Schema.Type<typeof persistedStateSchema>
 
-const readPersistedState = async (path: string): Promise<PersistedState> =>
-  Schema.decodeUnknownSync(persistedStateSchema)(JSON.parse(await readFile(path, 'utf8')))
+const readPersistedState = async (path: string): Promise<PersistedState> => decodeJson(persistedStateSchema, await readFile(path, 'utf8'))
 
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))

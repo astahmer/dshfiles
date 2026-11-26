@@ -6,7 +6,7 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { previewApi } from './api.js'
 import { previewRenderApi, RenderHtmlLimits } from './render-api.js'
 import { PreviewInactive, PreviewThreadRefused } from './preview-errors.js'
-import { embedVerdict } from './embed-policy.js'
+import { EmbedPolicy } from './embed-policy.js'
 import { PreviewPreflight } from './preview-preflight-promise.js'
 import { PreviewImages } from './preview-images-promise.js'
 import { PreviewPages } from './preview-pages-promise.js'
@@ -153,7 +153,7 @@ const previewHandlers = Api.handlers(previewApi, {
     Effect.gen(function* () {
       const preflight = yield* PreviewPreflight
       const check = yield* preflight.probe({ url: input.url })
-      return { ...check, verdict: embedVerdict(check) }
+      return { ...check, verdict: EmbedPolicy.verdict(check) }
     }),
   stopDevServer: (input, call) =>
     Effect.gen(function* () {

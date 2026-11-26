@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService, type CommunicationAgent, type CommunicationService } from '@dshfiles/dshx/communication'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { Effect, Layer } from 'effect'
 import { CommunicationOperations } from './api-operations.js'
 import { CommunicationHub } from './communication-hub-promise.js'
@@ -261,7 +262,7 @@ describe('Agent communication integration', () => {
     })
     expect(await reopened.browseMessages({ agentId: staleId })).toMatchObject({ totalMatching: 1 })
 
-    const persisted: unknown = JSON.parse(await readFile(statePath, 'utf8'))
+    const persisted = decodeJson(jsonValueSchema, await readFile(statePath, 'utf8'))
     expect(persisted).toMatchObject({ schemaVersion: 5, messages: [{ id: message.id }] })
   })
 

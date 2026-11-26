@@ -366,9 +366,8 @@ const make = Effect.gen(function* () {
       expiresAt: (yield* Clock.currentTimeMillis) + Duration.toMillis(PREVIEW_TTL),
       ...(destination !== undefined && { workspaceParentIdentity: destination.parentIdentity }),
       ...(destination === undefined && workspaceRoot !== undefined && { workspaceRoot }),
-      ...(operationId === undefined ? {} : { operationId }),
     }
-    return prepared
+    return operationId === undefined ? prepared : { ...prepared, operationId }
   })
 
   /**

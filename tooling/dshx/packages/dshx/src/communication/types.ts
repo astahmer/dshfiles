@@ -20,16 +20,16 @@ const strictStruct = <const Fields extends Schema.Struct.Fields & { readonly [Ke
     }
     return Schema.decodeUnknownSync(struct)(value)
   }
-  return Object.assign(struct, {
-    parse,
-    safeParse: (value: unknown): { readonly success: true; readonly data: typeof struct.Type } | { readonly success: false; readonly error: unknown } => {
-      try {
-        return { success: true, data: parse(value) }
-      } catch (error) {
-        return { success: false, error }
-      }
-    },
-  })
+  const parseSafely = (
+    value: unknown,
+  ): { readonly success: true; readonly data: typeof struct.Type } | { readonly success: false; readonly error: unknown } => {
+    try {
+      return { success: true, data: parse(value) }
+    } catch (error) {
+      return { success: false, error }
+    }
+  }
+  return Object.assign(struct, { parse, safeParse: parseSafely })
 }
 
 const boundedString = (minimum: number, maximum: number) => Schema.String.check(Schema.isMinLength(minimum), Schema.isMaxLength(maximum))

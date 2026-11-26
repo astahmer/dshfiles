@@ -63,6 +63,9 @@ export interface CliArgs {
   readonly follow?: boolean
 }
 
+/** One parsed CLI option value, as the shared scope check reads it. */
+type CliOptionValue = string | number | boolean | readonly string[] | undefined
+
 export class CliUsageError extends Error {
   constructor(message: string) {
     super(message)
@@ -497,9 +500,9 @@ const optionScopes: ReadonlyMap<string, OptionScope> = new Map([
   ['explain', { allows: inspectSlots, usage: '--explain is only valid with inspect slots.' }],
 ])
 
-const isSet = (value: unknown): boolean => value !== undefined && value !== false
+const isSet = (value: CliOptionValue): boolean => value !== undefined && value !== false
 
-const validateOptionScopes = (options: Readonly<Record<string, unknown>>, context: CliOptionContext): void => {
+const validateOptionScopes = (options: Readonly<Record<string, CliOptionValue>>, context: CliOptionContext): void => {
   for (const [option, value] of Object.entries(options)) {
     const scope = optionScopes.get(option)
     if (scope !== undefined && isSet(value) && !scope.allows(context)) throw new CliUsageError(scope.usage)

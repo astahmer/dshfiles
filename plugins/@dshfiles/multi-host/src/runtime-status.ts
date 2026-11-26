@@ -58,10 +58,10 @@ const decodeArchivedSessionIds = Schema.decodeUnknownOption(
 /** Every workspace row anywhere in the follow frames, bounded in depth and count. */
 const collectWorkspaces = (frames: readonly unknown[]): WorkspaceRow[] => {
   const results = new Map<string, WorkspaceRow>()
-  const visit = (value: unknown, depth: number): void => {
+  const parseNode = (value: unknown, depth: number): void => {
     if (depth > 16 || results.size >= 256) return
     if (Array.isArray(value)) {
-      for (const item of value.slice(0, 512)) visit(item, depth + 1)
+      for (const item of value.slice(0, 512)) parseNode(item, depth + 1)
       return
     }
     const workspace = decodeWorkspaceRow(value)
@@ -70,10 +70,10 @@ const collectWorkspaces = (frames: readonly unknown[]): WorkspaceRow[] => {
     if (Option.isNone(container)) return
     for (const key of ['items', 'value', 'workspace', 'workspaces', 'baseline', 'snapshot'] as const) {
       const child = container.value[key]
-      if (child !== undefined) visit(child, depth + 1)
+      if (child !== undefined) parseNode(child, depth + 1)
     }
   }
-  for (const frame of frames) visit(frame, 0)
+  for (const frame of frames) parseNode(frame, 0)
   return [...results.values()]
 }
 
@@ -83,10 +83,10 @@ const collectWorkspaces = (frames: readonly unknown[]): WorkspaceRow[] => {
  */
 const collectArchivedSessionIds = (frames: readonly unknown[]): string[] => {
   const results = new Set<string>()
-  const visit = (value: unknown, depth: number): void => {
+  const parseNode = (value: unknown, depth: number): void => {
     if (depth > 16 || results.size >= 10_000) return
     if (Array.isArray(value)) {
-      for (const item of value.slice(0, 512)) visit(item, depth + 1)
+      for (const item of value.slice(0, 512)) parseNode(item, depth + 1)
       return
     }
     const archived = decodeArchivedSessionIds(value)
@@ -95,10 +95,10 @@ const collectArchivedSessionIds = (frames: readonly unknown[]): string[] => {
     if (Option.isNone(container)) return
     for (const key of ['items', 'value', 'workspace', 'workspaces', 'baseline', 'snapshot'] as const) {
       const child = container.value[key]
-      if (child !== undefined) visit(child, depth + 1)
+      if (child !== undefined) parseNode(child, depth + 1)
     }
   }
-  for (const frame of frames) visit(frame, 0)
+  for (const frame of frames) parseNode(frame, 0)
   return [...results.values()]
 }
 

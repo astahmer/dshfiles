@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import assert from 'node:assert/strict'
@@ -461,7 +462,7 @@ test('a deep link names the thread workspace the session lives in, not its ownin
 
 test('invalid stored preference data is rejected without exposing the raw value', () => {
   const raw = '{"session":"private-session-id","newerVersion":true}'
-  assert.equal(SidebarPreferencesModel.decode(JSON.parse(raw)), null)
+  assert.equal(SidebarPreferencesModel.decode(decodeJson(jsonValueSchema, raw)), null)
 })
 
 test('navigation preferences preserve independent order, visibility, and header mode', () => {

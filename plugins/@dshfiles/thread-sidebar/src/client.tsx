@@ -2687,10 +2687,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
    */
   const openThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     if (archivedSessionIds.has(sessionId)) {
-      void props.unarchiveSession(sessionId).then(
-        () => selectThread(sessionId, options),
-        () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') }),
-      )
+      void (async () => {
+        try {
+          await props.unarchiveSession(sessionId)
+        } catch {
+          setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+          return
+        }
+        selectThread(sessionId, options)
+      })()
       return
     }
     selectThread(sessionId, options)
@@ -2953,9 +2958,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const batchMutate = (operation: RowOperation): void => {
     const targetIds = batchSelectionIds()
     if (targetIds.length === 0) return
-    void mutateThreads(targetIds, operation).then(succeeded => {
-      if (succeeded) setThreadSelection(EMPTY_THREAD_SELECTION)
-    })
+    void (async () => {
+      if (await mutateThreads(targetIds, operation)) setThreadSelection(EMPTY_THREAD_SELECTION)
+    })()
   }
 
   const batchSetParked = (park: boolean): void => {
@@ -3280,9 +3285,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
       return
     }
-    void remoteThreadArchive({ runtimeId: thread.runtimeId, sessionId: thread.sessionId, archived }).then(outcome => {
+    void (async () => {
+      const outcome = await remoteThreadArchive({ runtimeId: thread.runtimeId, sessionId: thread.sessionId, archived })
       setNotice(outcome.ok ? null : { tone: 'danger', message: outcome.message })
-    })
+    })()
   }
 
   /**
@@ -3650,10 +3656,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     // Keep the browser copy until the Host stored it, so a failed write is retried on the next load.
     if (entries.length === 0) legacyNotificationPreferences.remove()
     else
-      void attention.migrate(entries).then(
-        () => legacyNotificationPreferences.remove(),
-        () => undefined,
-      )
+      void (async () => {
+        try {
+          await attention.migrate(entries)
+        } catch {
+          return
+        }
+        legacyNotificationPreferences.remove()
+      })()
   }, [
     attention,
     isPrimarySurface,
