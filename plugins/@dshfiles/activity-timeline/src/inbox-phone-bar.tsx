@@ -12,7 +12,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogPortal } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import type { PageAction } from '@dshfiles/plugin-ui/components/page'
-import { EllipsisIcon } from '@dshfiles/plugin-ui/icons'
+import { EllipsisIcon, ListChecksIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useId, useSyncExternalStore } from 'react'
 import { InboxView } from './inbox-view.js'
 
@@ -22,7 +22,8 @@ export interface InboxPhoneActions {
   readonly moreLabel: string
   /**
    * Council round 11 C1: Start triage as a worded 44px "Triage" text button in the bar's trailing seats, beside ⋯, so
-   * the view switcher's row keeps only the segments and their tally. Absent while nothing is open to triage.
+   * the view switcher's row keeps only the segments and their tally (council round 13 C1: the kit's bar text button).
+   * Absent while nothing is open to triage.
    */
   readonly triage?: { readonly label: string; readonly onSelect: () => void }
 }
@@ -81,7 +82,10 @@ export const InboxPhoneBar = (): JSX.Element | null => {
         ) : null}
         <div data-inbox-phone-bar="trailing" className={InboxView.PHONE_BAR}>
           {value.triage === undefined ? null : (
-            <Button type="button" variant="ghost" data-inbox-phone-triage="" className={InboxView.PHONE_TRIAGE} onClick={value.triage.onSelect}>
+            // Council round 13 C1: the kit's bar text button (secondary label at 500, list-checks glyph, 44px seat), so
+            // "Triage" reads as an action beside the title, not a second title.
+            <Button type="button" variant="bar" data-inbox-phone-triage="" onClick={value.triage.onSelect}>
+              <ListChecksIcon aria-hidden />
               {value.triage.label}
             </Button>
           )}

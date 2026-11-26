@@ -12,12 +12,9 @@ describe('the phone Triage button (council round 11 C1)', () => {
     const at = trailing.indexOf('data-inbox-phone-triage=""')
     expect(at).toBeGreaterThan(-1)
     const button = trailing.slice(trailing.lastIndexOf('<Button', at), trailing.indexOf('</Button>', at))
-    expect(button).toContain('variant="ghost"')
-    expect(button).toMatch(/>\s*\{value\.triage\.label\}\s*$/u)
+    // Council round 13 C1: the kit's bar text button with its glyph (inbox-round13.test.ts).
+    expect(button).toMatch(/\{value\.triage\.label\}\s*$/u)
     expect(at).toBeLessThan(trailing.indexOf('<EllipsisIcon'))
-    expect(InboxView.PHONE_TRIAGE).toContain('dshx:h-11')
-    expect(InboxView.PHONE_TRIAGE).toContain('dshx:text-foreground')
-    expect(InboxView.PHONE_TRIAGE).not.toContain('dshx:w-11')
     // The page publishes it with its name while something is open to triage, and never while triaging.
     expect(list).toContain("usePublishInboxPhoneActions(triaging || !triageable ? phoneBar : { ...phoneBar, triage: { label: t('triage'), onSelect: () => void startTriage() } })")
   })
@@ -31,17 +28,15 @@ describe('the phone Triage button (council round 11 C1)', () => {
 })
 
 describe('the phone approval card (council round 11 C1)', () => {
-  it('captions its command block "Runs" inside the block, at 12px', () => {
+  it('holds "Runs:" inside the block, at 12px (council round 13 C1: inline, no caption line)', () => {
     const runs = panel.slice(panel.indexOf('data-inbox-runs=""'), panel.indexOf('</code>', panel.indexOf('data-inbox-runs=""')))
     expect(runs).toContain('InboxView.RUNS_BLOCK')
-    expect(runs).toMatch(/<span data-inbox-runs-caption="" className=\{InboxView\.RUNS_CAPTION\}>\s*\{t\('runsCaption'\)\}/u)
-    expect(runs).toContain("<span className={InboxView.RUNS_INLINE}>{t('runs')}</span>")
+    expect(runs).toContain("<span>{t('runs')}</span>")
     // The block (fill, radius, inset) is the runs line, not the code inside it.
     expect(InboxView.RUNS_BLOCK).toContain('dshx:@max-pane-narrow:bg-muted')
     expect(InboxView.COMMAND_BLOCK).not.toContain('bg-muted')
     expect(InboxView.COMMAND_BLOCK).not.toContain('mt-1')
     expect(InboxView.LEAD_IN).toContain('dshx:text-xs dshx:leading-4')
-    expect(InboxView.RUNS_CAPTION).toContain('dshx:@max-pane-narrow:block')
   })
 
   it('sets Review 4px under the block and 4px above the card edge', () => {

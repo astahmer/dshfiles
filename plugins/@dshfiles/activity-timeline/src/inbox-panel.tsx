@@ -447,11 +447,8 @@ const InboxRow = (props: {
         {reason === null ? null : <span className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.TEXT_MEASURE)}>{reason}</span>}
         {card.detail === null ? null : card.command ? (
           <span data-inbox-runs="" className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.LEAD_IN, InboxView.RUNS_BLOCK, InboxView.TEXT_MEASURE)}>
-            {/* A wide pane reads "Runs: command" on one line; a compact one captions its command block "Runs" (council round 11 C1). */}
-            <span className={InboxView.RUNS_INLINE}>{t('runs')}</span>
-            <span data-inbox-runs-caption="" className={InboxView.RUNS_CAPTION}>
-              {t('runsCaption')}
-            </span>{' '}
+            {/* "Runs: command" inline on every width (council round 13 C1); a compact pane draws it as one muted block. */}
+            <span>{t('runs')}</span>{' '}
             <code className={cn(InboxView.COMMAND, InboxView.COMMAND_BLOCK)}>
               {InboxView.commandWords(card.detail).map((word, index) => (
                 <span key={index}>

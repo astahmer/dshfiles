@@ -276,23 +276,19 @@ const COMMAND = 'dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground
 const LEAD_IN = 'dshx:font-sans dshx:text-xs dshx:leading-4 dshx:text-muted-foreground dshx:@max-pane-narrow:line-clamp-none'
 
 /**
- * On a compact pane the command is a block (council round 9 C1): 13/18 mono (COMMAND's meta step is 13px on a touch
- * screen), a wrapped line hanging 2ch under the first, at most four lines. Council round 11 C1: the block holds its
- * "Runs" caption (RUNS_BLOCK, RUNS_CAPTION), so the command line is one object instead of a label above a box.
+ * On a compact pane the command is 13/18 mono (council round 9 C1; COMMAND's meta step is 13px on a touch screen),
+ * inline after "Runs:" (council round 13 C1); the block around it (RUNS_BLOCK) clamps and hangs the whole line.
  */
-const COMMAND_BLOCK =
-  'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:pl-[2ch] dshx:@max-pane-narrow:-indent-[2ch] dshx:@max-pane-narrow:leading-4.5'
+const COMMAND_BLOCK = 'dshx:@max-pane-narrow:leading-4.5'
 
 /**
  * The approval's evidence on a compact pane (council round 11 C1): one muted block, 6px radius, 6px by 10px inside
- * (council round 12 C3: 6px, not 8, top and bottom), "Runs" as its 12/16 muted caption on the first line and the
- * command under it. A wide pane keeps "Runs: command" inline.
+ * (council round 12 C3: 6px, not 8, top and bottom). Council round 13 C1: "Runs: command" reads inline as on a wide
+ * pane, so the caption line above the command is gone (a line back above the fold); a wrapped line hangs 2ch under the
+ * first, at most four lines.
  */
-const RUNS_BLOCK = 'dshx:@max-pane-narrow:block dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted dshx:@max-pane-narrow:px-2.5 dshx:@max-pane-narrow:py-1.5'
-
-/** The block's caption: "Runs" with no colon, 12/16, on its own line (the inline "Runs:" hides there). */
-const RUNS_CAPTION = 'dshx:hidden dshx:@max-pane-narrow:block dshx:@max-pane-narrow:mb-0.5'
-const RUNS_INLINE = 'dshx:@max-pane-narrow:hidden'
+const RUNS_BLOCK =
+  'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted dshx:@max-pane-narrow:py-1.5 dshx:@max-pane-narrow:pr-2.5 dshx:@max-pane-narrow:pl-[calc(0.625rem+2ch)] dshx:@max-pane-narrow:-indent-[2ch]'
 
 /**
  * A compact card's body verb under its evidence (council round 11 C1): 4px above and below, so the approval card is
@@ -358,12 +354,6 @@ const PHONE_BAR =
  * The bar's leading seat (round five C4, council round 5): the frame's status button sits left of the centred "Inbox"
  * title, so the trailing corner holds only the menu and Start triage and never runs over the title at 390 px.
  */
-/**
- * Start triage on a phone (council round 11 C1): a worded "Triage" text button, 44px tall, in the top bar's trailing
- * seats beside ⋯ (InboxPhoneBar), in ink at the bar's 14/500, so the view switcher's row holds only the segments and
- * the Needs you tally. (Round 9 put a worded button on that row, round 10 a framed list-checks square; both crowded it.)
- */
-const PHONE_TRIAGE = 'dshx:h-11 dshx:px-3 dshx:text-sm dshx:font-medium dshx:text-foreground'
 
 const PHONE_BAR_LEADING =
   'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:left-[max(12px,env(safe-area-inset-left,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
@@ -535,15 +525,12 @@ export class InboxView {
   static readonly LEAD_IN = LEAD_IN
   static readonly COMMAND_BLOCK = COMMAND_BLOCK
   static readonly RUNS_BLOCK = RUNS_BLOCK
-  static readonly RUNS_CAPTION = RUNS_CAPTION
-  static readonly RUNS_INLINE = RUNS_INLINE
   static readonly VERB_MARGIN = VERB_MARGIN
   static readonly cardText = cardText
   static readonly compact = compact
   static readonly titleCounts = titleCounts
   static readonly PHONE_BAR = PHONE_BAR
   static readonly PHONE_BAR_LEADING = PHONE_BAR_LEADING
-  static readonly PHONE_TRIAGE = PHONE_TRIAGE
   static readonly bodyReason = bodyReason
   static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge

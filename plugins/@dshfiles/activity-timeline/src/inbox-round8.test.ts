@@ -22,8 +22,8 @@ describe('one Inbox card structure (council round 8 C2)', () => {
   })
 
   it('opens an approval body with "Runs:" and its command in 12/16 ink mono', () => {
-    // Council round 11 C1: a compact pane captions the block "Runs" instead (inbox-round11.test.ts).
-    expect(row).toMatch(/data-inbox-runs=""[^>]*>[\s\S]*?<span className=\{InboxView\.RUNS_INLINE\}>\{t\('runs'\)\}<\/span>[\s\S]*?<\/span>\{' '\}\s*<code className=\{cn\(InboxView\.COMMAND, InboxView\.COMMAND_BLOCK\)\}>\s*\{InboxView\.commandWords\(card\.detail\)/u)
+    // Council round 13 C1: inline on every width, a compact pane included (inbox-round13.test.ts).
+    expect(row).toMatch(/data-inbox-runs=""[^>]*>[\s\S]*?<span>\{t\('runs'\)\}<\/span>\{' '\}\s*<code className=\{cn\(InboxView\.COMMAND, InboxView\.COMMAND_BLOCK\)\}>\s*\{InboxView\.commandWords\(card\.detail\)/u)
     // It wraps only between words: a phone broke `--env` after its dashes.
     expect(InboxView.commandWords('node scripts/publish-preview.mjs --env preview')).toEqual([
       { text: 'node', keep: true },
