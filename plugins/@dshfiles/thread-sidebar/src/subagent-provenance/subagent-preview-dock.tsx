@@ -64,7 +64,7 @@ const DockRow = (
           <span className="dshx:min-w-0 dshx:shrink dshx:truncate dshx:font-medium">{label}</span>
           {run.route === undefined ? null : (
             // Shrinks after the step and the name (they give way first), then truncates its name; the mark stays.
-            <RouteModel provider={run.route.provider} model={run.route.model} className="dshx:ml-1 dshx:max-w-[45%] dshx:shrink-0" />
+            <RouteModel provider={run.route.provider} model={run.route.model} seat className="dshx:ml-1 dshx:max-w-[45%] dshx:shrink-0" />
           )}
           {step === undefined ? null : (
             <span

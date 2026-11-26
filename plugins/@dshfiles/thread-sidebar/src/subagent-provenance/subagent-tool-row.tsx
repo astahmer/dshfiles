@@ -106,7 +106,7 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary.
     ...(route === undefined
       ? {}
-      : { headerAccessory: <RouteModel provider={route.provider} model={route.model} size="md" className="dshx:max-w-[45%] dshx:shrink-0" /> }),
+      : { headerAccessory: <RouteModel provider={route.provider} model={route.model} size="md" seat className="dshx:max-w-[45%] dshx:shrink-0" /> }),
   }
 
   return (

@@ -532,6 +532,23 @@ describe('a subagent row under its parent', () => {
     expect(working?.textContent).toBe('gpt-6-luna')
   })
 
+  it('starts an unknown-family model on the same edge as a marked one: an empty 16 px seat (round 21 D5)', async () => {
+    const child = rowSession({
+      id: SessionId('child-unknown'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: {
+        threadSidebarModelRoute: 'dshx_fake_commandcode/step-5-preview',
+        subagent: { mode: 'continuable', label: 'Review currency conversion', seq: SessionSeq(3) },
+      },
+    })
+    const row = await renderRow({ childThreads: [child], childrenOpen: true, allChildrenShown: true, rowStyle: { ...rowProps().rowStyle, time: false } })
+    const model = row.querySelector<HTMLElement>('ul [data-thread-child-meta] [data-slot="route-model"]')
+    expect(model?.textContent).toBe('step-5-preview')
+    expect(model?.firstElementChild?.getAttribute('data-model-mark')).toBe('none')
+    expect(model?.firstElementChild?.className).toContain('dshx:size-4')
+  })
+
   it('says why a failed child failed, "Turn failed", beside its Failed glyph (round 21 D4)', async () => {
     const child = rowSession({
       id: SessionId('child-failed'),

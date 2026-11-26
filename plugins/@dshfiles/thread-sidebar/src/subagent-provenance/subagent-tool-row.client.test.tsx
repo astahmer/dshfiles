@@ -190,6 +190,13 @@ describe('SubagentProvenanceToolRow', () => {
     expect(screen.getByText('subagentPreviewKind · Optimize traces plugin')).not.toBeNull()
   })
 
+  it('keeps an empty mark seat for a model with no known family, so names share one start edge (round 21 D5)', () => {
+    render(<SubagentProvenanceToolRow {...props({ provider: 'dshx_fake_commandcode', model: 'step-5-preview', description: 'Review currency conversion' })} />)
+    const model = screen.getByTestId('header-accessory').querySelector('[data-slot="route-model"]')
+    expect(model?.textContent).toBe('step-5-preview')
+    expect(model?.firstElementChild?.getAttribute('data-model-mark')).toBe('none')
+  })
+
   it('prefers the route the child really runs on over the one its call asked for', () => {
     const base = settled({ running: true })
     const list = {

@@ -941,7 +941,7 @@ const ChildThreadList = (props: {
           {route === undefined ? null : (
             // Under the title: the glyph's 16px seat and line 1's 8px gap, then the model whole or truncated, then the word.
             <span className="dshx:flex dshx:h-4 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:pl-6 dshx:text-xs/4 dshx:text-muted-foreground" data-thread-child-meta="">
-              <RouteModel provider={route.provider} model={route.model} className="dshx:shrink" />
+              <RouteModel provider={route.provider} model={route.model} seat className="dshx:shrink" />
               {stateWord === undefined ? null : (
                 <>
                   <span aria-hidden="true" className="dshx:shrink-0">
