@@ -42,7 +42,14 @@ const markup = (inner: string): HTMLElement => {
   return dock
 }
 const english = (key: string, params: { readonly count: number }): string =>
-  ({ 'liveWork.job': '{count} job', 'liveWork.jobs': '{count} jobs', 'liveWork.working': '{count} working', 'liveWork.failed': '{count} failed' })[key]!.replace(
+  ({
+    'liveWork.job': '{count} job',
+    'liveWork.jobs': '{count} jobs',
+    'liveWork.subagent': '{count} subagent',
+    'liveWork.subagents': '{count} subagents',
+    'liveWork.working': '{count} working',
+    'liveWork.failed': '{count} failed',
+  })[key]!.replace(
     '{count}',
     String(params.count),
   )
@@ -65,8 +72,10 @@ describe('Live work on a narrow phone (unslop r5 C1)', () => {
     expect(LiveWork.count(markup('<div data-todo=""></div>'))).toEqual({ jobs: 0, subagents: 0 })
   })
 
-  it('says "1 job · 1 working", plural where it counts more, and drops a zero part', () => {
-    expect(LiveWork.detail({ jobs: 1, subagents: 1 }, english)).toBe('1 job · 1 working')
+  it('says "1 job · 1 subagent" beside running jobs, plural where it counts more, and drops a zero part (council round 23, item 10)', () => {
+    // "1 job · 1 working" read as one job of which one is working; it means one job plus one subagent.
+    expect(LiveWork.detail({ jobs: 1, subagents: 1 }, english)).toBe('1 job · 1 subagent')
+    expect(LiveWork.detail({ jobs: 2, subagents: 3 }, english)).toBe('2 jobs · 3 subagents')
     expect(LiveWork.detail({ jobs: 2, subagents: 0 }, english)).toBe('2 jobs')
   })
 
@@ -99,7 +108,7 @@ describe('Live work on a narrow phone (unslop r5 C1)', () => {
       await Promise.resolve()
     })
     const summary = host.querySelector('[data-live-work-summary]')
-    expect(summary?.textContent).toBe('Live work·1 job · 1 working')
+    expect(summary?.textContent).toBe('Live work·1 job · 1 subagent')
     expect(summary?.getAttribute('aria-expanded')).toBe('false')
     expect(summary?.className).toContain('dshx:h-11')
     await act(async () => root.unmount())
