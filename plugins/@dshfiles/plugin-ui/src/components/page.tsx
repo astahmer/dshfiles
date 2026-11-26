@@ -1,8 +1,9 @@
 import * as React from 'react'
-import { ChevronDownIcon, EllipsisIcon } from 'lucide-react'
+import { ChevronDownIcon } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { Button } from './ui/button.js'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu.js'
+import { OverflowGlyph } from './ui/overflow-glyph.js'
 import { Spinner } from './ui/spinner.js'
 import { SegmentLabel, Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs.js'
 import { StatusCount, StatusGlyph, WorkStatusModel, type WorkStatus } from './work-status.js'
@@ -288,7 +289,7 @@ const PageHeaderRow = (props: {
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button type="button" size="icon" variant="ghost" aria-label={props.overflowLabel ?? 'More actions'}>
-                  <EllipsisIcon aria-hidden />
+                  <OverflowGlyph />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="dshx-root">

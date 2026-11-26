@@ -7,7 +7,6 @@ import {
   CircleCheckIcon,
   CircleDashedIcon,
   CircleHelpIcon,
-  EllipsisIcon,
   LoaderCircleIcon,
   PauseIcon,
   PencilIcon,
@@ -16,6 +15,7 @@ import {
   XIcon,
 } from '../../icons.js'
 import { Button } from '../ui/button.js'
+import { OverflowGlyph } from '../ui/overflow-glyph.js'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip.js'
 import { RollingNumber } from './text.js'
 import { formatElapsed } from '../../lib/format-duration.js'
@@ -146,7 +146,7 @@ export function ApprovalRun({
           <Tooltip>
             <TooltipTrigger asChild>
               <Button variant="ghost" size="icon-xs" className="dshx:ml-auto" aria-label="Run actions" onClick={onMenu}>
-                <EllipsisIcon aria-hidden />
+                <OverflowGlyph />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Run actions</TooltipContent>
