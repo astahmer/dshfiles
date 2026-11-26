@@ -124,7 +124,10 @@ export const modelIdentity = (provider?: string, model?: string): ModelIdentity 
 export interface RouteModelProps {
   readonly provider?: string | undefined
   readonly model?: string | undefined
-  /** `sm` (default): 12/16, beside meta text. `md`: 13/18, on a row's own line or a header. The mark is 16 px in both. */
+  /**
+   * `sm` (default): the 12px meta step (13px on a phone), beside meta text. `md`: the 13px UI step (15px on a phone), on
+   * a row's own line or a header. The mark is 16 px in both.
+   */
   readonly size?: 'sm' | 'md' | undefined
   readonly className?: string | undefined
 }
@@ -145,7 +148,7 @@ export const RouteModel = ({ provider, model, size = 'sm', className }: RouteMod
       data-model-family={identity.mark ?? 'none'}
       className={cn(
         'dshx:inline-flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:text-muted-foreground',
-        size === 'md' ? 'dshx:text-[13px]/[18px]' : 'dshx:text-xs/4',
+        size === 'md' ? 'dshx:text-sm' : 'dshx:text-xs/4',
         className,
       )}
     >

@@ -100,7 +100,8 @@ const CHANGE_BADGE = {
 /**
  * A file's change as a letter badge before its name (council round 17 A2): M modified and R renamed in the secondary
  * ink, A added in the success tone, D deleted in the danger tone, each AA on the diff header. A 16px box with a 1px edge
- * in the same tone, 11/16 at 600, so it reads as a status letter, not a radio button. A screen reader hears the word.
+ * in the same tone, the 11px step at 600, so it reads as a status letter, not a radio button. A screen reader hears the
+ * word.
  */
 export const ChangeBadge = (props: { readonly type: ChangeTypes }): JSX.Element => {
   const badge = CHANGE_BADGE[props.type]
@@ -108,7 +109,7 @@ export const ChangeBadge = (props: { readonly type: ChangeTypes }): JSX.Element 
     <span
       data-change-badge={props.type}
       className={cn(
-        'dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-[4px] dshx:border dshx:border-current dshx:font-sans dshx:text-[11px]/4 dshx:font-semibold',
+        'dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-current dshx:font-sans dshx:text-2xs dshx:leading-none dshx:font-semibold',
         badge.tone,
       )}
     >

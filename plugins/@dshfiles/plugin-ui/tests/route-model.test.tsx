@@ -28,7 +28,7 @@ describe('A route model identity (council round 17 A1: the subagent model is eas
     expect(markup).toMatch(/^<span data-slot="route-model" data-model-family="openai" class="[^"]*dshx:text-muted-foreground[^"]*dshx:text-xs\/4[^"]*">/u)
     expect(markup).toMatch(/<span aria-hidden="true" data-model-mark="openai" class="[^"]*dshx:size-4[^"]*dshx:shrink-0[^"]*"><svg/u)
     expect(markup).toContain('<span class="dshx:min-w-0 dshx:truncate">gpt-6.2-astra</span>')
-    expect(renderToStaticMarkup(<RouteModel provider="openai-codex" model="gpt-6.2-astra" size="md" />)).toContain('dshx:text-[13px]/[18px]')
+    expect(renderToStaticMarkup(<RouteModel provider="openai-codex" model="gpt-6.2-astra" size="md" />)).toMatch(/class="[^"]*dshx:text-sm[ "]/u)
   })
 
   it('draws no mark seat for an unknown family, and nothing at all without a model', () => {
