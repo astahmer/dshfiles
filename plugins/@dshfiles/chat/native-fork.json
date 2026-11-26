@@ -57,6 +57,7 @@
     "src/native/chat/TurnTailNodeView.tsx",
     "src/native/chat/TurnTriggerNodeView.module.css",
     "src/native/chat/TurnTriggerNodeView.tsx",
+    "src/native/chat/turn-trigger.ts",
     "src/native/chat/TurnUsagePanel.tsx",
     "src/native/chat/UserContent.tsx",
     "src/native/chat/flow-motion.ts",
