@@ -347,4 +347,30 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('the current one is drawn in its tone on its tile with a 600 label')
     expect(design).not.toContain('a "Breakdown by" segmented')
   })
+
+  it('records the fourteenth council pass: one attention meta line, the selected edge apart from the field edge, child rows, the dark dense checkbox (council round 14 A4)', () => {
+    // Read across line wraps.
+    const prose = design.replace(/\s+/gu, ' ')
+    for (const text of [
+      '**One attention meta line.**',
+      '`AttentionMeta`',
+      '`ATTENTION_KIND_LABEL`',
+      'Approval, Question, Turn failed',
+      'Line 2: the `AttentionMeta` line',
+      '"Thread question", never a quoted description',
+      'the age goes first, then the name',
+      'fewer than eight',
+      '`markSeat="rail"`',
+      'sized to the verb',
+      '**Selected edge is not the field edge.**',
+      '**Child rows.**',
+      'a 16px seat',
+      '`oklch(0.68 0.008 65)`',
+    ])
+      expect(prose, text).toContain(text)
+    // Retired by this pass: a Needs-you row's detail quoting the question or the command; a phone Inbox head without
+    // the project's name.
+    expect(prose).not.toContain("The row's detail says which: the question's first words")
+    expect(prose).not.toContain('Line 2: the `ProjectMark`, the kind (Approval, Question, Turn failed…) and the age')
+  })
 })

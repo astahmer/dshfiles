@@ -532,8 +532,8 @@ the search field's filter or the ⋯ menu, never the toolbar.
 
 **Phone Inbox head.** Every phone Inbox card, the failed one included, takes the same two-line head. Line 1: the
 status glyph, the full title (wrapping to two lines, never cut for metadata) and the ⋯ menu, whose glyph sits 22px
-from the card edge. Line 2: the `ProjectMark`, the kind (Approval, Question, Turn failed…) and the age, at 13/400 in
-secondary ink. Titles win over the fold. **Triage** is a worded 44px text button in the top bar's trailing seats,
+from the card edge. Line 2: the `AttentionMeta` line, `ProjectMark project · kind · age`, at 13/400 in secondary ink
+(the same line as a desktop card, see **One attention meta line**). Titles win over the fold. **Triage** is a worded 44px text button in the top bar's trailing seats,
 beside ⋯ (council round 11 C1: its label, never an icon alone); the Needs you / Other / Done segmented row carries no
 Triage control. **Bar text buttons.** Every worded action in a phone top bar is `Button variant="bar"` (council
 round 13): the secondary label at 500 with a 16px glyph 6px before it (Triage: list-checks), no fill at rest, on the
@@ -741,7 +741,8 @@ Finished / All) is a `ToggleGroup`.
 (`@dshfiles/plugin-ui/components/ui/input`): a 1px field boundary, the page fill, the 8px radius, no shadow and no dark
 fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#88827d`, dark
 `#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); checkbox and radio
-edges use it too. A checkbox column in a dense table (AI accounts' "Show model") takes `Checkbox size="sm"` (council
+edges use it too. The selected-row edge is a separate, stronger token (`--dshx-selected-edge`, see **Selected edge is
+not the field edge**), so a selected row never reads as a resting field. A checkbox column in a dense table (AI accounts' "Show model") takes `Checkbox size="sm"` (council
 round 11 A5): the same 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke, no shadow; in light its
 checked fill is `control-on-dense`, `oklch(0.50 0.01 65)` (`#67625d`, council round 13 A1; 0.38 in round 12) with a
 white tick, so a column of checked boxes reads as light marks, not dark squares (3:1 on bg, nav, raised and the selected
@@ -808,12 +809,26 @@ surface says a state with one of the six words or with the glyph alone: never Ru
 Finished. A subagent that has finished is Done, never Idle.
 
 **Waiting on you is Needs you, whatever asks.** A question, a tool approval and a plan review all make the thread
-Needs you on every surface, the open thread included. The row's detail says which: the question's first words, or
-`Approve: git push --force…`. While it waits nothing counts it as Working: not the status strip, not the browser
+Needs you on every surface, the open thread included. The row's second line says which in one word (Approval,
+Question, Turn failed; see **One attention meta line**); the question or the command shows on the Inbox card and in
+the thread, never cut to a row. While it waits nothing counts it as Working: not the status strip, not the browser
 title, not the tool row, which reads "Waiting for approval" in place of a clock. The Inbox lists every thread the
 list calls Needs you, and the two counts are equal. A failed turn stays in Needs you, in the list and in the Inbox,
 until it is retried or marked Done. An approval is decided on its card, where the whole command shows; a row or an
 Inbox item only opens it, and its verb is Review.
+
+**One attention meta line.** Every surface describes an ask the same way, with one formatter: `AttentionMeta`
+(`components/ui/attention-meta`, council round 14 A1), `ProjectMark project · kind · age`, 12/16 in secondary ink
+(13/18 on a phone Inbox head). The kind is one word from `ATTENTION_KIND_LABEL`: Approval, Question, Turn failed (never
+"Thread question", never a quoted description); another source names itself in a word or two (Ready to land). The age
+shows only where the surface has no other clock (an Inbox card, not a thread row, whose time sits on line 1). When the
+line runs out of room, the age goes first, then the name truncates, and a name is never cut to a stub: once fewer than
+eight of its characters would show, it drops and the mark alone names the project (the words stay for assistive
+tech). In list rows (the desktop thread list, the phone list) the line takes `markSeat="rail"`: on every row with a
+second line (Needs you, Failed, Working, Ready) the mark hangs in the status glyph's 16px column, so the marks form one
+rail and the name starts under the title. The trailing verb's reservation is sized to the verb, not a fixed width, so
+"billing-api" and "web-app" read whole at the default sidebar width and at 390px (about 146px of line). On an Inbox
+card, desktop and phone, the line sits under the title (`markSeat="inline"`, the mark 6px before the name).
 
 **EntityRow / EntityList** (`components/entity-row`). One row shape: `leading control · status glyph · title · muted
 meta chips · trailing inline verb`, with an optional muted description line and full-width children (an output pane).
@@ -822,6 +837,10 @@ card with hairline dividers. In narrow panes meta wraps under the title and trai
 A selected row takes `bg-selected-wash` and the `selected-marker`, with its title at 550; a row that leads with its
 status glyph draws no pill (council round 11 A1), only the wash, the 550 title and, as the list's current item, the
 `selected-edge` (council round 12 A1); a Needs-you or Failed row holds its attention wash instead.
+**Child rows.** A row that belongs to the row above it (a subagent under its thread, a Settings entry under its
+group, such as AI accounts settings under AI accounts) carries a child line in a 16px seat in the parent's glyph
+column: the thread list's tree line, or a leading elbow (↳, faint ink) where a list has none (council round 14). It
+never stands alone as a broken row.
 
 **Live work row** (a subagent, a background job). One row in the EntityRow shape: `status glyph · name · muted
 current step · elapsed · Open`. While the work runs it lives in the dock above the composer, where it expands to its
