@@ -8,6 +8,7 @@ import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { Progress } from '@dshfiles/plugin-ui/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
+import { PlaceGlyph, type PlaceTone } from '@dshfiles/plugin-ui/components/ui/place-glyph'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Skeleton } from '@dshfiles/plugin-ui/components/ui/skeleton'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
@@ -152,38 +153,59 @@ function SelectionDemo() {
   )
 }
 
-/** The rail destinations and their identity tones (`nav-tone-<id>`); classes are literal so Tailwind keeps them. */
+/** The rail destinations and their navigation tones (`PlaceTone`). */
 const navItems = [
-  ['Threads', MessagesSquareIcon, 'dshx:nav-tone-threads'],
-  ['Inbox', InboxIcon, 'dshx:nav-tone-inbox'],
-  ['Land', GitMergeIcon, 'dshx:nav-tone-land'],
-  ['Work', ListTodoIcon, 'dshx:nav-tone-work'],
-  ['Agents', BotIcon, 'dshx:nav-tone-agents'],
-  ['Observe', ActivityIcon, 'dshx:nav-tone-observe'],
-  ['Knowledge', LibraryIcon, 'dshx:nav-tone-knowledge'],
-  ['Settings', SettingsIcon, 'dshx:nav-tone-settings'],
+  ['Threads', MessagesSquareIcon, 'threads'],
+  ['Inbox', InboxIcon, 'inbox'],
+  ['Land', GitMergeIcon, 'land'],
+  ['Work', ListTodoIcon, 'work'],
+  ['Agents', BotIcon, 'agents'],
+  ['Observe', ActivityIcon, 'observe'],
+  ['Knowledge', LibraryIcon, 'knowledge'],
+  ['Settings', SettingsIcon, 'settings'],
+] as const satisfies ReadonlyArray<readonly [string, unknown, PlaceTone]>
+
+/** Settings groups take an identity tone as their place tone (settings-shell's group ramp). */
+const settingsItems = [
+  ['General', SettingsIcon, 'var(--dshx-identity-7)'],
+  ['Models & accounts', BotIcon, 'var(--dshx-identity-2)'],
+  ['Tools & MCP', ListTodoIcon, 'var(--dshx-identity-3)'],
+  ['Plugins', LibraryIcon, 'var(--dshx-identity-1)'],
 ] as const
 
-/** Each destination glyph in its tone; the current one takes the 14% tile and an ink 600 label. */
+const placeRow = (selected: boolean): string =>
+  `dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-left dshx:text-sm dshx:hover:bg-accent ${selected ? 'dshx:bg-selected-wash dshx:selected-marker dshx:font-selected dshx:text-foreground' : 'dshx:text-muted-foreground'}`
+
+/**
+ * A selected place carries its tone (council round 9 A1): every glyph in its tone; the current one sits on its 14% tile
+ * (`PlaceGlyph` follows the row's `aria-current`), with the neutral wash, ink marker and label of a selected row.
+ */
 function NavToneDemo() {
   const [current, setCurrent] = React.useState<string>('Threads')
+  const [group, setGroup] = React.useState<string>('General')
   return (
-    <nav aria-label="Destinations" className="dshx:flex dshx:w-44 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:bg-card dshx:p-1.5">
-      {navItems.map(([label, Icon, tone]) => (
-        <button
-          key={label}
-          type="button"
-          aria-current={current === label ? 'page' : undefined}
-          onClick={() => setCurrent(label)}
-          className={`${tone} dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-1 dshx:text-left dshx:text-sm dshx:hover:bg-accent ${current === label ? 'dshx:font-semibold dshx:text-foreground' : 'dshx:text-muted-foreground'}`}
-        >
-          <span className={`dshx:flex dshx:size-6 dshx:items-center dshx:justify-center dshx:rounded-md ${current === label ? 'dshx:bg-nav-tile' : ''}`}>
-            <Icon aria-hidden className="dshx:text-nav-tone dshx:size-4" />
-          </span>
-          {label}
-        </button>
-      ))}
-    </nav>
+    <div className="dshx:flex dshx:flex-wrap dshx:gap-3">
+      <nav aria-label="Destinations" className="dshx:flex dshx:w-44 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:bg-card dshx:p-1.5">
+        {navItems.map(([label, Icon, tone]) => (
+          <button key={label} type="button" aria-current={current === label ? 'page' : undefined} onClick={() => setCurrent(label)} className={placeRow(current === label)}>
+            <PlaceGlyph tone={tone}>
+              <Icon aria-hidden />
+            </PlaceGlyph>
+            {label}
+          </button>
+        ))}
+      </nav>
+      <nav aria-label="Settings groups" className="dshx:flex dshx:w-52 dshx:flex-col dshx:gap-0.5 dshx:rounded-lg dshx:bg-card dshx:p-1.5">
+        {settingsItems.map(([label, Icon, tone]) => (
+          <button key={label} type="button" aria-current={group === label ? 'page' : undefined} onClick={() => setGroup(label)} className={placeRow(group === label)}>
+            <PlaceGlyph toneColor={tone}>
+              <Icon aria-hidden strokeWidth={1.5} />
+            </PlaceGlyph>
+            {label}
+          </button>
+        ))}
+      </nav>
+    </div>
   )
 }
 
@@ -397,8 +419,8 @@ export const kitDemos: readonly GalleryDemo[] = [
   {
     id: 'kit-nav-tones',
     title: 'Navigation tones',
-    description: 'Each destination glyph in its identity tone; the current destination adds a 14% tile and an ink label.',
-    source: "className='dshx:nav-tone-threads' · <Icon className='dshx:text-nav-tone' /> · 'dshx:bg-nav-tile'",
+    description: 'A selected place carries its tone: each glyph in its tone, the current one on a 14% tile of it; the wash, marker and label stay neutral.',
+    source: "<PlaceGlyph tone='threads'><Icon /></PlaceGlyph> · <PlaceGlyph toneColor='var(--dshx-identity-7)' selected />",
     static: true,
     render: () => <NavToneDemo />,
   },

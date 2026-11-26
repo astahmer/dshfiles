@@ -179,6 +179,29 @@
 }
 
 /*
+ * The selected-place tile (council round 9 A1): "a selected place carries its tone". `dshx:place-seat` is the seat of a
+ * 16–18px glyph in a nav row, a side-column row, a tab or a phone tab-bar tab: the glyph draws in the place's tone
+ * (`--dshx-nav-tone`: a `nav-tone-<id>` class, a Settings group's identity tone as an inline variable, see `PlaceGlyph`)
+ * and, once the place is selected, sits on the same 14% tile as the rail. Selected means the seat says so
+ * (`data-selected="true"`) or the row or tab around it does: `aria-current` (a nav or list row), `aria-selected="true"`
+ * (a tab) or Dockview's `.dv-active-tab`; `data-selected="false"` opts a seat out. Geometry stays with the caller
+ * (`size-6 rounded-md` is the 24px default), so the tile never moves a row. The selection bar, wash and label stay
+ * neutral ink. Glyph 3:1 and ink label AA on the tile over bg, panel, raised and the selected wash, for every nav and
+ * identity tone (tests/place-glyph.test.tsx).
+ */
+@utility place-seat {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--dshx-nav-tone, currentColor);
+  &[data-selected='true'],
+  :where([aria-current]:not([aria-current='false']), [aria-selected='true'], .dv-active-tab) &:not([data-selected='false']) {
+    background-color: color-mix(in oklab, var(--dshx-nav-tone, currentColor) 14%, transparent);
+  }
+}
+
+/*
  * The attention badge (council round 4 A3): a Needs-you count on a nav glyph or a tab (`AttentionBadge`, or
  * `dshx:badge-attention` on a span). A 16px pill in the attention fill: the Needs-you colour with white text in light;
  * in dark a lifted fill of the accent hue (L 0.72) with dark text (L 0.2), so it is never a white blob. A 2px ring in
