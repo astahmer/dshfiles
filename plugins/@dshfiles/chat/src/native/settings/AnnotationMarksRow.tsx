@@ -16,6 +16,7 @@ type ChatKey = Parameters<Translate>[0]
 
 const LABELS: Record<AnnotationMarks, ChatKey> = {
   popover: 'settings.annotationMarks.popover',
+  hover: 'settings.annotationMarks.hover',
   column: 'settings.annotationMarks.column',
   inline: 'settings.annotationMarks.inline',
   off: 'settings.annotationMarks.off',

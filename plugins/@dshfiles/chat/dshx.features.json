@@ -741,7 +741,7 @@
     {
       "id": "inline-annotations",
       "title": "See annotations beside the passage they quote, sent or draft",
-      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Sending moves the annotations into the session's Host-stored review history: markers and comments stay on the passage and return in any browser after a reload. Quote and Annotate share one selection row on every input kind. Settings › General › Annotation marks switches between marker + popover, comments column (default), inline marker and off; Comment while annotating switches between asking at the passage (default) and attaching silently.",
+      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Sending moves the annotations into the session's Host-stored review history: markers and comments stay on the passage and return in any browser after a reload. Quote and Annotate share one selection row on every input kind. Settings › General › Annotation marks switches between a marker popover opened on click, a marker card opened on hover, comments column (default), inline marker and off; Comment while annotating switches between asking at the passage (default) and attaching silently. A marker and its comment leave the screen once the passage they quote scrolls out of the transcript, or while the thread is not the visible tab.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
@@ -750,7 +750,7 @@
         {
           "key": "annotationMarks",
           "defaultValue": "column",
-          "constraints": "popover, column, inline or off; a live Chat setting under Settings › General, no restart.",
+          "constraints": "popover, hover, column, inline or off; a live Chat setting under Settings › General, no restart.",
           "coveredBy": ["chat.annotation-marker-placement", "chat.annotation-column-stack"]
         },
         {
@@ -760,12 +760,18 @@
           "coveredBy": ["chat.annotation-quick-add"]
         }
       ],
-      "states": ["marker", "comment-open", "comment-empty", "sent", "column", "inline", "off"],
-      "failureModes": [
-        "An annotation whose assistant step the transcript window has not mounted shows no marker until that step is back on screen.",
-        "A window with no room beside the transcript keeps markers and their popovers instead of the comments column.",
-        "Sent annotations live in the Host's per-session store: without the profile's storage-domain row they stay in this tab until reload, and a message trimmed out of the transcript hides its marker."
-      ],
+      "states": ["marker", "comment-open",     "comment-empty",
+    "sent",
+    "column",
+    "hover",
+    "inline",
+    "off"],
+        "failureModes": [
+    "An annotation whose assistant step the transcript window has not mounted shows no marker until that step is back on screen.",
+    "A marker and its comment leave the screen once the passage they quote scrolls out of the visible transcript.",
+    "A window with no room beside the transcript keeps markers and their popovers instead of the comments column.",
+    "Sent annotations live in the Host's per-session store: without the profile's storage-domain row they stay in this tab until reload, and a message trimmed out of the transcript hides its marker."
+  ],
       "externalDependencies": [],
       "verification": [
         {
@@ -780,12 +786,24 @@
           "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
           "testName": "sits in the gutter just past the quoted paragraph"
         },
-        {
-          "kind": "unit-test",
-          "id": "chat.annotation-column-stack",
-          "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
-          "testName": "pushes a card below the one above it"
-        },
+            {
+      "kind": "unit-test",
+      "id": "chat.annotation-column-stack",
+      "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
+      "testName": "pushes a card below the one above it"
+    },
+    {
+      "kind": "unit-test",
+      "id": "chat.annotation-out-of-view",
+      "file": "plugins/@dshfiles/chat/tests/annotation-anchors.test.ts",
+      "testName": "drops the marker once the quoted passage scrolled above the transcript"
+    },
+    {
+      "kind": "unit-test",
+      "id": "chat.annotation-hover-reveal",
+      "file": "plugins/@dshfiles/chat/tests/annotation-marks-hover.test.tsx",
+      "testName": "opens the comment on hover and takes it away once the pointer leaves"
+    },
         {
           "kind": "unit-test",
           "id": "chat.annotation-quick-add",
@@ -795,7 +813,7 @@
         {
           "kind": "not-applicable",
           "id": "chat.inline-annotations-browser",
-          "reason": "Walked in a scratch DSH: select an assistant passage, press Annotate, write the comment, then read the marker and comments column at 1440x900 and the marker popover at 390x844 Chromium."
+          "reason": "Walked in a scratch DSH at 1900x900 and 390x844: select an assistant passage, press Annotate, write the comment, read the marker and comments column, switch Annotation marks to Marker card (hover) and see it open on hover and close on leave, then open New tab and come back: the marker and its card leave with the hidden thread."
         },
         {
           "kind": "unit-test",

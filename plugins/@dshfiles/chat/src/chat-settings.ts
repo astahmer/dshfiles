@@ -87,8 +87,8 @@ export type LinkOpening = 'sidebar' | 'new-tab'
 /** Preserve the built-in browser for users without an explicit preference. */
 export const DEFAULT_LINK_OPENING: LinkOpening = 'sidebar'
 
-/** Available inline annotation shapes: a marker per passage with a popover, a persistent comments column, an inline thread icon, or none. */
-export const ANNOTATION_MARKS = ['popover', 'column', 'inline', 'off'] as const
+/** Available inline annotation shapes: a marker per passage with its comment on click or on hover, a persistent comments column, an inline thread icon, or none. */
+export const ANNOTATION_MARKS = ['popover', 'hover', 'column', 'inline', 'off'] as const
 
 /** Inline annotation shape chosen by the user. */
 export type AnnotationMarks = typeof ANNOTATION_MARKS[number]

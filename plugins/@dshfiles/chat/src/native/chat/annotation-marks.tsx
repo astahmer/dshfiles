@@ -1,5 +1,5 @@
 /** Inline draft annotations: a marker beside each quoted passage, and its comment where the reader looks. */
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from 'react'
 import { createPortal } from 'react-dom'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { MessageSquareTextIcon, PencilIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
@@ -76,9 +76,16 @@ const useAnnotationLayout = (input: {
     }
     let frame: number | undefined
     let disposed = false
+    const view = container.ownerDocument.defaultView
+    if (view === null) return
     const measure = (): void => {
       frame = undefined
       if (disposed) return
+      // A hidden tab keeps the thread mounted and laid out; visibility, not geometry, is what hides it.
+      if (view.getComputedStyle(container).visibility === 'hidden') {
+        setLayout(emptyLayout)
+        return
+      }
       const column = boxOf(container.getBoundingClientRect())
       const pane = container.closest('[data-chat-frame]')?.getBoundingClientRect()
       const paneRight = Math.min(window.innerWidth, pane?.right ?? window.innerWidth)
@@ -89,16 +96,22 @@ const useAnnotationLayout = (input: {
         top: Math.max(0, scrollport.top),
         bottom: Math.min(window.innerHeight, composerTop > 0 ? composerTop : window.innerHeight),
       }
-      setLayout({ anchors: annotationAnchors({ container, annotations, mode }), column, band, paneRight })
+      setLayout({ anchors: annotationAnchors({ container, annotations, mode, band }), column, band, paneRight })
     }
     const schedule = (): void => {
       if (frame !== undefined) return
       frame = window.requestAnimationFrame(measure)
     }
-    const view = container.ownerDocument.defaultView
-    if (view === null) return
     const mutations = new MutationObserver(schedule)
     mutations.observe(container, { childList: true, subtree: true, characterData: true })
+    // A tab switch hides this view by flipping visibility on an ancestor, without resizing it or touching its subtree.
+    const visibilityScope = container.closest('[data-slot="main"]') ?? container.ownerDocument.body
+    const visibilityMutations = new MutationObserver(schedule)
+    visibilityMutations.observe(visibilityScope, {
+      attributes: true,
+      subtree: true,
+      attributeFilter: ['style', 'class', 'hidden', 'inert', 'aria-hidden'],
+    })
     const resize = new ResizeObserver(schedule)
     resize.observe(container)
     const pane = container.closest('[data-chat-frame]')
@@ -113,6 +126,7 @@ const useAnnotationLayout = (input: {
       disposed = true
       if (frame !== undefined) view.cancelAnimationFrame(frame)
       mutations.disconnect()
+      visibilityMutations.disconnect()
       resize.disconnect()
       view.removeEventListener('resize', schedule)
       scrollport.removeEventListener('scroll', schedule)
@@ -194,33 +208,83 @@ const CommentBody = ({ annotation, onSave, onRemove, t }: {
   )
 }
 
-/** One numbered control that opens its comment under itself. */
-const Marker = ({ anchor, index, left, top, onSave, onRemove, t }: {
+/** How long a hover card stays after the pointer leaves its marker or card, so the pointer can cross the gap. */
+const HOVER_CLOSE_DELAY_MS = 150
+
+/** One numbered control that opens its comment on click, or on hover in the hover shape. */
+const Marker = ({ anchor, index, left, top, mode, onSave, onRemove, t }: {
   readonly anchor: AnnotationAnchor
   readonly index: number
   readonly left: number
   readonly top: number
+  readonly mode: Exclude<AnnotationMarksMode, 'off'>
   readonly onSave: (comment: string) => void
   readonly onRemove: () => void
   readonly t: Translate
-}): ReactNode => (
-  <Popover>
-    <PopoverTrigger asChild>
-      <button
-        type="button"
-        className={css.marker}
-        style={{ left, top }}
-        aria-label={t('annotation.marks.marker', { index: index + 1 })}
-        onPointerDown={event => event.preventDefault()}
+}): ReactNode => {
+  const hover = mode === 'hover'
+  const [open, setOpen] = useState(false)
+  const closeTimer = useRef<number | undefined>(undefined)
+  const cancelClose = useCallback(() => {
+    if (closeTimer.current === undefined) return
+    window.clearTimeout(closeTimer.current)
+    closeTimer.current = undefined
+  }, [])
+  const closeSoon = useCallback(() => {
+    cancelClose()
+    closeTimer.current = window.setTimeout(() => {
+      closeTimer.current = undefined
+      setOpen(false)
+    }, HOVER_CLOSE_DELAY_MS)
+  }, [cancelClose])
+  const reveal = useCallback(() => {
+    cancelClose()
+    setOpen(true)
+  }, [cancelClose])
+  // Tab reaches the marker and then the card; focus moving between the two must not close it.
+  const leaveFocus = useCallback((event: FocusEvent<HTMLElement>) => {
+    const next = event.relatedTarget
+    if (next instanceof Element && next.closest('[data-slot="popover-content"]') !== null) return
+    closeSoon()
+  }, [closeSoon])
+  useEffect(() => () => { cancelClose() }, [cancelClose])
+  return (
+    <Popover {...(hover ? { open, onOpenChange: setOpen } : {})}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className={css.marker}
+          style={{ left, top }}
+          aria-label={t('annotation.marks.marker', { index: index + 1 })}
+          onPointerDown={event => event.preventDefault()}
+          onPointerEnter={hover ? reveal : undefined}
+          onPointerLeave={hover ? closeSoon : undefined}
+          onFocus={hover ? reveal : undefined}
+          onBlur={hover ? leaveFocus : undefined}
+          onClick={hover ? (event) => {
+            event.preventDefault()
+            reveal()
+          } : undefined}
+        >
+          {index + 1}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="bottom"
+        align="start"
+        className={css.popover}
+        {...(hover ? {
+          onPointerEnter: cancelClose,
+          onPointerLeave: closeSoon,
+          onBlur: leaveFocus,
+          onOpenAutoFocus: (event: Event) => { event.preventDefault() },
+        } : {})}
       >
-        {index + 1}
-      </button>
-    </PopoverTrigger>
-    <PopoverContent side="bottom" align="start" className={css.popover}>
-      <CommentBody annotation={anchor.annotation} onSave={onSave} onRemove={onRemove} t={t} />
-    </PopoverContent>
-  </Popover>
-)
+        <CommentBody annotation={anchor.annotation} onSave={onSave} onRemove={onRemove} t={t} />
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 /** Reports its card's measured height once, so the column can stack without guessing. */
 const CardMeasure = ({ onMeasure }: { readonly onMeasure: (height: number) => void }): ReactNode => {
@@ -286,7 +350,7 @@ export const AnnotationMarks = ({ sessionId, containerRef, mode, t }: {
       {layout.anchors.map((anchor, index) => {
         const placed = markerPlacement({ anchor, mode, column: layout.column, bound: layout.band, windowWidth: width })
         return (
-          <Marker key={anchor.annotation.id} anchor={anchor} index={index} left={placed.left} top={placed.top}
+          <Marker key={anchor.annotation.id} anchor={anchor} index={index} mode={mode} left={placed.left} top={placed.top}
             onSave={save(anchor.annotation)} onRemove={remove(anchor.annotation)} t={t} />
         )
       })}

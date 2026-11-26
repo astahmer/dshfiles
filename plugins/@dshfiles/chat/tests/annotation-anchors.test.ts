@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest'
 import { SelectionAnnotation } from '../src/annotate-selection.ts'
-import { columnLeft, markerPlacement, stackTops, type AnnotationAnchor } from '../src/native/chat/annotation-anchors.ts'
+import { annotationAnchors, columnLeft, markerPlacement, stackTops, type AnnotationAnchor } from '../src/native/chat/annotation-anchors.ts'
 
 // jsdom has no layout; an empty rect stands in for whatever the browser measured.
 Range.prototype.getBoundingClientRect ??= () => DOMRect.fromRect()
@@ -60,6 +60,40 @@ describe('markerPlacement', () => {
   it('never lands under the composer', () => {
     const low = anchor({ left: 100, top: 790, right: 700, bottom: 830 })
     expect(markerPlacement({ anchor: low, mode: 'popover', column, bound, windowWidth: 1400 }).top).toBe(bound.bottom - 18 - 4)
+  })
+})
+
+describe('annotationAnchors visibility', () => {
+  const band = { top: 40, bottom: 800 }
+  const annotation = { id: 'draft:1', text: 'Alpha beta', comment: '', source: 'step=step-1&block=0', sent: false }
+
+  // One rendered passage with its quoted text; jsdom has no layout, so the quote's rect is stubbed per test.
+  const anchorsAt = (quoteTop: number, quoteHeight = 20) => {
+    const container = render('<div data-chat-flow-kind="assistant-step" data-chat-flow-key="step-1"><p id="block">Alpha beta gamma.</p></div>')
+    const original = Range.prototype.getBoundingClientRect
+    Range.prototype.getBoundingClientRect = () => DOMRect.fromRect({ x: 100, y: quoteTop, width: 120, height: quoteHeight })
+    cleanups.push(() => {
+      Range.prototype.getBoundingClientRect = original
+    })
+    return annotationAnchors({ container, annotations: [annotation], mode: 'column', band })
+  }
+
+  it('keeps the marker while the quoted passage is on screen', () => {
+    expect(anchorsAt(200)).toHaveLength(1)
+    expect(anchorsAt(795)).toHaveLength(1)
+  })
+
+  it('drops the marker once the quoted passage scrolled above the transcript', () => {
+    expect(anchorsAt(-60)).toHaveLength(0)
+    expect(anchorsAt(20)).toHaveLength(0)
+  })
+
+  it('drops the marker once the quoted passage scrolled below the composer', () => {
+    expect(anchorsAt(820)).toHaveLength(0)
+  })
+
+  it('drops a quoted passage without layout, like one inside a folded group', () => {
+    expect(anchorsAt(200, 0)).toHaveLength(0)
   })
 })
 

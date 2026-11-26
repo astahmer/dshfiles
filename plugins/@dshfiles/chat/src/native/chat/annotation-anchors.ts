@@ -26,15 +26,32 @@ export interface AnnotationAnchor {
 const boxOf = (rect: DOMRect): Box => ({ left: rect.left, top: rect.top, right: rect.left + rect.width, bottom: rect.top + rect.height })
 const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), Math.max(min, max))
 
+/** The vertical span of the transcript a reader can see, between the scrolled top and the composer. */
+export interface VisibleBand {
+  readonly top: number
+  readonly bottom: number
+}
+
 /**
- * Resolve every annotation onto its paragraph and quoted-text bounds, dropping the ones the window has not mounted.
- * @param input - the chat column, the draft annotations, and the chosen inline shape.
- * @returns one anchor per rendered annotation, in annotation order.
+ * Whether a quoted passage is on screen, so its marker and comment never linger at the band edge after the passage scrolls away.
+ * @param box - viewport bounds of the quoted text.
+ * @param band - the visible transcript span.
+ * @returns true while any part of the quote is visible.
+ */
+export const visibleInBand = (box: Box, band: VisibleBand): boolean =>
+  box.right > box.left && box.bottom > box.top && box.bottom > band.top + 1 && box.top < band.bottom - 1
+
+/**
+ * Resolve every annotation onto its paragraph and quoted-text bounds, dropping the ones the window has not mounted
+ * and the ones whose quoted passage scrolled out of the transcript.
+ * @param input - the chat column, the draft annotations, the chosen inline shape and the visible transcript span.
+ * @returns one anchor per visible annotation, in annotation order.
  */
 export const annotationAnchors = (input: {
   readonly container: Element
   readonly annotations: readonly ComposerAnnotation[]
   readonly mode: AnnotationMarks
+  readonly band: VisibleBand
 }): readonly AnnotationAnchor[] => {
   if (input.mode === 'off') return []
   return input.annotations.flatMap((annotation) => {
@@ -42,8 +59,11 @@ export const annotationAnchors = (input: {
     if (block === undefined) return []
     const range = SelectionAnnotation.rangeOf({ block, text: annotation.text })
     const blockBox = boxOf(block.getBoundingClientRect())
-    if (range === undefined) return [{ annotation, block, bounds: blockBox, text: blockBox, marker: blockBox }]
+    if (range === undefined) {
+      return visibleInBand(blockBox, input.band) ? [{ annotation, block, bounds: blockBox, text: blockBox, marker: blockBox }] : []
+    }
     const text = boxOf(range.getBoundingClientRect())
+    if (!visibleInBand(text, input.band)) return []
     const lines = [...range.getClientRects()]
     const last = lines.at(-1)
     const marker = input.mode === 'inline' && last !== undefined ? boxOf(last) : blockBox
