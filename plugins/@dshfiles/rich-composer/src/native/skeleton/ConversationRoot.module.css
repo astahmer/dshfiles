@@ -1178,19 +1178,21 @@ button.crumbEditable {
   flex-wrap: wrap;
   justify-content: center;
   /* dshfiles (unslop r5 C4, council round 3): Resume and Inbox form one quiet navigation line 12px below the composer;
-     the starters (onboarding) take their own line under it. */
-  column-gap: 8px;
+     the starters (onboarding) take their own line under it. Council round 12 C4: its chips sit 12px apart. */
+  column-gap: 12px;
   row-gap: 12px;
   min-width: 0;
   padding: 12px var(--dsh-composer-side-clearance) 0;
 }
 
-/* The navigation entries (thread-sidebar's Resume, Review and Inbox) read as quiet 28px links on that line, not
-   outlined cards: the hero's one card is the composer. */
+/* The navigation entries (thread-sidebar's Resume, Review and Inbox) are quiet 28px chips on that line (council round
+   12 C4): a border-l2 hairline, the 8px radius and the card's own clear fill (its hover wash kept), so they read as two controls rather than a sentence, and
+   the hero's one elevated card stays the composer. */
 .heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-'])) {
   height: 28px;
-  padding-inline: 8px;
-  border-color: transparent;
+  padding-inline: 10px;
+  border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  border-radius: var(--dsw-radius-md);
 }
 
 /* A touch screen keeps the 44pt target. */

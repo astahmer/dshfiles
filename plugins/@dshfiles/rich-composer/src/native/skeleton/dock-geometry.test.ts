@@ -75,10 +75,15 @@ describe('the new-thread hero (round five C4, council round 3)', () => {
     expect(block('.heroSuggestions')).toMatch(/row-gap: 12px;/)
   })
 
-  it('draws Resume, Review and Inbox as quiet 28px links, not outlined cards', () => {
+  it('draws Resume, Review and Inbox as quiet 28px chips 12px apart: a hairline, an 8px radius, no fill (council round 12 C4)', () => {
     const nav = block(".heroSuggestions :global([data-hero-card]:not([data-hero-card^='starter-']))")
     expect(nav).toMatch(/height: 28px;/)
-    expect(nav).toMatch(/border-color: transparent;/)
+    expect(nav).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+    expect(nav).toMatch(/border-radius: var\(--dsw-radius-md\);/)
+    // No fill of its own: the card stays clear and keeps its hover wash.
+    expect(nav).not.toMatch(/background/)
+    expect(nav).not.toMatch(/border-color: transparent;/)
+    expect(block('.heroSuggestions')).toMatch(/column-gap: 12px;/)
   })
 })
 
