@@ -164,8 +164,14 @@ override a Combobox trigger's height.
 item or palette row adds `selected-marker`, a straight 3 x 16px ink pill (`--dsw-alias-label-primary`, radius full) 3px
 from the leading edge and centred on the row's height (council round 10 A2: background layers, so it needs no
 positioned row and never bends with a rounded corner), and its title at `font-selected` (550). A row whose `place-seat`
-tile already shows the selection (`PlaceGlyph` in a selected row) draws no marker; a seat with `data-selected="false"`
-gives it back. The active underline tab draws a
+tile already shows the selection (`PlaceGlyph` in a selected row) draws no marker. Since council round 11 A1 a row
+whose first visual is a glyph, tile or mark draws no marker either: the wash and the 550 title carry the selection.
+The kit finds its own leading glyphs (`StatusGlyph`, `ProjectMark`, `PlaceGlyph`/`place-seat`, `ModelMark`,
+`NativeProviderMark` as the row's first element, up to four wrappers deep), so a selected `EntityRow` with a `status`
+and a palette row that starts with a project tile lose the pill. A plugin row spreads `LEADING_GLYPH_ATTRIBUTE`
+(`data-leading-glyph`, found anywhere in the row) on its own leading glyph, or `MARKER_OPT_OUT` (`data-marker="none"`)
+on the row itself; both come from `@dshfiles/plugin-ui/components/selection`. Only plain-text rows keep the pill. The
+active underline tab draws a
 2px ink bar too (council round 7 A1), like the window tab strip; the checked switch, checkbox and radio fill
 `control-on`, the ink, with the tick or knob in `control-on-foreground`. Indigo is attention, the focus ring and links. The kit applies wash and marker to the selected
 `EntityRow` and the highlighted `CommandItem`, and the wash alone to a pressed `Toggle`/`ToggleGroupItem`; use the same

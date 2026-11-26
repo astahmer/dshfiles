@@ -120,9 +120,24 @@
  * body and two round caps), so it needs no positioned row, no pseudo-element and moves nothing. A row whose place glyph
  * already shows the selection (a `place-seat` tile that has not opted out with `data-selected="false"`) draws no
  * marker. An active underline tab draws its own 2px ink bar (council round 7 A1), under the tab.
+ *
+ * Council round 11 A1: a row whose first visual is a glyph, tile or mark draws no marker either; the wash and the 550
+ * title carry it (Linear, Things), so the pill never crowds a status glyph, project tile or provider mark. Leading means
+ * the row's first element, or the first element of its first element, up to four deep: `StatusGlyph`, `ProjectMark`,
+ * `PlaceGlyph`/`place-seat` (selected or not), `ModelMark` and `NativeProviderMark`. A plugin glyph opts in with
+ * `data-leading-glyph` (found anywhere in the row), and a row opts out with `data-marker="none"`
+ * (`components/selection`). The pill stays on plain-text rows.
  */
 @utility selected-marker {
-  &:not(:has([class*='place-seat']:not([data-selected='false']))) {
+  &:not(:has([class*='place-seat']:not([data-selected='false']))):not([data-marker='none']):not(
+      :has(
+        [data-leading-glyph],
+        > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child,
+        > :first-child > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child,
+        > :first-child > :first-child > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child,
+        > :first-child > :first-child > :first-child > :is([data-slot='status-glyph'], [data-slot='project-mark'], [class*='place-seat'], [data-model-mark], [data-native-provider-mark]):first-child
+      )
+    ) {
     background-image:
       linear-gradient(var(--dsw-alias-label-primary), var(--dsw-alias-label-primary)),
       radial-gradient(circle closest-side, var(--dsw-alias-label-primary) 80%, transparent 100%),
