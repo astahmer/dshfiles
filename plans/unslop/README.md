@@ -36,6 +36,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 7 (round-6 shots) | 8.5 | 8.5 | 8.5 | indigo still on on-states and the theme card; one header frame; phone fold; one identity mark per page |
 | 8 (round-7 shots) | 8.5 | 8.5 | **9** | Mistral at target; grammar left: one colour layer per attention row, filter-row triggers, phone Inbox context |
 | 9 (round-8 shots) | 8.5 | 8.5 | **9** | phone Inbox head agreed by all; Settings width, selected-place colour, phone shell grid |
+| 10 (round-9 shots) | 8.5 | 8.5 | **9** | control chrome too loud, phone toolbar and dock, selection bar bends, Review icon |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -199,6 +200,11 @@ Triage, Turn failed and a text Review, phone Live work attached to the composer,
 Inbox and transcript); D 6 revisions `tnskmzqs` … `nokkloqo` (one edged spend leaf, Totals header with Cost/Tokens/
 Requests, Backlog status menu and Triage view, toolbar field heights, Show this account / Show model with a hidden note).
 Follow-ups: phone Settings › AI accounts stacks two back headers; Usage's default chart metric is Cost.
+
+Round 10 findings, merged in `.cache/unslop-audit/r5/council/round-10-fixes.md`: quiet filled triggers with the 3:1 edge
+on text fields only; a one-row phone thread-list toolbar; a clean phone dock edge with an ArrowDown jump; a straight pill
+selection marker, none where a place tile shows selection; the Review icon regression; a status tally on the phone
+Inbox's Needs you; a 640 px palette; one Usage breakdown dimension; quieter AI accounts controls; Backlog's status button.
 
 ## Round four
 
