@@ -14,7 +14,6 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { SidebarFolderTargets } from './shell-merge.js'
 import { PinIcon, PlusIcon, XIcon } from '@dshfiles/plugin-ui/icons'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { DEFAULT_CLOSE_BUTTON_POSITION, TabProjectMark, workbenchTabs } from './tabs.js'
 import { withoutPluginPrefix, type WorkbenchPanelRegistry } from './registry.js'
 import { SurfaceAction } from './surface-action.js'
@@ -105,8 +104,10 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <div
-            // 12px in on every tab (round five T5): dockview's own side padding is zeroed in dockview-theme.css.
-            className="dshx-root dshx:flex dshx:h-full dshx:items-center dshx:gap-2 dshx:pr-2 dshx:pl-3"
+            // 12px in on every tab (round five T5): dockview's own side padding is zeroed in dockview-theme.css. The root
+            // inherits the `.dv-tab` ink (council round 18 B2.1): `.dshx-root` alone resets it to the primary label, which
+            // drew every kept inactive tab in ink.
+            className="dshx-root dshx:flex dshx:h-full dshx:items-center dshx:gap-2 dshx:pr-2 dshx:pl-3 dshx:text-inherit"
             data-preview={tab?.preview || undefined}
             data-workbench-tab-id={props.api.id}
             onPointerDownCapture={event => {
@@ -156,14 +157,10 @@ export const createWorkbenchTab = (registry: WorkbenchPanelRegistry) =>
                 }}
               />
             ) : (
-              // A preview tab is muted, not italic; a long title ends in an ellipsis instead of taking the strip. The tab on
-              // screen (dockview's active tab) is ink at 500 even while it is a preview (round five B5).
-              <span
-                className={cn(
-                  'dshx:max-w-56 dshx:truncate dshx:text-xs dshx:in-[.dv-active-tab]:font-medium dshx:in-[.dv-active-tab]:text-foreground',
-                  tab?.preview && 'dshx:text-muted-foreground',
-                )}
-              >
+              // Every tab not on screen takes the strip's one secondary ink, preview or kept (council round 18 B2.1); a long
+              // title ends in an ellipsis instead of taking the strip. The tab on screen (dockview's active tab) is ink at
+              // 500 even while it is a preview (round five B5).
+              <span className="dshx:max-w-56 dshx:truncate dshx:text-xs dshx:in-[.dv-active-tab]:font-medium dshx:in-[.dv-active-tab]:text-foreground">
                 {title}
               </span>
             )}

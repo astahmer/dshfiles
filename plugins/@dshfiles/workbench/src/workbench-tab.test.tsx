@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { createDockview, type DockviewApi, type IDockviewPanel } from 'dockview-react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
@@ -386,16 +387,31 @@ describe('workbench semantic tab chrome', () => {
     expect(seat()?.querySelector('[data-tab-status]')).toBeNull()
   })
 
-  it('marks a preview tab with a muted title instead of italics, and caps the title width with an ellipsis', () => {
+  it('draws every tab not on screen in one ink, preview or kept (council round 18 B2.1), and caps the title with an ellipsis', () => {
     const tab = fixture()
     const title = screen.getByText('Thread A')
+    // The preview stays in the DOM, but its title takes no ink of its own: a muted preview beside an ink kept tab read
+    // as two inks for one state.
     expect(tab.trigger().getAttribute('data-preview')).toBe('true')
     expect(title.className).not.toContain('italic')
-    expect(title.className).toContain('dshx:text-muted-foreground')
+    expect(title.className).not.toContain('dshx:text-muted-foreground')
     expect(title.className).toContain('dshx:truncate')
     expect(title.className).toContain('dshx:max-w-56')
+    // The tab's own `.dshx-root` reset its ink to the primary label, over Dockview's per-state tab ink: a kept inactive
+    // tab drew in ink. The content inherits the `.dv-tab` colour instead.
+    expect(tab.trigger().className).toContain('dshx-root')
+    expect(tab.trigger().className).toContain('dshx:text-inherit')
     tab.update({ preview: false })
     expect(screen.getByText('Thread A').className).not.toContain('dshx:text-muted-foreground')
+  })
+
+  it('gives every inactive tab the secondary ink in the Dockview theme, in and outside the focused group', () => {
+    const css = readFileSync('src/dockview-theme.css', 'utf8')
+    const ink = (name: string): string | undefined => new RegExp(`--dv-${name}-tab-color: ([^;]+);`, 'u').exec(css)?.[1]
+    expect(ink('activegroup-visiblepanel')).toBe('var(--dsw-alias-label-primary)')
+    expect(ink('activegroup-hiddenpanel')).toBe('var(--dsw-alias-label-secondary)')
+    expect(ink('inactivegroup-visiblepanel')).toBe('var(--dsw-alias-label-secondary)')
+    expect(ink('inactivegroup-hiddenpanel')).toBe('var(--dsw-alias-label-secondary)')
   })
 
   it('draws the title of the tab on screen in ink at 500, even while it is a preview (round five B5)', () => {

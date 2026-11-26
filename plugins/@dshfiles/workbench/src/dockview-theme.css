@@ -44,7 +44,8 @@
   --dv-activegroup-visiblepanel-tab-color: var(--dsw-alias-label-primary);
   --dv-activegroup-hiddenpanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-inactivegroup-visiblepanel-tab-color: var(--dsw-alias-label-secondary);
-  --dv-inactivegroup-hiddenpanel-tab-color: var(--dsw-alias-label-tertiary);
+  /* One ink for every tab not on screen (council round 18 B2.1): secondary in and outside the focused group. */
+  --dv-inactivegroup-hiddenpanel-tab-color: var(--dsw-alias-label-secondary);
   --dv-separator-border: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   --dv-paneview-header-border-color: var(--dshx-tone-line, var(--dsw-alias-border-l2));
   /* One tab chrome for both surfaces (the native strip declares the same names in main-tabs): the selected tab

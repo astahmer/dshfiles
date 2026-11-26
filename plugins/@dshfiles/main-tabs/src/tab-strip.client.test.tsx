@@ -242,16 +242,17 @@ describe('TabStrip layout', () => {
     registry.places = []
   })
 
-  it('marks a preview tab with a muted title instead of italics', () => {
+  it('draws a preview tab in the one inactive ink, not a muted ink of its own (council round 18 B2.1)', () => {
     mount(
       undefined,
       undefined,
       tabs.map(tab => (tab.kind === 'panel' ? { ...tab, preview: true } : tab)),
     )
     const title = screen.getByText('Workbench')
+    expect(title.closest('[role="tab"]')?.getAttribute('data-preview')).toBe('true')
     expect(title.className).not.toContain('italic')
-    expect(title.className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
-    expect(screen.getByText('Thread').className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(title.className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(title.closest('[role="tab"]')?.className).toContain('dshx:text-muted-foreground')
   })
 
   it('draws the active tab label in ink at 500, even when that tab is a preview', () => {
@@ -263,7 +264,7 @@ describe('TabStrip layout', () => {
     const active = screen.getByText('Thread')
     expect(active.className).toContain('dshx:font-medium')
     expect(active.className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
-    expect(screen.getByText('Workbench').className).toContain('dshx:text-(--dsw-alias-label-tertiary)')
+    expect(screen.getByText('Workbench').className).not.toContain('dshx:text-(--dsw-alias-label-tertiary)')
     expect(screen.getByText('Workbench').className).not.toContain('dshx:font-medium')
   })
 
