@@ -57,10 +57,9 @@ describe('the phone Inbox (council round 7 C2)', () => {
     expect(InboxView.ANSWERS).toContain('dshx:gap-2')
   })
 
-  it('draws a foot verb 36px tall over the full width; the kit keeps its 44px hit area', () => {
+  // Council round 16 C2 draws it 44pt tall (inbox-round16.test.ts).
+  it('draws a foot verb over the full width', () => {
     expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:w-full')
-    expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:h-9!')
-    expect(InboxView.FOOT_VERB).not.toContain('dshx:h-11')
   })
 
   it("seats a failed card's Review and ⋯ 8px inside the card edge (44pt seats since council round 9 C1)", () => {

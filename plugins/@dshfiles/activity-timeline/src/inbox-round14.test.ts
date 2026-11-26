@@ -52,7 +52,7 @@ describe('the card head\'s meta line (council round 14 C1)', () => {
 })
 
 describe('the desktop question card\'s quiet verb (council round 14 C3)', () => {
-  it('reads "Open thread" (its open label); council round 15 C1 drops its arrow, as Review has none', () => {
+  it('reads "Open thread" (its open label), never a → (council round 16 C2 gives it ↗, inbox-round16.test.ts)', () => {
     const at = panel.indexOf('data-inbox-open-head=""')
     const button = panel.slice(panel.lastIndexOf('<Button', at), panel.indexOf('</Button>', at))
     expect(button).toContain('{openLabel}')

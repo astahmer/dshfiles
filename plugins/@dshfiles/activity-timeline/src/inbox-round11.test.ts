@@ -39,8 +39,9 @@ describe('the phone approval card (council round 11 C1)', () => {
     expect(InboxView.LEAD_IN).toContain('dshx:text-xs dshx:leading-4')
   })
 
-  it('sets Review 4px under the block and 4px above the card edge', () => {
-    expect(InboxView.VERB_MARGIN).toBe('dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:pb-1')
+  // Council round 16 C2: 8px under the block (inbox-round16.test.ts), 4px above the card edge.
+  it('sets Review 4px above the card edge', () => {
+    expect(InboxView.VERB_MARGIN).toContain('dshx:@max-pane-narrow:pb-1')
     expect(panel).toContain('answers === null && bodyVerbs !== null && InboxView.VERB_MARGIN,')
   })
 })

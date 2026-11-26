@@ -34,7 +34,18 @@ import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { BellIcon, CheckIcon, ClockIcon, EllipsisIcon, InboxIcon, ListChecksIcon, MessagesSquareIcon, PencilLineIcon, RefreshCwIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ArrowUpRightIcon,
+  BellIcon,
+  CheckIcon,
+  ClockIcon,
+  EllipsisIcon,
+  InboxIcon,
+  ListChecksIcon,
+  MessagesSquareIcon,
+  PencilLineIcon,
+  RefreshCwIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { fromPromise, useMachine } from '@dshfiles/plugin-ui/machine'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
@@ -304,17 +315,17 @@ const InboxRow = (props: {
           ) : null}
           {/* A question's answers are its verbs; on a desktop its head still seats Open (council round 13 C2), so the verb
               column down the list has no hole. Council round 14 C3: it names where it goes, "Open thread". Council round
-              15 C1: the same 28px band-tinted pill as Review, so the Inbox's verbs read in one style. */}
+              16 C2: a quiet ghost in secondary ink with ↗, so the answers below are the card's strongest controls. */}
           {place === 'head' && openable && answerable ? (
             <Button
               size="sm"
-              variant={InboxView.headVariant(status)}
-              band={InboxView.onBand(status)}
+              variant="ghost"
               data-inbox-open-head=""
-              className={cn('dshx:max-w-full', INBOX_CHIP, size, InboxView.SHORT_VERB)}
+              className={cn('dshx:max-w-full', INBOX_CHIP, size, InboxView.SHORT_VERB, InboxView.QUIET_OPEN)}
               onClick={() => props.onOpen(item)}
             >
               <span className="dshx:truncate">{openLabel}</span>
+              <ArrowUpRightIcon aria-hidden />
             </Button>
           ) : null}
           {openable && !answerable ? (

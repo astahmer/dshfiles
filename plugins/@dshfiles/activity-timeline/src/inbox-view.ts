@@ -221,10 +221,10 @@ const EVIDENCE =
 const BODY_VERBS = 'dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1 dshx:@max-pane-narrow:flex-col dshx:@max-pane-narrow:items-stretch dshx:@max-pane-narrow:gap-2'
 
 /**
- * A body verb: 28px beside the evidence (a 44pt target on a touch screen); on a compact pane 36px over the full width
- * (council round 7 C2; the kit's ::after keeps a 44px hit area).
+ * A body verb: 28px beside the evidence (a 44pt target on a touch screen); on a compact pane drawn 44pt tall over the
+ * full width (council round 16 C2: Review's visible height is its 44pt target, where 36px read as a small control).
  */
-const FOOT_VERB = 'dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:h-9!'
+const FOOT_VERB = 'dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:h-11!'
 const BODY_VERB = `dshx:shrink dshx:h-7 dshx:pointer-coarse:h-11 ${FOOT_VERB}`
 
 /**
@@ -302,10 +302,16 @@ const RUNS_BLOCK =
   'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted dshx:@max-pane-narrow:py-1.5 dshx:@max-pane-narrow:pr-2.5 dshx:@max-pane-narrow:pl-[calc(0.625rem+2ch)] dshx:@max-pane-narrow:-indent-[2ch]'
 
 /**
- * A compact card's body verb under its evidence (council round 11 C1): 4px above and below, so the approval card is
- * the block, Review, and the card's edge with no slack between them.
+ * A compact card's body verb under its evidence (council round 11 C1): 4px under it to the card's edge. Council round 16
+ * C2: 8px above it, so the evidence well and Review read as two things, not one stacked control.
  */
-const VERB_MARGIN = 'dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:pb-1'
+const VERB_MARGIN = 'dshx:@max-pane-narrow:gap-2 dshx:@max-pane-narrow:pb-1'
+
+/**
+ * A question card's "Open thread" in its head (council round 16 C2): a quiet secondary action, ghost with no fill, in
+ * secondary ink with a ↗ after it, so the answers under the question are the card's strongest controls. Ink on hover.
+ */
+const QUIET_OPEN = 'dshx:text-muted-foreground dshx:hover:text-foreground dshx:gap-1 dshx:[&_svg]:size-3.5'
 
 const APPROVAL_SOURCE = 'thread-sidebar.approval'
 const APPROVE_LEAD_IN = /^Approve:\s*/u
@@ -574,6 +580,7 @@ export class InboxView {
   static readonly COMMAND_BLOCK = COMMAND_BLOCK
   static readonly RUNS_BLOCK = RUNS_BLOCK
   static readonly VERB_MARGIN = VERB_MARGIN
+  static readonly QUIET_OPEN = QUIET_OPEN
   static readonly cardText = cardText
   static readonly compact = compact
   static readonly titleCounts = titleCounts

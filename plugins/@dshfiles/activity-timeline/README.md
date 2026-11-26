@@ -46,7 +46,8 @@ body opens with the evidence (an approval's "Runs: `command`" in 12/16 mono, on 
 "Runs"; a question's "Asks: …") and the verbs
 follow it as full-width buttons on a phone (a question's answers are its verbs). On a desktop (council round 11) a
 card's verb sits in its head's trailing slot, 12 px before the `⋯`, approval and failed alike; answers stay under the
-question. A
+question. Council round 16 C2: a question card's head **Open thread** is a quiet ghost in secondary ink with ↗, so its
+answers are the strongest controls; a phone's body Review is drawn 44 pt tall, 8 pt under the evidence. A
 bodyless failure keeps its verb in the head. On a phone the head of a card with a body is one 44 pt line: the title
 truncates, the project's mark and the kind stay ("BA · Approval"), and the age shows only where it fits; the body
 takes the card's 16 pt inset and a long answer wraps inside its 44 pt row. **Start triage** (a worded 44 pt "Triage" text

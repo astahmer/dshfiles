@@ -22,13 +22,11 @@ describe('the desktop Inbox (council round 15 C1)', () => {
     expect(InboxView.CARD_HEAD).toContain('dshx:[&_[data-slot=entity-row-trailing]]:self-center')
   })
 
-  it('draws "Open thread" as the same band-tinted pill as Review', () => {
+  // Council round 16 C2 makes "Open thread" a quiet ghost again, with ↗ (inbox-round16.test.ts).
+  it('reads "Open thread" in words', () => {
     const at = panel.indexOf('data-inbox-open-head=""')
     expect(at).toBeGreaterThan(-1)
     const button = panel.slice(panel.lastIndexOf('<Button', at), panel.indexOf('</Button>', at))
-    expect(button).toContain('variant={InboxView.headVariant(status)}')
-    expect(button).toContain('band={InboxView.onBand(status)}')
-    for (const quiet of ['variant="ghost"', 'text-muted-foreground', 'ArrowRightIcon']) expect(button).not.toContain(quiet)
     expect(button).toContain('{openLabel}')
   })
 })

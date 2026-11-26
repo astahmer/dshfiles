@@ -16,12 +16,12 @@ describe('a phone Inbox card (round six C1)', () => {
     expect(InboxView.HEAD_SEAT).toContain('dshx:@max-pane-narrow:-my-2!')
   })
 
-  it('moves the verb of a card with a body to a full-width button at the bottom of the body (36px since council round 7 C2)', () => {
+  it('moves the verb of a card with a body to a full-width button at the bottom of the body (44pt since council round 16 C2)', () => {
     expect(InboxView.footsVerbs(false, true)).toBe(true)
     // Council round 8 C2: the verbs follow the evidence in the body on every width, full-width under it on a phone.
     expect(InboxView.BODY_VERBS).toContain('dshx:@max-pane-narrow:flex-col')
     expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:w-full')
-    expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:h-9!')
+    expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:h-11!')
     const body = between('data-inbox-row-actions="body"', '</div>')
     expect(body).toContain("verbButtons('body')")
     expect(row).toContain("verbButtons('head')")
