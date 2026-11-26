@@ -42,6 +42,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 13 (round-12 shots) | 8.5 | 8.5 | **9** | palette dark selection, phone tab pill, chart headroom, New thread chips, send seat, phone Inbox fold |
 | 14 (round-13 shots) | 8.5 | 8.5 | **9** | all three: project names cut in attention rows, a stray dash on New thread; one attention meta wording |
 | 15 (round-14 shots) | 8.5 | **9** | **9** | Sol and Mistral at target; Opus: rail marks clipped (regression), Inbox tally and verbs, palette wording |
+| 16 (round-15 shots) | **9** | 8.5 (Astra) | 8.5 | Opus at target; Astra (new GPT seat): composer, answer-first Inbox, installed plugins first; Mistral: colour (owner kept the restraint) |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -289,6 +290,12 @@ its head pill: a full-width footer Review needed ~78 px and only 16–34 px coul
 finished-turn reach.
 Follow-ups: keep a failed turn's error first line on the Host so the reason well can quote it; agents and jujutsu still
 draw off-size overflow glyphs; ~77 idle thread workspaces had 117 GB of turbo caches (cleared) and still hold node_modules.
+
+Owner decision (round 16): keep the colour restraint. Colour stays on status washes, project and provider marks, nav and
+group tones, tags and charts; no tinted surfaces, heroes or empty states. The GPT seat is GPT-6.2 Astra from round 16.
+Round 16 findings, merged in `.cache/unslop-audit/r5/council/round-16-fixes.md`: one composer location control and lighter
+starters, the answer as the strongest Inbox control with a quiet Open thread, installed plugins first, one palette row
+grammar, one evidence well and a failed well only with a real error line, a Drafts count chip.
 
 ## Round four
 
