@@ -71,24 +71,25 @@ describe('settings view: page header (council round 3 B3)', () => {
     const toolbar = view.host.querySelector('[data-settings-toolbar]')
     expect(toolbar?.querySelector('[role="searchbox"]')).not.toBeNull()
     expect(toolbar?.querySelector('[data-settings-modified-filter]')).not.toBeNull()
-    // The header comes first, the toolbar under it; both end where the settings column (208 + the 880 lane) ends.
+    // The header comes first, the toolbar under it; both end where the settings column (208 + the 720 form) ends.
     if (header == null || toolbar == null) throw new Error('Settings header or toolbar missing')
     expect(header.compareDocumentPosition(toolbar)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(toolbar?.className).toContain('dshx:max-w-[1088px]')
-    expect(toolbar?.className).toContain('dshx:@min-pane-wide:max-w-[1168px]')
+    expect(toolbar?.className).toContain('dshx:max-w-[928px]')
+    expect(toolbar?.className).not.toContain('1088px')
+    expect(toolbar?.className).not.toContain('1168px')
     view.unmount()
   })
 
-  it('puts the header, the toolbar and the field column on the 880 lane (council round 7 B1)', () => {
+  it('puts the header, the toolbar and the field column on the 720 form frame (round nine B1, kit A5)', () => {
     const view = mount({ columnNavigation: true })
     const column = view.host.querySelector('[data-settings-column]')?.className
-    expect(column).toContain('dshx:max-w-lane')
-    expect(column).toContain('dshx:@min-pane-wide:max-w-lane-wide')
-    expect(column).not.toContain('680px')
+    expect(column).toContain('dshx:max-w-form')
+    expect(column).not.toContain('dshx:max-w-lane')
+    expect(column).not.toContain('max-w-lane-wide')
     const toolbar = view.host.querySelector<HTMLElement>('[data-settings-toolbar]')
-    expect(toolbar?.className).toContain('dshx:max-w-lane')
-    expect(toolbar?.className).not.toContain('680px')
-    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-lane')
+    expect(toolbar?.className).toContain('dshx:max-w-form')
+    expect(toolbar?.className).not.toContain('dshx:max-w-lane')
+    expect(view.host.querySelector('[data-settings-page-header]')?.className).toContain('dshx:max-w-form')
     // One 8px rhythm between the search, Modified and the action group.
     expect(toolbar?.className).toContain('dshx:gap-2')
     expect(toolbar?.className).not.toContain('dshx:gap-3')

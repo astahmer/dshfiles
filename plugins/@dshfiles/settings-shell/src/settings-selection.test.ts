@@ -29,6 +29,11 @@ describe('Settings › General controls in the kit field look (council round 3 B
   it('draws the row selectors as the kit select and the font size as one field with its unit inside', () => {
     const general = read('native/general-section.tsx')
     expect(general).toContain('dshx:[&_[class*=_selector_]]:select-look!')
+    // One 176px minimum for every select (round nine B1): the control column's left edge stays straight.
+    expect(general).toContain('dshx:[&_[class*=_selector_]]:min-w-44!')
+    // At that width core's value and chevron would sit together at the start: the chevron keeps the trailing edge.
+    expect(general).toContain('dshx:[&_[class*=_selector_]]:justify-between!')
+    expect(read('schema-form/settings-form.tsx')).toContain('<SelectTrigger aria-label={props.label} className="dshx:min-w-44" size="sm">')
     // The number and its unit share one bordered box: the stepper drops its trailing edge, the unit takes it.
     expect(general).toContain('dshx:[&_[class*=_stepper_]]:rounded-r-none!')
     expect(general).toContain('dshx:[&_[class*=_stepper_]]:border-r-0!')

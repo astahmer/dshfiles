@@ -76,6 +76,9 @@ describe('Settings › General groups its transcript rows (council round 6 B5)',
     expect(column).toContain('dshx:[&_[class$=row]:has(+[data-settings-language-note])]:bg-none!')
     expect(column).toContain('dshx:[&_[class$=row]_[class*=_title_]]:settings-label!')
     expect(column).toContain('dshx:[&_[class$=row]_[class*=_description_]]:settings-description!')
+    // The theme row is core's `_group` with a `_title` (no trailing `_`) over its cubes: it read 14/400 beside the
+    // 14/500 labels (round nine B1).
+    expect(column).toContain('dshx:[&_[class$=_title]:has(+[class$=_cubeRow])]:settings-label!')
   })
 
   it('draws the chosen theme card as the kit selected card on the card surface: core\'s platform fill is dropped (council round 8 B4, A2)', async () => {

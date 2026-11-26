@@ -92,6 +92,9 @@ export const GeneralSection = (
         // The kit Settings row grammar (council round 8 B4, kit A5) on core's module rows: an inset hairline (the utility
         // drops the native border), a full-row hover wash, the 14/500 label and the 13/400 description.
         'dshx:[&_[class$=row]]:settings-row! dshx:[&_[class$=row]_[class*=_title_]]:settings-label! dshx:[&_[class$=row]_[class*=_description_]]:settings-description!',
+        // Core's Appearance row is a `_group` whose `_title` (no trailing `_`) sits over its cubes: the same 14/500 label
+        // (round nine B1), not core's 14/400.
+        'dshx:[&_[class$=_title]:has(+[class$=_cubeRow])]:settings-label!',
         // Below 28rem every native row stacks, its control under its text (round five B7), like the plugin rows.
         'dshx:@max-pane-narrow:[&_[class$=row]]:flex-col! dshx:@max-pane-narrow:[&_[class$=row]]:items-start! dshx:@max-pane-narrow:[&_[class$=row]]:gap-y-2',
         'dshx:@max-pane-narrow:[&_[class$=rowText]]:min-w-0! dshx:@max-pane-narrow:[&_[class$=rowText]]:w-full!',
@@ -105,6 +108,9 @@ export const GeneralSection = (
         // The rows' selectors (core module CSS, filled and borderless) in the kit's one select look (council round 3 B3,
         // kit A4): 32px, a 1px border, the page fill, 8px corners.
         'dshx:[&_[class*=_selector_]]:select-look! dshx:[&_[class*=_selector_]:hover]:bg-(--dsw-alias-interactive-bg-hover)!',
+        // One 176px minimum for every select, the plugin rows' too (round nine B1): the control column's left edge is
+        // straight instead of following each value's length, and the chevron keeps to the trailing edge.
+        'dshx:[&_[class*=_selector_]]:min-w-44! dshx:[&_[class*=_selector_]]:justify-between!',
         // A touch screen keeps 44px controls: the selectors, and the stepper whose up and down buttons are 44px there.
         'dshx:pointer-coarse:[&_[class*=_selector_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]]:h-11! dshx:pointer-coarse:[&_[class*=_stepper_]+[class*=_unit_]]:h-11!',
         // Font size: the core stepper and its "px" read as one field with the unit as an inner suffix, the kit's UnitInput

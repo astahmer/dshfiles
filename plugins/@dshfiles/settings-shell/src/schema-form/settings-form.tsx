@@ -187,7 +187,7 @@ const ChoiceInput = (props: {
   }
   return (
     <Select disabled={props.disabled} onValueChange={pick} value={selected}>
-      <SelectTrigger aria-label={props.label} className="dshx:min-w-40" size="sm">
+      <SelectTrigger aria-label={props.label} className="dshx:min-w-44" size="sm">
         <SelectValue>{props.options.find(option => choiceKey(option.value) === selected)?.label}</SelectValue>
       </SelectTrigger>
       <SelectContent>

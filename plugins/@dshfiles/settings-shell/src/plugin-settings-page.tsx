@@ -96,8 +96,8 @@ export const PluginSettingsPageView = (props: {
     </div>
   )
   return (
-    // The 880 lane of every Settings column (council round 7 B1).
-    <section aria-label={props.page.title} className={cn('dshx-root dshx:flex dshx:flex-col dshx:gap-1', PAGE_FRAME_CLASS.lane)} data-settings-page={props.page.ns}>
+    // The 720 form frame of every Settings column (round nine B1).
+    <section aria-label={props.page.title} className={cn('dshx-root dshx:flex dshx:flex-col dshx:gap-1', PAGE_FRAME_CLASS.form)} data-settings-page={props.page.ns}>
       {props.heading === 'section' && <h3 className={SECTION_TITLE_CLASS}>{props.page.title}</h3>}
       {(props.heading === undefined || props.heading === 'page' || props.heading === 'named') && (
         <h2

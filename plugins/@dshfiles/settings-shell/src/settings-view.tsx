@@ -34,12 +34,12 @@ const headerButton =
 const navCell =
   'dshx:box-border dshx:flex dshx:h-8 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-lg dshx:border-none dshx:bg-transparent dshx:pr-2 dshx:pl-3 dshx:text-left dshx:text-sm dshx:leading-5 dshx:font-normal dshx:text-foreground dshx:hover:bg-[var(--dshx-tone-2)]'
 /**
- * The settings column on the kit's 880 lane, as every list and form page (council round 7 B1): each row splits into its
- * label and a 280px control seat, so values keep to the trailing edge the header's actions end on.
+ * The settings column on the kit's 720 form frame (round nine B1, kit A5): each row splits into its label and a 280px
+ * control seat, so values sit close to their labels and keep to the trailing edge the header's actions end on.
  */
-export const SETTINGS_COLUMN_WIDTH = PAGE_FRAME_CLASS.lane
-/** Without the side column the page draws its own 208px list before the column: the header spans both. */
-const OWN_LIST_HEADER_WIDTH = 'dshx:max-w-[1088px] dshx:@min-pane-wide:max-w-[1168px]'
+export const SETTINGS_COLUMN_WIDTH = PAGE_FRAME_CLASS.form
+/** Without the side column the page draws its own 208px list before the column: the header spans both (208 + 720). */
+const OWN_LIST_HEADER_WIDTH = 'dshx:max-w-[928px]'
 /** The active category (round five K2, A1): the quiet selected wash with its leading marker, ink text at 550. */
 const navCellActive = 'dshx:bg-selected-wash dshx:selected-marker dshx:hover:bg-selected-wash dshx:font-selected dshx:text-foreground'
 // A group label is a label, not one more row: 16 px above it (none above the first), 4 px between it and its entries.
