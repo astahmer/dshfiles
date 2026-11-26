@@ -112,14 +112,14 @@ describe('selected wash (round five K2, quieter in A1, neutral in council round 
 describe('selected card (council round 3 A1, round 8 A2)', () => {
   const card = /@utility selected-card\s*\{([\s\S]*?)\n\}/u.exec(roles)?.[1] ?? ''
 
-  it('draws a 2px control-on edge on the card\'s own surface, with no fill, no inset marker and no layout shift', () => {
+  it('draws a 1.5px edge in the ink at 80% on the card\'s own surface, with no fill, no inset marker and no layout shift (council round 9 A3)', () => {
     // Council round 8 A2: the edge and the check carry the choice; the card keeps its normal surface.
     expect(card.replace(/&::after\s*\{[^}]*\}/u, '')).not.toMatch(/background/u)
-    // A 1px border in the ring colour plus a 1px inset ring: 2px on a bordered card, without changing its box.
+    // A 1px border plus a 0.5px inset ring in the ink at 80%: 1.5px on a bordered card, without changing its box.
     // The control-on ink (council round 7 A1), not the accent: indigo means attention, focus and links only.
     expect(roles).toContain('--color-control-on: var(--dshx-control-on, var(--dsw-alias-label-primary));')
-    expect(card).toContain('border-color: var(--dsw-alias-label-primary);')
-    expect(card).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);')
+    expect(card).toContain('border-color: color-mix(in oklab, var(--dsw-alias-label-primary) 80%, transparent);')
+    expect(card).toContain('box-shadow: inset 0 0 0 0.5px color-mix(in oklab, var(--dsw-alias-label-primary) 80%, transparent);')
     expect(card).not.toContain('business')
     expect(card).not.toContain('inset 2px 0 0')
     expect(card).not.toMatch(/border-width|padding|margin/u)
@@ -139,5 +139,13 @@ describe('selected card (council round 3 A1, round 8 A2)', () => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
     // `--dsw-alias-label-primary` is neutral step 10; the check is cut out to the card's own surface.
     for (const step of [0, 1, 2, 3]) expect(PaletteMath.contrastRatio(p.neutral[10]!, p.neutral[step]!), `step ${step}`).toBeGreaterThanOrEqual(3)
+    // The edge is the ink at 80% composited over the card surface (sRGB alpha), still 3:1 on every step.
+    const over = (top: string, under: string, alpha: number): string =>
+      `#${[1, 3, 5].map(at => Math.round(Number.parseInt(top.slice(at, at + 2), 16) * alpha + Number.parseInt(under.slice(at, at + 2), 16) * (1 - alpha)).toString(16).padStart(2, '0')).join('')}`
+    for (const step of [0, 1, 2, 3]) {
+      const surface = PaletteMath.toHex(p.neutral[step]!)
+      const edge = PaletteMath.hexToOklch(over(PaletteMath.toHex(p.neutral[10]!), surface, 0.8))
+      expect(PaletteMath.contrastRatio(edge, p.neutral[step]!), `edge on step ${step}`).toBeGreaterThanOrEqual(3)
+    }
   })
 })

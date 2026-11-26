@@ -126,7 +126,7 @@ const identityText = [
 
 const cardChoices = ['Warm stone', 'Neutral', 'High contrast'] as const
 
-/** A chosen card (`selected-card`: 2px control-on edge and check on its own surface) beside a selected list row (wash, marker, 550). */
+/** A chosen card (`selected-card`: 1.5px edge in the ink at 80% and an ink check on its own surface) beside a selected list row (wash, marker, 550). */
 function SelectionDemo() {
   const [chosen, setChosen] = React.useState<string>(cardChoices[0])
   return (
