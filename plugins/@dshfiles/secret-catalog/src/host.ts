@@ -24,6 +24,8 @@ const cwdForScope = (scope: SecretScope, requestedCwd: string | null) => {
 
 const CatalogLive = SecretCatalog.layer.pipe(Layer.provide(SecretCli.layer), Layer.provide(DshChildProcessSpawner.layer))
 
+const SecretMcpLive = SecretMcp.layer.pipe(Layer.provide(DshChildProcessSpawner.layer))
+
 /** Tell browsers to read the pending secret requests again whenever one is added or settled. */
 const RequestEvents = Layer.effectDiscard(
   Effect.gen(function* () {
@@ -42,7 +44,7 @@ const RequestEvents = Layer.effectDiscard(
 
 const SecretCatalogLive = Layer.mergeAll(CatalogPorts, RequestEvents).pipe(
   Layer.provideMerge(SecretRequests.layer),
-  Layer.provideMerge(Layer.mergeAll(CatalogLive, SecretMcp.layer, DshCredentials.layer)),
+  Layer.provideMerge(Layer.mergeAll(CatalogLive, SecretMcpLive, DshCredentials.layer)),
   Layer.provideMerge(NodeFileSystem.layer),
 )
 
