@@ -1850,11 +1850,16 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                           attentionColors={rowStyle.attentionColors}
                         />
                       ) : null
-                    // The glyph has its own 16px seat (b:212a), where the project mark used to carry it as a corner badge:
-                    // the mark moved to line 2, so line 1 keeps main's widths and the mute marker its place by the strip.
+                    // The glyph has its own seat (b:212a), where the project mark used to carry it as a corner badge: the
+                    // mark moved to line 2. The seat is the kit's 20px rail seat, the glyph centred in it (council round
+                    // 15 B1), so the status glyph and the project mark under it share one centre axis and the name
+                    // starts under the title; the 16px glyph box sits inside it.
                     return status === null ? null : (
                       <span
-                        className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', wrapTitle && 'dshx:mt-px')}
+                        className={cn(
+                          'dshx:inline-flex dshx:h-4 dshx:w-[var(--attention-meta-rail-seat,20px)] dshx:shrink-0 dshx:items-center dshx:justify-center',
+                          wrapTitle && 'dshx:mt-px',
+                        )}
                         data-thread-lead=""
                         // A row led by its status glyph draws no marker pill beside it (council round 11 B3, kit A1): the
                         // selected wash and the 550 title carry the selection. An attention row keeps the pill through
@@ -1941,7 +1946,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {/* Line 2 is where the thread runs (b:212a): the project mark sits in the seat under the status glyph,
                       so the project name lines up with the title. Its 8px gap matches line 1's. */}
                   {!metaRail && (leadSeat || showMark) ? (
-                    <span className="dshx:mr-0.5 dshx:inline-flex dshx:w-4 dshx:shrink-0 dshx:justify-center">
+                    <span
+                      data-thread-mark-seat=""
+                      className="dshx:mr-0.5 dshx:inline-flex dshx:w-[var(--attention-meta-rail-seat,20px)] dshx:shrink-0 dshx:justify-center"
+                    >
                       {showMark ? (
                         <RowProjectMark
                           name={props.workspaceTitle}
@@ -1957,7 +1965,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   {metaKind === undefined ? null : (
                     // The kind stays whole; the name beside the rail's mark is whole or gone (the kit measures it), so a
                     // narrow column never shows "billing…". 12/16 in the secondary ink, the title being the row's ink.
-                    // The rail's 16px seat and 8px gap match line 1's glyph and gap, so the name starts under the title.
+                    // The rail's 20px seat and 8px gap match line 1's glyph seat and gap, so the name starts under the title.
                     <AttentionMeta
                       data-testid="thread-row-status-kind"
                       markSeat={metaRail ? 'rail' : 'inline'}

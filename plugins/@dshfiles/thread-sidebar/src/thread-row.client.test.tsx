@@ -250,6 +250,29 @@ describe('a row that needs you', () => {
   })
 })
 
+describe('the glyph column (council round 15 B1)', () => {
+  const SEAT = 'dshx:w-[var(--attention-meta-rail-seat,20px)]'
+
+  it('seats the status glyph at the rail seat\'s 20px width, centred, so glyph and mark share one axis', async () => {
+    for (const workStatus of [
+      rowStatus({ status: 'needs-you', verb: 'Approve', detail: 'git push --force origin main' }),
+      rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }),
+      rowStatus({ status: 'idle' }),
+    ]) {
+      const row = await renderRow({ selected: true, workStatus })
+      const lead = row.querySelector<HTMLElement>('[data-thread-lead]')
+      expect(lead?.className).toContain(SEAT)
+      expect(lead?.className).toContain('dshx:justify-center')
+      expect(lead?.className).not.toContain('dshx:size-4')
+      // Line 2's mark sits in a seat as wide: the kit's rail on an attention row, the row's own seat otherwise.
+      const seat = row.querySelector<HTMLElement>('[data-attention-meta-part="rail"]') ?? row.querySelector<HTMLElement>('[data-thread-mark-seat]')
+      expect(seat?.className).toContain(SEAT)
+      expect(seat?.querySelector('[data-slot="project-mark"]')).not.toBeNull()
+      cleanup()
+    }
+  })
+})
+
 describe('colour in a row', () => {
   const wash = (row: HTMLElement): HTMLElement | null => row.querySelector<HTMLElement>('[data-row-wash]')
 
