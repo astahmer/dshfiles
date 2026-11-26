@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
-import { cleanup, fireEvent } from '@testing-library/react'
+import { cleanup, fireEvent, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { renderRow, rowProps, rowSession, rowStatus, VisibleObserver } from './thread-row.test-support.js'
@@ -569,6 +569,33 @@ describe('a subagent row under its parent', () => {
     const button = row.querySelector<HTMLElement>('ul [data-thread-main-action]')
     expect(button?.querySelector('[data-thread-child-lead] [data-status="failed"]')).not.toBeNull()
     expect(button?.querySelector('[data-thread-child-meta]')?.textContent).toBe('claude-sonnet-5-5·Turn failed')
+  })
+
+  it('merges its list controls into one muted 12 px footer line after every child (council round 22, item 11)', async () => {
+    const working = ['w1', 'w2', 'w3', 'w4'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('s1'), origin: 'subagent', running: true }))
+    const failed = rowSession({ id: SessionId('f1'), parentId: SessionId('s1'), origin: 'subagent' })
+    const row = await renderRow({
+      childThreads: working,
+      finishedChildThreads: [failed],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false, maxChildren: 3 },
+    })
+    const list = row.querySelector('ul')
+    const footer = () => list?.lastElementChild
+    expect(footer()?.hasAttribute('data-thread-child-footer')).toBe(true)
+    expect(footer()?.className).toContain('dshx:text-xs')
+    expect(footer()?.className).toContain('dshx:text-muted-foreground')
+    expect([...(footer()?.querySelectorAll('button') ?? [])].map(button => button.textContent)).toEqual([
+      'threadSidebarFewerChildren',
+      '1 threadSidebarFinishedChildren',
+    ])
+    // Opening the finished children puts them above the footer, never below a control.
+    fireEvent.click(within(footer() as HTMLElement).getByText('1 threadSidebarFinishedChildren'))
+    const items = [...(list?.children ?? [])]
+    expect(items.at(-2)?.querySelector('[data-thread-id="f1"]')).not.toBeNull()
+    expect(footer()?.textContent).toBe('threadSidebarFewerChildren·threadSidebarHideFinishedChildren')
+    expect(list?.querySelectorAll('[data-thread-child-footer]')).toHaveLength(1)
   })
 
   it('lists its children in launch order with the failed ones last, whatever their activity (council round 22, item 12)', async () => {

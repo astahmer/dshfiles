@@ -974,34 +974,39 @@ const ChildThreadList = (props: {
       </li>
     )
   }
+  const moreToggle = hiddenCount > 0 || props.allShown
+  const finishedToggle = finishedChildThreads.length > 0
+  // The list's controls share one muted 12 px footer line after every child (council round 22, item 11): "Show less ·
+  // Hide finished", never two full rows between the working children and the failed ones.
+  const footerButton = cn(
+    // The kit sheet draws the focus ring.
+    'dshx:inline-flex dshx:h-6 dshx:shrink-0 dshx:items-center dshx:rounded-sm dshx:px-1 dshx:hover:text-foreground',
+    'dshx:pointer-coarse:h-11',
+  )
   return (
     <ul className="dshx:mb-1 dshx:ml-3.5 dshx:flex dshx:flex-col dshx:border-l dshx:pl-1.5" aria-label={t('threadSidebarChildThreads')}>
       {shown.map(renderChild)}
-      {hiddenCount > 0 || props.allShown ? (
-        <li>
-          <button
-            type="button"
-            className={cn(lineClass, 'dshx:text-muted-foreground dshx:hover:text-foreground')}
-            aria-expanded={props.allShown}
-            onClick={() => props.actions.toggleAllChildren(props.parentId)}
-          >
-            {props.allShown ? t('threadSidebarFewerChildren') : `${hiddenCount} ${t('threadSidebarMoreChildren')}`}
-          </button>
-        </li>
-      ) : null}
-      {props.finishedChildThreads.length > 0 ? (
-        <li>
-          <button
-            type="button"
-            className={cn(lineClass, 'dshx:text-muted-foreground dshx:hover:text-foreground')}
-            aria-expanded={finishedShown}
-            onClick={() => setFinishedShown(current => !current)}
-          >
-            {finishedShown ? t('threadSidebarHideFinishedChildren') : `${finishedChildThreads.length} ${t('threadSidebarFinishedChildren')}`}
-          </button>
-        </li>
-      ) : null}
       {finishedShown ? finishedChildThreads.map(renderChild) : null}
+      {moreToggle || finishedToggle ? (
+        <li className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-0.5 dshx:px-1 dshx:text-xs dshx:text-muted-foreground" data-thread-child-footer="">
+          {moreToggle ? (
+            <button
+              type="button"
+              className={footerButton}
+              aria-expanded={props.allShown}
+              onClick={() => props.actions.toggleAllChildren(props.parentId)}
+            >
+              {props.allShown ? t('threadSidebarFewerChildren') : `${hiddenCount} ${t('threadSidebarMoreChildren')}`}
+            </button>
+          ) : null}
+          {moreToggle && finishedToggle ? <span aria-hidden="true">·</span> : null}
+          {finishedToggle ? (
+            <button type="button" className={footerButton} aria-expanded={finishedShown} onClick={() => setFinishedShown(current => !current)}>
+              {finishedShown ? t('threadSidebarHideFinishedChildren') : `${finishedChildThreads.length} ${t('threadSidebarFinishedChildren')}`}
+            </button>
+          ) : null}
+        </li>
+      ) : null}
     </ul>
   )
 }
