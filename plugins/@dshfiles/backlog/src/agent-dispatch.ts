@@ -19,6 +19,11 @@ export interface AgentChoice {
   readonly name: string
   readonly glyph: string
   readonly description: string
+  /**
+   * The agent's identity colour slot (0–5) once the agents contract carries one (round eight, lane A); without it the
+   * glyph tile takes the slot hashed from the handle.
+   */
+  readonly tone?: number | undefined
 }
 
 export interface AgentContinuationThread {
