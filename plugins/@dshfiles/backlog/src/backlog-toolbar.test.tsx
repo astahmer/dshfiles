@@ -64,11 +64,13 @@ test('the toolbar folds project scope, sort, agent items and saved views into on
   expect(byName('combobox', 'Filter by project')).toBeUndefined()
   const trigger = byName('button', 'Backlog view options')
   // Filter-row grammar (council round 8, D2): beside the search field, the triggers that show a value (the project
-  // scope, the active filter count) take the field look, at the search field's control height (council round 9, A4).
+  // scope, the active filter count) take the field variant at the search field's control height (council round 9, A4),
+  // drawn as the kit's quiet trigger: filled, the 3:1 edge on hover (council round 10, A1).
   for (const control of [trigger, byName('button', 'Filter')]) {
     expect(control?.dataset.variant).toBe('field')
     expect(control?.dataset.size).toBe('field')
-    expect(control?.className).toContain('dshx:border-field-border')
+    expect(control?.className).toContain('dshx:bg-trigger-fill')
+    expect(control?.className).toContain('dshx:not-disabled:hover:border-field-border')
     expect(control?.className).toContain('dshx:h-(--dshx-control-h)')
     expect(control?.className).not.toContain('dshx:h-7')
   }

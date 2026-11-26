@@ -144,11 +144,11 @@ describe('account detail sections (council round 3, D3)', () => {
     const classOf = (label: string): string => new RegExp(`<button[^>]*aria-label="${label}"[^>]*class="([^"]*)"`, 'u').exec(markup)?.[1] ?? ''
     const effort = classOf('Default reasoning effort for GPT Six')
     const mode = classOf('Model settings mode')
-    for (const look of ['dshx:border-field-border', 'dshx:bg-background', 'dshx:h-(--dshx-control-h)']) {
+    // The kit's quiet trigger (council round 10, A1/D2): filled, no edge at rest, the 3:1 edge on hover and when open.
+    for (const look of ['dshx:bg-trigger-fill', 'dshx:not-disabled:hover:border-field-border', 'dshx:h-(--dshx-control-h)']) {
       expect(effort).toContain(look)
       expect(mode).toContain(look)
     }
-    expect(effort).not.toContain('dshx:border-transparent')
     // A1's control height owns every field's height: no per-control override, the account search included.
     expect(source('model-curation.tsx')).not.toContain('dshx:h-8')
     expect(source('accounts-toolbar.tsx')).not.toContain('dshx:h-10')
