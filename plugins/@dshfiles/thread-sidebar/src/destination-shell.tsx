@@ -150,8 +150,17 @@ const openSettingsPage = (): boolean => dispatchOpenSettings()
 const PHONE_NAV_HEIGHT = 'calc(56px + env(safe-area-inset-bottom, 0px))'
 /** Inside a thread the tab bar is gone; the stage still stops above the home indicator. */
 const PHONE_NAV_HIDDEN_HEIGHT = 'env(safe-area-inset-bottom, 0px)'
-/** The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px). */
-const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px))'
+/**
+ * The phone top bar (Back, title, thread panels; the frame's status chip takes its trailing 48px), with a subagent's
+ * parent strip under it when there is one: the stage starts under both. Whatever sits in the bar's 44px row from this
+ * height (the thread's ⋯) subtracts the strip, `--dsh-phone-top-strip`, 0px everywhere else.
+ */
+const PHONE_TOP_HEIGHT = 'calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))'
+/**
+ * A subagent's parent strip (round 22 item 4): 13px over a 32px line, under the bar. The bar cannot also name the parent
+ * at 390px: its title and line 2 fill it, and a Back label had ~72px (`‹ Audit …`).
+ */
+const PHONE_PARENT_STRIP = '32px'
 /**
  * The phone top bar's one seat rule (council round 17 B2.2): every bar has a leading and a trailing 44 x 44 seat on its
  * 44px row under the status bar, 4px in from the screen edge (the safe-area inset when that is larger), so a 20px glyph
@@ -1557,6 +1566,15 @@ const PhoneNavigation = (
     if (drawer) openThread(parentId)
     else runStackMotion('pop', () => openThread(parentId))
   }
+  // The child names its parent on a strip under the bar (round 22 item 4); the stage and the ⋯ follow its height.
+  const parentStrip = parentBack !== null
+  useLayoutEffect(() => {
+    const root = document.documentElement
+    root.style.setProperty('--dsh-phone-top-strip', parentStrip ? PHONE_PARENT_STRIP : '0px')
+    return () => {
+      root.style.removeProperty('--dsh-phone-top-strip')
+    }
+  }, [parentStrip])
   // Drawer mode keeps one Back: a thread opened from a page on the stage (an Inbox item's Open) returns to that page.
   const pageBack = drawer && stageBar.back?.to === 'page' ? stageBar.back : null
   const backToPage = (): void => {
@@ -1820,7 +1838,7 @@ const PhoneNavigation = (
         data-phone-top-bar=""
         data-phone-stage={listOpen && !drawer ? undefined : stageBar.thread ? 'thread' : (props.activePanelId ?? 'none')}
         className={cn(
-          'dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pl-[var(--dsh-phone-seat-left,4px)] dshx:text-foreground',
+          'dshx:fixed dshx:inset-x-0 dshx:top-0 dshx:z-[41] dshx:flex dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:flex-col dshx:justify-end dshx:border-b dshx:border-border dshx:bg-background dshx:pt-[env(safe-area-inset-top,0px)] dshx:pl-[var(--dsh-phone-seat-left,4px)] dshx:text-foreground',
           // A thread on the stage puts its Changes pill and one `⋯` menu (rich-composer, T1.4/T3.2) in the trailing
           // corner, publishing that bar's width; the status strip is a pill above the tab bar (frame-layout, T1.6).
           stageBar.thread && (drawer || !listOpen)
@@ -1983,6 +2001,20 @@ const PhoneNavigation = (
           ) : null}
           </div>
         </div>
+        {parentBack === null ? null : (
+          // A subagent names its parent under the bar (round 22 item 4): `Subagent of Audit money rounding ›`, 13px in
+          // the secondary ink at the title's x, on the bar's plate. The line is 32px; its hit reaches 12px up into the
+          // title block (no control there) for 44px, and stops at the ⋯ seat, the header's trailing padding.
+          <button
+            type="button"
+            data-phone-parent-strip=""
+            onClick={backToParent}
+            className="dshx:relative dshx:ml-11 dshx:flex dshx:h-8 dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-0.5 dshx:pb-1 dshx:text-left dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:before:absolute dshx:before:inset-x-0 dshx:before:-top-3 dshx:before:bottom-0 dshx:before:content-[''] dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:active:text-foreground"
+          >
+            <span className="dshx:min-w-0 dshx:truncate">Subagent of {parentBack.title}</span>
+            <ChevronRightIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+          </button>
+        )}
       </header>
       {listOpen && !drawer ? (
         <div

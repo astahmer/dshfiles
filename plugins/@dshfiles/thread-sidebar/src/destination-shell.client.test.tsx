@@ -1014,6 +1014,56 @@ describe('DestinationShell', () => {
     expect(screen.getByRole('button', { name: 'Back to Threads' })).toBeTruthy()
   })
 
+  it('names a subagent\'s parent on a tappable 13px strip under the bar, its 44px hit reaching into the bar edge (round 22 item 4)', async () => {
+    setPhone(true)
+    const openThread = vi.fn()
+    const root = document.documentElement
+    const child = {
+      collapsed: true,
+      selectedThreadId: 'child-1',
+      stageThreadId: 'child-1',
+      stageTitle: 'Check how credit notes round tax.',
+      openThread,
+      stageMeta: {
+        project: undefined,
+        mark: undefined,
+        route: { provider: 'dshx_fake_commandcode', model: 'deepseek/deepseek-v4-flash' },
+        status: 'Working',
+        working: true,
+        subagents: undefined,
+        parent: { id: 'session-parent', title: 'Audit money rounding' },
+        title: 'Check credit note rounding',
+      },
+    } as const
+    renderShell(child)
+    // The bar keeps the whole title and line 2; the parent gets its own line under them, inside the bar's plate.
+    expect(document.querySelector('[data-phone-title]')?.textContent).toBe('Check credit note rounding')
+    const strip = screen.getByRole('button', { name: 'Subagent of Audit money rounding' })
+    expect(strip.closest('[data-phone-top-bar]')).not.toBeNull()
+    expect(strip.hasAttribute('data-phone-parent-strip')).toBe(true)
+    expect(strip.textContent).toBe('Subagent of Audit money rounding')
+    // 13px secondary ink on a 32px line, a 12px hit extension up into the bar's title block: 44px to tap, never over
+    // the bar's Back or ⋯ (the strip starts at the title's x and stops at the ⋯ seat, the header's padding).
+    expect(strip.className).toContain('dshx:text-xs')
+    expect(strip.className).toContain('dshx:text-muted-foreground')
+    expect(strip.className).toContain('dshx:h-8')
+    expect(strip.className).toContain('dshx:before:-top-3')
+    expect(strip.className).toContain('dshx:ml-11')
+    // The stage starts under the strip: the shell publishes its height on its own and inside the top height, so the
+    // thread's ⋯ (rich-composer) keeps the bar row: top = top height - 44px - strip.
+    expect(root.style.getPropertyValue('--dsh-phone-top-strip')).toBe('32px')
+    expect(root.style.getPropertyValue('--dsh-phone-top-height')).toBe('calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))')
+    expect(document.querySelector<HTMLElement>('[data-phone-top-bar]')?.style.height).toBe('calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))')
+    fireEvent.click(strip)
+    await waitFor(() => expect(openThread).toHaveBeenCalledWith('session-parent'))
+    cleanup()
+    // A root thread has no strip: the bar is its one 44px row again.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix', openThread })
+    expect(document.querySelector('[data-phone-parent-strip]')).toBeNull()
+    expect(root.style.getPropertyValue('--dsh-phone-top-strip')).toBe('0px')
+    expect(root.style.getPropertyValue('--dsh-phone-top-height')).toBe('calc(44px + env(safe-area-inset-top, 0px) + var(--dsh-phone-top-strip, 0px))')
+  })
+
   it('moves Thread panels into the thread\'s ⋯ menu, keeping the bar button only without that menu (council round 17 B2.2)', () => {
     setPhone(true)
     const togglePanels = vi.fn()
