@@ -191,7 +191,11 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     headerAccessory:
       route === undefined && failure === undefined && ending === '' && since === undefined ? undefined : (
         <>
-          {route === undefined ? null : <RouteModel provider={route.provider} model={route.model} size="md" className="dshx:max-w-[45%] dshx:shrink-0" />}
+          {route === undefined ? null : (
+            // In a shared title column the names stack, so an unknown family keeps its empty mark seat and its name starts on
+            // the others' x, as in the dock (council round 24, item 1); inline, a lone row draws no seat (round 22, item 8).
+            <RouteModel provider={route.provider} model={route.model} size="md" seat={titleColumn !== undefined} className="dshx:max-w-[45%] dshx:shrink-0" />
+          )}
           {failure === undefined ? null : (
             <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
               {failure}

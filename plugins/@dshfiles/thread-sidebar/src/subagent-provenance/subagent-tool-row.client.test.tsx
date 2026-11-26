@@ -229,6 +229,38 @@ describe('SubagentProvenanceToolRow', () => {
     expect(model?.querySelector('[data-model-mark]')).toBeNull()
   })
 
+  it('keeps an unknown model\'s empty mark seat in a run\'s shared column, so its name starts on the names\' x (council round 24, item 1)', () => {
+    // "step-5-preview" started in the mark column of the eight-call group, 22 px left of every other name.
+    const width = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get').mockImplementation(function (this: HTMLElement) {
+      return this.dataset.testid === 'row-title' ? (this.textContent ?? '').length * 10 : 0
+    })
+    const seats: HTMLElement[] = []
+    try {
+      for (const [description, model] of [
+        ['Audit', 'gpt-6.1-luna'],
+        ['Review currency conversion', 'step-5-preview'],
+        ['Check discount', 'gemini-3.8-flash'],
+      ] as const) {
+        const seat = document.createElement('div')
+        seat.setAttribute('data-chat-flow-key', `seat-${String(seats.length)}`)
+        seat.setAttribute('data-run-fold-member', 'member')
+        seat.setAttribute('data-run-fold-run', 'run-seat')
+        seat.setAttribute('data-run-fold-size', '3')
+        document.body.append(seat)
+        seats.push(seat)
+        render(<SubagentProvenanceToolRow {...props({ provider: 'dshx_fake_commandcode', model, description })} />, { container: seat })
+      }
+      const unknown = seats[1]?.querySelector('[data-slot="route-model"]')
+      expect(unknown?.textContent).toBe('step-5-preview')
+      expect(unknown?.firstElementChild?.getAttribute('data-model-mark')).toBe('none')
+      expect(unknown?.firstElementChild?.className).toContain('dshx:size-4')
+    } finally {
+      cleanup()
+      for (const seat of seats) seat.remove()
+      width.mockRestore()
+    }
+  })
+
   it('prefers the route the child really runs on over the one its call asked for', () => {
     const base = settled({ running: true })
     const list = {
