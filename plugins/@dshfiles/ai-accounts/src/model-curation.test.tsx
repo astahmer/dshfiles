@@ -97,10 +97,11 @@ describe('reference Models table', () => {
     expect(container.querySelector('[data-account-hidden-note]')).toBeNull()
   })
 
-  it('sizes each effort select to its value in a 144 px column, leaving the width to model names (council round 7, D2)', async () => {
+  it('sizes each effort select to its value in a 192 px column, leaving the width to model names (council round 7, D2; round 12, D3)', async () => {
     await mount(AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }))
     const effortHead = [...container.querySelectorAll('th')].find(element => element.textContent === 'Reasoning effort')
-    expect(effortHead?.className).toContain('dshx:w-36')
+    // 192 px: room for "Provider default · Auto" at 12 px and its chevron (council round 12, D3).
+    expect(effortHead?.className).toContain('dshx:w-48')
     const trigger = container.querySelector('[aria-label="Default reasoning effort for Model 0"]')
     const classes = (trigger?.getAttribute('class') ?? '').split(' ')
     // An inherited value hugs its text (council round 11, D2); an overridden chip keeps the 96 px minimum (below).
@@ -141,21 +142,18 @@ describe('reference Models table', () => {
     expect(container.querySelector('[aria-label="Default reasoning effort"]')?.textContent).toBe('Low')
   })
 
-  it('says once above the table that every row inherits, instead of an Inherited label per row (council round 10, D2)', async () => {
+  it('says in each row that it inherits, with no Inherited label and no separate note (council round 12, D3)', async () => {
     await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true })
-    const note = container.querySelector('[data-models-inherit-note]')
-    expect(note?.textContent).toBe('All models inherit the provider’s effort.')
-    // A 12/16 caption above the table.
-    for (const look of ['dshx:text-xs', 'dshx:leading-4', 'dshx:text-muted-foreground']) expect(note?.className).toContain(look)
-    const table = container.querySelector('table')
-    expect(note !== null && table !== null && (note.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+    // The row's own effort cell says where the value comes from, so the caption above the table would repeat it.
+    expect(container.querySelector('[data-models-inherit-note]')).toBeNull()
+    expect(container.textContent).not.toContain('All models inherit')
+    expect(container.querySelector('[aria-label="Default reasoning effort for Model 0"]')?.textContent).toMatch(/^Provider default · /u)
     expect(container.querySelector('tbody')?.textContent).not.toContain('Inherited')
     expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effort', 'Show model', 'Actions'])
     await act(async () => root?.unmount())
     container.remove()
-    // One overridden row brings the Source column back, and the caption goes.
+    // One overridden row brings the Source column back.
     await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false, favoriteModelIds: ['model-0'] })
-    expect(container.querySelector('[data-models-inherit-note]')).toBeNull()
     expect(container.querySelector('tbody')?.textContent).toContain('Overridden')
     expect(container.querySelector('tbody')?.textContent).toContain('Inherited')
   })
@@ -179,11 +177,13 @@ describe('Models table cells (council round 11, D2)', () => {
   const effortTrigger = (name: string): Element | null => container.querySelector(`[aria-label="Default reasoning effort for ${name}"]`)
   const classesOf = (element: Element | null): string[] => (element?.getAttribute('class') ?? '').split(' ')
 
-  it('shows an inherited effort as 13 px secondary text with a small chevron, the trigger chrome on hover, focus and open', async () => {
+  it('shows an inherited effort as quiet 12 px secondary text with a small chevron, the trigger chrome on hover, focus and open', async () => {
     await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true })
     const trigger = effortTrigger('Model 0')
     const classes = classesOf(trigger)
-    for (const look of ['dshx:text-sm', 'dshx:text-muted-foreground', 'dshx:border-transparent', 'dshx:bg-transparent']) expect(classes, look).toContain(look)
+    // Council round 12, D3: 12 px, so "Provider default · Auto" fits the column beside the 13 px names.
+    expect(classes).not.toContain('dshx:text-sm')
+    for (const look of ['dshx:text-xs', 'dshx:text-muted-foreground', 'dshx:border-transparent', 'dshx:bg-transparent']) expect(classes, look).toContain(look)
     for (const look of ['dshx:hover:bg-trigger-fill', 'dshx:focus-visible:bg-trigger-fill', 'dshx:aria-expanded:bg-trigger-fill', 'dshx:hover:text-foreground'])
       expect(classes, look).toContain(look)
     // The kit trigger's hover, open and focus edges stay: only the rest look is quiet.

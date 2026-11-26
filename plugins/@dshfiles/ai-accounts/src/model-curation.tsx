@@ -36,7 +36,7 @@ const PROVIDER_DEFAULT = '__provider-default__'
  * ink and the edges `triggerLook` keeps for those states.
  */
 const INHERITED_EFFORT =
-  'dshx:min-w-0 dshx:border-transparent dshx:bg-transparent dshx:text-muted-foreground dshx:[&>svg]:size-3 dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:focus-visible:bg-trigger-fill dshx:focus-visible:text-foreground dshx:aria-expanded:bg-trigger-fill dshx:aria-expanded:text-foreground'
+  'dshx:min-w-0 dshx:text-xs dshx:border-transparent dshx:bg-transparent dshx:text-muted-foreground dshx:[&>svg]:size-3 dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:focus-visible:bg-trigger-fill dshx:focus-visible:text-foreground dshx:aria-expanded:bg-trigger-fill dshx:aria-expanded:text-foreground'
 
 /** Provider inheritance suspends saved overrides; editing a row explicitly resumes account customization. */
 export const ModelCuration = (props: {
@@ -155,11 +155,6 @@ export const ModelCuration = (props: {
           This account is hidden, so none of its models show in the model picker. Turn on Show this account to use them.
         </p>
       )}
-      {allInherit && shown.length > 0 ? (
-        <p className="dshx:text-xs dshx:leading-4 dshx:text-muted-foreground" data-models-inherit-note>
-          All models inherit the provider’s effort.
-        </p>
-      ) : null}
       {/* Rows separate by hairlines; the detail pane is the only frame. */}
       <div className="dshx:overflow-x-auto dshx:border-y">
         <table className="dshx:w-full dshx:min-w-[600px] dshx:border-collapse dshx:text-sm">
@@ -167,7 +162,7 @@ export const ModelCuration = (props: {
             <tr>
               {/* Starts on the names: the cell's 8 px, the 24 px star, the 16 px mark and two 8 px gaps (council round 10, D2). */}
               <th className="dshx:py-2 dshx:pr-3 dshx:pl-16 dshx:font-normal">Model</th>
-              <th className="dshx:w-36 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
+              <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show model</th>
               {allInherit ? null : <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>}
               <th className="dshx:w-10">
@@ -186,7 +181,9 @@ export const ModelCuration = (props: {
               const index = fullOrder.findIndex(candidate => candidate.id === model.id)
               const accountEffort = model.efforts.find(effort => effort.id === effective.defaultReasoningEffort)
               const nativeEffort = model.efforts.find(effort => effort.id === model.defaultEffort)
-              const defaultLabel = accountEffort === undefined ? (nativeEffort?.name ?? 'Auto') : `Account default (${accountEffort.name})`
+              // Each row says where its effort comes from, so no caption above the table repeats it (council round 12, D3).
+              const defaultLabel =
+                accountEffort === undefined ? `Provider default · ${nativeEffort?.name ?? 'Auto'}` : `Account default · ${accountEffort.name}`
               return (
                 <tr key={model.id} className="dshx:border-b dshx:last:border-b-0 dshx:hover:bg-muted/20">
                   <td className="dshx:px-2 dshx:py-2">
