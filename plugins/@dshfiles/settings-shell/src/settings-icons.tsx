@@ -201,11 +201,17 @@ const BY_GROUP = {
 /** The secondary ink: the groups the ramp leaves neutral (Developer, Pages, About and the rest). */
 const NEUTRAL = 'var(--dsw-alias-label-secondary)'
 
+/** Two identity steps blended in OKLCH: the hue between theirs, at their lightness and chroma, in either scheme. */
+const between = (a: number, b: number): string => `color-mix(in oklch, var(--dshx-identity-${String(a)}) 50%, var(--dshx-identity-${String(b)}))`
+
 /**
- * Each group's identity tone (DESIGN.md › Colour roles: identity tells things apart and never says state), one per group
- * on the council's ramp (round 6 B3): General sky, Models & accounts violet, Agents rose, Tools & MCP orange, Projects
- * olive, Security slate, Plugins teal; the rest neutral. Slate is the sky step greyed into the secondary ink in sRGB,
- * so it stays on the kit's tokens in both schemes. Green and amber are skipped: they sit near the status hues.
+ * Each group's identity tone (DESIGN.md › Colour roles: identity tells things apart and never says state). Council
+ * round 8 B4: every group the column shows has its own tone, no grey group, and groups that follow each other sit 40° or
+ * more apart. The ramp's six steps clear of the status hues (round 6 B3) go first — General sky 235, Models & accounts
+ * violet 300, Agents rose 350, Tools & MCP copper 50, Projects olive 100, Plugins teal 195 — and the rest take the hue
+ * between two steps (an OKLCH mix keeps the steps' lightness, so the 3:1 glyph holds in both schemes): Hosts azure 215,
+ * Security orchid 325, Notifications moss 122, Pages aqua 170. About is slate, the sky step greyed into the secondary
+ * ink. Green 145 and amber 70 stay out: they sit on the status hues.
  */
 const TONE = {
   general: 'var(--dshx-identity-7)',
@@ -213,13 +219,13 @@ const TONE = {
   agents: 'var(--dshx-identity-4)',
   tools: 'var(--dshx-identity-3)',
   projects: 'var(--dshx-identity-6)',
-  hosts: NEUTRAL,
-  security: `color-mix(in srgb, var(--dshx-identity-7) 45%, ${NEUTRAL})`,
-  notifications: NEUTRAL,
+  hosts: between(1, 7),
+  security: between(2, 4),
+  notifications: between(6, 5),
   plugins: 'var(--dshx-identity-1)',
-  about: NEUTRAL,
+  about: `color-mix(in srgb, var(--dshx-identity-7) 55%, ${NEUTRAL})`,
   other: NEUTRAL,
-  pages: NEUTRAL,
+  pages: between(1, 5),
 } as const satisfies Record<SettingsIconGroup, string>
 
 const isGroup = (group: string): group is SettingsIconGroup => Object.hasOwn(BY_GROUP, group)

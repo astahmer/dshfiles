@@ -27,19 +27,44 @@ const channel = (hex: string, index: number): number => Number.parseInt(hex.slic
 const mixHex = (top: string, under: string, weight: number): string =>
   `#${[0, 1, 2].map(index => Math.round(channel(top, index) * weight + channel(under, index) * (1 - weight)).toString(16).padStart(2, '0')).join('')}`
 
-/** A tone's colour in one scheme: an identity step from the kit's roles, the secondary ink, or their sRGB mix. */
-const toneHex = (tone: string, scheme: 'light' | 'dark'): string => {
+/** An identity step of the kit's roles in one scheme, as OKLCH. */
+const identityOklch = (step: string, scheme: 'light' | 'dark'): Oklch => {
   const selector = scheme === 'light' ? ':root {' : 'body[data-ds-dark-theme] {'
   const block = roles.slice(roles.indexOf(selector), roles.indexOf('}', roles.indexOf(selector)))
-  const identity = (step: string): string => {
-    const match = new RegExp(`--dshx-identity-${step}: oklch\\(([\\d.]+) ([\\d.]+) ([\\d.]+)\\)`, 'u').exec(block)
-    if (match === null) throw new Error(`identity-${step} missing`)
-    return PaletteMath.toHex({ l: Number(match[1]), c: Number(match[2]), h: Number(match[3]) })
-  }
+  const match = new RegExp(`--dshx-identity-${step}: oklch\\(([\\d.]+) ([\\d.]+) ([\\d.]+)\\)`, 'u').exec(block)
+  if (match === null) throw new Error(`identity-${step} missing`)
+  return { l: Number(match[1]), c: Number(match[2]), h: Number(match[3]) }
+}
+
+/** `color-mix(in oklch, a P%, b)`: lightness and chroma blend linearly, the hue along the shorter arc. */
+const mixOklch = (a: Oklch, b: Oklch, weight: number): Oklch => {
+  const delta = ((((b.h - a.h) % 360) + 540) % 360) - 180
+  return { l: a.l * weight + b.l * (1 - weight), c: a.c * weight + b.c * (1 - weight), h: (a.h + delta * (1 - weight) + 360) % 360 }
+}
+
+/** A two-step OKLCH mix's parts, or undefined for any other tone. */
+const oklchMix = (tone: string): { readonly a: string; readonly b: string; readonly weight: number } | undefined => {
+  const match = /^color-mix\(in oklch, var\(--dshx-identity-(\d)\) (\d+)%, var\(--dshx-identity-(\d)\)\)$/u.exec(tone)
+  return match === null ? undefined : { a: match[1] ?? '', b: match[3] ?? '', weight: Number(match[2]) / 100 }
+}
+
+/** A tone's hue: an identity step's, or the hue its OKLCH mix lands on; undefined for the ink and its sRGB mixes. */
+const toneHue = (tone: string, scheme: 'light' | 'dark'): number | undefined => {
+  const plain = /^var\(--dshx-identity-(\d)\)$/u.exec(tone)
+  if (plain !== null) return identityOklch(plain[1] ?? '', scheme).h
+  const mix = oklchMix(tone)
+  return mix === undefined ? undefined : mixOklch(identityOklch(mix.a, scheme), identityOklch(mix.b, scheme), mix.weight).h
+}
+
+/** A tone's colour in one scheme: an identity step from the kit's roles, two steps' OKLCH mix, the secondary ink, or an sRGB mix of a step into it. */
+const toneHex = (tone: string, scheme: 'light' | 'dark'): string => {
+  const identity = (step: string): string => PaletteMath.toHex(identityOklch(step, scheme))
   const muted = PaletteMath.standaloneColours(scheme).muted
   if (tone === 'var(--dsw-alias-label-secondary)') return muted
   const plain = /^var\(--dshx-identity-(\d)\)$/u.exec(tone)
   if (plain !== null) return identity(plain[1] ?? '')
+  const mix = oklchMix(tone)
+  if (mix !== undefined) return PaletteMath.toHex(mixOklch(identityOklch(mix.a, scheme), identityOklch(mix.b, scheme), mix.weight))
   const mixed = /^color-mix\(in srgb, var\(--dshx-identity-(\d)\) (\d+)%, var\(--dsw-alias-label-secondary\)\)$/u.exec(tone)
   if (mixed === null) throw new Error(`unreadable tone ${tone}`)
   return mixHex(identity(mixed[1] ?? ''), muted, Number(mixed[2]) / 100)
@@ -68,17 +93,29 @@ describe('SettingsIcons (round five B5, B6; council round 6 B3, B4)', () => {
       }
   })
 
-  it('tones each group by the identity ramp: General sky, Models violet, Agents rose, Tools orange, Security slate, Plugins teal', () => {
+  it('keeps the ramp tones: General sky, Models violet, Agents rose, Tools copper, Plugins teal', () => {
     expect(SettingsIcons.toneOf('general')).toBe('var(--dshx-identity-7)')
     expect(SettingsIcons.toneOf('models')).toBe('var(--dshx-identity-2)')
     expect(SettingsIcons.toneOf('agents')).toBe('var(--dshx-identity-4)')
     expect(SettingsIcons.toneOf('tools')).toBe('var(--dshx-identity-3)')
-    expect(SettingsIcons.toneOf('security')).toMatch(/^color-mix\(in srgb, var\(--dshx-identity-7\)/u)
     expect(SettingsIcons.toneOf('plugins')).toBe('var(--dshx-identity-1)')
-    expect(SettingsIcons.toneOf('pages')).toBe('var(--dsw-alias-label-secondary)')
-    // Neighbouring named groups never share a tone.
-    const named = ['general', 'models', 'agents', 'tools', 'projects'] as const
-    expect(new Set(named.map(group => SettingsIcons.toneOf(group))).size).toBe(named.length)
+  })
+
+  it('tints every group of the column, each in its own tone, neighbours at least 40° apart (council round 8 B4)', () => {
+    const groups = Object.keys(COLUMN)
+    const tones = groups.map(group => SettingsIcons.toneOf(group))
+    // No grey group: none is the bare secondary ink.
+    for (const [index, tone] of tones.entries()) expect(tone, groups[index]).not.toBe('var(--dsw-alias-label-secondary)')
+    // No repeats.
+    expect(new Set(tones).size).toBe(groups.length)
+    // Groups that stand one after the other in the column read apart: 40° of hue, or one of them is the low-chroma slate.
+    for (const scheme of ['light', 'dark'] as const)
+      for (let index = 1; index < groups.length; index += 1) {
+        const [before, after] = [toneHue(tones[index - 1] ?? '', scheme), toneHue(tones[index] ?? '', scheme)]
+        if (before === undefined || after === undefined) continue
+        const apart = Math.min(Math.abs(before - after), 360 - Math.abs(before - after))
+        expect(apart, `${scheme} ${groups[index - 1] ?? ''} / ${groups[index] ?? ''}`).toBeGreaterThanOrEqual(40)
+      }
   })
 
   it('draws every glyph at 3:1 on the page and on its 14% tile, in both schemes, and no tinted one in a status hue', () => {
@@ -93,10 +130,10 @@ describe('SettingsIcons (round five B5, B6; council round 6 B3, B4)', () => {
           ['tile', mixHex(glyph, colours.bg, 0.14)],
         ] as const)
           expect(PaletteMath.contrastRatio(hue(glyph), hue(ground)), `${scheme} ${group} on ${surface}`).toBeGreaterThanOrEqual(3)
-        if (tone === 'var(--dsw-alias-label-secondary)' || tone.startsWith('color-mix')) continue
-        // 20° or more from the status hues (danger 25, warning 80, success 150, accent 270), as the role declares it.
-        const step = /identity-(\d)/u.exec(tone)?.[1] ?? ''
-        const h = Number(new RegExp(`--dshx-identity-${step}: oklch\\([\\d.]+ [\\d.]+ ([\\d.]+)\\)`, 'u').exec(roles)?.[1])
+        // 20° or more from the status hues (danger 25, warning 80, success 150, accent 270), as the role declares it;
+        // an OKLCH mix of two steps is held to it too.
+        const h = toneHue(tone, scheme)
+        if (h === undefined) continue
         for (const status of [25, 80, 150, 270]) expect(Math.min(Math.abs(h - status), 360 - Math.abs(h - status)), `${scheme} ${group}`).toBeGreaterThanOrEqual(20)
       }
     }
