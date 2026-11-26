@@ -38,3 +38,14 @@ describe('MessageIconActions tooltips', () => {
     expect(tooltip.closest('[data-workbench-panel-id]')).toBeNull()
   })
 })
+
+// Council round 15 A2: every overflow trigger draws the kit's one ⋯, 16px at stroke 2 (it drew 14px at 1.5).
+describe('MessageIconActions overflow trigger', () => {
+  it('draws the kit OverflowGlyph', () => {
+    render(<MessageIconActions text="hello" clock="end" onBranch={() => undefined} t={t} />)
+    const glyph = screen.getByRole('button', { name: 'message.more' }).querySelector('svg')
+    expect(glyph?.getAttribute('data-slot')).toBe('overflow-glyph')
+    expect(glyph?.getAttribute('width')).toBe('16')
+    expect(glyph?.getAttribute('stroke-width')).toBe('2')
+  })
+})
