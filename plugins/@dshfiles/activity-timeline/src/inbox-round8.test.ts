@@ -42,32 +42,27 @@ describe('one Inbox card structure (council round 8 C2)', () => {
     expect(answers).toContain("{footed && hasVerbs && props.actionRow !== false ? verbButtons('body') : null}")
   })
 
-  it('separates the head parts with a muted "·", 6px each side, and no flex gaps', () => {
-    expect(InboxView.HEAD_SEP).toBe('dshx:px-1.5 dshx:text-muted-foreground')
+  it('separates the head parts with a muted "·" and no flex gaps', () => {
+    // 4px each side since council round 14 C1, as the kit's AttentionMeta spaces the parts after it.
+    expect(InboxView.HEAD_SEP).toBe('dshx:px-1 dshx:text-muted-foreground')
     expect(InboxView.CARD_HEAD).toContain('dshx:[&_[data-slot=entity-row-meta]]:gap-x-0')
-    for (const part of ['project', 'kind', 'age']) {
-      const at = meta.indexOf(`data-inbox-head-part="${part}"`)
-      expect(at).toBeGreaterThan(-1)
-      expect(meta.indexOf('<HeadSep />', at)).toBeGreaterThan(at)
-    }
-    // Order: project, kind, time.
-    expect(meta.indexOf('data-inbox-head-part="project"')).toBeLessThan(meta.indexOf('data-inbox-head-part="kind"'))
-    expect(meta.indexOf('data-inbox-head-part="kind"')).toBeLessThan(meta.indexOf('data-inbox-head-part="age"'))
+    // The "·" after the title leads the meta; AttentionMeta separates project, kind and age itself.
+    const lead = meta.indexOf('data-inbox-head-part="lead"')
+    expect(lead).toBeGreaterThan(-1)
+    expect(meta.indexOf('<HeadSep />', lead)).toBeLessThan(meta.indexOf('<AttentionMeta'))
   })
 })
 
 describe('the phone Inbox card head (council round 8 C1)', () => {
-  it('names a question "Question" on a phone, where "Thread question" left the title a few letters', () => {
-    expect(InboxView.headMeta('agent-questions.native-question', 'billing-api')).toEqual({ project: 'billing-api', kind: 'Thread question', shortKind: 'Question' })
+  it('names a question "Question" on every width (council round 14 C1: one word list, no phone-only short kind)', () => {
+    expect(InboxView.headMeta('agent-questions.native-question', 'billing-api')).toEqual({ project: 'billing-api', kind: 'Question' })
     expect(InboxView.headMeta('thread-sidebar.approval', 'billing-api')).toEqual({ project: 'billing-api', kind: 'Approval' })
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&_[data-inbox-kind-short]]:inline')
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&_[data-inbox-kind-long]]:hidden')
-    expect(row).toContain('<span data-inbox-kind-short="">{head.shortKind}</span>')
+    expect(row).not.toContain('data-inbox-kind-short')
   })
 
-  it('keeps the project mark and the kind on a phone; only the project name hides', () => {
+  it('keeps the project mark and the kind on a phone; the name too, unless AttentionMeta runs out of room', () => {
     expect(meta).not.toContain('dshx:@max-pane-narrow:hidden')
-    expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden')
+    expect(InboxView.HEAD_TWO_LINES).not.toContain('data-inbox-project-name')
   })
   // Council round 9 superseded the one-line head (C1: two lines, the full title) and the icon-only Start triage in the
   // top bar (C2: a worded Triage button on the view switcher's row): inbox-round9.test.ts.

@@ -1,14 +1,18 @@
 import type { AttentionItem, AttentionSeverity, AttentionSubjectKind, AttentionView } from './attention-api.js'
+import { ATTENTION_KIND_LABEL } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { RowSwipeSide } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { InboxPreview } from './inbox-preview.js'
 
-/** Sources the inbox names in words; any other source shows its own id. */
-const SOURCE_LABELS = new Map([
+/**
+ * Sources the inbox names in words; any other source shows its own id. An approval and a thread's question use the
+ * kit's one word list (council round 14 C1: "Question", never "Thread question"), as the thread list does.
+ */
+const SOURCE_LABELS = new Map<string, string>([
   ['agent-questions.child-question', 'Subagent question'],
   ['thread-sidebar.finished-turn', 'Thread turns'],
-  ['thread-sidebar.approval', 'Approval'],
-  ['agent-questions.native-question', 'Thread question'],
+  ['thread-sidebar.approval', ATTENTION_KIND_LABEL.approval],
+  ['agent-questions.native-question', ATTENTION_KIND_LABEL.question],
   ['jj-integration.land-blocked', 'Land blocked'],
   ['jj-integration.ready-to-land', 'Ready to land'],
   ['ai-accounts.quota-continuation', 'Usage limit'],
@@ -18,15 +22,6 @@ const SOURCE_LABELS = new Map([
 ])
 
 const sourceLabel = (source: string): string => SOURCE_LABELS.get(source) ?? source
-
-/**
- * The kind a phone's one-line card head prints where the full name would leave the title a few letters (council round 8
- * C1): "Thread question" took ~90px of a 390px head and cut "Reconcile Stripe payouts" to "Reconcile Str…".
- */
-const SHORT_SOURCE_LABELS = new Map([
-  ['agent-questions.child-question', 'Question'],
-  ['agent-questions.native-question', 'Question'],
-])
 
 export type SnoozeChoice = 'hour' | 'four-hours' | 'tomorrow' | 'change'
 
@@ -148,13 +143,24 @@ const CARD_HEAD =
   // so a head whose title holds one line is 52px (6 + 20 + 2 + 18 + 6).
   'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-1.5' +
   ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start' +
-  // Council round 8 C2: the head's parts are spaced by their muted "·" separators (6px each side), not by flex gaps.
+  // Council round 8 C2: the head's parts are spaced by their muted "·" separators, not by flex gaps.
   ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
-  // A kind with a short name shows it on a compact pane (council round 8 C1).
-  ' dshx:[&_[data-inbox-kind-short]]:hidden dshx:@max-pane-narrow:[&_[data-inbox-kind-short]]:inline dshx:@max-pane-narrow:[&_[data-inbox-kind-long]]:hidden'
+  // Council round 14 C1: the meta grows to the rest of its line (or wraps to a line of its own), so the kit's
+  // AttentionMeta measures the room it really has; a shrink-to-content box would keep it at its last drop step.
+  ' dshx:[&_[data-slot=entity-row-meta]]:flex-auto'
 
-/** The muted "·" before each head part after the title (council round 8 C2): 6px each side. */
-const HEAD_SEP = 'dshx:px-1.5 dshx:text-muted-foreground'
+/**
+ * The muted "·" before a head part after the title (council round 8 C2): 4px each side since council round 14 C1, as
+ * the kit's AttentionMeta spaces its own parts, so every "·" on the line sits alike.
+ */
+const HEAD_SEP = 'dshx:px-1 dshx:text-muted-foreground'
+
+/**
+ * The card head's meta line (council round 14 C1): the kit's AttentionMeta, `ProjectMark project · kind · age` with
+ * its drop order. 12/16 on a wide pane; on a compact pane 13/18 (the kit's touch meta step), so a one-line head stays
+ * 52px.
+ */
+const HEAD_META = 'dshx:@max-pane-narrow:leading-4.5'
 
 /** One head part (project, kind, link, age): it keeps its words on one line and never shrinks; the title does. */
 const HEAD_PART = 'dshx:inline-flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap'
@@ -162,14 +168,13 @@ const HEAD_PART = 'dshx:inline-flex dshx:min-w-0 dshx:shrink-0 dshx:items-center
 /**
  * Every card head on a compact pane is the same two lines (council round 9 C1, all seats). Line 1: glyph · the full
  * title, wrapping, never cut for metadata · the seat (a bodyless Failed card's verb, then ⋯). Line 2: the project's
- * mark · kind · age at 13/400 muted (the kit's meta step on a touch screen), never opening on a separator; the
- * project's name is left to the mark.
+ * mark and name · kind · age at 13/400 muted (the kit's meta step on a touch screen), never opening on a separator.
+ * Council round 14 C1: the name shows whole; AttentionMeta drops the age, then the name, when the line runs out.
  */
 const HEAD_TWO_LINES =
   'dshx:@max-pane-narrow:[&_span:has(>[data-slot=entity-row-title])]:gap-y-0.5' +
   ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:basis-full dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:leading-4.5' +
   ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]>[data-inbox-head-part]:first-child>[data-inbox-head-sep]]:hidden' +
-  ' dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden' +
   // A Failed card's verb meets its ⋯: both are 44pt seats, so no gap between them.
   ' dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0'
 
@@ -244,18 +249,14 @@ export interface InboxHeadMeta {
   readonly project: string | undefined
   /** The item's kind in words ("Approval"), unless the project already names the card. */
   readonly kind: string | undefined
-  /** A shorter name for the kind on a compact pane ("Question"), when it has one. */
-  readonly shortKind?: string
 }
 
 /** A finished turn that failed says so as its kind (council round 9 C3), where a finished turn otherwise names none. */
-const FAILED_TURN_KIND = 'Turn failed'
+const FAILED_TURN_KIND = ATTENTION_KIND_LABEL.failed
 
 const headMeta = (source: string, project: string | undefined, failed = false): InboxHeadMeta => {
   if (failed && namesProject(source)) return { project, kind: FAILED_TURN_KIND }
-  const kind = project !== undefined && namesProject(source) ? undefined : sourceLabel(source)
-  const shortKind = kind === undefined ? undefined : SHORT_SOURCE_LABELS.get(source)
-  return shortKind === undefined ? { project, kind } : { project, kind, shortKind }
+  return { project, kind: project !== undefined && namesProject(source) ? undefined : sourceLabel(source) }
 }
 
 /**
@@ -512,6 +513,7 @@ export class InboxView {
   static readonly HEAD_VERB = HEAD_VERB
   static readonly CARD_HEAD = CARD_HEAD
   static readonly HEAD_SEP = HEAD_SEP
+  static readonly HEAD_META = HEAD_META
   static readonly HEAD_PART = HEAD_PART
   static readonly HEAD_TWO_LINES = HEAD_TWO_LINES
   static readonly HEAD_SEAT = HEAD_SEAT

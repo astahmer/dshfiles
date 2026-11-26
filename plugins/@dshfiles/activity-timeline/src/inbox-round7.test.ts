@@ -13,18 +13,21 @@ describe('the Inbox page (council round 7 C1)', () => {
   })
 
   it('prints every card head in one order: title, project, kind, time', () => {
-    const meta = row.slice(row.indexOf('meta={'), row.indexOf('InboxView.relativeAge(item.openedAt, props.now)'))
-    const projectAt = meta.indexOf('<ProjectMark name={head.project}')
-    const kindAt = meta.indexOf('{head.kind}')
+    // Council round 14 C1: the kit's AttentionMeta draws project, kind and age in that order.
+    const meta = row.slice(row.indexOf('meta={'), row.indexOf('InboxView.relativeAge(item.openedAt, props.now)') + 50)
+    const projectAt = meta.indexOf('project={head.project}')
+    const kindAt = meta.indexOf('kind={head.kind}')
     expect(projectAt).toBeGreaterThan(-1)
     expect(kindAt).toBeGreaterThan(projectAt)
+    expect(meta.indexOf('age={InboxView.relativeAge')).toBeGreaterThan(kindAt)
     // Every thread card knows its project, not only a finished turn's.
     expect(row).toMatch(/const project = item\.subject\.kind === 'session' \? props\.projectOf\(item\.subject\.id\) : undefined/u)
   })
 
   it('names the project on every thread card and the kind unless a project already says it', () => {
     expect(InboxView.headMeta('thread-sidebar.approval', 'billing-api')).toEqual({ project: 'billing-api', kind: 'Approval' })
-    expect(InboxView.headMeta('agent-questions.native-question', 'billing-api')).toMatchObject({ project: 'billing-api', kind: 'Thread question' })
+    // "Question", never "Thread question" (council round 14 C1).
+    expect(InboxView.headMeta('agent-questions.native-question', 'billing-api')).toMatchObject({ project: 'billing-api', kind: 'Question' })
     expect(InboxView.headMeta('thread-sidebar.finished-turn', 'web-app')).toEqual({ project: 'web-app', kind: undefined })
     // With no project known a finished turn still says what it is.
     expect(InboxView.headMeta('thread-sidebar.finished-turn', undefined)).toEqual({ project: undefined, kind: 'Thread turns' })

@@ -30,7 +30,7 @@ import { PeekCard, RowPeek } from '@dshfiles/plugin-ui/components/peek'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { useCommands } from '@dshfiles/plugin-ui/hooks/commands'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
-import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
+import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { useLastReply, type RetainThread } from '@dshfiles/plugin-ui/hooks/last-reply'
 import { RowGestureModel, useRowGestures } from '@dshfiles/plugin-ui/hooks/row-gestures'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -523,29 +523,18 @@ const InboxRow = (props: {
           {/* Every head reads glyph · title · project · kind · time with muted "·" separators (council round 7 C1, round 8
               C2); a finished turn's project replaces its "Thread turns" kind (round five C4), and a failed one reads "Turn
               failed" (council round 9 C3). On a phone these parts take a second line under the full title
-              (InboxView.HEAD_TWO_LINES). */}
-          {head.project === undefined ? null : (
-            <span data-inbox-head-part="project" data-inbox-project="" className={InboxView.HEAD_PART}>
-              <HeadSep />
-              <ProjectMark name={head.project} size="dense" />
-              <span data-inbox-project-name="" className="dshx:truncate dshx:pl-1.5">
-                {head.project}
-              </span>
-            </span>
-          )}
-          {head.kind === undefined ? null : (
-            <span data-inbox-head-part="kind" className={InboxView.HEAD_PART}>
-              <HeadSep />
-              {head.shortKind === undefined ? (
-                head.kind
-              ) : (
-                <>
-                  <span data-inbox-kind-long="">{head.kind}</span>
-                  <span data-inbox-kind-short="">{head.shortKind}</span>
-                </>
-              )}
-            </span>
-          )}
+              (InboxView.HEAD_TWO_LINES), where the "·" after the title goes. Council round 14 C1: project, kind and age are
+              the kit's AttentionMeta, the one formatter the thread list uses too (age drops first, then the name). */}
+          <span data-inbox-head-part="lead" className={InboxView.HEAD_PART}>
+            <HeadSep />
+          </span>
+          <AttentionMeta
+            data-inbox-head-meta=""
+            className={InboxView.HEAD_META}
+            project={head.project}
+            kind={head.kind}
+            age={InboxView.relativeAge(item.openedAt, props.now)}
+          />
           {referencedThreadId === null ? null : (
             <span data-inbox-head-part="thread" className={InboxView.HEAD_PART}>
               <HeadSep />
@@ -559,10 +548,6 @@ const InboxRow = (props: {
               </button>
             </span>
           )}
-          <span data-inbox-head-part="age" className={InboxView.HEAD_PART}>
-            <HeadSep />
-            <span data-inbox-age="">{InboxView.relativeAge(item.openedAt, props.now)}</span>
-          </span>
           {item.occurrences > 1 ? <Badge variant="outline" className="dshx:ml-2">{`${String(item.occurrences)} ${t('occurrences')}`}</Badge> : null}
           {item.resolvedAt !== null ? <Badge variant="secondary" className="dshx:ml-2">{t('resolved')}</Badge> : null}
           {props.view === 'snoozed' ? (

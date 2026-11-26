@@ -116,8 +116,8 @@ describe('Inbox on a phone (round five P2)', () => {
   })
 
   it('keeps the mark and kind in the phone head, on the line under the full title (council round 9 C1)', () => {
-    expect(row).toMatch(/data-inbox-head-part="kind" className=\{InboxView\.HEAD_PART\}/u)
-    expect(row).toContain('data-inbox-project-name=""')
+    // Council round 14 C1: mark, name, kind and age are the kit's AttentionMeta (inbox-round14.test.ts).
+    expect(row).toContain('<AttentionMeta')
     expect(row).toContain('InboxView.HEAD_TWO_LINES')
   })
 

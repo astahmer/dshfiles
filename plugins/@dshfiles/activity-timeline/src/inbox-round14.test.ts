@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { ATTENTION_KIND_LABEL } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { describe, expect, it } from 'vitest'
 import { InboxView } from './inbox-view.js'
@@ -21,6 +22,32 @@ describe('the phone failed card\'s Review (council round 14 C2)', () => {
     expect(seat).not.toContain('dshx:@max-pane-narrow:-my-2!')
     // Only a touch screen's head that holds a verb (a bodyless failed card): a ⋯ alone stays level with the title.
     expect(panel).toContain('className={cn(InboxView.HEAD_SEAT, phone && !footed && InboxView.HEAD_SEAT_VERB)}')
+  })
+})
+
+describe('the card head\'s meta line (council round 14 C1)', () => {
+  const meta = panel.slice(panel.indexOf('meta={'), panel.indexOf('</EntityRow>', panel.indexOf('meta={')))
+
+  it('speaks the one word list: Approval, Question, Turn failed (never "Thread question")', () => {
+    expect(InboxView.headMeta('thread-sidebar.approval', 'billing-api')).toEqual({ project: 'billing-api', kind: ATTENTION_KIND_LABEL.approval })
+    expect(InboxView.headMeta('agent-questions.native-question', 'billing-api')).toEqual({ project: 'billing-api', kind: ATTENTION_KIND_LABEL.question })
+    expect(InboxView.headMeta('thread-sidebar.finished-turn', 'web-app', true)).toEqual({ project: 'web-app', kind: ATTENTION_KIND_LABEL.failed })
+    expect(InboxView.sourceLabel('agent-questions.native-question')).toBe('Question')
+  })
+
+  it('draws ProjectMark project · kind · age with the kit\'s AttentionMeta, desktop and phone alike', () => {
+    expect(meta).toMatch(/<AttentionMeta\s[^>]*project=\{head\.project\}\s+kind=\{head\.kind\}\s+age=\{InboxView\.relativeAge\(item\.openedAt, props\.now\)\}/u)
+    // Its own mark, name, kind and age parts are gone: one formatter, no phone-only short kind, no hidden name.
+    for (const gone of ['<ProjectMark', 'data-inbox-project-name', 'data-inbox-kind-short', 'data-inbox-kind-long', 'data-inbox-age', 'head.shortKind']) expect(meta).not.toContain(gone)
+    expect(InboxView.HEAD_TWO_LINES).not.toContain('data-inbox-project-name')
+    expect(InboxView.CARD_HEAD).not.toContain('data-inbox-kind-short')
+  })
+
+  it('lets the line grow to the head\'s width, so it measures the room it really has', () => {
+    expect(InboxView.CARD_HEAD).toContain('dshx:[&_[data-slot=entity-row-meta]]:flex-auto')
+    // 13/18 on a phone, as the two-line head had (a 52px head).
+    expect(meta).toContain('className={InboxView.HEAD_META}')
+    expect(InboxView.HEAD_META).toContain('dshx:@max-pane-narrow:leading-4.5')
   })
 })
 

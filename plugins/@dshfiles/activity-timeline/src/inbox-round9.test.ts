@@ -18,7 +18,8 @@ describe('the phone Inbox head (council round 9 C1)', () => {
     // The kit's meta step (text-xs) is 13px on a touch screen: no larger step.
     expect(InboxView.HEAD_TWO_LINES).not.toContain('text-sm')
     expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:leading-4.5')
-    expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden')
+    // Council round 14 C1: the project's name shows on a phone too (AttentionMeta drops it only when out of room).
+    expect(InboxView.HEAD_TWO_LINES).not.toContain('data-inbox-project-name')
     // Line 2 never opens on a separator.
     expect(InboxView.HEAD_TWO_LINES).toContain('[&_[data-slot=entity-row-meta]>[data-inbox-head-part]:first-child>[data-inbox-head-sep]]:hidden')
     // The seat is top-aligned with the title's first line.

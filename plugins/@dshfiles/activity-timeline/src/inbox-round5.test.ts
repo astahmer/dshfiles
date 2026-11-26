@@ -53,7 +53,8 @@ describe('an Inbox card (round five C4, council round 5)', () => {
     expect(InboxView.namesProject('thread-sidebar.finished-turn')).toBe(true)
     expect(InboxView.namesProject('thread-sidebar.approval')).toBe(false)
     expect(InboxView.namesProject('agent-questions.native-question')).toBe(false)
-    expect(row).toMatch(/<ProjectMark name=\{head\.project\} size="dense" \/>/u)
+    // The mark and name are drawn by the kit's AttentionMeta since council round 14 C1.
+    expect(row).toMatch(/<AttentionMeta[^>]*project=\{head\.project\}/u)
     expect(panel).toContain('EntityLabels.useWorkspaceLabel(props.workspaces)')
   })
 
