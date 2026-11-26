@@ -123,6 +123,13 @@ describe('Usage filter triggers (council round 7, D3 / A4)', () => {
     expect(purpose).toContain('variant="field"')
     expect(row).not.toContain('variant="outline"')
   })
+
+  it('ends Custom with the chevron its neighbours end with, so it reads as the same filled trigger (council round 14, D1)', () => {
+    const panel = read('panel.tsx')
+    const row = panel.slice(panel.indexOf('aria-label="Filters"'), panel.indexOf("{preferences.tab === 'log' ? ("))
+    const custom = /<PopoverTrigger asChild>([\s\S]*?)<\/PopoverTrigger>/u.exec(row)?.[1] ?? ''
+    expect(custom).toMatch(/'Custom'\}\s*<ChevronDownIcon aria-hidden \/>\s*<\/Button>/u)
+  })
 })
 
 describe('Usage filter labels and spacing (council round 11, D1)', () => {

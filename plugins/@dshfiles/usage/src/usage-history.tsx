@@ -1,3 +1,4 @@
+import { ModelMark } from '@dshfiles/plugin-ui/components/model-mark'
 import { useState } from 'react'
 import { UsageFormattingModel } from './format.js'
 import type { ChartQuery, ChartView } from './api.js'
@@ -116,6 +117,8 @@ export const UsageBreakdownTable = (props: {
       </th>
     )
   }
+  // Models and accounts carry the provider mark "Where it went" draws (council round 14, D1); projects and purposes have none.
+  const marked = props.groupBy === 'model' || props.groupBy === 'provider'
   return (
     // The hairline card the totals, trend and "Where it went" above take, so the page keeps one rhythm; the cells' own
     // 8 px inset is pulled back so the first column starts on the title's edge (council round 13, D1).
@@ -145,9 +148,10 @@ export const UsageBreakdownTable = (props: {
                       <button
                         type="button"
                         onClick={() => props.onShowRequests(row.key, props.groupBy)}
-                        className="dshx:block dshx:w-full dshx:truncate dshx:rounded-sm dshx:text-left dshx:hover:underline"
+                        className="dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:text-left dshx:text-sm dshx:hover:underline"
                       >
-                        {row.key}
+                        {marked ? <ModelMark modelId={row.key} /> : null}
+                        <span className="dshx:min-w-0 dshx:truncate">{row.key}</span>
                       </button>
                     </td>
                     {TABLE_COLUMNS.map(column => (

@@ -311,7 +311,8 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                     }
                   />
                   {/* A trigger that shows a value (the range) takes the field look of the selects beside it; the range
-                    replacing "Custom" is the pressed cue (council round 7, D3 / A4). */}
+                    replacing "Custom" is the pressed cue (council round 7, D3 / A4). It ends with the chevron the triggers
+                    beside it end with, so it reads as one of them, not as an outlined action (council round 14, D1). */}
                   <Popover open={customOpen} onOpenChange={setCustomOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -328,6 +329,7 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
                       >
                         <CalendarIcon aria-hidden />
                         {preferences.preset === 'custom' ? `${formatShortDay(range.from)} – ${formatShortDay(range.to - 1)}` : 'Custom'}
+                        <ChevronDownIcon aria-hidden />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent align="start" className="dshx-root dshx:flex dshx:w-auto dshx:items-center dshx:gap-2 dshx:p-3 dshx:text-xs">

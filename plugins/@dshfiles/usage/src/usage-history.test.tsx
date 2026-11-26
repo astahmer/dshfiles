@@ -120,6 +120,37 @@ describe('usage history views', () => {
     expect(markup).toMatch(/<div class="[^"]*dshx:-mx-2[^"]*"><table/u)
   })
 
+  describe('the distribution table reads like "Where it went" (council round 14, D1)', () => {
+    const modelRow = view.breakdown.model[0]
+    const branded: ChartView = {
+      ...view,
+      breakdown: { ...view.breakdown, model: modelRow === undefined ? [] : [{ ...modelRow, key: 'gpt-6-luna' }, { ...modelRow, key: 'step-5-preview', cost: 0.01 }] },
+    }
+
+    it('draws the 16 px provider mark "Where it went" draws before each model, an empty seat for an unknown one', () => {
+      const markup = renderToStaticMarkup(<UsageBreakdownTable view={branded} groupBy="model" onShowRequests={() => 'opened'} />)
+      const cells = markup.match(/<tbody[^>]*>.*<\/tbody>/su)?.[0].match(/<td class="[^"]*dshx:min-w-40[^"]*">.*?<\/td>/gsu) ?? []
+      expect(cells).toHaveLength(2)
+      expect(cells[0]).toMatch(/<button[^>]*><span aria-hidden="true" data-model-mark="openai" class="[^"]*dshx:size-4[^"]*">.*?<\/span><span[^>]*dshx:truncate[^>]*>gpt-6-luna<\/span><\/button>/su)
+      // An unknown family keeps the seat, so the names stay on one edge.
+      expect(cells[1]).toMatch(/data-model-mark="none"[^>]*><\/span><span[^>]*>step-5-preview<\/span>/su)
+      // Accounts take the mark too (as in "Where it went"); projects and purposes have no provider.
+      expect(renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="provider" onShowRequests={() => 'opened'} />)).toContain('data-model-mark="openai"')
+      const projects: ChartView = { ...view, breakdown: { ...view.breakdown, project: view.breakdown.provider } }
+      expect(renderToStaticMarkup(<UsageBreakdownTable view={projects} groupBy="project" onShowRequests={() => 'opened'} />)).not.toContain('data-model-mark')
+    })
+
+    it('keeps the headers at 12/500 in secondary ink: the cell sets the type and its sort button inherits it', () => {
+      const markup = renderToStaticMarkup(<UsageBreakdownTable view={branded} groupBy="model" onShowRequests={() => 'opened'} />)
+      const headers = [...markup.matchAll(/<th [^>]*class="([^"]*)"[^>]*><button[^>]*class="([^"]*)"/gsu)]
+      expect(headers).toHaveLength(11)
+      for (const [, cell = '', button = ''] of headers) {
+        for (const token of ['dshx:text-xs', 'dshx:font-medium', 'dshx:text-muted-foreground']) expect(cell.split(' ')).toContain(token)
+        expect(button).not.toMatch(/dshx:(?:text-(?:sm|base|foreground)|font-(?:normal|semibold))\b/u)
+      }
+    })
+  })
+
   it('renders daily cells for a year range in the measure the chart shows, with no switch of its own', () => {
     const from = new Date(2026, 0, 1).getTime()
     const markup = renderToStaticMarkup(<UsageCalendar view={view} metric="tokens" range={{ from, to: from + 365 * 86_400_000 }} />)
