@@ -15,6 +15,10 @@ colors:
   # The quiet trigger's fill as it paints on the page (council round 10 A1: the ink at 5%; 5.2% dark).
   trigger-fill: '#f3f1ef'
   selected-wash: '#ebe9e6'
+  # A glyph-leading selected row's 1px inset edge (council round 12 A1), 3:1 on the wash.
+  selected-edge: '#88827d'
+  # The dense checkbox's checked fill in light (council round 12 A3).
+  control-on-dense: '#45423e'
   prompt-fill: '#ecf5fa'
   wash-needs-you: '#e1e9ff'
   wash-failed: '#ffe4e1'
@@ -36,6 +40,7 @@ colors:
   segment-thumb-dark: '#302c28'
   label-secondary-dark: '#a7a4a1'
   selected-wash-dark: '#2a2725'
+  selected-edge-dark: '#7f7974'
   prompt-fill-dark: '#1a252a'
   wash-needs-you-dark: '#232a42'
   wash-needs-you-band-dark: '#242b3d'
@@ -318,7 +323,12 @@ work on any surface.
    that already holds its attention wash (a Needs-you or Failed thread row), the verb is `variant="attention-text"`
    (`variant="danger-text"` on a failed row): the same foreground on a transparent fill, the 12% tint only on hover
    and 18% pressed, at the size and hit area of `attention`; AA at rest, hover and press over the wash and every
-   surface. Inbox CTAs (card heads, the phone's full-width verbs) keep the filled tint. A selection (the selected row, the settings category, a pressed
+   surface. Inbox CTAs (card heads, the phone's full-width verbs) keep the filled tint. **Verbs on a head band**
+   (council round 12 A2): on a card's coloured head band a 12% tint disappears into the band, so a verb there takes
+   `Button band`: 20% at rest, 26% on hover, 32% pressed, attention and danger alike, with its text pulled further
+   toward the ink (`text-attention-band-foreground` / `text-danger-band-foreground`: the status colour 60% in light,
+   50% in dark) so it holds AA on every state over the band. Both Inbox Review verbs are the same 28px trigger with the
+   same padding. A selection (the selected row, the settings category, a pressed
    toggle, the palette's highlighted row, a chosen card) is `bg-selected-wash`, a neutral warm grey step with no accent
    hue, with ink text. Indigo fills mean attention only, and a selection's cue is ink too. A
    selected list row, nav item, palette row or account row adds `selected-marker` (council round 10 A2: a straight
@@ -329,7 +339,11 @@ work on any surface.
    selected `place-seat`. **No bar beside a glyph, tile or mark.** Since council round 11 A1 a row whose first visual
    is a glyph, tile or mark draws none either (a status glyph, a project tile, a provider or model mark: the pill sat
    3–5px from it and crowded the leading column); the wash and the 550 title carry the selection, as in Linear and
-   Things. The kit finds its own leading
+   Things. **Selected edge.** Such a row adds `selected-edge` beside its wash (council round 12 A1; `SELECTED_EDGE` in
+   `components/selection`): a neutral 1px inset edge, `--dshx-selected-edge` (light `#88827d`, dark `#7f7974`; the
+   council's `#a39b93` held only 2.26:1 on the light wash), 3:1 against the wash on the page, the nav column and a
+   dialog, because the wash alone sits about 1.1:1 off the dark page. An inset shadow, so it moves nothing. The current
+   thread row and an account row take it; a pill row never does. The kit finds its own leading
    `StatusGlyph`, `ProjectMark`, `PlaceGlyph`, `ModelMark` and `NativeProviderMark`; a plugin row marks its own glyph
    with `LEADING_GLYPH_ATTRIBUTE` or opts the row out with `MARKER_OPT_OUT` (`components/selection`). Only plain-text
    rows keep the pill, and one exception: a selected Needs-you or Failed row keeps it (`MARKER_KEEP`,
@@ -389,7 +403,8 @@ work on any surface.
     in both schemes; light L 0.52–0.56 at chroma 0.14, dark L 0.78 at 0.13; a chroma floor of 0.12, or the sRGB edge
     where a hue ends lower (teal and blue in light, about 0.10 and 0.12), so no tone reads muddy; every hue 25° or more
     from the status hues (25, 80, 150, 270) and 40° or more from every other; every pair ΔE 0.06 or more; the glyph
-    3:1 on bg, panel, raised and its own 14% tile, the ink label AA on that tile. The phone tab bar uses the same tones.
+    3:1 on bg, panel, raised and its own 14% tile, the ink label AA on that tile. The phone tab bar uses the same tones,
+    on its current tab only.
     **Rail surface.** The rail is one surface in every state: the nav tone (`--dsw-specific-sidebar-fill`) beside a
     page on bg, whichever destination is open, whether its side column is open or folded. A destination never repaints
     the rail. **Active destination tab.** The active main tab of a destination page (Inbox, Backlog, Usage, Review,
@@ -401,8 +416,10 @@ work on any surface.
     tile of that tone, a 24px seat (`PlaceGlyph`, `components/ui/place-glyph`: `tone` for a nav place, `toneColor`
     for any identity tone; or `dshx:place-seat` with your own size and radius). The seat lights from the row's own
     `aria-current`, a tab's `aria-selected="true"` or Dockview's `.dv-active-tab`, and keeps its size either way, so
-    selecting never moves a row. On the phone tab bar every destination glyph is drawn in its tone at rest and the
-    active one keeps its tile and a 600 label; Inbox stays the secondary ink beside its badge. The selection bar, the
+    selecting never moves a row. **Phone tab bar: colour on the current tab only** (council round 12, reversing round
+    9 B3: on iOS a tinted glyph means selected, so tinted neighbours pulled the eye away from the current tab). Unselected
+    glyphs are the tertiary ink; the current one is drawn in its tone on its tile with a 600 label; Inbox keeps its
+    badge. The desktop rail keeps its always-toned glyphs: it is a launcher, not a tab bar. The selection bar, the
     wash and the label stay neutral ink: only the glyph and its tile carry colour. Page `h1` marks stay glyph-only.
     Glyph 3:1 and the ink label AA on the tile over bg, panel, raised and the selection wash, for every nav and
     identity tone (`plugin-ui/tests/place-glyph.test.tsx`).
@@ -505,9 +522,9 @@ the search field's filter or the ⋯ menu, never the toolbar.
 **Phone Inbox head.** Every phone Inbox card, the failed one included, takes the same two-line head. Line 1: the
 status glyph, the full title (wrapping to two lines, never cut for metadata) and the ⋯ menu, whose glyph sits 22px
 from the card edge. Line 2: the `ProjectMark`, the kind (Approval, Question, Turn failed…) and the age, at 13/400 in
-secondary ink. Titles win over the fold. The Needs you / Other / Done segmented row ends with a framed 44px ghost
-**Triage** button, the list-checks glyph and its label (never an icon alone, never in the top bar, which keeps its
-title and ⋯ only). When Needs you holds more than one status, its segment counts them as a tally (◆ 2 · ✕ 1: each
+secondary ink. Titles win over the fold. **Triage** is a worded 44px text button in the top bar's trailing seats,
+beside ⋯ (council round 11 C1: its label, never an icon alone); the Needs you / Other / Done segmented row carries no
+Triage control. When Needs you holds more than one status, its segment counts them as a tally (◆ 2 · ✕ 1: each
 status glyph and its tabular number 4px apart, no pill, a muted dot between; `PageTab` `statusCounts`, phone shell
 only), so a failure below the fold shows at first glance.
 
@@ -574,7 +591,9 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   edit, shell and subagent in identity tones; read and search neutral). A work row (a turn's "Worked for" header, a
   tool call, a summary line) is as wide as its content and no wider than that column; its duration or count follows the label after 8px, and its
   hover wash covers its own box. Only a block with a body (output, a diff, a test or job card, a question) takes the
-  message column. Everything docked above the composer shares the composer card's two edges.
+  message column. Everything docked above the composer shares the composer card's fill, but only the editable card
+  keeps the field edge: the dock's outline and its internal dividers are `border-l2` (`#dedcda` / `#2f2c29`; council
+  round 12 C1, after the dividers took the 3:1 edge), on desktop and phone.
 - **One Settings navigation.** While any Settings page is on stage (General or another), the side column stays open
   and lists, once each, the preference categories (General, Appearance, Keyboard shortcuts, Thread list, Layout,
   Composer, Transcript, Editor, Models & accounts…, grouped) and the Settings pages (AI accounts, MCP servers,
@@ -704,7 +723,9 @@ Finished / All) is a `ToggleGroup`.
 fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#88827d`, dark
 `#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); checkbox and radio
 edges use it too. A checkbox column in a dense table (AI accounts' "Show model") takes `Checkbox size="sm"` (council
-round 11 A5): the same 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke, no shadow. Dividers and card hairlines stay `border-border`, subtle. **Quiet triggers** (council round 10 A1).
+round 11 A5): the same 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke, no shadow; in light its
+checked fill is `control-on-dense`, `oklch(0.38 0.008 65)` (`#45423e`, council round 12 A3), so a column of checked
+boxes stops reading as black squares (3:1 on every surface, the tick 4.5:1 on it); dark keeps the on state. Dividers and card hairlines stay `border-border`, subtle. **Quiet triggers** (council round 10 A1).
 A control that opens a list and shows a value, the `Select` and `Combobox` triggers, `Button` `variant="field"` and the
 `select-look` utility (a Host select the kit does not draw), shares `triggerLook`: a filled chip, `bg-trigger-fill`
 (the ink at 5%, 5.2% dark, so `#f3f1ef` / `#201d1a` on the page and one visible step on a panel, the nav column, raised
@@ -777,8 +798,8 @@ meta chips · trailing inline verb`, with an optional muted description line and
 The middle is one button when the row selects; leading and trailing stay separate controls. Lists are one bordered
 card with hairline dividers. In narrow panes meta wraps under the title and trailing verbs drop to their own line.
 A selected row takes `bg-selected-wash` and the `selected-marker`, with its title at 550; a row that leads with its
-status glyph draws no pill (council round 11 A1), only the wash and the 550 title; a Needs-you or Failed row holds its
-attention wash instead.
+status glyph draws no pill (council round 11 A1), only the wash, the 550 title and, as the list's current item, the
+`selected-edge` (council round 12 A1); a Needs-you or Failed row holds its attention wash instead.
 
 **Live work row** (a subagent, a background job). One row in the EntityRow shape: `status glyph · name · muted
 current step · elapsed · Open`. While the work runs it lives in the dock above the composer, where it expands to its
@@ -789,8 +810,8 @@ no route or account id. One thing is never a card and a row on the same screen.
 **Dock row grammar** (council round 8 C3): every dock row reads `› glyph · Label · detail · elapsed · worded link ↗`,
 with one leading chevron per row: the label 13/500 sans ("Running" for a job), the detail 13 regular (a job's command
 in mono). The desktop dock attaches to the composer: the composer fill (`--dsw-specific-input-major`), the dock's top
-corners at `--dsw-radius-lg` and its bottom square, the composer card's ring as the one shared edge, and the card's
-top corners square under the dock.
+corners at `--dsw-radius-lg` and its bottom square, its outline and dividers in the quiet `border-l2` while the
+editable card alone keeps the 3:1 field edge, and the card's top corners square under the dock.
 
 **PageSection.** `h2` (section title) that names its `section` region, optional muted meta ("3 enabled") and actions.
 

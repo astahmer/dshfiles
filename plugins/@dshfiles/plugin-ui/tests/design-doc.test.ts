@@ -300,4 +300,27 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('with a tinted dot')
     expect(design).not.toContain('Prose reads at about 66ch')
   })
+
+  it('records the twelfth council pass: the selected edge, verbs on a band, dense checkbox ink, the phone tab bar, Triage, the quiet dock (council round 12 A5)', () => {
+    for (const text of [
+      '**Selected edge.**',
+      '`SELECTED_EDGE`',
+      "  selected-edge: '#88827d'",
+      "  selected-edge-dark: '#7f7974'",
+      '**Verbs on a head band**',
+      '`Button band`: 20% at rest, 26% on hover, 32% pressed',
+      '`control-on-dense`, `oklch(0.38 0.008 65)`',
+      '**Phone tab bar: colour on the current tab only**',
+      'Unselected\n    glyphs are the tertiary ink',
+      '**Triage** is a worded 44px text button in the top bar',
+      'only the editable card\n  keeps the field edge',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: Triage kept out of the top bar, every tab-bar glyph toned at rest, the dock sharing the
+    // composer's 3:1 edge.
+    expect(design).not.toContain('never in the top bar')
+    expect(design).not.toContain('every destination glyph is drawn in its tone at rest')
+    expect(design).not.toContain("shares the composer card's two edges")
+    expect(design).not.toContain("the composer card's ring as the one shared edge")
+  })
 })
