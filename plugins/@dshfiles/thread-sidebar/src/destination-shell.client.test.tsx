@@ -177,11 +177,11 @@ describe('DestinationShell', () => {
     // Council round 8 B4: no grey group; its rows keep their own icons, drawn in the Developer tone.
     for (const button of within(developer).getAllByRole('button', { name: /^(?:Component gallery|Plugin guide)$/u }))
       expect(button.querySelector('[data-section-icon] [data-settings-glyph]')?.getAttribute('data-settings-glyph')).toBe('developer')
-    // Round nine B1: its head is a Settings group head like the others, at their indent and 16px under the group above,
-    // with no rule of its own.
+    // Round nine B1: its head is a Settings group head like the others, at their indent and 20px under the group above
+    // (council round 13 B5), with no rule of its own.
     expect(developer.className).not.toContain('dshx:border-t')
-    expect(developer.className).toContain('dshx:mt-4')
-    expect(developer.querySelector('h3')?.className).toBe('dshx:px-2.5 dshx:pb-1 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground')
+    expect(developer.className).toBe('dshx:mt-5 dshx:flex dshx:flex-col dshx:gap-0.5')
+    expect(developer.querySelector('h3')?.className).toBe('dshx:px-2.5 dshx:pb-0.5 dshx:text-xs dshx:font-semibold dshx:tracking-[0.01em] dshx:text-(--dsw-alias-label-tertiary)')
     cleanup()
     DestinationSelection.set('settings')
     renderShell({ panels: developerPanels, showDeveloperPages: false })
@@ -293,6 +293,22 @@ describe('DestinationShell', () => {
     expect(general.className).not.toContain('selected-edge')
   })
 
+  it('heads each Settings group 12/600 in the tertiary ink, +0.01em, 20px under the group above and 4px over its first row (council round 13 B5)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: navigationOf(settingsState) })
+    const column = screen.getByRole('navigation', { name: 'Settings pages' })
+    const group = column.querySelector<HTMLElement>('[data-settings-group="models"]')
+    // 20px above: the group's top margin. 4px below: the head's 2px padding and the group's 2px row gap.
+    expect(group?.className).toMatch(/(^| )dshx:mt-5( |$)/u)
+    expect(group?.className).toContain('dshx:gap-0.5')
+    const head = group?.querySelector<HTMLElement>('h3')?.className ?? ''
+    for (const token of ['dshx:text-xs', 'dshx:font-semibold', 'dshx:tracking-[0.01em]', 'dshx:text-(--dsw-alias-label-tertiary)', 'dshx:pb-0.5'])
+      expect(head).toContain(token)
+    expect(head).not.toContain('dshx:text-sm')
+    expect(head).not.toContain('dshx:text-muted-foreground')
+  })
+
   it('lists Settings categories and pages in one list, each once, and the page drops its own list (council round 4 B1)', () => {
     setPhone(false)
     DestinationSelection.set('settings')
@@ -330,11 +346,8 @@ describe('DestinationShell', () => {
     for (const button of within(pages ?? list).getAllByRole('button'))
       expect(button.querySelector('[data-section-icon] [data-settings-glyph]')?.getAttribute('data-settings-glyph'), button.getAttribute('aria-label') ?? '').toBe('pages')
     const head = within(list).getByRole('group', { name: 'Models & accounts' }).querySelector('h3')
-    expect(head?.className).toContain('dshx:text-sm')
     expect(head?.className).toContain('dshx:font-semibold')
-    expect(head?.className).toContain('dshx:text-muted-foreground')
-    expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-4')
-    expect(head?.className).toContain('dshx:pb-1')
+    expect(within(list).getByRole('group', { name: 'Models & accounts' }).className).toContain('dshx:mt-5')
     // Council round 7 B2: the column keeps its "Settings" head on every Settings page (the page's h1 names the category),
     // so the list never jumps 36px between General and another Settings page.
     const columnTitle = screen.getByRole('heading', { level: 2, name: 'Settings' })

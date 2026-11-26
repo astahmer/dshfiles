@@ -64,6 +64,10 @@ describe.each(schemes)('thread list colour (%s)', scheme => {
     expect(PaletteMath.contrastRatio(p.accent.fg, p.selectedWash)).toBeGreaterThanOrEqual(3)
   })
 
+  it('keeps a Settings group head (12px, tertiary ink) at AA on the nav column (council round 13 B5)', () => {
+    expect(PaletteMath.contrastRatio(p.neutral[8]!, p.neutral[1]!)).toBeGreaterThanOrEqual(4.5)
+  })
+
   it('keeps every current phone tab glyph at 3:1 on the one neutral pill (council round 13 B2)', () => {
     // PHONE_TAB_PILL: the secondary ink at 14% over the tab bar's nav fill (tone-1). The tab tones from color-roles.css.
     const pill = composite(p.neutral[1]!, secondary, 0.14)

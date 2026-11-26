@@ -639,7 +639,13 @@ const DestinationGlyph = (props: { readonly icon: DestinationIcon }): JSX.Elemen
 /** The phone bar's title: the bar row's 17/22, at 600 (council round 4 B3, round 7 B5). */
 const PHONE_TITLE_CLASS = 'dshx:min-w-0 dshx:truncate dshx:font-semibold'
 
-const SETTINGS_GROUP_HEAD = 'dshx:px-2.5 dshx:pb-1 dshx:text-sm dshx:font-semibold dshx:text-muted-foreground'
+/**
+ * A Settings group head (council round 13 B5): 12/600 in the tertiary ink at +0.01em, a label over its rows rather than
+ * a second row of titles. 2px under it plus the group's 2px row gap: 4px over the first row.
+ */
+const SETTINGS_GROUP_HEAD = 'dshx:px-2.5 dshx:pb-0.5 dshx:text-xs dshx:font-semibold dshx:tracking-[0.01em] dshx:text-(--dsw-alias-label-tertiary)'
+/** A Settings group: 20px under the group above (council round 13 B5), its rows 2px apart. */
+const SETTINGS_GROUP = 'dshx:mt-5 dshx:flex dshx:flex-col dshx:gap-0.5'
 
 /**
  * The Settings column (council round 4 B1): Settings' categories by task group and the destination's pages, one list
@@ -674,9 +680,7 @@ const SettingsColumnList = (props: {
           role="group"
           aria-label={group.label}
           data-settings-group={group.id}
-          // Group heads 13/600 in the secondary ink (round five B5), 16px under the group above and 4px over their first
-          // row (council round 6 B3).
-          className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5 dshx:first:mt-0"
+          className={cn(SETTINGS_GROUP, 'dshx:first:mt-0')}
         >
           {group.named ? <h3 className={SETTINGS_GROUP_HEAD}>{group.label}</h3> : null}
           {group.rows.map(row => {
@@ -713,7 +717,7 @@ const SettingsColumnList = (props: {
         </div>
       ))}
       {rest.length === 0 ? null : (
-        <div role="group" aria-label="Pages" data-settings-group="pages" className="dshx:mt-4 dshx:flex dshx:flex-col dshx:gap-0.5">
+        <div role="group" aria-label="Pages" data-settings-group="pages" className={SETTINGS_GROUP}>
           <h3 className={SETTINGS_GROUP_HEAD}>Pages</h3>
           {props.rows(rest, 'pages')}
         </div>
@@ -843,10 +847,10 @@ const FolderIndex = (props: {
           </section>
         )}
         {developer.length === 0 ? null : (
-          // In Settings the group's head is one more Settings group head (round nine B1): the same step, indent and 16px
-          // above it, no rule of its own; elsewhere it stays a quiet label under a rule.
+          // In Settings the group's head is one more Settings group head (round nine B1): the same step, indent and room
+          // around it, no rule of its own; elsewhere it stays a quiet label under a rule.
           <section
-            className={folder.id === 'settings' ? 'dshx:mt-4' : 'dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3'}
+            className={folder.id === 'settings' ? SETTINGS_GROUP : 'dshx:mt-3 dshx:border-t dshx:border-border dshx:pt-3'}
             aria-label="Developer"
             data-destination-group="developer"
           >
