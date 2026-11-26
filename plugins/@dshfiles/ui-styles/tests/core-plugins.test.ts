@@ -255,6 +255,63 @@ describe('core Plugins multi-line rows (council round 10, D4)', () => {
   })
 })
 
+describe('core Plugins tiles are never solid (council round 11, D4)', () => {
+  /** The custom properties one row's rules set, the later rule winning, as the cascade resolves equal specificity. */
+  const propsOf = (needle: string): Record<string, string> =>
+    Object.fromEntries(
+      rules
+        .filter(([selector]) => selector.split(',').some(part => part.trim().endsWith(needle)))
+        .flatMap(([, body]) => [...body.matchAll(/(--dshx-plugin-(?:tone|glyph)):\s*([^;]+);/gu)].map(([, key = '', value = '']) => [key, value.trim()] as const)),
+    )
+  const glyphNamed = (value: string | undefined, path: string): boolean => (value ?? '').startsWith('url("data:image/svg+xml,') && (value ?? '').includes(path)
+
+  it('still renders the hooks: built-in item ids, inline artwork, and package images', () => {
+    expect(page.includes('ITEM_ARTWORK=new Map([[`shell`'), 'item artwork map').toBe(true)
+    for (const id of ['agent-loop', 'subagent', 'web-search']) expect(page.includes(`[\`${id}\`,`), id).toBe(true)
+    expect(/className:PluginManagerPage_module_css_default\.packageImage,src/u.test(page), 'package image').toBe(true)
+  })
+
+  it('redraws inline artwork (built-in items, the default art) as an 18px outline glyph in the tile tone', () => {
+    const hide = rules.find(([selector]) => selector.includes(":has(> svg) > svg"))
+    expect(hide?.[1]).toMatch(/display:\s*none;/u)
+    const mark = rules.find(([selector]) => selector.includes(':has(> svg)::before'))?.[1] ?? ''
+    expect(mark).toMatch(/flex:\s*0 0 18px;/u)
+    expect(mark).toMatch(/height:\s*18px;/u)
+    expect(mark).toMatch(/background-color:\s*var\(--dshx-plugin-tone\);/u)
+    expect(mark).toMatch(/mask:\s*var\(--dshx-plugin-glyph\) center \/ 18px 18px no-repeat;/u)
+    // Default glyph: lucide `puzzle` at the Settings column's 1.5 stroke.
+    const frame = ruleFor('[data-plugin-panel][data-plugin-panel] {')
+    expect(frame).toMatch(/--dshx-plugin-glyph:\s*url\("data:image\/svg\+xml,[^"]*stroke-width='1\.5'[^"]*M15\.39 4\.39/u)
+  })
+
+  it('draws named built-ins with their Settings column glyph and group tone: Subagents rose, Web search copper', () => {
+    const subagent = propsOf("li[data-plugin-item='subagent']")
+    expect(subagent['--dshx-plugin-tone']).toBe('var(--dshx-identity-4)')
+    expect(glyphNamed(subagent['--dshx-plugin-glyph'], "M7 11v4a2 2 0 0 0 2 2h4"), 'workflow').toBe(true)
+    const web = propsOf("li[data-plugin-item='web-search']")
+    expect(web['--dshx-plugin-tone']).toBe('var(--dshx-identity-3)')
+    expect(glyphNamed(web['--dshx-plugin-glyph'], 'M12 2a14.5 14.5 0 0 0 0 20'), 'globe').toBe(true)
+    const loop = propsOf("li[data-plugin-item='agent-loop']")
+    expect(loop['--dshx-plugin-tone']).toBe('var(--dshx-identity-4)')
+    expect(glyphNamed(loop['--dshx-plugin-glyph'], 'm17 2 4 4-4 4'), 'repeat').toBe(true)
+    expect(glyphNamed(propsOf("li[data-plugin-item='shell']")['--dshx-plugin-glyph'], 'm7 11 2-2-2-2'), 'square-terminal').toBe(true)
+  })
+
+  it('draws DSH packages whose artwork is a filled block as an outline glyph instead of a solid silhouette', () => {
+    for (const [name, path] of [
+      ['/dsh-experimental-auto-review', 'm9 12 2 2 4-4'],
+      ['/dsh-experimental-forge-bundle', "M13 6h3a2 2 0 0 1 2 2v7"],
+      ['/dsh-experimental-plugin-market-bundle', 'M10 22V7a1 1 0 0 0-1-1H4'],
+    ] as const) {
+      expect(glyphNamed(propsOf(`li[data-plugin-package$='${name}']`)['--dshx-plugin-glyph'], path), name).toBe(true)
+      const hidden = rules.find(([selector, body]) => selector.includes(`[data-plugin-package$='${name}']`) && selector.includes("[class*='_cardIcon'] > *") && /display:\s*none;/u.test(body))
+      expect(hidden, `${name} hides its image`).toBeDefined()
+      const drawn = rules.find(([selector]) => selector.includes(`[data-plugin-package$='${name}']`) && selector.includes("[class*='_cardIcon']::before"))
+      expect(drawn, `${name} draws the glyph`).toBeDefined()
+    }
+  })
+})
+
 describe('core Plugins header (council round 7, D1 and D5)', () => {
   it('still renders the toolbar, its Refresh button and the title hooks', () => {
     expect(page.includes('"data-plugin-toolbar"') || page.includes('data-plugin-toolbar'), 'toolbar').toBe(true)
