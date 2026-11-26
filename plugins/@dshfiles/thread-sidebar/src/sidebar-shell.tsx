@@ -34,7 +34,6 @@ import {
   ChevronUpIcon,
   CircleCheckIcon,
   CommandIcon,
-  EllipsisIcon,
   GripVerticalIcon,
   LinkIcon,
   MessageSquareIcon,
@@ -53,6 +52,7 @@ import {
   TextCursorInputIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { useCopyFeedback } from '@dshfiles/plugin-ui/hooks/copy-feedback'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -1734,7 +1734,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                       className={cn('dshx:shrink-0 dshx:text-muted-foreground', wide && 'dshx:ml-auto')}
                       aria-label={text(props.t, 'threadSidebarMore')}
                     >
-                      <EllipsisIcon strokeWidth={1.5} size={16} />
+                      <OverflowGlyph />
                     </Button>
                   </PopoverTrigger>
                 </TooltipTrigger>

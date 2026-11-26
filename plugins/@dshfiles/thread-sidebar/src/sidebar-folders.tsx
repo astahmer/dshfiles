@@ -26,7 +26,6 @@ import {
   BugIcon,
   CodeIcon,
   DatabaseIcon,
-  EllipsisIcon,
   EyeIcon,
   FlaskConicalIcon,
   FolderIcon,
@@ -45,6 +44,7 @@ import {
   ZapIcon,
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { SidebarFolderTargets, WorkbenchPorts } from '@dshfiles/workbench/shell-merge'
@@ -341,7 +341,7 @@ export const EntryMenu = (props: { readonly entry: ResolvedEntry; readonly folde
           data-sidebar-entry-menu=""
           className="dshx:flex dshx:size-6 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:opacity-0 dshx:outline-none dshx:group-hover/row:opacity-100 dshx:hover:bg-accent dshx:focus-visible:opacity-100 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:data-[state=open]:opacity-100"
         >
-          <EllipsisIcon className="dshx:size-3.5" aria-hidden="true" />
+          <OverflowGlyph />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-56">
@@ -443,7 +443,7 @@ export const FolderMenu = (props: { readonly folder: ResolvedFolder; readonly ui
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon-xs" className="dshx:text-muted-foreground" aria-label={`Folder options: ${folder.title}`}>
-          <EllipsisIcon className="dshx:size-3.5" aria-hidden="true" />
+          <OverflowGlyph />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:w-48">

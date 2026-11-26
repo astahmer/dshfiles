@@ -10,7 +10,8 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
-import { MoreVerticalIcon, RefreshCwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { RefreshCwIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ThreadSidebarLocaleKey } from './locales.js'
 import { UsageLimitRowsModel, type UsageLimitRow } from './usage-limit-rows.js'
@@ -138,7 +139,7 @@ export const UsageLimitSection = <Thread extends UsageLimitThread>(props: UsageL
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button aria-label={t('threadSidebarUsageLimitOptions')} disabled={busy} size="icon-xs" type="button" variant="ghost">
-                  <MoreVerticalIcon className="dshx:size-3.5" />
+                  <OverflowGlyph />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">

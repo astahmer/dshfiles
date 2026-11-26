@@ -115,7 +115,6 @@ import {
   CircleCheckIcon,
   CircleDashedIcon,
   CirclePauseIcon,
-  EllipsisIcon,
   FolderIcon,
   GripVerticalIcon,
   GitBranchIcon,
@@ -139,6 +138,7 @@ import {
   UsersIcon,
   XIcon,
 } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { PhoneLayout } from './phone-layout.js'
 import { ThreadMenu, type ThreadMenuEntries, type ThreadMenuKit } from './thread-menu.js'
@@ -2148,7 +2148,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       aria-haspopup="menu"
                       onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
                     >
-                      <EllipsisIcon className="dshx:size-3.5" aria-hidden="true" />
+                      <OverflowGlyph />
                     </Button>,
                   )}
                 </div>
@@ -2168,7 +2168,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               className="dshx:absolute dshx:top-1 dshx:right-1 dshx:hidden dshx:text-muted-foreground dshx:pointer-coarse:inline-flex"
               onClick={event => ThreadRowMenu.open(rowRef.current, event.currentTarget)}
             >
-              <EllipsisIcon className="dshx:size-4" aria-hidden="true" />
+              <OverflowGlyph />
             </Button>
           ) : null}
         </div>
