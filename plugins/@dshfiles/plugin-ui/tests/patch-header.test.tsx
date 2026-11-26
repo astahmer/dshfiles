@@ -6,9 +6,10 @@ import { PaletteMath, WARM_STONE, type Oklch } from '../src/theme/palette.ts'
 
 /** `over` at `alpha` on `under`, mixed in oklab as Tailwind's `/12` opacity (`color-mix(in oklab, …)`) paints it. */
 const tintOver = (under: Oklch, over: Oklch, alpha: number): Oklch => {
-  const lab = ({ l, c, h }: Oklch): readonly [number, number, number] => [l, c * Math.cos((h * Math.PI) / 180), c * Math.sin((h * Math.PI) / 180)]
+  const lab = ({ l, c, h }: Oklch) => ({ l, a: c * Math.cos((h * Math.PI) / 180), b: c * Math.sin((h * Math.PI) / 180) })
   const [u, o] = [lab(under), lab(over)]
-  const [l, a, b] = u.map((value, i) => value * (1 - alpha) + (o[i] ?? 0) * alpha) as [number, number, number]
+  const mix = (from: number, to: number): number => from * (1 - alpha) + to * alpha
+  const [l, a, b] = [mix(u.l, o.l), mix(u.a, o.a), mix(u.b, o.b)]
   const h = (Math.atan2(b, a) * 180) / Math.PI
   return { l, c: Math.hypot(a, b), h: h < 0 ? h + 360 : h }
 }

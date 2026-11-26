@@ -16,7 +16,7 @@ const composite = (under: Oklch, over: Oklch, alpha: number): Oklch => {
   return PaletteMath.hexToOklch(`#${u.map((value, i) => Math.round(value * (1 - alpha) + (o[i] ?? 0) * alpha).toString(16).padStart(2, '0')).join('')}`)
 }
 
-const surfacesOf = (input: PaletteInput): Record<string, Oklch> => {
+const surfacesOf = (input: PaletteInput) => {
   const p = PaletteMath.palette(input)
   const dark = input.scheme === 'dark'
   const chip = (under: Oklch): Oklch => composite(under, p.triggerFill, p.triggerFill.alpha ?? 1)
@@ -32,7 +32,7 @@ const surfacesOf = (input: PaletteInput): Record<string, Oklch> => {
   }
 }
 
-const weakest = (edge: Oklch, surfaces: Record<string, Oklch>): number => Math.min(...Object.values(surfaces).map(surface => PaletteMath.contrastRatio(edge, surface)))
+const weakest = (edge: Oklch, surfaces: ReturnType<typeof surfacesOf>): number => Math.min(...Object.values(surfaces).map(surface => PaletteMath.contrastRatio(edge, surface)))
 
 describe('field resting edge (council round 18 A1)', () => {
   it.each(schemes)('is the lightest edge that still holds 3:1 on every surface (%s)', scheme => {
