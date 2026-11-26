@@ -50,6 +50,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 22 (round-20 shots + subagent shots) | 9 | 9 (Astra) | 9 (Fable, for Mistral) | Round seven. 01–14 hold 9.5; subagent shots 7.5–9: phone dock rows lose task names, failures hard to see, four counts, phone child doesn't name its parent |
 | 23 (round-21 shots + subagent shots) | 9 | 9 (Astra) | **9.5** (Fable, for Mistral) | Child views at 9.5; the parent views hold 9: transcript group shows no live state, failed count drawn four ways, text cut under the desktop dock, the phone dock is three boxes |
 | 24 (round-22 shots + subagent shots) | 9 | **9.5** (Astra) | **9.5** (Fable, for Mistral) | Astra and Fable at target; Opus: transcript model/outcome columns, the failed child's model, the phone dock end, one selected look, one clock |
+| 25 (round-23 shots + subagent shots) | 9 | 9 (Astra) | 9 (Fable, for Mistral) | No increase (first). All three: the phone transcript row for the call that never started clips its title |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -409,6 +410,10 @@ All lanes done: T `smloxzzl` … `rnqknptn` (the unknown model's seat and one mo
 group, "Failed" on child rows with the model whole, the root row's selected edge on child rows, no clock in the desktop
 child header); D `uzwozxru` … `xpznqqop` (a two-row phone dock frame whose last row rests on its edge, fades only on an
 edge that can still scroll, a fade under the phone top bar). The capture now opens the phone dock at its first row.
+Round 25 findings, merged in `.cache/unslop-audit/r5/council/round-25-fixes.md`: the clipped phone row stacked on two
+lines with its task whole, one type size per role and task names leading in transcript subagent rows, bare model ids in
+AI accounts, the dock's last row height, one quiet Stop in Send's seat. If round 26 brings no increase, round seven
+stops.
 
 ## Round four
 
