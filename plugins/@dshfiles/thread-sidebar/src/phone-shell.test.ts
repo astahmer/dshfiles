@@ -121,17 +121,3 @@ describe('PhoneTopBarModel', () => {
     })
   })
 })
-
-describe('phone thread bar subtitle (council round 7 B5)', () => {
-  const labels = { working: 'Working', subagents: (count: number) => (count === 1 ? '1 subagent' : `${String(count)} subagents`) }
-
-  it('names the subagents, with the working glyph while any of them or the thread works, as the desktop header does', () => {
-    expect(PhoneTopBarModel.subtitle({ working: true, subagents: 1, labels })).toEqual({ working: true, label: '1 subagent' })
-    expect(PhoneTopBarModel.subtitle({ working: false, subagents: 2, labels })).toEqual({ working: false, label: '2 subagents' })
-  })
-
-  it('says Working for a working thread without subagents, and nothing for a quiet one', () => {
-    expect(PhoneTopBarModel.subtitle({ working: true, subagents: 0, labels })).toEqual({ working: true, label: 'Working' })
-    expect(PhoneTopBarModel.subtitle({ working: false, subagents: 0, labels })).toBeUndefined()
-  })
-})

@@ -870,14 +870,14 @@ describe('DestinationShell', () => {
     expect(chevron.className).toContain('dshx:after:w-11')
   })
 
-  it('on a phone, titles a thread 17/600 over a 13px muted line with its status glyph and subagents (council round 7 B5)', () => {
+  it('on a phone, titles a thread 17/600 on one 44px line, its status glyph before the title, no subagent line (council round 13 B6)', () => {
     setPhone(true)
     renderShell({
       collapsed: true,
       selectedThreadId: 'session-1',
       stageThreadId: 'session-1',
       stageTitle: 'Fix invoice tax rounding',
-      stageSubtitle: { working: true, label: '1 subagent' },
+      stageWorking: true,
     })
     const title = document.querySelector('[data-phone-title]')
     expect(title?.textContent).toBe('Fix invoice tax rounding')
@@ -886,18 +886,20 @@ describe('DestinationShell', () => {
     expect(title?.className).toContain('dshx:font-semibold')
     expect(title?.className).not.toContain('dshx:font-bold')
     expect(title?.className).not.toMatch(/dshx:text-(xl|lg|title|\[20px\])/u)
-    const subtitle = document.querySelector('[data-phone-subtitle]')
-    expect(subtitle?.textContent).toContain('1 subagent')
-    // 13px: the kit's text-sm.
-    expect(subtitle?.className).toContain('dshx:text-sm')
-    expect(subtitle?.className).toContain('dshx:text-muted-foreground')
-    expect(subtitle?.querySelector('[data-status]')?.getAttribute('data-status')).toBe('working')
-    // Title and subtitle stack in one cell after the chevron.
-    expect(title?.parentElement?.contains(subtitle ?? null)).toBe(true)
-    cleanup()
-    // A page keeps its one centred line.
-    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageSubtitle: { working: true, label: '1 subagent' } })
+    // The Live work strip counts the subagents; the bar keeps one line, the working glyph leading the title.
     expect(document.querySelector('[data-phone-subtitle]')).toBeNull()
+    expect(document.querySelector('[data-phone-bar-layout]')?.className).toContain('dshx:h-11')
+    expect(title?.firstElementChild?.getAttribute('data-status')).toBe('working')
+    expect(title?.className).toContain('dshx:flex')
+    expect(title?.querySelector('[data-phone-title-text]')?.className).toContain('dshx:truncate')
+    cleanup()
+    // A quiet thread draws no glyph.
+    renderShell({ collapsed: true, selectedThreadId: 'session-1', stageThreadId: 'session-1', stageTitle: 'Fix invoice tax rounding' })
+    expect(document.querySelector('[data-phone-title] [data-status]')).toBeNull()
+    cleanup()
+    // A page keeps its one centred line, no glyph.
+    renderShell({ collapsed: true, activePanelId: 'dshfiles-settings', stageWorking: true })
+    expect(document.querySelector('[data-phone-title] [data-status]')).toBeNull()
   })
 })
 

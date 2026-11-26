@@ -4,7 +4,7 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
-import { plural, useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
 import { SettingsNavigation } from '@dshfiles/settings-shell/settings-navigation'
 import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
 import {
@@ -69,7 +69,7 @@ import {
   type ReactNode,
   type Ref,
 } from 'react'
-import { PendingPick, PhoneTopBarModel, SETTINGS_PANEL_ID } from './phone-shell.js'
+import { PendingPick, SETTINGS_PANEL_ID } from './phone-shell.js'
 import { StageCover } from './stage-cover.js'
 import { SidebarOrganization, type OrderedSidebarEntry, type SidebarPreferences, type ThreadRowAction } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
@@ -297,18 +297,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const stageTitle = props.useSessions(state =>
     stageThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === stageThread)?.displayTitle,
   )
-  // The phone thread bar's second line (council round 7 B5): its direct subagents, and whether it or one of them works.
-  const stageSubagents = props.useSessions(state =>
-    stageThread === undefined ? 0 : Object.values(state.byId).filter(session => session.parentId === stageThread).length,
-  )
+  // The phone thread bar's glyph (council round 13 B6): whether the thread or one of its subagents works.
   const stageWorking = props.useSessions(
     state => stageThread !== undefined && Object.values(state.byId).some(session => (session.id === stageThread || session.parentId === stageThread) && session.running),
   )
-  const stageSubtitle = PhoneTopBarModel.subtitle({
-    working: stageWorking,
-    subagents: stageSubagents,
-    labels: { working: text(props.t, 'threadSidebarWorking'), subagents: count => plural(props.t, 'subagentCount', count) },
-  })
   // The stage Session follows a tap only once the thread opens; until then the bar names the pick from the list.
   const [pickSeen, setPickSeen] = useState({ pick: pickedThread, stage: stageSession })
   if (pickSeen.pick !== pickedThread) setPickSeen({ pick: pickedThread, stage: stageSession })
@@ -1433,7 +1425,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             record={recordNavigation}
             folderUi={folderUi}
             stageTitle={stageTitle}
-            stageSubtitle={stageSubtitle}
+            stageWorking={stageWorking}
             pendingTitle={pendingTitle}
             // The Workbench's thread panel (a bottom sheet on a phone) through its registered command; none without it.
             togglePanels={props.runCommand === null ? null : () => void props.runCommand?.(THREAD_PANEL_COMMAND_ID)}
