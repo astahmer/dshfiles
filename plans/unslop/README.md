@@ -189,6 +189,16 @@ Round 9 findings, merged in `.cache/unslop-audit/r5/council/round-9-fixes.md`: o
 title; a labelled phone Triage button; Settings on a 720 px form frame with one select width; a selected place carries its
 tone (tile behind the glyph on selected nav rows and the active tab, tones on the phone tab bar); a calmer dark on-state;
 one phone gutter and header grid; Usage stats matching the chart; Backlog's status as a menu and its view renamed Triage.
+All four lanes done: A kit 6 revisions `ksownsxp` … `tkqyumnx` (PlaceGlyph selected-place tile, 720 px form frame,
+field button size, dark on-state at L 0.82, 1.5 px card edge, DESIGN.md); B 8 revisions `upkyyxqn` … `zlwrrxpy` (tones on
+every phone tab glyph, one toolbar field height and the 12/24 phone gutter, Settings on the form frame with 176 px
+selects, Developer head, list fade that switches off under a selected row instead of scrolling, phone Settings inset
+separators, place tiles on selected side-column rows and the active tab, leaf glyphs on the AI accounts and Plugins
+tabs); C 7 revisions `mornvuwz` … `qrlrryzt` (two-line phone Inbox heads with the full title, mono command block, worded
+Triage, Turn failed and a text Review, phone Live work attached to the composer, arrow-down-to-line, the phone gutter on
+Inbox and transcript); D 6 revisions `tnskmzqs` … `nokkloqo` (one edged spend leaf, Totals header with Cost/Tokens/
+Requests, Backlog status menu and Triage view, toolbar field heights, Show this account / Show model with a hidden note).
+Follow-ups: phone Settings › AI accounts stacks two back headers; Usage's default chart metric is Cost.
 
 ## Round four
 
