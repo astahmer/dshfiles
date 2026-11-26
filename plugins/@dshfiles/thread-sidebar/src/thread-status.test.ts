@@ -121,6 +121,21 @@ describe('thread status', () => {
     expect(ThreadStatusModel.statusOf(input({ failedTurn, archived: true })).status).toBe('done')
   })
 
+  it('reads a subagent whose turn failed as Failed on its own row, and leaves it out of its parent\'s roll-up (round 21 D4)', () => {
+    // The provider refused the child's turn: its finish is unread, so before this it read Ready.
+    const failedTurn = { at: NOW - 5_000, reason: 'error' } as const
+    const failed = ThreadStatusModel.childStatusOf(input({ unread: true, failedTurn }))
+    expect(failed.row).toMatchObject({ status: 'failed', detail: 'Turn failed' })
+    expect(failed.rollup.status).toBe('ready')
+    // A child the user stopped keeps its own status: no failure, the two agree.
+    const stopped = ThreadStatusModel.childStatusOf(input({ unread: true }))
+    expect(stopped.row).toBe(stopped.rollup)
+    expect(stopped.row.status).not.toBe('failed')
+    // A working parent with a failed child stays Working.
+    const parent = ThreadStatusModel.statusOf(input({ running: true }), [failed.rollup], COPY)
+    expect(parent.status).toBe('working')
+  })
+
   it('offers Review on a failed row whose provider names no verb, like a Needs-you row (council round 4 B4)', () => {
     const failedTurn = { at: NOW, reason: 'error' } as const
     expect(ThreadStatusModel.statusOf(input({ failedTurn })).verb).toBe('Review')

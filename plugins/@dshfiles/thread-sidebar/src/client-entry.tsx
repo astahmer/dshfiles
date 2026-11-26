@@ -52,6 +52,7 @@ import type { SubagentPreviewBindings } from './subagent-provenance/subagent-liv
 import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
 import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { subagentRunFold } from './subagent-provenance/subagent-run-fold.js'
+import { SubagentFailedTurns } from './subagent-provenance/subagent-failed-turns.js'
 import { TranscriptRunFolds } from '@dshfiles/chat/run-folds'
 import { ThreadWorkStatusSources } from './thread-status-client.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
@@ -1034,6 +1035,8 @@ export default defineClient({
     )
     const SubagentRow = decorate((props: SubagentToolViewProps) => <SubagentProvenanceToolRow {...props} preview={subagentPreview} />)
     // Two or more consecutive subagent rows fold into one transcript row (b:7rv2).
+    // Every subagent surface reads a child's failed turn through this one client, the fold included (round 21 D4).
+    ctx.effect(() => SubagentFailedTurns.bind(ctx), 'thread-sidebar: subagent failed turns')
     plugin?.add(TranscriptRunFolds, subagentRunFold({ t: translate, count: subagentCount }))
     // The list's one status per thread, for the tab, the header and the palette (thread-status-client).
     plugin?.add(ThreadWorkStatusSources, { getSnapshot: threadWorkStatusStore.getSnapshot, subscribe: threadWorkStatusStore.subscribe })

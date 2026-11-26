@@ -1,6 +1,8 @@
 import type { UseSessions, UseSessionStatus } from '@deepseek-ai/dsh-client-ui-session/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { useMemo } from 'react'
+import { useSubagentFailedTurns } from './subagent-failed-turns.js'
+import { SubagentFeedModel, type SubagentTerminal } from './subagent-feed.js'
 
 /** What both seats of a subagent (the dock row and the transcript record row) know about the child. */
 export interface SubagentState {
@@ -8,8 +10,8 @@ export interface SubagentState {
   readonly working: boolean
   /** Browser clock, epoch ms, of the open turn's start; the dock's clock. */
   readonly since: number | undefined
-  /** Whether the latest closed turn completed; undefined while a turn is open or before one closed. */
-  readonly lastTurnCompleted: boolean | undefined
+  /** How the latest closed turn ended (completed, failed, stopped); undefined while a turn is open or before one closed. */
+  readonly terminal: SubagentTerminal | undefined
   /** Time the child worked over its closed turns; the record row's `Done · 5m 02s`. */
   readonly settledMs: number | undefined
 }
@@ -31,8 +33,19 @@ export const useSubagentState = (input: {
   const since = input.useSessions(list => timing(list)?.active?.since)
   const lastTurnCompleted = input.useSessions(list => timing(list)?.lastTurnCompleted)
   const settledMs = input.useSessions(list => timing(list)?.settledMs)
-  return useMemo(
-    () => ({ working: running ?? since !== undefined, since, lastTurnCompleted, settledMs }),
-    [running, since, lastTurnCompleted, settledMs],
-  )
+  const failedTurn = useSubagentFailedTurns().has(childId ?? '')
+  return useMemo(() => {
+    const working = running ?? since !== undefined
+    return { working, since, terminal: SubagentFeedModel.terminalOf({ running: working, failedTurn, lastTurnCompleted }), settledMs }
+  }, [running, since, failedTurn, lastTurnCompleted, settledMs])
 }
+
+/**
+ * How a child's latest turn ended, for a surface that draws one child and holds the session hooks (the phone header,
+ * round 21 D4): `completed`, `failed` or `stopped`; undefined while it works or before a turn closed.
+ */
+export const useSubagentTerminal = (input: {
+  readonly childId: string | undefined
+  readonly useSessions: UseSessions
+  readonly useSessionStatus: UseSessionStatus
+}): SubagentTerminal | undefined => useSubagentState(input).terminal

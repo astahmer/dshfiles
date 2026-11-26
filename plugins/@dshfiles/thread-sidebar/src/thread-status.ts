@@ -242,6 +242,16 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
   return { ...rolled, group: input.draft === true && !input.pinned ? 'draft' : groupOf(rolled.status, input.pinned) }
 }
 
+/**
+ * A subagent's two statuses (round 21 D4). Its own row reads Failed while its last turn failed (the Host's failed-turn
+ * record), so a child whose provider refused it no longer reads Ready or Idle. Its parent's roll-up leaves that failure
+ * out: a subagent's failed turn is its parent's tool result, which the parent's own turn answers.
+ */
+const childStatusOf = (input: ThreadStatusInput): { readonly row: ThreadStatus; readonly rollup: ThreadStatus } => {
+  const rollup = statusOf({ ...input, failedTurn: undefined })
+  return { row: input.failedTurn === undefined ? rollup : statusOf(input), rollup }
+}
+
 /** Pinned threads keep their glyph but sit above every group; Failed shares the Needs you group (§4.8). */
 const groupOf = (status: WorkStatus, pinned: boolean): Exclude<ThreadStatusGroup, 'draft'> => {
   if (pinned) return 'pinned'
@@ -354,6 +364,7 @@ const stoppedTurnOf = (
 export class ThreadStatusModel {
   static readonly stoppedTurnOf = stoppedTurnOf
   static readonly statusOf = statusOf
+  static readonly childStatusOf = childStatusOf
   static readonly ownStatus = ownStatus
   static readonly groupOf = groupOf
   static readonly groupEntries = groupEntries

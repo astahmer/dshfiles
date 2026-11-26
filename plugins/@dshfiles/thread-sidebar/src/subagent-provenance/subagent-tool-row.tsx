@@ -11,7 +11,7 @@ import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { JsonText } from '../json-text.js'
-import { SubagentFeedModel } from './subagent-feed.js'
+import { SubagentFeedModel, type SubagentTerminal } from './subagent-feed.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
 import { useSubagentState } from './subagent-state.js'
 import { SubagentRouteLabelModel } from './route-label.js'
@@ -49,7 +49,7 @@ const endingOf = (
   settledMs: number | undefined,
 ): readonly string[] => {
   if (state === 'finished') return settledMs === undefined || settledMs < 1_000 ? [subagentStateLabel(t, state)] : [subagentStateLabel(t, state), formatElapsed(settledMs)]
-  if (state === 'interrupted' || state === 'failed-to-start') return [subagentStateLabel(t, state)]
+  if (state === 'interrupted' || state === 'failed' || state === 'failed-to-start') return [subagentStateLabel(t, state)]
   return []
 }
 
@@ -80,13 +80,13 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   // The result only says the child started; the child's own state is what the row reports from here on.
   const output = childId === undefined ? result : undefined
   const child = useSubagentState({ childId, useSessions: props.useSessions, useSessionStatus: props.useSessionStatus })
-  const [feedTurn, setFeedTurn] = useState<boolean | undefined>(undefined)
+  const [feedTurn, setFeedTurn] = useState<SubagentTerminal | undefined>(undefined)
   const state = SubagentFeedModel.stateOf({
     phase: props.phase,
     failed: props.phase === 'result' && props.block.isError,
     childId,
     running: child.working,
-    lastTurnCompleted: feedTurn ?? child.lastTurnCompleted,
+    terminal: feedTurn ?? child.terminal,
   })
   const task = args?.description?.trim() || catalogLabel?.trim() || undefined
   const title = [props.preview.t('subagentPreviewKind'), task, ...endingOf(props.preview.t, state, child.settledMs)]

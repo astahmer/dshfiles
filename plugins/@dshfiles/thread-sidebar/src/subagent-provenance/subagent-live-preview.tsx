@@ -3,7 +3,7 @@ import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import type { THREAD_SIDEBAR_LOCALE_NAMESPACE } from '../locales.js'
-import { createSubagentFeedStore, type SubagentFeed, type SubagentFeedStore, type SubagentPreviewState } from './subagent-feed.js'
+import { createSubagentFeedStore, type SubagentFeed, type SubagentFeedStore, type SubagentPreviewState, type SubagentTerminal } from './subagent-feed.js'
 import { ToolSteps } from '../tool-steps.js'
 import { failureMessage, useSubagentStop } from './subagent-stop.js'
 
@@ -25,6 +25,7 @@ const STATE_KEY = {
   'failed-to-start': 'subagentPreviewFailedToStart',
   working: 'subagentPreviewWorking',
   finished: 'subagentPreviewFinished',
+  failed: 'subagentPreviewFailed',
   interrupted: 'subagentPreviewInterrupted',
 } as const satisfies Record<SubagentPreviewState, string>
 
@@ -96,11 +97,11 @@ const StopChild = (props: { readonly binding: SessionBinding; readonly t: Subage
 const FeedLine = (props: {
   readonly store: SubagentFeedStore
   readonly t: SubagentPreviewTranslate
-  readonly onTurnState: (lastTurnCompleted: boolean | undefined) => void
+  readonly onTurnState: (lastTurnEnd: SubagentTerminal | undefined) => void
 }): JSX.Element => {
   const feed: SubagentFeed = useSyncExternalStore(props.store.subscribe, props.store.getSnapshot)
   const { onTurnState } = props
-  useEffect(() => onTurnState(feed.lastTurnCompleted), [feed.lastTurnCompleted, onTurnState])
+  useEffect(() => onTurnState(feed.lastTurnEnd), [feed.lastTurnEnd, onTurnState])
   return (
     <>
       <p className="dshx:text-muted-foreground" data-dshfiles-live-preview-progress="">
@@ -125,7 +126,7 @@ export const SubagentLivePreview = (
   props: SubagentPreviewBindings & {
     readonly childId: string
     readonly state: SubagentPreviewState | undefined
-    readonly onTurnState: (lastTurnCompleted: boolean | undefined) => void
+    readonly onTurnState: (lastTurnEnd: SubagentTerminal | undefined) => void
     /** Off when the surface around the preview already renders Stop and Open thread. */
     readonly showActions?: boolean
     /** Off when the row around the preview already has Open thread (the dock row does). */

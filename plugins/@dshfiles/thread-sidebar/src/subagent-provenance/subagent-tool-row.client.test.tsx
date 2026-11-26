@@ -7,6 +7,10 @@ import { PartialArguments } from '@deepseek-ai/dsh-util-values'
 import type { SubagentPreviewBindings } from './subagent-live-preview.js'
 import { SubagentProvenanceToolRow } from './subagent-tool-row.js'
 
+/** The Host's failed-turn record the row reads (round 21 D4); a test fills it per case. */
+const failedTurns = vi.hoisted(() => new Map<string, { readonly sessionId: string; readonly failedAt: number; readonly reason: 'error' | 'max-tokens' }>())
+vi.mock('./subagent-failed-turns.js', () => ({ useSubagentFailedTurns: () => failedTurns }))
+
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   DisclosureRow: ({
     title,
@@ -164,7 +168,10 @@ const settled = (input: {
 
 const previewRoot = () => document.querySelector('[data-dshfiles-live-preview="agent"]')
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  failedTurns.clear()
+})
 
 describe('SubagentProvenanceToolRow', () => {
   it('names the row by the task the parent gave, with no generated handle and no route', () => {
@@ -236,6 +243,32 @@ describe('SubagentProvenanceToolRow', () => {
     rerender(<SubagentProvenanceToolRow {...settled({})} />)
     expect(previewRoot()?.getAttribute('data-state')).not.toBe('idle')
     expect(document.body.textContent).not.toMatch(/idle/iu)
+  })
+
+  it('says Failed for a child whose turn failed, and keeps Stopped for one the user stopped (round 21 D4)', () => {
+    // The provider refused the child's turn: `subagentTiming` says only that it did not complete.
+    failedTurns.set(CHILD, { sessionId: CHILD, failedAt: 1, reason: 'error' })
+    const { rerender } = render(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)
+    expect(previewRoot()?.getAttribute('data-state')).toBe('failed')
+    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewFailed')).not.toBeNull()
+    failedTurns.clear()
+    rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false, preview: previewBindings() })} />)
+    expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
+    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewInterrupted')).not.toBeNull()
+  })
+
+  it('reads how the turn ended from the open child\'s own events, as DSH writes them (round 21 D4)', async () => {
+    // A real `turn/end` carries `{ kind }`; the feed read it as a string, so an open preview said Stopped for every end.
+    const events = [{ type: 'event', event: { type: 'turn/end', seq: 2, time: 2, data: { turn: 1, reason: { kind: 'completed' } } } }]
+    const eventSource = {
+      getSnapshot: () => ({ entries: events, hasMore: false, revision: 0, change: { kind: 'replace', entries: events } }),
+      subscribe: () => () => undefined,
+    }
+    // SAFETY: the preview reads only the event source of the binding.
+    const ready = Promise.resolve({ eventSource, session: { cancel: vi.fn() } } as never)
+    const preview = previewBindings({ retainChild: () => ({ ready, release: vi.fn() }) })
+    render(<SubagentProvenanceToolRow {...settled({ expanded: true, preview })} />)
+    await waitFor(() => expect(previewRoot()?.getAttribute('data-state')).toBe('finished'))
   })
 
   it('follows the child core names by its handle, through the parent catalog', () => {

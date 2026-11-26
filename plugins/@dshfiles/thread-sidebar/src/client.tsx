@@ -861,11 +861,14 @@ const ChildThreadList = (props: {
       route: child.projectionValues?.threadSidebarModelRoute,
       identity: child.projectionValues?.subagent,
     })
+    // A Failed child says why, as the attention meta does ("Turn failed", round 21 D4); a Needs-you child its state.
     const stateWord =
       childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed')
         ? undefined
-        : t(workStatusLabelKeys[childStatus.status])
-    const lineOneWord = route === undefined && childStatus !== undefined && (childStatus.status === 'needs-you' || childStatus.status === 'failed')
+        : childStatus.status === 'failed'
+          ? (childStatus.detail ?? t(workStatusLabelKeys.failed))
+          : t(workStatusLabelKeys[childStatus.status])
+    const lineOneWord = route === undefined && stateWord !== undefined
     return (
       <li key={child.id}>
         <button
@@ -920,9 +923,7 @@ const ChildThreadList = (props: {
           >
             {subagentRowTitle(child)}
           </span>
-          {!lineOneWord || childStatus === undefined ? null : (
-            <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{t(workStatusLabelKeys[childStatus.status])}</span>
-          )}
+          {!lineOneWord ? null : <span className="dshx:shrink-0 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">{stateWord}</span>}
           {attentionLabel === undefined ? null : (
             <span
               className={cn(
@@ -4263,33 +4264,37 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
     return details
   }, [approvalNeededRows, liveTurns, sessionStatus])
-  const childStatusById = useMemo(() => {
+  // Each subagent's own status (its row, tab, header and palette) and the one its parent rolls up (round 21 D4).
+  const { childStatusById, childRollupStatusById } = useMemo(() => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
-    if (!statusGlyphs) return statuses
+    const rollups = new Map<SessionSummary['id'], ThreadStatus>()
+    if (!statusGlyphs) return { childStatusById: statuses, childRollupStatusById: rollups }
     for (const entry of [...childThreadEntries, ...detachedThreadEntries]) {
-      statuses.set(
-        entry.session.id,
-        ThreadStatusModel.statusOf({
-          running: entry.session.running,
-          pinned: false,
-          archived: archivedSessionIds.has(entry.session.id),
-          settled: settledSessionIds.has(entry.session.id),
-          unread: attention.records.has(entry.session.id),
-          labels: attentionLabelsBySession.get(entry.session.id) ?? [],
-          inbox: inbox.signals.get(entry.session.id),
-          activityAt: entry.activity.updatedAt,
-          settledAt: preferences.settledAt[entry.session.id],
-          now,
-        }),
-      )
+      const failedTurn = failedTurns.get(entry.session.id)
+      const { row, rollup } = ThreadStatusModel.childStatusOf({
+        running: entry.session.running,
+        pinned: false,
+        archived: archivedSessionIds.has(entry.session.id),
+        settled: settledSessionIds.has(entry.session.id),
+        unread: attention.records.has(entry.session.id),
+        labels: attentionLabelsBySession.get(entry.session.id) ?? [],
+        inbox: inbox.signals.get(entry.session.id),
+        failedTurn: failedTurn === undefined ? undefined : { at: failedTurn.failedAt, reason: failedTurn.reason },
+        activityAt: entry.activity.updatedAt,
+        settledAt: preferences.settledAt[entry.session.id],
+        now,
+      })
+      statuses.set(entry.session.id, row)
+      rollups.set(entry.session.id, rollup)
     }
-    return statuses
+    return { childStatusById: statuses, childRollupStatusById: rollups }
   }, [
     archivedSessionIds,
     attention.records,
     attentionLabelsBySession,
     childThreadEntries,
     detachedThreadEntries,
+    failedTurns,
     inbox.signals,
     now,
     preferences.settledAt,
@@ -4301,7 +4306,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (!statusGlyphs) return statuses
     for (const entry of sectionEntries) {
       const children = (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).flatMap(child => {
-        const status = childStatusById.get(child.id)
+        const status = childRollupStatusById.get(child.id)
         return status === undefined ? [] : [status]
       })
       // Top-level rows only: a subagent's failed turn is its parent's tool result, which the parent's own turn answers.
@@ -4337,7 +4342,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     archivedSessionIds,
     attention.records,
     attentionLabelsBySession,
-    childStatusById,
+    childRollupStatusById,
     rollupCopy,
     failedTurns,
     inbox.signals,

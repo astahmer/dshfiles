@@ -57,11 +57,27 @@ describe('SubagentFeedModel', () => {
     expect(feed.text.length).toBe(2_000)
   })
 
-  it('records how the latest turn ended and forgets it when another starts', () => {
-    const ended = SubagentFeedModel.fold(SubagentFeedModel.empty, [entry('turn/end', { reason: 'completed' })])
-    expect(ended.lastTurnCompleted).toBe(true)
-    expect(SubagentFeedModel.fold(ended, [entry('turn/start', {})]).lastTurnCompleted).toBeUndefined()
-    expect(SubagentFeedModel.fold(SubagentFeedModel.empty, [entry('turn/end', { reason: 'cancelled' })]).lastTurnCompleted).toBe(false)
+  it('records how the latest turn ended, from the reason DSH writes, and forgets it when another starts (round 21 D4)', () => {
+    const endedWith = (reason: object) => SubagentFeedModel.fold(SubagentFeedModel.empty, [entry('turn/end', { turn: 1, reason })]).lastTurnEnd
+    const ended = SubagentFeedModel.fold(SubagentFeedModel.empty, [entry('turn/end', { turn: 1, reason: { kind: 'completed' } })])
+    expect(ended.lastTurnEnd).toBe('completed')
+    expect(SubagentFeedModel.fold(ended, [entry('turn/start', {})]).lastTurnEnd).toBeUndefined()
+    // A provider refusal or the output limit is a failure; a stop, a refused gate or a crash is a stop.
+    expect(endedWith({ kind: 'error', error: { message: '404 Command Code has no such route', code: 'UNKNOWN' } })).toBe('failed')
+    expect(endedWith({ kind: 'max-tokens' })).toBe('failed')
+    expect(endedWith({ kind: 'aborted', reason: { kind: 'user' } })).toBe('stopped')
+    expect(endedWith({ kind: 'blocked' })).toBe('stopped')
+    expect(endedWith({ kind: 'interrupted' })).toBe('stopped')
+  })
+
+  it('reads a child\'s terminal state from the list facts every surface holds (round 21 D4)', () => {
+    const base = { running: false, failedTurn: false, lastTurnCompleted: undefined }
+    expect(SubagentFeedModel.terminalOf({ ...base, lastTurnCompleted: true })).toBe('completed')
+    // `subagentTiming` only says the turn did not complete; the Host's failed-turn record says it failed.
+    expect(SubagentFeedModel.terminalOf({ ...base, lastTurnCompleted: false, failedTurn: true })).toBe('failed')
+    expect(SubagentFeedModel.terminalOf({ ...base, lastTurnCompleted: false })).toBe('stopped')
+    expect(SubagentFeedModel.terminalOf({ ...base, failedTurn: true, running: true })).toBeUndefined()
+    expect(SubagentFeedModel.terminalOf(base)).toBeUndefined()
   })
 
   it('ignores events it does not read and malformed payloads', () => {
@@ -74,11 +90,13 @@ describe('SubagentFeedModel', () => {
   })
 
   it('keeps agent states apart from a started call', () => {
-    const base = { phase: 'result' as const, failed: false, childId: 'child', running: false, lastTurnCompleted: undefined }
+    const base = { phase: 'result' as const, failed: false, childId: 'child', running: false, terminal: undefined }
     expect(SubagentFeedModel.stateOf({ ...base, phase: 'start', childId: undefined })).toBe('starting')
     expect(SubagentFeedModel.stateOf({ ...base, failed: true })).toBe('failed-to-start')
-    expect(SubagentFeedModel.stateOf({ ...base, running: true, lastTurnCompleted: true })).toBe('working')
-    expect(SubagentFeedModel.stateOf({ ...base, lastTurnCompleted: false })).toBe('interrupted')
+    expect(SubagentFeedModel.stateOf({ ...base, running: true, terminal: 'completed' })).toBe('working')
+    expect(SubagentFeedModel.stateOf({ ...base, terminal: 'completed' })).toBe('finished')
+    expect(SubagentFeedModel.stateOf({ ...base, terminal: 'failed' })).toBe('failed')
+    expect(SubagentFeedModel.stateOf({ ...base, terminal: 'stopped' })).toBe('interrupted')
   })
 })
 

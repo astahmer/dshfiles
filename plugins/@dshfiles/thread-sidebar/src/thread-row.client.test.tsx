@@ -531,6 +531,28 @@ describe('a subagent row under its parent', () => {
     const working = row.querySelector<HTMLElement>('ul [data-thread-child-meta]')
     expect(working?.textContent).toBe('gpt-6-luna')
   })
+
+  it('says why a failed child failed, "Turn failed", beside its Failed glyph (round 21 D4)', async () => {
+    const child = rowSession({
+      id: SessionId('child-failed'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: {
+        threadSidebarModelRoute: 'dshx_fake_commandcode/claude-sonnet-5-5',
+        subagent: { mode: 'continuable', label: 'Diff the ledger', seq: SessionSeq(3) },
+      },
+    })
+    const row = await renderRow({
+      childThreads: [child],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false },
+      childStatuses: new Map([[child.id, rowStatus({ status: 'failed', detail: 'Turn failed' })]]),
+    })
+    const button = row.querySelector<HTMLElement>('ul [data-thread-main-action]')
+    expect(button?.querySelector('[data-thread-child-lead] [data-status="failed"]')).not.toBeNull()
+    expect(button?.querySelector('[data-thread-child-meta]')?.textContent).toBe('claude-sonnet-5-5·Turn failed')
+  })
 })
 
 describe('the phone list (council round 18 B1.3)', () => {

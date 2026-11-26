@@ -2,6 +2,7 @@ import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RunFoldKind, RunFoldMemberState, RunFoldStatus } from '@dshfiles/chat/run-folds'
 import { BotIcon } from '@dshfiles/plugin-ui/icons'
 import { useMemo } from 'react'
+import { useSubagentFailedTurns } from './subagent-failed-turns.js'
 import { SubagentFeedModel, type SubagentPreviewState } from './subagent-feed.js'
 import { subagentStateLabel, type SubagentPreviewTranslate } from './subagent-live-preview.js'
 
@@ -11,6 +12,7 @@ const STATUS = {
   'failed-to-start': 'failed',
   working: 'working',
   finished: 'done',
+  failed: 'failed',
   interrupted: 'stopped',
 } as const satisfies Record<SubagentPreviewState, RunFoldStatus>
 
@@ -51,8 +53,12 @@ export const subagentRunFold = (input: { readonly t: SubagentPreviewTranslate; r
         })
         .join(SEPARATOR),
     )
+    // Read without a dshx slot context: the fold runs inside Chat (round 21 D4).
+    const failedTurns = useSubagentFailedTurns()
+    const failed = children.map(child => (child !== '' && failedTurns.has(child) ? 'f' : '')).join(SEPARATOR)
     const phases = calls.map(call => `${call.phase}:${String(call.isError)}`).join(SEPARATOR)
     return useMemo((): readonly RunFoldMemberState[] => {
+      const failedParts = failed.split(SEPARATOR)
       const liveParts = live.split(SEPARATOR)
       const turnParts = turns.split(SEPARATOR)
       return phases.split(SEPARATOR).map((phase, index): RunFoldMemberState => {
@@ -63,17 +69,22 @@ export const subagentRunFold = (input: { readonly t: SubagentPreviewTranslate; r
         // A result that names no child (the tool answered with text) has settled.
         if (callPhase === 'result' && error !== 'true' && child === '') return { status: 'done' }
         const turn = turnParts[index]
+        const running = flags.includes('r')
         const state = SubagentFeedModel.stateOf({
           phase: callPhase === 'preparing' || callPhase === 'start' ? callPhase : 'result',
           failed: error === 'true',
           childId: child === '' ? undefined : child,
-          running: flags.includes('r'),
-          lastTurnCompleted: turn === '' || turn === undefined ? undefined : turn === 'true',
+          running,
+          terminal: SubagentFeedModel.terminalOf({
+            running,
+            failedTurn: failedParts[index] === 'f',
+            lastTurnCompleted: turn === '' || turn === undefined ? undefined : turn === 'true',
+          }),
         })
         // A child with no known status or closed turn yet settled as far as the fold can tell.
         return { status: state === undefined ? 'done' : STATUS[state] }
       })
-    }, [key, live, turns, phases])
+    }, [key, live, turns, failed, phases])
   },
   useText: () => ({
     count: input.count,
