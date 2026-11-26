@@ -31,6 +31,10 @@ describe('the phone transcript gutter (council round 9, lane B B4)', () => {
     expect(rulesIn(read('ChatView.module.css'), PHONE, `${phone} .scroll`)).toMatch(/padding-inline: calc\(var\(--dsh-composer-side-clearance\) \+ 12px\);/)
   })
 
+  it('ends the transcript 12px above the dock\'s 28px fade, so the last line still sits 40px above Live work (council round 10 C1)', () => {
+    expect(rulesIn(read('ChatView.module.css'), PHONE, `${phone} .scroll`)).toMatch(/padding-bottom: 12px;/)
+  })
+
   it('pulls a code card and the prompt bubble back out to the 12px fill edge', () => {
     expect(rulesIn(read('AssistantMarkdown.module.css'), PHONE, `${phone} .body :global([data-dsh-markdown] .md-code-block)`)).toMatch(/margin-inline: -12px;/)
     expect(rulesIn(read('MessageItem.module.css'), PHONE, `${phone} .userStack`)).toMatch(/margin-right: -12px;/)

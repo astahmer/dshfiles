@@ -1222,14 +1222,20 @@ button.crumbEditable {
      dock surface starts: the line above the dock dissolves through the whole band instead of being sliced. Council
      round 8 C5: 36px greyed the last readable line as well. The band is 16px: it only overlaps text while the
      transcript continues under the dock (at the end, Chat's end padding keeps the last line above it, in full ink),
-     and the line above it stays full ink. */
+     and the line above it stays full ink. Council round 10 C1: 16px is shorter than a line, so the line the dock cut
+     still showed its cap tops as a half-clipped strip on the Live work card's edge. The band is one 28px line-height,
+     opaque exactly at the card's top, on an even ease (30/62/88% at 7/14/21px), so a line resting in the band fades as
+     a whole instead of keeping its top and losing its foot; Chat's phone end padding gives the 12px back, so the last
+     line still ends 40px above the card at the tail. */
   :global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat {
-    padding-top: 16px;
+    padding-top: 28px;
     background: linear-gradient(
       180deg,
       color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
-      color-mix(in srgb, var(--dsw-alias-bg-base) 60%, transparent) 8px,
-      var(--dsw-alias-bg-base) 16px
+      color-mix(in srgb, var(--dsw-alias-bg-base) 30%, transparent) 7px,
+      color-mix(in srgb, var(--dsw-alias-bg-base) 62%, transparent) 14px,
+      color-mix(in srgb, var(--dsw-alias-bg-base) 88%, transparent) 21px,
+      var(--dsw-alias-bg-base) 28px
     );
   }
 
@@ -1351,9 +1357,12 @@ button.crumbEditable {
     margin-left: auto;
   }
 
+  /* Council round 10 C1: the control is a filled 28px circle now, so it sits 8px inside the strip's end (as Live work's
+     chevron does at its start) instead of touching the card's edge. */
   :global(html[data-shell-phone-nav]) .dockHead:has(> [data-live-work-summary]) > .jumpSeat {
     width: auto;
     gap: 6px;
+    padding-inline-end: 8px;
   }
 
   :global(html[data-shell-phone-nav]) .dockHead:has(> [data-live-work-summary]) > .jumpSeat::before {

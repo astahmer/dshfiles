@@ -1029,4 +1029,19 @@
     bottom: auto !important;
     z-index: 5;
   }
+
+  /* Council round 10 C1: the empty docked composer is a 76px block, not 88px: no top pad and a 36px text line (6px
+     pads), then the 40px bar. The line is a floor, so the card still grows with the draft. */
+  :global(html[data-shell-phone-nav]) .root:not(.hero) .card {
+    padding-top: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .root:not(.hero) .input {
+    min-height: 36px;
+    padding-block: 6px;
+  }
+
+  :global(html[data-shell-phone-nav]) .root:not(.hero) .placeholder {
+    top: 6px;
+  }
 }

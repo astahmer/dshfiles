@@ -446,24 +446,25 @@
 /* dshfiles (unslop r5 C1, council round 4): a phone has no gutter, so the control sits in the dock's trailing seat
    (rich-composer's PhoneDockHead), on the dock, never over prose; there it is an ordinary box in a row. Round five C1
    (council round 5): a 32px control in that 44px seat, its own control beside Live work. Council round 8 C4: it is the
-   strip's trailing icon button after the seat's hairline, drawn like the bar's other icon buttons (no floating fill or
-   shadow, the fields' 8px radius, a tint on hover and press), not a circle floating in the row. */
+   strip's trailing icon button after the seat's hairline, with no floating shadow. Council round 10 C1: a 28px round
+   seat filled like the composer's + circle (InputBar `.add`), so the strip's end reads as one control, not a loose
+   glyph. */
 .toBottomInDock {
-  --dsh-to-bottom-size: 32px;
+  --dsh-to-bottom-size: 28px;
   margin-top: 0;
-  border-radius: var(--dsw-radius-md, 8px);
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
+  border-radius: 999px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-specific-selector);
   box-shadow: none;
 }
 
 .toBottomInDock:active {
-  background: var(--dsw-alias-button-floating-hover);
+  background: var(--dsw-alias-interactive-bg-hover-solid);
 }
 
 @media (hover: hover) {
   .toBottomInDock:hover {
-    background: var(--dsw-alias-button-floating-hover);
+    background: var(--dsw-alias-interactive-bg-hover-solid);
   }
 }
 
@@ -476,7 +477,7 @@
   }
 
   .toBottomInDock::after {
-    inset: -6px;
+    inset: -8px;
   }
 }
 
@@ -536,7 +537,10 @@
    bare text (prose, lists, "Worked for", the turn summary) 12px further, at 24px, like every phone page. Fills pull
    back out to the 12px edge (AssistantMarkdown's code cards, MessageItem's prompt bubble). */
 @media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
+  /* Council round 10 C1: the composer seat's fade above the dock grew from 16px to one 28px line; the end padding gives
+     those 12px back, so at the tail the last line still ends 40px above the Live work card. */
   :global(html[data-shell-phone-nav]) .scroll {
     padding-inline: calc(var(--dsh-composer-side-clearance) + 12px);
+    padding-bottom: 12px;
   }
 }

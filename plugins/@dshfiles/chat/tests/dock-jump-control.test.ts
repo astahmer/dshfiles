@@ -5,21 +5,21 @@ const view = readFileSync(new URL('../src/native/chat/ChatView.tsx', import.meta
 const css = readFileSync(new URL('../src/native/chat/ChatView.module.css', import.meta.url), 'utf8')
 
 describe('Back to bottom (round five C1, council round 5)', () => {
-  it('is an arrow to the latest line, not a second disclosure chevron beside Live work (council round 9 C4)', () => {
+  it('is a plain down arrow, not an arrow to a line ("download") or a disclosure chevron (council round 10 C1)', () => {
     const control = view.slice(view.indexOf('const toBottom = ('), view.indexOf('return (', view.indexOf('const toBottom = (')))
-    // arrow-down-to-line reads "jump to latest"; a bare arrow read as "expand".
-    expect(control).toContain('<ArrowDownToLineIcon')
-    expect(control).not.toContain('<ArrowDownIcon')
+    expect(control).toContain('<ArrowDownIcon')
+    expect(control).not.toContain('ArrowDownToLineIcon')
     expect(control).not.toContain('ChevronDownIcon')
   })
 
-  it('is a 32px icon button in the dock seat, with a 44px tap area on a touch screen', () => {
-    expect(css).toMatch(/\.toBottomInDock \{[^}]*--dsh-to-bottom-size: 32px;/u)
-    // Council round 8 C4: the strip's flat trailing icon button, not a floating circle with a shadow.
+  it('sits in a 28px round seat on the dock, filled like the composer\'s + circle, with a 44px tap area on touch', () => {
     const rule = /\.toBottomInDock \{([^}]*)\}/u.exec(css)?.[1] ?? ''
+    expect(rule).toContain('--dsh-to-bottom-size: 28px;')
+    expect(rule).toContain('border-radius: 999px;')
+    // The composer's + control's seat (InputBar `.add`): the selector fill, primary glyph, no floating shadow.
+    expect(rule).toContain('background: var(--dsw-specific-selector);')
+    expect(rule).toContain('color: var(--dsw-alias-label-primary);')
     expect(rule).toContain('box-shadow: none;')
-    expect(rule).toContain('background: transparent;')
-    expect(rule).toContain('border-radius: var(--dsw-radius-md, 8px);')
-    expect(css).toMatch(/\.toBottomInDock::after \{[^}]*inset: -6px;/u)
+    expect(css).toMatch(/\.toBottomInDock::after \{[^}]*inset: -8px;/u)
   })
 })
