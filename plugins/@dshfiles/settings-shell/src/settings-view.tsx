@@ -127,11 +127,22 @@ const SettingsRootList = (props: { readonly groups: readonly GroupedEntries[]; r
   <div className="dshx:hidden dshx:flex-col dshx:gap-4 dshx:pt-1 dshx:pb-6 dshx:@max-pane-compact:flex" data-settings-root="">
     {props.groups.map(({ group, entries }, index) => (
       <section aria-label={group.label} className="dshx:flex dshx:flex-col dshx:gap-1.5" data-settings-group={group.id} key={group.id} role="group">
-        {index === 0 ? null : <h3 className="dshx:m-0 dshx:px-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.label}</h3>}
-        <div className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-(--dsw-alias-bg-layer-1)">
+        {/* Heads on the phone's 24px text edge (round nine B4). */}
+        {index === 0 ? null : <h3 className="dshx:m-0 dshx:px-3 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.label}</h3>}
+        {/* A grouped list (round nine B7): a lighter outer edge than the separators, which start at the label column
+            and stop before the last row's end. */}
+        <div
+          className="dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-(--dsw-alias-border-l2) dshx:bg-(--dsw-alias-bg-layer-1)"
+          data-settings-root-card=""
+        >
           {entries.map(entry => (
             <button
-              className="dshx:flex dshx:h-11 dshx:w-full dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:border-none dshx:bg-transparent dshx:px-2 dshx:text-left dshx:text-sm dshx:text-foreground dshx:active:bg-accent dshx:hover:bg-[var(--dshx-tone-2)]"
+              className={cn(
+                // The card fills from the 12px gutter, its tiles start at 24px (its 1px edge and 11px, round nine B4).
+                'dshx:relative dshx:flex dshx:h-11 dshx:w-full dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:border-none dshx:bg-transparent dshx:px-[11px] dshx:text-left dshx:text-sm dshx:text-foreground dshx:active:bg-accent dshx:hover:bg-[var(--dshx-tone-2)]',
+                // The separator above every row but the first, from the label column: 11px, the 28px tile and 12px.
+                "dshx:not-first:before:pointer-events-none dshx:not-first:before:absolute dshx:not-first:before:top-0 dshx:not-first:before:right-0 dshx:not-first:before:left-[51px] dshx:not-first:before:h-px dshx:not-first:before:bg-border dshx:not-first:before:content-['']",
+              )}
               data-settings-root-row={entry.id}
               key={entry.id}
               onClick={() => props.onOpen(entry.id)}

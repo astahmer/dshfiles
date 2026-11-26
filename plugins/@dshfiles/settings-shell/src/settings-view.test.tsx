@@ -482,6 +482,28 @@ describe('settings view: phone drill-down (round five B6)', () => {
     view.unmount()
   })
 
+  it('draws each group as a card with 1px separators from the label column, none after the last row (round nine B7, B4)', () => {
+    const view = mount({ activeId: undefined, onBack: () => {} })
+    const card = view.host.querySelector<HTMLElement>('[data-settings-root-card]')
+    // No full-width dividers: an inset rule on every row but the first, from the label column (11 + 28 + 12 = 51px).
+    expect(card?.className).not.toContain('dshx:divide-y')
+    // A lighter outer edge than the separators.
+    expect(card?.className).toContain('dshx:border-(--dsw-alias-border-l2)')
+    expect(card?.className).not.toContain('dshx:border-border')
+    const rows = [...view.host.querySelectorAll<HTMLElement>('[data-settings-root-row]')]
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row.className).toContain('dshx:not-first:before:left-[51px]')
+      expect(row.className).toContain('dshx:not-first:before:h-px')
+      expect(row.className).toContain('dshx:not-first:before:bg-border')
+      // The phone gutter (round nine B4): the card fills from 12px, its tiles start at 24px (1px edge + 11px).
+      expect(row.className).toContain('dshx:px-[11px]')
+    }
+    // Group heads on the 24px text edge.
+    expect(view.host.querySelector('[data-settings-root] h3')?.className).toContain('dshx:px-3')
+    view.unmount()
+  })
+
   it('shows a picked category under one Back row, without the search toolbar, and Back returns to the list', () => {
     const onBack = vi.fn()
     const view = mount({ activeId: 'appearance', onBack })
