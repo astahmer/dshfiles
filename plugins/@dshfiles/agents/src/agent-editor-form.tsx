@@ -1,3 +1,4 @@
+import { identityToneIndex, PalettePicker } from '@dshfiles/plugin-ui/components/palette-picker'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
@@ -246,6 +247,26 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
             </div>
           </div>
           <IssueLine reveal={shown('glyph')} field="glyph" review={review} onFix={props.onFix} />
+        </div>
+
+        <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
+          <Label>Colour</Label>
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
+            <PalettePicker
+              label="Colour"
+              value={draft.tone ?? undefined}
+              defaultSlot={identityToneIndex(review.handle)}
+              onChange={tone => patch({ tone })}
+            />
+            {draft.tone === null || draft.tone === undefined ? null : (
+              <Button type="button" size="xs" variant="ghost" onClick={() => patch({ tone: null })}>
+                Use default
+              </Button>
+            )}
+          </div>
+          <p className="dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">
+            Marks its tile and mentions. The theme sets the colours, so a new theme recolours the agent.
+          </p>
         </div>
 
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5">

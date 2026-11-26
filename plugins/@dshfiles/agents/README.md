@@ -69,6 +69,12 @@ follows [DESIGN.md](../../../DESIGN.md).
   instructions in a tall monospace editor. The model field is the kit's searchable, provider-grouped Combobox over the
   Host model catalog (no owned plugin exports a model picker to reuse), and reasoning offers only that model's efforts.
   Peers are typed or picked from the saved agents.
+- **Colour.** Under the glyph, the kit's `PalettePicker` offers the active theme's six identity colours; the handle's
+  default is marked, and **Use default** clears a choice. The agent stores the slot (`tone`, 0–5), not a colour, so a
+  theme change recolours it. Its glyph tile (list, editor heading, start dialog, peer buttons, mention card) and every
+  `@{handle}` chip paint the colour on its own 18 % wash, like a project mark; an agent without a slot, including every
+  agent saved before colours, takes the one its handle hashes to. `agents_save` takes `tone`: `null` clears it, leaving
+  it out keeps it.
 - **Inline checks with a way out.** A missing name, a taken handle (with a free one offered), a bad memory scope (with
   the default offered), an empty peer list (with “no messaging” offered) block the save and sit under their field; a
   route this Host lacks, an unknown peer and instructions the 4,000-character opening message would clip are warnings.

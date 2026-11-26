@@ -156,13 +156,13 @@
       "id": "agent-colour",
       "title": "Colour an agent",
       "summary": "Give an agent a colour from the theme's palette, so its tile and mentions are easy to tell apart.",
-      "details": "An agent stores an optional palette slot (tone 0–5) beside its glyph. The active theme paints the slot, so switching theme recolours every agent to match; an agent without one, including every agent saved before colours, takes the slot hashed from its handle (the shared project-tone hash). The agents_save tool takes the same slot: null returns to the default and leaving it out keeps the current colour.",
-      "surfaces": ["host", "storage", "tool"],
+      "details": "An agent stores an optional palette slot (tone 0–5) beside its glyph. The editor's Identity section offers the theme's six colours as a radio group under the glyph, with the handle's default marked and Use default to clear a choice. The glyph tile in the list, the editor heading, the start dialog, peer buttons and the mention card, and every @{handle} reference chip in sent messages and answers, paint the agent's colour on its own wash. The active theme paints the slot, so switching theme recolours every agent to match; an agent without one, including every agent saved before colours, takes the slot hashed from its handle (the shared project-tone hash). The agents_save tool takes the same slot: null returns to the default and leaving it out keeps the current colour.",
+      "surfaces": ["client", "host", "storage", "tool"],
       "surface": "destinationSection",
       "destination": "agents",
       "currentSurface": "left-nav: Agents",
       "configuration": [],
-      "states": ["default-tone", "chosen-tone", "cleared"],
+      "states": ["default-tone", "chosen-tone", "cleared", "theme-switched"],
       "failureModes": [
         "A slot outside 0–5 is refused by the save, and the stored colour stays.",
         "A save that names no tone keeps the stored one, so an edit by an agent tool never drops the colour."
@@ -188,6 +188,30 @@
           "testName": "the agents_save tool takes an optional colour slot, null to clear it"
         },
         {
+          "kind": "unit-test",
+          "id": "agents.tone-paint",
+          "file": "plugins/@dshfiles/agents/src/agent-tone.test.tsx",
+          "testName": "paints a reference chip with the chosen colour once the registry list names it, else the hashed one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-list",
+          "file": "plugins/@dshfiles/agents/src/agent-tone.test.tsx",
+          "testName": "paints each list row\u2019s glyph tile with the agent\u2019s colour on its wash"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-editor-pick",
+          "file": "plugins/@dshfiles/agents/src/agent-editor-colour.test.tsx",
+          "testName": "offers the palette beside the glyph, marks the handle\u2019s default and picks a slot"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-editor-clear",
+          "file": "plugins/@dshfiles/agents/src/agent-editor-colour.test.tsx",
+          "testName": "clears a chosen colour back to the default"
+        },
+        {
           "kind": "not-applicable",
           "id": "agents.tone-browser",
           "reason": "No Gherkin scenario switches themes yet; the coloured panel, the editor's palette, a composer mention and a transcript reference were walked on a scratch DSH in the default theme and Dracula, light and dark, at desktop and 390 px WebKit, and the stored slot is Host-tested."
@@ -202,6 +226,15 @@
           "kind": "automatic",
           "source": "agent-tool"
         }
+      ],
+      "reach": [
+        "click button \"Agents\"",
+        "click button \"New agent\"",
+        "fill textbox \"Name\" \"Luna\"",
+        "expect radiogroup \"Colour\"",
+        "click radio \"Violet\"",
+        "click button \"Create agent\"",
+        "expect text \"Saved.\""
       ]
     },
     {
