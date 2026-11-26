@@ -8,6 +8,9 @@
  * copy of the kit, so a module-level store would not be shared): JSON `{ "light"?: string[6], "dark"?: string[6] }`.
  * A scheme left out uses the default theme's slots and names.
  */
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+
 export const IDENTITY_SLOT_COUNT = 6
 
 /** The default theme's slot names, index for index with `--dshx-project-balanced-0..5`. */
@@ -36,21 +39,21 @@ export const GENERIC_IDENTITY_NAMES: readonly string[] = Array.from({ length: ID
 const isNameList = (value: unknown): value is readonly string[] =>
   Array.isArray(value) && value.length === IDENTITY_SLOT_COUNT && value.every(name => typeof name === 'string' && name.trim() !== '')
 
+/** The attribute's JSON: each scheme's list is checked for six names by `isNameList`. */
+const decodeAttribute = Schema.decodeUnknownOption(
+  Schema.fromJsonString(Schema.Struct({ light: Schema.optional(Schema.Unknown), dark: Schema.optional(Schema.Unknown) })),
+)
+
 /** The attribute's value parsed; anything malformed reads as "no theme names" (the default names apply). */
 function parseNames(raw: string | null | undefined): IdentityNames {
   if (raw === null || raw === undefined || raw === '') return {}
-  try {
-    const value: unknown = JSON.parse(raw)
-    if (typeof value !== 'object' || value === null) return {}
-    const light = 'light' in value ? value.light : undefined
-    const dark = 'dark' in value ? value.dark : undefined
-    let names: IdentityNames = {}
-    if (isNameList(light)) names = { ...names, light }
-    if (isNameList(dark)) names = { ...names, dark }
-    return names
-  } catch {
-    return {}
-  }
+  const decoded = decodeAttribute(raw)
+  if (Option.isNone(decoded)) return {}
+  const { light, dark } = decoded.value
+  let names: IdentityNames = {}
+  if (isNameList(light)) names = { ...names, light }
+  if (isNameList(dark)) names = { ...names, dark }
+  return names
 }
 
 /** The attribute's value for some names, or `''` (remove the attribute) when neither scheme has any. */

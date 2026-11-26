@@ -137,7 +137,7 @@ export function PalettePicker({ value, onChange, label, defaultSlot, size = 'md'
             onClick={() => choose(slot)}
             onKeyDown={event => onKeyDown(event, slot)}
             className={cn(
-              'dshx:group dshx:inline-flex dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-full dshx:outline-none dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50',
+              'dshx:group dshx:inline-flex dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-full dshx:disabled:cursor-not-allowed dshx:disabled:opacity-50',
               size === 'sm' ? 'dshx:size-6' : 'dshx:size-7',
               'dshx:pointer-coarse:size-11',
             )}
@@ -146,8 +146,7 @@ export function PalettePicker({ value, onChange, label, defaultSlot, size = 'md'
               aria-hidden
               data-slot="palette-swatch-ring"
               className={cn(
-                'dshx:flex dshx:items-center dshx:justify-center dshx:rounded-full dshx:border-2 dshx:transition-[border-color,box-shadow] dshx:duration-(--dshx-duration-hover)',
-                'dshx:group-focus-visible:ring-[3px] dshx:group-focus-visible:ring-ring/50',
+                'dshx:flex dshx:items-center dshx:justify-center dshx:rounded-full dshx:border-2 dshx:transition-[border-color] dshx:duration-(--dshx-duration-hover)',
                 size === 'sm' ? 'dshx:size-6' : 'dshx:size-7',
                 selected
                   ? 'dshx:border-foreground'
