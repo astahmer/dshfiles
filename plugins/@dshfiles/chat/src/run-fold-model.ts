@@ -152,7 +152,7 @@ const summary = (groups: readonly RunFoldGroup[], words: RunFoldWords): readonly
         working: phrase(text.active),
         needsYou: phrase(words.needsYou),
         failed: phrase(words.failed),
-        ...(text.notStarted === undefined ? {} : { notStarted: text.notStarted }),
+        notStarted: text.notStarted,
         stopped: phrase(words.stopped),
         done: phrase(text.done),
       },

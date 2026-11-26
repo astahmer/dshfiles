@@ -16,8 +16,7 @@ export const subagentCountWords = (
 ): WorkCountWords => ({
   working: count => translate('threadSidebarWorkingCount', { count }),
   failed: count => translate('threadSidebarFailedCount', { count }),
-  ...(include.calls === true ? { calls: (count: number) => plural(translate, 'subagentCountCalls', count) } : {}),
-  ...(include.settled === true
-    ? { stopped: (count: number) => translate('subagentCountStopped', { count }), done: (count: number) => translate('subagentCountDone', { count }) }
-    : {}),
+  calls: include.calls === true ? count => plural(translate, 'subagentCountCalls', count) : undefined,
+  stopped: include.settled === true ? count => translate('subagentCountStopped', { count }) : undefined,
+  done: include.settled === true ? count => translate('subagentCountDone', { count }) : undefined,
 })

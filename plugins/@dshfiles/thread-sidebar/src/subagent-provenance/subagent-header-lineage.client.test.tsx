@@ -192,10 +192,10 @@ describe('SubagentHeaderLineage route provenance', () => {
     const { container } = render(<SubagentHeaderLineage {...props()} useSessions={select => select(running)} />)
     const model = container.querySelector('[data-subagent-route]')
     const state = container.querySelector('[data-subagent-live-state]')
-    expect(state).not.toBeNull()
+    if (model === null || state === null) throw new Error('no model or no live state in the child header')
     // Document order: the model, then its state.
-    expect(model?.compareDocumentPosition(state as Node) ?? 0).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
-    expect(state?.querySelector('[data-testid="thread-header-live-activity"]')?.textContent).toContain('Working')
+    expect(model.compareDocumentPosition(state)).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+    expect(state.querySelector('[data-testid="thread-header-live-activity"]')?.textContent).toContain('Working')
     // An idle child names no state there.
     cleanup()
     const idle = render(<SubagentHeaderLineage {...props()} />)

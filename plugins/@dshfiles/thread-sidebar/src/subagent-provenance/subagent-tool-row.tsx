@@ -151,20 +151,17 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     running: props.phase === 'preparing' || props.phase === 'start' || state === 'working',
     // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; a
     // failed row ends with its failure word.
-    ...(route === undefined && failure === undefined
-      ? {}
-      : {
-          headerAccessory: (
-            <>
-              {route === undefined ? null : <RouteModel provider={route.provider} model={route.model} size="md" className="dshx:max-w-[45%] dshx:shrink-0" />}
-              {failure === undefined ? null : (
-                <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
-                  {failure}
-                </span>
-              )}
-            </>
-          ),
-        }),
+    headerAccessory:
+      route === undefined && failure === undefined ? undefined : (
+        <>
+          {route === undefined ? null : <RouteModel provider={route.provider} model={route.model} size="md" className="dshx:max-w-[45%] dshx:shrink-0" />}
+          {failure === undefined ? null : (
+            <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
+              {failure}
+            </span>
+          )}
+        </>
+      ),
   }
 
   return (
@@ -172,7 +169,8 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
       ref={rootRef}
       className="dshx-root"
       data-dshfiles-subagent-row=""
-      {...(childId === undefined ? {} : { 'data-dshfiles-live-preview': 'agent', 'data-state': state ?? 'unknown' })}
+      data-dshfiles-live-preview={childId === undefined ? undefined : 'agent'}
+      data-state={childId === undefined ? undefined : (state ?? 'unknown')}
     >
       <DisclosureRow {...disclosureProps}>
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:p-3">

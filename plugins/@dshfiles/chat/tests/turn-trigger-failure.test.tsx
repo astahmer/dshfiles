@@ -37,7 +37,7 @@ const renderNotice = (stopReason: string) =>
       t={t}
       sessionId={PARENT as never}
       // SAFETY: the view reads only the parent's subagent catalog of the session list.
-      useSessions={((select: (value: never) => unknown) => select(list as never)) as never}
+      useSessions={(<Selected,>(select: (value: never) => Selected): Selected => select(list as never)) as never}
     />,
   )
 

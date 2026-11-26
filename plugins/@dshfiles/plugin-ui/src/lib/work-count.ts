@@ -32,14 +32,14 @@ export interface WorkCountWords {
   readonly working: (count: number) => string
   readonly failed: (count: number) => string
   /** Pass only on a surface that lists every call. */
-  readonly calls?: (count: number) => string
-  readonly needsYou?: (count: number) => string
+  readonly calls?: ((count: number) => string) | undefined
+  readonly needsYou?: ((count: number) => string) | undefined
   /** Pass only on a surface that lists every call: "1 didn't start". */
-  readonly notStarted?: (count: number) => string
+  readonly notStarted?: ((count: number) => string) | undefined
   /** Pass only where stopped children matter. */
-  readonly stopped?: (count: number) => string
+  readonly stopped?: ((count: number) => string) | undefined
   /** Pass only where finished children matter. */
-  readonly done?: (count: number) => string
+  readonly done?: ((count: number) => string) | undefined
 }
 
 /** A clause of the summary; `tone` colours only the problem states (DESIGN.md: colour for Needs you and Failed). */

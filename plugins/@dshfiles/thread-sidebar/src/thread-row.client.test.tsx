@@ -591,7 +591,9 @@ describe('a subagent row under its parent', () => {
       '1 threadSidebarFinishedChildren',
     ])
     // Opening the finished children puts them above the footer, never below a control.
-    fireEvent.click(within(footer() as HTMLElement).getByText('1 threadSidebarFinishedChildren'))
+    const footerLine = row.querySelector<HTMLElement>('[data-thread-child-footer]')
+    if (footerLine === null) throw new Error('no child list footer')
+    fireEvent.click(within(footerLine).getByText('1 threadSidebarFinishedChildren'))
     const items = [...(list?.children ?? [])]
     expect(items.at(-2)?.querySelector('[data-thread-id="f1"]')).not.toBeNull()
     expect(footer()?.textContent).toBe('threadSidebarFewerChildren·threadSidebarHideFinishedChildren')
