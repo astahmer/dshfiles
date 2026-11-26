@@ -69,7 +69,7 @@ const failureWordOf = (t: SubagentPreviewBindings['t'], state: ReturnType<typeof
 
 /**
  * A delegation's record row in the transcript: `Subagent · {description}`, the same glyph and name as its dock row and
- * no clock, then the model it runs on as the kit's mark and name (council round 17 B1.1). It ends as `Done · 5m 02s`,
+ * no clock, then the model it runs on as the kit's mark and name, with no empty mark seat inline (council round 17 B1.1, round 22 item 8). It ends as `Done · 5m 02s`,
  * `Failed` or `Stopped`; it never shows a generated handle or the provider id.
  */
 export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
@@ -126,7 +126,7 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
       : {
           headerAccessory: (
             <>
-              {route === undefined ? null : <RouteModel provider={route.provider} model={route.model} size="md" seat className="dshx:max-w-[45%] dshx:shrink-0" />}
+              {route === undefined ? null : <RouteModel provider={route.provider} model={route.model} size="md" className="dshx:max-w-[45%] dshx:shrink-0" />}
               {failure === undefined ? null : (
                 <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
                   {failure}

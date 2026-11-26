@@ -6,8 +6,8 @@ import type { SubagentPreviewBindings } from './subagent-live-preview.js'
 
 /**
  * Round 21 D5: a model with no known family (`step-5-preview`) started 22 px left of every marked name in the stacked
- * subagent rows. The dock keeps the kit's empty 16 px seat for it; the list's child rows and the transcript rows are
- * covered beside their own fixtures (`thread-row.client.test.tsx`, `subagent-tool-row.client.test.tsx`).
+ * subagent rows. The dock keeps the kit's empty 16 px seat for it, and so do the list's child rows (`thread-row.client.test.tsx`);
+ * inline transcript rows draw no seat (council round 22, item 8; `subagent-tool-row.client.test.tsx`).
  */
 
 afterEach(cleanup)

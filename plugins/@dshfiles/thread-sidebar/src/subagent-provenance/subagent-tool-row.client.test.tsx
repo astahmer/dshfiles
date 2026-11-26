@@ -193,11 +193,12 @@ describe('SubagentProvenanceToolRow', () => {
     expect(screen.getByText('subagentPreviewKind · Optimize traces plugin')).not.toBeNull()
   })
 
-  it('keeps an empty mark seat for a model with no known family, so names share one start edge (round 21 D5)', () => {
+  it('draws no empty mark seat inline for a model with no known family (council round 22, item 8)', () => {
+    // The seat lines names up only where they stack in a column (the list's line 2); inline it left a 16 px gap.
     render(<SubagentProvenanceToolRow {...props({ provider: 'dshx_fake_commandcode', model: 'step-5-preview', description: 'Review currency conversion' })} />)
     const model = screen.getByTestId('header-accessory').querySelector('[data-slot="route-model"]')
     expect(model?.textContent).toBe('step-5-preview')
-    expect(model?.firstElementChild?.getAttribute('data-model-mark')).toBe('none')
+    expect(model?.querySelector('[data-model-mark]')).toBeNull()
   })
 
   it('prefers the route the child really runs on over the one its call asked for', () => {
