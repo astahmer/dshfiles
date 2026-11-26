@@ -95,8 +95,8 @@ export interface PaletteThreadStatus {
   readonly label: string
   /**
    * A Needs-you or Failed thread's kind in the one attention word list (Approval, Question, Turn failed), as the list
-   * row's line 2 says it. With it the row reads `[mark] project · kind · age` through the kit's AttentionMeta (council
-   * round 15 B3); without it (an older provider, any other status) the row keeps its status word.
+   * row's line 2 says it. Every row reads `[mark] project · word · age` through the kit's AttentionMeta (council round
+   * 16 B1): the word is this kind, else `label` (an older provider, any other status).
    */
   readonly kind?: string | undefined
 }

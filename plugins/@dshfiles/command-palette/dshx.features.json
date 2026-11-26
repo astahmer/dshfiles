@@ -5,7 +5,7 @@
       "id": "palette-search",
       "title": "Search threads and workspace files",
       "summary": "Search threads by title, project or id, and files in the workspace.",
-      "details": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all. On Everything, threads come before commands when their best match is stronger, and an empty search leads with recent threads; a thread row draws the thread list's status glyph and word when a provider (thread-sidebar) adds one to PaletteThreadStatuses.",
+      "details": "Search top-level threads by title, project, and id prefix; subagents and child sessions are excluded. Rank recent threads by title, project, and id prefix; rank workspace paths by basename and frecency; the Threads tab lists the current project’s threads (its thread workspaces included) unless threadsScope is all. On Everything, threads come before commands when their best match is stronger, and an empty search leads with recent threads; every thread row reads in the thread list's grammar: its status glyph on the rail, then `[mark] project · word · age` (Working, Ready, Idle, Approval, Question, Turn failed), the word from the provider (thread-sidebar) that adds one to PaletteThreadStatuses, else from the thread's running fact.",
       "surfaces": ["client"],
       "surface": "command",
       "destination": "none",

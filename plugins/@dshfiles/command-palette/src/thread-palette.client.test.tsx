@@ -552,8 +552,8 @@ describe('Threads tab project scope', () => {
     expect(custom?.style.getPropertyValue('--chip-light')).toBe('oklch(from var(--chip) min(l, 0.52) c h)')
     expect(custom?.style.color).toBe('var(--chip-clamped)')
     expect(custom?.className).toContain('dshx:[--chip-clamped:var(--chip-light)]')
-    const loose = await markOf(/Loose work/)
-    expect(loose?.className).toContain('dshx:bg-muted')
+    // A thread with no project has no mark to draw: its status glyph leads, and line 2 names its word and age (round 16 B1).
+    expect(await markOf(/Loose work/)).toBeNull()
     expect(colorOf).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'session-loose' }))
   })
 
@@ -811,7 +811,7 @@ describe('ThreadPalette goes to threads', () => {
       />,
     )
     const row = await screen.findByRole('option', { name: /Today work/ })
-    expect(row.textContent).toContain('dshfiles · 2m')
+    expect(row.querySelector('[data-attention-meta-part="age"]')?.textContent).toBe('2m')
     expect(row.textContent).not.toContain(new Date().toLocaleDateString())
     const search = screen.getByRole('combobox').closest('[data-slot="command-input-wrapper"]')?.parentElement
     expect(search?.className).toContain('dshx:[&_[data-slot=command-input-wrapper]]:outline-none!')
@@ -863,12 +863,66 @@ describe('ThreadPalette goes to threads', () => {
     }
   })
 
-  it('keeps the status word on a row without an attention kind (council round 15 B3)', async () => {
-    render(palette({ threadStatusOf: thread => (thread.id === 'session-fake-2' ? { status: 'ready', label: 'Ready' } : undefined) }))
-    const row = await screen.findByRole('option', { name: /Fake child run/ })
-    expect(row.querySelector('[data-slot="attention-meta"]')).toBeNull()
-    expect(row.querySelector('[data-palette-thread-status]')?.textContent).toBe('Ready')
-    expect(row.firstElementChild?.querySelector('[data-palette-project-mark]')).not.toBeNull()
+  // One row grammar (council round 16 B1): every thread row's rail is its status glyph in the kit's 20px rail seat, and
+  // line 2 is always AttentionMeta, `[mark] project · word · age`; no status tail, no project tile in the rail.
+  const expectListGrammar = (row: HTMLElement, status: string, word: string, project: string | null): void => {
+    const lead = row.firstElementChild
+    expect(lead?.hasAttribute('data-leading-glyph')).toBe(true)
+    const seat = lead?.querySelector<HTMLElement>('[data-palette-status-seat]')
+    expect(seat?.className).toContain('dshx:w-[var(--attention-meta-rail-seat,20px)]')
+    const glyph = seat?.querySelector('[data-slot="status-glyph"]')
+    expect(glyph?.getAttribute('data-status')).toBe(status)
+    expect(glyph?.className).toContain('dshx:[&_svg]:text-current!')
+    expect(lead?.querySelector('[data-slot="project-mark"]')).toBeNull()
+    const meta = row.querySelector<HTMLElement>('[data-slot="attention-meta"]')
+    expect(meta?.getAttribute('data-mark-seat')).toBe('inline')
+    const parts = Array.from(meta?.querySelectorAll(':scope > [data-attention-meta-part]') ?? []).map(part => part.getAttribute('data-attention-meta-part'))
+    expect(parts).toEqual(project === null ? ['kind', 'sep', 'age'] : ['mark', 'name', 'sep', 'kind', 'sep', 'age'])
+    if (project !== null) expect(meta?.querySelector('[data-attention-meta-part="name"]')?.textContent).toBe(project)
+    expect(meta?.querySelector('[data-attention-meta-part="kind"]')?.textContent).toBe(word)
+    expect(row.querySelector('[data-palette-thread-status]')).toBeNull()
+    expect(row.querySelectorAll('[data-slot="status-glyph"]')).toHaveLength(1)
+    expect(row.querySelectorAll('[data-slot="project-mark"]')).toHaveLength(project === null ? 0 : 1)
+  }
+
+  it('reads every thread row in the list grammar: glyph rail, AttentionMeta with the status word (council round 16 B1)', async () => {
+    const statuses = new Map<string, PaletteThreadStatus>([
+      ['session-fake-1', { status: 'working', label: 'Working' }],
+      ['session-fake-2', { status: 'ready', label: 'Ready' }],
+      ['session-fake-3', { status: 'idle', label: 'Idle' }],
+    ])
+    render(palette({ threadStatusOf: thread => statuses.get(thread.id) }))
+    for (const [title, status, word] of [
+      ['Fake provider seeds', 'working', 'Working'],
+      ['Fake child run', 'ready', 'Ready'],
+      ['Remove the fake clock', 'idle', 'Idle'],
+    ] as const)
+      expectListGrammar(await screen.findByRole('option', { name: new RegExp(title, 'u') }), status, word, 'dshfiles')
+  })
+
+  it('keeps the list grammar without a status provider: the running fact picks the glyph and word (council round 16 B1)', async () => {
+    const threads = [
+      { id: 'session-run', title: 'Running one', project: 'dshfiles', cwd: '/dev/dshfiles', updatedAt: 3, running: true },
+      { id: 'session-rest', title: 'Resting one', project: '', cwd: '/tmp', updatedAt: 2, running: false },
+    ]
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={threads}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expectListGrammar(await screen.findByRole('option', { name: /Running one/u }), 'working', 'Working', 'dshfiles')
+    expectListGrammar(await screen.findByRole('option', { name: /Resting one/u }), 'idle', 'Idle', null)
   })
 
   it('replaces the clipped prefix legend with one "? Prefixes" hint that opens the prefix list', async () => {

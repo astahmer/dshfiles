@@ -6,7 +6,7 @@ import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/t
 import { matchesPhoneShell } from '@dshfiles/plugin-ui/lib/phone-shell'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
-import { ProjectMark, type ProjectMarkProps } from '@dshfiles/plugin-ui/components/ui/project-mark'
+import type { ProjectMarkProps } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
@@ -159,7 +159,7 @@ const neutralMark = 'dshx:bg-muted dshx:text-muted-foreground'
 type ProjectMarkPaint = Pick<ProjectMarkProps, 'tone' | 'color' | 'palette' | 'className' | 'style'>
 
 /**
- * The project tile of a thread row (round five T6): the thread list's `ProjectMark`, in the tone or colour the list gives
+ * The project mark on a thread row's meta line (round five T6, council round 16 B1): the thread list's `ProjectMark`, in the tone or colour the list gives
  * the project. A custom pick rides as --chip and is clamped per scheme (L <= 0.52 in light, L >= 0.78 in dark), so a
  * pale or dark pick still reads. Without a colour source the tile stays neutral ink.
  */
@@ -678,59 +678,33 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
         <CommandGroup heading={emptyQuery ? props.copy.recent : props.copy.threads}>
           {threadRows.map(thread => {
             const row: PaletteRow = { kind: 'thread', thread }
-            const project = thread.project.length > 0 ? thread.project : props.copy.unassigned
             // The list's status, rolled up: a thread that waits for an answer is Needs you here too, not Working.
             const listed = props.threadStatusOf?.(thread)
-            // A thread that needs you or failed reads as the list row and the Inbox card do (council round 15 B3): its
-            // status glyph leads, and the meta is the kit's AttentionMeta, `[mark] project · kind · age`, in the one
-            // word list (Approval, Question, Turn failed). Every other row keeps its project tile and its status word.
-            const attentionKind = listed?.status === 'needs-you' || listed?.status === 'failed' ? listed.kind : undefined
+            // One row grammar, the thread list's (council round 16 B1): the rail is the status glyph on every row, and
+            // line 2 is the kit's AttentionMeta, `[mark] project · word · age`, the word from the one list (Working,
+            // Ready, Idle, Approval, Question, Turn failed). No status tail, no project tile in the rail. Without a status
+            // provider the thread's own running fact picks Working or Idle.
+            const status = listed?.status ?? (thread.running === true ? 'working' : 'idle')
+            const word = listed === undefined ? (thread.running === true ? props.copy.working : props.copy.idle) : (listed.kind ?? listed.label)
             const age = thread.updatedAt > 0 ? recentTime(thread.updatedAt) : undefined
             return (
               <CommandItem key={thread.id} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
+                {/* The palette's 28px leading column keeps every row's title on one edge; inside it the glyph sits in the
+                    kit's 20px rail seat, the thread list's. */}
                 <span className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" {...LEADING_GLYPH_ATTRIBUTE}>
-                  {listed !== undefined && attentionKind !== undefined ? (
-                    // The row's own rule greys every icon without a text colour; the glyph keeps its status hue.
-                    <StatusGlyph status={listed.status} decorative className="dshx:[&_svg]:text-current!" />
-                  ) : thread.project.length > 0 ? (
-                    <ProjectMark name={project} data-palette-project-mark="" {...projectMarkPaint(props.projectColorOf?.(thread))} />
-                  ) : (
-                    <span
-                      className={cn('dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded-sm', neutralMark)}
-                      data-palette-project-mark=""
-                    >
-                      <MessageSquareIcon className="dshx:size-3.5" />
-                    </span>
-                  )}
+                  <span className="dshx:inline-flex dshx:w-[var(--attention-meta-rail-seat,20px)] dshx:justify-center" data-palette-status-seat="">
+                    {/* The row's own rule greys every icon without a text colour; the glyph keeps its status hue. */}
+                    <StatusGlyph status={status} decorative className="dshx:[&_svg]:text-current!" />
+                  </span>
                 </span>
                 <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                   <span className="dshx:truncate dshx:text-sm dshx:font-medium">{thread.title}</span>
-                  {attentionKind !== undefined ? (
-                    <AttentionMeta
-                      project={thread.project.length > 0 ? thread.project : undefined}
-                      kind={attentionKind}
-                      age={age}
-                      mark={{ ...projectMarkPaint(props.projectColorOf?.(thread)), 'data-palette-project-mark': '' }}
-                    />
-                  ) : (
-                    <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
-                      <span className="dshx:min-w-0 dshx:truncate">
-                        {[project, age ?? null, listed !== undefined || thread.running === undefined ? null : thread.running ? props.copy.working : props.copy.idle]
-                          .filter(value => value !== null)
-                          .join(' · ')}
-                      </span>
-                      {listed === undefined ? null : (
-                        <>
-                          <span aria-hidden="true">·</span>
-                          {/* The row's own rule greys every icon without a text colour; the glyph keeps its status hue. */}
-                          <StatusGlyph status={listed.status} decorative className="dshx:[&_svg]:text-current!" />
-                          <span className="dshx:shrink-0" data-palette-thread-status="">
-                            {listed.label}
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  )}
+                  <AttentionMeta
+                    project={thread.project.length > 0 ? thread.project : undefined}
+                    kind={word}
+                    age={age}
+                    mark={thread.project.length > 0 ? { ...projectMarkPaint(props.projectColorOf?.(thread)), 'data-palette-project-mark': '' } : undefined}
+                  />
                 </span>
                 {shortcut(row)}
               </CommandItem>
