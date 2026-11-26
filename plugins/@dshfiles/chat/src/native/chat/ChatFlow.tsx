@@ -1,5 +1,5 @@
 /** Ordered Chat rows, local echoes, and running status share the flow slot's parent. */
-import { Fragment, memo, useContext, useMemo, type ReactElement } from 'react'
+import { Fragment, memo, useContext, useMemo, useRef, type ReactElement } from 'react'
 import type { PendingSubmission } from '@deepseek-ai/dsh-api-session-controller/client'
 import { assertNever } from '@deepseek-ai/dsh-util-values'
 import type { ChatFlowSlotProps } from '../contract/slots.ts'
@@ -9,7 +9,7 @@ import { ChatGroupSeat } from './ChatGroupSeat.tsx'
 import { PendingSteeringBubble, PendingSubmissionBubble } from './MessageItem.tsx'
 import { chatRenderKey } from './render-entry.ts'
 import { RunningStatus } from './RunningStatus.tsx'
-import { RunFoldContext, useRunFoldPlacements, type RunFoldScope } from './RunFold.tsx'
+import { RunFoldContext, useRunFoldAbsorbed, useRunFoldPlacements, type RunFoldScope } from './RunFold.tsx'
 import { SinceYouLeftContext } from './SinceYouLeftCard.tsx'
 
 /** A local submission echo, or a Host-pending steering item without a local submission. */
@@ -64,7 +64,28 @@ const ChatFlowRows = memo(function ChatFlowRows({
   useConnectionState, useStore, actions, renderSlot, renderFactorySlot, t, useGroupAction, useGroupHeaderAction,
   cwd, openFile, inspectCall, forkAt, loadImage, useProjection,
 }: ChatFlowRowsProps) {
-  const runKeys = useMemo(() => entries.map(entry => entry.kind === 'node' && entry.groupPart === undefined ? entry.key : undefined), [entries])
+  // dshfiles (round 21 D6): the tool rows a Turn keeps outside its process group (a failed call) stand right after
+  // it; the group's run may count them, and then the flow does not fold them a second time.
+  const trailingCache = useRef(new Map<string, readonly string[]>())
+  const trailingByGroup = useMemo(() => {
+    const trailing = new Map<string, readonly string[]>()
+    entries.forEach((entry, index) => {
+      if (entry.kind !== 'group') return
+      const keys: string[] = []
+      for (const next of entries.slice(index + 1)) {
+        if (next.kind !== 'node' || next.groupPart !== undefined || nodeStore.get(next.key)?.kind !== 'tool-call') break
+        keys.push(next.key)
+      }
+      if (keys.length === 0) return
+      // The same rows keep the same array, so a group seat re-renders only when its trailing rows change.
+      const previous = trailingCache.current.get(entry.key)
+      trailing.set(entry.key, previous !== undefined && previous.length === keys.length && previous.every((key, at) => key === keys[at]) ? previous : keys)
+    })
+    trailingCache.current = trailing
+    return trailing
+  }, [entries, nodeStore])
+  const absorbed = useRunFoldAbsorbed()
+  const runKeys = useMemo(() => entries.map(entry => entry.kind === 'node' && entry.groupPart === undefined && !absorbed.has(entry.key) ? entry.key : undefined), [entries, absorbed])
   const placements = useRunFoldPlacements(nodeStore, runKeys)
   // dshfiles (productivity pass T4.3): the "Since you left" divider, keyed so inserting it moves no other row.
   const sinceYouLeft = useContext(SinceYouLeftContext)
@@ -95,7 +116,8 @@ const ChatFlowRows = memo(function ChatFlowRows({
           {...entry.groupPart === undefined ? {} : { groupPart: entry.groupPart }} />
       case 'group':
         return <ChatGroupSeat {...seatProps} key={chatRenderKey(entry)} groupKey={entry.key}
-          useChatGroup={useChatGroup} useGroupHeaderAction={useGroupHeaderAction} />
+          useChatGroup={useChatGroup} useGroupHeaderAction={useGroupHeaderAction}
+          trailingKeys={trailingByGroup.get(entry.key)} />
       default:
         return assertNever(entry)
     }

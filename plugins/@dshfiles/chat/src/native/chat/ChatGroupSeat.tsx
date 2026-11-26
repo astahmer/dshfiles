@@ -26,6 +26,8 @@ type ChatGroupSeatProps = SeatProps & {
   readonly groupKey: GroupKey
   readonly useChatGroup: ChatFlowSlotProps['useChatGroup']
   readonly useGroupHeaderAction: ChatFlowSlotProps['useGroupHeaderAction']
+  /** dshfiles (round 21 D6): tool rows the Turn keeps outside this group right after it; its last run may count them. */
+  readonly trailingKeys?: readonly string[] | undefined
 }
 const PROCESS_TITLE_MINIMUM_MS = 150
 
@@ -85,12 +87,13 @@ function useStableLiveProcessTitle(desired: LiveProcessTitle, active: boolean): 
 }
 
 
-const GroupMembers = memo(function GroupMembers({ members, ...props }: SeatProps & {
+const GroupMembers = memo(function GroupMembers({ members, trailingKeys, ...props }: SeatProps & {
   readonly members: readonly NodeReference[]
+  readonly trailingKeys?: readonly string[] | undefined
 }) {
   // dshfiles (b:7rv2): consecutive background-job and subagent rows fold into one summary row.
   const keys = useMemo(() => members.map(member => member.groupPart === undefined ? member.key : undefined), [members])
-  const placements = useRunFoldPlacements(props.nodeStore, keys)
+  const placements = useRunFoldPlacements(props.nodeStore, keys, trailingKeys)
   return members.map((member, index) => <ChatNodeSeat {...props} key={chatRenderKey(member)} nodeKey={member.key}
     runFold={placements[index]}
     {...member.groupPart === undefined ? {} : { groupPart: member.groupPart }} />)
@@ -136,7 +139,7 @@ const ProcessGroupHeader = memo(function ProcessGroupHeader({ groupKey, useChatG
 })
 
 /** Render a process group with local disclosure and the existing outer-Turn visibility. */
-export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGroup, useGroupHeaderAction, ...props }: ChatGroupSeatProps) {
+export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGroup, useGroupHeaderAction, trailingKeys, ...props }: ChatGroupSeatProps) {
   const members = useChatGroup(groupKey, group => group?.members)
   const turn = useChatGroup(groupKey, group => group?.data.turn)
   const closed = useChatGroup(groupKey, group => group?.data.closed)
@@ -221,7 +224,7 @@ export const ChatGroupSeat = memo(function ChatGroupSeat({ groupKey, useChatGrou
         data-scroll-up={edges.canScrollUp || undefined} data-scroll-down={edges.canScrollDown || undefined}
         {...events}>
         <div ref={contentRef} className={css.content} data-step-process-content data-chat-flow="">
-          {membersMounted && <GroupMembers {...props} members={members} />}
+          {membersMounted && <GroupMembers {...props} members={members} trailingKeys={trailingKeys} />}
         </div>
       </div>
     </div>

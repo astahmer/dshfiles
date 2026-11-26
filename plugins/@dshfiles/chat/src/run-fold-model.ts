@@ -35,6 +35,32 @@ const partition = (kinds: readonly (string | undefined)[], enabled: boolean): re
   return runs
 }
 
+/**
+ * Runs of a process group's rows, joined by the rows the Turn keeps outside the group right after it (round 21 D6). A
+ * failed call never folds into "Worked for", so it stands after the group; the group's last run takes it as a member
+ * when it reaches the group's last row. Its summary then counts the failed call it sits beside ("7 subagents · 1
+ * failed") while that call keeps its own row, as a failed member always does.
+ * @param kinds - per group row, the claiming kind id, or undefined.
+ * @param trailing - per row kept outside the group right after it, the claiming kind id, or undefined.
+ * @param enabled - false in Verbose.
+ * @returns the group's runs (an end may reach past the group into `trailing`) and how many trailing rows they took.
+ */
+export interface RunFoldTrailingLayout {
+  readonly runs: readonly RunFoldSpan[]
+  /** How many of the trailing rows the group's last run took. */
+  readonly absorbed: number
+}
+
+const partitionWithTrailing = (
+  kinds: readonly (string | undefined)[],
+  trailing: readonly (string | undefined)[],
+  enabled: boolean,
+): RunFoldTrailingLayout => {
+  const runs = partition([...kinds, ...trailing], enabled).filter(run => run.start < kinds.length)
+  const last = runs.at(-1)
+  return { runs, absorbed: last === undefined ? 0 : Math.max(0, last.end - kinds.length) }
+}
+
 /** Problems never fold: a failed member or one waiting on the user keeps its own row. */
 const isProblem = (status: RunFoldStatus): boolean => status === 'failed' || status === 'needs-you'
 
@@ -131,6 +157,7 @@ const longest = (
 export const RunFoldModel = {
   minimum: RUN_FOLD_MINIMUM,
   partition,
+  partitionWithTrailing,
   isProblem,
   memberHidden,
   count,

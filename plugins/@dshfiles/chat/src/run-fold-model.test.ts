@@ -36,6 +36,37 @@ describe('RunFoldModel.partition', () => {
   })
 })
 
+describe('RunFoldModel.partitionWithTrailing (round 21 D6)', () => {
+  // Six subagent calls inside "Worked for", then the one that failed to start, which the Turn keeps outside it.
+  const group = ['agent', 'agent', 'agent', 'agent', 'agent', 'agent']
+
+  it('takes the failed call kept outside the group into the run it follows', () => {
+    expect(RunFoldModel.partitionWithTrailing(group, ['agent'], true)).toEqual({ runs: [{ start: 0, end: 7 }], absorbed: 1 })
+    // One call inside and the rest failed: one run of all seven, not a run of the six failed outside.
+    expect(RunFoldModel.partitionWithTrailing(['agent'], ['agent', 'agent', 'agent', 'agent', 'agent', 'agent'], true)).toEqual({
+      runs: [{ start: 0, end: 7 }],
+      absorbed: 6,
+    })
+  })
+
+  it('takes nothing when the group does not end on a claimed row, or the view does not fold', () => {
+    expect(RunFoldModel.partitionWithTrailing(['agent', 'agent', undefined], ['agent', 'agent'], true)).toEqual({ runs: [{ start: 0, end: 2 }], absorbed: 0 })
+    expect(RunFoldModel.partitionWithTrailing(group, [undefined, 'agent'], true)).toEqual({ runs: [{ start: 0, end: 6 }], absorbed: 0 })
+    expect(RunFoldModel.partitionWithTrailing(group, ['agent'], false)).toEqual({ runs: [], absorbed: 0 })
+  })
+
+  it('counts what the run shows: the summary names the failed call, open or collapsed', () => {
+    const { runs } = RunFoldModel.partitionWithTrailing(group, ['agent'], true)
+    const members = runs[0]?.end ?? 0
+    const states = [state('working'), state('stopped'), state('working'), state('working'), state('stopped'), state('done'), state('failed')].slice(0, members)
+    expect(text(RunFoldModel.summary([{ text: agent, states }], words))).toBe('7 subagents · 1 failed · 3 working · 1 finished · 2 stopped')
+    // Collapsed, the failed member is the one row left beside the summary; open, every row shows. Either way the
+    // summary's count is the rows it stands for.
+    expect(RunFoldModel.memberHidden({ expanded: false, problem: true })).toBe(false)
+    expect(RunFoldModel.memberHidden({ expanded: true, problem: false })).toBe(false)
+  })
+})
+
 describe('RunFoldModel.memberHidden', () => {
   it('hides members of a collapsed run', () => {
     expect(RunFoldModel.memberHidden({ expanded: false, problem: false })).toBe(true)
