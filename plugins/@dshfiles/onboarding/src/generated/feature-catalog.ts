@@ -26806,10 +26806,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"The turn stopped on an error.\"",
+          "text": "expect text \"Turn failed\"",
           "action": "expect",
           "by": "text",
-          "name": "The turn stopped on an error.",
+          "name": "Turn failed",
           "value": null
         },
         {
