@@ -212,3 +212,30 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
     expect(hidden).toMatch(/display:\s*none/)
   })
 })
+
+describe('Live work attached to the composer on a phone (council round 9 C4)', () => {
+  const NARROW = '@media (max-width: 27.99rem)'
+  const phone = ':global(html[data-shell-phone-nav])'
+  // Closed, with nothing else in the dock between the strip and the card.
+  const attached = `${phone} .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+
+  it('draws the strip as the composer card\'s top: its fill and hairline, 1px wider, meeting the card\'s ring', () => {
+    const head = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary])`)
+    expect(head).toMatch(/background: var\(--dsw-specific-input-major\);/)
+    expect(head).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+    expect(head).toMatch(/border-bottom-width: 0;/)
+    expect(head).toMatch(/border-radius: var\(--dsw-radius-lg\) var\(--dsw-radius-lg\) 0 0;/)
+    expect(head).toMatch(/margin-inline: calc\(var\(--dsh-composer-side-clearance, 0px\) - 1px\);/)
+    // The card's 1px ring is the one divider between them.
+    expect(head).toMatch(/margin-bottom: calc\(-1 \* var\(--dsh-composer-stack-gap\) - 1px\);/)
+  })
+
+  it('lets the row take the shared fill, inset like the desktop dock rows, and squares the card\'s top corners', () => {
+    const row = ruleIn(NARROW, `${attached} > .dockHead > [data-live-work-summary]`)
+    expect(row).toMatch(/background: transparent;/)
+    expect(row).toMatch(/padding-inline: 8px 4px;/)
+    const card = ruleIn(NARROW, `${attached}:has(> .dockHead > [data-live-work-summary]) :global([data-composer-card])`)
+    expect(card).toMatch(/border-top-left-radius: 0;/)
+    expect(card).toMatch(/border-top-right-radius: 0;/)
+  })
+})
