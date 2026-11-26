@@ -190,6 +190,8 @@ export interface SidebarPreferences {
   subscriptionNoticeLevel: SubscriptionNoticeLevel
   /** How a running subscriber hears a notice: steered into its live turn, or queued behind it. */
   subscriptionDelivery: SubscriptionDeliveryMode
+  /** Whether `notify_user` is limited per thread and in total; the Host reads it, the sidebar only shows it. */
+  notifyUserRateLimit: boolean
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
   finishedSubagents: FinishedSubagentsMode
@@ -287,6 +289,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   autoRestartQuietSeconds: 60,
   subscriptionNoticeLevel: 'all',
   subscriptionDelivery: 'steer',
+  notifyUserRateLimit: true,
   maxChildren: 3,
   finishedSubagents: 'collapse',
   subagentRunCards: true,

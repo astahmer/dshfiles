@@ -177,6 +177,9 @@ export const threadSidebarSettings = defineSettings({
       .description(
         'How a notice reaches a watching thread that is running: steer it into the live turn at its next step, or queue it for after that turn. Notices that arrive together merge into one either way.',
       ),
+    notifyUserRateLimit: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.notifyUserRateLimit)
+      .description('Limit agent notifications (notify_user) to 3 per thread and 12 in total within 10 minutes. Off: every notify_user call is delivered.'),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
       .description('Apply manual pin, park, archive, and restore actions to all child threads.'),

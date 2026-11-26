@@ -221,6 +221,7 @@ const preferencesInputFields = {
   ),
   subscriptionNoticeLevel: SchemaHelpers.withDecodedDefault(Schema.Literals(SUBSCRIPTION_NOTICE_LEVELS), () => DEFAULT_PREFERENCES.subscriptionNoticeLevel),
   subscriptionDelivery: SchemaHelpers.withDecodedDefault(Schema.Literals(SUBSCRIPTION_DELIVERY_MODES), () => DEFAULT_PREFERENCES.subscriptionDelivery),
+  notifyUserRateLimit: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.notifyUserRateLimit),
   maxChildren: SchemaHelpers.withDecodedDefault(
     Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(50)),
     () => DEFAULT_PREFERENCES.maxChildren,
