@@ -35,6 +35,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 6 (round-5 shots) | 8 | 8.5 | 8.5 | colour and type at the bar; craft and alignment (phone Inbox head, Settings header edge, indigo selection) |
 | 7 (round-6 shots) | 8.5 | 8.5 | 8.5 | indigo still on on-states and the theme card; one header frame; phone fold; one identity mark per page |
 | 8 (round-7 shots) | 8.5 | 8.5 | **9** | Mistral at target; grammar left: one colour layer per attention row, filter-row triggers, phone Inbox context |
+| 9 (round-8 shots) | 8.5 | 8.5 | **9** | phone Inbox head agreed by all; Settings width, selected-place colour, phone shell grid |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -183,6 +184,11 @@ and secondary previews on rows, one tone per Settings group, Settings row gramma
 series colour, Backlog rounded-square statuses and field triggers, Review's labelled controls and base combobox, leaf
 title marks for AI accounts and Plugins). The lead raised the spend node edge to the full series colour (60 % was
 2.1:1) and taught the capture script the Re-index menu. Backlog's "Inbox" view is not renamed: it lists attention items.
+
+Round 9 findings, merged in `.cache/unslop-audit/r5/council/round-9-fixes.md`: one two-line phone Inbox head with the full
+title; a labelled phone Triage button; Settings on a 720 px form frame with one select width; a selected place carries its
+tone (tile behind the glyph on selected nav rows and the active tab, tones on the phone tab bar); a calmer dark on-state;
+one phone gutter and header grid; Usage stats matching the chart; Backlog's status as a menu and its view renamed Triage.
 
 ## Round four
 
