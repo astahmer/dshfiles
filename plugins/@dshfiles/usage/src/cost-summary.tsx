@@ -26,7 +26,7 @@ const Tile = (props: { readonly label: ReactNode; readonly value: string; readon
  * baseline, never as a sub-line only some of the three carry (council round 8, D1).
  */
 const LeadTile = (props: { readonly label: ReactNode; readonly value: string; readonly change?: ReactNode }): JSX.Element => (
-  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:px-4 dshx:py-3 dshx:@max-pane-narrow:px-3">
+  <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:px-4 dshx:pt-2 dshx:pb-3 dshx:@max-pane-narrow:px-3">
     <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
     <span className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2" data-kpi-line>
       <span className="dshx:min-w-0 dshx:truncate dshx:text-title dshx:font-title dshx:tabular-nums" data-kpi-value>
@@ -54,9 +54,10 @@ const Change = (props: { readonly current: number; readonly previous: number; re
 const LEAD_CHANGE = 'dshx:shrink-0 dshx:whitespace-nowrap dshx:text-xs dshx:font-medium'
 
 /**
- * The Overview tab's numbers: cost, requests and cache hit lead, in one hairline card split by two dividers; the other
- * five open under a hairline inside the same card. "More numbers" is a 13 px text link in the card's top-right corner, so
- * the card needs no footer row (council round 6, D1; round 7, D3; round 8, D1). The estimate's caveat (list price,
+ * The Overview tab's numbers: cost, tokens and requests lead (tokens is the chart's default measure), in one hairline
+ * card split by two dividers; the other five, cache hit among them, open under a hairline inside the same card. The card
+ * has a small header line like the cards below it, "Totals" with "More numbers" at its end, so the link sits in no stat
+ * cell and needs no footer row (council round 6, D1; round 7, D3; round 9, D1). The estimate's caveat (list price,
  * catalog age) is a tooltip on the cost label.
  */
 export const CostSummary = (props: {
@@ -71,16 +72,27 @@ export const CostSummary = (props: {
   const { summary } = props
   const tokens = summary.input + summary.cacheRead + summary.cacheWrite + summary.output
   const cacheHit = UsageFormattingModel.cacheHitRatio(summary)
-  const change = (current: number, previous: number): JSX.Element | undefined =>
-    UsageFormattingModel.changeRatio(current, previous) === null ? undefined : <Change current={current} previous={previous} />
   const leadChange = (current: number, previous: number): JSX.Element | undefined =>
     UsageFormattingModel.changeRatio(current, previous) === null ? undefined : <Change className={LEAD_CHANGE} current={current} previous={previous} />
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
       <div
         data-usage-stats
-        className="dshx:@container dshx:relative dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card"
+        className="dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card"
       >
+        <div
+          className="dshx:flex dshx:min-w-0 dshx:items-center dshx:justify-between dshx:gap-3 dshx:px-4 dshx:pt-3 dshx:@max-pane-narrow:px-3"
+          data-usage-stats-header
+        >
+          <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">Totals</span>
+          <Button aria-controls={moreId} aria-expanded={open} className={STATS_MORE_LINK} onClick={() => setOpen(!open)} type="button" variant="link">
+            {open ? 'Fewer numbers' : 'More numbers'}
+            <ChevronDownIcon
+              aria-hidden
+              className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
+            />
+          </Button>
+        </div>
         <div className="dshx:grid dshx:min-w-0 dshx:grid-cols-3 dshx:divide-x dshx:divide-border" data-usage-stats-row>
           <LeadTile
             label={
@@ -101,17 +113,9 @@ export const CostSummary = (props: {
             value={UsageFormattingModel.formatCost(summary.cost)}
             change={leadChange(summary.cost, summary.previous.cost)}
           />
+          <LeadTile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} change={leadChange(tokens, summary.previous.tokens)} />
           <LeadTile label="Requests" value={summary.requests.toLocaleString()} change={leadChange(summary.requests, summary.previous.requests)} />
-          <LeadTile label="Cache hit" value={UsageFormattingModel.formatPercent(cacheHit)} />
         </div>
-        {/* A text link in the card's top-right corner, on the cells' label line (council round 8, D1). */}
-        <Button aria-controls={moreId} aria-expanded={open} className={STATS_MORE_LINK} onClick={() => setOpen(!open)} type="button" variant="link">
-          <span className="dshx:@max-pane-narrow:sr-only">{open ? 'Fewer numbers' : 'More numbers'}</span>
-          <ChevronDownIcon
-            aria-hidden
-            className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
-          />
-        </Button>
         {open ? (
           <div
             className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3 dshx:@min-[42rem]:grid-cols-3 dshx:@min-[64rem]:grid-cols-5 dshx:@max-pane-narrow:px-3"
@@ -127,7 +131,7 @@ export const CostSummary = (props: {
               value={`${summary.failed.toLocaleString()} / ${summary.aborted.toLocaleString()}`}
               detail={summary.failed === 0 ? undefined : UsageFormattingModel.formatPercent(summary.failed / summary.requests)}
             />
-            <Tile label="Tokens" value={UsageFormattingModel.formatCount(tokens)} detail={change(tokens, summary.previous.tokens)} />
+            <Tile label="Cache hit" value={UsageFormattingModel.formatPercent(cacheHit)} />
             <Tile
               label="Cache savings (estimate)"
               value={UsageFormattingModel.formatCost(summary.cacheSavings)}
@@ -150,8 +154,8 @@ export const CostSummary = (props: {
 }
 
 /**
- * "More numbers": a 13 px ink link, 20 px tall (44 px under a coarse pointer), pinned to the card's top-right corner and
- * centred on the cells' 12 px label line; a narrow pane keeps only its chevron.
+ * "More numbers": a 13 px ink link, 20 px tall, at the end of the card's header line. Under a coarse pointer it takes a
+ * 44 px target whose extra height overhangs the line (negative block margin), so the header does not grow.
  */
 export const STATS_MORE_LINK =
-  'dshx:absolute dshx:top-2.5 dshx:right-4 dshx:h-5 dshx:gap-1 dshx:px-0 dshx:text-sm dshx:has-[>svg]:px-0 dshx:pointer-coarse:top-0 dshx:pointer-coarse:h-11 dshx:pointer-coarse:min-w-11 dshx:@max-pane-narrow:right-3'
+  'dshx:h-5 dshx:gap-1 dshx:px-0 dshx:text-sm dshx:has-[>svg]:px-0 dshx:pointer-coarse:h-11 dshx:pointer-coarse:-my-3 dshx:pointer-coarse:min-w-11'
