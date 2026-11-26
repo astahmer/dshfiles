@@ -1,5 +1,6 @@
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import { describe, expect, it } from 'vitest'
+import { threadSidebarDictionaries } from './locales.js'
 import { PhoneThreadMeta } from './phone-thread-meta.js'
 
 /** A workspace row as the Host lists it; only the fields the meta line reads matter. */
@@ -52,6 +53,14 @@ describe('phone thread meta line (council round 17 B2.2)', () => {
     expect(PhoneThreadMeta.resolve({ ...saved, lineage: ['s-thread'] }).mark).toEqual({ tone: 4, color: '#aa3300', palette: 'balanced' })
     expect(PhoneThreadMeta.resolve({ ...saved, lineage: ['s-root'], coloured: false }).mark).toEqual({ tone: 4, color: 'currentColor', palette: 'balanced' })
     expect(PhoneThreadMeta.resolve({ ...base, lineage: ['elsewhere'] })).toMatchObject({ project: undefined, mark: undefined })
+  })
+})
+
+describe('the count formula\'s words (round 22 items 2 and 3)', () => {
+  it('says `N working` and `N failed` in both languages', () => {
+    expect(threadSidebarDictionaries.en.threadSidebarWorkingCount).toBe('{count} working')
+    expect(threadSidebarDictionaries.en.threadSidebarFailedCount).toBe('{count} failed')
+    expect(threadSidebarDictionaries.zh.threadSidebarFailedCount).toBe('{count} 个失败')
   })
 })
 

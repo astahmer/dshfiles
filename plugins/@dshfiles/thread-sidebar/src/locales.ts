@@ -619,6 +619,8 @@ const en = {
   threadSidebarRowActions: 'Hover actions',
   threadSidebarRowActionDismiss: 'Dismiss reminder',
   threadSidebarRowActionsHint: 'Buttons drawn on a thread row while the pointer is over it. Drag a row, or move it, to set their left-to-right order.',
+  /** Children whose turn failed, in the one count formula (`6 working · 2 failed`, round 22 items 2 and 3). */
+  threadSidebarFailedCount: '{count} failed',
 }
 
 const zh = {
@@ -1232,6 +1234,7 @@ const zh = {
   threadSidebarRowActions: '悬停操作',
   threadSidebarRowActionDismiss: '忽略提醒',
   threadSidebarRowActionsHint: '指针悬停在会话行上时显示的按钮；拖动或移动列表项即可设置其从左到右的顺序。',
+  threadSidebarFailedCount: '{count} 个失败',
 }
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
