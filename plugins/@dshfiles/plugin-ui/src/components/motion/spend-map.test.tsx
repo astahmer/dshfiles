@@ -145,3 +145,54 @@ describe('SpendMap › active node and connectors (council round 8, D1)', () => 
     expect(html).not.toContain('dshx:text-border')
   })
 })
+
+describe('SpendMap › one dimension at a time (council round 10, D1)', () => {
+  const html = renderToStaticMarkup(
+    <SpendMap
+      heading="Where it went"
+      subtitle="Tokens · input, cache and output"
+      owner="All accounts"
+      total={10}
+      format={value => String(value)}
+      dimensions={dimensions('var(--dshx-data-2)')}
+      dimensionId="model"
+      leafId="a"
+      picker="segments"
+      onDimensionChange={() => undefined}
+      onLeafChange={() => undefined}
+    />,
+  )
+  const header = /<header.*?<\/header>/su.exec(html)?.[0] ?? ''
+
+  it('picks the dimension with a "Breakdown by" segment control in the header, not a column of cards', () => {
+    expect(header).toContain('Breakdown by')
+    expect(header).toContain('aria-label="Breakdown by"')
+    for (const label of ['Models', 'Accounts']) expect(header).toContain(`>${label}<`)
+    expect(header).toContain('Tokens · input, cache and output')
+    expect(html).not.toContain('data-node-anchor="dim:')
+    expect(html).not.toContain('aria-label="Split by"')
+  })
+
+  it("draws only the selected dimension's flow: the total straight to its entries", () => {
+    expect(html).toContain('data-spend-link="leaf:model:a"')
+    expect(html).toContain('data-spend-link="leaf:model:b"')
+    expect(html).not.toContain('data-spend-link="root:')
+    expect(html).not.toContain('leaf:provider:acme')
+    expect(html).toContain('data-spend-link-active="leaf:model:a"')
+  })
+
+  it('spans the entries across the card, each label in full beside a bar of its share', () => {
+    const column = /<div[^>]*role="radiogroup" aria-label="Models"[^>]*>/u.exec(html)?.[0] ?? ''
+    expect(column).not.toContain('max-width')
+    expect(column).toContain('dshx:flex-1')
+    const node = /<button[^>]*data-node-anchor="leaf:model:a"[^>]*>.*?<\/button>/su.exec(html)?.[0] ?? ''
+    expect(node).toMatch(/<span class="[^"]*dshx:whitespace-nowrap[^"]*">Model A<\/span>/u)
+    expect(node).not.toMatch(/dshx:truncate[^"]*">Model A</u)
+    expect(node).toMatch(/data-spend-share=""[^>]*style="width:60%;background-color:var\(--dshx-data-2\)"/u)
+  })
+
+  it('keeps the card picker by default', () => {
+    expect(render()).toContain('data-node-anchor="dim:model"')
+    expect(render()).not.toContain('Breakdown by')
+  })
+})

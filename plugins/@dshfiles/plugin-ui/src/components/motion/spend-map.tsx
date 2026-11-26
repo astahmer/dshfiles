@@ -73,6 +73,12 @@ export interface SpendMapProps extends Omit<React.HTMLAttributes<HTMLElement>, '
    * the rest of the row.
    */
   readonly leafMaxWidth?: number
+  /**
+   * `cards` (default) fans the total out to a column of dimension cards, then to the selected one's entries. `segments`
+   * shows one dimension at a time: a "Breakdown by" segment control in the header picks it, and the total runs straight
+   * to its entries, which span the card with each label in full beside a bar of its share (council round 10, D1).
+   */
+  readonly picker?: 'cards' | 'segments'
 }
 
 const noLeaves: readonly SpendLeaf[] = []
@@ -106,9 +112,11 @@ export function SpendMap({
   footer,
   inset = 'framed',
   leafMaxWidth,
+  picker = 'cards',
   className,
   ...props
 }: SpendMapProps) {
+  const segments = picker === 'segments'
   const mapRef = React.useRef<HTMLDivElement>(null)
   const dimension = dimensions.find(entry => entry.id === dimensionId) ?? dimensions[0]
   const leaves = dimension?.leaves ?? noLeaves
@@ -116,13 +124,17 @@ export function SpendMap({
 
   const links = React.useMemo<NodeLink[]>(
     () => [
-      ...dimensions.map(entry => ({ id: `root:${entry.id}`, from: 'root', to: `dim:${entry.id}` })),
-      ...leaves.map(entry => ({ id: `leaf:${dimension?.id}:${entry.id}`, from: `dim:${dimension?.id}`, to: `leaf:${dimension?.id}:${entry.id}` })),
+      ...(segments ? [] : dimensions.map(entry => ({ id: `root:${entry.id}`, from: 'root', to: `dim:${entry.id}` }))),
+      ...leaves.map(entry => ({
+        id: `leaf:${dimension?.id}:${entry.id}`,
+        from: segments ? 'root' : `dim:${dimension?.id}`,
+        to: `leaf:${dimension?.id}:${entry.id}`,
+      })),
     ],
-    [dimensions, leaves, dimension?.id],
+    [dimensions, leaves, dimension?.id, segments],
   )
-  const layout = useNodeLinks(mapRef, links, [dimension?.id, leaves.length])
-  const activeLinks = [`root:${dimension?.id}`, `leaf:${dimension?.id}:${leaf?.id}`]
+  const layout = useNodeLinks(mapRef, links, [dimension?.id, leaves.length, segments])
+  const activeLinks = segments ? [`leaf:${dimension?.id}:${leaf?.id}`] : [`root:${dimension?.id}`, `leaf:${dimension?.id}:${leaf?.id}`]
   // A leaf's series colour runs its whole route: the selected leaf colours the branch into its dimension too.
   const linkColors = new Map<string, string>([
     ...leaves.flatMap(entry => (entry.color === undefined ? [] : [[`leaf:${dimension?.id}:${entry.id}`, entry.color] as const])),
@@ -153,6 +165,20 @@ export function SpendMap({
         {metrics && metric !== undefined ? (
           <SlidingSegments size="sm" aria-label="Measure" options={metrics} value={metric} onValueChange={value => onMetricChange?.(value)} />
         ) : null}
+        {segments && dimension !== undefined ? (
+          <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
+            <span aria-hidden className="dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
+              Breakdown by
+            </span>
+            <SlidingSegments
+              size="sm"
+              aria-label="Breakdown by"
+              options={dimensions.map(entry => ({ value: entry.id, label: entry.label }))}
+              value={dimension.id}
+              onValueChange={onDimensionChange}
+            />
+          </span>
+        ) : null}
       </header>
 
       {/* The map scrolls inside its own box when even the narrow layout cannot fit; it never widens the card. */}
@@ -166,7 +192,11 @@ export function SpendMap({
       >
         <div
           ref={mapRef}
-          className="dshx:relative dshx:flex dshx:min-w-fit dshx:items-center dshx:gap-7 dshx:p-4 dshx:@max-pane-compact:gap-5 dshx:@max-pane-narrow:gap-4 dshx:@max-pane-narrow:p-3"
+          className={cn(
+            'dshx:relative dshx:flex dshx:min-w-fit dshx:items-center dshx:gap-7 dshx:p-4 dshx:@max-pane-compact:gap-5 dshx:@max-pane-narrow:gap-4 dshx:@max-pane-narrow:p-3',
+            // With no card column between them, the total and its entries keep a run long enough to read as a flow.
+            segments && 'dshx:gap-16 dshx:@max-pane-compact:gap-10',
+          )}
         >
           <svg
             aria-hidden
@@ -235,21 +265,23 @@ export function SpendMap({
             ) : null}
           </div>
 
-          <div
-            role="radiogroup"
-            aria-label="Split by"
-            className="dshx:relative dshx:flex dshx:w-[150px] dshx:shrink-0 dshx:flex-col dshx:gap-2 dshx:@max-pane-narrow:w-[116px]"
-          >
-            {dimensions.map(entry => (
-              <DimensionCard
-                key={entry.id}
-                dimension={entry}
-                selected={entry.id === dimension?.id}
-                highlightLeafId={entry.id === dimension?.id ? (leaf?.id ?? null) : null}
-                onSelect={() => onDimensionChange(entry.id)}
-              />
-            ))}
-          </div>
+          {segments ? null : (
+            <div
+              role="radiogroup"
+              aria-label="Split by"
+              className="dshx:relative dshx:flex dshx:w-[150px] dshx:shrink-0 dshx:flex-col dshx:gap-2 dshx:@max-pane-narrow:w-[116px]"
+            >
+              {dimensions.map(entry => (
+                <DimensionCard
+                  key={entry.id}
+                  dimension={entry}
+                  selected={entry.id === dimension?.id}
+                  highlightLeafId={entry.id === dimension?.id ? (leaf?.id ?? null) : null}
+                  onSelect={() => onDimensionChange(entry.id)}
+                />
+              ))}
+            </div>
+          )}
 
           <div
             ref={leavesRef}
@@ -257,7 +289,7 @@ export function SpendMap({
             role="radiogroup"
             aria-label={dimension?.label ?? 'Entries'}
             className="dshx:relative dshx:flex dshx:min-w-[8.5rem] dshx:flex-1 dshx:flex-col dshx:gap-1.5"
-            style={leafMaxWidth === undefined ? undefined : { maxWidth: leafMaxWidth }}
+            style={leafMaxWidth === undefined || segments ? undefined : { maxWidth: leafMaxWidth }}
           >
             {leaves.map(entry => (
               <LeafCard
@@ -265,6 +297,7 @@ export function SpendMap({
                 anchor={`leaf:${dimension?.id}:${entry.id}`}
                 leaf={entry}
                 selected={entry.id === leaf?.id}
+                wide={segments}
                 format={format}
                 onSelect={() => onLeafChange(entry.id)}
               />
@@ -450,12 +483,15 @@ function LeafCard({
   leaf,
   anchor,
   selected,
+  wide = false,
   format,
   onSelect,
 }: {
   readonly leaf: SpendLeaf
   readonly anchor: string
   readonly selected: boolean
+  /** One line across the card: the label in full, a bar of the entry's share, then its amount and share. */
+  readonly wide?: boolean
   readonly format: (value: number) => string
   readonly onSelect: () => void
 }) {
@@ -480,12 +516,29 @@ function LeafCard({
       >
         {leaf.icon ?? leaf.label.slice(0, 1)}
       </span>
-      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
-        <span className="dshx:truncate dshx:text-xs dshx:font-medium dshx:text-foreground">{leaf.label}</span>
-        <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
-          {format(leaf.amount)} · {percent(leaf.share)}
+      {wide ? (
+        <>
+          <span className="dshx:shrink-0 dshx:text-xs dshx:font-medium dshx:whitespace-nowrap dshx:text-foreground">{leaf.label}</span>
+          {/* The share as a bar on a quiet track, in the entry's series colour (ink without one). */}
+          <span aria-hidden className="dshx:h-1.5 dshx:min-w-12 dshx:flex-1 dshx:overflow-hidden dshx:rounded-full dshx:bg-muted">
+            <span
+              data-spend-share=""
+              className={cn('dshx:block dshx:h-full dshx:rounded-full', leaf.color === undefined && 'dshx:bg-foreground')}
+              style={{ width: percent(leaf.share), ...(leaf.color !== undefined && { backgroundColor: leaf.color }) }}
+            />
+          </span>
+          <span className="dshx:shrink-0 dshx:text-xs dshx:whitespace-nowrap dshx:text-muted-foreground dshx:tabular-nums">
+            <span className="dshx:font-medium dshx:text-foreground">{format(leaf.amount)}</span> · {percent(leaf.share)}
+          </span>
+        </>
+      ) : (
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+          <span className="dshx:truncate dshx:text-xs dshx:font-medium dshx:text-foreground">{leaf.label}</span>
+          <span className="dshx:truncate dshx:text-2xs dshx:text-muted-foreground dshx:tabular-nums">
+            {format(leaf.amount)} · {percent(leaf.share)}
+          </span>
         </span>
-      </span>
+      )}
       {leaf.flag ? (
         <span
           className={cn(
