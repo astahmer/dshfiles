@@ -37,6 +37,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 8 (round-7 shots) | 8.5 | 8.5 | **9** | Mistral at target; grammar left: one colour layer per attention row, filter-row triggers, phone Inbox context |
 | 9 (round-8 shots) | 8.5 | 8.5 | **9** | phone Inbox head agreed by all; Settings width, selected-place colour, phone shell grid |
 | 10 (round-9 shots) | 8.5 | 8.5 | **9** | control chrome too loud, phone toolbar and dock, selection bar bends, Review icon |
+| 11 (round-10 shots) | 8.5 | 8.5 | **9** | marker crowds leading glyphs, quiet triggers vanish at rest, light diff, Usage repeats, prose measure |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -216,6 +217,11 @@ tally, a framed 44 px Triage icon, tighter card heads, one composer chip ink); D
 picker and Usage's one-dimension breakdown). Review's Compare against keeps its edge: it is a typed field.
 Follow-ups: thread-sidebar `host.test.ts` fails 2 tests in isolation on the round base too (pre-existing); the phone
 Triage icon has no visible label on touch; Usage has two grouping controls (toolbar By and Breakdown by).
+
+Round 11 findings, merged in `.cache/unslop-audit/r5/council/round-11-fixes.md`: no selection pill on rows that start with
+a glyph or tile; a resting hairline on quiet triggers and the field edge on the empty composer; a stronger light diff;
+one-row Usage breakdowns and one toolbar label grammar; one verb slot on desktop Inbox cards; inherited AI accounts
+effort as text; a ~72-character prose measure; a worded phone Triage and a Filters scope button.
 
 ## Round four
 
