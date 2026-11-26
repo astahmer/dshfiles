@@ -140,8 +140,8 @@ press over the row wash and every surface (`tests/button-tint.test.tsx`). Inbox 
 keep the filled tint.
 
 **Settings rows.** `dshx:settings-row` on each Settings row: an inset 1px hairline and a full-row hover/focus wash that
-bleeds 8px past the text (`dshx:bg-none` drops the last row's hairline); `dshx:settings-heading` (18/24 600, 40px above, 12px below; was 15/20 600, 32px
-above), `dshx:settings-label` (14/20 500) and `dshx:settings-description` (13/18 400, secondary ink). On a native row
+bleeds 8px past the text (`dshx:bg-none` drops the last row's hairline); `dshx:settings-heading` (18/24 600, 40px
+above and 12px below), `dshx:settings-label` (14/20 500) and `dshx:settings-description` (13/18 400, secondary ink). On a native row
 use the important form through an arbitrary variant (`dshx:[&_[class$=row]]:settings-row!`).
 
 **Wrapped code.** `CodeIndent` (`@dshfiles/plugin-ui/lib/code-indent`) hangs a wrapped line 2ch right of its own

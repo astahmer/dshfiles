@@ -12,6 +12,8 @@ colors:
   border-control: '#d6d4d2'
   border-strong: '#bfbdbb'
   field-border: '#88827d'
+  # The quiet trigger's fill as it paints on the page (council round 10 A1: the ink at 5%; 5.2% dark).
+  trigger-fill: '#f3f1ef'
   selected-wash: '#ebe9e6'
   prompt-fill: '#ecf5fa'
   wash-needs-you: '#e1e9ff'
@@ -30,6 +32,8 @@ colors:
   surface-raised-dark: '#23201d'
   border-hairline-dark: '#2f2c29'
   field-border-dark: '#76706c'
+  trigger-fill-dark: '#201d1a'
+  segment-thumb-dark: '#302c28'
   label-secondary-dark: '#a7a4a1'
   selected-wash-dark: '#2a2725'
   prompt-fill-dark: '#1a252a'
@@ -272,7 +276,9 @@ work on any surface.
    (rate limited, sign-in required, quota at 15% or less); it is never a work status.
    A page's own vocabulary is not a work status and takes no status hue: Backlog's In progress, Done and Dropped,
    a toolkit's source, a project marked Active are ink and muted shapes. Dropped is a struck ring, never the red
-   cross.
+   cross. **Backlog status glyphs** (council round 10) are ink rings, replacing round 8's rounded squares: an open ring
+   (to do), a ring holding a half-disc (in progress), a ring holding a check (done). Its status trigger is one
+   status-glyph button in a 32px seat with a 10px chevron, never a checkbox look.
 3. **Results are green, once.** Ready (finished, not yet seen) is a green dot with a bold title. A green check
    confirms an outcome the system verified: landed, every test passed, signed in, connection test passed. Done is a
    muted check. Working is motion, not hue: an ink ring spinner and the shimmer. Green is the glyph only; the text
@@ -315,8 +321,12 @@ work on any surface.
    surface. Inbox CTAs (card heads, the phone's full-width verbs) keep the filled tint. A selection (the selected row, the settings category, a pressed
    toggle, the palette's highlighted row, a chosen card) is `bg-selected-wash`, a neutral warm grey step with no accent
    hue, with ink text. Indigo fills mean attention only, and a selection's cue is ink too. A
-   selected list row, nav item, palette row or account row adds `selected-marker` (a 2px ink bar,
-   `--dsw-alias-label-primary`, inset on its leading edge, which follows a rounded row; 3:1 on the wash) and sets its title at `font-selected` (550); a chosen card or tile (a theme card, a starter) takes `selected-card`
+   selected list row, nav item, palette row or account row adds `selected-marker` (council round 10 A2: a straight
+   3 x 16px ink pill, `--dsw-alias-label-primary`, radius full, 3px from the start edge and centred on the row, painted
+   as background layers so it never bends with a rounded corner; 3:1 on the wash) and sets its title at `font-selected` (550).
+   **No bar beside a place tile.** Where a place glyph's tile already shows the selection (a side column row, a
+   Settings category with its `PlaceGlyph`), the row draws no marker: `selected-marker` skips a row that holds a
+   selected `place-seat` (a seat with `data-selected="false"` gives the pill back); a chosen card or tile (a theme card, a starter) takes `selected-card`
    instead, nothing heavier: a 1.5px edge in the ink at 80% (its 1px border plus a 0.5px inset ring, so the box never
    moves; 3:1 on every card surface) and an ink check badge in its trailing top corner (16px) in the full ink, no
    wash, so the card keeps its own surface and its artwork; no leading marker. The current
@@ -333,17 +343,23 @@ work on any surface.
    palette onto it. A status hue appears in a chart only when the series is
    that status (failed requests are `destructive`). Quota is ink while healthy, amber at 15% or less, red when
    spent.
-   **Chart labels.** Axis ticks and legend labels inside a `ChartFrame` read at the full secondary ink (`#646362`,
-   `#a7a4a1`: AA on bg, panel and raised), 12px, tabular figures; the chart library's own 68–78% opacity is overridden.
-   Gridlines stay quiet.
+   **Chart labels.** Axis ticks and titles, legend labels (steps and gradient ends too) and facet labels inside a
+   `ChartFrame` read at the full secondary ink (`#646362`, `#a7a4a1`: AA on bg, panel and raised), 12px, tabular
+   figures; the chart library's own 68–78% opacity and 10–11px are overridden, and the frame's own text is the 12px meta
+   step, so no chart text is under 12px (council round 10 A8). The interactive legend takes the size only, so a hidden
+   series keeps its dimmed label. Gridlines and value labels on marks stay quiet.
+   **Spend map breakdown.** `SpendMap` `picker="segments"` shows one dimension at a time: a "Breakdown by" segmented
+   control (Models / Accounts / Projects / Purpose) above the flow of the selected dimension only, which spans the card
+   width so its labels show in full; the caption names the active metric and its unit (council round 10 D1).
 9. **Diff and syntax.** The transcript's code blocks and the diff view share one syntax pair: Shiki's `css-variables`
    theme reading the `--shiki-token-*` values the theme block generates (keyword violet, function blue, string teal,
    constant copper, parameter magenta, every hue 25° or more from the status hues), each fitted per scheme to hold
    4.6:1 on the page, the code block, raised and every diff band. The diff body sits on the ramp (the page in light,
    the panel step in dark, never a near-black); in light, added and removed lines are a 12% tint of success and danger
    over it (a changed word 20%), written as `color-mix()` over the theme tones so every preset follows; in dark, where
-   that tint barely moved off the panel, each band is its own step in the tone's hue, L 0.27 at chroma 0.045 (a
-   changed word L 0.32 at 0.065). The gutter shows `+` and `−`, so a change reads without its colour. The
+   that tint barely moved off the panel, each band is its own step in the tone's hue: calm lines at L 0.25, chroma
+   0.04, and a changed word clearly lifted off its line at L 0.34, chroma 0.075 (council round 10 A4; every syntax
+   colour 5.6:1 or more on both, ink 9:1). The gutter shows `+` and `−`, so a change reads without its colour. The
    collapsed-lines bar is a 3% ink wash that reaches both card edges: where it expands, a 14px chevron in the
    line-number gutter and "Show N unchanged lines" where the code starts; where it cannot (a patch without the file),
    "N unchanged lines" at the same inset and no chevron. Comments are the faint step, darkened only as far as the
@@ -406,12 +422,13 @@ than size:
 | ------------- | ------------------------------- | ------------ | ----------------------------------------------- |
 | Display       | 26/32 (`text-display`)          | 600, -0.02em | Hero headline (new thread)                      |
 | Page title    | 22/28 (`text-title`)            | 650, -0.01em | The page `h1`, exactly one per page             |
-| Heading       | 15/20 (`text-heading`)          | 600          | In-page section heading: a Settings category's sections, an Inbox card title |
+| Heading       | 15/20 (`text-heading`)          | 600          | In-page section heading: an Inbox card title    |
+| Settings heading | 18/24 (`settings-heading`)   | 600          | A Settings category's sections: 40px above, 12px below |
 | Section title | 13px, 15px phone (`text-sm`)    | 600          | `PageSection` `h2`, card titles                 |
 | Body / UI     | 13px, 15px phone (`text-sm`) / 1.45 | 400      | Rows, descriptions, forms                       |
 | Prose         | 14px, 15px phone (`text-base`)  | 400          | Assistant messages, long descriptions           |
-| Label / meta  | 12px, 13px phone (`text-xs`) / 1.35 | 400–500  | Chips, timestamps, helper text, badges          |
-| Dense meta    | 11px, 12px phone (`text-2xs`)   | 400–500      | Counters, kbd hints, graph and chart labels     |
+| Label / meta  | 12px, 13px phone (`text-xs`) / 1.35 | 400–500  | Chips, timestamps, helper text, badges, keycaps, chart axes and legends |
+| Dense meta    | 11px, 12px phone (`text-2xs`)   | 400–500      | Counters, graph labels                          |
 | Code          | 12–12.5px mono                  | 400          | Commands, paths, ids that must be read verbatim |
 
 The minimum is 11px; nothing smaller. Every kit text step reads a density token (`text-2xs` the minimum,
@@ -454,9 +471,10 @@ Two densities, switched by pointer and width, never by user agent (`plugin-ui/sr
 `Input`, `InputGroup`, `Combobox`, the default `Select` trigger (and `select-look`), the segmented `TabsList` root with
 its items inset 3px, and default-size `Button`s, so `Page` header actions. All take one radius, 8px
 (`--dsw-radius-md`, `rounded-lg`); every `Button` size shares it. `size="sm"` (28px) is for a dense row or toolbar,
-never beside a field. **Toolbar fields.** In a toolbar row, a field-look launcher or value trigger (Search threads, a
-filter, a project picker) is `Button` `variant="field"` `size="field"`: the control height at 13px with a 14px
-glyph, so the search field, the pickers and the filter are one 32px row on desktop and 44px on a coarse pointer.
+never beside a field. **Toolbar fields.** In a toolbar row, a launcher or value trigger (Search threads, a filter, a
+project picker) is `Button` `variant="field"` `size="field"`: the control height at 13px with a 14px glyph, so the
+search field, the pickers and the filter are one 32px row on desktop and 44px on a coarse pointer. The pickers and
+the filter are quiet triggers; only the search field (or a launcher that stands for it) keeps the field edge.
 
 Safe areas: `--dshx-safe-top|right|bottom|left` (`env(safe-area-inset-*)`) on the phone top bar, tab bar, composer and
 sheets. Kit buttons, toggles and menu rows already get 44px hit areas on a coarse pointer.
@@ -475,13 +493,17 @@ the search field's filter or the ⋯ menu, never the toolbar.
 **Phone Inbox head.** Every phone Inbox card, the failed one included, takes the same two-line head. Line 1: the
 status glyph, the full title (wrapping to two lines, never cut for metadata) and the ⋯ menu, whose glyph sits 22px
 from the card edge. Line 2: the `ProjectMark`, the kind (Approval, Question, Turn failed…) and the age, at 13/400 in
-secondary ink. Titles win over the fold. The Needs you / Other / Done segmented row ends with a labelled 44px
-**Triage** text button (never an icon, never in the top bar, which keeps its title and ⋯ only).
+secondary ink. Titles win over the fold. The Needs you / Other / Done segmented row ends with a framed 44px ghost
+**Triage** button, the list-checks glyph and its label (never an icon alone, never in the top bar, which keeps its
+title and ⋯ only). When Needs you holds more than one status, its segment counts them as a tally (◆ 2 · ✕ 1: each
+status glyph and its tabular number 4px apart, no pill, a muted dot between; `PageTab` `statusCounts`, phone shell
+only), so a failure below the fold shows at first glance.
 
 **Phone dock.** On a phone the transcript scroller ends above the dock (composer and its docked rows), never under
-it: a 24px fade at its bottom edge instead of a hard clip line through text, and bottom padding that clears the last
-line. The jump-to-latest control sits in the dock's trailing seat, or 16px above the dock's top edge outside the text
-column; it is never over text.
+it: a fade one line-height tall (28px) ending exactly at the top edge of the dock's first card, so no line is half
+clipped, and bottom padding that clears the last line. The jump-to-latest control is `ArrowDown` in a 28px round seat
+(never arrow-to-line, which reads as download), in the dock's trailing seat or 16px above the dock's top edge outside
+the text column; it is never over text. The empty composer is a 72–76px block that grows as you type.
 
 Every control on a phone screen has a 44px hit area. Kit controls have it; a native-fork control takes the kit's
 `dshx-hit-44` class. A full-screen surface on a phone has a visible way out (Cancel or ‹) in its first row. With
@@ -549,8 +571,8 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   (`plugin-ui/src/settings-rows.css`): `settings-row` on each row draws a 1px hairline (`border-border`) inset to the
   text edges and a full-row wash (the ghost hover fill) on hover, where a pointer hovers, and while a control inside
   has keyboard focus; the row bleeds 8px past its text so the wash has room without moving it, and the last row drops
-  its hairline (`bg-none`). Type steps: `settings-heading` (section heading, 15/20 at 600, 32px above, none on the
-  first), `settings-label` (row label, 14/20 at 500, ink), `settings-description` (13/18 at 400, secondary ink).
+  its hairline (`bg-none`). Type steps: `settings-heading` (section heading, 18/24 at 600, 40px above and 12px below,
+  no top margin on the first; council round 10 A6), `settings-label` (row label, 14/20 at 500, ink), `settings-description` (13/18 at 400, secondary ink).
 - Counts: the count beside a heading is the number of rows its list shows with no filter; a filter's count is what
   it would show; a zero is not drawn. A count the list cannot reproduce is a bug.
 - One name per destination: the rail row, the tab title, the palette row and the `h1` are the same words, with no
@@ -592,7 +614,11 @@ Dialogs, alert dialogs and the command palette sit on `surface-dialog`: in light
 in dark a raised warm fill `oklch(0.27 0.006 60)` (`#292624`, clear of the scrim), a faint light edge
 `oklch(1 0 0 / 0.08)` and one deep shadow `0 24px 64px rgb(0 0 0 / 0.55)`. That fill sits on the page's selection
 wash, so inside a dark dialog the selection lifts to L 0.30 and the faint step to L 0.68 (AA on that selection), and a
-popover-level fill (the palette's `Command`) takes the dialog fill, so the card is one tone. A keycap (`Kbd`) in dark is a faint light cap (`oklch(1 0 0 / 0.08)`) with a 12% edge.
+popover-level fill (the palette's `Command`) takes the dialog fill, so the card is one tone. **One shortcut chip.** A
+keycap (`Kbd`, so `KeyHint` and the palette footer) is the same chip in both schemes and on every surface (council
+round 10 A5): 20px, the raised step (`tone-2`) with a 1px `border-l2` hairline, 12/500 secondary ink with tabular
+numerals, in the UI sans with the platform symbol faces before any generic fallback (`--dshx-kbd-font`), so ⌘ ⌥ ⇧
+never fall to a serif face.
 
 ## Motion
 
@@ -643,26 +669,39 @@ Heights: 24 compact · 28 default control · 32 list row · 36 composer bar · 4
 **Primary button — ink.** `Button` `variant="default"` is the Host brand fill (`--dshx-primary-fill`): in light a soft
 warm near-black `oklch(0.30 0.01 h)` (`#312d29`, a step off the ink so it is not a black slab) that darkens to
 `oklch(0.24 0.01 h)` on hover (`--dshx-primary-hover`, also the Host's primary hover), and in dark a softened warm grey
-`oklch(0.88 0.006 65)` so the one primary is never the brightest thing on the screen; `h` is the preset's grey hue.
+`oklch(0.88 0.006 65)` (`#dad7d3`, measured on the rendered Add account and Add plugin buttons) so the one primary is
+never the brightest thing on the screen; `h` is the preset's grey hue. No kit action bypasses it with the 0.93 ink:
+a Send button is the primary fill, a selected check the `control-on` ink (council round 10 A7).
 Its label is the page colour at weight 500, 13:1 or more at rest and on hover. Never indigo. One per page. Header secondary actions are
 `outline` `sm`; row verbs are `outline` or `ghost` `sm`, and a row verb that answers what waits on you is
 `attention` (`danger-tint` on a failed row; see the tint rung); destructive verbs `destructive` and always behind a
 confirmation when they lose work.
 
 **Tabs — the rule.** Underline tabs for page sections (`Page` `tabs.variant="underline"`): secondary-ink labels on a
-hairline, the active one in ink over a 2px ink bar, the same bar as the window tab strip. The segmented control (muted track, paper active pill) only for
-up to four view modes of one list; past four items the tabs are always underline. A filter over one list (Running /
+hairline, the active one in ink over a 2px ink bar, the same bar as the window tab strip. The segmented control only for
+up to four view modes of one list. **One selected segment** (council round 10 A3): the segmented `TabsList`, the
+page's sliding indicator and `SlidingSegments` share `segment-thumb`: paper (`#FEFCFA`) on the `#EBE9E7` track in light,
+a raised `#302C28` on the `#23201D` track in dark, inset 3px at a 6px radius with a quiet 1px edge and no shadow, the
+selected label the ink at 550 (its width reserved by `SegmentLabel`, so selecting never moves a neighbour); past four items the tabs are always underline. A filter over one list (Running /
 Finished / All) is a `ToggleGroup`.
 
-**Fields — one look.** `Input`, `Textarea`, `InputGroup` and the `Select` trigger share `fieldLook`
+**Fields — one look.** Text-entry fields, `Input`, `Textarea` and `InputGroup` (so search), share `fieldLook`
 (`@dshfiles/plugin-ui/components/ui/input`): a 1px field boundary, the page fill, the 8px radius, no shadow and no dark
 fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#88827d`, dark
-`#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); the combobox
-trigger, checkbox and radio edges use it too. Dividers and card hairlines stay `border-border`, subtle. The select trigger is 32px with its chevron in secondary ink at full strength. A Host select the kit does not draw
-takes the `select-look` utility. **Field trigger.** A popover or menu trigger that shows a value rather than running
-an action (a date range, a purpose filter, a project picker) is `Button` `variant="field"`: the select trigger's look,
-its value in ink at 400 and its chevron in secondary ink, with no hover fill. A filter row never mixes the field edge
-with the quiet outline edge; an action beside it (Refresh) stays `outline`. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
+`#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); checkbox and radio
+edges use it too. Dividers and card hairlines stay `border-border`, subtle. **Quiet triggers** (council round 10 A1).
+A control that opens a list and shows a value, the `Select` and `Combobox` triggers, `Button` `variant="field"` and the
+`select-look` utility (a Host select the kit does not draw), shares `triggerLook`: a filled chip, `bg-trigger-fill`
+(the ink at 5%, 5.2% dark, so `#f3f1ef` / `#201d1a` on the page and one visible step on a panel, the nav column, raised
+or a dialog), a transparent 1px edge at rest, the 3:1 field edge on hover and while open, and the accent edge under the
+kit focus ring on focus; the box never changes. It is 32px with its chevron in secondary ink at full strength.
+**Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
+filter, a project picker) is `Button` `variant="field"`: that look, its value in ink at 400 and its chevron in
+secondary ink. **Filter row.** A filter row is one edged text field (the search) and calm filled triggers beside it
+(council round 10 reverses round 8's all-edged row, which read as wireframe); an action beside it (Refresh) stays
+`outline`. On a phone the thread list's filter row is one 44px row: the search field and one scope button (the
+funnel glyph and the current scope as text) that opens one popover holding project and status, with a tinted dot
+when the scope is not the default. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
 reader hears), never a number glued to a second control.
 
 **Attention badge.** A Needs-you count on a nav glyph or a tab is one `AttentionBadge`

@@ -138,7 +138,8 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
 
   it('records the sixth council pass: ink selection marker, field boundary, 960 lane, dark layering, prompt fill (council round 6 A8)', () => {
     for (const text of [
-      'a 2px ink bar,\n   `--dsw-alias-label-primary`',
+      // Council round 10 A2 made the bar a straight pill; it stays the ink.
+      'ink pill, `--dsw-alias-label-primary`',
       '**Field boundary contrast.**',
       '`--dshx-field-border`',
       "  field-border: '#88827d'",
@@ -170,7 +171,8 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '**Short code on narrow panes.**',
       '12 lines or fewer',
       'Show N unchanged lines',
-      'L 0.27 at chroma 0.045',
+      // Council round 10 A4 recalibrated the dark bands; they stay their own step in the tone's hue.
+      "each band is its own step in the tone's hue",
     ])
       expect(design, text).toContain(text)
     // Retired by this pass: indigo on the active tab bar and on control on states.
@@ -231,5 +233,42 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('the tab takes no tile or tint')
     expect(design).not.toContain('Rows stay on the 880 frame')
   })
-})
 
+  it('records the tenth council pass: quiet triggers, the pill marker, one segment, one keycap, Settings headings, dark diff, chart text (council round 10 A9)', () => {
+    for (const text of [
+      '**Quiet triggers**',
+      '`triggerLook`',
+      '`bg-trigger-fill`',
+      '**Filter row.**',
+      'one scope button',
+      'a straight\n   3 x 16px ink pill',
+      '**No bar beside a place tile.**',
+      '**One selected segment**',
+      '`segment-thumb`',
+      '`SegmentLabel`',
+      '**One shortcut chip.**',
+      '`--dshx-kbd-font`',
+      '18/24 (`settings-heading`)',
+      '40px above and 12px below',
+      'calm lines at L 0.25',
+      'L 0.34, chroma 0.075',
+      '`#dad7d3`, measured',
+      'no chart text is under 12px',
+      '**Backlog status glyphs**',
+      'a ring holding a half-disc',
+      '**Spend map breakdown.**',
+      '`picker="segments"`',
+      '◆ 2 · ✕ 1',
+      '`ArrowDown` in a 28px round seat',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: the bending inset bar, the all-edged filter row, the two-scheme keycap, the 15/32 Settings
+    // heading, the brighter dark diff bands and 11px chart labels.
+    expect(design).not.toContain('inset on its leading edge, which follows a rounded row')
+    expect(design).not.toContain('A filter row never mixes the field edge')
+    expect(design).not.toContain('a faint light cap (`oklch(1 0 0 / 0.08)`) with a 12% edge')
+    expect(design).not.toContain('15/20 at 600, 32px above')
+    expect(design).not.toContain('L 0.27 at chroma 0.045')
+    expect(design).not.toContain('kbd hints, graph and chart labels')
+  })
+})
