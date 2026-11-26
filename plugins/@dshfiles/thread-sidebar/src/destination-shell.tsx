@@ -4,7 +4,7 @@ import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
 import { usePhoneHistoryLayer } from '@dshfiles/workbench/phone-history'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
-import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
+import { LEADING_GLYPH_ATTRIBUTE, SELECTED_EDGE } from '@dshfiles/plugin-ui/components/selection'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { fieldLook } from '@dshfiles/plugin-ui/components/ui/input'
@@ -520,6 +520,8 @@ const SectionButton = (props: {
           // The open page (round five T3, A1; council round 3 B2): the neutral selected wash and its leading marker, which
           // carries the accent, with an ink icon and label: the current place is lit once, here.
           props.selected && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
+          // A row led by its glyph or place seat draws no pill: the kit's selected edge outlines its wash (council round 12 B1).
+          props.selected && props.icon !== undefined && props.icon !== null && SELECTED_EDGE,
         )}
       >
         {props.icon === undefined || props.icon === null ? null : props.place === undefined ? (

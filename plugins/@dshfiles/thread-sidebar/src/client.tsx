@@ -1755,7 +1755,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
             // Selection is the quieter cue (round five B3): its low-chroma wash plus the leading accent bar. A Needs-you or
             // Failed row keeps its stronger attention wash when selected and takes only the bar.
             'dshx:group-data-[selected=true]/row:selected-marker',
-            rowWash === undefined && 'dshx:group-data-[selected=true]/row:bg-selected-wash',
+            // A row led by its status glyph draws no pill, so the kit's selected edge (a neutral 1px inset, 3:1 on the
+            // wash) outlines the wash (council round 12 B1): the wash alone measured 1.10:1 off the dark list.
+            rowWash === undefined && 'dshx:group-data-[selected=true]/row:bg-selected-wash dshx:group-data-[selected=true]/row:selected-edge',
             swipe.offset === 0 ? 'dshx:transition-transform dshx:duration-150' : 'dshx:bg-(--dsw-specific-sidebar-fill)',
             swipe.offset === 0 && rowWash === 'needs-you' && 'dshx:bg-wash-needs-you',
             swipe.offset === 0 && rowWash === 'failed' && 'dshx:bg-wash-failed',

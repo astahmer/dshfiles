@@ -223,6 +223,8 @@ describe('DestinationShell', () => {
     const usage = screen.getByRole('button', { name: 'Usage' })
     expect(usage.className).toContain('dshx:bg-selected-wash')
     expect(usage.className).toContain('dshx:selected-marker')
+    // A glyph-led row draws no pill, so the kit's selected edge outlines its wash (council round 12 B1).
+    expect(usage.className).toContain('dshx:selected-edge')
     const seat = usage.querySelector<HTMLElement>('[data-section-icon]')
     expect(seat?.className).toContain('dshx:place-seat')
     expect(seat?.className).toContain('dshx:nav-tone-observe')

@@ -269,6 +269,18 @@ describe('colour in a row', () => {
     expect(row.querySelector('[data-marker]')).toBeNull()
   })
 
+  it('outlines the selected glyph-led row with the kit selected edge on its wash (council round 12 B1)', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'working' }) })
+    const fill = row.querySelector<HTMLElement>('article > div')
+    // The wash alone measured 1.10:1 off the dark list; a 1px neutral inset edge (3:1 on the wash) outlines it.
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:selected-edge')
+    expect(fill?.className).toContain('dshx:group-data-[selected=true]/row:bg-selected-wash')
+    cleanup()
+    // A Needs-you or Failed row keeps its attention wash and its pill, no edge.
+    const asking = await renderRow({ selected: true, workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    expect(asking.querySelector<HTMLElement>('[data-row-wash]')?.className).not.toContain('selected-edge')
+  })
+
   it('keeps the pill on a selected Needs-you or Failed row, whose attention wash replaces the selected wash (council round 11 B3)', async () => {
     for (const workStatus of [rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }), rowStatus({ status: 'failed', detail: 'Turn failed' })]) {
       const row = await renderRow({ selected: true, workStatus })
