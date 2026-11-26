@@ -421,7 +421,7 @@ const InboxRow = (props: {
   const answers = !answerable ? null : (
         <div
           data-inbox-row-actions=""
-          className={cn(InboxView.ANSWERS, InboxView.BODY_INSET)}
+          className={cn(InboxView.ANSWERS, InboxView.ANSWERS_MEASURE, InboxView.BODY_INSET)}
         >
           {[
                 ...item.choices.map((choice, index) => (

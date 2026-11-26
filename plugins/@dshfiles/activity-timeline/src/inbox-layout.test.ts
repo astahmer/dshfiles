@@ -17,7 +17,8 @@ describe('inbox page layout', () => {
   })
 
   it('keeps a readable measure on the text of a row instead', () => {
-    expect(InboxView.TEXT_MEASURE).toBe('dshx:max-w-[72ch]')
+    // Council round 17 C1: one 36rem measure for the well, the prose and the answers.
+    expect(InboxView.TEXT_MEASURE).toBe('dshx:max-w-xl')
     expect(panel).toContain('InboxView.TEXT_MEASURE')
   })
 

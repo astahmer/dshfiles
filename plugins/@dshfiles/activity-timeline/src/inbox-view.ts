@@ -472,8 +472,15 @@ const textOf = (item: AttentionItem) => {
   return { reason: reason === '' ? sourceLabel(item.source) : reason, detail: detail === '' ? null : detail }
 }
 
-/** A page fills its pane (DESIGN.md); the words of a row keep a readable line length on a wide one. */
-const TEXT_MEASURE = 'dshx:max-w-[72ch]'
+/**
+ * A page fills its pane (DESIGN.md); the words of a row keep a readable line length on a wide one. Council round 17 C1:
+ * a card body's well, prose and answers share this one measure, 36rem, where 72ch in the well's mono 12px, the prose's
+ * sans 14px and the answers' own width drew three right edges. A phone is narrower, so its body runs the full card.
+ */
+const TEXT_MEASURE = 'dshx:max-w-xl'
+
+/** The answers row measures its content box, so its inset stays outside the measure, as the evidence's does. */
+const ANSWERS_MEASURE = `dshx:box-content ${TEXT_MEASURE}`
 
 export interface InboxPageAction {
   readonly id: 'triage' | 'alerts'
@@ -517,6 +524,7 @@ export class InboxView {
   static readonly threadQuestions = threadQuestions
   static readonly pageActions = pageActions
   static readonly TEXT_MEASURE = TEXT_MEASURE
+  static readonly ANSWERS_MEASURE = ANSWERS_MEASURE
   static readonly textOf = textOf
   static readonly asksQuestion = asksQuestion
   static readonly offersQuickReplies = offersQuickReplies

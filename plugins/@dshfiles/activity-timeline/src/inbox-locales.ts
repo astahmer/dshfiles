@@ -5,7 +5,7 @@ export const INBOX_LOCALE_NAMESPACE = 'dshfiles.attentionInbox'
 
 const en = {
   title: 'Inbox',
-  subtitle: 'Everything that needs you, in one place. An item that can be answered here shows its options.',
+  subtitle: 'Review approvals, answer questions, and inspect failures.',
   needsYou: 'Needs you',
   other: 'Other',
   snoozed: 'Snoozed',
@@ -128,7 +128,7 @@ const en = {
 
 const zh = {
   title: '收件箱',
-  subtitle: '所有需要你处理的事项集中于此。可在此回答的事项会显示其选项。',
+  subtitle: '审阅批准、回答问题、检查失败。',
   needsYou: '需要你',
   other: '其他',
   snoozed: '已暂缓',
