@@ -532,6 +532,25 @@ describe('a subagent row under its parent', () => {
     expect(working?.textContent).toBe('gpt-6-luna')
   })
 
+  it('draws no age on a child row, which equals its parent\'s, so the model and its state keep the room (council round 23, item 6)', async () => {
+    const child = rowSession({
+      id: SessionId('child-1'),
+      parentId: SessionId('s1'),
+      origin: 'subagent',
+      projectionValues: { threadSidebarModelRoute: 'dshx_fake_commandcode/claude-sonnet-5-5', subagent: { mode: 'continuable', label: 'Diff', seq: SessionSeq(3) } },
+    })
+    const row = await renderRow({
+      childThreads: [child],
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: true },
+      childStatuses: new Map([[child.id, rowStatus({ status: 'failed', detail: 'Turn failed' })]]),
+    })
+    const head = row.querySelector<HTMLElement>('ul [data-thread-child-head]')
+    expect(head?.textContent).toBe('Diff')
+    expect(head?.querySelector('.dshx\\:tabular-nums')).toBeNull()
+  })
+
   it('says "Turn failed" in the failed ink on either line, and Needs you in the muted one (council round 23, item 2)', async () => {
     const routed = rowSession({
       id: SessionId('child-routed'),

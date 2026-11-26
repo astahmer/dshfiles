@@ -862,7 +862,7 @@ const ChildThreadList = (props: {
     [...props.childThreads, ...props.finishedChildThreads].map(child => child.id),
   )
   const lineClass = cn(
-    // Touch: the time stands in the parent rows' time column, clear of their menu button's (council round 4 B4).
+    // Touch: line 1 ends where the parent rows' time column does, clear of their menu button's (council round 4 B4).
     'dshx:pointer-coarse:pr-11',
     'dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:outline-none dshx:hover:bg-accent/60 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
     compact ? 'dshx:h-6 dshx:text-xs' : 'dshx:h-7 dshx:text-sm',
@@ -957,9 +957,7 @@ const ChildThreadList = (props: {
               {t(attentionLabel)}
             </span>
           )}
-          {props.rowStyle.time ? (
-            <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{formatAge(child.updatedAt)}</span>
-          ) : null}
+          {/* No age: a child's equals its parent's, and the title and the model need the room (council round 23, item 6). */}
           </span>
           {route === undefined ? null : (
             // Under the title: the glyph's 16px seat and line 1's 8px gap, then the model whole or truncated, then the word.
