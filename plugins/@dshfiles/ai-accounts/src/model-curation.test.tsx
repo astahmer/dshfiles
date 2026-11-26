@@ -102,7 +102,7 @@ describe('reference Models table', () => {
     const effortHead = [...container.querySelectorAll('th')].find(element => element.textContent === 'Reasoning effort')
     // 192 px: room for "Provider default · Auto" at 12 px and its chevron (council round 12, D3).
     expect(effortHead?.className).toContain('dshx:w-48')
-    const trigger = container.querySelector('[aria-label="Default reasoning effort for Model 0"]')
+    const trigger = container.querySelector('[role="combobox"][aria-label^="Default reasoning effort for Model 0"]')
     const classes = (trigger?.getAttribute('class') ?? '').split(' ')
     // An inherited value hugs its text (council round 11, D2); an overridden chip keeps the 96 px minimum (below).
     for (const look of ['dshx:w-fit', 'dshx:max-w-full', 'dshx:px-2']) expect(classes).toContain(look)
@@ -147,7 +147,8 @@ describe('reference Models table', () => {
     // The row's own effort cell says where the value comes from, so the caption above the table would repeat it.
     expect(container.querySelector('[data-models-inherit-note]')).toBeNull()
     expect(container.textContent).not.toContain('All models inherit')
-    expect(container.querySelector('[aria-label="Default reasoning effort for Model 0"]')?.textContent).toMatch(/^Provider default · /u)
+    // Value first, then its source (council round 13, D2); the accessible name keeps "Provider default".
+    expect(container.querySelector('[role="combobox"][aria-label^="Default reasoning effort for Model 0"]')?.textContent).toBe('High · Provider')
     expect(container.querySelector('tbody')?.textContent).not.toContain('Inherited')
     expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effort', 'Show model', 'Actions'])
     await act(async () => root?.unmount())
@@ -174,7 +175,7 @@ describe('reference Models table', () => {
 })
 
 describe('Models table cells (council round 11, D2)', () => {
-  const effortTrigger = (name: string): Element | null => container.querySelector(`[aria-label="Default reasoning effort for ${name}"]`)
+  const effortTrigger = (name: string): Element | null => container.querySelector(`[role="combobox"][aria-label^="Default reasoning effort for ${name}"]`)
   const classesOf = (element: Element | null): string[] => (element?.getAttribute('class') ?? '').split(' ')
 
   it('shows an inherited effort as quiet 12 px secondary text with a small chevron, the trigger chrome on hover, focus and open', async () => {
@@ -205,6 +206,32 @@ describe('Models table cells (council round 11, D2)', () => {
     expect(classes).toContain('dshx:bg-trigger-fill')
     expect(classes).toContain('dshx:min-w-24')
     expect(classesOf(effortTrigger('Model 1'))).toContain('dshx:bg-transparent')
+  })
+
+  it('leads an inherited effort with its value: 13 px ink, then the source in 12 px secondary; the menu and name keep the full provenance (council round 13, D2)', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true })
+    const trigger = container.querySelector('[role="combobox"][aria-label^="Default reasoning effort for Model 0"]')
+    expect(trigger?.getAttribute('aria-label')).toBe('Default reasoning effort for Model 0, Provider default · High')
+    expect(trigger?.textContent).toBe('High · Provider')
+    const value = trigger?.querySelector('[data-effort-value]')
+    expect(value?.textContent).toBe('High')
+    for (const look of ['dshx:text-sm', 'dshx:text-foreground']) expect(classesOf(value ?? null), look).toContain(look)
+    const source = trigger?.querySelector('[data-effort-source]')
+    expect(source?.textContent).toBe(' · Provider')
+    for (const look of ['dshx:text-xs', 'dshx:text-muted-foreground']) expect(classesOf(source ?? null), look).toContain(look)
+    // The menu still names where the inherited value comes from. jsdom has no ResizeObserver or scrollIntoView for the popover.
+    if (!('ResizeObserver' in globalThis))
+      Object.assign(globalThis, { ResizeObserver: class { observe(): void {} unobserve(): void {} disconnect(): void {} } })
+    if (!('scrollIntoView' in Element.prototype)) Object.assign(Element.prototype, { scrollIntoView: () => undefined })
+    await click(trigger)
+    expect(document.body.textContent).toContain('Provider default · High')
+  })
+
+  it('names an account-wide default as the source', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false, defaultReasoningEffort: 'low' })
+    const trigger = container.querySelector('[role="combobox"][aria-label^="Default reasoning effort for Model 0"]')
+    expect(trigger?.textContent).toBe('Low · Account')
+    expect(trigger?.getAttribute('aria-label')).toBe('Default reasoning effort for Model 0, Account default · Low')
   })
 
   it('draws the Show model checkboxes at the dense 16 px size', async () => {

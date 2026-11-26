@@ -142,7 +142,7 @@ describe('account detail sections (council round 3, D3)', () => {
       </TooltipProvider>,
     )
     const classOf = (label: string): string => new RegExp(`<button[^>]*aria-label="${label}"[^>]*class="([^"]*)"`, 'u').exec(markup)?.[1] ?? ''
-    const effort = classOf('Default reasoning effort for GPT Six')
+    const effort = classOf('Default reasoning effort for GPT Six[^"]*')
     const mode = classOf('Model settings mode')
     // The kit's quiet trigger (council round 10, A1/D2): filled, no edge at rest, the 3:1 edge on hover and when open.
     for (const look of ['dshx:bg-trigger-fill', 'dshx:not-disabled:hover:border-field-border', 'dshx:h-(--dshx-control-h)']) expect(mode).toContain(look)

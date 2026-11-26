@@ -182,8 +182,11 @@ export const ModelCuration = (props: {
               const accountEffort = model.efforts.find(effort => effort.id === effective.defaultReasoningEffort)
               const nativeEffort = model.efforts.find(effort => effort.id === model.defaultEffort)
               // Each row says where its effort comes from, so no caption above the table repeats it (council round 12, D3).
-              const defaultLabel =
-                accountEffort === undefined ? `Provider default · ${nativeEffort?.name ?? 'Auto'}` : `Account default · ${accountEffort.name}`
+              const defaultSource = accountEffort === undefined ? 'Provider' : 'Account'
+              const defaultValue = accountEffort?.name ?? nativeEffort?.name ?? 'Auto'
+              const defaultLabel = `${defaultSource} default · ${defaultValue}`
+              // An inherited cell leads with its value, the source after it; the menu and the name keep the full provenance (council round 13, D2).
+              const inheritedEffort = validEffort === undefined && model.efforts.length > 0
               return (
                 <tr key={model.id} className="dshx:border-b dshx:last:border-b-0 dshx:hover:bg-muted/20">
                   <td className="dshx:px-2 dshx:py-2">
@@ -213,7 +216,20 @@ export const ModelCuration = (props: {
                   </td>
                   <td className="dshx:px-3 dshx:py-1.5">
                     <Combobox
-                      label={`Default reasoning effort for ${model.name}`}
+                      label={`Default reasoning effort for ${model.name}${inheritedEffort ? `, ${defaultLabel}` : ''}`}
+                      searchLabel={`Default reasoning effort for ${model.name} search`}
+                      trigger={
+                        inheritedEffort ? (
+                          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">
+                            <span data-effort-value className="dshx:text-sm dshx:text-foreground">
+                              {defaultValue}
+                            </span>
+                            <span data-effort-source className="dshx:text-xs dshx:text-muted-foreground">
+                              {` · ${defaultSource}`}
+                            </span>
+                          </span>
+                        ) : undefined
+                      }
                       value={validEffort ?? PROVIDER_DEFAULT}
                       disabled={model.efforts.length === 0}
                       options={[
