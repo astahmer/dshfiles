@@ -292,6 +292,14 @@ at the 12px meta size, additions in `text-success` and deletions in `text-destru
 selected wash), a zero side muted, the minus U+2212. A screen reader hears "48 lines added, 3 lines removed" (`label`
 overrides it). Use it for review summaries, file headers, tool rows and change pills instead of hand-built spans.
 
+**A route's model.** `RouteModel` (`components/model-mark`) shows the model a subagent or a route runs on:
+`<RouteModel provider={route.provider} model={route.model} />` draws the provider's 16px `ModelMark` and the model's
+display name in secondary ink (12px; `size="md"` for 13px on a row's own line or a header). `modelIdentity(provider,
+model)` is the rule behind it, for a surface that lays the parts out itself: `{ mark, name }`, the name as the model
+picker shows it (an account provider's own `<provider>/` prefix drops), the mark from the model id first and the
+provider only as a fallback, and `undefined` without a model. A family no token names draws the name alone; nothing is
+guessed. Pass route parts you may show: the kit does not screen secrets.
+
 ## Shared components
 
 Audit of UI rebuilt across owned plugins (native forks excluded), October 2026. Add a component here only when three or
@@ -529,7 +537,8 @@ Its other blocks were compared against what this repository already ships, and n
 
 ## Diff
 
-`@dshfiles/plugin-ui/diff` wraps `@pierre/diffs` 1.5.2 (Shiki-based, Apache-2.0). `PatchView` takes a git patch
+`@dshfiles/plugin-ui/diff` wraps `@pierre/diffs` 1.5.2 (Shiki-based, Apache-2.0). Each file header leads with a
+`ChangeBadge` (M, A, D, R; also exported) in place of the library's change glyph. `PatchView` takes a git patch
 string (`patch`) or pre-parsed `files` (`parsePatchFiles(patch).flatMap(p => p.files)`), a `layout` of `unified`
 (default) or `split`, an optional `focusPath` to scroll to, and `empty` content. It virtualizes files and lines, so
 megabyte patches stay responsive; give it a bounded height through `className`. Light/dark follows
