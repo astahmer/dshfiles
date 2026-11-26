@@ -26757,17 +26757,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect text \"Turn failed.\"",
+          "text": "expect text \"The turn stopped on an error.\"",
           "action": "expect",
           "by": "text",
-          "name": "Turn failed.",
+          "name": "The turn stopped on an error.",
           "value": null
         },
         {
-          "text": "click button \"Open\"",
+          "text": "click button \"Review thread\"",
           "action": "click",
           "by": "button",
-          "name": "Open",
+          "name": "Review thread",
           "value": null
         },
         {

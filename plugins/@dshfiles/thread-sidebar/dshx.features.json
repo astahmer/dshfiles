@@ -3710,8 +3710,8 @@
         "fill textbox \"commands, @ files or s*\" \"[[call bash {\\\"command\\\":\\\"echo inbox\\\",\\\"description\\\":\\\"Inbox check\\\"}]]\"",
         "press Enter",
         "click tab \"Inbox\"",
-        "expect text \"Turn failed.\"",
-        "click button \"Open\"",
+        "expect text \"The turn stopped on an error.\"",
+        "click button \"Review thread\"",
         "click tab \"Inbox\"",
         "click tab \"Done*\"",
         "expect text \"Resolved\""
