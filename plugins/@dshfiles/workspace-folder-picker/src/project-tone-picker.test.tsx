@@ -54,6 +54,27 @@ describe('ProjectTonePicker', () => {
     expect(onChange).toHaveBeenLastCalledWith({ kind: 'tone', tone: 4 })
   })
 
+  it('seats the custom colour like a palette swatch: 28 px, 44 pt on a coarse pointer, ringed when chosen', () => {
+    const { rerender, onChange } = renderPicker({ kind: 'tone', tone: 0 })
+    const seat = (): HTMLElement => {
+      const label = screen.getByLabelText('Custom colour for dshfiles').closest('label')
+      if (label === null) throw new Error('the custom colour input lost its label seat')
+      return label
+    }
+    for (const size of ['dshx:size-7', 'dshx:pointer-coarse:size-11']) {
+      expect(swatch(0).classList).toContain(size)
+      expect(seat().classList).toContain(size)
+    }
+    expect(seat().getAttribute('data-state')).toBe('unchecked')
+    rerender(<ProjectTonePicker choice={{ kind: 'custom', color: '#12ab34' }} name="dshfiles" onChange={onChange} />)
+    expect(seat().getAttribute('data-state')).toBe('checked')
+  })
+
+  it('wraps its label above the swatches when six 44 pt seats do not fit beside it', () => {
+    renderPicker({ kind: 'tone', tone: 0 })
+    expect(screen.getByText('Project colour').parentElement?.classList).toContain('dshx:flex-wrap')
+  })
+
   it('keeps the custom colour as a lower-case #rrggbb, with no swatch checked while it applies', () => {
     const { onChange } = renderPicker({ kind: 'custom', color: '#12ab34' })
     expect(within(group()).queryByRole('radio', { checked: true })).toBeNull()
