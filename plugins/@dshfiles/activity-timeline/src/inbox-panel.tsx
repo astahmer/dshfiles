@@ -296,6 +296,20 @@ const InboxRow = (props: {
               {t('review')}
             </Button>
           ) : null}
+          {/* A question's answers are its verbs; on a desktop its head still seats a quiet Open (council round 13 C2), so
+              the verb column down the list has no hole. */}
+          {place === 'head' && openable && answerable ? (
+            <Button
+              size="sm"
+              variant="ghost"
+              data-inbox-open-quiet=""
+              className={cn('dshx:max-w-full dshx:text-muted-foreground dshx:hover:text-foreground', INBOX_CHIP, size, InboxView.SHORT_VERB)}
+              aria-label={openLabel}
+              onClick={() => props.onOpen(item)}
+            >
+              {t('open')}
+            </Button>
+          ) : null}
           {openable && !answerable ? (
             <Button
               size="sm"

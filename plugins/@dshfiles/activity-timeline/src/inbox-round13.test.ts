@@ -39,3 +39,15 @@ describe('the phone approval card (council round 13 C1)', () => {
   })
 })
 
+describe('the desktop question card (council round 13 C2)', () => {
+  it('offers a quiet Open in its head seat, so the verb column has no hole', () => {
+    const at = panel.indexOf('data-inbox-open-quiet=""')
+    expect(at).toBeGreaterThan(-1)
+    const button = panel.slice(panel.lastIndexOf('<Button', at), panel.indexOf('</Button>', at))
+    expect(button).toContain('variant="ghost"')
+    expect(button).toContain('aria-label={openLabel}')
+    expect(button).toContain("{t('open')}")
+    // Only in the head (a desktop), only for a card whose answers are its verbs.
+    expect(panel).toContain("{place === 'head' && openable && answerable ? (")
+  })
+})
