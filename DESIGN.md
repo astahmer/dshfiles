@@ -326,7 +326,13 @@ work on any surface.
    as background layers so it never bends with a rounded corner; 3:1 on the wash) and sets its title at `font-selected` (550).
    **No bar beside a place tile.** Where a place glyph's tile already shows the selection (a side column row, a
    Settings category with its `PlaceGlyph`), the row draws no marker: `selected-marker` skips a row that holds a
-   selected `place-seat` (a seat with `data-selected="false"` gives the pill back); a chosen card or tile (a theme card, a starter) takes `selected-card`
+   selected `place-seat`. **No bar beside a glyph, tile or mark.** Since council round 11 A1 a row whose first visual
+   is a glyph, tile or mark draws none either (a status glyph, a project tile, a provider or model mark: the pill sat
+   3–5px from it and crowded the leading column); the wash and the 550 title carry the selection, as in Linear and
+   Things. The kit finds its own leading
+   `StatusGlyph`, `ProjectMark`, `PlaceGlyph`, `ModelMark` and `NativeProviderMark`; a plugin row marks its own glyph
+   with `LEADING_GLYPH_ATTRIBUTE` or opts the row out with `MARKER_OPT_OUT` (`components/selection`). Only plain-text
+   rows keep the pill. A chosen card or tile (a theme card, a starter) takes `selected-card`
    instead, nothing heavier: a 1.5px edge in the ink at 80% (its 1px border plus a 0.5px inset ring, so the box never
    moves; 3:1 on every card surface) and an ink check badge in its trailing top corner (16px) in the full ink, no
    wash, so the card keeps its own surface and its artwork; no leading marker. The current
@@ -355,8 +361,12 @@ work on any surface.
    theme reading the `--shiki-token-*` values the theme block generates (keyword violet, function blue, string teal,
    constant copper, parameter magenta, every hue 25° or more from the status hues), each fitted per scheme to hold
    4.6:1 on the page, the code block, raised and every diff band. The diff body sits on the ramp (the page in light,
-   the panel step in dark, never a near-black); in light, added and removed lines are a 12% tint of success and danger
-   over it (a changed word 20%), written as `color-mix()` over the theme tones so every preset follows; in dark, where
+   the panel step in dark, never a near-black); in light, added and removed lines are a 16% tint of success and danger
+   over it and a changed word 34% (council round 11 A3: at 12% / 20% a changed word lifted only 1.08:1 off its line;
+   now 1.3:1), written as `color-mix()` over the theme tones so every preset follows and painted as is (the library's
+   own line mix is off). Inside the light diff, punctuation and comments are capped at L 0.43 and the `+`/`−` marks and
+   line numbers are the tone pulled 25% toward the ink, so every text, syntax colour and the ink hold 4.5:1 on lines
+   and changed words alike; in dark, where
    that tint barely moved off the panel, each band is its own step in the tone's hue: calm lines at L 0.25, chroma
    0.04, and a changed word clearly lifted off its line at L 0.34, chroma 0.075 (council round 10 A4; every syntax
    colour 5.6:1 or more on both, ink 9:1). The gutter shows `+` and `−`, so a change reads without its colour. The
@@ -689,12 +699,17 @@ Finished / All) is a `ToggleGroup`.
 (`@dshfiles/plugin-ui/components/ui/input`): a 1px field boundary, the page fill, the 8px radius, no shadow and no dark
 fill. **Field boundary contrast.** The boundary is `border-field-border` (`--dshx-field-border`, light `#88827d`, dark
 `#76706c`), 3:1 against bg, panel, raised, the nav column and the dark dialog fill (WCAG 1.4.11); checkbox and radio
-edges use it too. Dividers and card hairlines stay `border-border`, subtle. **Quiet triggers** (council round 10 A1).
+edges use it too. A checkbox column in a dense table (AI accounts' "Show model") takes `Checkbox size="sm"` (council
+round 11 A5): the same 16px box and 44px touch area, a 12px tick at an absolute 1.5px stroke, no shadow. Dividers and card hairlines stay `border-border`, subtle. **Quiet triggers** (council round 10 A1).
 A control that opens a list and shows a value, the `Select` and `Combobox` triggers, `Button` `variant="field"` and the
 `select-look` utility (a Host select the kit does not draw), shares `triggerLook`: a filled chip, `bg-trigger-fill`
 (the ink at 5%, 5.2% dark, so `#f3f1ef` / `#201d1a` on the page and one visible step on a panel, the nav column, raised
-or a dialog), a transparent 1px edge at rest, the 3:1 field edge on hover and while open, and the accent edge under the
-kit focus ring on focus; the box never changes. It is 32px with its chevron in secondary ink at full strength.
+or a dialog), a quiet 1px hairline at rest (`border-border`, `--dsw-alias-border-l2`; council round 11 A2: with a
+transparent edge the chip vanished into its surface), the 3:1 field edge on hover and while open, and the accent edge
+under the kit focus ring on focus; the box never changes. It is 32px with its chevron in secondary ink at full strength.
+**A typeable combobox** beside quiet triggers (Review's "Compare against": type a revision or pick a bookmark) takes
+`Input rest="trigger"` (`typeableTriggerLook`, council round 11 A4): the trigger look at rest, so the pair matches, and
+the field look (page fill, 3:1 edge) on hover, while its list is open and while it has focus, so while you type.
 **Field trigger.** A popover or menu trigger that shows a value rather than running an action (a date range, a purpose
 filter, a project picker) is `Button` `variant="field"`: that look, its value in ink at 400 and its chevron in
 secondary ink. **Filter row.** A filter row is one edged text field (the search) and calm filled triggers beside it
@@ -757,8 +772,9 @@ Inbox item only opens it, and its verb is Review.
 meta chips · trailing inline verb`, with an optional muted description line and full-width children (an output pane).
 The middle is one button when the row selects; leading and trailing stay separate controls. Lists are one bordered
 card with hairline dividers. In narrow panes meta wraps under the title and trailing verbs drop to their own line.
-A selected row takes `bg-selected-wash` and the `selected-marker`, with its title at 550; a Needs-you or Failed row
-holds its attention wash instead.
+A selected row takes `bg-selected-wash` and the `selected-marker`, with its title at 550; a row that leads with its
+status glyph draws no pill (council round 11 A1), only the wash and the 550 title; a Needs-you or Failed row holds its
+attention wash instead.
 
 **Live work row** (a subagent, a background job). One row in the EntityRow shape: `status glyph · name · muted
 current step · elapsed · Open`. While the work runs it lives in the dock above the composer, where it expands to its

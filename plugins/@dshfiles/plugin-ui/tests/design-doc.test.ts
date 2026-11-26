@@ -271,4 +271,26 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('L 0.27 at chroma 0.045')
     expect(design).not.toContain('kbd hints, graph and chart labels')
   })
+
+  it('records the eleventh council pass: no pill beside a glyph, the trigger hairline, the typeable combobox, the light diff, the dense checkbox (council round 11 A6)', () => {
+    for (const text of [
+      '**No bar beside a glyph, tile or mark.**',
+      '`LEADING_GLYPH_ATTRIBUTE`',
+      '`MARKER_OPT_OUT`',
+      'Only plain-text\n   rows keep the pill.',
+      'a quiet 1px hairline at rest (`border-border`, `--dsw-alias-border-l2`',
+      '**A typeable combobox**',
+      '`Input rest="trigger"`',
+      'a 16% tint of success and danger',
+      'a changed word 34%',
+      'capped at L 0.43',
+      '`Checkbox size="sm"`',
+      'a 12px tick at an absolute 1.5px stroke',
+    ])
+      expect(design, text).toContain(text)
+    // Retired by this pass: the transparent trigger edge, the 12% / 20% light diff and the pill a seat gave back.
+    expect(design).not.toContain('a transparent 1px edge at rest')
+    expect(design).not.toContain('a 12% tint of success and danger')
+    expect(design).not.toContain('gives the pill back')
+  })
 })
