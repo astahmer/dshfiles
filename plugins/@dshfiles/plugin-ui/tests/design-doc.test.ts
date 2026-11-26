@@ -277,7 +277,10 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
       '**No bar beside a glyph, tile or mark.**',
       '`LEADING_GLYPH_ATTRIBUTE`',
       '`MARKER_OPT_OUT`',
-      'Only plain-text\n   rows keep the pill.',
+      '`MARKER_KEEP`',
+      'a selected Needs-you or Failed row keeps it',
+      'with an ink count of the filters that are on',
+      'Only plain-text\n   rows keep the pill',
       'a quiet 1px hairline at rest (`border-border`, `--dsw-alias-border-l2`',
       '**A typeable combobox**',
       '`Input rest="trigger"`',
@@ -292,5 +295,6 @@ describe('DESIGN.md and the kit agree (round four R8-R15)', () => {
     expect(design).not.toContain('a transparent 1px edge at rest')
     expect(design).not.toContain('a 12% tint of success and danger')
     expect(design).not.toContain('gives the pill back')
+    expect(design).not.toContain('with a tinted dot')
   })
 })

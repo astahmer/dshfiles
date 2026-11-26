@@ -170,7 +170,9 @@ The kit finds its own leading glyphs (`StatusGlyph`, `ProjectMark`, `PlaceGlyph`
 `NativeProviderMark` as the row's first element, up to four wrappers deep), so a selected `EntityRow` with a `status`
 and a palette row that starts with a project tile lose the pill. A plugin row spreads `LEADING_GLYPH_ATTRIBUTE`
 (`data-leading-glyph`, found anywhere in the row) on its own leading glyph, or `MARKER_OPT_OUT` (`data-marker="none"`)
-on the row itself; both come from `@dshfiles/plugin-ui/components/selection`. Only plain-text rows keep the pill. The
+on the row itself; both come from `@dshfiles/plugin-ui/components/selection`. Only plain-text rows keep the pill,
+and a row that spreads `MARKER_KEEP` (`data-marker="pill"`): a selected Needs-you or Failed row, which shows its
+attention wash instead of the selected wash. The
 active underline tab draws a
 2px ink bar too (council round 7 A1), like the window tab strip; the checked switch, checkbox and radio fill
 `control-on`, the ink, with the tick or knob in `control-on-foreground`. Indigo is attention, the focus ring and links. The kit applies wash and marker to the selected

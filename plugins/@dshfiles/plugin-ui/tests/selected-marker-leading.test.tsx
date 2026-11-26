@@ -13,7 +13,7 @@ import type * as React from 'react'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { EntityRow } from '../src/components/entity-row.js'
 import { ModelMark, NativeProviderMark } from '../src/components/model-mark.js'
-import { LEADING_GLYPH_ATTRIBUTE, MARKER_OPT_OUT } from '../src/components/selection.js'
+import { LEADING_GLYPH_ATTRIBUTE, MARKER_KEEP, MARKER_OPT_OUT } from '../src/components/selection.js'
 import { PlaceGlyph } from '../src/components/ui/place-glyph.js'
 import { ProjectMark } from '../src/components/ui/project-mark.js'
 import { StatusGlyph } from '../src/components/work-status.js'
@@ -43,8 +43,8 @@ const draws = (row: React.ReactElement): boolean => {
 }
 
 describe('selection marker skips rows that lead with a glyph, tile or mark (council round 11 A1)', () => {
-  it('compiles to one selector', () => {
-    expect(selector).toMatch(/^\.dshx\\:selected-marker:not\(/u)
+  it('compiles to one rule: the opt-in, then the rows that do not lead with a glyph', () => {
+    expect(selector).toMatch(/^\.dshx\\:selected-marker\[data-marker='pill'\],\s*\.dshx\\:selected-marker:not\(/u)
   })
 
   it('keeps the pill on a plain-text row', () => {
@@ -141,6 +141,20 @@ describe('selection marker skips rows that lead with a glyph, tile or mark (coun
         </div>,
       ),
     ).toBe(false)
+  })
+
+  it('keeps the pill on a row that opts in: a selected Needs-you or Failed row shows its attention wash, not the selected one', () => {
+    expect(MARKER_KEEP).toEqual({ 'data-marker': 'pill' })
+    expect(draws(<EntityRow status="needs-you" heading="Publish preview build" selected onSelect={() => undefined} {...MARKER_KEEP} />)).toBe(true)
+    const row = (
+      <div className="dshx:selected-marker" {...MARKER_KEEP}>
+        <span>
+          <ProjectMark name="billing-api" />
+        </span>
+        <span>Reconcile Stripe payouts</span>
+      </div>
+    )
+    expect(draws(row)).toBe(true)
   })
 
   it('keeps the place-seat rule: a selected tile anywhere in the row already shows the selection', () => {

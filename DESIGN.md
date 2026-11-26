@@ -332,7 +332,9 @@ work on any surface.
    Things. The kit finds its own leading
    `StatusGlyph`, `ProjectMark`, `PlaceGlyph`, `ModelMark` and `NativeProviderMark`; a plugin row marks its own glyph
    with `LEADING_GLYPH_ATTRIBUTE` or opts the row out with `MARKER_OPT_OUT` (`components/selection`). Only plain-text
-   rows keep the pill. A chosen card or tile (a theme card, a starter) takes `selected-card`
+   rows keep the pill, and one exception: a selected Needs-you or Failed row keeps it (`MARKER_KEEP`,
+   `data-marker="pill"`), because it shows its attention wash instead of the selected wash and the pill is then its
+   only selection cue besides the 550 title. A chosen card or tile (a theme card, a starter) takes `selected-card`
    instead, nothing heavier: a 1.5px edge in the ink at 80% (its 1px border plus a 0.5px inset ring, so the box never
    moves; 3:1 on every card surface) and an ink check badge in its trailing top corner (16px) in the full ink, no
    wash, so the card keeps its own surface and its artwork; no leading marker. The current
@@ -715,8 +717,8 @@ filter, a project picker) is `Button` `variant="field"`: that look, its value in
 secondary ink. **Filter row.** A filter row is one edged text field (the search) and calm filled triggers beside it
 (council round 10 reverses round 8's all-edged row, which read as wireframe); an action beside it (Refresh) stays
 `outline`. On a phone the thread list's filter row is one 44px row: the search field and one scope button (the
-funnel glyph and the current scope as text) that opens one popover holding project and status, with a tinted dot
-when the scope is not the default. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
+funnel and "Filters", or the picked project's name, with an ink count of the filters that are on) that opens one
+popover holding project and status. A number with a unit is one `UnitInput` (the unit a muted inner suffix the screen
 reader hears), never a number glued to a second control.
 
 **Attention badge.** A Needs-you count on a nav glyph or a tab is one `AttentionBadge`

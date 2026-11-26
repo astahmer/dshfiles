@@ -126,9 +126,12 @@
  * the row's first element, or the first element of its first element, up to four deep: `StatusGlyph`, `ProjectMark`,
  * `PlaceGlyph`/`place-seat` (selected or not), `ModelMark` and `NativeProviderMark`. A plugin glyph opts in with
  * `data-leading-glyph` (found anywhere in the row), and a row opts out with `data-marker="none"`
- * (`components/selection`). The pill stays on plain-text rows.
+ * (`components/selection`). The pill stays on plain-text rows. A row whose wash is not the selection wash (a selected
+ * Needs-you or Failed row keeps its attention wash) keeps the pill with `data-marker="pill"`: there it is the only
+ * selection cue besides the 550 title.
  */
 @utility selected-marker {
+  &[data-marker='pill'],
   &:not(:has([class*='place-seat']:not([data-selected='false']))):not([data-marker='none']):not(
       :has(
         [data-leading-glyph],
