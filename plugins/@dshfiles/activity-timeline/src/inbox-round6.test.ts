@@ -8,12 +8,12 @@ const between = (from: string, to: string): string => row.slice(row.indexOf(from
 
 describe('a phone Inbox card (round six C1)', () => {
   it('pads the head row 12px (11px before the glyph, 8px after the seat) and gives the title its own line', () => {
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-2')
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px]')
     expect(InboxView.CARD_HEAD).not.toContain('py-0')
     expect(InboxView.CARD_HEAD).not.toContain('min-h-11')
     // The 44pt ⋯ (and a compact card's verb) sits inside the 12px padding, centred on the title's first line.
-    expect(InboxView.HEAD_SEAT).toContain('dshx:@max-pane-narrow:-my-3!')
+    expect(InboxView.HEAD_SEAT).toContain('dshx:@max-pane-narrow:-my-2!')
   })
 
   it('moves the verb of a card with a body to a full-width button at the bottom of the body (36px since council round 7 C2)', () => {

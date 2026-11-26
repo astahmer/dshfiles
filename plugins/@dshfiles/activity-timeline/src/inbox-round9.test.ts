@@ -76,7 +76,7 @@ describe('the phone Triage button (council round 9 C2)', () => {
     expect(InboxView.PHONE_TRIAGE).toContain('dshx:in-data-shell-phone-nav:inline-flex')
     expect(InboxView.PHONE_TRIAGE).toContain('dshx:absolute dshx:top-0 dshx:right-0')
     expect(InboxView.PHONE_TRIAGE).toContain('dshx:h-11')
-    expect(list).toMatch(/data-inbox-phone-triage=""[^>]*>\s*\{t\('triage'\)\}/u)
+    expect(list).toMatch(/data-inbox-phone-triage=""[^>]*>\s*<ListChecksIcon aria-hidden \/>\s*\{t\('triage'\)\}/u)
     // The switcher row holds it: the tabs root is its frame, and the strip keeps clear of it.
     expect(list).toContain("'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:relative'")
     // The top bar keeps its title and ⋯: Triage never reaches it, and it has no primary seat.

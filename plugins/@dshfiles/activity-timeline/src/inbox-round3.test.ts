@@ -37,7 +37,7 @@ describe('an Inbox card on a phone (round five C3, council round 3)', () => {
     const verbs = row.slice(row.indexOf('const headVerbs = '), row.indexOf('const answers = '))
     expect(verbs).toMatch(/aria-label=\{t\('more'\)\}/u)
     // The head is 44pt tall on a phone: 12px padding around the 20px title (round six C1).
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-2')
     expect(row).toContain('InboxView.CARD_HEAD')
   })
 

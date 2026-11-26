@@ -1475,7 +1475,8 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
       }}
     >
       {triageable ? (
-        <Button type="button" variant="ghost" onClick={() => void startTriage()} className={InboxView.PHONE_TRIAGE} data-inbox-phone-triage="">
+        <Button type="button" variant="outline" onClick={() => void startTriage()} className={InboxView.PHONE_TRIAGE} data-inbox-phone-triage="">
+          <ListChecksIcon aria-hidden />
           {t('triage')}
         </Button>
       ) : null}

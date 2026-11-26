@@ -112,7 +112,8 @@ const CARD_HEAD =
   // Council round 9 C1: the seat is top-aligned with the title's first line, and its 44px controls sit 8px inside the
   // card's edge, so the ⋯ glyph is 22px from it on every card. The glyph leads 11px inside the border, 24px from the
   // screen's edge (lane B's phone gutter).
-  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-3' +
+  // Council round 10 C2: 8px above and below the head, not 12, so each card is 8px shorter.
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-2' +
   ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start' +
   // Council round 8 C2: the head's parts are spaced by their muted "·" separators (6px each side), not by flex gaps.
   ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
@@ -141,11 +142,11 @@ const HEAD_TWO_LINES =
 
 /**
  * The head row's seat: 28px controls pulled 4px into the row's padding on a wide pane; on a compact pane its 44pt
- * controls sit inside the 12px padding, centred on the title's first line (important: the touch rule `my-0` is emitted after the container
+ * controls sit inside the 8px padding (council round 10 C2), centred on the title's first line (important: the touch rule `my-0` is emitted after the container
  * query and would otherwise win on a phone).
  */
 const HEAD_SEAT =
-  'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-3!'
+  'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-2!'
 
 /** A card with a body draws its verbs in the body, after its evidence; a bodyless (compact) Failed card keeps them in its head. */
 const footsVerbs = (compactCard: boolean): boolean => !compactCard
@@ -302,9 +303,11 @@ const PHONE_BAR =
 /**
  * Start triage on a phone (council round 9 C2): a worded 44px "Triage" button at the trailing end of the view switcher's
  * row, not an icon in the top bar. The page's tabs root is its frame (`relative`), so it sits on the switcher's row.
+ * Council round 10 C2: framed (the kit's outline button) with the list-checks glyph, so it reads as a control, not a
+ * label beside the segments.
  */
 const PHONE_TRIAGE =
-  'dshx:hidden dshx:in-data-shell-phone-nav:inline-flex dshx:absolute dshx:top-0 dshx:right-0 dshx:h-11 dshx:px-3 dshx:font-medium dshx:text-foreground'
+  'dshx:hidden dshx:in-data-shell-phone-nav:inline-flex dshx:absolute dshx:top-0 dshx:right-0 dshx:h-11 dshx:px-3 dshx:font-medium'
 
 const PHONE_BAR_LEADING =
   'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:left-[max(12px,env(safe-area-inset-left,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
