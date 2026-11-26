@@ -243,16 +243,17 @@ describe('core Plugins header (council round 7, D1 and D5)', () => {
     expect(refresh).toMatch(/box-shadow:\s*none;/u)
   })
 
-  it('marks the page title with the Settings glyph in its neutral nav tone, 18px, 8px before the h1 (A2)', () => {
+  it('marks the page title with its own Settings leaf glyph, the teal package of the Plugins group, 18px, 8px before the h1 (round 8, D4)', () => {
     const title = ruleFor("[class*='_pageTitle']")
     expect(title).toMatch(/display:\s*flex;/u)
     expect(title).toMatch(/gap:\s*8px;/u)
     const mark = ruleFor("[class*='_pageTitle']::before")
     expect(mark).toMatch(/flex:\s*0 0 18px;/u)
     expect(mark).toMatch(/height:\s*28px;/u)
-    expect(mark).toMatch(/background-color:\s*var\(--dshx-nav-tone-settings\);/u)
-    // lucide `settings`, the gear the rail's Settings destination and the page's tab draw.
-    expect(mark).toMatch(/mask:\s*url\("data:image\/svg\+xml,[^"]*M9\.671 4\.136[^"]*"\)/u)
+    expect(mark).toMatch(/background-color:\s*var\(--dshx-identity-1\);/u)
+    // lucide `package`, the Plugins row's glyph in the Settings column, at the column's 1.5 stroke.
+    expect(mark).toMatch(/mask:\s*url\("data:image\/svg\+xml,[^"]*stroke-width='1\.5'[^"]*M11 21\.73[^"]*"\)/u)
+    expect(mark).not.toContain('M9.671 4.136')
     expect(mark).toMatch(/center \/ 18px 18px no-repeat;/u)
   })
 })
