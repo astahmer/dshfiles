@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AppearanceModel, DEFAULT_APPEARANCE, PRESET_IDS, RUNTIME_DARK_SELECTOR, RUNTIME_LIGHT_SELECTOR } from '../src/theme/appearance.ts'
 import { DRACULA_THEME } from '../src/theme/dracula.ts'
+import { PaletteMath } from '../src/theme/palette.ts'
 import { BACKDROP_HOST, ThemeDefinitionModel, type ThemeDefinition } from '../src/theme/theme-definition.ts'
 
 const colours = (bg: string, text: string, accent: string) => ({
@@ -137,6 +138,22 @@ describe('built-in Dracula', () => {
       'light: danger on raised is 4.14:1 (needs 4.5:1)',
       'light: syntax string on panel is 4.22:1 (needs 4.5:1)',
     ])
+  })
+
+  it('ships the spec’s six accents as its identity palette, every one text-safe on bg, panel and raised (round eight)', () => {
+    const parsed = ThemeDefinitionModel.parse(DRACULA_THEME).definition!
+    expect(parsed.dark?.palette).toEqual(['#8be9fd', '#50fa7b', '#ffb86c', '#bd93f9', '#ff79c6', '#f1fa8c'])
+    // Alucard's yellow darkened at its own hue: the spec's #846e15 reads 4.09:1 on raised.
+    expect(parsed.light?.palette).toEqual(['#036a96', '#14710a', '#a34d14', '#644ac9', '#a3144d', '#7d6706'])
+    for (const scheme of [parsed.dark!, parsed.light!]) {
+      expect(scheme.paletteNames).toEqual(['Cyan', 'Green', 'Orange', 'Purple', 'Pink', 'Yellow'])
+      for (const tone of scheme.palette!)
+        for (const surface of ['bg', 'panel', 'raised'] as const)
+          expect(
+            PaletteMath.contrastRatio(PaletteMath.hexToOklch(tone), PaletteMath.hexToOklch(scheme.colours[surface])),
+            `${tone} on ${surface}`,
+          ).toBeGreaterThanOrEqual(4.5)
+    }
   })
 
   it('paints the night sky only in dark, animating opacity alone', () => {
