@@ -21,48 +21,66 @@ const Tile = (props: { readonly label: ReactNode; readonly value: string; readon
 
 /**
  * A lead number: 22/650 tabular figures in neutral ink, the page title's step (council round 5, D1). No series dot:
- * none of these measures is a series on screen, so a coloured dot would key nothing (council round 2, D1).
+ * none of these measures is a series on screen, so a coloured dot would key nothing (council round 2, D1). Every lead
+ * number has the same two lines, label and value; a change against the previous period sits beside the value on its
+ * baseline, never as a sub-line only some of the three carry (council round 8, D1).
  */
-const LeadTile = (props: { readonly label: ReactNode; readonly value: string; readonly detail?: ReactNode }): JSX.Element => (
+const LeadTile = (props: { readonly label: ReactNode; readonly value: string; readonly change?: ReactNode }): JSX.Element => (
   <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1 dshx:px-4 dshx:py-3 dshx:@max-pane-narrow:px-3">
     <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">{props.label}</span>
-    <span className="dshx:truncate dshx:text-title dshx:font-title dshx:tabular-nums" data-kpi-value>
-      {props.value}
+    <span className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-2" data-kpi-line>
+      <span className="dshx:min-w-0 dshx:truncate dshx:text-title dshx:font-title dshx:tabular-nums" data-kpi-value>
+        {props.value}
+      </span>
+      {props.change}
     </span>
-    {props.detail === undefined || props.detail === null ? null : <span className="dshx:text-2xs dshx:text-muted-foreground">{props.detail}</span>}
   </div>
 )
 
 /** A change against the previous period, or nothing when there is no earlier usage: an absent number needs no caption. */
-const Change = (props: { readonly current: number; readonly previous: number }): JSX.Element | null => {
+const Change = (props: { readonly current: number; readonly previous: number; readonly className?: string }): JSX.Element | null => {
   const ratio = UsageFormattingModel.changeRatio(props.current, props.previous)
   if (ratio === null) return null
   const up = ratio >= 0
   return (
-    <span className={up ? 'dshx:text-warning' : 'dshx:text-success'}>
-      {up ? '▲' : '▼'} {Math.abs(ratio) >= 10 ? `${String(Math.round(ratio + 1))}×` : UsageFormattingModel.formatPercent(Math.abs(ratio))} vs previous period
+    <span className={cn(up ? 'dshx:text-warning' : 'dshx:text-success', props.className)}>
+      {up ? '▲' : '▼'} {Math.abs(ratio) >= 10 ? `${String(Math.round(ratio + 1))}×` : UsageFormattingModel.formatPercent(Math.abs(ratio))}{' '}
+      <span className="dshx:@max-pane-compact:sr-only">vs previous period</span>
     </span>
   )
 }
 
+/** The lead row's change: 12 px beside the value, never wrapping under it. */
+const LEAD_CHANGE = 'dshx:shrink-0 dshx:whitespace-nowrap dshx:text-xs dshx:font-medium'
+
 /**
  * The Overview tab's numbers: cost, requests and cache hit lead, in one hairline card split by two dividers; the other
- * five open under a hairline inside the same card. "More numbers" is a 13 px link in the card's footer, under a hairline
- * on its trailing edge, so the third cell holds only its number and the toggle belongs to the strip it opens (council
- * round 6, D1; round 7, D3). The estimate's caveat (list price, catalog age) is a
- * tooltip on the cost label.
+ * five open under a hairline inside the same card. "More numbers" is a 13 px text link in the card's top-right corner, so
+ * the card needs no footer row (council round 6, D1; round 7, D3; round 8, D1). The estimate's caveat (list price,
+ * catalog age) is a tooltip on the cost label.
  */
-export const CostSummary = (props: { readonly summary: Summary; readonly days: number; readonly pricingNote: string }): JSX.Element => {
-  const [open, setOpen] = useState(false)
+export const CostSummary = (props: {
+  readonly summary: Summary
+  readonly days: number
+  readonly pricingNote: string
+  /** Opens with the other five numbers showing. */
+  readonly defaultOpen?: boolean
+}): JSX.Element => {
+  const [open, setOpen] = useState(props.defaultOpen === true)
   const moreId = useId()
   const { summary } = props
   const tokens = summary.input + summary.cacheRead + summary.cacheWrite + summary.output
   const cacheHit = UsageFormattingModel.cacheHitRatio(summary)
   const change = (current: number, previous: number): JSX.Element | undefined =>
     UsageFormattingModel.changeRatio(current, previous) === null ? undefined : <Change current={current} previous={previous} />
+  const leadChange = (current: number, previous: number): JSX.Element | undefined =>
+    UsageFormattingModel.changeRatio(current, previous) === null ? undefined : <Change className={LEAD_CHANGE} current={current} previous={previous} />
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-1">
-      <div data-usage-stats className="dshx:@container dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card">
+      <div
+        data-usage-stats
+        className="dshx:@container dshx:relative dshx:flex dshx:min-w-0 dshx:flex-col dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card"
+      >
         <div className="dshx:grid dshx:min-w-0 dshx:grid-cols-3 dshx:divide-x dshx:divide-border" data-usage-stats-row>
           <LeadTile
             label={
@@ -81,15 +99,19 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
               </>
             }
             value={UsageFormattingModel.formatCost(summary.cost)}
-            detail={change(summary.cost, summary.previous.cost)}
+            change={leadChange(summary.cost, summary.previous.cost)}
           />
-          <LeadTile label="Requests" value={summary.requests.toLocaleString()} detail={change(summary.requests, summary.previous.requests)} />
-          <LeadTile
-            label="Cache hit"
-            value={UsageFormattingModel.formatPercent(cacheHit)}
-            detail={cacheHit === null ? undefined : `${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens`}
-          />
+          <LeadTile label="Requests" value={summary.requests.toLocaleString()} change={leadChange(summary.requests, summary.previous.requests)} />
+          <LeadTile label="Cache hit" value={UsageFormattingModel.formatPercent(cacheHit)} />
         </div>
+        {/* A text link in the card's top-right corner, on the cells' label line (council round 8, D1). */}
+        <Button aria-controls={moreId} aria-expanded={open} className={STATS_MORE_LINK} onClick={() => setOpen(!open)} type="button" variant="link">
+          <span className="dshx:@max-pane-narrow:sr-only">{open ? 'Fewer numbers' : 'More numbers'}</span>
+          <ChevronDownIcon
+            aria-hidden
+            className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
+          />
+        </Button>
         {open ? (
           <div
             className="dshx:grid dshx:grid-cols-2 dshx:gap-x-4 dshx:gap-y-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3 dshx:@min-[42rem]:grid-cols-3 dshx:@min-[64rem]:grid-cols-5 dshx:@max-pane-narrow:px-3"
@@ -112,7 +134,7 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
               detail={
                 cacheHit === null
                   ? undefined
-                  : `${UsageFormattingModel.formatPercent(cacheHit)} of prompt tokens billed at the cache-read rate${summary.unpriced === 0 ? '' : ' · priced routes only'}`
+                  : `${UsageFormattingModel.formatCount(summary.cacheRead)} cached prompt tokens at the cache-read rate${summary.unpriced === 0 ? '' : ' · priced routes only'}`
               }
             />
             <Tile
@@ -122,22 +144,14 @@ export const CostSummary = (props: { readonly summary: Summary; readonly days: n
             />
           </div>
         ) : null}
-        <div
-          className="dshx:flex dshx:justify-end dshx:border-t dshx:border-border dshx:px-4 dshx:py-1.5 dshx:pointer-coarse:py-0 dshx:@max-pane-narrow:px-3"
-          data-usage-stats-more
-        >
-          <Button aria-controls={moreId} aria-expanded={open} className={STATS_MORE_LINK} onClick={() => setOpen(!open)} type="button" variant="link">
-            {open ? 'Fewer numbers' : 'More numbers'}
-            <ChevronDownIcon
-              aria-hidden
-              className={cn('dshx:size-3.5 dshx:transition-transform dshx:duration-(--dshx-duration-fade) dshx:ease-enter', open && 'dshx:rotate-180')}
-            />
-          </Button>
-        </div>
       </div>
     </div>
   )
 }
 
-/** "More numbers": a 13 px ink link, 20 px tall (44 px under a coarse pointer), its text on the card footer's trailing edge. */
-export const STATS_MORE_LINK = 'dshx:h-5 dshx:gap-1 dshx:px-0 dshx:text-sm dshx:has-[>svg]:px-0 dshx:pointer-coarse:h-11'
+/**
+ * "More numbers": a 13 px ink link, 20 px tall (44 px under a coarse pointer), pinned to the card's top-right corner and
+ * centred on the cells' 12 px label line; a narrow pane keeps only its chevron.
+ */
+export const STATS_MORE_LINK =
+  'dshx:absolute dshx:top-2.5 dshx:right-4 dshx:h-5 dshx:gap-1 dshx:px-0 dshx:text-sm dshx:has-[>svg]:px-0 dshx:pointer-coarse:top-0 dshx:pointer-coarse:h-11 dshx:pointer-coarse:min-w-11 dshx:@max-pane-narrow:right-3'
