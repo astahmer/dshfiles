@@ -70,6 +70,17 @@ describe('ProjectTonePicker', () => {
     expect(seat().getAttribute('data-state')).toBe('checked')
   })
 
+  it('rings the custom seat for its own focus and hover only, not for any group around the picker', () => {
+    renderPicker({ kind: 'tone', tone: 0 })
+    const label = screen.getByLabelText('Custom colour for dshfiles').closest('label')
+    const classes = [label, ...(label?.querySelectorAll('*') ?? [])].flatMap(element => [...(element?.classList ?? [])])
+    // An unnamed `group-*` variant answers to the nearest ancestor with `group` anywhere on the page (a settings row,
+    // a kit swatch's parent), so the custom seat lit up while a palette swatch had the focus.
+    expect(classes.filter(name => /^dshx:group(?:-[a-z-]+)?:/u.test(name) || name === 'dshx:group')).toEqual([])
+    expect(classes).toContain('dshx:group/custom-colour')
+    expect(classes).toContain('dshx:group-has-focus-visible/custom-colour:ring-2')
+  })
+
   it('wraps its label above the swatches when six 44 pt seats do not fit beside it', () => {
     renderPicker({ kind: 'tone', tone: 0 })
     expect(screen.getByText('Project colour').parentElement?.classList).toContain('dshx:flex-wrap')
