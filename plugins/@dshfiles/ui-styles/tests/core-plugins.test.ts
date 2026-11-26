@@ -144,10 +144,10 @@ describe('core Plugins rows and section titles (council round 4, D5)', () => {
     expect(/_cardDesc\{[^}]*-webkit-line-clamp:1;/u.test(page), 'one-line clamp').toBe(true)
   })
 
-  it('wraps a description to two lines before it clamps', () => {
+  it('wraps a description before it clamps (three lines since council round 12, D4)', () => {
     const desc = ruleFor("[class*='_cardDesc']")
-    expect(desc).toMatch(/-webkit-line-clamp:\s*2;/u)
-    expect(desc).toMatch(/line-clamp:\s*2;/u)
+    expect(desc).toMatch(/-webkit-line-clamp:\s*3;/u)
+    expect(desc).toMatch(/(?<!-webkit-)line-clamp:\s*3;/u)
   })
 
   it('gives a row without a description the height of a one-line row, so rows are even', () => {
@@ -222,7 +222,7 @@ describe('core Plugins page title and descriptions (council round 6, D4)', () =>
     expect(title).toMatch(/letter-spacing:\s*-0\.01em;/u)
   })
 
-  it('leads each description with a summary line of at most 70ch before its two-line clamp', () => {
+  it('leads each description with a summary line of at most 70ch before it clamps', () => {
     expect(ruleFor("[class*='_cardDesc']")).toMatch(/max-width:\s*70ch;/u)
   })
 })
@@ -250,8 +250,23 @@ describe('core Plugins multi-line rows (council round 10, D4)', () => {
     for (const [selector] of raised) expect(selector).toContain('li[data-plugin-package] ')
   })
 
-  it('clamps a description at two complete lines, never a partial third', () => {
-    expect(ruleFor("[class*='_cardDesc']")).toMatch(/max-height:\s*36px;/u)
+  it('clamps a description at whole lines, never a partial one', () => {
+    expect(ruleFor("[class*='_cardDesc']")).toMatch(/max-height:\s*54px;/u)
+  })
+})
+
+describe('core Plugins complete summaries (council round 12, D4)', () => {
+  it('lets a summary take a third 18px line instead of an ellipsis while the row has room', () => {
+    const desc = ruleFor("[class*='_cardDesc']")
+    // Three whole 18px lines: the clamp and the height cap agree, so no partial fourth line shows.
+    expect(desc).toMatch(/max-height:\s*54px;/u)
+    expect(desc).toMatch(/-webkit-line-clamp:\s*3;/u)
+    expect(desc).not.toMatch(/line-clamp:\s*2;/u)
+  })
+
+  it('keeps the switch on the title line however many lines the summary takes', () => {
+    const end = ruleFor("li[data-plugin-package] [class*='_cardHead']:has([class*='_cardDesc']:not(:empty)) > [class*='_cardEnd']")
+    expect(end).toMatch(/align-self:\s*flex-start;/u)
   })
 })
 

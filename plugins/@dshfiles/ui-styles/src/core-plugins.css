@@ -155,17 +155,20 @@ section[data-plugin-panel] [class*='_cardIcon'] > * {
 }
 
 /*
- * Rows (council round 4, D5). A description wraps to two lines before it clamps, instead of the module's one-line clamp
+ * Rows (council round 4, D5). A description wraps to three lines before it clamps, instead of the module's one-line clamp
  * that cut "an…" and "agent.…" mid-thought; a row with no description keeps a one-line row's height (title 20 + gap 4
  * + an 18px line), its title centred, so rows are even.
  */
 section[data-plugin-panel] [class*='_cardDesc'] {
-  /* A first line of at most 70ch reads as the row's summary; the rest wraps once, then clamps (council round 6, D4). */
+  /* A first line of at most 70ch reads as the row's summary; the rest wraps, then clamps (council round 6, D4). */
   max-width: 70ch;
-  /* Two complete 18px lines, never a partial third where the clamp is not honoured (council round 10, D4). */
-  max-height: 36px;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
+  /*
+   * Three complete 18px lines, never a partial fourth where the clamp is not honoured (council round 10, D4): a summary
+   * that overruns two lines takes a third instead of ending on an ellipsis while the row has room (council round 12, D4).
+   */
+  max-height: 54px;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   text-wrap: pretty;
 }
 
