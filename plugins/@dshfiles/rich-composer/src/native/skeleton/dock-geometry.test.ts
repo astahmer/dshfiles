@@ -165,8 +165,11 @@ describe('the desktop live work dock (round six C2)', () => {
 
   it('attaches to the composer card: one shared 1px edge, only the dock\'s top corners rounded (council round 8 C3)', () => {
     const last = rule(`${DESK}:last-child`)
-    // The dock's bottom edge meets the card's top, where the card's 1px ring is the one line between them.
-    expect(last).toMatch(/margin-bottom: calc\(-1 \* var\(--dsh-composer-stack-gap\) - 1px\);/)
+    // The dock's bottom edge meets the top of the card's 1px ring (drawn outside the card's box), the one line between
+    // them. Council round 25, item 5: it overlapped the card by 1px, so ring and card covered the last row's bottom 2px
+    // (rendered pitch 33, 33, …, 31 CSS px); ending on the ring keeps every row 33px with the frame edge outside it.
+    expect(last).toMatch(/margin-bottom: calc\(-1 \* var\(--dsh-composer-stack-gap\) \+ 1px\);/)
+    expect(last).not.toMatch(/- 1px\)/)
     expect(last).toMatch(/border-bottom-width: 0;/)
     expect(last).toMatch(/border-radius: var\(--dsw-radius-lg\) var\(--dsw-radius-lg\) 0 0;/)
     const card = rule(

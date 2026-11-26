@@ -804,9 +804,11 @@ button.crumbEditable {
 
 /* Council round 8 C3: the dock attaches to the composer card. Its bottom edge meets the card's top, so the card's 1px
    ring is the one line between them; only the dock's top corners are rounded (the composer's 12px), and the card's top
-   corners square off under it, so dock and composer read as one object. */
+   corners square off under it, so dock and composer read as one object. Council round 25, item 5: the ring is drawn
+   outside the card's box, so the dock ends on the ring's top, not 1px inside the card: overlapping it, ring and card
+   covered the last row's bottom 2px (31px under 33px rows); now every row is 33px and the frame edge sits outside. */
 :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):last-child {
-  margin-bottom: calc(-1 * var(--dsh-composer-stack-gap) - 1px);
+  margin-bottom: calc(-1 * var(--dsh-composer-stack-gap) + 1px);
   border-bottom-width: 0;
   border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
 }
