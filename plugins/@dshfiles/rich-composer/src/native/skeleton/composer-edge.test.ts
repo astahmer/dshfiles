@@ -53,14 +53,14 @@ describe('the dock and the composer read as one field (council round 19 C2)', ()
   })
 
   it('outlines the phone Live work strip with the field edge too', () => {
-    const attached = `:global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+    const attached = `:global(html[data-shell-phone-nav]) .composerStack:not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
     const strip = rule(root, `${attached} > .dockHead:has(> [data-live-work-summary])`)
     expect(strip).toContain(FIELD)
     expect(strip).not.toContain('--dsw-alias-border-l2')
   })
 
   it('draws one seam under the attached strip: the card ring, with no top highlight of the card under it (council round 18 C4)', () => {
-    const attached = `:global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+    const attached = `:global(html[data-shell-phone-nav]) .composerStack:not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
     // The strip draws no bottom edge of its own.
     expect(rule(root, `${attached} > .dockHead:has(> [data-live-work-summary])`)).toContain('border-bottom-width: 0;')
     // Dark's s1 elevation carries an inset top highlight that read as a second line 1px under the ring: there the card's

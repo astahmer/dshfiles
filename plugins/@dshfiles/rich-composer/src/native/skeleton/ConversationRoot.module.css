@@ -1473,10 +1473,13 @@ button.crumbEditable {
   }
 
   /* Council round 22, item 5: the subagent rows are one card with 1px dividers, as on desktop (each row was its own
-     outlined card), on the composer's fill with its field edge. The list stops near 3.5 rows (thread-sidebar's two-line
-     row is 54px) so half a row peeks and says the list scrolls. */
+     outlined card), on the composer's fill with its field edge. Council round 23, item 5: the list shows two whole rows
+     (thread-sidebar's two-line row is 54px) and the third row's title (its divider, 8px padding, 20px title and 2px
+     gap), so a row peeks and says the list scrolls; rows snap to whole positions, so a model line never shows at the
+     top without its title. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
-    max-height: calc(3.5 * 54px + 3px + 2px);
+    max-height: calc(2 * 54px + 1px + 31px + 2px);
+    scroll-snap-type: y mandatory;
     background: var(--dsw-specific-input-major);
     border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
     border-radius: var(--dsw-radius-lg);
@@ -1515,6 +1518,17 @@ button.crumbEditable {
     background: linear-gradient(0deg, var(--dsw-specific-input-major), color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
   }
 
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview]) {
+    scroll-snap-align: start;
+  }
+
+  /* The scroll range ends on a row's start: the last of three or more rows ends with the peek's room (140px visible
+     minus two 55px rows), so the last snap position shows the last two rows whole over a blank peek instead of a
+     model line cut from its title at the top (17b). Fewer rows never scroll and keep no blank. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global(section[data-dshfiles-live-preview]:nth-of-type(n + 3):last-of-type) {
+    padding-bottom: 30px;
+  }
+
   /* Between rows only: a row after the (hidden or sticky) fold row takes the plate's hairline instead. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) > :global([data-dshfiles-live-preview]) ~ :global([data-dshfiles-live-preview]) {
     border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
@@ -1531,7 +1545,8 @@ button.crumbEditable {
   }
 
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
-    max-height: calc(44px + 3.5 * 54px + 3px + 2px);
+    max-height: calc(44px + 2 * 54px + 1px + 31px + 2px);
+    scroll-padding-top: 44px;
   }
 
   /* A dock holding only live work leaves no empty seat (and no stack gap) while the summary is closed. */
@@ -1539,14 +1554,14 @@ button.crumbEditable {
     display: none !important;
   }
 
-  /* Council round 9 C4: closed, with nothing else in the dock between them, the Live work strip is the composer card's
-     top, as the desktop dock is (council round 8 C3): the card's fill and hairline, 1px wider on each side to take the
-     card's ring edges, its bottom edge on the card's top, so the card's 1px ring is the one divider. Only the strip's top
-     corners are rounded and the card's top corners square off under it. Open, the strip stays flat on the page above
-     the rows it lists. Council round 11 C4: the strip sits on the nav surface (#F4F2F0 light, the nav step in dark), a
+  /* Council round 9 C4: with nothing else in the dock between them, the Live work strip is the composer card's top, as
+     the desktop dock is (council round 8 C3): the card's fill and hairline, 1px wider on each side to take the card's
+     ring edges; closed, its bottom edge sits on the card's top, so the card's 1px ring is the one divider. Only the
+     strip's top corners are rounded and the card's top corners square off under it. Open, the rows join under it
+     (council round 23, item 5, below). Council round 11 C4: the strip sits on the nav surface (#F4F2F0 light, the nav step in dark), a
      status band above the composer's own fill. Council round 19 C2: its top and side edges are the card's 3:1 field
      edge (round 11 C3), so strip and card read as one field; the card's ring stays its one separator from the input. */
-  :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) {
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) {
     margin-inline: calc(var(--dsh-composer-side-clearance, 0px) - 1px);
     margin-bottom: calc(-1 * var(--dsh-composer-stack-gap) - 1px);
     background: var(--dshx-surface-nav, var(--dsw-specific-sidebar-fill, var(--dsw-alias-bg-layer-1)));
@@ -1557,27 +1572,75 @@ button.crumbEditable {
 
   /* On the nav surface the jump control's selector fill matched the strip in light: it takes the composer's own fill
      and the kit's at-rest hairline (a quiet trigger), so its circle reads as a control in both schemes. */
-  :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button) {
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button) {
     background: var(--dsw-specific-input-major);
     box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2);
   }
 
-  :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button:active) {
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button:active) {
     background: var(--dsw-alias-interactive-bg-hover-solid);
   }
 
   /* The row takes the shared fill and the desktop dock rows' 8px inset. */
-  :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead > [data-live-work-summary] {
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead > [data-live-work-summary] {
     padding-inline: 8px 4px;
     background: transparent;
   }
 
   /* Council round 18 C4: the strip has no bottom edge, and the card's seam layer (InputBar.module.css) covers dark's s1
      top highlight with the card fill, which read as a second line under the ring: one seam in both schemes. */
-  :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))):has(> .dockHead > [data-live-work-summary]) :global([data-composer-card]) {
+  :global(html[data-shell-phone-nav]) .composerStack:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))):has(> .dockHead > [data-live-work-summary]) :global([data-composer-card]) {
     border-top-left-radius: 0;
     border-top-right-radius: 0;
     --dsh-composer-card-seam: var(--dsh-composer-card-fill);
+  }
+
+  /* Council round 23, item 5: open, the strip and the rows stay the composer card's top section, one frame as when
+     closed and as on desktop. The strip floated flat on the page above a separate card of rows, 6px from it and 6px
+     from the composer. Now the strip keeps its frame and draws the one hairline over the rows; the rows run on the
+     card's side edges with no frame, radius or gap of their own, and the card's ring is the line under them. */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > .dockHead:has(> [data-live-work-summary]) {
+    margin-bottom: calc(-1 * var(--dsh-composer-stack-gap));
+    border-bottom: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) {
+    row-gap: 0;
+    /* The rows end on the card ring's top: they are stacking contexts (container queries) and painted over the ring,
+       which then showed only beside their scrollbar as a stray tick. */
+    margin-bottom: calc(1px - var(--dsh-composer-stack-gap));
+  }
+
+  /* 1px wider on each side, as the strip is, to take the card ring's edges. */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) {
+    flex-basis: calc(100% + 2px);
+    max-width: none;
+    margin-inline: -1px;
+    background: var(--dsw-specific-input-major);
+    border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
+    border-block-width: 0;
+    border-radius: 0;
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) + :global([data-dshfiles-live-preview-dock]) {
+    border-top: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  }
+
+  /* No card edges of their own: 140px of rows, plus the plate beside running jobs (and the divider above it there). */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(2 * 54px + 1px + 31px);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    max-height: calc(44px + 2 * 54px + 1px + 31px + 1px);
+  }
+
+  /* A running job's row and fold row lie on the section too, instead of drawing a card inside it. */
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :is(:global([data-slot='composer-row'][data-variant='card']), :global([data-dshfiles-live-preview-fold])) {
+    margin-block: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
   }
 }
 

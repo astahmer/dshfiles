@@ -255,8 +255,8 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
 describe('Live work attached to the composer on a phone (council round 9 C4)', () => {
   const NARROW = '@media (max-width: 27.99rem)'
   const phone = ':global(html[data-shell-phone-nav])'
-  // Closed, with nothing else in the dock between the strip and the card.
-  const attached = `${phone} .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+  // Open or closed, with nothing else in the dock between the strip and the card (open: council round 23, item 5).
+  const attached = `${phone} .composerStack:not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
 
   it('draws the strip as the composer card\'s top: its fill and hairline, 1px wider, meeting the card\'s ring', () => {
     const head = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary])`)
@@ -296,8 +296,7 @@ describe('one header for live subagents on a phone (council round 22, item 5)', 
     expect(card).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
     expect(card).toMatch(/border-radius: var\(--dsw-radius-lg\);/)
     expect(card).toMatch(/background: var\(--dsw-specific-input-major\);/)
-    // thread-sidebar's two-line row is 54px: three whole rows, half of the fourth, three dividers and the card's edges.
-    expect(card).toMatch(/max-height: calc\(3\.5 \* 54px \+ 3px \+ 2px\);/)
+    // thread-sidebar's two-line row is 54px; the cap is council round 23 item 5's (below).
     const row = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold]))`)
     for (const flat of [/margin-block: 0;/, /border: 0;/, /border-radius: 0;/]) expect(row).toMatch(flat)
     const divider = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global([data-dshfiles-live-preview]) ~ :global([data-dshfiles-live-preview])`)
@@ -313,7 +312,7 @@ describe('one header for live subagents on a phone (council round 22, item 5)', 
     expect(plate).toMatch(/box-shadow: 0 1px 0 var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
     // Beside jobs the plate shows: the cap makes room for its 44px.
     const cap = ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}`)
-    expect(cap).toMatch(/max-height: calc\(44px \+ 3\.5 \* 54px \+ 3px \+ 2px\);/)
+    expect(cap).toMatch(/max-height: calc\(44px \+ /)
   })
 
   it('fades rows out over 8px at the card\'s scroll edges, so no row text rests cut by its top or bottom (17b, item 6)', () => {
@@ -345,7 +344,7 @@ describe('one header for live subagents on a phone (council round 22, item 5)', 
 describe('the phone Live work strip on the nav surface (council round 11 C4)', () => {
   const NARROW = '@media (max-width: 27.99rem)'
   const phone = ':global(html[data-shell-phone-nav])'
-  const attached = `${phone} .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+  const attached = `${phone} .composerStack:not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
 
   it('sits on the nav surface above the composer fill, with the field edge and the card ring as its one separator', () => {
     const head = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary])`)
@@ -359,5 +358,57 @@ describe('the phone Live work strip on the nav surface (council round 11 C4)', (
     const jump = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button)`)
     expect(jump).toMatch(/background: var\(--dsw-specific-input-major\);/)
     expect(jump).toMatch(/box-shadow: inset 0 0 0 1px var\(--dsw-alias-border-l2\);/)
+  })
+})
+
+describe('the open phone dock is the composer card\'s top section (council round 23, item 5)', () => {
+  const NARROW = '@media (max-width: 27.99rem)'
+  const phone = ':global(html[data-shell-phone-nav])'
+  const SUBAGENTS = ":global([data-dshfiles-live-preview-dock='subagents'])"
+  const OTHER = ":global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))"
+  const LIVE = ':global([data-dshfiles-live-preview-dock])'
+  // Open or closed, with nothing but live work in the dock between the strip and the card.
+  const joined = `${phone} .composerStack:not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+  const open = `${phone} .composerStack[data-live-work-open]:not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+
+  it('keeps the strip framed as the card\'s top while open, its one hairline over the rows, no gap', () => {
+    // Open, the strip floated flat on the page above a separate card of rows, 6px from it and 6px from the composer.
+    const head = ruleIn(NARROW, `${joined} > .dockHead:has(> [data-live-work-summary])`)
+    expect(head).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
+    expect(head).toMatch(/border-radius: var\(--dsw-radius-lg\) var\(--dsw-radius-lg\) 0 0;/)
+    const openHead = ruleIn(NARROW, `${open} > .dockHead:has(> [data-live-work-summary])`)
+    expect(openHead).toMatch(/margin-bottom: calc\(-1 \* var\(--dsh-composer-stack-gap\)\);/)
+    expect(openHead).toMatch(/border-bottom: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+    expect(ruleIn(NARROW, `${joined}:has(> .dockHead > [data-live-work-summary]) :global([data-composer-card])`)).toMatch(/border-top-left-radius: 0;/)
+  })
+
+  it('runs the rows between the strip and the card on the card\'s side edges, with no frame or gap of their own', () => {
+    const outlet = ruleIn(NARROW, `${open} > ${DOCK}`)
+    expect(outlet).toMatch(/row-gap: 0;/)
+    // The card's 1px ring is the line between the rows and the input: the rows end on its top, never over it.
+    expect(outlet).toMatch(/margin-bottom: calc\(1px - var\(--dsh-composer-stack-gap\)\);/)
+    const section = ruleIn(NARROW, `${open} > ${DOCK} > ${LIVE}`)
+    expect(section).toMatch(/flex-basis: calc\(100% \+ 2px\);/)
+    expect(section).toMatch(/margin-inline: -1px;/)
+    expect(section).toMatch(/border-block-width: 0;/)
+    expect(section).toMatch(/border-radius: 0;/)
+    expect(ruleIn(NARROW, `${open} > ${DOCK} > ${LIVE} + ${LIVE}`)).toMatch(/border-top: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
+  })
+
+  it('shows two whole rows and the next row\'s title, snapping to whole rows so a model line never shows without its title', () => {
+    // 54px two-line rows: two rows, their divider, then the third row's divider, 8px padding, 20px title and 2px gap.
+    expect(ruleIn(NARROW, `${open} > ${DOCK} > ${SUBAGENTS}`)).toMatch(/max-height: calc\(2 \* 54px \+ 1px \+ 31px\);/)
+    const card = ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}`)
+    expect(card).toMatch(/max-height: calc\(2 \* 54px \+ 1px \+ 31px \+ 2px\);/)
+    expect(card).toMatch(/scroll-snap-type: y mandatory;/)
+    expect(ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global([data-dshfiles-live-preview])`)).toMatch(/scroll-snap-align: start;/)
+    // The last snap position puts the last two rows whole at the top: the last of three or more rows ends with the
+    // peek's 30px (140px visible minus two 55px rows), so the scroll range ends on a row's start.
+    expect(ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS} > :global(section[data-dshfiles-live-preview]:nth-of-type(n + 3):last-of-type)`)).toMatch(/padding-bottom: 30px;/)
+    // Beside running jobs the sticky 44px fold plate sits over the top: snap below it.
+    const beside = ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}`)
+    expect(beside).toMatch(/max-height: calc\(44px \+ 2 \* 54px \+ 1px \+ 31px \+ 2px\);/)
+    expect(beside).toMatch(/scroll-padding-top: 44px;/)
+    expect(css).not.toMatch(/3\.5 \* 54px/)
   })
 })

@@ -661,7 +661,10 @@ fewer than three rows fit above. Hover styles sit behind `(hover: hover)`.
   message column. Everything docked above the composer shares the composer card's fill. The Live work dock's top and
   side edges take the card's 3:1 field edge, so dock and composer read as one field; its internal dividers (between
   rows, and where a subagents dock joins a jobs dock) stay `border-l2` hairlines (`#dedcda` / `#2f2c29`; council round
-  19 C2, reversing round 12 C1's quiet outline), on desktop and phone.
+  19 C2, reversing round 12 C1's quiet outline), on desktop and phone. Open on a phone, the Live work strip and its
+  rows stay that one field: the strip's hairline over the rows, the card's ring under them, no gap. The rows show two
+  whole two-line rows and the next row's title, and snap to whole rows, so a model line never shows without its title
+  (council round 23).
 - **Composer send.** The send arrow sits in a 28px circle (32px on a phone): the raised fill with a faint glyph while
   there is nothing to send, the ink fill with the inverse glyph once it can send (council round 13). It is the one
   filled mark in the composer bar.
