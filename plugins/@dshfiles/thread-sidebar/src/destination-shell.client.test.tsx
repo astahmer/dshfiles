@@ -218,14 +218,23 @@ describe('DestinationShell', () => {
     expect(threads.className).toContain('dshx:nav-tone-threads')
     expect(threads.querySelector('[data-rail-icon]')?.className).toContain('dshx:text-nav-tone')
     expect(threads.querySelector('[data-rail-icon]')?.className).not.toContain('dshx:bg-nav-tile')
-    // The open page: the neutral wash and the marker, which carries the accent; its icon in ink.
+    // The open page: the neutral wash and the marker; its glyph carries the destination's tone on that tone's 14% tile
+    // (round nine B2, kit A1), the selected-place seat that follows the row's aria-current.
     const usage = screen.getByRole('button', { name: 'Usage' })
     expect(usage.className).toContain('dshx:bg-selected-wash')
     expect(usage.className).toContain('dshx:selected-marker')
-    expect(usage.querySelector('[data-section-icon]')?.className).toContain('dshx:text-foreground')
-    expect(usage.querySelector('[data-section-icon]')?.className).not.toContain('dshx:text-control-on')
+    const seat = usage.querySelector<HTMLElement>('[data-section-icon]')
+    expect(seat?.className).toContain('dshx:place-seat')
+    expect(seat?.className).toContain('dshx:nav-tone-observe')
+    expect(seat?.className).not.toContain('dshx:text-control-on')
+    // A 24px seat on the 16px glyph's footprint, so selecting a row never moves it.
+    expect(seat?.className).toContain('dshx:size-6 dshx:-mx-1 dshx:-mt-0.5 dshx:-mb-1')
     const traces = screen.getByRole('button', { name: 'Traces' })
     expect(traces.className).not.toContain('dshx:bg-selected-wash')
+    // At rest a row's glyph stays in the secondary ink, with no tile.
+    const quiet = traces.querySelector<HTMLElement>('[data-section-icon]')
+    expect(quiet?.className).not.toContain('dshx:nav-tone-observe')
+    expect(quiet?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dsw-alias-label-secondary)')
   })
 
   it('keeps the Settings column open on every Settings page: it is the one Settings navigation (council round 4 B1)', () => {
@@ -264,6 +273,10 @@ describe('DestinationShell', () => {
       expect(glyph?.getAttribute('class'), name).toContain('dshx:text-(--settings-tone)')
       expect(glyph?.getAttribute('data-settings-glyph'), name).toBe(group)
     }
+    // Round nine B2: each row's seat takes its group's tone, so the selected row's glyph sits on a 14% tile of it.
+    const general = within(list).getByRole('button', { name: 'General' }).querySelector<HTMLElement>('[data-section-icon]')
+    expect(general?.className).toContain('dshx:place-seat')
+    expect(general?.style.getPropertyValue('--dshx-nav-tone')).toBe('var(--dshx-identity-7)')
     // Council round 8 B4: the Pages group's rows keep their own icons, in the Pages tone, never grey.
     const pages = list.querySelector<HTMLElement>('[data-settings-group="pages"]')
     expect(pages).not.toBeNull()

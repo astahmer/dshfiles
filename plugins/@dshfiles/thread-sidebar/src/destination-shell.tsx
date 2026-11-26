@@ -30,6 +30,7 @@ import {
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { PLACE_TONE_CLASS, placeToneStyle, type PlaceTone } from '@dshfiles/plugin-ui/components/ui/place-glyph'
 import * as Schema from 'effect/Schema'
 import { Fragment, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
@@ -58,7 +59,7 @@ import { StageFold, type StageFoldState } from './stage-fold.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
 import type { SettingsNavigationService, SettingsNavigationState } from '@dshfiles/settings-shell/settings-navigation'
 import { SettingsColumn, type SettingsColumnRow } from './settings-column.js'
-import { SettingsEntryGlyph, SettingsToneMark } from '@dshfiles/settings-shell/settings-icons'
+import { SettingsEntryGlyph, SettingsIcons, SettingsToneMark } from '@dshfiles/settings-shell/settings-icons'
 
 const ICONS = {
   'messages-square': MessagesSquareIcon,
@@ -463,6 +464,11 @@ const SectionButton = (props: {
   readonly count?: number | undefined
   /** A row under the row above it (a category's settings under its page). */
   readonly nested?: boolean
+  /**
+   * The place's tone (round nine B2, kit A1): a destination's, or any CSS colour (a Settings group's identity tone). The
+   * selected row's glyph sits on a 14% tile of it; at rest a destination row's glyph stays in the secondary ink.
+   */
+  readonly place?: { readonly tone: PlaceTone } | { readonly color: string } | undefined
 }): JSX.Element => {
   const descriptionId = useId()
   const [dropping, setDropping] = useState(false)
@@ -508,13 +514,28 @@ const SectionButton = (props: {
           props.selected && 'dshx:bg-selected-wash dshx:selected-marker dshx:text-foreground dshx:hover:bg-selected-wash',
         )}
       >
-        {props.icon === undefined || props.icon === null ? null : (
+        {props.icon === undefined || props.icon === null ? null : props.place === undefined ? (
           <span
             className={cn(
               'dshx:mt-0.5 dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center',
               props.selected ? 'dshx:text-foreground' : 'dshx:text-muted-foreground',
               SECTION_ROW_BADGE,
             )}
+            aria-hidden="true"
+            data-section-icon=""
+          >
+            {props.icon}
+          </span>
+        ) : (
+          // The selected-place seat (round nine B2, kit A1): 24px on the 16px glyph's footprint (negative margins), so
+          // the tile it draws under `aria-current` never moves the row or its label.
+          <span
+            className={cn(
+              'dshx:place-seat dshx:size-6 dshx:-mx-1 dshx:-mt-0.5 dshx:-mb-1 dshx:rounded-md',
+              'tone' in props.place && props.selected ? PLACE_TONE_CLASS[props.place.tone] : undefined,
+              SECTION_ROW_BADGE,
+            )}
+            style={'color' in props.place ? placeToneStyle(props.place.color) : props.selected ? undefined : placeToneStyle(PLACE_REST_TONE)}
             aria-hidden="true"
             data-section-icon=""
           >
@@ -541,6 +562,13 @@ const SectionButton = (props: {
   )
 }
 
+/** A side-column row's glyph at rest: the secondary ink, as before it had a place seat. */
+const PLACE_REST_TONE = 'var(--dsw-alias-label-secondary)'
+
+/** The tone a folder's selected row carries: its destination's, or none for a user folder. */
+const placeOf = (folder: RailFolder, toneGroup: 'pages' | 'developer' | undefined): { readonly tone: PlaceTone } | { readonly color: string } | undefined =>
+  toneGroup !== undefined ? { color: SettingsIcons.toneOf(toneGroup) } : isDestinationId(folder.id) ? { tone: folder.id } : undefined
+
 /** The rows of one folder: a page opens in the stage, any other view through the Workbench (b:952m). */
 const EntryRows = (props: {
   readonly folder: RailFolder
@@ -563,6 +591,7 @@ const EntryRows = (props: {
           label={entry.title}
           description={props.descriptions === false ? undefined : entry.description}
           icon={props.toneGroup === undefined ? icon : <SettingsToneMark group={props.toneGroup}>{icon}</SettingsToneMark>}
+          place={placeOf(props.folder, props.toneGroup)}
           selected={props.activePanelId === entry.viewId}
           onSelect={() => props.openEntry(entry)}
           menu={props.folderUi === undefined ? undefined : <EntryMenu entry={entry} folderId={props.folder.id} ui={props.folderUi} />}
@@ -627,6 +656,8 @@ const SettingsColumnList = (props: {
                   label={row.label}
                   // Every category's 16px glyph in its group's tone (round five B5, council round 6 B3), as its phone tile.
                   icon={<SettingsEntryGlyph group={group.id} label={row.label} />}
+                  // The selected category's glyph on a 14% tile of its group's tone (round nine B2).
+                  place={{ color: SettingsIcons.toneOf(group.id) }}
                   selected={here}
                   onSelect={() => open(row)}
                   count={state.searching ? row.count : undefined}
