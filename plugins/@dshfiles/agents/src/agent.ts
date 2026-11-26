@@ -16,6 +16,8 @@ export const MAX_SESSION_CHARS = 256
 const MAX_MEMORY_SCOPE_CHARS = 80
 const MAX_ROUTINE_CHARS = 400
 const MAX_PEER_HANDLES = 50
+/** The kit's identity palette has six slots (`IDENTITY_SLOT_COUNT`, the project tones); the theme decides their colours. */
+export const AGENT_TONE_SLOTS = 6
 /** Newest threads kept per agent; an older row is pruned so one agent cannot grow the table without bound. */
 export const MAX_THREADS_PER_AGENT = 50
 /** Matches the backlog start-thread limit, so a dispatch prompt travels the same path as a typed one. */
@@ -31,6 +33,9 @@ const timestampSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThan
 const agentMemoryScopeSchema = Schema.NullOr(
   Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_MEMORY_SCOPE_CHARS), Schema.isPattern(/^[A-Za-z0-9][A-Za-z0-9:._/-]*$/u)),
 ).pipe(Schema.withDecodingDefaultKey(Effect.succeed(null)))
+
+/** One identity palette slot, 0–5: the active theme paints it, so switching theme recolours the agent. */
+const toneSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(AGENT_TONE_SLOTS - 1))
 
 export const agentRouteSchema = Schema.Struct({
   provider: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(MAX_PROVIDER_CHARS)),
@@ -69,10 +74,16 @@ const agentDraftFields = {
   enabled: Schema.Boolean,
 }
 
-export const agentDraftSchema = Schema.Struct(agentDraftFields)
+/**
+ * A draft names the colour three ways: a slot sets it, `null` returns to the default (hashed from the handle), and no
+ * key keeps the stored one, so an agent tool that edits only the instructions leaves the colour alone.
+ */
+export const agentDraftSchema = Schema.Struct({ ...agentDraftFields, tone: Schema.optional(Schema.NullOr(toneSchema)) })
 
 export const agentSchema = Schema.Struct({
   ...agentDraftFields,
+  /** The colour slot the person chose; absent (every row stored before colours) means the handle's hashed default. */
+  tone: Schema.optional(toneSchema),
   builtIn: Schema.Boolean,
   createdAt: timestampSchema,
   updatedAt: timestampSchema,

@@ -71,7 +71,7 @@ export const agentsApi = defineApi({
     save: method({
       input: Schema.Struct({ agent: agentDraftSchema }),
       output: agentSaveResultSchema,
-      description: `Create or update one agent. ${writeNote}`,
+      description: `Create or update one agent. \`tone\` is its colour, an identity palette slot 0–5 the active theme paints: null returns it to the default hashed from the handle, and leaving it out keeps the current one. ${writeNote}`,
       tool: { name: 'agents_save', readOnly: false },
     }),
     remove: method({

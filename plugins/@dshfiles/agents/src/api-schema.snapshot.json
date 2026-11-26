@@ -158,6 +158,18 @@
                 "enabled": {
                   "type": "boolean"
                 },
+                "tone": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "builtIn": {
                   "type": "boolean"
                 },
@@ -304,6 +316,9 @@
                 },
                 "enabled": {
                   "type": "boolean"
+                },
+                "tone": {
+                  "type": "integer"
                 },
                 "builtIn": {
                   "type": "boolean"
@@ -510,6 +525,18 @@
                   "enabled": {
                     "type": "boolean"
                   },
+                  "tone": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "builtIn": {
                     "type": "boolean"
                   },
@@ -664,6 +691,9 @@
               "enabled": {
                 "type": "boolean"
               },
+              "tone": {
+                "type": "integer"
+              },
               "builtIn": {
                 "type": "boolean"
               },
@@ -773,7 +803,7 @@
     },
     {
       "name": "save",
-      "description": "Create or update one agent. May run only when the user asked for that change.",
+      "description": "Create or update one agent. `tone` is its colour, an identity palette slot 0–5 the active theme paints: null returns it to the default hashed from the handle, and leaving it out keeps the current one. May run only when the user asked for that change.",
       "tool": {
         "name": "agents_save",
         "readOnly": false
@@ -898,6 +928,21 @@
               },
               "enabled": {
                 "type": "boolean"
+              },
+              "tone": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -1069,6 +1114,18 @@
                     },
                     "enabled": {
                       "type": "boolean"
+                    },
+                    "tone": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 5
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
                     },
                     "builtIn": {
                       "type": "boolean"
@@ -1255,6 +1312,18 @@
                   "enabled": {
                     "type": "boolean"
                   },
+                  "tone": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
                   "builtIn": {
                     "type": "boolean"
                   },
@@ -1464,6 +1533,18 @@
                     "enabled": {
                       "type": "boolean"
                     },
+                    "tone": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 5
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
                     "builtIn": {
                       "type": "boolean"
                     },
@@ -1604,6 +1685,9 @@
               },
               "enabled": {
                 "type": "boolean"
+              },
+              "tone": {
+                "type": "integer"
               }
             },
             "required": [
@@ -1716,6 +1800,9 @@
                     },
                     "enabled": {
                       "type": "boolean"
+                    },
+                    "tone": {
+                      "type": "integer"
                     },
                     "builtIn": {
                       "type": "boolean"
@@ -1830,6 +1917,9 @@
                   },
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "tone": {
+                    "type": "integer"
                   },
                   "builtIn": {
                     "type": "boolean"
@@ -1966,6 +2056,9 @@
                     },
                     "enabled": {
                       "type": "boolean"
+                    },
+                    "tone": {
+                      "type": "integer"
                     },
                     "builtIn": {
                       "type": "boolean"
@@ -2195,6 +2288,18 @@
                 "enabled": {
                   "type": "boolean"
                 },
+                "tone": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
                 "builtIn": {
                   "type": "boolean"
                 },
@@ -2366,6 +2471,9 @@
                 },
                 "enabled": {
                   "type": "boolean"
+                },
+                "tone": {
+                  "type": "integer"
                 },
                 "builtIn": {
                   "type": "boolean"
@@ -2599,6 +2707,18 @@
                 },
                 "enabled": {
                   "type": "boolean"
+                },
+                "tone": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 5
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 },
                 "builtIn": {
                   "type": "boolean"
@@ -2929,6 +3049,18 @@
                   },
                   "enabled": {
                     "type": "boolean"
+                  },
+                  "tone": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
                   },
                   "builtIn": {
                     "type": "boolean"

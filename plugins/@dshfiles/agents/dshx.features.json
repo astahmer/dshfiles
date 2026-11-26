@@ -153,6 +153,58 @@
       ]
     },
     {
+      "id": "agent-colour",
+      "title": "Colour an agent",
+      "summary": "Give an agent a colour from the theme's palette, so its tile and mentions are easy to tell apart.",
+      "details": "An agent stores an optional palette slot (tone 0–5) beside its glyph. The active theme paints the slot, so switching theme recolours every agent to match; an agent without one, including every agent saved before colours, takes the slot hashed from its handle (the shared project-tone hash). The agents_save tool takes the same slot: null returns to the default and leaving it out keeps the current colour.",
+      "surfaces": ["host", "storage", "tool"],
+      "surface": "destinationSection",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents",
+      "configuration": [],
+      "states": ["default-tone", "chosen-tone", "cleared"],
+      "failureModes": [
+        "A slot outside 0–5 is refused by the save, and the stored colour stays.",
+        "A save that names no tone keeps the stored one, so an edit by an agent tool never drops the colour."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "host-test",
+          "id": "agents.tone-store",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "keeps a chosen tone across a restart and a save that omits it, and clears it with null"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-schema",
+          "file": "plugins/@dshfiles/agents/src/agent.test.ts",
+          "testName": "a tone is one of the six identity slots"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tone-tool",
+          "file": "plugins/@dshfiles/agents/tests/api-schema-parity.spec.ts",
+          "testName": "the agents_save tool takes an optional colour slot, null to clear it"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.tone-browser",
+          "reason": "No Gherkin scenario switches themes yet; the coloured panel, the editor's palette, a composer mention and a transcript reference were walked on a scratch DSH in the default theme and Dracula, light and dark, at desktop and 390 px WebKit, and the stored slot is Host-tested."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
       "summary": "Start a thread on an agent by typing its @handle at the start of your message.",

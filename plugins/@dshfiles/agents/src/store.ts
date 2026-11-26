@@ -98,14 +98,18 @@ export class AgentsRegistry extends Context.Service<
         const existing = current.records.get(draft.handle)
         if (existing === undefined && current.records.size >= MAX_AGENTS) return { kind: 'limit' as const, ...snapshotOf(current) }
         const now = yield* Clock.currentTimeMillis
-        const agent: Agent = {
-          ...draft,
+        const { tone: chosen, ...fields } = draft
+        // No key keeps the stored colour; null clears it back to the handle's default.
+        const tone = chosen === undefined ? existing?.tone : (chosen ?? undefined)
+        const saved: Agent = {
+          ...fields,
           builtIn: existing?.builtIn ?? false,
           createdAt: existing?.createdAt ?? now,
           updatedAt: now,
           lastUsedAt: existing?.lastUsedAt ?? null,
           threadCount: existing?.threadCount ?? 0,
         }
+        const agent: Agent = tone === undefined ? saved : { ...saved, tone }
         const next = yield* commit({ records: new Map(current.records).set(agent.handle, agent), history: current.history }, now)
         yield* persist(agentRows.put(agent.handle, agent))
         return { kind: 'applied' as const, ...snapshotOf(next), agent }
