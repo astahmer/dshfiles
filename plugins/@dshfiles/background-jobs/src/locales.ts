@@ -92,6 +92,8 @@ const en = {
   statusKilled: 'killed',
   statusFailed: 'failed',
   statusInterrupted: 'interrupted',
+  previewStateRunning: 'Working',
+  previewStateStopping: 'Stopping',
   outlivedTurn: 'outlived its turn',
 } as const
 
@@ -184,6 +186,8 @@ const zh = {
   statusKilled: '已终止',
   statusFailed: '失败',
   statusInterrupted: '已中断',
+  previewStateRunning: '运行中',
+  previewStateStopping: '正在停止',
   outlivedTurn: '已超出所属回合',
 } as const
 

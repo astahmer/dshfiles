@@ -4,7 +4,7 @@ import { useApi } from '@dshfiles/dshx/client'
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ComposerRow } from '@dshfiles/plugin-ui/components/composer-row'
-import { ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpRightIcon, ChevronRightIcon, SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { StatusGlyph, type StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
@@ -15,7 +15,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import { backgroundJobsApi } from './api.js'
 import { JobPreviewModel, type JobPreviewView, type JobsClient } from './job-preview-model.js'
 import { JobTitles } from './job-titles.js'
-import type { BackgroundJobsTranslate } from './locales.js'
+import type { BackgroundJobsKey, BackgroundJobsTranslate } from './locales.js'
 import { STATUS_KEY } from './panel.js'
 
 /** What the card reads from its plugin, bound once in the client entry. */
@@ -69,6 +69,15 @@ const GLYPH = {
   failed: 'failed',
   killed: 'stopped',
 } as const satisfies Record<JobPreviewView['status'], StatusGlyphState>
+
+/** The word an untitled job's dock row leads with (council round 8 C3); only live jobs sit in the dock. */
+const DOCK_LABEL_KEY = {
+  running: 'previewStateRunning',
+  stopping: 'previewStateStopping',
+  completed: undefined,
+  failed: undefined,
+  killed: undefined,
+} as const satisfies Record<JobPreviewView['status'], BackgroundJobsKey | undefined>
 
 /** Mounted only while the card is open: collapsing stops the stream, and the Host coalesces its frames. */
 const JobOutput = (props: {
@@ -161,6 +170,10 @@ const JobPreviewCard = (
   const open = disclosure.expanded
   // The call's description titles the job; the shell command it ran is the second line.
   const name = title ?? view.label
+  const dock = props.seat === 'dock'
+  // Council round 8 C3: in the dock an untitled job reads like a subagent row, a 13/500 state word ("Working", its glyph's name) then the command
+  // in regular mono, so both rows share one grammar.
+  const stateWord = dock && title === undefined ? DOCK_LABEL_KEY[view.status] : undefined
   return (
     <section
       aria-label={`${t('previewKind')}: ${name}`}
@@ -176,17 +189,28 @@ const JobPreviewCard = (
       {/* glyph · description · muted command · elapsed · › (DESIGN.md, live work row) */}
       <ComposerRow
         icon={<StatusGlyph status={GLYPH[view.status]} decorative />}
-        label={title === undefined ? <span className="dshx:font-mono!">{view.label}</span> : <span data-job-title="">{title}</span>}
+        label={
+          stateWord !== undefined ? (
+            <span data-job-state="">{t(stateWord)}</span>
+          ) : title === undefined ? (
+            <span className="dshx:font-mono!">{view.label}</span>
+          ) : (
+            <span data-job-title="">{title}</span>
+          )
+        }
         meta={
           <>
-            {title === undefined ? null : (
-              <span className="dshx:min-w-0 dshx:truncate dshx:font-mono! dshx:@max-pane-narrow:hidden" data-job-command="">
+            {title === undefined && stateWord === undefined ? null : (
+              <span
+                className={cn('dshx:min-w-0 dshx:truncate dshx:font-mono!', stateWord === undefined && 'dshx:@max-pane-narrow:hidden')}
+                data-job-command=""
+              >
                 {view.label}
               </span>
             )}
             <span className="dshx:flex-1" />
-            {/* The glyph says the state; assistive technology hears it as a word. */}
-            <span role="status" className="dshx:sr-only">{t(STATUS_KEY[view.status])}</span>
+            {/* The glyph says the state; assistive technology hears it as a word (the label already says it in the dock). */}
+            {stateWord === undefined ? <span role="status" className="dshx:sr-only">{t(STATUS_KEY[view.status])}</span> : null}
             <Elapsed startedAt={view.startedAt} finishedAt={view.finishedAt} live={live} />
             <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:transition-transform', open && 'dshx:rotate-90')} />
           </>
@@ -194,7 +218,16 @@ const JobPreviewCard = (
         expanded={open}
         onSelect={disclosure.toggle}
         selectLabel={t('previewToggle', { label: name })}
-        variant={props.seat === 'dock' ? 'card' : 'plain'}
+        variant={dock ? 'card' : 'plain'}
+        // Council round 8 C3: the dock row ends like a subagent row's, with a worded link out and its arrow.
+        actions={
+          dock ? (
+            <Button size="xs" variant="ghost" className="dshx:shrink dshx:text-muted-foreground" data-job-open-processes="" onClick={props.openProcesses}>
+              <span className="dshx:@max-pane-narrow:sr-only">{t('previewOpenProcesses')}</span>
+              <ArrowUpRightIcon aria-hidden="true" />
+            </Button>
+          ) : undefined
+        }
       >
       {open ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:p-2">

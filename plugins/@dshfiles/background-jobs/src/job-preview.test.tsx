@@ -247,6 +247,23 @@ describe('JobPreviewDock', () => {
     expect(document.querySelector('[data-dshfiles-live-preview-dock]')).toBeNull()
   })
 
+  it('leads an untitled row with its state word, the command after it in mono, and ends with Open in Processes (council round 8 C3)', () => {
+    // SAFETY: the dock treats the job id as an opaque key; a fresh id has no title from an earlier card.
+    renderDock(fakeJobs([row({ id: 'bash-9e8f' as JobView['id'] })]))
+    const dock = dockCards()[0]
+    expect(dock?.querySelector('[data-slot="composer-row-label"]')?.textContent).toBe('previewStateRunning')
+    const command = dock?.querySelector('[data-job-command]')
+    expect(command?.textContent).toBe('pnpm build')
+    expect(command?.className).toContain('dshx:font-mono!')
+    // The state word is the label, so no second status line is read out.
+    expect(dock?.querySelector('[role="status"]')).toBeNull()
+    const link = dock?.querySelector('[data-slot="composer-row-actions"] [data-job-open-processes]')
+    expect(link?.textContent).toBe('previewOpenProcesses')
+    if (!(link instanceof HTMLElement)) throw new Error('no Open in Processes')
+    fireEvent.click(link)
+    expect(bindings.openProcesses).toHaveBeenCalled()
+  })
+
   it('renders nothing for a thread with no running job', () => {
     renderDock(fakeJobs([]))
     expect(document.querySelector('[data-dshfiles-live-preview-dock]')).toBeNull()
