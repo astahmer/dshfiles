@@ -26,36 +26,30 @@ const kindLabels = { task: 'Task', bug: 'Bug', idea: 'Idea', note: 'Note', quest
 const attentionLabels = { none: 'No attention', 'needs-input': 'Needs you', blocked: 'Blocked', waiting: 'Waiting' } satisfies Record<BacklogAttention, string>
 
 const statusTone = {
-  inbox: 'dshx:text-muted-foreground',
-  todo: 'dshx:text-muted-foreground',
+  inbox: 'dshx:text-foreground',
+  todo: 'dshx:text-foreground',
   doing: 'dshx:text-foreground',
-  done: 'dshx:text-muted-foreground',
+  done: 'dshx:text-foreground',
   dropped: 'dshx:text-muted-foreground',
 } satisfies Record<BacklogStatus, string>
 
 /** Freshness the glyph draws as stale: an open item idle past its limit may be out of date. */
 const isStale = (freshness: string): boolean => freshness === 'stale' || freshness === 'dormant'
 
-/** The glyph's one shape: a 16 px rounded square edged 1.5 px, so no status reads as the Working ring spinner. */
-const Square = (props: { readonly stale?: boolean | undefined }): JSX.Element => (
-  <rect
-    x="1.75"
-    y="1.75"
-    width="12.5"
-    height="12.5"
-    rx="3.25"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.5"
-    strokeDasharray={props.stale === true ? '2.4 1.9' : undefined}
-  />
+/**
+ * The glyph's one shape: a 16 px ring edged 1.5 px. A stale ring is dashed in ten even steps around its 39.3 px
+ * circumference, so the dashes meet without a seam.
+ */
+const Ring = (props: { readonly stale?: boolean | undefined }): JSX.Element => (
+  <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray={props.stale === true ? '2.45 1.477' : undefined} />
 )
 
 /**
- * Status as a rounded square, a to-do box (council round 8, D2): an open item (Inbox, Todo) is the empty square with
- * a muted edge, In progress adds an ink half, Done a muted check, Dropped one diagonal stroke (DESIGN.md › Colour
- * roles: the red cross is Failed's, and a page's own vocabulary takes no status hue). A ring is the Working spinner's
- * shape, so no status draws one. The dashed edge is only for a stale item (council round 6, D3).
+ * Status as an ink ring (council round 10, D3; owner decision: statuses stay ink): an open item (Inbox, Todo) is the
+ * open ring, In progress fills its right half, Done draws a check inside it, Dropped one diagonal stroke in muted ink
+ * (DESIGN.md › Colour roles: the red cross is Failed's, and a page's own vocabulary takes no status hue). The round 8
+ * to-do square read as a checkbox beside the menu chevron. The dashed edge is only for a stale item (council round 6,
+ * D3).
  */
 const StatusIcon = (props: { readonly status: BacklogStatus; readonly stale?: boolean; readonly className?: string }): JSX.Element => (
   <svg
@@ -66,23 +60,23 @@ const StatusIcon = (props: { readonly status: BacklogStatus; readonly stale?: bo
     data-stale={props.stale === true || undefined}
     className={cn('dshx:size-4 dshx:shrink-0', props.stale === true ? 'dshx:text-muted-foreground' : statusTone[props.status], props.className)}
   >
-    {props.status === 'inbox' || props.status === 'todo' ? <Square stale={props.stale} /> : null}
+    {props.status === 'inbox' || props.status === 'todo' ? <Ring stale={props.stale} /> : null}
     {props.status === 'doing' ? (
       <>
-        <Square stale={props.stale} />
-        <path d="M8 4.75h2a1.25 1.25 0 0 1 1.25 1.25v4a1.25 1.25 0 0 1-1.25 1.25H8z" fill="currentColor" />
+        <Ring stale={props.stale} />
+        <path d="M8 4.5a3.5 3.5 0 0 1 0 7z" fill="currentColor" />
       </>
     ) : null}
     {props.status === 'done' ? (
       <>
-        <Square />
-        <path d="m5.1 8.2 2 2 3.8-4.2" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        <Ring />
+        <path d="m5.4 8.1 1.85 1.85 3.35-3.7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       </>
     ) : null}
     {props.status === 'dropped' ? (
       <>
-        <Square />
-        <path d="m5 11 6-6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <Ring />
+        <path d="m5.5 10.5 5-5" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
       </>
     ) : null}
   </svg>

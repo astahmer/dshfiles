@@ -24,7 +24,7 @@ test('status and kind glyphs are ink or muted, never a status hue', () => {
   expect(renderToStaticMarkup(<WorkGlyphs.PriorityIcon priority="urgent" />)).not.toMatch(STATUS_HUE)
 })
 
-test('Dropped is a square with one diagonal stroke, not the Failed cross', () => {
+test('Dropped is a ring with one diagonal stroke, not the Failed cross', () => {
   const markup = renderToStaticMarkup(<ItemGlyphs.StatusIcon status="dropped" />)
   const strokes = [...markup.matchAll(/<path d="([^"]+)"/gu)].map(match => match[1] ?? '')
   expect(strokes).toHaveLength(1)
@@ -47,17 +47,19 @@ test('status groups with no items are not drawn', () => {
   expect(view).toContain('const visibleGroups = groups.filter(group => group.items.length > 0)')
 })
 
-test('an open item (Inbox, Todo) is a 16 px rounded square with a 1.5 px muted edge, not a ring that reads as Working (council round 8, D2)', () => {
-  for (const status of ['inbox', 'todo'] as const) {
+test('status glyphs are ink rings, not the to-do square that read as a checkbox (council round 10, D3)', () => {
+  // An open item (Inbox, Todo) is an open 16 px ring edged 1.5 px in ink; In progress adds a half-disc, Done a check.
+  for (const status of ['inbox', 'todo', 'doing', 'done'] as const) {
     const markup = renderToStaticMarkup(<ItemGlyphs.StatusIcon status={status} />)
     expect(markup, status).toMatch(/<svg[^>]*width="16" height="16"/u)
     expect(markup, status).toContain('dshx:size-4')
-    expect(markup, status).toMatch(/<rect [^>]*rx="[\d.]+"[^>]*stroke-width="1.5"/u)
+    expect(markup, status).toMatch(/<circle [^>]*stroke-width="1.5"/u)
+    expect(markup, status).not.toContain('<rect')
     expect(markup, status).not.toContain('stroke-dasharray')
-    expect(markup, status).toContain('dshx:text-muted-foreground')
+    expect(markup, status).toContain('dshx:text-foreground')
   }
-  // One shape family: no status draws the ring the Working spinner uses.
-  for (const status of STATUSES) expect(renderToStaticMarkup(<ItemGlyphs.StatusIcon status={status} />), status).not.toContain('<circle')
+  expect(renderToStaticMarkup(<ItemGlyphs.StatusIcon status="doing" />)).toMatch(/<path d="M8 [^"]*a3\.5 3\.5 [^"]*" fill="currentColor"/u)
+  expect(renderToStaticMarkup(<ItemGlyphs.StatusIcon status="done" />)).toMatch(/<path d="m[^"]*" fill="none" stroke="currentColor"/u)
   for (const status of ['inbox', 'todo', 'doing'] as const) {
     const stale = renderToStaticMarkup(<ItemGlyphs.StatusIcon status={status} stale />)
     expect(stale, status).toContain('stroke-dasharray')
