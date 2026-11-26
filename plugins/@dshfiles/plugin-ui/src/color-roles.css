@@ -36,9 +36,10 @@
   /*
    * A selection (round five K2): a neutral warm wash since council round 3 (generated in theme.generated.css), so
    * indigo fills mean attention only. The selected row, the settings category, a pressed toggle, the palette's
-   * highlighted row, a chosen card. Text on it stays ink (`text-foreground`). A selected list row adds
+   * highlighted row. Text on it stays ink (`text-foreground`). A selected list row adds
    * `selected-marker` (a 2px ink bar inset on the leading edge, which follows a rounded row; ink since council round 6
-   * A1, so indigo means attention only) and its title at `font-selected` (550); a card or tile takes `selected-card`.
+   * A1, so indigo means attention only) and its title at `font-selected` (550); a chosen card or tile takes
+   * `selected-card` instead, with no wash (council round 8 A2).
    */
   --color-selected-wash: var(--dshx-selected-wash);
   --font-weight-selected: 550;
@@ -115,15 +116,14 @@
 
 /*
  * The chosen card or tile (council round 3 A1): `dshx:selected-card` on a bordered card (a theme card, a starter tile,
- * a plan option). The neutral wash, a 2px ink ring edge (its own 1px border plus a 1px inset ring, so the box never
- * changes size; ink since council round 7 A1) and a 16px check badge in the trailing top corner, so the choice reads
- * without colour. No inset leading marker: that is the list row's cue. The badge is the ink with the check cut out to
- * the wash, which holds 3:1 both ways over any card artwork. Focus keeps the indigo kit outline, which this never
- * touches.
+ * a plan option). A 2px edge in the control-on ink (its own 1px border plus a 1px inset ring, so the box never changes
+ * size; ink since council round 7 A1) and a 16px check badge in the trailing top corner, so the choice reads without
+ * colour. Nothing heavier (council round 8 A2): the card keeps its normal surface, no wash. No inset leading marker:
+ * that is the list row's cue. The badge is the ink with the check cut out to the card's surface, 3:1 both ways on
+ * every surface step. Focus keeps the indigo kit outline, which this never touches.
  */
 @utility selected-card {
   position: relative;
-  background-color: var(--dshx-selected-wash);
   border-color: var(--dsw-alias-label-primary);
   box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);
   &::after {

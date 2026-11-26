@@ -109,13 +109,15 @@ describe('selected wash (round five K2, quieter in A1, neutral in council round 
   })
 })
 
-describe('selected card (council round 3 A1)', () => {
+describe('selected card (council round 3 A1, round 8 A2)', () => {
   const card = /@utility selected-card\s*\{([\s\S]*?)\n\}/u.exec(roles)?.[1] ?? ''
 
-  it('draws a 2px ring edge and the wash with no inset marker and no layout shift', () => {
-    expect(card).toContain('background-color: var(--dshx-selected-wash);')
+  it('draws a 2px control-on edge on the card\'s own surface, with no fill, no inset marker and no layout shift', () => {
+    // Council round 8 A2: the edge and the check carry the choice; the card keeps its normal surface.
+    expect(card.replace(/&::after\s*\{[^}]*\}/u, '')).not.toMatch(/background/u)
     // A 1px border in the ring colour plus a 1px inset ring: 2px on a bordered card, without changing its box.
-    // Ink, not the accent (council round 7 A1): indigo means attention, focus and links only.
+    // The control-on ink (council round 7 A1), not the accent: indigo means attention, focus and links only.
+    expect(roles).toContain('--color-control-on: var(--dsw-alias-label-primary);')
     expect(card).toContain('border-color: var(--dsw-alias-label-primary);')
     expect(card).toContain('box-shadow: inset 0 0 0 1px var(--dsw-alias-label-primary);')
     expect(card).not.toContain('business')
@@ -133,9 +135,9 @@ describe('selected card (council round 3 A1)', () => {
     expect(card).toMatch(/&::after\s*\{[^}]*inset-block: 6px auto;[^}]*inset-inline: auto 6px;/u)
   })
 
-  it.each(schemes)('holds the check and the edge at 3:1 on the wash (%s)', scheme => {
+  it.each(schemes)('holds the check and the edge at 3:1 on every card surface (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    // `--dsw-alias-label-primary` is neutral step 10; the check is cut out to the wash.
-    expect(PaletteMath.contrastRatio(p.neutral[10]!, p.selectedWash)).toBeGreaterThanOrEqual(3)
+    // `--dsw-alias-label-primary` is neutral step 10; the check is cut out to the card's own surface.
+    for (const step of [0, 1, 2, 3]) expect(PaletteMath.contrastRatio(p.neutral[10]!, p.neutral[step]!), `step ${step}`).toBeGreaterThanOrEqual(3)
   })
 })

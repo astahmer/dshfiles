@@ -125,7 +125,7 @@ const identityText = [
 
 const cardChoices = ['Warm stone', 'Neutral', 'High contrast'] as const
 
-/** A chosen card (`selected-card`: ring edge, neutral wash, check) beside a selected list row (wash, marker, 550). */
+/** A chosen card (`selected-card`: 2px control-on edge and check on its own surface) beside a selected list row (wash, marker, 550). */
 function SelectionDemo() {
   const [chosen, setChosen] = React.useState<string>(cardChoices[0])
   return (
@@ -138,7 +138,7 @@ function SelectionDemo() {
             role="radio"
             aria-checked={chosen === choice}
             onClick={() => setChosen(choice)}
-            className={`dshx:flex dshx:h-16 dshx:items-end dshx:rounded-lg dshx:border dshx:p-2 dshx:text-left dshx:text-sm ${chosen === choice ? 'dshx:selected-card dshx:font-selected' : 'dshx:border-border dshx:bg-background'}`}
+            className={`dshx:flex dshx:h-16 dshx:items-end dshx:rounded-lg dshx:border dshx:p-2 dshx:bg-background dshx:text-left dshx:text-sm ${chosen === choice ? 'dshx:selected-card dshx:font-selected' : 'dshx:border-border'}`}
           >
             {choice}
           </button>
