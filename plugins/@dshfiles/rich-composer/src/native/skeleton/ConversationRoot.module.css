@@ -703,9 +703,10 @@ button.crumbEditable {
   width: calc(100% - var(--dsh-composer-side-clearance, 0px) * 2 + 2px);
   max-width: calc(var(--dsh-composer-card-max-width) + 2px);
   margin-inline: auto;
-  background: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
+  /* Council round 8 C3: the composer card's own fill, so the dock reads as the composer's top, not a panel above it. */
+  background: var(--dsw-specific-input-major);
   border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
-  border-radius: var(--dsw-radius-md, 8px);
+  border-radius: var(--dsw-radius-lg);
 }
 
 /* A jobs dock and a subagents dock that follow each other are one surface: the second joins the first under a 1px
@@ -731,7 +732,7 @@ button.crumbEditable {
   margin-block: 0;
   border: 0;
   border-radius: 0;
-  background: var(--dshx-tone-panel, var(--dsw-alias-bg-layer-1));
+  background: var(--dsw-specific-input-major);
 }
 
 /* A job row is the kit's dock row: it fills the surface instead of drawing a card inside it. */
@@ -744,11 +745,43 @@ button.crumbEditable {
   background: transparent;
 }
 
-/* Council round 7 C6: a subagent row leads with its disclosure chevron, so its status glyph sits 28px into the row (8px
-   inset, 14px chevron, 6px gap). A job row in a dock that also holds subagents reserves the same leading seat (its 10px
-   inset plus 18px), so every status glyph in the dock sits on one column. Alone, a job row keeps its glyph at the edge. */
-:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock='subagents'])) > :global([data-dshfiles-live-preview-dock='jobs']) :global([data-slot='composer-row-icon']) {
-  margin-inline-start: 18px;
+/* Council round 8 C3: one row grammar for the dock. A subagent row leads with its disclosure chevron (8px inset, 14px
+   chevron, 6px gap, so its glyph sits 28px in); a job row draws the same chevron in the same seat instead of a trailing
+   one, turning with its disclosure, so every row leads with one chevron and every glyph sits on one column. Labels are
+   13/500 sans and details 13 regular (a job's command in mono); both rows end with their worded link out. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) {
+  gap: 4px;
+  padding-inline: 8px 4px;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) > :global(button) {
+  gap: 6px;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row']) > :global(div:first-child) > :global(button)::before {
+  content: '';
+  flex: none;
+  width: 14px;
+  height: 14px;
+  background: var(--dsw-alias-label-secondary);
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / 14px 14px no-repeat;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row'][data-expanded]) > :global(div:first-child) > :global(button)::before {
+  rotate: 90deg;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row-meta']) > :global(svg:last-child) {
+  display: none;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :is(:global([data-slot='composer-row-label']), :global([data-slot='composer-row-meta']), :global([data-dshfiles-live-preview='agent'])) {
+  font-size: 13px;
+  line-height: 16px;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) :global([data-slot='composer-row-label']) {
+  font-weight: 500;
 }
 
 /* 32px collapsed rows, the subagent row's height; a touch screen keeps the owners' 44pt targets. */
@@ -759,9 +792,22 @@ button.crumbEditable {
   }
 }
 
-/* The dock ends 8px above the composer card. */
+/* Council round 8 C3: the dock attaches to the composer card. Its bottom edge meets the card's top, so the card's 1px
+   ring is the one line between them; only the dock's top corners are rounded (the composer's 12px), and the card's top
+   corners square off under it, so dock and composer read as one object. */
 :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):last-child {
-  margin-bottom: calc(8px - var(--dsh-composer-stack-gap));
+  margin-bottom: calc(-1 * var(--dsh-composer-stack-gap) - 1px);
+  border-bottom-width: 0;
+  border-radius: var(--dsw-radius-lg) var(--dsw-radius-lg) 0 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]) + :global([data-dshfiles-live-preview-dock]):last-child {
+  border-radius: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack:has(> :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock]):last-child) :global([data-composer-card]) {
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
 }
 
 /* An entry fades in where it lands; the seat is pinned to the floor, so the input never moves. */

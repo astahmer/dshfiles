@@ -88,7 +88,9 @@ describe('the desktop live work dock (round six C2)', () => {
 
   it('draws running jobs and working subagents on one neutral surface with the composer card edges', () => {
     const surface = rule(DESK)
-    expect(surface).toMatch(/background: var\(--dshx-tone-panel, var\(--dsw-alias-bg-layer-1\)\);/)
+    // Council round 8 C3: the composer card's own fill and radius, so the dock reads as the composer's top.
+    expect(surface).toMatch(/background: var\(--dsw-specific-input-major\);/)
+    expect(surface).toMatch(/border-radius: var\(--dsw-radius-lg\);/)
     expect(surface).toMatch(/border: 1px solid var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\);/)
     // Council round 7 C6: the composer draws its hairline as a 1px ring outside its box, so the dock's border box is 1px
     // wider on each side to share the composer's exact edges (it sat 1px inside them).
@@ -109,13 +111,25 @@ describe('the desktop live work dock (round six C2)', () => {
     expect(rows).toMatch(/border: 0;/)
     expect(rows).toMatch(/margin-block: 0;/)
     expect(rows).toMatch(/border-radius: 0;/)
-    const jobLine = blocks().find(candidate => candidate.selector === `${DESK} :global([data-slot='composer-row']) > :global(div:first-child)`)
+    const jobLine = blocks().find(candidate => candidate.selector === `${DESK} :global([data-slot='composer-row']) > :global(div:first-child)` && candidate.context !== '')
     expect(jobLine?.context).toBe('@media (pointer: fine)')
     expect(jobLine?.body).toMatch(/height: 32px;/)
   })
 
-  it('ends 8px above the composer', () => {
-    expect(rule(`${DESK}:last-child`)).toMatch(/margin-bottom: calc\(8px - var\(--dsh-composer-stack-gap\)\);/)
+  it('attaches to the composer card: one shared 1px edge, only the dock\'s top corners rounded (council round 8 C3)', () => {
+    const last = rule(`${DESK}:last-child`)
+    // The dock's bottom edge meets the card's top, where the card's 1px ring is the one line between them.
+    expect(last).toMatch(/margin-bottom: calc\(-1 \* var\(--dsh-composer-stack-gap\) - 1px\);/)
+    expect(last).toMatch(/border-bottom-width: 0;/)
+    expect(last).toMatch(/border-radius: var\(--dsw-radius-lg\) var\(--dsw-radius-lg\) 0 0;/)
+    const card = rule(
+      `:global(html:not([data-shell-phone-nav])) .composerStack:has(> ${DOCK} > :global([data-dshfiles-live-preview-dock]):last-child) :global([data-composer-card])`,
+    )
+    expect(card).toMatch(/border-top-left-radius: 0;/)
+    expect(card).toMatch(/border-top-right-radius: 0;/)
+    expect(rule(`${DESK} > :is(:global([data-dshfiles-live-preview]), :global([data-dshfiles-live-preview-fold]))`)).toMatch(
+      /background: var\(--dsw-specific-input-major\);/,
+    )
   })
 })
 
@@ -148,14 +162,32 @@ describe('the phone transcript fade above the dock (council round 7 C3, round 8 
   })
 })
 
-describe('the desktop live work dock seats (council round 7 C6)', () => {
-  it('reserves a job row the subagent row\'s leading seat when the dock holds subagents: both glyphs 28px into the row', () => {
-    const rule = blocks().find(
-      block =>
-        block.selector ===
-        `:global(html:not([data-shell-phone-nav])) .composerStack > ${DOCK}:has(> :global([data-dshfiles-live-preview-dock='subagents'])) > :global([data-dshfiles-live-preview-dock='jobs']) :global([data-slot='composer-row-icon'])`,
+describe('one row grammar in the desktop dock (council round 8 C3)', () => {
+  const DESK = `:global(html:not([data-shell-phone-nav])) .composerStack > ${DOCK} > :global([data-dshfiles-live-preview-dock])`
+  const ROW = `${DESK} :global([data-slot='composer-row']) > :global(div:first-child)`
+  const rule = (selector: string): string => blocks().find(candidate => candidate.selector === selector && candidate.context === '')?.body ?? ''
+
+  it('leads a job row with the subagent row\'s chevron seat: 8px inset, 14px chevron, 6px gap, both glyphs 28px in', () => {
+    expect(rule(ROW)).toMatch(/padding-inline: 8px 4px;/)
+    expect(rule(`${ROW} > :global(button)`)).toMatch(/gap: 6px;/)
+    const chevron = rule(`${ROW} > :global(button)::before`)
+    expect(chevron).toMatch(/width: 14px;/)
+    expect(chevron).toMatch(/height: 14px;/)
+    expect(chevron).toMatch(/background: var\(--dsw-alias-label-secondary\);/)
+    expect(chevron).toContain("d='m9 18 6-6-6-6'")
+    expect(rule(`${DESK} :global([data-slot='composer-row'][data-expanded]) > :global(div:first-child) > :global(button)::before`)).toMatch(/rotate: 90deg;/)
+    // Its own trailing chevron goes: one chevron per row.
+    expect(rule(`${DESK} :global([data-slot='composer-row-meta']) > :global(svg:last-child)`)).toMatch(/display: none;/)
+    // The 18px leading margin of round 7 is gone: the chevron holds the seat.
+    expect(css).not.toMatch(/margin-inline-start: 18px;/)
+  })
+
+  it('sets both rows at 13px, labels at 500', () => {
+    const text = rule(
+      `${DESK} :is(:global([data-slot='composer-row-label']), :global([data-slot='composer-row-meta']), :global([data-dshfiles-live-preview='agent']))`,
     )
-    // The subagent row: 8px inset + 14px chevron + 6px gap; the job row: 10px inset + 18px (measured 568.5 vs 562.5 at 24px).
-    expect(rule?.body).toMatch(/margin-inline-start: 18px;/)
+    expect(text).toMatch(/font-size: 13px;/)
+    expect(text).toMatch(/line-height: 16px;/)
+    expect(rule(`${DESK} :global([data-slot='composer-row-label'])`)).toMatch(/font-weight: 500;/)
   })
 })
