@@ -236,6 +236,15 @@ Round 12 findings, merged in `.cache/unslop-audit/r5/council/round-12-fixes.md`:
 ↵ for glyph-leading selections; quiet dock dividers (a round-11 regression); one Review verb style on head bands; the
 Usage table aligned and bars on tracks; Backlog tabs that scroll instead of clipping; the phone tab tone on the current
 tab only; New thread's Resume and Inbox as chips; a tighter phone Inbox; DESIGN.md synced on Triage.
+All four lanes done: A kit 4 revisions `ykvmwprs` … `xumnysrz` (selected edge at ≥ 3:1 on the wash, band-tinted
+verbs with AA band text, softer light dense checkbox, DESIGN.md); B 5 revisions `tkususoz` … `lyyxpzks` (palette ↵,
+current-tab-only phone tone, selected edge on glyph-led rows, kind · project on desktop Needs-you rows, pinned phone
+verbs, StatusCount on the New thread Inbox chip); C 5 revisions `ylyrnmvl` … `ntorpkwr` (quiet dock dividers, one band
+Review verb, a phone Inbox whose failed title clears the tab bar, Resume/Inbox chips); D 6 revisions `oqovxxky` …
+`nowlvzwn` (Usage table aligned, share bars on tracks, Backlog tabs scroll with a fade, capture field edge, quiet status
+column, Provider default · Auto, selected edge on accounts, three-line plugin summaries).
+Follow-ups: the committed thread-sidebar `phone-tab-bar.png` predates the current-tab-only tone; Usage's day labels
+overlap at 390 px.
 
 ## Round four
 
