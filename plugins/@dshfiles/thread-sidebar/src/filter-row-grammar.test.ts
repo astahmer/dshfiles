@@ -15,8 +15,12 @@ describe('thread list filter row grammar (council round 8 B2)', () => {
       expect(headerRow, stripped).not.toMatch(new RegExp(`triggerClassName="[^"]*${stripped}[ "]`, 'u'))
   })
 
-  it('draws the Filter trigger in the field look beside it, at the same height, with its value in ink', () => {
-    expect(filterMenu).toContain('variant="field"')
+  it('draws the Filter trigger as the kit quiet secondary beside it, at the same height (council round 18 B1.4)', () => {
+    // One secondary look beside a search field: the trigger fill and hairline, its label in secondary ink at 500, ink
+    // while its menu is open. The project picker keeps the field look: it shows a value, not an action.
+    expect(filterMenu).toContain('variant="quiet"')
+    expect(filterMenu).not.toContain('variant="field"')
+    expect(filterMenu).toContain('size="field"')
     expect(filterMenu).not.toContain("variant={listFiltered ? 'secondary' : 'ghost'}")
     expect(filterMenu).toContain("'dshx:max-w-[50%] dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:phone:px-3'")
     // Two field edges side by side keep 8px between them.

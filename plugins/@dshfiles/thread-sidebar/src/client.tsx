@@ -6472,8 +6472,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       <DropdownMenuTrigger asChild>
         <Button
           type="button"
-          // The field look whether or not a filter is on: its value names the active filter.
-          variant="field"
+          // The kit quiet secondary (council round 18 B1.4): the one look for an action beside a search field, the trigger
+          // fill and hairline with its label in secondary ink, ink while the menu is open, whether or not a filter is on.
+          variant="quiet"
           size="field"
           data-thread-list-filter=""
           data-filtered={listFiltered ? '' : undefined}
