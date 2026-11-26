@@ -263,6 +263,16 @@ describe('colour in a row', () => {
     expect(row.querySelector('[data-thread-title]')?.className).toContain('dshx:group-data-[selected=true]/row:font-selected')
   })
 
+  it('draws no marker pill beside a leading status glyph: the selected wash and the 550 title carry it (council round 11 B3)', async () => {
+    const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'working' }) })
+    expect(row.querySelector('[data-thread-lead]')?.hasAttribute('data-leading-glyph')).toBe(true)
+    cleanup()
+    // An attention row keeps its attention wash when selected, so the pill stays its one selection cue.
+    const asking = await renderRow({ selected: true, workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    expect(asking.querySelector('[data-thread-lead]')).not.toBeNull()
+    expect(asking.querySelector('[data-leading-glyph]')).toBeNull()
+  })
+
   it('keeps a selected Needs-you row on its attention wash and adds only the marker', async () => {
     const row = await renderRow({ selected: true, workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
     const fill = row.querySelector<HTMLElement>('[data-row-wash]')

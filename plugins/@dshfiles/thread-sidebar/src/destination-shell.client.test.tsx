@@ -267,6 +267,15 @@ describe('DestinationShell', () => {
     expect(workspaces?.className).toContain('dshx:[&_svg]:size-4')
   })
 
+  it('marks a side-column row\'s plain glyph seat as its leading glyph, so a selected row draws no pill beside it (council round 11 B3)', () => {
+    // A destination or Settings row's seat is a kit place seat, which the kit rule finds itself; a custom folder's row
+    // keeps a plain 16px seat, which says so through the kit hook.
+    const source = readFileSync('src/destination-shell.tsx', 'utf8')
+    const plainSeat = source.slice(source.indexOf("props.place === undefined ? ("), source.indexOf('// The selected-place seat'))
+    expect(plainSeat).toContain('data-section-icon=""')
+    expect(plainSeat).toContain('{...LEADING_GLYPH_ATTRIBUTE}')
+  })
+
   it('keeps the Settings column open on every Settings page: it is the one Settings navigation (council round 4 B1)', () => {
     setPhone(false)
     DestinationSelection.set('settings')

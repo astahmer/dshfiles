@@ -4,6 +4,7 @@ import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
 import { usePhoneHistoryLayer } from '@dshfiles/workbench/phone-history'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { LoadError } from '@dshfiles/plugin-ui/components/load-error'
+import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { EntityList, EntityRow } from '@dshfiles/plugin-ui/components/entity-row'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { fieldLook } from '@dshfiles/plugin-ui/components/ui/input'
@@ -531,6 +532,9 @@ const SectionButton = (props: {
             )}
             aria-hidden="true"
             data-section-icon=""
+            // A row led by its glyph draws no marker pill beside it (council round 11 B3, kit A1): the wash and the 550
+            // label carry the selection. A place seat is found by the kit rule itself.
+            {...LEADING_GLYPH_ATTRIBUTE}
           >
             {props.icon}
           </span>

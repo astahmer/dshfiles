@@ -57,6 +57,7 @@ import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
+import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -1841,6 +1842,10 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       <span
                         className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', wrapTitle && 'dshx:mt-px')}
                         data-thread-lead=""
+                        // A row led by its status glyph draws no marker pill beside it (council round 11 B3, kit A1): the
+                        // selected wash and the 550 title carry the selection. An attention row keeps its own wash when
+                        // selected, so there the pill stays its one selection cue.
+                        {...(rowWash === undefined ? LEADING_GLYPH_ATTRIBUTE : {})}
                       >
                         {status}
                       </span>
