@@ -30,7 +30,8 @@ interface ThreadGroupHeaderProps {
   readonly statusCounts?: { readonly needsYou: number; readonly failed: number }
   /**
    * The status a status group stands for (Working, Ready, Idle, Done): its count is the kit's muted StatusCount with the
-   * 10px status glyph, like the Needs you chips, with no new hue (council round 15 B2). Other groups keep "(n)".
+   * 10px status glyph, like the Needs you chips, with no new hue (council round 15 B2); Drafts count with the idle glyph
+   * (round 16 B2). Other groups keep "(n)".
    */
   readonly status?: GroupCountStatus
 }
@@ -38,7 +39,10 @@ interface ThreadGroupHeaderProps {
 /** The status groups whose count carries its glyph; Needs you splits its count by `statusCounts` instead. */
 export type GroupCountStatus = 'working' | 'ready' | 'idle' | 'done'
 
-/** The glyph a status group's count carries, from the group's status (`state:<status>` without its prefix). */
+/**
+ * The glyph a status group's count carries, from the group's status (`state:<status>` without its prefix). Drafts are
+ * never-prompted threads whose rows draw the idle glyph, so their count carries it too (council round 16 B2).
+ */
 export const groupCountStatusOf = (status: string): GroupCountStatus | undefined => {
   switch (status) {
     case 'working':
@@ -46,6 +50,8 @@ export const groupCountStatusOf = (status: string): GroupCountStatus | undefined
     case 'idle':
     case 'done':
       return status
+    case 'draft':
+      return 'idle'
     default:
       return undefined
   }

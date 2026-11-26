@@ -7722,7 +7722,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                           { needsYou: 0, failed: 0 },
                         )
                       : undefined
-                  // Working, Ready, Idle and Done count beside their 10px status glyph (council round 15 B2).
+                  // Working, Ready, Idle, Done and Drafts count beside their 10px status glyph (council round 15 B2, round 16 B2).
                   const groupStatus = group.key.startsWith(STATUS_GROUP_KEY_PREFIX) ? groupCountStatusOf(group.key.slice(STATUS_GROUP_KEY_PREFIX.length)) : undefined
                   return (
                     <section

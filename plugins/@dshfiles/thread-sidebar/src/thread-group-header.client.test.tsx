@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ThreadGroupHeader } from './thread-group-header.js'
+import { groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
 
 const mount = (
   options: {
@@ -155,6 +155,20 @@ describe('ThreadGroupHeader', () => {
       expect(screen.getAllByText('(12)').map(node => node.className)).toEqual(['dshx:sr-only'])
     },
   )
+
+  it('counts the Drafts group with the idle glyph its never-prompted rows carry, as the other groups do (council round 16 B2)', () => {
+    // "Drafts (1)" kept the bracketed count beside groups that count in the chip.
+    const status = groupCountStatusOf('draft')
+    expect(status).toBe('idle')
+    if (status === undefined) throw new Error('the Drafts group maps to a status')
+    const header = mount({ label: 'Drafts', status })
+    const chips = Array.from(header.container.querySelectorAll<HTMLElement>('[data-group-count]'))
+    expect(chips.map(chip => chip.getAttribute('data-slot'))).toEqual(['status-count'])
+    expect(chips[0]?.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('idle')
+    expect(screen.getAllByText('(12)').map(node => node.className)).toEqual(['dshx:sr-only'])
+    // Pinned and project groups keep "(n)": they stand for no one status.
+    expect(groupCountStatusOf('pinned')).toBeUndefined()
+  })
 
   it('names how many local checkouts a repository row stands for', () => {
     mount({ label: 'repo', projectId: 'project-1', checkoutCount: 2 })
