@@ -166,14 +166,27 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
   const PHONE = '@media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px)'
   const phone = ':global(html[data-shell-phone-nav])'
 
-  it('ends the transcript above the dock in an 8px fade (council round 17 C4), so no line of text is cut by a rule', () => {
+  it('keeps the seat\'s 8px top band on the phone, opaque under the dock (council round 17 C4)', () => {
     const seat = ruleIn(PHONE, `${phone} .body[data-content-phase='active'] .composerSeat`)
     expect(seat).toMatch(/padding-top:\s*8px/)
-    // Transparent at the band's top, the page base before the band ends: the band is the fade, the dock below opaque.
-    expect(seat).toMatch(/var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,/)
-    const opaqueAt = Number(/var\(--dsw-alias-bg-base\) (\d+)px,?\s/u.exec(seat)?.[1])
-    expect(opaqueAt).toBeGreaterThanOrEqual(6)
-    expect(opaqueAt).toBeLessThanOrEqual(8)
+    // The band itself is clear: the 16px fade drawn over it and above it (below) is the transcript's one edge.
+    expect(seat).toMatch(/transparent 0px,\s*transparent 8px,\s*var\(--dsw-alias-bg-base\) 8px/)
+  })
+
+  it('fades the transcript out over 16px above the dock, so no line rests cut by its top edge (council round 22, item 6)', () => {
+    // Desktop drew no fade above the dock (the seat's own 36px band sat behind the opaque dock), so a line resting on the
+    // dock's top edge ("Answered by …" in 15) was sliced in full ink; the phone's 8px band was shorter than a cap height.
+    const band = /\n\.body\[data-content-phase='active'\] \.composerSeat::before \{([^}]*)\}/u.exec(css)?.[1] ?? ''
+    expect(band).toMatch(/height: 16px;/)
+    expect(band).toMatch(/bottom: calc\(100% - var\(--dsh-composer-seat-fade-inset, 0px\)\);/)
+    expect(band).toMatch(/pointer-events: none;/)
+    expect(band).toMatch(/linear-gradient\(\s*180deg,\s*color-mix\(in srgb, var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,\s*var\(--dsw-alias-bg-base\) 16px\s*\)/)
+    // Over the text column only, so the back-to-bottom control in the gutter stays whole.
+    expect(band).toMatch(/width: min\(calc\(100% - var\(--dsh-composer-side-clearance, 0px\) \* 2\), var\(--dsh-composer-card-max-width\)\);/)
+    // On the phone it ends at the dock, 8px into the seat, under the seat's clear top band.
+    expect(ruleIn(PHONE, `${phone} .body[data-content-phase='active'] .composerSeat`)).toMatch(/--dsh-composer-seat-fade-inset: 8px;/)
+    // A view's composer overlay sits over the view, not a transcript: no fade there.
+    expect(css).toMatch(/\.scrollBody:has\(\[data-conversation-composer-overlay\]\) > \.composerSeat::before \{\s*display: none;\s*\}/)
   })
 
   it('ends the Live work strip with the jump control after a hairline (council round 8 C4)', () => {

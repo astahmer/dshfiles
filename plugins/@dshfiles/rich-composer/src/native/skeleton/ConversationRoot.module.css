@@ -975,6 +975,27 @@ button.crumbEditable {
   );
 }
 
+/* Council round 22, item 6: the band above sits behind the dock and the card, both opaque, so a transcript line resting
+   on the dock's top edge was sliced in full ink ("Answered by …" in 15). A 16px fade over the text column ends where
+   the dock starts (on the phone 8px into the seat, under its clear top band), so the line dissolves instead. Desktop's
+   24px end padding keeps the last line above it at the tail; it stays clear of the back-to-bottom control in the
+   gutter. */
+.body[data-content-phase='active'] .composerSeat::before {
+  position: absolute;
+  bottom: calc(100% - var(--dsh-composer-seat-fade-inset, 0px));
+  left: 50%;
+  width: min(calc(100% - var(--dsh-composer-side-clearance, 0px) * 2), var(--dsh-composer-card-max-width));
+  height: 16px;
+  content: '';
+  pointer-events: none;
+  translate: -50% 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
+    var(--dsw-alias-bg-base) 16px
+  );
+}
+
 /* Views may opt into a composer overlay while ConversationRoot retains
    ownership of the seat geometry and its active-phase precedence. */
 .scrollBody:has([data-conversation-composer-overlay]) {
@@ -997,6 +1018,10 @@ button.crumbEditable {
   flex: 1 1 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.scrollBody:has([data-conversation-composer-overlay]) > .composerSeat::before {
+  display: none;
 }
 
 .scrollBody:has([data-conversation-composer-overlay]) > .composerSeat {
@@ -1267,12 +1292,12 @@ button.crumbEditable {
      prose over the dock while the transcript scrolled. The fade is the last 8px above the card; Chat's phone end
      padding takes the 20px back (32px), so the last line still ends 40px above the card at the tail. */
   :global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat {
+    /* Council round 22, item 6: the 8px band is clear; the seat's 16px fade (above) ends at its foot, where the dock
+       starts, so the fade reaches 8px above the seat. */
+    --dsh-composer-seat-fade-inset: 8px;
+
     padding-top: 8px;
-    background: linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0px,
-      var(--dsw-alias-bg-base) 8px
-    );
+    background: linear-gradient(180deg, transparent 0px, transparent 8px, var(--dsw-alias-bg-base) 8px);
   }
 
   :global(html[data-shell-phone-nav]) .composerHero {

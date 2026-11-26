@@ -194,8 +194,8 @@ describe('the new-thread hero centre (round six C5)', () => {
   })
 })
 
-describe('the phone transcript fade above the dock (council round 7 C3, round 8 C5, round 10 C1, round 17 C4)', () => {
-  it('fades only the last 8px above the Live work card, opaque exactly where the dock surface starts', () => {
+describe('the phone transcript fade above the dock (council round 7 C3, round 8 C5, round 10 C1, round 17 C4, round 22 item 6)', () => {
+  it('fades over 16px ending exactly where the dock surface starts, never a whole line', () => {
     const rule = blocks().find(
       block =>
         block.selector === ":global(html[data-shell-phone-nav]) .body[data-content-phase='active'] .composerSeat" &&
@@ -204,8 +204,10 @@ describe('the phone transcript fade above the dock (council round 7 C3, round 8 
     // Council round 17 C4 (Astra): the 28px band greyed a whole line of prose over the dock; the fade is the last 8px.
     expect(rule?.body).toMatch(/padding-top: 8px;/)
     expect(rule?.body).not.toMatch(/padding-top: 28px;/)
-    // The last stop is the seat's padding edge, the Live work card's top: the band never ends early or late.
-    expect(rule?.body).toMatch(/color-mix\(in srgb, var\(--dsw-alias-bg-base\) 0%, transparent\) 0px,\s*var\(--dsw-alias-bg-base\) 8px\s*\)/)
+    // Council round 22, item 6: 8px was shorter than a cap height, so a line on the card's edge still read as sliced. The
+    // seat's 16px fade ends at the padding edge, the Live work card's top (its inset), and the padding band is clear.
+    expect(rule?.body).toMatch(/--dsh-composer-seat-fade-inset: 8px;/)
+    expect(rule?.body).toMatch(/transparent 8px, var\(--dsw-alias-bg-base\) 8px\)/)
     for (const longer of ['36px', '28px', '21px', '14px']) expect(rule?.body).not.toContain(longer)
   })
 })
