@@ -343,6 +343,16 @@ describe('core Plugins header (council round 7, D1 and D5)', () => {
     expect(refresh).toMatch(/box-shadow:\s*none;/u)
   })
 
+  it('sets the labelled header buttons like kit buttons: label at 500, the kit 8px icon gap (council round 17, D3)', () => {
+    // The Host Button draws a 4px gap at weight 400; Refresh and Add plugin carry a label, the chevron half does not.
+    expect(new RegExp('"addPrimary":\\s*`[A-Za-z0-9]+_[A-Za-z0-9]+_addPrimary`', 'u').test(page), 'addPrimary').toBe(true)
+    const label = rules.find(([selector]) => selector.includes("[data-plugin-toolbar] [class*='_addButton']") && !selector.includes('aria-busy'))
+    expect(label?.[0]).toContain("[data-plugin-toolbar] [class*='_addPrimary']")
+    expect(label?.[0]).not.toContain('_addMore')
+    expect(label?.[1]).toMatch(/font-weight:\s*500;/u)
+    expect(label?.[1]).toMatch(/gap:\s*8px;/u)
+  })
+
   it('marks the page title with its own Settings leaf glyph, the teal package of the Plugins group, 18px, 8px before the h1 (round 8, D4)', () => {
     const title = ruleFor("[class*='_pageTitle']")
     expect(title).toMatch(/display:\s*flex;/u)

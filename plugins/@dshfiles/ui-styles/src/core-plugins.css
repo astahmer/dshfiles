@@ -100,6 +100,16 @@ section[data-plugin-panel] [data-plugin-toolbar] [class*='_addButton'][aria-busy
 }
 
 /*
+ * The labelled header buttons (Refresh, Add plugin) set like kit buttons: the label at 500 and the kit's 8px icon gap,
+ * not the Host Button's 400 and 4px (council round 17, D3). The chevron half of Add plugin has no label and keeps its box.
+ */
+section[data-plugin-panel] [data-plugin-toolbar] [class*='_addButton'],
+section[data-plugin-panel] [data-plugin-toolbar] [class*='_addPrimary'] {
+  gap: 8px;
+  font-weight: 500;
+}
+
+/*
  * The switch sits in a fixed column, so descriptions end at one edge. A row with no switch opens a page (a settings
  * item): the column holds a 14px chevron in secondary ink, centred on the switch's axis (the 36px Host switch sits flush
  * right, so its axis is 18px in), and the Host's card-link hover fills the whole row (council round 5, D5).
