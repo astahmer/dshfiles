@@ -34,7 +34,8 @@ describe('one Inbox card body measure (council round 17 C1)', () => {
     expect(writeOwn).toContain('InboxView.ANSWER_ROW')
     expect(InboxView.ANSWER_ROW).toContain('dshx:pointer-coarse:min-h-11')
     // The pencil in secondary ink, the words in ink at the answers' 500.
-    expect(InboxView.WRITE_OWN).toBe('dshx:text-foreground dshx:[&_svg]:text-muted-foreground')
+    // Council round 18 C2: its pencil starts on the answers' label edge (inbox-round18.test.ts).
+    expect(InboxView.WRITE_OWN).toBe(`dshx:text-foreground dshx:[&_svg]:text-muted-foreground ${InboxView.BORDERLESS_EDGE}`)
     expect(writeOwn).toContain('InboxView.ANSWER,')
     for (const edge of ['border', 'bg-', 'shadow']) expect(InboxView.WRITE_OWN).not.toContain(edge)
   })

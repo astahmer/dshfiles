@@ -63,8 +63,9 @@ describe('the phone Inbox (council round 7 C2)', () => {
     expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:w-full')
   })
 
-  it("seats a failed card's Review and ⋯ 8px inside the card edge (44pt seats since council round 9 C1)", () => {
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pr-2')
+  // Council round 18 C2: on the card's inner edge since (inbox-round18.test.ts).
+  it("seats a failed card's Review and ⋯ on the card's inner edge (44pt seats since council round 9 C1)", () => {
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pr-0')
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-1.5')
     expect(row).toContain('data-inbox-card-menu=""')
   })

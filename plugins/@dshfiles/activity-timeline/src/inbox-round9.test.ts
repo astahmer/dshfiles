@@ -28,8 +28,9 @@ describe('the phone Inbox head (council round 9 C1)', () => {
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start')
   })
 
-  it('puts the ⋯ seat 8px inside the card edge on every card, so its glyph sits 22px from it', () => {
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pr-2')
+  // Council round 18 C2: the seat meets the card's inner edge, its glyph 22px inside the border (inbox-round18.test.ts).
+  it('puts the ⋯ seat on the card\'s inner edge on every card, so its glyph sits 22px inside it', () => {
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pr-0')
     expect(InboxView.CARD_HEAD).not.toContain('dshx:@max-pane-narrow:[&>div:first-child]:px-4')
   })
 

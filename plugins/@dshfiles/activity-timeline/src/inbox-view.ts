@@ -71,11 +71,20 @@ const attentionVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'ou
  * hairline at rest, the 3:1 edge on hover), and the recommended one differs by its tint only (`attention`). Both at
  * one weight, so the tint is the one difference; the recommendation is also said in words. Council round 12 C3: that
  * weight is 500, and "Recommended" is a 12/400 annotation in secondary ink 12px after the answer (the button's 6px gap
- * plus 6px), not a second label in the tint pushed to the row's end.
+ * plus 6px), not a second label in the tint. Council round 18 C2: it is a trailing annotation, pushed to the row's end
+ * (`margin-inline-start: auto`) on a phone's full-width row, at least 8px after the answer (the 6px gap plus 2px); a
+ * desktop's shrink-to-content answer keeps it 8px after the label.
  */
 const answerVariant = (recommended: boolean): 'attention' | 'field' => (recommended ? 'attention' : 'field')
 const ANSWER = 'dshx:font-medium'
-const RECOMMENDED = 'dshx:shrink-0 dshx:ml-1.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground'
+const RECOMMENDED = 'dshx:shrink-0 dshx:ms-auto dshx:ps-0.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground'
+
+/**
+ * A borderless answer row (the recommended answer's tint, "Write your own…"'s ghost) on a touch screen starts its
+ * content 17px in, where a bordered answer's 1px edge and 16px inset put its label, so every label and the pencil
+ * start on one edge (council round 18 C2). Important: the kit's `has-[>svg]:px-2` would otherwise win.
+ */
+const BORDERLESS_EDGE = 'dshx:pointer-coarse:pl-[17px]!'
 
 /**
  * One answer row (and "Write your own…", council round 12 C3: the same resting trigger look): on a touch screen a
@@ -88,7 +97,7 @@ const ANSWER_ROW =
  * "Write your own…" after the answers (council round 17 C2): a ghost row, no fill or edge at rest, its pencil in
  * secondary ink and its words in ink at the answers' 500; the hover wash and the answers' row and 44pt target stay.
  */
-const WRITE_OWN = 'dshx:text-foreground dshx:[&_svg]:text-muted-foreground'
+const WRITE_OWN = `dshx:text-foreground dshx:[&_svg]:text-muted-foreground ${BORDERLESS_EDGE}`
 
 /**
  * The answers under a question: 8px apart beside each other on a wide pane. Council round 12 C3: on a phone they stack
@@ -142,12 +151,12 @@ const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
  * wrapping under it (the kit drops it to a line of its own on a narrow pane): the title owns the row with its age and ⋯.
  */
 const CARD_HEAD =
-  // Council round 9 C1: the seat is top-aligned with the title's first line, and its 44px controls sit 8px inside the
-  // card's edge, so the ⋯ glyph is 22px from it on every card. The glyph leads 11px inside the border, 24px from the
-  // screen's edge (lane B's phone gutter).
+  // Council round 9 C1: the seat is top-aligned with the title's first line. Council round 18 C2: its 44px controls
+  // meet the card's inner edge, so the ⋯ glyph centres 22px inside the border (x 349 at 390pt), the axis the thread
+  // list's row ⋯ shares. The glyph leads 11px inside the border, 24px from the screen's edge (lane B's phone gutter).
   // Council round 10 C2: 8px above and below the head, not 12, so each card is 8px shorter. Council round 12 C3: 6px,
   // so a head whose title holds one line is 52px (6 + 20 + 2 + 18 + 6).
-  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-1.5' +
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-[11px] dshx:@max-pane-narrow:[&>div:first-child]:pr-0 dshx:@max-pane-narrow:[&>div:first-child]:py-1.5' +
   ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start' +
   // Council round 8 C2: the head's parts are spaced by their muted "·" separators, not by flex gaps.
   ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
@@ -565,6 +574,7 @@ export class InboxView {
   static readonly answerVariant = answerVariant
   static readonly ANSWER = ANSWER
   static readonly RECOMMENDED = RECOMMENDED
+  static readonly BORDERLESS_EDGE = BORDERLESS_EDGE
   static readonly ANSWER_ROW = ANSWER_ROW
   static readonly WRITE_OWN = WRITE_OWN
   static readonly ANSWERS = ANSWERS

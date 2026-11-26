@@ -435,7 +435,7 @@ const InboxRow = (props: {
                     size="sm"
                     variant={InboxView.answerVariant(choice.recommended === true)}
                     // On a phone each option is a full-width row of at least 44 px (InboxView.ANSWER_ROW).
-                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW)}
+                    className={cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW, choice.recommended === true && InboxView.BORDERLESS_EDGE)}
                     disabled={props.busy}
                     onClick={() => props.onAct(item, 'Answer', choice.id)}
                   >

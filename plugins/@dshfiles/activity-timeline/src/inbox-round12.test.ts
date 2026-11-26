@@ -84,10 +84,10 @@ describe('the two Review verbs on head bands (council round 12 C2)', () => {
 })
 
 describe('"Recommended" (council round 12 C3)', () => {
-  it('is a 12/400 secondary annotation 12px after the answer, which reads at 500', () => {
+  it('is a 12/400 secondary annotation after the answer, which reads at 500', () => {
     expect(InboxView.ANSWER).toBe('dshx:font-medium')
-    // The button's 6px gap plus 6px.
-    expect(InboxView.RECOMMENDED).toBe('dshx:shrink-0 dshx:ml-1.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground')
+    // Council round 18 C2: a trailing annotation since (inbox-round18.test.ts).
+    expect(InboxView.RECOMMENDED).toBe('dshx:shrink-0 dshx:ms-auto dshx:ps-0.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground')
     expect(panel).toContain('data-inbox-recommended="" className={InboxView.RECOMMENDED}')
     expect(panel).not.toContain('dshx:pointer-coarse:ml-auto')
   })

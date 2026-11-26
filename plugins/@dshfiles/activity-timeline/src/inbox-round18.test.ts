@@ -1,9 +1,17 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { INBOX_CHIP } from './triage-stage.js'
 import { InboxView } from './inbox-view.js'
 
 const panel = readFileSync(new URL('./inbox-panel.tsx', import.meta.url), 'utf8')
+
+/** The JSX of the element opened before `marker`, up to its closing tag. */
+const element = (marker: string, tag: string): string => {
+  const at = panel.indexOf(marker)
+  expect(at).toBeGreaterThan(-1)
+  return panel.slice(panel.lastIndexOf(`<${tag}`, at), panel.indexOf(`</${tag}>`, at))
+}
 
 describe('one phone card action pattern (council round 18 C1)', () => {
   const card = { compact: false, coarse: true, verbs: 1, answers: false }
@@ -37,5 +45,27 @@ describe('one phone card action pattern (council round 18 C1)', () => {
 
   it('wraps a long title to two lines beside the pill on a phone, never moving the pill to a footer', () => {
     expect(InboxView.TITLE).toBe('dshx:text-heading dshx:@max-pane-narrow:line-clamp-2')
+  })
+})
+
+describe('phone card trims (council round 18 C2)', () => {
+  it('puts the card ⋯ seat on the card\'s inner edge: its glyph on x 349 at 390pt, the thread list\'s axis', () => {
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pr-0')
+    expect(InboxView.CARD_HEAD).not.toContain('[&>div:first-child]:pr-2')
+  })
+
+  it('sets "Recommended" as a trailing annotation, 8px or more after the answer', () => {
+    expect(InboxView.RECOMMENDED).toBe('dshx:shrink-0 dshx:ms-auto dshx:ps-0.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground')
+    expect(InboxView.RECOMMENDED).not.toContain('ml-1.5')
+  })
+
+  it('starts the pencil and the recommended label on the bordered answers\' label edge (1px edge + 16px)', () => {
+    expect(InboxView.BORDERLESS_EDGE).toBe('dshx:pointer-coarse:pl-[17px]!')
+    expect(InboxView.WRITE_OWN).toContain(InboxView.BORDERLESS_EDGE)
+    // Merged after the chip's 16px inset, so it is the one leading inset left.
+    const writeOwn = cn(INBOX_CHIP, InboxView.ANSWER, InboxView.ANSWER_ROW, InboxView.WRITE_OWN)
+    expect(writeOwn).toContain('dshx:pointer-coarse:pl-[17px]!')
+    expect(element('data-inbox-write-own=""', 'Button')).toContain('InboxView.WRITE_OWN')
+    expect(panel).toContain('choice.recommended === true && InboxView.BORDERLESS_EDGE)}')
   })
 })
