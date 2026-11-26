@@ -8,6 +8,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
+import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
 import { JsonText } from '../json-text.js'
@@ -42,15 +43,28 @@ const resultText = (props: SubagentToolRowProps): string | undefined => {
   return props.block.error === undefined ? undefined : `${props.block.error.name}: ${props.block.error.code}`
 }
 
-/** How a record row ends once its child stopped working; a working child says it with the row's spinner, not a word. */
+/**
+ * How a record row ends once its child stopped working; a working child says it with the row's spinner, not a word. A
+ * failure is not part of the title: it ends the row in failed ink ({@link failureWordOf}).
+ */
 const endingOf = (
   t: SubagentPreviewBindings['t'],
   state: ReturnType<typeof SubagentFeedModel.stateOf>,
   settledMs: number | undefined,
 ): readonly string[] => {
   if (state === 'finished') return settledMs === undefined || settledMs < 1_000 ? [subagentStateLabel(t, state)] : [subagentStateLabel(t, state), formatElapsed(settledMs)]
-  if (state === 'interrupted' || state === 'failed' || state === 'failed-to-start') return [subagentStateLabel(t, state)]
+  if (state === 'interrupted') return [subagentStateLabel(t, state)]
   return []
+}
+
+/**
+ * The word a failed row ends with, in failed ink after its model (council round 22, item 2): "Turn failed" for a child
+ * whose turn failed, "Didn't start" for a call that never started one.
+ */
+const failureWordOf = (t: SubagentPreviewBindings['t'], state: ReturnType<typeof SubagentFeedModel.stateOf>): string | undefined => {
+  if (state === 'failed') return t('threadSidebarFailed')
+  if (state === 'failed-to-start') return t('subagentRowNotStarted')
+  return undefined
 }
 
 /**
@@ -92,21 +106,35 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const title = [props.preview.t('subagentPreviewKind'), task, ...endingOf(props.preview.t, state, child.settledMs)]
     .filter(part => part !== undefined)
     .join(' · ')
+  const failure = failureWordOf(props.preview.t, state)
   const disclosure = props.useDisclosure()
   const prompt = args?.prompt?.trim()
   const expandable = (prompt !== undefined && prompt !== '') || output !== undefined || childId !== undefined
   /** The native row names its visible header through `title`; that is a heading, not hover help. */
   const disclosureProps: ComponentProps<typeof DisclosureRow> = {
-    icon: <IconAgentPresetOutlineRegular />,
+    // A failed row leads with the red cross the group's "2 failed" and the list use, not the agent mark.
+    icon: failure === undefined ? <IconAgentPresetOutlineRegular /> : <StatusGlyph status="failed" decorative />,
     title,
     open: disclosure.expanded,
     expandable,
     onToggle: disclosure.toggle,
     running: props.phase === 'preparing' || props.phase === 'start' || state === 'working',
-    // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary.
-    ...(route === undefined
+    // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; a
+    // failed row ends with its failure word.
+    ...(route === undefined && failure === undefined
       ? {}
-      : { headerAccessory: <RouteModel provider={route.provider} model={route.model} size="md" seat className="dshx:max-w-[45%] dshx:shrink-0" /> }),
+      : {
+          headerAccessory: (
+            <>
+              {route === undefined ? null : <RouteModel provider={route.provider} model={route.model} size="md" seat className="dshx:max-w-[45%] dshx:shrink-0" />}
+              {failure === undefined ? null : (
+                <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
+                  {failure}
+                </span>
+              )}
+            </>
+          ),
+        }),
   }
 
   return (

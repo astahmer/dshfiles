@@ -48,8 +48,10 @@
   height: calc(14px + var(--dsh-content-font-delta, 0px));
 }
 
+/* The label takes only its text, so the row's glyph sits right after it instead of detached at the far right (council
+   round 22, item 2); a long label still shrinks and truncates first. */
 .label {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -936,7 +936,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "TranscriptRunFolds",
       "importFrom": "@dshfiles/chat/run-folds",
       "owner": "@dshfiles/chat",
-      "source": "plugins/@dshfiles/chat/src/run-folds.ts:78",
+      "source": "plugins/@dshfiles/chat/src/run-folds.ts:90",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/chat.transcript-run-fold",

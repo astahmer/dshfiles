@@ -13,12 +13,14 @@ vi.mock('./subagent-failed-turns.js', () => ({ useSubagentFailedTurns: () => fai
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   DisclosureRow: ({
+    icon,
     title,
     collapsedContent,
     headerAccessory,
     open,
     children,
   }: {
+    icon: ReactNode
     title: string
     collapsedContent?: ReactNode
     headerAccessory?: ReactNode
@@ -26,6 +28,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
     children?: ReactNode
   }) => (
     <div>
+      <div data-testid="leading">{icon}</div>
       <div>{title}</div>
       {headerAccessory === undefined ? null : <div data-testid="header-accessory">{headerAccessory}</div>}
       {collapsedContent === undefined ? null : <div data-testid="collapsed-content">{collapsedContent}</div>}
@@ -257,11 +260,19 @@ describe('SubagentProvenanceToolRow', () => {
     failedTurns.set(CHILD, { sessionId: CHILD, failedAt: 1, reason: 'error' })
     const { rerender } = render(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('failed')
-    expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewFailed')).not.toBeNull()
+    // Council round 22, item 2: the red cross leads, the title is the task, "Turn failed" ends the row in failed ink.
+    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+    expect(screen.getByTestId('leading').querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
+    const failure = screen.getByTestId('header-accessory').querySelector('[data-subagent-failure]')
+    expect(failure?.textContent).toBe('threadSidebarFailed')
+    expect(failure?.className).toContain('dshx:text-destructive')
     failedTurns.clear()
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false, preview: previewBindings() })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
     expect(screen.getByText('subagentPreviewKind · Long child · subagentPreviewInterrupted')).not.toBeNull()
+    // A stopped child is no failure: its mark stays the agent's, and nothing reads in failed ink.
+    expect(screen.getByTestId('leading').querySelector('[data-slot="status-glyph"]')).toBeNull()
+    expect(document.querySelector('[data-subagent-failure]')).toBeNull()
   })
 
   it('reads how the turn ended from the open child\'s own events, as DSH writes them (round 21 D4)', async () => {
@@ -287,7 +298,9 @@ describe('SubagentProvenanceToolRow', () => {
   it('shows the failure of a call that started no child', () => {
     render(<SubagentProvenanceToolRow {...settled({ isError: true, expanded: true })} />)
     expect(previewRoot()).toBeNull()
-    expect(screen.getByText('subagentPreviewKind · subagentPreviewFailedToStart')).not.toBeNull()
+    expect(screen.getByText('subagentPreviewKind')).not.toBeNull()
+    expect(screen.getByTestId('leading').querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
+    expect(screen.getByTestId('header-accessory').querySelector('[data-subagent-failure="failed-to-start"]')?.textContent).toBe('subagentRowNotStarted')
     expect(screen.getByTestId('expanded-content').textContent).toContain('no route')
   })
 
