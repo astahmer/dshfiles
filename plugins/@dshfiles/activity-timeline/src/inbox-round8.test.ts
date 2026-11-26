@@ -24,7 +24,7 @@ describe('one Inbox card structure (council round 8 C2)', () => {
   })
 
   it('opens an approval body with "Runs:" and its command in 12/16 ink mono', () => {
-    expect(row).toMatch(/data-inbox-runs=""[^>]*>\s*\{t\('runs'\)\}\{' '\}\s*<code className=\{InboxView\.COMMAND\}>\s*\{InboxView\.commandWords\(card\.detail\)/u)
+    expect(row).toMatch(/data-inbox-runs=""[^>]*>\s*\{t\('runs'\)\}\{' '\}\s*<code className=\{cn\(InboxView\.COMMAND, InboxView\.COMMAND_BLOCK\)\}>\s*\{InboxView\.commandWords\(card\.detail\)/u)
     // It wraps only between words: a phone broke `--env` after its dashes.
     expect(InboxView.commandWords('node scripts/publish-preview.mjs --env preview')).toEqual([
       { text: 'node', keep: true },
@@ -68,21 +68,9 @@ describe('the phone Inbox card head (council round 8 C1)', () => {
 
   it('keeps the project mark and the kind on a phone; only the project name hides', () => {
     expect(meta).not.toContain('dshx:@max-pane-narrow:hidden')
-    expect(InboxView.HEAD_ONE_LINE).toContain('dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden')
+    expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden')
   })
-
-  it('holds a bodied card head to one line: the title truncates, the age shows only where it fits', () => {
-    expect(row).toContain('footed ? InboxView.HEAD_ONE_LINE : cn(InboxView.COMPACT_SEAT, InboxView.HEAD_META_UNDER)')
-    expect(InboxView.HEAD_ONE_LINE).toContain('dshx:@max-pane-narrow:[&_[data-slot=entity-row-title]]:truncate')
-    expect(InboxView.HEAD_ONE_LINE).toContain('dshx:@max-pane-narrow:[&>div:first-child]:flex-nowrap')
-    // The age takes the space left (flex 1 1 0), wraps away behind a zero-width anchor and is clipped to one 16px line.
-    expect(InboxView.HEAD_ONE_LINE).toContain('[&_[data-inbox-head-part=age]]:flex-[1_1_0]')
-    expect(InboxView.HEAD_ONE_LINE).toContain('[&_[data-inbox-head-part=age]]:flex-wrap')
-    expect(InboxView.HEAD_ONE_LINE).toContain('[&_[data-inbox-head-part=age]]:h-4')
-    expect(InboxView.HEAD_ONE_LINE).toContain('[&_[data-inbox-head-part=age]]:overflow-hidden')
-    const age = meta.slice(meta.indexOf('data-inbox-head-part="age"'))
-    expect(age.indexOf('<span aria-hidden className="dshx:w-0" />')).toBeLessThan(age.indexOf('data-inbox-age=""'))
-  })
+  // Council round 9 C1 superseded the one-line head (two lines, the full title): inbox-round9.test.ts.
 
   it('draws Start triage as a 44x44 icon-only button, named by aria-label and tooltip, before the ⋯', () => {
     const primary = trailingBar.slice(trailingBar.indexOf('<TooltipProvider>'), trailingBar.indexOf('</TooltipProvider>'))

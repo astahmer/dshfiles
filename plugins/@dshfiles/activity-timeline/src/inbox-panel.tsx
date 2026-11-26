@@ -244,15 +244,15 @@ const InboxRow = (props: {
   const openable = item.subject.kind === 'session' || opener !== undefined
   const openLabel = openLabelOf(item, opener, t)
   const project = item.subject.kind === 'session' ? props.projectOf(item.subject.id) : undefined
-  const head = InboxView.headMeta(item.source, project)
+  const head = InboxView.headMeta(item.source, project, status === 'failed')
   const referencedThreadId =
     item.subject.kind === 'session'
       ? null
       : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
   /**
    * The card's verbs (council round 8 C2): in its body, right after the evidence they act on (an approval's command, a
-   * question's answers), on every width; a bodyless Failed card keeps its one verb in the head, under a short name on a
-   * compact pane. The head holds glyph · title · project · kind · time and the menu.
+   * question's answers), on every width; a bodyless Failed card keeps its one verb in the head, under its short name
+   * (council round 9 C3: "Review", named "Review thread"). The head holds glyph · title · project · kind · time and the menu.
    */
   const hasVerbs =
     (open && PROVIDER_VERBS.some(verb => item.verbs.includes(verb))) || (open && props.onReview !== undefined) || (openable && !answerable) || undo !== null
@@ -298,13 +298,14 @@ const InboxRow = (props: {
           {openable && !answerable ? (
             <Button
               size="sm"
-              variant={open && !item.verbs.includes('Answer') ? InboxView.attentionVariant(status) : 'ghost'}
+              variant={
+                open && !item.verbs.includes('Answer') ? (place === 'head' ? InboxView.headVariant(status) : InboxView.attentionVariant(status)) : 'ghost'
+              }
               className={cn('dshx:max-w-full', INBOX_CHIP, size, shortLabel !== null && InboxView.SHORT_VERB)}
               aria-label={openLabel}
               onClick={() => props.onOpen(item)}
             >
-              <span className={cn('dshx:truncate', shortLabel !== null && 'dshx:@max-pane-narrow:hidden')}>{openLabel}</span>
-              {shortLabel === null ? null : <span className="dshx:hidden dshx:truncate dshx:@max-pane-narrow:inline">{shortLabel}</span>}
+              <span className="dshx:truncate">{shortLabel ?? openLabel}</span>
             </Button>
           ) : null}
           {undo === 'reopen' || undo === 'unsnooze' ? (
@@ -456,7 +457,7 @@ const InboxRow = (props: {
         {card.detail === null ? null : card.command ? (
           <span data-inbox-runs="" className={cn(clamped && 'dshx:line-clamp-2', 'dshx:break-words', InboxView.LEAD_IN, InboxView.TEXT_MEASURE)}>
             {t('runs')}{' '}
-            <code className={InboxView.COMMAND}>
+            <code className={cn(InboxView.COMMAND, InboxView.COMMAND_BLOCK)}>
               {InboxView.commandWords(card.detail).map((word, index) => (
                 <span key={index}>
                   {index === 0 ? null : ' '}
@@ -498,9 +499,9 @@ const InboxRow = (props: {
         'dshx:relative',
         // The verbs and the menu share the head row with the title on every width (round five C4, council round 5).
         InboxView.CARD_HEAD,
-        // A bodyless Failed card's verb and menu sit beside its title line, its age under the title (round six C1); a card
-        // with a body keeps its head to one line on a phone (council round 8 C1).
-        footed ? InboxView.HEAD_ONE_LINE : cn(InboxView.COMPACT_SEAT, InboxView.HEAD_META_UNDER),
+        // On a phone every card's head is the same two lines: glyph · full title · seat, then mark · kind · age (council
+        // round 9 C1).
+        InboxView.HEAD_TWO_LINES,
         phone && gestures.offset === 0 && 'dshx:transition-transform dshx:duration-150',
         InboxView.headerBand(status),
       )}
@@ -513,9 +514,9 @@ const InboxRow = (props: {
       meta={
         <>
           {/* Every head reads glyph · title · project · kind · time with muted "·" separators (council round 7 C1, round 8
-              C2); a finished turn's project replaces its "Thread turns" kind (round five C4). On a phone the head of a card
-              with a body stays one line (InboxView.HEAD_ONE_LINE): the project's mark and the kind stay, the title
-              truncates and the age shows only where it fits. */}
+              C2); a finished turn's project replaces its "Thread turns" kind (round five C4), and a failed one reads "Turn
+              failed" (council round 9 C3). On a phone these parts take a second line under the full title
+              (InboxView.HEAD_TWO_LINES). */}
           {head.project === undefined ? null : (
             <span data-inbox-head-part="project" data-inbox-project="" className={InboxView.HEAD_PART}>
               <HeadSep />
@@ -552,8 +553,6 @@ const InboxRow = (props: {
             </span>
           )}
           <span data-inbox-head-part="age" className={InboxView.HEAD_PART}>
-            {/* Zero wide: an age that does not fit beside it wraps away on a phone (InboxView.HEAD_ONE_LINE). */}
-            <span aria-hidden className="dshx:w-0" />
             <HeadSep />
             <span data-inbox-age="">{InboxView.relativeAge(item.openedAt, props.now)}</span>
           </span>

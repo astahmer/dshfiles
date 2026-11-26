@@ -13,7 +13,8 @@ describe('Inbox colour on things you act on (round five P2)', () => {
     expect(InboxView.attentionVariant('failed')).toBe('danger-tint')
     expect(InboxView.attentionVariant('ready')).toBe('outline')
     expect(row).toContain("variant={choice.recommended === true ? 'attention' : 'outline'}")
-    expect(row).toMatch(/variant=\{open && !item\.verbs\.includes\('Answer'\) \? InboxView\.attentionVariant\(status\) : 'ghost'\}/u)
+    // A Failed head's verb is red text on its red band (council round 9 C3); a body verb keeps the tint rung.
+    expect(row).toContain("place === 'head' ? InboxView.headVariant(status) : InboxView.attentionVariant(status)")
   })
 
   it('draws no ink button in a card: the page keeps one ink primary, Start triage', () => {
@@ -113,10 +114,10 @@ describe('Inbox on a phone (round five P2)', () => {
     expect(InboxView.PHONE_BAR).toContain('dshx:right-[max(12px,env(safe-area-inset-right,0px))]')
   })
 
-  it('keeps the phone head band to one line: the title truncates, the mark and kind stay (council round 8 C1)', () => {
+  it('keeps the mark and kind in the phone head, on the line under the full title (council round 9 C1)', () => {
     expect(row).toMatch(/data-inbox-head-part="kind" className=\{InboxView\.HEAD_PART\}/u)
     expect(row).toContain('data-inbox-project-name=""')
-    expect(row).toContain('InboxView.HEAD_ONE_LINE')
+    expect(row).toContain('InboxView.HEAD_TWO_LINES')
   })
 
   it('draws answer options as full-width 44 px rows with an 8 px radius, not 48 px pills', () => {

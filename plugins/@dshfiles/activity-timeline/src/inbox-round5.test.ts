@@ -56,9 +56,9 @@ describe('an Inbox card (round five C4, council round 5)', () => {
     expect(panel).toContain('EntityLabels.useWorkspaceLabel(props.workspaces)')
   })
 
-  it('keeps the head row one line on a phone: the verbs stay beside the title, centred in a 44pt band', () => {
+  it('keeps the verbs beside the title on a phone, top-aligned with its first line (council round 9 C1)', () => {
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto')
-    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:items-center')
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:items-start')
     expect(InboxView.CARD_HEAD).not.toContain('pr-12')
   })
 })

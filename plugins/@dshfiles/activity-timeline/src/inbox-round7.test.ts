@@ -65,10 +65,8 @@ describe('the phone Inbox (council round 7 C2)', () => {
     expect(InboxView.FOOT_VERB).not.toContain('dshx:h-11')
   })
 
-  it("insets a failed card's Review pill 8px from the card edge: 36px controls, the head padded 12px", () => {
-    expect(InboxView.COMPACT_SEAT).toContain('dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:-my-1!')
-    expect(InboxView.COMPACT_SEAT).toContain('dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]_[data-slot=button]]:h-9!')
-    expect(InboxView.COMPACT_SEAT).toContain('dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]_[data-inbox-card-menu]]:size-9!')
+  it("seats a failed card's Review and ⋯ 8px inside the card edge (44pt seats since council round 9 C1)", () => {
+    expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:pr-2')
     expect(InboxView.CARD_HEAD).toContain('dshx:@max-pane-narrow:[&>div:first-child]:py-3')
     expect(row).toContain('data-inbox-card-menu=""')
   })

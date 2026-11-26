@@ -72,6 +72,13 @@ const attentionVariant = (status: WorkStatus): 'attention' | 'danger-tint' | 'ou
   status === 'needs-you' ? 'attention' : status === 'failed' ? 'danger-tint' : 'outline'
 
 /**
+ * The verb in a card's head sits on its wash (council round 9 C3): a Failed head is already red, so its verb is red
+ * text, not a red fill on a red row.
+ */
+const headVariant = (status: WorkStatus): 'attention' | 'danger-text' | 'outline' =>
+  status === 'failed' ? 'danger-text' : status === 'needs-you' ? 'attention' : 'outline'
+
+/**
  * The head band of a waiting card (round five C4): glyph, title, type and age on the kit's attention wash (A2), flush
  * with the card's top, so Needs you and Failed read at a glance; the question and the verbs below stay on the card's
  * neutral body. Ink and muted text hold AA on both washes (plugin-ui tests/attention-wash.test.ts).
@@ -101,7 +108,10 @@ const HEAD_VERB = 'dshx:h-7 dshx:pointer-coarse:h-11'
  * wrapping under it (the kit drops it to a line of its own on a narrow pane): the title owns the row with its age and ⋯.
  */
 const CARD_HEAD =
-  'dshx:@max-pane-narrow:[&>div:first-child]:items-center dshx:@max-pane-narrow:[&>div:first-child]:px-4 dshx:@max-pane-narrow:[&>div:first-child]:py-3 dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto' +
+  // Council round 9 C1: the seat is top-aligned with the title's first line, and its 44px controls sit 8px inside the
+  // card's edge, so the ⋯ glyph is 22px from it on every card.
+  'dshx:@max-pane-narrow:[&>div:first-child]:items-start dshx:@max-pane-narrow:[&>div:first-child]:pl-4 dshx:@max-pane-narrow:[&>div:first-child]:pr-2 dshx:@max-pane-narrow:[&>div:first-child]:py-3' +
+  ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:w-auto dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start' +
   // Council round 8 C2: the head's parts are spaced by their muted "·" separators (6px each side), not by flex gaps.
   ' dshx:[&_span:has(>[data-slot=entity-row-title])]:gap-x-0 dshx:[&_[data-slot=entity-row-meta]]:gap-x-0' +
   // A kind with a short name shows it on a compact pane (council round 8 C1).
@@ -114,30 +124,22 @@ const HEAD_SEP = 'dshx:px-1.5 dshx:text-muted-foreground'
 const HEAD_PART = 'dshx:inline-flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:whitespace-nowrap'
 
 /**
- * A card head with a body on a compact pane (council round 8 C1) is one line: glyph · title · project mark · kind, the
- * title truncating, the ⋯ trailing. The project shows its dense mark only ("BA · Approval"). The age takes the space
- * left before the ⋯ and shows only when it fits there: its part leads with a zero-width anchor, so an age wider than
- * the space wraps to a second line that the part's 16px height clips.
+ * Every card head on a compact pane is the same two lines (council round 9 C1, all seats). Line 1: glyph · the full
+ * title, wrapping, never cut for metadata · the seat (a bodyless Failed card's verb, then ⋯). Line 2: the project's
+ * mark · kind · age at 13/400 muted (the kit's meta step on a touch screen), never opening on a separator; the
+ * project's name is left to the mark.
  */
-const HEAD_ONE_LINE =
-  'dshx:@max-pane-narrow:[&>div:first-child]:flex-nowrap dshx:@max-pane-narrow:[&_span:has(>[data-slot=entity-row-title])]:flex-nowrap' +
-  ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-title]]:truncate dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:contents' +
+const HEAD_TWO_LINES =
+  'dshx:@max-pane-narrow:[&_span:has(>[data-slot=entity-row-title])]:gap-y-0.5' +
+  ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:basis-full dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:leading-4.5' +
+  ' dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]>[data-inbox-head-part]:first-child>[data-inbox-head-sep]]:hidden' +
   ' dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden' +
-  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:h-4 dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:flex-[1_1_0]' +
-  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:flex-wrap dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:justify-end' +
-  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]]:overflow-hidden dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]>[data-inbox-head-sep]]:hidden' +
-  ' dshx:@max-pane-narrow:[&_[data-inbox-head-part=age]>[data-inbox-age]]:pl-2'
+  // A Failed card's verb meets its ⋯: both are 44pt seats, so no gap between them.
+  ' dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0'
 
 /**
- * A bodyless (compact) card on a compact pane keeps its full title; its project and age take a line of their own under
- * it, so that line does not open on a separator.
- */
-const HEAD_META_UNDER =
-  'dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]]:basis-full dshx:@max-pane-narrow:[&_[data-slot=entity-row-meta]>[data-inbox-head-part]:first-child>[data-inbox-head-sep]]:hidden'
-
-/**
- * The head row's seat: 28px controls pulled 4px into the row's padding on a wide pane; on a compact pane the 44pt ⋯ sits
- * inside the 12px padding, so the head stays 44px tall (important: the touch rule `my-0` is emitted after the container
+ * The head row's seat: 28px controls pulled 4px into the row's padding on a wide pane; on a compact pane its 44pt
+ * controls sit inside the 12px padding, centred on the title's first line (important: the touch rule `my-0` is emitted after the container
  * query and would otherwise win on a phone).
  */
 const HEAD_SEAT =
@@ -165,24 +167,15 @@ const FOOT_VERB = 'dshx:@max-pane-narrow:w-full dshx:@max-pane-narrow:h-9!'
 const BODY_VERB = `dshx:shrink dshx:h-7 dshx:pointer-coarse:h-11 ${FOOT_VERB}`
 
 /**
- * A bodyless (compact) card on a compact pane: its verb and menu keep to the title line, top-aligned, and the age wraps
- * under the title, so the row never grows the verb's band past the title line.
- */
-const COMPACT_SEAT =
-  'dshx:@max-pane-narrow:[&_[data-slot=entity-row-trailing]]:self-start dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:gap-0' +
-  // Council round 7 C2: its verb and ⋯ are 36px (44px hit areas), pulled 4px into the 12px head padding, so the pill
-  // sits 8px inside the card's edge instead of flush with the band.
-  ' dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]]:-my-1! dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]_[data-slot=button]]:h-9!' +
-  // The ⋯ is a menu trigger, not a kit button slot: it takes 36px by its own hook.
-  ' dshx:@max-pane-narrow:[&_[data-inbox-row-actions=band]_[data-inbox-card-menu]]:size-9!'
-
-/**
  * That verb's 10px inset on a compact pane (a touch screen gives chips 16px) and no gap before the ghost ⋯, so a title
  * of about 177px ("Upgrade the router to v8") keeps one line at 390px.
  */
 const SHORT_VERB = 'dshx:@max-pane-narrow:px-2.5!'
 
-/** The short name a compact card's open verb shows on a phone, so its title keeps one line ("Review", not "Review thread"). */
+/**
+ * The short name a bodyless card's open verb shows on every width (council round 9 C3: "Review", named "Review
+ * thread"), so its title keeps the head.
+ */
 const shortOpenLabelKey = (action: InboxOpenAction): 'review' | 'open' => (action === 'review' || action === 'approval' ? 'review' : 'open')
 
 /** Sources whose type says nothing a card does not (a finished turn): the card names the thread's project instead. */
@@ -203,7 +196,11 @@ export interface InboxHeadMeta {
   readonly shortKind?: string
 }
 
-const headMeta = (source: string, project: string | undefined): InboxHeadMeta => {
+/** A finished turn that failed says so as its kind (council round 9 C3), where a finished turn otherwise names none. */
+const FAILED_TURN_KIND = 'Turn failed'
+
+const headMeta = (source: string, project: string | undefined, failed = false): InboxHeadMeta => {
+  if (failed && namesProject(source)) return { project, kind: FAILED_TURN_KIND }
   const kind = project !== undefined && namesProject(source) ? undefined : sourceLabel(source)
   const shortKind = kind === undefined ? undefined : SHORT_SOURCE_LABELS.get(source)
   return shortKind === undefined ? { project, kind } : { project, kind, shortKind }
@@ -226,8 +223,21 @@ const TITLE = 'dshx:text-heading'
  */
 const COMMAND = 'dshx:font-mono dshx:text-xs dshx:leading-4 dshx:text-foreground'
 
-/** The lead-in before an approval's command: 12/16 sans, muted. */
-const LEAD_IN = 'dshx:font-sans dshx:text-xs dshx:leading-4 dshx:text-muted-foreground'
+/**
+ * The lead-in before an approval's command: 12/16 sans, muted. On a compact pane its two-line clamp lets go, since the
+ * command under it is a block that clamps itself (COMMAND_BLOCK).
+ */
+const LEAD_IN = 'dshx:font-sans dshx:text-xs dshx:leading-4 dshx:text-muted-foreground dshx:@max-pane-narrow:line-clamp-none'
+
+/**
+ * On a compact pane the command is a block under "Runs:" (council round 9 C1): 13/18 mono (COMMAND's meta step is 13px
+ * on a touch screen) on a muted fill, 6px radius,
+ * 8px by 10px inside, a wrapped line hanging 2ch under the first, at most four lines.
+ */
+const COMMAND_BLOCK =
+  'dshx:@max-pane-narrow:line-clamp-4 dshx:@max-pane-narrow:mt-1 dshx:@max-pane-narrow:rounded-md dshx:@max-pane-narrow:bg-muted' +
+  ' dshx:@max-pane-narrow:py-2 dshx:@max-pane-narrow:pr-2.5 dshx:@max-pane-narrow:pl-[calc(0.625rem+2ch)] dshx:@max-pane-narrow:-indent-[2ch]' +
+  ' dshx:@max-pane-narrow:leading-4.5'
 
 const APPROVAL_SOURCE = 'thread-sidebar.approval'
 const APPROVE_LEAD_IN = /^Approve:\s*/u
@@ -425,6 +435,7 @@ export class InboxView {
   static readonly severityGlyph = severityGlyph
   static readonly statusOf = statusOf
   static readonly attentionVariant = attentionVariant
+  static readonly headVariant = headVariant
   static readonly headerBand = headerBand
   static readonly CARD = CARD
   static readonly BODY_INSET = BODY_INSET
@@ -432,8 +443,7 @@ export class InboxView {
   static readonly CARD_HEAD = CARD_HEAD
   static readonly HEAD_SEP = HEAD_SEP
   static readonly HEAD_PART = HEAD_PART
-  static readonly HEAD_ONE_LINE = HEAD_ONE_LINE
-  static readonly HEAD_META_UNDER = HEAD_META_UNDER
+  static readonly HEAD_TWO_LINES = HEAD_TWO_LINES
   static readonly HEAD_SEAT = HEAD_SEAT
   static readonly footsVerbs = footsVerbs
   static readonly EVIDENCE = EVIDENCE
@@ -441,7 +451,6 @@ export class InboxView {
   static readonly BODY_VERB = BODY_VERB
   static readonly FOOT_VERB = FOOT_VERB
   static readonly shortOpenLabelKey = shortOpenLabelKey
-  static readonly COMPACT_SEAT = COMPACT_SEAT
   static readonly SHORT_VERB = SHORT_VERB
   static readonly namesProject = namesProject
   static readonly headMeta = headMeta
@@ -449,6 +458,7 @@ export class InboxView {
   static readonly TITLE = TITLE
   static readonly COMMAND = COMMAND
   static readonly LEAD_IN = LEAD_IN
+  static readonly COMMAND_BLOCK = COMMAND_BLOCK
   static readonly cardText = cardText
   static readonly compact = compact
   static readonly titleCounts = titleCounts
