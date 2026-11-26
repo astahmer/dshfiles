@@ -272,9 +272,11 @@ describe("a phone's bar (unslop r5 C3)", () => {
     const { dirname, resolve } = await import('node:path')
     const { fileURLToPath } = await import('node:url')
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
-    expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]:has\(svg\[data-brand\]\)\) :global\(\[data-model-picker-text\]\) \{[^}]*max-width: 96px;/)
-    expect(css).toContain('.row[data-model-mark-tight] :global([data-model-trigger]:has(svg[data-brand])) :global([data-model-picker-text])')
-    expect(css).not.toContain('.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand])) :is(:global([data-model-picker-text])')
+    // Council round 18 C3: the picker draws the kit's ModelMark (`[data-model-mark]`) where it drew its own `svg[data-brand]`.
+    const marked = ':global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark])))'
+    expect(css).toContain(`.row[data-model-mark] ${marked} :global([data-model-picker-text]) {\n  max-width: 96px;`)
+    expect(css).toContain(`.row[data-model-mark-tight] ${marked} :global([data-model-picker-text])`)
+    expect(css).not.toContain('.row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand]))')
   })
 
   it('leaves a wider bar to the content-sized steps', () => {
@@ -290,10 +292,11 @@ describe("a phone's bar (unslop r5 C3)", () => {
     const { dirname, resolve } = await import('node:path')
     const { fileURLToPath } = await import('node:url')
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
-    const trigger = ".row[data-model-mark] :global([data-model-trigger]:has(svg[data-brand]))"
-    expect(css).toMatch(new RegExp(`${trigger.replace(/[[\]().:]/g, '\\$&')} \\{[^}]*padding-inline: 4px`))
+    const trigger = '.row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark])))'
+    expect(css).toContain(`${trigger} {\n  min-width: 0;\n  gap: 0;\n  padding-inline: 4px;`)
     expect(css).toContain(`${trigger} :global([data-model-picker-provider])`)
-    expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]\) :global\(svg\[data-brand\]\) \{\s*width: 16px;\s*height: 16px;/)
+    expect(css).toContain(`${trigger} > svg:last-child`)
+    expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]\) :global\(:is\(svg\[data-brand\], \[data-model-mark\]\)\) \{\s*width: 16px;\s*height: 16px;/)
     // Zero-width plugin anchors each cost a gap, so the mark step drops them like the icon step: + · mode · ⋯ · model.
     expect(css).toMatch(/\.row:is\(\[data-model-icon\], \[data-model-mark\]\) \.standardControls \{\s*column-gap: 0;/)
   })
