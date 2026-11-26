@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -743,6 +744,14 @@ describe('ThreadPalette goes to threads', () => {
     expect(caps[0]?.className).toContain('dshx:group-data-[selected=true]/item:opacity-100')
     expect(caps[0]?.className).toContain('dshx:group-hover/item:opacity-100')
     expect(row.className).toContain('dshx:group/item')
+  })
+
+  it('draws every hint as the kit shortcut chip, unfaded and unrestyled (council round 10 A5, B4)', () => {
+    const source = readFileSync('src/thread-palette.tsx', 'utf8')
+    // A 70% chip read under AA; the kit chip carries its own fill, edge and face, so no hint overrides them.
+    expect(source).not.toContain('dshx:opacity-70')
+    for (const override of ['font-mono', 'dshx:bg-muted dshx:px-1.5'])
+      expect(source.match(new RegExp(`<Kbd[^>]*${override}`, 'u'))).toBeNull()
   })
 
   it("says a same-day recent's time in whole units, and draws the palette in one frame (round five B6)", async () => {

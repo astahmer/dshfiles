@@ -586,9 +586,10 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
     if (index < 0 && keys.length === 0 && hostCaps.length === 0) return null
     return (
       <span className="dshx:ml-auto dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-2">
-        {keys.length > 0 ? <KeyHint keys={keys} mac={props.mac} className="dshx:opacity-70" /> : null}
+        {/* The kit's one shortcut chip at full strength (council round 10 A5, B4): a 70% chip fell under AA. */}
+        {keys.length > 0 ? <KeyHint keys={keys} mac={props.mac} /> : null}
         {hostCaps.length > 0 ? (
-          <KbdGroup className="dshx:opacity-70">
+          <KbdGroup>
             {hostCaps.map(cap => (
               <Kbd key={cap}>{cap}</Kbd>
             ))}
