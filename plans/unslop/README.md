@@ -45,6 +45,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 16 (round-15 shots) | **9** | 8.5 (Astra) | 8.5 | Opus at target; Astra (new GPT seat): composer, answer-first Inbox, installed plugins first; Mistral: colour (owner kept the restraint) |
 | 17 (round-16 shots) | **9** | **9** (Astra) | **9** (Fable, for Mistral) | **Target met.** Mistral's provider failed every request; the owner seated Claude Fable 5.2 for this round |
 | 18 (round-17 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | Round six, target 9.5; all seats pass the subagent model; shared: phone failed Inbox card, AI accounts column, secondary buttons |
+| 19 (round-18 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | No increase (first). Shared: the Inbox's folded brand overhang; Opus: sidebar content presses against the new brand hairline (regression) |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -343,6 +344,10 @@ card clears the tab bar by 34–41 pt, a trailing Recommended, the composer mark
 bar, an aligned effort column, Model actions). The lead added the background-jobs dock column, a Usage tab glyph through
 TabPlaceGlyphs and three lint fixes. Follow-ups: a preview-tab cue that does not use ink; the folded sidebar's brand
 overhang; Plugins experimental copy is core's.
+Round 19 findings, merged in `.cache/unslop-audit/r5/council/round-19-fixes.md`: 12 px back under the brand hairline
+(regression), the folded Inbox overhang on the strip, one phone Inbox meta grammar with a drawn 34–36 pt pill, group
+chevrons on the row axis, the phone Threads search inset, one dock and composer edge, the AI accounts ⋯. If round 20 brings
+no score increase, round six stops (two rounds without one).
 
 ## Round four
 
