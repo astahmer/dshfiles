@@ -3,6 +3,7 @@ import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import type { ProjectColorPalette } from './organization.js'
 import type { ProjectChip } from './project-colors.js'
 import type { ThreadDirectories } from './thread-directories.js'
+import type { SubagentTerminal } from './subagent-provenance/subagent-feed.js'
 import type { SubagentModelRoute } from './subagent-provenance/route-label.js'
 import type { ThreadWorkStatus } from './thread-status-client.js'
 import { WorkspacePaths } from './workspace-paths.js'
@@ -37,6 +38,13 @@ export interface PhoneStageChild {
   readonly parentTitle: string | undefined
   readonly label: string | undefined
   readonly route: SubagentModelRoute | undefined
+  /**
+   * How its last turn ended (round 21 D4): a failed child says the list's Failed word ("Turn failed", the AttentionMeta
+   * rule: Failed keeps its word) where it read Idle; a stopped or completed one keeps today's word.
+   */
+  readonly terminal?: SubagentTerminal | undefined
+  /** The Failed row's word, "Turn failed", in the user's language. */
+  readonly failedLabel?: string | undefined
 }
 
 /** The workspace a thread or one of its ancestors is filed in, walking up the lineage (stage first). */
@@ -91,10 +99,12 @@ const resolve = (input: {
   if (parentId === undefined || child === undefined) return { project, mark, status, working, subagents }
   const parentTitle = child.parentTitle?.trim() || undefined
   const title = child.label?.trim() || undefined
+  // The list's own status wins when it publishes one; inside a thread it does not, and a failed child read Idle.
+  const childStatus = input.status === undefined && work !== 'working' && child.terminal === 'failed' ? (child.failedLabel ?? status) : status
   const meta: { -readonly [Key in keyof PhoneStageMeta]: PhoneStageMeta[Key] } =
     child.route === undefined
-      ? { project, mark, status, working, subagents }
-      : { project: undefined, mark: undefined, route: child.route, status, working, subagents }
+      ? { project, mark, status: childStatus, working, subagents }
+      : { project: undefined, mark: undefined, route: child.route, status: childStatus, working, subagents }
   if (parentTitle !== undefined) meta.parent = { id: parentId, title: parentTitle }
   if (title !== undefined) meta.title = title
   return meta

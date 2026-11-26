@@ -72,6 +72,8 @@ import {
 import { PendingPick, SETTINGS_PANEL_ID } from './phone-shell.js'
 import { PhoneThreadMeta, type PhoneStageMeta } from './phone-thread-meta.js'
 import { SubagentRouteLabelModel } from './subagent-provenance/route-label.js'
+import { useSubagentFailedTurns } from './subagent-provenance/subagent-failed-turns.js'
+import { SubagentFeedModel } from './subagent-provenance/subagent-feed.js'
 import { STATUS_WORD_KEYS } from './palette-thread-statuses.js'
 import { useSavedProjectChip } from './project-colors.js'
 import { HostSnapshotsModel } from './snapshots.js'
@@ -318,6 +320,15 @@ const usePhoneStageMeta = (
     const route = SubagentRouteLabelModel.subagentRoute({ route: values?.threadSidebarModelRoute, identity: values?.subagent })
     return route === undefined ? undefined : `${route.provider}\n${route.model}`
   })
+  // How its last turn ended (round 21 D4): the Host's failed-turn record and the child's timing, as the list reads them.
+  const failedTurns = useSubagentFailedTurns()
+  const lastTurnCompleted = props.useSessions(state =>
+    parentId === undefined || stageThread === undefined ? undefined : state.byId[SessionId(stageThread)]?.projectionValues?.subagentTiming?.lastTurnCompleted,
+  )
+  const terminal =
+    parentId === undefined || stageThread === undefined
+      ? undefined
+      : SubagentFeedModel.terminalOf({ running, failedTurn: failedTurns.has(stageThread), lastTurnCompleted })
   const t = props.t
   return useMemo(
     () =>
@@ -342,6 +353,8 @@ const usePhoneStageMeta = (
                 routeKey === undefined
                   ? undefined
                   : { provider: routeKey.slice(0, routeKey.indexOf('\n')), model: routeKey.slice(routeKey.indexOf('\n') + 1) },
+              terminal,
+              failedLabel: t('threadSidebarFailed'),
             },
           }),
     [
@@ -358,6 +371,7 @@ const usePhoneStageMeta = (
       parentTitle,
       childLabel,
       routeKey,
+      terminal,
     ],
   )
 }

@@ -81,6 +81,17 @@ describe('a subagent\'s phone header (round 21 D3)', () => {
     expect(meta.title).toBeUndefined()
   })
 
+  it('says Turn failed for a child whose last turn failed, where it read Idle (round 21 D4)', () => {
+    const failed = { ...child, terminal: 'failed' as const, failedLabel: 'Turn failed' }
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], child: failed })).toMatchObject({ status: 'Turn failed', working: false })
+    // A child the user stopped, or one that finished, keeps today's word.
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], child: { ...failed, terminal: 'stopped' } }).status).toBe('Idle')
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], child: { ...failed, terminal: 'completed' } }).status).toBe('Idle')
+    // A new turn works again; the list's own status still wins when it publishes one.
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], running: true, child: failed }).status).toBe('Working')
+    expect(PhoneThreadMeta.resolve({ ...base, lineage: ['child', 's-root'], status: { status: 'needs-you', detail: undefined, kind: 'Approval' }, child: failed }).status).toBe('Approval')
+  })
+
   it('ignores child facts on a root thread', () => {
     const meta = PhoneThreadMeta.resolve({ ...base, lineage: ['s-root'], child })
     expect(meta).toEqual({ project: 'billing-api', mark: { palette: 'balanced' }, status: 'Idle', working: false, subagents: undefined })
