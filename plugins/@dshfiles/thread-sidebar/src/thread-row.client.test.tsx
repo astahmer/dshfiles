@@ -551,7 +551,7 @@ describe('a subagent row under its parent', () => {
     expect(head?.querySelector('.dshx\\:tabular-nums')).toBeNull()
   })
 
-  it('says "Turn failed" in the failed ink on either line, and Needs you in the muted one (council round 23, item 2)', async () => {
+  it('says "Failed" in the failed ink on either line, and Needs you in the muted one (council round 23, item 2; round 24, item 3)', async () => {
     const routed = rowSession({
       id: SessionId('child-routed'),
       parentId: SessionId('s1'),
@@ -578,7 +578,8 @@ describe('a subagent row under its parent', () => {
     })
     const word = (id: string): HTMLElement | null => row.querySelector<HTMLElement>(`ul [data-thread-id="${id}"] [data-thread-child-state]`)
     const words = [word('child-routed'), word('child-unrouted'), word('child-asking')]
-    expect(words.map(state => state?.textContent)).toEqual(['Turn failed', 'Turn failed', 'threadSidebarStateNeedsYou'])
+    // The ✕ and the failed ink say the rest; "Turn failed" cut the model to "claude-sonnet…" (council round 24, item 3).
+    expect(words.map(state => state?.textContent)).toEqual(['threadSidebarStateFailed', 'threadSidebarStateFailed', 'threadSidebarStateNeedsYou'])
     expect(words.map(state => state?.className.includes('dshx:text-destructive'))).toEqual([true, true, false])
     expect(words[1]?.className).not.toContain('dshx:text-muted-foreground')
   })
@@ -619,7 +620,7 @@ describe('a subagent row under its parent', () => {
     expect(model?.firstElementChild?.className).toContain('dshx:size-4')
   })
 
-  it('says why a failed child failed, "Turn failed", beside its Failed glyph (round 21 D4)', async () => {
+  it('reads a failed child\'s model whole: "Failed" after it, and the word gives way before the model (council round 24, item 3)', async () => {
     const child = rowSession({
       id: SessionId('child-failed'),
       parentId: SessionId('s1'),
@@ -638,7 +639,13 @@ describe('a subagent row under its parent', () => {
     })
     const button = row.querySelector<HTMLElement>('ul [data-thread-main-action]')
     expect(button?.querySelector('[data-thread-child-lead] [data-status="failed"]')).not.toBeNull()
-    expect(button?.querySelector('[data-thread-child-meta]')?.textContent).toBe('claude-sonnet-5-5·Turn failed')
+    const meta = button?.querySelector<HTMLElement>('[data-thread-child-meta]')
+    expect(meta?.textContent).toBe('claude-sonnet-5-5·threadSidebarStateFailed')
+    // If the line is still too narrow, the state word truncates first; the model shrinks only once the word is gone.
+    const word = meta?.querySelector<HTMLElement>('[data-thread-child-state]')
+    expect(word?.className).toContain('dshx:truncate')
+    expect(word?.className).toContain('dshx:shrink-[100]')
+    expect(meta?.querySelector('[data-slot="route-model"]')?.className).not.toContain('dshx:shrink-[100]')
   })
 
   it('merges its list controls into one muted 12 px footer line after every child (council round 22, item 11)', async () => {

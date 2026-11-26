@@ -878,13 +878,10 @@ const ChildThreadList = (props: {
       route: child.projectionValues?.threadSidebarModelRoute,
       identity: child.projectionValues?.subagent,
     })
-    // A Failed child says why, as the attention meta does ("Turn failed", round 21 D4); a Needs-you child its state.
+    // A Failed or Needs-you child says its state. A Failed child says "Failed", not the attention meta's "Turn failed": the
+    // ✕ and the failed ink carry the rest, and the longer word cut the model to "claude-sonnet…" (council round 24, item 3).
     const stateWord =
-      childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed')
-        ? undefined
-        : childStatus.status === 'failed'
-          ? (childStatus.detail ?? t(workStatusLabelKeys.failed))
-          : t(workStatusLabelKeys[childStatus.status])
+      childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed') ? undefined : t(workStatusLabelKeys[childStatus.status])
     const lineOneWord = route === undefined && stateWord !== undefined
     // "Turn failed" reads in the failed ink, as the parent's failed count does (council round 23, item 2).
     const stateInk = childStatus?.status === 'failed' ? 'dshx:text-destructive' : undefined
@@ -968,7 +965,8 @@ const ChildThreadList = (props: {
                   <span aria-hidden="true" className="dshx:shrink-0">
                     ·
                   </span>
-                  <span className={cn('dshx:shrink-0 dshx:whitespace-nowrap', stateInk)} data-thread-child-state="">
+                  {/* A line still too narrow truncates the word first, then the model (round 24, item 3). */}
+                  <span className={cn('dshx:min-w-0 dshx:shrink-[100] dshx:truncate', stateInk)} data-thread-child-state="">
                     {stateWord}
                   </span>
                 </>
