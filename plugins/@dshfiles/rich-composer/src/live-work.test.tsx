@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { act, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
 import { LiveWork, LiveWorkSummary, PhoneDockHead, useLiveWorkCounts } from './live-work.tsx'
 
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
@@ -41,7 +42,7 @@ const markup = (inner: string): HTMLElement => {
   return dock
 }
 const english = (key: string, params: { readonly count: number }): string =>
-  ({ 'liveWork.job': '{count} job', 'liveWork.jobs': '{count} jobs', 'liveWork.subagent': '{count} subagent', 'liveWork.subagents': '{count} subagents' })[key]!.replace(
+  ({ 'liveWork.job': '{count} job', 'liveWork.jobs': '{count} jobs', 'liveWork.working': '{count} working', 'liveWork.failed': '{count} failed' })[key]!.replace(
     '{count}',
     String(params.count),
   )
@@ -64,10 +65,15 @@ describe('Live work on a narrow phone (unslop r5 C1)', () => {
     expect(LiveWork.count(markup('<div data-todo=""></div>'))).toEqual({ jobs: 0, subagents: 0 })
   })
 
-  it('says "1 job · 1 subagent", plural where it counts more, and drops a zero part', () => {
-    expect(LiveWork.detail({ jobs: 1, subagents: 1 }, english)).toBe('1 job · 1 subagent')
+  it('says "1 job · 1 working", plural where it counts more, and drops a zero part', () => {
+    expect(LiveWork.detail({ jobs: 1, subagents: 1 }, english)).toBe('1 job · 1 working')
     expect(LiveWork.detail({ jobs: 2, subagents: 0 }, english)).toBe('2 jobs')
-    expect(LiveWork.detail({ jobs: 0, subagents: 4 }, english)).toBe('4 subagents')
+  })
+
+  it('counts subagents with the one formula every child summary uses (council round 22, items 3 and 5)', () => {
+    // "Live work · 6 subagents" sat above "6 subagents working"; the header alone now reads "Live work · 6 working".
+    expect(LiveWork.detail({ jobs: 0, subagents: 6 }, english)).toBe(workCountLabel({ working: 6 }, { working: n => `${n} working`, failed: n => `${n} failed` }))
+    expect(LiveWork.detail({ jobs: 0, subagents: 6 }, english)).toBe('6 working')
   })
 
   it('counts the outlet live under 28rem and draws one 44px disclosure; nothing without live work', async () => {
@@ -93,7 +99,7 @@ describe('Live work on a narrow phone (unslop r5 C1)', () => {
       await Promise.resolve()
     })
     const summary = host.querySelector('[data-live-work-summary]')
-    expect(summary?.textContent).toBe('Live work·1 job · 1 subagent')
+    expect(summary?.textContent).toBe('Live work·1 job · 1 working')
     expect(summary?.getAttribute('aria-expanded')).toBe('false')
     expect(summary?.className).toContain('dshx:h-11')
     await act(async () => root.unmount())

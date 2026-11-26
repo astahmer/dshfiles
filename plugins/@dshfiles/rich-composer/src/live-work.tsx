@@ -2,10 +2,11 @@ import { useEffect, useState, useSyncExternalStore, type RefObject } from 'react
 import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { WORK_COUNT_SEPARATOR, workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
 
 /**
  * Live work on a phone (unslop round five, C1). Below 28rem the dock's running jobs and working subagents fold into one
- * 44px "Live work · 1 job · 1 subagent" disclosure that opens to their full-width rows. Side by side, two cards each
+ * 44px "Live work · 1 job · 1 working" disclosure that opens to their full-width rows. Side by side, two cards each
  * kept about 170px and truncated everything, and a clipped elapsed time read as a stray "^".
  *
  * The rows stay their owners' (background-jobs, thread-sidebar): this only counts them, from the markers their docks
@@ -45,19 +46,24 @@ export const LiveWork = {
     return a.jobs === b.jobs && a.subagents === b.subagents
   },
   /**
-   * "1 job · 2 subagents": the parts that are not zero.
+   * "1 job · 6 working": the parts that are not zero. Subagents take the one count formula every child summary uses
+   * (council round 22, item 3), so with only subagents the header reads "Live work · 6 working" (item 5). The dock lists
+   * working children only, so its failed part is always zero.
    * @param counts - what the dock holds.
    * @param t - the conversation table (`liveWork.*`).
    */
   detail(counts: LiveWorkCounts, t: (key: LiveWorkKey, params: { readonly count: number }) => string): string {
-    return [
-      counts.jobs === 0 ? undefined : t(counts.jobs === 1 ? 'liveWork.job' : 'liveWork.jobs', { count: counts.jobs }),
-      counts.subagents === 0 ? undefined : t(counts.subagents === 1 ? 'liveWork.subagent' : 'liveWork.subagents', { count: counts.subagents }),
-    ].filter(part => part !== undefined).join(' · ')
+    const subagents = workCountLabel(
+      { working: counts.subagents },
+      { working: count => t('liveWork.working', { count }), failed: count => t('liveWork.failed', { count }) },
+    )
+    return [counts.jobs === 0 ? '' : t(counts.jobs === 1 ? 'liveWork.job' : 'liveWork.jobs', { count: counts.jobs }), subagents]
+      .filter(part => part !== '')
+      .join(WORK_COUNT_SEPARATOR)
   },
 }
 
-export type LiveWorkKey = 'liveWork.job' | 'liveWork.jobs' | 'liveWork.subagent' | 'liveWork.subagents'
+export type LiveWorkKey = 'liveWork.job' | 'liveWork.jobs' | 'liveWork.working' | 'liveWork.failed'
 
 /** A window without `matchMedia` (a test DOM, an embedded view) never counts as narrow. */
 const query = (): MediaQueryList | undefined => (typeof window.matchMedia === 'function' ? window.matchMedia(LIVE_WORK_QUERY) : undefined)
@@ -114,7 +120,7 @@ export function useLiveWorkCounts(stack: RefObject<HTMLElement | null>): LiveWor
 }
 
 /**
- * The closed phone dock's one row: `› ○ Live work  1 job · 1 subagent`, 44px, the composer card's width.
+ * The closed phone dock's one row: `› ○ Live work  1 job · 1 working`, 44px, the composer card's width.
  * @param props.open - whether the live rows show under it.
  */
 export function LiveWorkSummary(props: {
