@@ -43,9 +43,9 @@ describe('AI accounts marks (council round 2, D4)', () => {
     expect(read('accounts-panel.tsx')).toContain('dshx:grid-cols-[minmax(260px,300px)_minmax(0,1fr)]')
   })
 
-  it('heads the picker column "In picker" and leaves an inherited source as quiet text', () => {
+  it('heads the picker column "Show model" (council round 9, D3) and leaves an inherited source as quiet text', () => {
     const table = read('model-curation.tsx')
-    expect(table).toContain('>In picker</th>')
+    expect(table).toContain('>Show model</th>')
     expect(table).toContain('<ModelMark modelId={model.id} />')
     expect(table).toContain("overridden ? 'dshx:rounded-full dshx:bg-accent dshx:px-2 dshx:py-1 dshx:text-accent-foreground' : 'dshx:text-muted-foreground'")
   })

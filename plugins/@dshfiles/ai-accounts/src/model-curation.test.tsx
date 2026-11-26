@@ -72,7 +72,7 @@ describe('reference Models table', () => {
     expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual([
       'Model',
       'Reasoning effort',
-      'In picker',
+      'Show model',
       'Source',
       'Actions',
     ])
@@ -88,6 +88,19 @@ describe('reference Models table', () => {
     expect(container.querySelectorAll('tbody [role="switch"]')).toHaveLength(0)
     expect(container.querySelectorAll('tbody [role="checkbox"]')).toHaveLength(9)
     expect(container.textContent).not.toContain('Default model')
+  })
+
+  it('says above the table when the hidden account masks every row (council round 9, D3)', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), enabled: false })
+    const note = container.querySelector('[data-account-hidden-note]')
+    expect(note?.textContent).toBe('This account is hidden, so none of its models show in the model picker. Turn on Show this account to use them.')
+    // Above the table, not under it.
+    const table = container.querySelector('table')
+    expect(note !== null && table !== null && (note.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+    await act(async () => root?.unmount())
+    container.remove()
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), enabled: true })
+    expect(container.querySelector('[data-account-hidden-note]')).toBeNull()
   })
 
   it('sizes each effort select to its value in a 144 px column, leaving the width to model names (council round 7, D2)', async () => {

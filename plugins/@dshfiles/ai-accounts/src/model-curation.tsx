@@ -125,6 +125,12 @@ export const ModelCuration = (props: {
           />
         </div>
       </div>
+      {/* The header's account switch overrides every row's "Show model": say so where the rows are (council round 9, D3). */}
+      {account.enabled ? null : (
+        <p className="dshx:text-xs dshx:text-muted-foreground" data-account-hidden-note>
+          This account is hidden, so none of its models show in the model picker. Turn on Show this account to use them.
+        </p>
+      )}
       {/* Rows separate by hairlines; the detail pane is the only frame. */}
       <div className="dshx:overflow-x-auto dshx:border-y">
         <table className="dshx:w-full dshx:min-w-[600px] dshx:border-collapse dshx:text-sm">
@@ -132,7 +138,7 @@ export const ModelCuration = (props: {
             <tr>
               <th className="dshx:px-3 dshx:py-2 dshx:font-normal">Model</th>
               <th className="dshx:w-36 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
-              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">In picker</th>
+              <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show model</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>
               <th className="dshx:w-10">
                 <span className="dshx:sr-only">Actions</span>

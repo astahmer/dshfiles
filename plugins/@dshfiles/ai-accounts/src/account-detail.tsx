@@ -87,7 +87,7 @@ export const AccountDetail = (props: {
         <>
           {/* The switch says what it controls in visible text, not only to assistive tech (council round 4, D2). */}
           <Label className="dshx:gap-2 dshx:border-l dshx:border-border dshx:pl-3 dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
-            {AccountLabels.routedKind(draft.kind) ? 'In model picker' : 'Track quota'}
+            {AccountLabels.routedKind(draft.kind) ? 'Show this account' : 'Track quota'}
             <Switch checked={draft.enabled} disabled={saving} onCheckedChange={enabled => void props.state.persist({ enabled })} />
           </Label>
           {selected === null ? null : (

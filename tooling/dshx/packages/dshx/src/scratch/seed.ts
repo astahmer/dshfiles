@@ -620,7 +620,7 @@ const configureFakeProviderThread = async (input: {
   await keyDialog.waitFor({ state: 'hidden', timeout: timeoutMs })
   const enabled = page
     .getByRole('region', { name: 'Selected account', exact: true })
-    .getByRole('switch', { name: 'In model picker', exact: true })
+    .getByRole('switch', { name: 'Show this account', exact: true })
   if ((await enabled.getAttribute('aria-checked')) !== 'true') await enabled.click({ timeout: timeoutMs })
   await waitForFakeProviderAccount({ home: state.home, timeoutMs, expected: 'an enabled loopback model route', matches: account => account?.enabled === true })
   await page.keyboard.press('Escape')

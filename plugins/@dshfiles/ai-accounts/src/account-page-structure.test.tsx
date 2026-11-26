@@ -85,9 +85,10 @@ describe('account detail header and tabs (council round 4, D2)', () => {
   })
   it('labels the enable switch with visible text', () => {
     const header = detail.slice(detail.indexOf('<DetailHeader'), detail.indexOf('</DetailHeader>'))
-    expect(header).toMatch(/<Label[^>]*>\s*\{AccountLabels\.routedKind\(draft\.kind\) \? 'In model picker' : 'Track quota'\}\s*<Switch/u)
-    expect(header).not.toContain("'Enabled in model picker'")
-    // A hairline parts the health word from the switch label, so "Connected" and "In model picker" read as two things.
+    // "Show this account" names what the switch does, as the table's "Show model" does per row (council round 9, D3).
+    expect(header).toMatch(/<Label[^>]*>\s*\{AccountLabels\.routedKind\(draft\.kind\) \? 'Show this account' : 'Track quota'\}\s*<Switch/u)
+    expect(header).not.toContain("'In model picker'")
+    // A hairline parts the health word from the switch label, so "Connected" and "Show this account" read as two things.
     expect(header).toMatch(/<Label className="[^"]*dshx:border-l[^"]*dshx:pl-3/u)
   })
   it('keeps Sign out in the account actions menu, not as a header button', () => {
