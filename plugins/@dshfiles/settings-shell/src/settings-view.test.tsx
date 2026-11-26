@@ -431,6 +431,13 @@ describe('settings view: one grouped page', () => {
     byName.unmount()
     const byKeys = mount({ query: '⌘,' })
     expect(byKeys.host.querySelector('[data-settings-shortcut="settings.open"]')).not.toBeNull()
+    // Its keys are the kit's one shortcut chip (council round 10 A5), not a local monospace cap.
+    const caps = [...byKeys.host.querySelectorAll<HTMLElement>('[data-settings-shortcut="settings.open"] kbd')]
+    expect(caps.map(cap => cap.textContent)).toEqual(['⌘', ','])
+    for (const cap of caps) {
+      expect(cap.getAttribute('data-slot')).toBe('kbd')
+      expect(cap.className).not.toContain('dshx:font-mono')
+    }
     byKeys.unmount()
   })
 })

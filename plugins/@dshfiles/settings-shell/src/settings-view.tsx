@@ -4,6 +4,7 @@ import { PAGE_FRAME_CLASS } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { PageHeader } from '@dshfiles/plugin-ui/components/ui/page-header'
 import { Toggle } from '@dshfiles/plugin-ui/components/ui/toggle'
+import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { ArrowUpRightIcon, ChevronLeftIcon, ChevronRightIcon, ListFilterIcon, SearchIcon, SettingsIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
@@ -190,11 +191,6 @@ const entryGroups = (
 const sectionOwnerWithTarget = (props: SettingsViewProps): SettingsSectionOwnerProps & SettingsSectionSearchProps =>
   props.sectionTarget === undefined ? props.sectionOwner : { ...props.sectionOwner, target: props.sectionTarget }
 
-const Kbd = (props: { readonly children: ReactNode }): JSX.Element => (
-  <kbd className="dshx:rounded dshx:border dshx:border-border dshx:bg-muted dshx:px-1.5 dshx:py-px dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">
-    {props.children}
-  </kbd>
-)
 
 const matchesText = (t: ShellTranslate, count: number): string => (count === 1 ? t('search.matchesOne') : t('search.matches', { count }))
 
