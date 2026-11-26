@@ -115,6 +115,26 @@ describe('settings view: page header (council round 3 B3)', () => {
     expect(read('open-config-action.tsx')).not.toContain('dshx:px-2.5 dshx:text-xs dshx:font-medium')
     view.unmount()
   })
+
+  it('draws Modified and the phone ⋯ beside the search field as the kit quiet secondary (council round 18 B2.4)', () => {
+    const view = mount({ columnNavigation: true })
+    const modified = view.host.querySelector('[data-settings-modified-filter]')?.className.split(/\s+/u) ?? []
+    // The quiet trigger chip (fill and hairline), secondary ink at rest, the wash, field edge and ink while pressed.
+    for (const token of ['dshx:bg-trigger-fill', 'dshx:border-border', 'dshx:text-muted-foreground', 'dshx:aria-pressed:bg-selected-wash', 'dshx:aria-pressed:border-field-border'])
+      expect(modified).toContain(token)
+    // Not the outlined header action it was.
+    expect(modified).not.toContain('dshx:shadow-xs')
+    expect(modified).not.toContain('dshx:border-input')
+    // On a phone the configuration file's split button folds to one ⋯ beside the search: it takes the same chip there,
+    // while the desktop "Open configuration file" stays an outlined header action.
+    const action = read('open-config-action.tsx')
+    expect(action).toContain(
+      'dshx:inline-flex dshx:h-8 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs dshx:@max-pane-compact:h-11 dshx:@max-pane-compact:rounded-lg dshx:@max-pane-compact:bg-trigger-fill dshx:@max-pane-compact:shadow-none',
+    )
+    expect(action).toContain('dshx:@max-pane-compact:hover:border-field-border')
+    expect(action).toContain('dshx:@max-pane-compact:hover:bg-transparent')
+    view.unmount()
+  })
 })
 
 describe('settings view: the page title names the category (council round 7 B2)', () => {

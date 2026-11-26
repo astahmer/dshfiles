@@ -63,8 +63,10 @@ export const OpenConfigAction = (props: {
         </span>
       )}
       {/* No overflow clip on the split button: it would cut the kit's 44px touch hit area of both halves. */}
-      {/* A narrow pane (a phone) gives it the 44px of the search and Modified beside it (council round 4 B3). */}
-      <div className="dshx:inline-flex dshx:h-8 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs dshx:@max-pane-compact:h-11">
+      {/* A narrow pane (a phone) gives it the 44px of the search and Modified beside it (council round 4 B3), and there,
+          folded to one ⋯ beside the search field, the kit's quiet secondary chip (council round 18 B2.4): trigger fill and
+          hairline, the field edge on hover and while open. Wide, it stays an outlined header action. */}
+      <div className="dshx:inline-flex dshx:h-8 dshx:items-stretch dshx:rounded-md dshx:border dshx:border-border dshx:bg-background dshx:shadow-xs dshx:@max-pane-compact:h-11 dshx:@max-pane-compact:rounded-lg dshx:@max-pane-compact:bg-trigger-fill dshx:@max-pane-compact:shadow-none dshx:@max-pane-compact:hover:border-field-border dshx:@max-pane-compact:has-[[aria-expanded=true]]:border-field-border">
         <Tooltip>
           <TooltipTrigger asChild>
             {/* A narrow pane has no room for the label: the menu (whose first item opens the file) takes the seat. */}
@@ -87,7 +89,7 @@ export const OpenConfigAction = (props: {
             <DropdownMenuTrigger asChild>
               <button
                 aria-label={t('config.more')}
-                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-r-md dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:@max-pane-compact:w-11 dshx:@max-pane-compact:rounded-md dshx:@max-pane-compact:border-l-0"
+                className="dshx:inline-flex dshx:w-6 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-r-md dshx:border-0 dshx:border-l dshx:border-solid dshx:border-border dshx:bg-transparent dshx:text-muted-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:aria-expanded:text-foreground dshx:@max-pane-compact:w-11 dshx:@max-pane-compact:rounded-lg dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:hover:bg-transparent"
                 type="button"
               >
                 <ChevronDownIcon className="dshx:size-3.5 dshx:@max-pane-compact:hidden" />

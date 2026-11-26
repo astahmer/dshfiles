@@ -594,7 +594,8 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             data-settings-modified-filter=""
             onPressedChange={() => props.onSearch(SettingsSearch.toggleModified(props.query))}
             pressed={SettingsSearch.hasModifiedFilter(props.query)}
-            variant="outline"
+            // The quiet secondary beside a search field (council round 18 B2.4); header actions stay outlined.
+            variant="quiet"
           >
             {t('search.modified')}
           </Toggle>
