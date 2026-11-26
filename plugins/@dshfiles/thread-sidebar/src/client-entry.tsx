@@ -49,6 +49,7 @@ import { HeaderThreadActions } from './header-actions.js'
 import { HeaderLiveActivity } from './header-live-activity.js'
 import { SubagentCatalogAction, SubagentHeaderLineage, type SubagentCatalogInjected } from './subagent-provenance/SubagentHeaderLineage.js'
 import type { SubagentPreviewBindings } from './subagent-provenance/subagent-live-preview.js'
+import { subagentCountWords } from './subagent-provenance/subagent-count.js'
 import { SubagentPreviewDock } from './subagent-provenance/subagent-preview-dock.js'
 import { SubagentProvenanceToolRow, type SubagentToolViewProps } from './subagent-provenance/subagent-tool-row.js'
 import { subagentRunFold } from './subagent-provenance/subagent-run-fold.js'
@@ -955,6 +956,7 @@ export default defineClient({
     // The header chip and its popover speak this plugin's words, never core's count beside an English word (C5).
     const subagentCatalogCopy: SubagentCatalogInjected['copy'] = {
       count: count => plural(translate, 'subagentCount', count),
+      summary: subagentCountWords(translate, { settled: true }),
       working: translate('subagentPreviewWorking'),
       done: translate('subagentPreviewFinished'),
       stopped: translate('subagentPreviewInterrupted'),

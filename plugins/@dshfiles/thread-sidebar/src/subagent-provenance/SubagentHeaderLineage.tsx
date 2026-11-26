@@ -10,6 +10,7 @@ import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { StatusGlyph, type StatusGlyphState } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { formatElapsed } from '@dshfiles/plugin-ui/lib/format-duration'
+import { WORK_COUNT_SEPARATOR, workCountParts, type WorkCounts, type WorkCountWords } from '@dshfiles/plugin-ui/lib/work-count'
 import { createHoverIntentMachine, useMachine } from '@dshfiles/plugin-ui/machine'
 import { HostSnapshotsModel } from '../snapshots.js'
 import { NS } from './locales.js'
@@ -58,6 +59,34 @@ export class SubagentCatalogs {
     }
   }
 
+  /**
+   * A catalog's direct children counted by state, for the chip's summary: working while running, else the terminal
+   * state every list surface reads (round 21 D4). A child with no known state yet counts in no part.
+   */
+  static countsOf(
+    entries: readonly { readonly id: SessionId; readonly mode: string; readonly activity: 'running' | 'inactive' }[],
+    summaries: Readonly<Record<SessionId, SessionSummary>>,
+    failedTurns: ReadonlyMap<string, unknown>,
+  ): WorkCounts {
+    let working = 0
+    let failed = 0
+    let stopped = 0
+    let done = 0
+    for (const entry of entries) {
+      const state = rowStateOf({
+        external: entry.mode === 'external',
+        running: entry.activity === 'running',
+        failedTurn: failedTurns.has(entry.id),
+        lastTurnCompleted: summaries[entry.id]?.projectionValues?.subagentTiming?.lastTurnCompleted,
+      })
+      if (state === 'working') working += 1
+      else if (state === 'failed') failed += 1
+      else if (state === 'stopped') stopped += 1
+      else if (state === 'done') done += 1
+    }
+    return { working, failed, stopped, done }
+  }
+
   /** The Session whose subagent catalog lists `childSessionId`, first match in projection order. */
   static parentOf(projections: CatalogProjections, childSessionId: SessionId): SessionId | undefined {
     for (const parentId in projections) {
@@ -79,8 +108,10 @@ export class SubagentCatalogs {
  * dictionaries ("Sous-agents 2 working", C5).
  */
 export interface SubagentCatalogCopy {
-  /** "1 subagent", "3 subagents". */
+  /** "1 subagent", "3 subagents": the chip's fallback while no child's state is known. */
   readonly count: (count: number) => string
+  /** The one count formula's words (council round 22, item 3): the chip reads `6 working · 1 failed`. */
+  readonly summary: WorkCountWords
   readonly working: string
   readonly done: string
   readonly stopped: string
@@ -448,8 +479,14 @@ function CatalogDropdown({
   const directChildren = catalog?.entries ?? []
   const directCount = directChildren.length
   const runningCount = directChildren.filter(entry => entry.activity === 'running').length
-  // "3 subagents", with the spinner only while one works; never "2/3" (C13).
-  const countLabel = copy.count(directCount)
+  const failedTurns = useSubagentFailedTurns()
+  // `6 working · 1 failed`, the formula every surface that summarises children reads (council round 22, item 3), with
+  // the spinner only while one works; "3 subagents" only while no child's state is known yet.
+  const countParts = workCountParts(
+    variant === 'count' ? SubagentCatalogs.countsOf(directChildren, summaries, failedTurns) : {},
+    copy.summary,
+  )
+  const countLabel = countParts.length === 0 ? copy.count(directCount) : countParts.map(part => part.text).join(WORK_COUNT_SEPARATOR)
   const presentedCatalog: SubagentCatalogSnapshot | undefined = catalog ?? (variant === 'switcher' ? { entries: [], state: 'loading', error: null } : undefined)
 
   const closeBranch = (root: SessionId): void => {
@@ -575,9 +612,7 @@ function CatalogDropdown({
         aria-label={
           variant === 'switcher'
             ? t('switcher.aria', { title: switcherDisplayTitle })
-            : runningCount > 0
-              ? `${countLabel} · ${copy.working}`
-              : countLabel
+            : countLabel
         }
         onClick={
           openTitle === undefined
@@ -607,7 +642,16 @@ function CatalogDropdown({
                 <StatusGlyph status="working" decorative />
               </span>
             )}
-            <span className={css.count}>{countLabel}</span>
+            <span className={css.count}>
+              {countParts.length === 0
+                ? countLabel
+                : countParts.map((part, index) => (
+                    <span key={part.key} className={part.tone === 'failed' ? css.countFailed : undefined}>
+                      {index === 0 ? '' : WORK_COUNT_SEPARATOR}
+                      {part.text}
+                    </span>
+                  ))}
+            </span>
           </>
         )}
         {variant === 'switcher' ? <SubagentSwitcherIcon /> : <ChevronDownIcon size={14} strokeWidth={1.5} className={open ? css.triggerOpen : undefined} />}

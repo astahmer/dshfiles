@@ -11,7 +11,7 @@ import { useSyncExternalStore } from 'react'
 
 export interface ThreadWorkStatus {
   readonly status: WorkStatus
-  /** The list's detail line, such as "Waiting on 1 subagent"; already in the user's language. */
+  /** The list's detail line, such as "2 working · 1 failed"; already in the user's language. */
   readonly detail: string | undefined
   /**
    * An attention row's kind as its line 2 says it (Approval, Question, or a Failed row's reason such as "Turn failed");

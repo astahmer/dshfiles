@@ -143,7 +143,19 @@ const props = (): SubagentHeaderLineageProps => ({
   openChild: vi.fn(),
   openChildAside: vi.fn(),
   refreshProjection: vi.fn(),
-  copy: { count: count => `${String(count)} ${count === 1 ? 'subagent' : 'subagents'}`, working: 'Working', done: 'Done', stopped: 'Stopped', failed: 'Failed' },
+  copy: {
+    count: count => `${String(count)} ${count === 1 ? 'subagent' : 'subagents'}`,
+    summary: {
+      working: count => `${String(count)} working`,
+      failed: count => `${String(count)} failed`,
+      stopped: count => `${String(count)} stopped`,
+      done: count => `${String(count)} done`,
+    },
+    working: 'Working',
+    done: 'Done',
+    stopped: 'Stopped',
+    failed: 'Failed',
+  },
   sessionId: CHILD,
   lineageSessionId: CHILD,
   displayTitle: 'worker',
@@ -174,12 +186,13 @@ describe('SubagentHeaderLineage route provenance', () => {
     expect(container.querySelector('[data-slot="route-model"]')).toBeNull()
   })
 
-  it('counts the subagents in its own words, with the spinner while one works and no "2/34"', () => {
+  it('counts the subagents with the one formula, with the spinner while one works and no "2/34"', () => {
     const state = sessionListWithRunningSubagents()
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(state)} />)
 
-    const trigger = screen.getByRole('button', { name: '34 subagents · Working' })
-    expect(trigger.textContent).toBe('34 subagents')
+    // Council round 22, item 3: `2 working`, never "34 subagents"; the 32 with no known state count in no part.
+    const trigger = screen.getByRole('button', { name: '2 working' })
+    expect(trigger.textContent).toBe('2 working')
     expect(trigger.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
 
     fireEvent.click(trigger)
@@ -206,7 +219,7 @@ describe('SubagentHeaderLineage route provenance', () => {
       },
     }
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(finished)} />)
-    fireEvent.click(screen.getByRole('button', { name: '1 subagent' }))
+    fireEvent.click(screen.getByRole('button', { name: '1 done' }))
     const row = screen.getByRole('treeitem', { name: 'worker · Done · 5m 00s' })
     expect(row.textContent).toContain('5m 00s')
     expect(row.textContent).not.toMatch(/tok|once call/u)
@@ -220,13 +233,13 @@ describe('SubagentHeaderLineage route provenance', () => {
     }
     failedTurns.set(CHILD, { sessionId: CHILD, failedAt: 1, reason: 'error' })
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(ended)} />)
-    fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
+    fireEvent.click(screen.getByRole('button', { name: '1 failed' }))
     const failed = screen.getByRole('treeitem', { name: /^worker · Failed/ })
     expect(failed.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
     cleanup()
     failedTurns.clear()
     render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(ended)} />)
-    fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
+    fireEvent.click(screen.getByRole('button', { name: '1 stopped' }))
     const stopped = screen.getByRole('treeitem', { name: /^worker · Stopped/ })
     expect(stopped.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('stopped')
   })
@@ -235,7 +248,7 @@ describe('SubagentHeaderLineage route provenance', () => {
     vi.useFakeTimers()
     try {
       render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(sessionList)} />)
-      const trigger = screen.getByRole('button', { name: /subagent/ })
+      const trigger = screen.getByRole('button', { name: '1 subagent' })
 
       fireEvent.mouseOver(trigger)
       expect(trigger.getAttribute('aria-expanded')).toBe('false')
@@ -275,5 +288,14 @@ describe('SubagentHeaderLineage route provenance', () => {
     fireEvent.click(screen.getByRole('button', { name: /subagent/ }))
     const row = screen.getByRole('treeitem', { name: /^worker/ })
     expect(row.textContent).toContain('1m 05s')
+  })
+
+  it('reads `N working · M failed` with the failed clause in failed ink (council round 22, item 3)', () => {
+    const state = sessionListWithRunningSubagents()
+    failedTurns.set('child-3', { sessionId: 'child-3', failedAt: 1, reason: 'error' })
+    render(<SubagentCatalogAction {...props()} sessionId={PARENT} useSessions={select => select(state)} />)
+    const trigger = screen.getByRole('button', { name: '2 working · 1 failed' })
+    const failed = [...trigger.querySelectorAll('span')].find(span => span.textContent === ' · 1 failed')
+    expect(failed?.className).toMatch(/countFailed/)
   })
 })

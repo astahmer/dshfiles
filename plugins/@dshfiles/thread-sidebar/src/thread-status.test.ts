@@ -10,6 +10,7 @@ import {
   type ThreadStatusInput,
 } from './thread-status.js'
 import { threadSidebarDictionaries } from './locales.js'
+import { workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
 
 const NOW = 10_000_000_000
 
@@ -33,8 +34,7 @@ const pick = (one: string, other: string) => (count: number): string => (count =
 const COPY: ThreadStatusCopy = {
   subagentsNeedYou: pick(en.threadSidebarSubagentsNeedYou_one, en.threadSidebarSubagentsNeedYou_other),
   subagentsFailed: pick(en.threadSidebarSubagentsFailed_one, en.threadSidebarSubagentsFailed_other),
-  waitingOnSubagents: pick(en.threadSidebarWaitingOnSubagents_one, en.threadSidebarWaitingOnSubagents_other),
-  subagentsWorking: pick(en.subagentsWorking_one, en.subagentsWorking_other),
+  childrenWorking: counts => workCountLabel(counts, { working: pick(en.threadSidebarWorkingCount, en.threadSidebarWorkingCount), failed: pick(en.threadSidebarFailedCount, en.threadSidebarFailedCount) }),
 }
 
 describe('thread status', () => {
@@ -194,7 +194,10 @@ describe('thread status', () => {
     const workingChild = ThreadStatusModel.ownStatus(input({ running: true }))
     expect(ThreadStatusModel.statusOf(input(), [waitingChild, waitingChild], COPY)).toMatchObject({ status: 'needs-you', detail: '2 subagents need you' })
     expect(ThreadStatusModel.statusOf(input({ running: true }), [failedChild], COPY)).toMatchObject({ status: 'failed', detail: '1 subagent failed', itemId: 'c' })
-    expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild], COPY)).toMatchObject({ status: 'working', detail: 'Waiting on 1 subagent' })
+    expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild], COPY)).toMatchObject({ status: 'working', detail: '1 working' })
+    // The one count formula (council round 22, item 3): a child whose own turn failed is named, never lifted.
+    expect(ThreadStatusModel.statusOf(input({ unread: true }), [workingChild, workingChild], COPY, 1)).toMatchObject({ status: 'working', detail: '2 working · 1 failed' })
+    expect(ThreadStatusModel.statusOf(input({ running: true }), [workingChild], COPY, 2)).toMatchObject({ status: 'working', detail: '1 working · 2 failed' })
     // A parent that already needs you keeps its own reason.
     expect(ThreadStatusModel.statusOf(input({ labels: ['threadSidebarApprovalNeeded'] }), [failedChild]).verb).toBe('Approve')
   })

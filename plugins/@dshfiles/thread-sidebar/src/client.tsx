@@ -56,11 +56,13 @@ import { IconPinFillRegular, writeClipboard } from '@deepseek-ai/dsh-client-ui-p
 import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { Alert } from '@dshfiles/plugin-ui/components/ui/alert'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
+import { workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { LEADING_GLYPH_ATTRIBUTE, MARKER_KEEP } from '@dshfiles/plugin-ui/components/selection'
 import { AttentionMeta } from '@dshfiles/plugin-ui/components/ui/attention-meta'
 import { RouteModel } from '@dshfiles/plugin-ui/components/model-mark'
 import { SubagentRouteLabelModel } from './subagent-provenance/route-label.js'
+import { subagentCountWords } from './subagent-provenance/subagent-count.js'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
@@ -4242,8 +4244,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     (): ThreadStatusCopy => ({
       subagentsNeedYou: count => plural(tSidebar, 'threadSidebarSubagentsNeedYou', count),
       subagentsFailed: count => plural(tSidebar, 'threadSidebarSubagentsFailed', count),
-      waitingOnSubagents: count => plural(tSidebar, 'threadSidebarWaitingOnSubagents', count),
-      subagentsWorking: count => plural(tSidebar, 'subagentsWorking', count),
+      childrenWorking: counts => workCountLabel(counts, subagentCountWords(tSidebar)),
     }),
     [tSidebar],
   )
@@ -4305,10 +4306,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const statuses = new Map<SessionSummary['id'], ThreadStatus>()
     if (!statusGlyphs) return statuses
     for (const entry of sectionEntries) {
-      const children = (threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN).flatMap(child => {
+      const childRows = threadTree.childrenByRoot.get(entry.session.id) ?? NO_CHILDREN
+      const children = childRows.flatMap(child => {
         const status = childRollupStatusById.get(child.id)
         return status === undefined ? [] : [status]
       })
+      // The detail line names the children whose own turn failed (`6 working · 1 failed`); the status leaves them out.
+      const failedChildren = childRows.filter(child => childStatusById.get(child.id)?.status === 'failed').length
       // Top-level rows only: a subagent's failed turn is its parent's tool result, which the parent's own turn answers.
       const failedTurn = failedTurns.get(entry.session.id)
       statuses.set(
@@ -4334,6 +4338,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           },
           children,
           rollupCopy,
+          failedChildren,
         ),
       )
     }
@@ -4343,6 +4348,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     attention.records,
     attentionLabelsBySession,
     childRollupStatusById,
+    childStatusById,
     rollupCopy,
     failedTurns,
     inbox.signals,

@@ -189,24 +189,29 @@ const ownStatus = (input: ThreadStatusInput): Omit<ThreadStatus, 'group'> => {
 export interface ThreadStatusCopy {
   readonly subagentsNeedYou: (count: number) => string
   readonly subagentsFailed: (count: number) => string
-  readonly waitingOnSubagents: (count: number) => string
-  readonly subagentsWorking: (count: number) => string
+  /** The one count formula (council round 22, item 3): `6 working · 2 failed`, a zero part omitted. */
+  readonly childrenWorking: (counts: { readonly working: number; readonly failed: number }) => string
 }
 
 /** A row with no children never asks for a roll-up line. */
 const NO_ROLLUP: ThreadStatusCopy = {
   subagentsNeedYou: () => '',
   subagentsFailed: () => '',
-  waitingOnSubagents: () => '',
-  subagentsWorking: () => '',
+  childrenWorking: () => '',
 }
 
 /**
  * The row status of a thread with its subagents rolled up: a child that needs you or failed lifts the parent into
  * Needs you (with detail text naming how many), and a running child keeps an otherwise finished parent Working
- * ("Waiting on 2 subagents").
+ * ("2 working · 1 failed"). `failedChildren` counts children whose own last turn failed: the roll-up leaves that
+ * failure out of the parent's status (see {@link ChildThreadStatus}), but the count names it.
  */
-const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus, 'group'>[] = [], copy: ThreadStatusCopy = NO_ROLLUP): ThreadStatus => {
+const statusOf = (
+  input: ThreadStatusInput,
+  children: readonly Omit<ThreadStatus, 'group'>[] = [],
+  copy: ThreadStatusCopy = NO_ROLLUP,
+  failedChildren = 0,
+): ThreadStatus => {
   const own = ownStatus(input)
   const waiting = children.filter(child => child.status === 'needs-you')
   const failed = children.filter(child => child.status === 'failed')
@@ -231,13 +236,13 @@ const statusOf = (input: ThreadStatusInput, children: readonly Omit<ThreadStatus
   } else if ((own.status === 'idle' || own.status === 'ready') && working.length > 0) {
     rolled = {
       status: 'working',
-      detail: copy.waitingOnSubagents(working.length),
+      detail: copy.childrenWorking({ working: working.length, failed: failedChildren }),
       verb: undefined,
       itemId: undefined,
       since: own.since,
     }
   } else if (own.status === 'working' && working.length > 0 && own.detail === undefined) {
-    rolled = { ...own, detail: copy.subagentsWorking(working.length) }
+    rolled = { ...own, detail: copy.childrenWorking({ working: working.length, failed: failedChildren }) }
   }
   return { ...rolled, group: input.draft === true && !input.pinned ? 'draft' : groupOf(rolled.status, input.pinned) }
 }
