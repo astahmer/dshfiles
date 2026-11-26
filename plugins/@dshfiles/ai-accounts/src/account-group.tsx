@@ -6,7 +6,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { ArrowDownIcon, ArrowUpIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Settings2Icon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { ArrowDownIcon, ArrowUpIcon, PencilIcon, RefreshCwIcon, Settings2Icon } from '@dshfiles/plugin-ui/icons'
 import { SELECTED_EDGE } from '@dshfiles/plugin-ui/components/selection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountLabels, KIND_LABEL } from './account-labels.js'
@@ -92,7 +93,7 @@ export const AccountGroup = (props: {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button aria-label={`Actions for ${profile.displayName}`} size="icon-xs" type="button" variant="ghost">
-                      <MoreHorizontalIcon />
+                      <OverflowGlyph />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

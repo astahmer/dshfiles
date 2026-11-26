@@ -13,7 +13,8 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ActionHint } from './panel-primitives.js'
 import { ModelMark } from '@dshfiles/plugin-ui/components/model-mark'
-import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 import type { AccountDraft, AccountsCatalog } from './api.js'
@@ -271,7 +272,7 @@ export const ModelCuration = (props: {
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button aria-label={`Actions for ${model.name}`} size="icon-xs" type="button" variant="ghost">
-                          <MoreHorizontalIcon />
+                          <OverflowGlyph />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">

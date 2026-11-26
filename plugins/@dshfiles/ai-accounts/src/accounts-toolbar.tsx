@@ -2,7 +2,8 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Combobox } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
-import { CopyIcon, MoreHorizontalIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { CopyIcon, SearchIcon } from '@dshfiles/plugin-ui/icons'
 import { Label } from '@dshfiles/plugin-ui/components/ui/label'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { useEffect, useId, useRef } from 'react'
@@ -64,7 +65,7 @@ export const AccountsToolbar = (props: {
         <Popover>
           <PopoverTrigger asChild>
             <Button aria-label="Account page options" size="icon-sm" type="button" variant="ghost">
-              <MoreHorizontalIcon />
+              <OverflowGlyph />
             </Button>
           </PopoverTrigger>
           <PopoverContent align="end" className="dshx-root dshx:w-80 dshx:space-y-4">

@@ -20,7 +20,8 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
-import { ChevronRightIcon, LogOutIcon, MoreHorizontalIcon, PencilIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { ChevronRightIcon, LogOutIcon, PencilIcon, RefreshCwIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import { AccountSignOut } from './account-sign-out.js'
 import { AccountSettings } from './account-settings.js'
@@ -102,7 +103,7 @@ export const AccountDetail = (props: {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button aria-label="Account actions" size="icon-sm" type="button" variant="outline">
-                <MoreHorizontalIcon />
+                <OverflowGlyph />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
