@@ -104,10 +104,11 @@ describe('Usage page width (council round 5 A2)', () => {
   })
 })
 
-describe('Usage page title mark (council round 7, D1)', () => {
-  it('marks the h1 with the Observe destination glyph in its nav tone', () => {
+describe('Usage page title mark (council round 7, D1; round 18, D2)', () => {
+  it("marks the h1 with Usage's own bar-chart glyph, the left column entry's, in the Observe nav tone", () => {
     const page = read('panel.tsx').slice(read('panel.tsx').indexOf('<Page'), read('panel.tsx').indexOf('heading="Usage"'))
-    expect(page).toContain('mark={<ActivityIcon />}')
+    expect(page).toContain('mark={<UsageGlyph />}')
+    expect(read('client.tsx')).toMatch(/const PanelGlyph = UsageGlyph\b/u)
     expect(page).toContain('markTone="observe"')
   })
 })

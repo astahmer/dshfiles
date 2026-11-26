@@ -16,26 +16,14 @@ import type { OpenThread } from './format.js'
 import { UsagePanel, UsageTabs } from './panel.js'
 import { UsageQuota } from './quota-tab.js'
 import { ThreadCostFacet } from './thread-cost-facet.js'
+import { UsageGlyph } from './usage-glyph.js'
 
 const PANEL_ID = 'dshfiles-usage'
 /** The thread panel's Cost facet (docs/ade-ux §4.4): a page tab type of the right pane. */
 const COST_FACET_ID = 'dshfiles-usage-cost'
 const TRACES_PANEL_ID = 'traces'
 
-const PanelGlyph = (props: { readonly size?: number | undefined }): JSX.Element => (
-  <svg
-    aria-hidden
-    width={props.size ?? 18}
-    height={props.size ?? 18}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.7"
-    strokeLinecap="round"
-  >
-    <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />
-  </svg>
-)
+const PanelGlyph = UsageGlyph
 
 export default defineClient({
   name: '@dshfiles/usage',

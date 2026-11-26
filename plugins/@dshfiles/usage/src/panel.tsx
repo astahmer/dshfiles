@@ -15,7 +15,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { createStoredValue } from '@dshfiles/plugin-ui/hooks/stored-value'
 import { panelOccurrence, useWorkbenchScopeKey } from '@dshfiles/workbench/panel-occurrence'
-import { ActivityIcon, CalendarIcon, ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
+import { CalendarIcon, ChevronDownIcon } from '@dshfiles/plugin-ui/icons'
 import { runHostRequest } from '@dshfiles/plugin-ui/lib/host-request'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useApi } from '@dshfiles/dshx/client'
@@ -28,6 +28,7 @@ import { purposeSchema, usageApi, type ChartQuery } from './api.js'
 import { UsageCharts } from './charts.js'
 import { USAGE_PAGE_DESCRIPTION, indexedLogsLabel } from './page-copy.js'
 import { reindexAction } from './reindex-action.js'
+import { UsageGlyph } from './usage-glyph.js'
 import { UsageFoldModel, type RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { RequestLog } from './request-log.js'
@@ -240,8 +241,8 @@ export const UsagePanel = (props: { readonly openThread: OpenThread; readonly pa
       // A data page sits on the wide frame, min(100%, 1200px): charts and tables share the header's edges (round 5 A2).
       width="wide"
       className="dshx:bg-background dshx:text-foreground"
-      // The Observe destination's glyph in its tone before the h1 (council round 7, D1).
-      mark={<ActivityIcon />}
+      // Usage's own bar-chart glyph, the left column entry's, in the Observe tone before the h1 (council round 18, D2).
+      mark={<UsageGlyph />}
       markTone="observe"
       heading="Usage"
       description={USAGE_PAGE_DESCRIPTION}
