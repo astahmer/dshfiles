@@ -252,12 +252,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5">
           <Label>Colour</Label>
           <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-            <PalettePicker
-              label="Colour"
-              value={draft.tone ?? undefined}
-              defaultSlot={identityToneIndex(review.handle)}
-              onChange={tone => patch({ tone })}
-            />
+            <PalettePicker label="Colour" value={draft.tone ?? undefined} defaultSlot={identityToneIndex(review.handle)} onChange={tone => patch({ tone })} />
             {draft.tone === null || draft.tone === undefined ? null : (
               <Button type="button" size="xs" variant="ghost" onClick={() => patch({ tone: null })}>
                 Use default

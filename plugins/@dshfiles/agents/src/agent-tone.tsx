@@ -8,7 +8,6 @@ import { useSyncExternalStore } from 'react'
  */
 const slotOf = (agent: { readonly handle: string; readonly tone?: number | null | undefined }): number => agent.tone ?? identityToneIndex(agent.handle)
 
-
 /**
  * The chosen colours by handle, for the chips: a chip knows only its handle, and the registry list the reference
  * decorations already read fills this. A handle missing here takes its hashed default.
