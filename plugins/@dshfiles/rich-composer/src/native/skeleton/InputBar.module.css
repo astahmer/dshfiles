@@ -650,14 +650,15 @@
 
 /* Primary send (visual refresh T3.3): ONE round button in ink, not the accent (colour is a signal for Needs you and
    Failed only). Its glyph morphs with what a click does now: send, queue behind the running turn, steer into it, or
-   stop. Composer redesign (b:v9yh): 32px on a fine pointer, 36pt on touch; with nothing to send it is no disc at all,
-   only a muted arrow. */
+   stop. Council round 13 C3: a 28px circle on a fine pointer (the + control's size) and 32px on touch, where the bar's
+   44pt hit area still centres on it; with nothing to send it keeps its disc, the + control's raised fill with a faint
+   glyph, so the seat never empties. */
 .primary {
   display: grid;
   place-items: center;
   flex: none;
-  width: 32px;
-  height: 32px;
+  width: 28px;
+  height: 28px;
   border: none;
   border-radius: 999px;
   corner-shape: round;
@@ -686,8 +687,8 @@
 }
 
 .primary:disabled {
-  background: transparent;
-  color: var(--dsw-alias-label-caption);
+  background: var(--dsw-specific-selector, var(--dshx-tone-raised));
+  color: var(--dsw-alias-label-tertiary);
   cursor: default;
 }
 
@@ -713,8 +714,8 @@
 
 @media (pointer: coarse) {
   .primary {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
   }
 
   /* Touch input never under 16px (visual refresh T3.5): WebKit zooms the page on focus below it. A larger
