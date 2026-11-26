@@ -877,7 +877,7 @@ button.crumbEditable {
      cards. Main width controls publish the live body width and optional user
      preference; embedded occurrences override this adaptive axis below. */
   /* dshfiles (unslop r5 C3): one transcript column; the dock and the input card share the column's edges instead of
-     standing 16px out on each side. Round five C1 (council round 3): the default is 680px, with prose at 66ch (613px),
+     standing 16px out on each side. Round five C1 (council round 3): the default is 680px (prose stops at 36em inside it, council round 11 C5),
      so code, cards and prose read as one column. A width the user dragged (--dsh-chat-user-width) still wins. */
   --dsh-chat-content-width: var(--dsh-chat-user-width, 680px);
   --dsh-composer-card-max-width: var(--dsh-chat-content-width);

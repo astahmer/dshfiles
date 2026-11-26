@@ -14,10 +14,13 @@ describe('work rows in the transcript (DESIGN.md, layout: transcript measure)', 
     )
   })
 
-  it('stops prose at about 66ch, not the 34em that left it 200px short of the cards (round five C1)', () => {
+  it('stops prose at about 72 characters, 36em of the prose size, left-aligned in the 680px column (council round 11 C5)', () => {
+    // 66ch measured 86 characters a line in the round-10 capture; 36em (504px at 14px) holds about 72.
     const markdown = readFileSync(new URL('../src/native/chat/AssistantMarkdown.module.css', import.meta.url), 'utf8')
-    expect(markdown).toMatch(/> :where\(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, details\) \{\s*max-inline-size: 66ch;/u)
-    expect(markdown).not.toContain('max-inline-size: 34em')
+    expect(markdown).toMatch(/> :where\(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, details\) \{\s*max-inline-size: 36em;/u)
+    expect(markdown).not.toContain('max-inline-size: 66ch')
+    // Code, tables, cards and the composer keep the column: only those prose blocks take the measure.
+    expect(markdown).not.toMatch(/:where\([^)]*\b(?:pre|table)\b[^)]*\) \{\s*max-inline-size/u)
   })
 
   it('draws "Worked for" as wide as its label, never across the column', () => {
