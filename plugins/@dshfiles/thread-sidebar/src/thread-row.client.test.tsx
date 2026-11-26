@@ -489,7 +489,8 @@ describe('a subagent row under its parent', () => {
     const meta = first?.querySelector<HTMLElement>('[data-thread-child-meta]')
     expect(meta?.querySelector('[data-slot="route-model"]')?.textContent).toBe('gpt-6-luna')
     expect(meta?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
-    expect(meta?.querySelector('[data-thread-child-state]')?.textContent).toBe('threadSidebarStateWorking')
+    // Council round 18 B1.1: the working glyph says Working, so line 2 is the model alone.
+    expect(meta?.querySelector('[data-thread-child-state]')).toBeNull()
     expect(meta?.className).toContain('dshx:text-xs/4')
     expect(meta?.className).toContain('dshx:text-muted-foreground')
     // Line 2 starts under the title: the 16px glyph seat and line 1's 8px gap.
@@ -500,5 +501,34 @@ describe('a subagent row under its parent', () => {
     expect(second?.querySelector('[data-thread-child-meta]')).toBeNull()
     expect(second?.querySelector('[data-slot="route-model"]')).toBeNull()
     expect(second?.querySelector('[data-thread-child-head]')?.textContent).toContain('threadSidebarStateFailed')
+  })
+
+  it('drops line 2\'s state word where the glyph already says it, and keeps the words the glyph cannot (council round 18 B1.1)', async () => {
+    const statuses = ['working', 'idle', 'ready', 'done', 'needs-you', 'failed'] as const
+    const children = statuses.map((status, index) =>
+      rowSession({
+        id: SessionId(`child-${status}`),
+        parentId: SessionId('s1'),
+        origin: 'subagent',
+        projectionValues: {
+          threadSidebarModelRoute: 'dshx_fake_commandcode/gpt-6-luna',
+          subagent: { mode: 'continuable', label: status, seq: SessionSeq(index + 3) },
+        },
+      }),
+    )
+    const row = await renderRow({
+      childThreads: children,
+      childrenOpen: true,
+      allChildrenShown: true,
+      rowStyle: { ...rowProps().rowStyle, time: false, maxChildren: 10 },
+      childStatuses: new Map(children.map((child, index) => [child.id, rowStatus({ status: statuses[index] ?? 'idle' })])),
+    })
+    const words = Array.from(row.querySelectorAll<HTMLElement>('ul [data-thread-child-meta]')).map(
+      meta => meta.querySelector('[data-thread-child-state]')?.textContent ?? null,
+    )
+    expect(words).toEqual([null, null, null, null, 'threadSidebarStateNeedsYou', 'threadSidebarStateFailed'])
+    // Without a word, line 2 is the model alone: no dangling separator.
+    const working = row.querySelector<HTMLElement>('ul [data-thread-child-meta]')
+    expect(working?.textContent).toBe('gpt-6-luna')
   })
 })

@@ -854,13 +854,18 @@ const ChildThreadList = (props: {
   const renderChild = (child: SessionSummary): JSX.Element => {
     const childStatus = props.childStatuses?.get(child.id)
     const attentionLabel = childStatus === undefined ? props.attentionLabels.get(child.id) : undefined
-    // Line 2 names the model the subagent runs on (council round 17 B1.1), `[mark] gpt-6-luna · Working`, in the
+    // Line 2 names the model the subagent runs on (council round 17 B1.1), `[mark] gpt-6-luna` (a Needs-you or Failed child adds `· Needs you`), in the
     // attention meta's 12/16 secondary ink; its state word moves there from line 1. An unknown model draws no line 2.
+    // Council round 18 B1.1: the word stays only where the glyph cannot say it (Needs you, Failed); a Working, Idle, Ready
+    // or Done glyph already names its state, so line 2 gives the model the room.
     const route = SubagentRouteLabelModel.subagentRoute({
       route: child.projectionValues?.threadSidebarModelRoute,
       identity: child.projectionValues?.subagent,
     })
-    const stateWord = childStatus === undefined ? undefined : t(workStatusLabelKeys[childStatus.status])
+    const stateWord =
+      childStatus === undefined || (childStatus.status !== 'needs-you' && childStatus.status !== 'failed')
+        ? undefined
+        : t(workStatusLabelKeys[childStatus.status])
     const lineOneWord = route === undefined && childStatus !== undefined && (childStatus.status === 'needs-you' || childStatus.status === 'failed')
     return (
       <li key={child.id}>
