@@ -414,6 +414,11 @@ Round 25 findings, merged in `.cache/unslop-audit/r5/council/round-25-fixes.md`:
 lines with its task whole, one type size per role and task names leading in transcript subagent rows, bare model ids in
 AI accounts, the dock's last row height, one quiet Stop in Send's seat. If round 26 brings no increase, round seven
 stops.
+All lanes done: T `rwtqwuru` … `ooowvnrl` (a transcript subagent row stacks on a narrow pane and drops the kind
+prefix whenever it has a task; one 13 px size for title, model and outcome; task titles in primary ink at 500); A
+`tunqsqmv` (AI accounts shows the kit model name, the full id in tooltip and screen-reader text); C `klttnunn` …
+`yzonlszy` (one quiet Stop in Send's seat with an empty draft, every desktop dock row 33 px, Stop and Send touch areas
+apart). The capture adds 17c (the phone transcript group) and keeps rows off the phone top bar.
 
 ## Round four
 
