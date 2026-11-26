@@ -359,7 +359,7 @@ export const FeedView = (props: {
     const previous = visible[index - 1]
     const separator = previous === undefined || dayLabel(backlogSortTime(previous, props.sort), now) !== label
     return (
-      <div key={item.id}>
+      <div key={item.id} className={cn(FeedLook.startsTimeGroup(times, index, separator) && 'dshx:mt-2')}>
         {/* Start-aligned on the rows' glyph edge, the rule running after it (council round 5, D4). */}
         {separator ? (
           <div role="separator" className="dshx:my-2 dshx:flex dshx:items-center dshx:gap-3 dshx:px-2">

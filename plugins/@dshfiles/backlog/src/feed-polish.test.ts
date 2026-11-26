@@ -146,3 +146,14 @@ describe('Backlog page title mark (council round 7, D1)', () => {
     expect(page).toContain('markTone="work"')
   })
 })
+
+describe('Backlog feed time groups (council round 8, D2)', () => {
+  it('opens each new time group with 8 px more space; a day divider already opens its own', () => {
+    const times = ['1:07 AM', '1:07 AM', '1:08 AM', '1:08 AM', '1:09 AM']
+    expect([0, 1, 2, 3, 4].map(index => FeedLook.startsTimeGroup(times, index, index === 0))).toEqual([false, false, true, false, true])
+    // The first row after a day divider starts a group, but the divider's own margin is the gap.
+    expect(FeedLook.startsTimeGroup(times, 2, true)).toBe(false)
+    const view = read('feed-view.tsx')
+    expect(view).toContain("FeedLook.startsTimeGroup(times, index, separator) && 'dshx:mt-2'")
+  })
+})

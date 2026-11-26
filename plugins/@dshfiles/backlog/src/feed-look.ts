@@ -34,6 +34,13 @@ export class FeedLook {
   static readonly timeShownAbove = (times: readonly string[], index: number): boolean => index > 0 && times[index] === times[index - 1]
 
   /**
+   * Whether this row opens a new time group (a new printed time after an earlier group), which takes 8 px more space
+   * above it so groups read apart (council round 8, D2). A row under a day divider has the divider's margin instead.
+   */
+  static readonly startsTimeGroup = (times: readonly string[], index: number, afterDivider: boolean): boolean =>
+    index > 0 && !afterDivider && !FeedLook.timeShownAbove(times, index)
+
+  /**
    * The one tag a row shows beside its title: only when it is the row's single chip and short, so the row stays one
    * 44 px line. Several chips, or a long tag, keep the line under the title.
    */
