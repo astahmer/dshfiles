@@ -394,6 +394,13 @@ Round 23 findings, merged in `.cache/unslop-audit/r5/council/round-23-fixes.md`:
 transcript group, one failed-count treatment, "Live work · 6 working" on the desktop dock, nothing cut under it, the
 expanded phone dock fused to the composer with snap scrolling, child rows without an age, the failure notice naming its
 model, breadcrumb sizes, clearer "1 thread working" and "1 job · 1 subagent".
+All lanes done, in one line: S `ksxzqzzt` … `tkupspqp` (kit `WorkCountText` with one leading ✕ and failed ink, used on
+the header chip, the sidebar parent row and the child's Turn failed; no age on child rows; one breadcrumb size; "1 thread
+working"); T `vsrktxmy` … `rxusmtko` (group header on WorkCountText with no trailing glyph, live Working ring and clock
+on group rows, one title column, the failure notice naming its model through a `useChildRoute` hook on chat's
+run-folds contract, even notice spacing); D `uvwskmnp` … `qzzuqvso` ("Live work · N working" on the desktop dock,
+nothing under its edge, the open phone dock as the composer's top section with snap scrolling, "1 job · 1 subagent").
+Open: the failed child row's model still truncates ("claude-sonnet…") at the default sidebar width.
 
 ## Round four
 
