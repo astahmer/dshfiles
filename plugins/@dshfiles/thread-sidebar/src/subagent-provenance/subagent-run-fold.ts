@@ -1,5 +1,6 @@
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { RunFoldKind, RunFoldMemberState, RunFoldStatus } from '@dshfiles/chat/run-folds'
+import { plural } from '@dshfiles/dshx/client'
 import { BotIcon } from '@dshfiles/plugin-ui/icons'
 import { useMemo } from 'react'
 import { useSubagentFailedTurns } from './subagent-failed-turns.js'
@@ -16,12 +17,17 @@ const STATUS = {
   interrupted: 'stopped',
 } as const satisfies Record<SubagentPreviewState, RunFoldStatus>
 
+/** A call that never started is a problem, but no child failed: the group names it apart (council round 22, item 3). */
+const memberOf = (state: SubagentPreviewState): RunFoldMemberState =>
+  state === 'failed-to-start' ? { status: STATUS[state], notStarted: true } : { status: STATUS[state] }
+
 const SUBAGENT_TOOLS: ReadonlySet<string> = new Set(['subagent', 'subagent_fork'])
 const SEPARATOR = '\n'
 
 /**
- * Subagent delegations as a transcript fold kind (b:7rv2): Chat folds two or more consecutive rows into
- * "3 subagents · 2 working · 1 finished". A child waiting on the user (a pending question or approval) is Needs you and
+ * Subagent delegations as a transcript fold kind (b:7rv2): Chat folds two or more consecutive rows into one row that
+ * reads the one count formula over every call, "8 calls · 6 working · 1 failed · 1 didn't start" (council round 22,
+ * item 3). A child waiting on the user (a pending question or approval) is Needs you and
  * keeps its own row outside the fold. Reads the same Session status and list hooks as the row itself.
  */
 export const subagentRunFold = (input: { readonly t: SubagentPreviewTranslate; readonly count: (count: number) => string }): RunFoldKind => ({
@@ -82,12 +88,14 @@ export const subagentRunFold = (input: { readonly t: SubagentPreviewTranslate; r
           }),
         })
         // A child with no known status or closed turn yet settled as far as the fold can tell.
-        return { status: state === undefined ? 'done' : STATUS[state] }
+        return state === undefined ? { status: 'done' } : memberOf(state)
       })
     }, [key, live, turns, failed, phases])
   },
   useText: () => ({
     count: input.count,
+    calls: count => plural(input.t, 'subagentCountCalls', count),
+    notStarted: count => input.t('subagentCountNotStarted', { count }),
     active: subagentStateLabel(input.t, 'working').toLocaleLowerCase(),
     done: subagentStateLabel(input.t, 'finished').toLocaleLowerCase(),
   }),

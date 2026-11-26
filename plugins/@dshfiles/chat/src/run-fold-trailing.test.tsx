@@ -101,13 +101,13 @@ describe('a run beside a failed call kept outside "Worked for" (round 21 D6)', (
     kinds()
     for (const [key, value] of [['c2', 'stopped'], ['c5', 'stopped'], ['c6', 'done'], ['c7', 'failed']] as const) status.set(key, value)
     render(<Flow nodeStore={store([...inside, 'c7'], new Set(['c7']))} inside={inside} trailing={['c7']} />)
-    expect(summary()).toBe('7 subagents · 1 failed · 3 working · 1 finished · 2 stopped')
+    expect(summary()).toBe('7 subagents · 3 working · 1 failed · 2 stopped · 1 finished')
     // Collapsed: the summary and the failed call, which stays visible beside it.
     expect(rows()).toEqual(['c7'])
     const runKey = `session-1\nc1`
     act(() => RunFoldStore.setExpanded(runKey, true))
     expect(rows()).toEqual([...inside, 'c7'])
-    expect(summary()).toBe('7 subagents · 1 failed · 3 working · 1 finished · 2 stopped')
+    expect(summary()).toBe('7 subagents · 3 working · 1 failed · 2 stopped · 1 finished')
     fireEvent.click(screen.getByRole('button'))
     expect(rows()).toEqual(['c7'])
   })
@@ -118,7 +118,7 @@ describe('a run beside a failed call kept outside "Worked for" (round 21 D6)', (
     for (const key of failed) status.set(key, 'failed')
     render(<Flow nodeStore={store(['c1', ...failed], new Set(failed))} inside={['c1']} trailing={failed} />)
     // One summary for all seven; it read "6 subagents · 6 failed" beside a lone seventh row.
-    expect(summary()).toBe('7 subagents · 6 failed · 1 working')
+    expect(summary()).toBe('7 subagents · 1 working · 6 failed')
     expect(rows()).toEqual(failed)
   })
 })

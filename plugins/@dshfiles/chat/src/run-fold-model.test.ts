@@ -59,7 +59,7 @@ describe('RunFoldModel.partitionWithTrailing (round 21 D6)', () => {
     const { runs } = RunFoldModel.partitionWithTrailing(group, ['agent'], true)
     const members = runs[0]?.end ?? 0
     const states = [state('working'), state('stopped'), state('working'), state('working'), state('stopped'), state('done'), state('failed')].slice(0, members)
-    expect(text(RunFoldModel.summary([{ text: agent, states }], words))).toBe('7 subagents · 1 failed · 3 working · 1 finished · 2 stopped')
+    expect(text(RunFoldModel.summary([{ text: agent, states }], words))).toBe('7 subagents · 3 working · 1 failed · 2 stopped · 1 finished')
     // Collapsed, the failed member is the one row left beside the summary; open, every row shows. Either way the
     // summary's count is the rows it stands for.
     expect(RunFoldModel.memberHidden({ expanded: false, problem: true })).toBe(false)
@@ -105,8 +105,19 @@ describe('RunFoldModel.summary', () => {
 
   it('counts a failure in the failed tone and a waiting member in the needs-you tone', () => {
     const parts = RunFoldModel.summary([{ text: agent, states: [state('working'), state('needs-you'), state('failed')] }], words)
-    expect(text(parts)).toBe('3 subagents · 1 need you · 1 failed · 1 working')
-    expect(parts.map(part => part.tone)).toEqual(['plain', 'needs-you', 'failed', 'plain'])
+    expect(text(parts)).toBe('3 subagents · 1 working · 1 need you · 1 failed')
+    expect(parts.map(part => part.tone)).toEqual(['plain', 'plain', 'needs-you', 'failed'])
+  })
+
+  it("reads the one count formula, counting calls, with a call that never started apart (council round 22, item 3)", () => {
+    const calls: RunFoldText = { ...agent, calls: value => `${String(value)} calls`, notStarted: value => `${String(value)} didn't start` }
+    const states = [...Array.from({ length: 6 }, () => state('working')), state('failed'), { status: 'failed' as const, notStarted: true }]
+    const parts = RunFoldModel.summary([{ text: calls, states }], words)
+    expect(text(parts)).toBe("8 calls · 6 working · 1 failed · 1 didn't start")
+    expect(parts.map(part => part.tone)).toEqual(['plain', 'plain', 'failed', 'failed'])
+    expect(RunFoldModel.glyph(RunFoldModel.count(states.slice(7)))).toBe('failed')
+    // A kind without its own words counts the call that never started as failed.
+    expect(text(RunFoldModel.summary([{ text: agent, states }], words))).toBe('8 subagents · 6 working · 2 failed')
   })
 
   it('leads a mixed run with its totals when a member failed', () => {
@@ -121,7 +132,7 @@ describe('RunFoldModel.summary', () => {
   })
 
   it('reports stopped members', () => {
-    expect(text(RunFoldModel.summary([{ text: job, states: [state('stopped'), state('done')] }], words))).toBe('2 background jobs · 1 done · 1 stopped')
+    expect(text(RunFoldModel.summary([{ text: job, states: [state('stopped'), state('done')] }], words))).toBe('2 background jobs · 1 stopped · 1 done')
   })
 })
 
