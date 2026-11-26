@@ -8,7 +8,8 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronDownIcon, EllipsisIcon, MessagesSquareIcon, PinIcon, PinOffIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { OverflowGlyph } from '@dshfiles/plugin-ui/components/ui/overflow-glyph'
+import { ChevronDownIcon, MessagesSquareIcon, PinIcon, PinOffIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { ReactNode } from 'react'
 
@@ -95,7 +96,7 @@ export const BulkSelectionBar = (props: {
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger aria-label="More actions" className={cn(actionClass, shownWhenNarrow)}>
-          <EllipsisIcon aria-hidden className={iconClass} />
+          <OverflowGlyph />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="dshx-root">
           <DropdownMenuSub>
