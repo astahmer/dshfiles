@@ -46,6 +46,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 17 (round-16 shots) | **9** | **9** (Astra) | **9** (Fable, for Mistral) | **Target met.** Mistral's provider failed every request; the owner seated Claude Fable 5.2 for this round |
 | 18 (round-17 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | Round six, target 9.5; all seats pass the subagent model; shared: phone failed Inbox card, AI accounts column, secondary buttons |
 | 19 (round-18 shots) | 9 | **9.5** (Astra) | 9 (Fable, for Mistral) | No increase (first). Shared: the Inbox's folded brand overhang; Opus: sidebar content presses against the new brand hairline (regression) |
+| 20 (round-19 shots) | **9.5** | **9.5** (Astra) | **9.5** (Fable, for Mistral) | **Round six target met.** Mistral's provider failed every request this round; Fable held its seat |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -352,6 +353,15 @@ All lanes done: B 4 revisions `soukssur` … `qnkomyxy` (12 px under the brand h
 overhang as the open brand row, group chevrons as the row chevron on the time edge, the phone search 8 pt under the bar);
 C 3 `uyurvzlk` … `wyokynzx` (the dock's outer edge as the field edge, one phone card meta with a compact age, a 36 pt
 drawn pill with a 44 pt hit); D 1 `uzsuvosn` (quiet search-side ⋯, ghost header ⋯).
+
+Round 20: every deciding seat scored the round-19 set 9.5/10 (Opus 9.5, Astra 9.5, Claude Fable 9.5 in Mistral's seat; the
+Mistral provider failed every request from round 17 on). All three pass the owner's subagent-model request. Left for a
+later pass, named for 10: round dots render as superellipse squares on desktop Chrome (kit `rounded-full` needs
+`corner-shape: round`), the AI accounts ⌘K hint uses a raw `<kbd>`, a roomier phone thread top bar, the palette status
+mark on the title line, one phone chevron column, the Settings General title offset, the phone question card ⋯ centring,
+Backlog toolbar air above its hairline, two account menus side by side, Usage's share bar beside its table, a light
+palette scrim, a preview-tab cue that does not use ink. Restart when landing live: thread-sidebar's Host half (route
+projection version 2), plus earlier rounds' restarts.
 
 ## Round four
 
