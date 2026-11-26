@@ -75,8 +75,7 @@ interface RunFoldSeat {
 const OUTSIDE_RUN: RunFoldSeat = { inRun: false, runKey: undefined, size: 0 }
 
 /**
- * Whether the row sits in a transcript run fold ("8 calls · 6 working · …"), whose summary already names the kind, so
- * the row drops its "Subagent ·" prefix (council round 22, item 9), and which run. Chat inlines its own copy of the
+ * Whether the row sits in a transcript run fold ("8 calls · 6 working · …") and which run. Chat inlines its own copy of the
  * run-fold module, so no React context reaches this row; the seat's attributes are the contract, read before paint and
  * on every change.
  */
@@ -104,6 +103,20 @@ const useRunFoldSeat = (ref: RefObject<HTMLElement | null>): RunFoldSeat => {
 }
 
 /**
+ * On a narrow pane (a phone) the row stacks like the failed-run notice (council round 25, item 1): one line held the
+ * prefix, the title, a model kept at 45% and the outcome, and the title was cut mid-glyph ("Subagent · ("). The header
+ * wraps there, with no gap between its lines; line 1 is the mark and the task, truncating across the whole width.
+ */
+const STACK_ON_NARROW_PANE =
+  'dshx:@max-pane-narrow:[&>[data-disclosure-header]]:flex-wrap dshx:@max-pane-narrow:[&>[data-disclosure-header]]:gap-y-0!'
+/**
+ * The model and the outcome: inline items of the header on a wide pane (`contents`), on a narrow one line 2 at the
+ * title's x (16 px leading + 6 px gap), the whole model, then · and the outcome, as the notice's "model · Turn failed".
+ */
+const META_LINE =
+  'dshx:contents dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:basis-full dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:pl-[calc(22px+var(--dsh-content-font-delta,0px))]'
+
+/**
  * The word a failed row ends with, in failed ink after its model (council round 22, item 2): "Turn failed" for a child
  * whose turn failed, "Didn't start" for a call that never started one.
  */
@@ -114,7 +127,7 @@ const failureWordOf = (t: SubagentPreviewBindings['t'], state: ReturnType<typeof
 }
 
 /**
- * A delegation's record row in the transcript: `Subagent · {description}`, the same name as its dock row, then the model
+ * A delegation's record row in the transcript: its task (`Subagent` when the call names none), as its dock row, then the model
  * it runs on as the kit's mark and name, with no empty mark seat inline (council round 17 B1.1, round 22 item 8). The
  * outcome ends the row (council round 23, item 1): a working child leads with the list's Working ring and ends with its
  * live clock, as in the dock; a settled one ends `Done · 5m 02s` or `Stopped`, a failed one `Turn failed` after its ✕.
@@ -154,8 +167,9 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
   const task = args?.description?.trim() || catalogLabel?.trim() || undefined
   const rootRef = useRef<HTMLDivElement>(null)
   const runSeat = useRunFoldSeat(rootRef)
-  // In a run fold the summary names the kind; a row with no task keeps it, so it never reads empty.
-  const kind = runSeat.inRun && task !== undefined ? undefined : props.preview.t('subagentPreviewKind')
+  // The task names the row, as in the dock, in or out of a run fold (council round 25, item 1); a row with no task keeps
+  // the kind, so it never reads empty.
+  const kind = task !== undefined ? undefined : props.preview.t('subagentPreviewKind')
   const title = [kind, task].filter(part => part !== undefined).join(' · ')
   // In a run of three or more rows the titles share one column, so every model starts on one x, as in the dock.
   const titleColumn = useSubagentTitleColumn({ rootRef, runKey: runSeat.runKey, size: runSeat.size, title })
@@ -183,17 +197,22 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
     expandable,
     onToggle: disclosure.toggle,
     running: props.phase === 'preparing' || props.phase === 'start' || state === 'working',
+    className: STACK_ON_NARROW_PANE,
     // The shared column sizes the title area (leading 16 px + 6 px gap, then the title, then 6 px that, with the header's
     // 8 px gap and the glyphs' side bearings, leave 16 px of paper between the widest title and the model's mark: council
     // round 24, item 2, measured in the shot); a longer title truncates in it, and a narrow pane still shrinks the area.
-    // Without a column the row keeps its content width.
-    rowClassName: titleColumn === undefined ? undefined : 'dshx:w-[calc(var(--dshfiles-subagent-title-column)_+_28px_+_var(--dsh-content-font-delta,0px))]',
-    titleClassName: titleColumn === undefined ? undefined : 'dshx:min-w-0! dshx:shrink! dshx:truncate',
+    // Without a column the row keeps its content width; on a narrow pane the title line takes the whole width.
+    rowClassName:
+      titleColumn === undefined
+        ? undefined
+        : 'dshx:w-[calc(var(--dshfiles-subagent-title-column)_+_28px_+_var(--dsh-content-font-delta,0px))] dshx:@max-pane-narrow:w-auto',
+    // The title always truncates (council round 25, item 1): without a column it was cut mid-glyph by the row's edge.
+    titleClassName: 'dshx:min-w-0! dshx:shrink! dshx:truncate',
     // Beside the title, outside the running shimmer: 13/18 like the title, in the secondary ink over its tertiary; then
     // the outcome: the failure word in failed ink, the live clock or the settled ending in the tertiary ink.
     headerAccessory:
       route === undefined && failure === undefined && ending === '' && since === undefined ? undefined : (
-        <>
+        <span className={META_LINE} data-subagent-row-meta="">
           {route === undefined ? null : (
             // In a shared title column the names stack, so an unknown family keeps its empty mark seat and its name starts on
             // the others' x, as in the dock (council round 24, item 1); inline, a lone row draws no seat (round 22, item 8).
@@ -205,10 +224,16 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
               size="md"
               seat={titleColumn !== undefined}
               className={cn(
-                'dshx:max-w-[45%] dshx:shrink-0',
-                titleColumn !== undefined && 'dshx:w-36 dshx:@max-pane-narrow:w-auto dshx:@max-pane-narrow:shrink',
+                // On a narrow pane the model has line 2 to itself: whole, truncating only past the pane's edge.
+                'dshx:max-w-[45%] dshx:shrink-0 dshx:@max-pane-narrow:max-w-none dshx:@max-pane-narrow:shrink',
+                titleColumn !== undefined && 'dshx:w-36 dshx:@max-pane-narrow:w-auto',
               )}
             />
+          )}
+          {route === undefined || (failure === undefined && ending === '' && since === undefined) ? null : (
+            <span aria-hidden className="dshx:hidden dshx:@max-pane-narrow:inline" data-subagent-row-separator="">
+              ·
+            </span>
           )}
           {failure === undefined ? null : (
             <span className="dshx:shrink-0 dshx:whitespace-nowrap dshx:text-destructive" data-subagent-failure={state}>
@@ -223,7 +248,7 @@ export const SubagentProvenanceToolRow = (props: SubagentToolRowProps) => {
               {ending}
             </span>
           )}
-        </>
+        </span>
       ),
   }
 

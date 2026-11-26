@@ -19,6 +19,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
     headerAccessory,
     open,
     children,
+    className,
     rowClassName,
     titleClassName,
   }: {
@@ -28,10 +29,11 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
     headerAccessory?: ReactNode
     open: boolean
     children?: ReactNode
+    className?: string
     rowClassName?: string
     titleClassName?: string
   }) => (
-    <div>
+    <div data-testid="disclosure-root" className={className}>
       {/* The native row's shape: the leading box, then the text area whose content box holds the title first. */}
       <div data-disclosure-row="" className={rowClassName}>
         <span data-testid="leading">{icon}</span>
@@ -84,7 +86,7 @@ const props = ({
   provider: string
   model: string
   prompt?: string
-  description?: string
+  description?: string | undefined
   expanded?: boolean
 }): Props => ({
   phase: 'start',
@@ -155,8 +157,10 @@ const settled = (input: {
   readonly settledMs?: number
   /** Browser clock of the child's open turn's start (`subagentTiming.active.since`). */
   readonly since?: number
+  /** The task the call names; without it a call that started no child has no title but the kind. */
+  readonly description?: string
 }): Props => {
-  const base = props({ provider: 'openai', model: 'gpt-6.1-luna', expanded: input.expanded ?? false })
+  const base = props({ provider: 'openai', model: 'gpt-6.1-luna', expanded: input.expanded ?? false, description: input.description })
   if (base.phase !== 'start') throw new Error('fixture starts from the start phase')
   // SAFETY: the row reads only these fields of a settled block.
   const block = {
@@ -208,7 +212,33 @@ describe('SubagentProvenanceToolRow', () => {
   it('names the row by the task the parent gave, with no generated handle and no route', () => {
     // It read "Create subagent · Fern Puffin · Optimize traces plugin · openai/gpt-6.1-luna".
     render(<SubagentProvenanceToolRow {...props({ provider: 'openai', model: 'gpt-6.1-luna', description: '  Optimize traces plugin ' })} />)
-    expect(screen.getByText('subagentPreviewKind · Optimize traces plugin')).not.toBeNull()
+    expect(screen.getByText('Optimize traces plugin')).not.toBeNull()
+  })
+
+  it('stacks a call that never started on a narrow pane, its task over its whole model and outcome (council round 25, item 1)', () => {
+    // On a 390 px phone it read "✕ Subagent · (" + mark + "deepseek-v4-fla…  Didn't start": the prefix and a model kept at
+    // 45% left the untruncated title ~70 px, cut mid-glyph.
+    render(<SubagentProvenanceToolRow {...settled({ isError: true, description: 'Check refund rounding' })} />)
+    // A row with a task never carries the kind, in or out of a run fold.
+    expect(screen.getByTestId('row-title').textContent).toBe('Check refund rounding')
+    // With no shared title column the title still truncates, never clips.
+    expect(screen.getByTestId('row-title').className).toContain('dshx:truncate')
+    expect(screen.getByTestId('row-title').className).toContain('dshx:min-w-0!')
+    // Narrow pane: the header wraps, and the meta is its own line at the title's x: mark, the whole model, · the outcome.
+    const root = screen.getByTestId('disclosure-root').className
+    expect(root).toContain('dshx:@max-pane-narrow:[&>[data-disclosure-header]]:flex-wrap')
+    expect(root).toContain('dshx:@max-pane-narrow:[&>[data-disclosure-header]]:gap-y-0!')
+    const meta = screen.getByTestId('header-accessory').querySelector<HTMLElement>('[data-subagent-row-meta]')
+    expect(meta?.className).toContain('dshx:contents')
+    expect(meta?.className).toContain('dshx:@max-pane-narrow:basis-full')
+    expect(meta?.className).toContain('dshx:@max-pane-narrow:pl-[calc(22px+var(--dsh-content-font-delta,0px))]')
+    const model = meta?.querySelector<HTMLElement>('[data-slot="route-model"]')
+    expect(model?.textContent).toBe('gpt-6.1-luna')
+    expect(model?.className).toContain('dshx:@max-pane-narrow:max-w-none')
+    const separator = meta?.querySelector('[data-subagent-row-separator]')
+    expect(separator?.className).toContain('dshx:hidden')
+    expect(separator?.className).toContain('dshx:@max-pane-narrow:inline')
+    expect(separator?.nextElementSibling?.getAttribute('data-subagent-failure')).toBe('failed-to-start')
   })
 
   it('shows the model it runs on after the description: the kit mark and the name, never the provider (council round 17 B1.1)', () => {
@@ -218,7 +248,7 @@ describe('SubagentProvenanceToolRow', () => {
     expect(model?.getAttribute('data-model-family')).toBe('openai')
     expect(model?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
     // The title stays the task; the model is beside it, outside the running shimmer.
-    expect(screen.getByText('subagentPreviewKind · Optimize traces plugin')).not.toBeNull()
+    expect(screen.getByText('Optimize traces plugin')).not.toBeNull()
   })
 
   it('draws no empty mark seat inline for a model with no known family (council round 22, item 8)', () => {
@@ -309,18 +339,18 @@ describe('SubagentProvenanceToolRow', () => {
     expect(model?.getAttribute('data-model-family')).toBe('claude')
   })
 
-  it('drops the "Subagent ·" prefix inside a run fold, whose summary names the kind (council round 22, item 9)', async () => {
+  it('drops the "Subagent ·" prefix in and out of a run fold once the row has a task (council round 22, item 9; round 25, item 1)', async () => {
     const seat = document.createElement('div')
     seat.setAttribute('data-chat-flow-key', 'row-1')
     document.body.append(seat)
     try {
       render(<SubagentProvenanceToolRow {...settled({ running: true })} />, { container: seat })
-      expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+      expect(screen.getByTestId('row-title').textContent).toBe('Long child')
       expect(document.querySelector('[data-dshfiles-subagent-row]')).not.toBeNull()
       act(() => seat.setAttribute('data-run-fold-member', 'member'))
-      await waitFor(() => expect(screen.getByText('Long child')).not.toBeNull())
+      await waitFor(() => expect(screen.getByTestId('row-title').textContent).toBe('Long child'))
       act(() => seat.removeAttribute('data-run-fold-member'))
-      await waitFor(() => expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull())
+      await waitFor(() => expect(screen.getByTestId('row-title').textContent).toBe('Long child'))
     } finally {
       seat.remove()
     }
@@ -458,7 +488,7 @@ describe('SubagentProvenanceToolRow', () => {
 
   it('falls back to the catalog label when the call gave no description', () => {
     render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
-    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+    expect(screen.getByText('Long child')).not.toBeNull()
   })
 
   it('keeps the full prompt out of the collapsed preview', () => {
@@ -486,11 +516,11 @@ describe('SubagentProvenanceToolRow', () => {
     const { rerender } = render(<SubagentProvenanceToolRow {...settled({ running: true })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('working')
     // A working child says it with the row's spinner; the record row has no clock.
-    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+    expect(screen.getByText('Long child')).not.toBeNull()
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: true, settledMs: 302_400 })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('finished')
     // Council round 23, item 1: the outcome ends the row, after the model; the title stays the task.
-    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+    expect(screen.getByText('Long child')).not.toBeNull()
     expect(ending()).toBe('subagentPreviewFinished · 5m 02s')
     rerender(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('interrupted')
@@ -510,7 +540,7 @@ describe('SubagentProvenanceToolRow', () => {
     expect(clock?.getAttribute('role')).toBe('timer')
     expect(clock?.className).toContain('dshx:tabular-nums')
     // The clock ends the row, after the model.
-    expect(accessory.lastElementChild).toBe(clock)
+    expect(accessory.querySelector('[data-subagent-row-meta]')?.lastElementChild).toBe(clock)
     // The row prints its own time: tool-meta draws no call duration beside a card that carries this mark.
     expect(document.querySelector('[data-dshfiles-subagent-row]')?.getAttribute('data-tool-card-timing')).toBe('own')
   })
@@ -529,7 +559,7 @@ describe('SubagentProvenanceToolRow', () => {
     const { rerender } = render(<SubagentProvenanceToolRow {...settled({ lastTurnCompleted: false })} />)
     expect(previewRoot()?.getAttribute('data-state')).toBe('failed')
     // Council round 22, item 2: the red cross leads, the title is the task, "Turn failed" ends the row in failed ink.
-    expect(screen.getByText('subagentPreviewKind · Long child')).not.toBeNull()
+    expect(screen.getByText('Long child')).not.toBeNull()
     expect(screen.getByTestId('leading').querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('failed')
     const failure = screen.getByTestId('header-accessory').querySelector('[data-subagent-failure]')
     expect(failure?.textContent).toBe('threadSidebarFailed')
