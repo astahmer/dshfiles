@@ -113,3 +113,23 @@ describe('account page model curation', () => {
     expect(markup).toContain('High')
   })
 })
+
+describe('account rows lead with a provider glyph (council round 11, A1/D2)', () => {
+  it('marks the row glyph as leading, so the selected row draws no marker pill beside it', () => {
+    const markup = renderToStaticMarkup(
+      <TooltipProvider>
+        <AccountGroup
+          accounts={[account('first')]}
+          kind="codex"
+          onMove={noop}
+          onSelect={noop}
+          reorderingDisabled={false}
+          selectedId="first"
+          visibleIds={['first']}
+        />
+      </TooltipProvider>,
+    )
+    expect(markup).toContain('dshx:selected-marker')
+    expect(markup).toMatch(/<span aria-hidden="true" data-leading-glyph=""/u)
+  })
+})

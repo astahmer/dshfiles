@@ -1,3 +1,4 @@
+import { LEADING_GLYPH_ATTRIBUTE } from '@dshfiles/plugin-ui/components/selection'
 import { Field, FieldDescription, FieldLabel } from '@dshfiles/plugin-ui/components/ui/field'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ProviderGlyph as ProviderLogo } from './provider-glyph.js'
@@ -33,6 +34,8 @@ export const ActionHint = (props: { readonly label: string; readonly children: J
 export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; readonly large?: boolean; readonly list?: boolean }): JSX.Element => (
   <span
     aria-hidden
+    // A list row leads with this mark, so its selection shows no marker pill beside it (council round 11, A1).
+    {...(props.list === true ? LEADING_GLYPH_ATTRIBUTE : undefined)}
     className={cn(
       'dshx:grid dshx:shrink-0 dshx:place-items-center dshx:rounded-lg dshx:bg-foreground dshx:text-background dshx:shadow-sm',
       // A list row's mark is 28 px, the detail header's 32 (council round 5, D2).

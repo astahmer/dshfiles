@@ -195,7 +195,7 @@ describe('AI accounts page (council round 5, D2)', () => {
   })
 
   it('draws the list marks at 28 px; the detail header keeps 32', () => {
-    expect(markup).toMatch(/<span aria-hidden="true" class="[^"]*dshx:size-7[^"]*"/u)
+    expect(markup).toMatch(/<span aria-hidden="true"(?: data-leading-glyph="")? class="[^"]*dshx:size-7[^"]*"/u)
     expect(renderToStaticMarkup(<ProviderGlyph kind="commandcode" />)).toContain('dshx:size-8')
     expect(source('native-providers-list.tsx')).toContain('<NativeProviderMark label={provider.label} size="list" />')
   })
