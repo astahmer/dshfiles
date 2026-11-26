@@ -5,8 +5,6 @@ import { InboxView } from './inbox-view.js'
 const panel = readFileSync(new URL('./inbox-panel.tsx', import.meta.url), 'utf8')
 const row = panel.slice(panel.indexOf('const InboxRow = '), panel.indexOf('const InboxActionSheet = '))
 const meta = row.slice(row.indexOf('meta={'), row.indexOf('{item.occurrences > 1'))
-const phoneBar = readFileSync(new URL('./inbox-phone-bar.tsx', import.meta.url), 'utf8')
-const trailingBar = phoneBar.slice(phoneBar.indexOf('data-inbox-phone-bar="trailing"'))
 
 describe('one Inbox card structure (council round 8 C2)', () => {
   it('draws the verbs in the body right after the evidence, on every width, never in the head of a card with a body', () => {
@@ -70,15 +68,6 @@ describe('the phone Inbox card head (council round 8 C1)', () => {
     expect(meta).not.toContain('dshx:@max-pane-narrow:hidden')
     expect(InboxView.HEAD_TWO_LINES).toContain('dshx:@max-pane-narrow:[&_[data-inbox-project-name]]:hidden')
   })
-  // Council round 9 C1 superseded the one-line head (two lines, the full title): inbox-round9.test.ts.
-
-  it('draws Start triage as a 44x44 icon-only button, named by aria-label and tooltip, before the ⋯', () => {
-    const primary = trailingBar.slice(trailingBar.indexOf('<TooltipProvider>'), trailingBar.indexOf('</TooltipProvider>'))
-    expect(primary).toContain('size="icon"')
-    expect(primary).toContain('dshx:size-11')
-    expect(primary).toContain('aria-label={primary.label}')
-    expect(primary).toMatch(/<TooltipContent[^>]*>\s*\{primary\.label\}/u)
-    expect(primary).not.toMatch(/\{primary\.icon\}\s*\{primary\.label\}/u)
-    expect(trailingBar.indexOf('aria-label={value.moreLabel}')).toBeGreaterThan(trailingBar.indexOf('</TooltipProvider>'))
-  })
+  // Council round 9 superseded the one-line head (C1: two lines, the full title) and the icon-only Start triage in the
+  // top bar (C2: a worded Triage button on the view switcher's row): inbox-round9.test.ts.
 })

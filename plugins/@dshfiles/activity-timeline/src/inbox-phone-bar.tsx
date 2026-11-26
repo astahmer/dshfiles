@@ -11,16 +11,16 @@ import { PhoneStatus } from '@dshfiles/frame-layout/status-strip'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogPortal } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import type { PageAction } from '@dshfiles/plugin-ui/components/page'
 import { EllipsisIcon } from '@dshfiles/plugin-ui/icons'
 import { useEffect, useId, useSyncExternalStore } from 'react'
 import { InboxView } from './inbox-view.js'
 
 export interface InboxPhoneActions {
-  /** The page's one ink button (Start triage, or Resume all). */
-  readonly primary: PageAction | undefined
-  /** Every other header action; they fold into one menu. */
+  /**
+   * The page's header actions, folded into one menu: the top bar keeps its title and ⋯ (council round 9 C2; Triage is a
+   * worded button on the view switcher's row).
+   */
   readonly actions: readonly PageAction[]
   readonly moreLabel: string
 }
@@ -64,11 +64,10 @@ export const usePublishInboxPhoneActions = (value: InboxPhoneActions): void => {
 export const InboxPhoneBar = (): JSX.Element | null => {
   const value = useSyncExternalStore(InboxPhoneActionsStore.subscribe, InboxPhoneActionsStore.read, () => undefined)
   // Round five C2: the frame's status button (usage, working threads); no band above the tab bar. Round five C4 (council
-  // round 5): it takes the bar's leading seat, left of the centred title, so the trailing corner (Start triage, ⋯) never
+  // round 5): it takes the bar's leading seat, left of the centred title, so the trailing corner (its ⋯) never
   // runs over "Inbox" at 390 px.
   const status = useContract(PhoneStatus)
-  if (value === undefined || (value.primary === undefined && value.actions.length === 0 && status.status !== 'active')) return null
-  const primary = value.primary
+  if (value === undefined || (value.actions.length === 0 && status.status !== 'active')) return null
   // A dialog root with no content is only a portal: no focus trap, no scroll lock, nothing hidden from assistive tech.
   return (
     <Dialog open modal={false}>
@@ -79,44 +78,6 @@ export const InboxPhoneBar = (): JSX.Element | null => {
           </div>
         ) : null}
         <div data-inbox-phone-bar="trailing" className={InboxView.PHONE_BAR}>
-          {/* Council round 8 C1: Start triage (or Resume all) is a 44x44 icon-only button named by its aria-label and
-              tooltip, before the page menu on the trailing edge, as on every other top bar; a worded button ran into the
-              centred "Inbox" title. An action without a glyph keeps its words. */}
-          {primary === undefined ? null : primary.icon === undefined ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              className="dshx-hit-44 dshx:h-9"
-              data-page-action={primary.id}
-              disabled={primary.disabled === true || primary.pending === true}
-              onClick={primary.onSelect}
-            >
-              {primary.label}
-            </Button>
-          ) : (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    size="icon"
-                    variant="ghost"
-                    className="dshx:size-11 dshx:text-foreground dshx:[&_svg]:size-5!"
-                    data-page-action={primary.id}
-                    aria-label={primary.label}
-                    disabled={primary.disabled === true || primary.pending === true}
-                    onClick={primary.onSelect}
-                  >
-                    {primary.icon}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="dshx-root">
-                  {primary.label}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          )}
           {value.actions.length === 0 ? null : (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

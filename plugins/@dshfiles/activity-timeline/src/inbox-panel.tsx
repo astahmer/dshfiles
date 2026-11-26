@@ -1365,11 +1365,11 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
   const headerActions = InboxView.pageActions({ triagePrimary: triageOnTop, alertSettings: InboxAlerts.available(), triageable }).map(action =>
     action.id === 'triage' ? triageAction : { ...alertSettingsAction, placement: action.placement },
   )
-  // On a phone these actions sit in the shell's top bar (inbox-phone-bar.tsx), not in a row of their own; triage
-  // draws its own bar, so the top bar holds none then.
-  usePublishInboxPhoneActions(
-    triaging ? { primary: undefined, actions: [], moreLabel: t('more') } : { primary: primaryAction, actions: headerActions, moreLabel: t('more') },
-  )
+  // On a phone the top bar keeps its title and ⋯ (inbox-phone-bar.tsx): Resume all and the other actions fold into the
+  // ⋯, and Triage is a worded button on the view switcher's row (council round 9 C2); triage draws its own bar, so the
+  // top bar holds none then.
+  const phoneActions = [...(resumeAllAction === null ? [] : [resumeAllAction]), ...headerActions.filter(action => action.id !== 'triage')]
+  usePublishInboxPhoneActions({ actions: triaging ? [] : phoneActions, moreLabel: t('more') })
   if (triaging) {
     const progress = TriageModel.progress(triage.context)
     return (
@@ -1458,6 +1458,9 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         'dshx:in-data-shell-phone-nav:[&_[data-slot=page-header]]:hidden',
         // Council round 7 C2: 8px, not 12, above the segmented control and under it, so the failed card clears the tab bar.
         'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]]:pt-2 dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:gap-2',
+        // Council round 9 C2: the tabs root frames the phone's Triage button on the switcher's row; the strip keeps clear of it.
+        'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:relative',
+        triageable && 'dshx:in-data-shell-phone-nav:[&_[data-slot=page-tab-strip]]:pr-20',
       )}
       // The kit's list lane (920px): header and list share one container, so Start triage ends on the list's edge.
       width="lane"
@@ -1471,6 +1474,11 @@ export const InboxPanel = (props: Navigation & { readonly t: InboxTranslate }): 
         items: visibleTabs.map(tab => ({ value: tab.view, label: tab.label, ...(tab.count > 0 && { count: tab.count }) })),
       }}
     >
+      {triageable ? (
+        <Button type="button" variant="ghost" onClick={() => void startTriage()} className={InboxView.PHONE_TRIAGE} data-inbox-phone-triage="">
+          {t('triage')}
+        </Button>
+      ) : null}
       {notice === null ? null : (
         <Alert variant={notice.tone === 'error' ? 'destructive' : 'default'} role={notice.tone === 'error' ? 'alert' : 'status'}>
           <AlertDescription>{notice.text}</AlertDescription>

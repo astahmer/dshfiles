@@ -35,18 +35,11 @@ const phoneBar = readFileSync(new URL('./inbox-phone-bar.tsx', import.meta.url),
 const trailingBar = phoneBar.slice(phoneBar.indexOf('data-inbox-phone-bar="trailing"'))
 
 describe('the phone Inbox (council round 7 C2)', () => {
-  it('ends the top bar with the page menu: Start triage first, then the ⋯ on the trailing edge', () => {
-    expect(trailingBar.indexOf('data-page-action={primary.id}')).toBeGreaterThan(-1)
-    expect(trailingBar.indexOf('aria-label={value.moreLabel}')).toBeGreaterThan(trailingBar.indexOf('data-page-action={primary.id}'))
-  })
-
-  it('draws Start triage as a quiet button, not the ink primary (an icon since council round 8 C1)', () => {
-    const primary = trailingBar.slice(trailingBar.indexOf('{primary === undefined ? null'), trailingBar.indexOf('</TooltipProvider>'))
-    expect(primary).toContain('variant="ghost"')
-    expect(primary).not.toContain('variant="default"')
+  // Council round 9 C2 moved Start triage out of the top bar to a worded Triage button (inbox-round9.test.ts).
+  it('keeps the top bar to its menu, a 36px ⋯', () => {
     const menu = trailingBar.slice(trailingBar.indexOf('<DropdownMenuTrigger'), trailingBar.indexOf('aria-label={value.moreLabel}'))
     expect(menu).toContain('dshx:size-9')
-    expect(menu).not.toContain('dshx:size-11')
+    expect(trailingBar).not.toContain('primary')
   })
 
   it('takes 8px, not 12, from the non-interactive gaps on a phone: page top, tabs to list, body to verb, card end', () => {

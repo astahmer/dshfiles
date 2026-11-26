@@ -5,6 +5,7 @@ import { InboxView } from './inbox-view.js'
 const panel = readFileSync(new URL('./inbox-panel.tsx', import.meta.url), 'utf8')
 const row = panel.slice(panel.indexOf('const InboxRow = '), panel.indexOf('const InboxActionSheet = '))
 const verbs = row.slice(row.indexOf('const verbButtons = '), row.indexOf('const headVerbs = '))
+const list = panel.slice(panel.indexOf('const triageable = '))
 
 describe('the phone Inbox head (council round 9 C1)', () => {
   it('gives every card the same two-line head: glyph · full title · seat, then mark · kind · age at 13/400', () => {
@@ -66,5 +67,20 @@ describe('the Failed card (council round 9 C3)', () => {
     expect(verbs).toContain('aria-label={openLabel}')
     expect(verbs).toContain('{shortLabel ?? openLabel}')
     expect(verbs).not.toContain('dshx:@max-pane-narrow:inline')
+  })
+})
+
+describe('the phone Triage button (council round 9 C2)', () => {
+  it('is a worded 44px button at the trailing end of the view switcher, never in the top bar', () => {
+    expect(InboxView.PHONE_TRIAGE).toContain('dshx:hidden')
+    expect(InboxView.PHONE_TRIAGE).toContain('dshx:in-data-shell-phone-nav:inline-flex')
+    expect(InboxView.PHONE_TRIAGE).toContain('dshx:absolute dshx:top-0 dshx:right-0')
+    expect(InboxView.PHONE_TRIAGE).toContain('dshx:h-11')
+    expect(list).toMatch(/data-inbox-phone-triage=""[^>]*>\s*\{t\('triage'\)\}/u)
+    // The switcher row holds it: the tabs root is its frame, and the strip keeps clear of it.
+    expect(list).toContain("'dshx:in-data-shell-phone-nav:[&>[data-slot=page-container]>[data-slot=tabs]]:relative'")
+    // The top bar keeps its title and ⋯: Triage never reaches it, and it has no primary seat.
+    expect(list).toContain("headerActions.filter(action => action.id !== 'triage')")
+    expect(list).toContain("usePublishInboxPhoneActions({ actions: triaging ? [] : phoneActions, moreLabel: t('more') })")
   })
 })

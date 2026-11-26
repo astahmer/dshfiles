@@ -297,6 +297,13 @@ const PHONE_BAR =
  * The bar's leading seat (round five C4, council round 5): the frame's status button sits left of the centred "Inbox"
  * title, so the trailing corner holds only the menu and Start triage and never runs over the title at 390 px.
  */
+/**
+ * Start triage on a phone (council round 9 C2): a worded 44px "Triage" button at the trailing end of the view switcher's
+ * row, not an icon in the top bar. The page's tabs root is its frame (`relative`), so it sits on the switcher's row.
+ */
+const PHONE_TRIAGE =
+  'dshx:hidden dshx:in-data-shell-phone-nav:inline-flex dshx:absolute dshx:top-0 dshx:right-0 dshx:h-11 dshx:px-3 dshx:font-medium dshx:text-foreground'
+
 const PHONE_BAR_LEADING =
   'dshx-root dshx:fixed dshx:top-[calc(var(--dsh-phone-top-height,44px)-44px)] dshx:left-[max(12px,env(safe-area-inset-left,0px))] dshx:z-[42] dshx:hidden dshx:h-11 dshx:translate-y-[var(--dsh-visual-offset-top,0px)] dshx:items-center dshx:[html:has([data-phone-top-bar][data-phone-stage=attention-inbox])_&]:flex'
 
@@ -464,6 +471,7 @@ export class InboxView {
   static readonly titleCounts = titleCounts
   static readonly PHONE_BAR = PHONE_BAR
   static readonly PHONE_BAR_LEADING = PHONE_BAR_LEADING
+  static readonly PHONE_TRIAGE = PHONE_TRIAGE
   static readonly bodyReason = bodyReason
   static readonly clampsText = clampsText
   static readonly relativeAge = relativeAge
