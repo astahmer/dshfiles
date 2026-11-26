@@ -7,6 +7,7 @@
  */
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { FileDiffIcon, InboxIcon, PlayIcon } from '@dshfiles/plugin-ui/icons'
+import { StatusCount } from '@dshfiles/plugin-ui/components/work-status'
 import { useMemo } from 'react'
 import { useInboxThreadSignals } from './inbox-signals.js'
 import { formatAge } from './relative-age.js'
@@ -100,9 +101,10 @@ export interface HeroSuggestionActions {
   readonly openInbox: () => void
 }
 
-// Flat cards on a hairline (the composer stays the only elevated object); 48pt rows on touch.
+// Flat cards on a hairline (the composer stays the only elevated object); 48pt rows on touch. The 16px rule reaches the
+// card's own icon only, so a StatusCount badge keeps its small glyph.
 const CARD =
-  'dshx-root dshx:inline-flex dshx:h-9 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-12 dshx:pointer-coarse:text-base dshx:[&_svg]:size-4 dshx:[&_svg]:flex-none'
+  'dshx-root dshx:inline-flex dshx:h-9 dshx:min-w-0 dshx:max-w-full dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:bg-transparent dshx:px-3 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:transition-colors dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-12 dshx:pointer-coarse:text-base dshx:[&>svg]:size-4 dshx:[&>svg]:flex-none'
 
 /** The cards for one hero; nothing when no card has real data. */
 export const HeroSuggestionCards = (props: {
@@ -112,8 +114,8 @@ export const HeroSuggestionCards = (props: {
   readonly now: () => number
 }): JSX.Element | null => {
   const sessions = props.useSessions(state => state)
-  const inbox = useInboxThreadSignals({ enabled: true })
-  const suggestions = useMemo(() => pick(rowsOf(sessions, inbox.signals), props.heroSessionId), [sessions, inbox.signals, props.heroSessionId])
+  const signals = useInboxThreadSignals({ enabled: true })
+  const suggestions = useMemo(() => pick(rowsOf(sessions, signals.signals), props.heroSessionId), [sessions, signals.signals, props.heroSessionId])
   const cards: JSX.Element[] = []
   if (suggestions.resume !== undefined) {
     const resume = suggestions.resume
@@ -150,14 +152,16 @@ export const HeroSuggestionCards = (props: {
       </button>,
     )
   }
-  const inboxText = inboxLabel(suggestions.inbox)
+  // The Inbox chip counts with the list's StatusCount badges (◆ 2 ✕ 1, council round 12 C4); the sentence is its name.
+  const inbox = suggestions.inbox
+  const inboxText = inboxLabel(inbox)
   if (inboxText !== undefined) {
     cards.push(
-      <button key="inbox" type="button" className={CARD} data-hero-card="inbox" onClick={props.actions.openInbox}>
+      <button key="inbox" type="button" className={CARD} data-hero-card="inbox" aria-label={`Inbox, ${inboxText}`} onClick={props.actions.openInbox}>
         <InboxIcon aria-hidden="true" />
         <span className="dshx:font-medium dshx:text-foreground">Inbox</span>
-        <span aria-hidden="true">·</span>
-        <span className="dshx:flex-none dshx:tabular-nums">{inboxText}</span>
+        <StatusCount status="needs-you" count={inbox.waiting} label={`${String(inbox.waiting)} waiting on you`} />
+        <StatusCount status="failed" count={inbox.failed} label={`${String(inbox.failed)} failed`} />
       </button>,
     )
   }
