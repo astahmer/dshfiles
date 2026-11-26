@@ -42,7 +42,8 @@ describe('an Inbox card (round five C3, council round 4)', () => {
   })
 
   it('titles a card at the contextual heading step, 15/20 at 600', () => {
-    expect(InboxView.TITLE).toBe('dshx:text-heading')
+    // Council round 18 C1: two lines at most on a phone (inbox-round18.test.ts).
+    expect(InboxView.TITLE).toBe('dshx:text-heading dshx:@max-pane-narrow:line-clamp-2')
     expect(row).toMatch(/heading=\{<span className=\{InboxView\.TITLE\}>\{title\}<\/span>\}/u)
   })
 

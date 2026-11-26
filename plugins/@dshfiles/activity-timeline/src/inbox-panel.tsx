@@ -268,14 +268,19 @@ const InboxRow = (props: {
       ? null
       : (ThreadReferences.threadIdIn(item.reason) ?? (item.detail === null ? null : ThreadReferences.threadIdIn(item.detail)))
   /**
-   * The card's verbs: on a desktop in the head's trailing slot before the menu (council round 11 C2), on a touch screen
-   * in the body right after the evidence they act on (council round 8 C2); a bodyless Failed card keeps its one verb in
-   * the head, under its short name (council round 9 C3: "Review", named "Review thread"). A question's answers stay
-   * under it. The head holds glyph · title · project · kind · time, the verb and the menu.
+   * The card's verbs: in the head's trailing slot before the menu (council round 11 C2), under their short name (council
+   * round 9 C3: "Review", named "Review thread"); on a touch screen too when the card has one verb (council round 18
+   * C1: approval and failed alike). Several verbs on a touch screen sit in the body after the evidence they act on
+   * (council round 8 C2). A question's answers stay under it. The head holds glyph · title · project · kind · time,
+   * the verb and the menu.
    */
-  const hasVerbs =
-    (open && PROVIDER_VERBS.some(verb => item.verbs.includes(verb))) || (open && props.onReview !== undefined) || (openable && !answerable) || undo !== null
-  const footed = InboxView.footsVerbs(compact, phone)
+  const verbCount =
+    (open ? PROVIDER_VERBS.filter(verb => item.verbs.includes(verb)).length : 0) +
+    (open && props.onReview !== undefined ? 1 : 0) +
+    (openable && !answerable ? 1 : 0) +
+    (undo === null ? 0 : 1)
+  const hasVerbs = verbCount > 0
+  const footed = InboxView.footsVerbs({ compact, coarse: phone, verbs: verbCount, answers: answerable })
   const hasMenu = doneable || snoozable || quickReplies.length > 0 || mutable
   const verbButtons = (place: 'head' | 'body'): JSX.Element => {
     const size = place === 'head' ? cn('dshx:shrink', InboxView.HEAD_VERB) : InboxView.BODY_VERB
@@ -357,7 +362,7 @@ const InboxRow = (props: {
     )
   }
   const headVerbs = (
-        <div data-inbox-row-actions="band" className={cn(InboxView.HEAD_SEAT, phone && !footed && InboxView.HEAD_SEAT_VERB)}>
+        <div data-inbox-row-actions="band" className={cn(InboxView.HEAD_SEAT, phone && !footed && hasVerbs && InboxView.HEAD_SEAT_VERB)}>
           {footed ? null : verbButtons('head')}
           {/* Utility verbs live in the card's menu (round five P2): the row shows the one verb it asks for. */}
           {hasMenu ? (

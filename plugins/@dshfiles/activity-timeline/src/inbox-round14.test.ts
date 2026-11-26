@@ -20,8 +20,9 @@ describe('the phone failed card\'s Review (council round 14 C2)', () => {
     const seat = cn(InboxView.HEAD_SEAT, InboxView.HEAD_SEAT_VERB)
     expect(seat).toContain('dshx:@max-pane-narrow:-my-0.5!')
     expect(seat).not.toContain('dshx:@max-pane-narrow:-my-2!')
-    // Only a touch screen's head that holds a verb (a bodyless failed card): a ⋯ alone stays level with the title.
-    expect(panel).toContain('className={cn(InboxView.HEAD_SEAT, phone && !footed && InboxView.HEAD_SEAT_VERB)}')
+    // Only a touch screen's head that holds a verb (a failed or, since council round 18 C1, an approval card): a ⋯ alone
+    // stays level with the title.
+    expect(panel).toContain('className={cn(InboxView.HEAD_SEAT, phone && !footed && hasVerbs && InboxView.HEAD_SEAT_VERB)}')
   })
 })
 

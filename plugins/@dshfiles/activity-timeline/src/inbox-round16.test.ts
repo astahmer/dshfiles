@@ -71,6 +71,6 @@ describe('Inbox card bodies on the kit evidence well (council round 16 C3)', () 
     expect(locales).not.toContain('failedOnError')
     // A failed card without a body stays one compact row with its Review in the head.
     expect(InboxView.compact('failed', { reason: null, detail: null })).toBe(true)
-    expect(InboxView.footsVerbs(true, true)).toBe(false)
+    expect(InboxView.footsVerbs({ compact: true, coarse: true, verbs: 1, answers: false })).toBe(false)
   })
 })

@@ -42,14 +42,15 @@ describe('the phone approval card (council round 11 C1)', () => {
 })
 
 describe('the desktop Inbox card (council round 11 C2)', () => {
-  it("puts every card's verb in the head's trailing slot on a desktop; a touch screen keeps a body's verb under its evidence", () => {
+  it("puts every card's verb in the head's trailing slot on a desktop; a touch screen foots only several verbs", () => {
     // Approval (a body with a command) and failed (a body or none): head on a fine pointer.
-    expect(InboxView.footsVerbs(false, false)).toBe(false)
-    expect(InboxView.footsVerbs(true, false)).toBe(false)
-    // A phone keeps the verb under the evidence, and a bodyless failure in the head.
-    expect(InboxView.footsVerbs(false, true)).toBe(true)
-    expect(InboxView.footsVerbs(true, true)).toBe(false)
-    expect(panel).toContain('const footed = InboxView.footsVerbs(compact, phone)')
+    const card = { compact: false, coarse: false, verbs: 1, answers: false }
+    expect(InboxView.footsVerbs(card)).toBe(false)
+    expect(InboxView.footsVerbs({ ...card, compact: true })).toBe(false)
+    // Council round 18 C1: a phone seats one verb in the head too; several stay under the evidence.
+    expect(InboxView.footsVerbs({ ...card, coarse: true })).toBe(false)
+    expect(InboxView.footsVerbs({ ...card, coarse: true, verbs: 2 })).toBe(true)
+    expect(panel).toContain('const footed = InboxView.footsVerbs({ compact, coarse: phone, verbs: verbCount, answers: answerable })')
     // Answers stay under their question: the answers row draws body verbs only when the card foots them.
     expect(panel).toContain("{footed && hasVerbs && props.actionRow !== false ? verbButtons('body') : null}")
   })

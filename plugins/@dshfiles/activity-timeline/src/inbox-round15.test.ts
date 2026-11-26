@@ -66,6 +66,6 @@ describe('the failed card\'s reason well (council round 15 C2)', () => {
   it('keeps the card compact, so a phone keeps its 46pt head Review (the 390×664 fold has no room for a footer)', () => {
     expect(panel).toMatch(/failure === null\s*\?\s*InboxView\.cardText\([^]*?: \{ reason: null, detail: null, command: false \}/u)
     expect(InboxView.compact('failed', { reason: null, detail: null })).toBe(true)
-    expect(InboxView.footsVerbs(true, true)).toBe(false)
+    expect(InboxView.footsVerbs({ compact: true, coarse: true, verbs: 1, answers: false })).toBe(false)
   })
 })

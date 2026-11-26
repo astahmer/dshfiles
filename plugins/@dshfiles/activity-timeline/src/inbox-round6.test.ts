@@ -16,8 +16,9 @@ describe('a phone Inbox card (round six C1)', () => {
     expect(InboxView.HEAD_SEAT).toContain('dshx:@max-pane-narrow:-my-2!')
   })
 
-  it('moves the verb of a card with a body to a full-width button at the bottom of the body (44pt since council round 16 C2)', () => {
-    expect(InboxView.footsVerbs(false, true)).toBe(true)
+  // Council round 18 C1: only a card with several verbs foots them on a phone; one verb sits in the head (inbox-round18.test.ts).
+  it('moves the verbs of a card with several to full-width buttons at the bottom of the body (44pt since council round 16 C2)', () => {
+    expect(InboxView.footsVerbs({ compact: false, coarse: true, verbs: 2, answers: false })).toBe(true)
     // Council round 8 C2: the verbs follow the evidence in the body on every width, full-width under it on a phone.
     expect(InboxView.BODY_VERBS).toContain('dshx:@max-pane-narrow:flex-col')
     expect(InboxView.FOOT_VERB).toContain('dshx:@max-pane-narrow:w-full')
@@ -28,7 +29,7 @@ describe('a phone Inbox card (round six C1)', () => {
   })
 
   it('keeps a bodyless Failed card one row, its verb shortened and its full name kept for assistive tech', () => {
-    expect(InboxView.footsVerbs(true, true)).toBe(false)
+    expect(InboxView.footsVerbs({ compact: true, coarse: true, verbs: 1, answers: false })).toBe(false)
     expect(InboxView.shortOpenLabelKey('review')).toBe('review')
     expect(InboxView.shortOpenLabelKey('approval')).toBe('review')
     expect(InboxView.shortOpenLabelKey('thread')).toBe('open')

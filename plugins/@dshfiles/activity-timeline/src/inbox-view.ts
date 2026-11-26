@@ -198,19 +198,31 @@ const HEAD_SEAT =
   'dshx:-my-1 dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-end dshx:gap-1 dshx:pointer-coarse:my-0 dshx:@max-pane-narrow:-my-2!'
 
 /**
- * A touch screen's seat that holds a verb (a bodyless Failed card's 44pt Review, council round 14 C2): 2px into the
- * head's 6px padding, not 8, so the pill sits 4px inside the 52px band, centred on both head lines; its 40px outer
- * height keeps the head (and the card's clearance above a phone's tab bar) unchanged.
+ * A touch screen's seat that holds a verb (a Failed or approval card's 44pt Review, council round 14 C2, round 18 C1):
+ * 2px into the head's 6px padding, not 8, so the pill sits 4px inside the 52px band, centred on both head lines; its
+ * 40px outer height keeps the head (and the card's clearance above a phone's tab bar) unchanged.
  */
 const HEAD_SEAT_VERB = 'dshx:@max-pane-narrow:-my-0.5!'
 
 /**
  * Where a card's verbs sit. Council round 11 C2: with a fine pointer (a desktop) every card's primary verb is in its
  * head's trailing slot, 12px before ⋯ (MENU_AFTER_VERB), approval and failed alike, so Review is always in one place;
- * a question's answers stay under it. A touch screen keeps a body's verb under its evidence, in the thumb's reach; a
- * bodyless (compact) Failed card keeps it in its head everywhere.
+ * a question's answers stay under it. Council round 18 C1: a touch screen does the same for every card with one verb
+ * (an approval's Review, a failed turn's Review), its 44pt pill in the head beside ⋯, so the approval and failed cards
+ * share one action pattern and the phone's 390×664 fold reaches the failed card (a footer Review cost 52pt). Only a
+ * card with several verbs foots them under its evidence, and a question keeps its answers (and any verb after them) in
+ * its body.
  */
-const footsVerbs = (compactCard: boolean, coarse: boolean): boolean => !compactCard && coarse
+const footsVerbs = (card: {
+  /** A bodyless (compact) card: always one head row. */
+  readonly compact: boolean
+  /** A touch screen. */
+  readonly coarse: boolean
+  /** How many verbs the card offers besides its answers. */
+  readonly verbs: number
+  /** The card asks a question it can answer in place. */
+  readonly answers: boolean
+}): boolean => card.coarse && !card.compact && (card.answers || card.verbs > 1)
 
 /** The card menu's trigger after a head verb: 8px on the seat's 4px gap, 12px; a compact pane's 44pt seats meet. */
 const MENU_AFTER_VERB = 'dshx:not-first:ml-2 dshx:@max-pane-narrow:ml-0!'
@@ -235,7 +247,8 @@ const BODY_VERB = `dshx:shrink dshx:h-7 dshx:pointer-coarse:h-11 ${FOOT_VERB}`
 
 /**
  * That verb's 10px inset on a compact pane (a touch screen gives chips 16px) and no gap before the ghost ⋯, so a title
- * of about 177px ("Upgrade the router to v8") keeps one line at 390px.
+ * of about 177px ("Upgrade the router to v8", "Publish preview build") keeps one line at 390px; a longer one wraps
+ * beside the pill (council round 18 C1: the pill never moves to a footer).
  */
 const SHORT_VERB = 'dshx:@max-pane-narrow:px-2.5!'
 
@@ -277,8 +290,11 @@ const COMMAND_WORD_MAX = 40
 const commandWords = (command: string): readonly { readonly text: string; readonly keep: boolean }[] =>
   command.split(' ').map(text => ({ text, keep: text.length <= COMMAND_WORD_MAX }))
 
-/** A card's title at the kit's contextual heading step, 15/20 at 600 (council round 4, A4/C3). */
-const TITLE = 'dshx:text-heading'
+/**
+ * A card's title at the kit's contextual heading step, 15/20 at 600 (council round 4, A4/C3). Council round 18 C1: on a
+ * phone a title too long to share the head with its Review pill wraps to two lines at most.
+ */
+const TITLE = 'dshx:text-heading dshx:@max-pane-narrow:line-clamp-2'
 
 /**
  * Council round 16 C3: a card body that quotes something (an approval's command, a failed turn's provider line) puts it
