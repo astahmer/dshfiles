@@ -10,6 +10,8 @@ import { DetailHeader } from './detail-header.js'
 import { ModelCuration } from './model-curation.js'
 import { ProviderGlyph } from './panel-primitives.js'
 import { AccountGroup } from './account-group.js'
+import { AccountsToolbar } from './accounts-toolbar.js'
+import { DISTRIBUTIONS } from './account-labels.js'
 import { AccountConnection } from './account-connection-status.js'
 import { formatClockTime } from '@dshfiles/plugin-ui/lib/format-clock-time'
 
@@ -225,6 +227,28 @@ describe('AI accounts page (council round 5, D2)', () => {
     expect(panel).toMatch(/<Page\s+data-account-dashboard\s+scroll\s+width="wide"/u)
     expect(panel).toContain('dshx:surface-stage')
     expect(panel).not.toContain('max-w-[1680px]')
+  })
+})
+
+describe('AI accounts ⋯ buttons (council round 19, D1)', () => {
+  it('draws the page options beside the search field as the kit quiet secondary, at the field height', () => {
+    type Props = Parameters<typeof AccountsToolbar>[0]
+    // SAFETY: the closed popover builds its content from these two reads only; nothing calls into the stubs.
+    const state = { preferences: { edgeWidget: false, footerButton: false } } as unknown as Props['state']
+    // SAFETY: as above, the popover content reads only the distribution.
+    const file = { distribution: DISTRIBUTIONS[0] } as unknown as Props['file']
+    const markup = renderToStaticMarkup(<AccountsToolbar file={file} onSearchChange={noop} search="" state={state} />)
+    const trigger = /<button[^>]*aria-label="Account page options"[^>]*>/u.exec(markup)?.[0] ?? ''
+    expect(trigger).toContain('data-variant="quiet"')
+    expect(trigger).toContain('data-size="icon"')
+    expect(trigger).toContain('dshx:bg-trigger-fill')
+    expect(trigger).toContain('dshx:size-(--dshx-control-h)')
+    expect(trigger).not.toContain('dshx:size-8')
+  })
+  it("draws the selected account's actions as a ghost icon button, as the kit page header does", () => {
+    const button = /<Button aria-label="Account actions"[^>]*>/u.exec(source('account-detail.tsx'))?.[0] ?? ''
+    expect(button).toContain('variant="ghost"')
+    expect(button).toContain('size="icon"')
   })
 })
 

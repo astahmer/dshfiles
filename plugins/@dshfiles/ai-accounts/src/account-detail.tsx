@@ -102,7 +102,8 @@ export const AccountDetail = (props: {
           )}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button aria-label="Account actions" size="icon-sm" type="button" variant="outline">
+              {/* A ghost icon button, as the kit page header's ⋯ on Inbox, Backlog and Usage (council round 19, D1). */}
+              <Button aria-label="Account actions" size="icon" type="button" variant="ghost">
                 <OverflowGlyph />
               </Button>
             </DropdownMenuTrigger>

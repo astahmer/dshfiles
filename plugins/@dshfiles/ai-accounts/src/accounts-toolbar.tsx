@@ -64,7 +64,8 @@ export const AccountsToolbar = (props: {
         </div>
         <Popover>
           <PopoverTrigger asChild>
-            <Button aria-label="Account page options" size="icon-sm" type="button" variant="ghost">
+            {/* An action beside the search field: the kit quiet secondary at the field's height (council round 19, D1). */}
+            <Button aria-label="Account page options" className="dshx:size-(--dshx-control-h)" size="icon" type="button" variant="quiet">
               <OverflowGlyph />
             </Button>
           </PopoverTrigger>
