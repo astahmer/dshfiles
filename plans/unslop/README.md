@@ -34,6 +34,7 @@ counts 2 threads needing you while the Inbox counts 3.
 | 5 (round-4 shots) | 8 | 8.5 | 8.5 | no redesign needed; page frames, control heights, phone density, colour in persistent chrome |
 | 6 (round-5 shots) | 8 | 8.5 | 8.5 | colour and type at the bar; craft and alignment (phone Inbox head, Settings header edge, indigo selection) |
 | 7 (round-6 shots) | 8.5 | 8.5 | 8.5 | indigo still on on-states and the theme card; one header frame; phone fold; one identity mark per page |
+| 8 (round-7 shots) | 8.5 | 8.5 | **9** | Mistral at target; grammar left: one colour layer per attention row, filter-row triggers, phone Inbox context |
 
 Round 1 findings, merged in `.cache/unslop-audit/r5/council/round-1-fixes.md`: colour only in 8 px glyphs while black row
 buttons are the loudest thing on screen; surface steps too close (dark panel 1.04:1 against bg); project tones are raw
@@ -167,6 +168,11 @@ fade, short code wraps on phones, work strip without chevrons, dock edges and gl
 block); D 9 revisions `rszuruly` … `xlwzstml` (ink tab bars, compact effort selects, Plugins Refresh, page title marks,
 field-look filters, Usage stats footer and 190 px chart, coloured breakdown cards, one Mark reviewed edge). The Inbox
 lane is 960 px on its wider pane by rule, not narrower than Backlog.
+
+Round 8 findings, merged in `.cache/unslop-audit/r5/council/round-8-fixes.md`: one colour layer per attention row (text
+verbs), filter-row trigger grammar, the dark search edge that did not render, phone Inbox project and kind and the full
+band strength, one Inbox card structure with verbs beside their evidence, one dock grammar attached to the composer,
+rail tones ≥ 40° apart, every Settings group tinted, Settings row dividers and type steps, switch off boundaries.
 
 ## Round four
 
