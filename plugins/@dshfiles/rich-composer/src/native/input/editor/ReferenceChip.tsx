@@ -7,7 +7,9 @@ import clsx from 'clsx'
 import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@dshfiles/plugin-ui/components/ui/sheet'
+import { identityToneColor } from '@dshfiles/plugin-ui/components/palette-picker'
 import { SquareTerminalIcon } from '@dshfiles/plugin-ui/icons'
+import { AgentChipTone } from '../../../agent-chip-tone.ts'
 import { ComposerSnippets, SNIPPET_SOURCE } from '../../../composer-snippets.ts'
 import { ReferenceIconRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ReferenceIconKind } from '@deepseek-ai/dsh-client-ui-primitives'
@@ -96,6 +98,29 @@ function TerminalExcerptChip({ label, excerpt }: { readonly label: string; reado
   )
 }
 
+/** The source the agents plugin's `@` mentions insert with; `reference` is the agent's handle. */
+const AGENT_SOURCE = 'agents'
+
+/**
+ * dshfiles: an agent mention paints the agent's identity colour on its own 18% wash, like its sent-message chip and a
+ * project mark; the handle takes the ink that holds AA on the wash (`dshx-project-mark-letters`). The label is already
+ * `@handle`, so the generic `@` marker is left out (it read `@ @luna`).
+ */
+function AgentMentionChip({ label, handle }: { readonly label: string; readonly handle: string }): ReactNode {
+  const slot = AgentChipTone.useSlot(handle)
+  return (
+    <span
+      className={clsx(referenceCss.reference, css.chip, css.agentTone)}
+      title={label}
+      data-agent-tone=""
+      data-tone={slot}
+      style={{ color: identityToneColor(slot) }}
+    >
+      <span className={clsx(css.label, 'dshx-project-mark-letters')}>{label}</span>
+    </span>
+  )
+}
+
 /**
  * Render one inline reference chip.
  * @param props - label, optional domain glyph, and the invalid bit.
@@ -105,6 +130,7 @@ function TerminalExcerptChip({ label, excerpt }: { readonly label: string; reado
 export function ReferenceChip({ label, appearance, invalid, source, reference }: ReferenceChipProps): ReactNode {
   const excerpt = source === SNIPPET_SOURCE && reference !== undefined ? ComposerSnippets.terminalExcerpt(reference) : undefined
   if (excerpt !== undefined) return <TerminalExcerptChip label={label} excerpt={excerpt} />
+  if (source === AGENT_SOURCE && reference !== undefined && appearance === undefined && !invalid) return <AgentMentionChip label={label} handle={reference} />
   return (
     <span className={clsx(referenceCss.reference, css.chip, appearance === 'file' && !invalid && referenceCss.openable, invalid && css.invalid)} title={label}>
       {appearance === undefined

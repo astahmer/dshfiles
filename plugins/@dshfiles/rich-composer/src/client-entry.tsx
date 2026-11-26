@@ -1,7 +1,9 @@
+import { agentsApi } from '@dshfiles/agents/contract'
 import { Command, Composer, createApiClient, defineClient } from '@dshfiles/dshx/client'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { ConversationScope } from '@dshfiles/workbench/conversation-header'
 import { PhoneMenuScope } from './phone-menu-scope.tsx'
+import { AgentChipTone } from './agent-chip-tone.ts'
 import { agentWarmupApi } from './agent-warmup-api.ts'
 import type {} from './agent-warmup.ts'
 import { AgentPresetVisibility } from './agent-preset-visibility.ts'
@@ -36,6 +38,17 @@ export default defineClient({
     metadata?.plugin?.provide(ConversationScope, { Scope: PhoneMenuScope })
     apply(ctx)
     metadata?.plugin?.provide(Composer, createComposerService(ctx))
+    // Agent mentions in a draft wear the colour the agent chose; one shared registry read, the hashed slot without it.
+    const agents = createApiClient(ctx, agentsApi)
+    ctx.effect(
+      () =>
+        AgentChipTone.install(async () => {
+          const listed = await agents.safe.list()
+          if (!listed.ok) return null
+          return new Map(listed.value.agents.flatMap(agent => (agent.tone === undefined ? [] : [[agent.handle, agent.tone] as const])))
+        }),
+      'rich-composer: agent mention colours',
+    )
     // The header's More actions as plain rows, for the thread menu that lists them (thread-views.ts): one `⋯` per header.
     ctx.effect(
       () =>

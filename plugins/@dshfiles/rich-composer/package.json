@@ -47,6 +47,7 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
+    "@dshfiles/agents": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",

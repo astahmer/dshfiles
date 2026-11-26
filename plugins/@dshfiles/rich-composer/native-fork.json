@@ -76,6 +76,7 @@
     "src/native/input/draft-annotations.ts",
     "src/native/input/editor/keymap.test.ts",
     "src/native/input/editor/reference-activation.test.ts",
+    "src/native/input/editor/reference-chip-agent-tone.test.tsx",
     "src/native/input/editor/reference-chip-excerpt.test.tsx",
     "src/native/input/editor/restore-draft-references.test.ts",
     "src/native/input/editor/touch-keyboard.test.ts",
