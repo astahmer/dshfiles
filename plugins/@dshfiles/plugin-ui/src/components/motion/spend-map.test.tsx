@@ -164,9 +164,11 @@ describe('SpendMap › one dimension at a time (council round 10, D1)', () => {
   )
   const header = /<header.*?<\/header>/su.exec(html)?.[0] ?? ''
 
-  it('picks the dimension with a "Breakdown by" segment control in the header, not a column of cards', () => {
-    expect(header).toContain('Breakdown by')
-    expect(header).toContain('aria-label="Breakdown by"')
+  it('picks the dimension with a "Share by" segment control in the header, not a column of cards', () => {
+    // "Share by", not "Breakdown by": it reads as the split of this card's total, not the page's Group (council round 13, D1).
+    expect(header).toContain('>Share by<')
+    expect(header).toContain('aria-label="Share by"')
+    expect(header).not.toContain('Breakdown by')
     for (const label of ['Models', 'Accounts']) expect(header).toContain(`>${label}<`)
     expect(header).toContain('Tokens · input, cache and output')
     expect(html).not.toContain('data-node-anchor="dim:')
@@ -193,7 +195,7 @@ describe('SpendMap › one dimension at a time (council round 10, D1)', () => {
 
   it('keeps the card picker by default', () => {
     expect(render()).toContain('data-node-anchor="dim:model"')
-    expect(render()).not.toContain('Breakdown by')
+    expect(render()).not.toContain('Share by')
   })
 })
 

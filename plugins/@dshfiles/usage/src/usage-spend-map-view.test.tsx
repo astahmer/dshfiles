@@ -162,9 +162,9 @@ describe('Usage › one card rhythm (council round 6, D1)', () => {
 describe('Usage › Where it went, one dimension at a time (council round 10, D1)', () => {
   const header = (metric: 'cost' | 'tokens' | 'requests'): string => /<header.*?<\/header>/su.exec(render(metric))?.[0] ?? ''
 
-  it('picks the breakdown with one "Breakdown by" control: Models, Accounts, Projects, Purpose', () => {
+  it('picks the breakdown with one "Share by" control: Models, Accounts, Projects, Purpose', () => {
     const html = render('cost')
-    expect(header('cost')).toContain('aria-label="Breakdown by"')
+    expect(header('cost')).toContain('aria-label="Share by"')
     const labels = [...header('cost').matchAll(/role="radio"[^>]*>(?:<[^>]+>)*([A-Za-z]+)</gu)].map(match => match[1])
     expect(labels).toEqual(['Models', 'Accounts', 'Projects', 'Purpose'])
     // Only the selected dimension's flow: no card per dimension, no route into one.

@@ -142,7 +142,7 @@ export const UsageSpendMap = (props: {
       data-usage-spend-map
       className={cn(PLAIN_TOTAL, SPEND_MAP_CARD)}
       inset="flush"
-      // One dimension at a time: a "Breakdown by" control in the header and only that dimension's flow, its entries
+      // One dimension at a time: a "Share by" control in the header and only that dimension's flow, its entries
       // across the card so labels show in full (council round 10, D1).
       picker="segments"
       subtitle={METRIC_CAPTIONS[metric]}

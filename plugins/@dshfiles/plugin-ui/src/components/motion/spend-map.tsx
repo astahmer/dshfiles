@@ -75,8 +75,9 @@ export interface SpendMapProps extends Omit<React.HTMLAttributes<HTMLElement>, '
   readonly leafMaxWidth?: number
   /**
    * `cards` (default) fans the total out to a column of dimension cards, then to the selected one's entries. `segments`
-   * shows one dimension at a time: a "Breakdown by" segment control in the header picks it, and the total runs straight
-   * to its entries, which span the card with each label in full beside a bar of its share (council round 10, D1).
+   * shows one dimension at a time: a "Share by" segment control in the header picks it (not "Breakdown by", which read
+   * as the page's Group, council round 13, D1), and the total runs straight to its entries, which span the card with
+   * each label in full beside a bar of its share (council round 10, D1).
    */
   readonly picker?: 'cards' | 'segments'
 }
@@ -174,11 +175,11 @@ export function SpendMap({
         {segments && dimension !== undefined ? (
           <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2">
             <span aria-hidden className="dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden">
-              Breakdown by
+              Share by
             </span>
             <SlidingSegments
               size="sm"
-              aria-label="Breakdown by"
+              aria-label="Share by"
               options={dimensions.map(entry => ({ value: entry.id, label: entry.label }))}
               value={dimension.id}
               onValueChange={onDimensionChange}
