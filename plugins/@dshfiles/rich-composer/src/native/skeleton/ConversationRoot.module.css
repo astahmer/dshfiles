@@ -433,7 +433,9 @@ button.crumbEditable {
 
 .phoneBar {
   position: fixed;
-  top: calc(var(--dsh-phone-top-height, 44px) - 44px);
+  /* The top height includes the strip a child thread shows under the bar ("Subagent of … ›", council round 22 item 4,
+     --dsh-phone-top-strip, 0px elsewhere), so the ⋯ stays in the bar row. */
+  top: calc(var(--dsh-phone-top-height, 44px) - 44px - var(--dsh-phone-top-strip, 0px));
   right: max(4px, env(safe-area-inset-right, 0px));
   z-index: 42;
   display: flex;
