@@ -1460,9 +1460,12 @@ button.crumbEditable {
     background: transparent;
   }
 
+  /* Council round 18 C4: the strip has no bottom edge, and the card's seam layer (InputBar.module.css) covers dark's s1
+     top highlight with the card fill, which read as a second line under the ring: one seam in both schemes. */
   :global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))):has(> .dockHead > [data-live-work-summary]) :global([data-composer-card]) {
     border-top-left-radius: 0;
     border-top-right-radius: 0;
+    --dsh-composer-card-seam: var(--dsh-composer-card-fill);
   }
 }
 

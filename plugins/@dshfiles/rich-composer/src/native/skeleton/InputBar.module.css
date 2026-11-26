@@ -285,8 +285,12 @@
   --dsh-composer-card-highlight: var(--dshx-tone-bg, transparent);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsh-composer-card-fill);
+  /* Council round 18 C4: a seam layer above the elevation, transparent unless the phone's Live work strip sits on the
+     card's top (ConversationRoot.module.css), where it takes the card fill and covers dark's s1 top highlight, so the
+     ring is the one line between them. */
   box-shadow:
     0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3)),
+    inset 0 1px 0 var(--dsh-composer-card-seam, transparent),
     var(--dshx-elevation-1, var(--dsw-elevation-soft)),
     inset 0 1px 0 var(--dsh-composer-card-highlight);
   transition: box-shadow var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease);
@@ -313,6 +317,7 @@
 .card:focus-within {
   box-shadow:
     0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3)),
+    inset 0 1px 0 var(--dsh-composer-card-seam, transparent),
     var(--dshx-elevation-1, var(--dsw-elevation-soft)),
     inset 0 1px 0 var(--dsh-composer-card-highlight);
 }

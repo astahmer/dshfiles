@@ -54,6 +54,22 @@ describe('the dock around the card stays quiet (council round 12 C1)', () => {
     expect(strip).not.toContain('--dshx-field-border')
   })
 
+  it('draws one seam under the attached strip: the card ring, with no top highlight of the card under it (council round 18 C4)', () => {
+    const attached = `:global(html[data-shell-phone-nav]) .composerStack:not([data-live-work-open]):not(:has(> ${DOCK} > :not([data-dshfiles-live-preview-dock])))`
+    // The strip draws no bottom edge of its own.
+    expect(rule(root, `${attached} > .dockHead:has(> [data-live-work-summary])`)).toContain('border-bottom-width: 0;')
+    // Dark's s1 elevation carries an inset top highlight that read as a second line 1px under the ring: there the card's
+    // seam layer takes the card's own fill and covers it (an earlier shadow paints on top), so the ring is the one seam.
+    const card = rule(root, `${attached}:has(> .dockHead > [data-live-work-summary]) :global([data-composer-card])`)
+    expect(card).toContain('--dsh-composer-card-seam: var(--dsh-composer-card-fill);')
+    for (const state of ['.card', '.card:focus-within']) {
+      const shadow = rule(inputBar, state)
+      const seam = shadow.indexOf('inset 0 1px 0 var(--dsh-composer-card-seam, transparent)')
+      expect(seam).toBeGreaterThan(shadow.indexOf(FIELD_EDGE))
+      expect(seam).toBeLessThan(shadow.indexOf('var(--dshx-elevation-1'))
+    }
+  })
+
   it('leaves no field edge anywhere in the conversation root outside the card', () => {
     expect(root).not.toContain('--dshx-field-border')
   })
