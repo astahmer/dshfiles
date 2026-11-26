@@ -1178,8 +1178,8 @@ button.crumbEditable {
   flex-wrap: wrap;
   justify-content: center;
   /* dshfiles (unslop r5 C4, council round 3): Resume and Inbox form one quiet navigation line 12px below the composer;
-     the starters (onboarding) take their own line under it. Council round 13 C6: every chip sits 8px apart, and the
-     two lines sit 8px from the divider between them. */
+     the starters (onboarding) take their own line under it. Council round 13 C6: every chip sits 8px apart; council
+     round 14 C4: the two lines sit 14px apart, with no divider (the starter row's margin below). */
   column-gap: 8px;
   row-gap: 8px;
   min-width: 0;
@@ -1212,16 +1212,11 @@ button.crumbEditable {
   }
 }
 
-/* The divider before the starters (council round 13 C6): the starters (~450px) never share the navigation line in the
-   680px column, so the divider is a 16px hairline centred on a line of its own at the head of the starter row, 8px
-   below Resume and Inbox and 8px above the starters, drawn in the faint ink (AA on the page; the line step is 1.2:1,
-   too faint for a 16px mark, and the 3:1 field edge belongs to the card alone). Without a navigation chip there is
-   nothing to divide. */
-.heroSuggestions:has(:global([data-hero-card]:not([data-hero-card^='starter-']))) :global([data-starter-row])::before {
-  content: '';
-  flex-basis: 100%;
-  height: 1px;
-  background: linear-gradient(var(--dsw-alias-label-tertiary), var(--dsw-alias-label-tertiary)) center / 16px 1px no-repeat;
+/* The starters (~450px) never share the navigation line in the 680px column. Council round 14 C4: the 16px hairline
+   between the two lines (round 13 C6) read as a stray dash, so space alone separates them: the 8px row gap plus 6px,
+   14px in all. Without a navigation chip the starters lead and take only the hero's 12px. */
+.heroSuggestions:has(:global([data-hero-card]:not([data-hero-card^='starter-']))) :global([data-starter-row]) {
+  margin-top: 6px;
 }
 
 .heroSuggestions > * {

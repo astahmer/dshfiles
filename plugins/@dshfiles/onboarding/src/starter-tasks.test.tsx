@@ -46,7 +46,7 @@ describe('the starter line (round five C4, council round 3)', () => {
     const line = container.querySelector<HTMLElement>('[data-starter-row]')
     expect(line).not.toBeNull()
     expect(line?.className).toContain('dshx:basis-full')
-    // The hero's divider is a full-basis line at the head of this row: the row must wrap.
+    // A narrow column wraps the starters onto more lines.
     expect(line?.className).toContain('dshx:flex-wrap')
     const chips = [...(line?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
     expect(chips).toHaveLength(3)

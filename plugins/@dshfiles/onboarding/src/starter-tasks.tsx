@@ -74,8 +74,8 @@ export const StarterTaskCards = (props: {
           Pick a first task for {project}; it goes into the composer and nothing is sent.
         </p>
       ) : null}
-      {/* The starters take a line of their own under Resume and Inbox (the hero's navigation line); the hero draws the
-          divider at the head of this row, so it wraps. */}
+      {/* The starters take a line of their own under Resume and Inbox (the hero's navigation line), 14px under it (the
+          hero's spacing, council round 14 C4); the row wraps when the column is narrow. */}
       <div className="dshx-root dshx:flex dshx:basis-full dshx:flex-wrap dshx:justify-center dshx:gap-2 dshx:order-1" data-starter-row="">
         {StarterTasks.list({ project })
           .slice(0, 3)
