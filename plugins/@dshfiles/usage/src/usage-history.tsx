@@ -117,9 +117,11 @@ export const UsageBreakdownTable = (props: {
     )
   }
   return (
-    <section className="dshx:min-w-0 dshx:border-t dshx:border-border dshx:pt-4">
-      <h3 className="dshx:mb-2 dshx:text-sm dshx:font-semibold">Usage distribution</h3>
-      <div className="dshx:overflow-x-auto">
+    // The hairline card the totals, trend and "Where it went" above take, so the page keeps one rhythm; the cells' own
+    // 8 px inset is pulled back so the first column starts on the title's edge (council round 13, D1).
+    <section className="dshx:min-w-0 dshx:rounded-lg dshx:border dshx:border-border dshx:bg-card dshx:px-4 dshx:pt-3.5 dshx:pb-2 dshx:@max-pane-narrow:px-3">
+      <h3 className="dshx:mb-1 dshx:text-sm dshx:font-semibold">Usage distribution</h3>
+      <div className="dshx:-mx-2 dshx:overflow-x-auto">
         <table className="dshx:w-full dshx:text-sm">
           <thead className="dshx:border-b dshx:border-border">
             <tr>

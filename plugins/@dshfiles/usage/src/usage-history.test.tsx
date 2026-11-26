@@ -111,6 +111,15 @@ describe('usage history views', () => {
     expect(markup).not.toContain('priced share*')
   })
 
+  it('sits in a hairline card like the totals, trend and "Where it went" above it (council round 13, D1)', () => {
+    const markup = renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="model" onShowRequests={() => 'opened'} />)
+    const section = markup.match(/^<section class="([^"]*)"/u)?.[1] ?? ''
+    for (const token of ['dshx:rounded-lg', 'dshx:border', 'dshx:border-border', 'dshx:bg-card', 'dshx:px-4', 'dshx:pt-3.5']) expect(section.split(' ')).toContain(token)
+    expect(section).not.toContain('dshx:border-t')
+    // The cells' own 8 px inset is pulled back, so the first column's text starts on the title's edge.
+    expect(markup).toMatch(/<div class="[^"]*dshx:-mx-2[^"]*"><table/u)
+  })
+
   it('renders daily cells for a year range in the measure the chart shows, with no switch of its own', () => {
     const from = new Date(2026, 0, 1).getTime()
     const markup = renderToStaticMarkup(<UsageCalendar view={view} metric="tokens" range={{ from, to: from + 365 * 86_400_000 }} />)
