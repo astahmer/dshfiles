@@ -163,14 +163,15 @@ describe('SubagentPreviewDock', () => {
     await waitFor(() => expect(document.querySelector('[data-subagent-run-step]')?.textContent).toBe('Running a command'))
     const row = rowOf('Review')
     expect(row.textContent).not.toMatch(/\bbash\b/u)
-    // Collapsed: the kit's mark and the model's name, between the child's name and its step.
+    // Collapsed: the kit's mark and the model's name, in the row's model column.
     const model = row.querySelector('[data-subagent-dock-row] [data-slot="route-model"]')
     expect(model?.textContent).toBe('gpt-6.1-luna')
     expect(model?.querySelector('[data-model-mark="openai"]')).not.toBeNull()
     const order = [...(row.querySelector('[data-subagent-dock-row] [data-subagent-dock-meta]')?.children ?? [])].map(
       child => (child.hasAttribute('data-subagent-run-step') ? 'step' : child.getAttribute('data-slot')) ?? child.tagName,
     )
-    expect(order.indexOf('route-model')).toBeLessThan(order.indexOf('step'))
+    // Council round 22, item 10: the model is a column after the name and its step, before the clock.
+    expect(order.indexOf('route-model')).toBeGreaterThan(order.indexOf('step'))
     // The model's name, never the route id with its provider ("openai/gpt-6.1-luna"), and not a second time when open.
     fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
     expect(row.querySelectorAll('[data-slot="route-model"]')).toHaveLength(1)
@@ -201,6 +202,35 @@ describe('SubagentPreviewDock', () => {
     // Two lines stay a whole touch row: at least 44pt.
     expect(line?.className).toContain('dshx:@max-pane-narrow:min-h-[54px]')
     expect(line?.querySelector('[data-live-work-action]')?.className).toContain('dshx:@max-pane-narrow:self-stretch')
+  })
+
+  it('starts every model name on one x on a wide pane: a fixed column before a fixed clock seat (council round 22, item 10)', async () => {
+    // The model followed each title, so "gpt-6-luna" and "deepseek-v4-flash" started wherever the title ended.
+    const bindings = preview({ retainChild: childInTool({ tools: { 'child-a': 'bash', 'child-b': null } }).retainChild })
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'], bindings, runCards: true, childTiming: true })} />)
+    await waitFor(() => expect(rowOf('Review').querySelector('[data-subagent-run-step]')).not.toBeNull())
+    for (const label of ['Review', 'Refactor']) {
+      const meta = rowOf(label).querySelector<HTMLElement>('[data-subagent-dock-meta]')
+      const model = meta?.querySelector<HTMLElement>('[data-slot="route-model"]')
+      // A fixed-width column that keeps the empty mark seat for a model without a family; a narrow pane lets it go.
+      expect(model?.className).toContain('dshx:w-36')
+      expect(model?.className).toContain('dshx:shrink-0')
+      expect(model?.className).toContain('dshx:@max-pane-narrow:w-auto')
+      // A fixed clock seat after it: "49s" and "1m 02s" no longer move the column.
+      const clock = meta?.querySelector<HTMLElement>('[data-live-elapsed]')
+      expect(clock?.className).toContain('dshx:min-w-12')
+      expect(clock?.className).toContain('dshx:text-right')
+      // The column follows the step, so a row in a tool and a row between tools put the model on the same x.
+      const kids = [...(meta?.children ?? [])]
+      const at = (match: (child: Element) => boolean): number => kids.findIndex(match)
+      expect(at(child => child.getAttribute('data-slot') === 'route-model')).toBeGreaterThan(at(child => child.hasAttribute('data-subagent-run-step')))
+    }
+  })
+
+  it('keeps the clock seat before the open turn is known, so the model column holds its x', () => {
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], runCards: true, childTiming: false })} />)
+    expect(document.querySelector('[data-live-elapsed]')).toBeNull()
+    expect(document.querySelector('[data-subagent-dock-clock-seat]')?.className).toContain('dshx:min-w-12')
   })
 
   it('names the model with the step setting off, and none when the route is unknown', () => {

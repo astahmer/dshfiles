@@ -80,15 +80,6 @@ const DockRow = (
             className="dshx:contents dshx:@max-pane-narrow:col-start-2 dshx:@max-pane-narrow:flex dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:items-center dshx:@max-pane-narrow:gap-1 dshx:@max-pane-narrow:text-muted-foreground"
             data-subagent-dock-meta=""
           >
-            {run.route === undefined ? null : (
-              // Shrinks after the step and the name (they give way first), then truncates its name; the mark stays.
-              <RouteModel
-                provider={run.route.provider}
-                model={run.route.model}
-                seat
-                className="dshx:ml-1 dshx:max-w-[45%] dshx:shrink-0 dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:max-w-none dshx:@max-pane-narrow:shrink"
-              />
-            )}
             {step === undefined ? null : (
               <>
                 {/* On line 2 the step follows the clock, so the clock never truncates. */}
@@ -106,15 +97,32 @@ const DockRow = (
                 </span>
               </>
             )}
-            <span className="dshx:flex-1 dshx:@max-pane-narrow:hidden" />
-            {!runCards || state.since === undefined ? null : (
+            {step === undefined ? <span className="dshx:flex-1 dshx:@max-pane-narrow:hidden" /> : null}
+            {run.route === undefined ? null : (
+              // Council round 22, item 10: on a wide pane the model is a fixed column after the name and its step, before
+              // a fixed clock seat and the fixed action column, so every model name starts on one x (the empty mark seat
+              // keeps a model without a family on it). It truncates its name; the mark stays.
+              <RouteModel
+                provider={run.route.provider}
+                model={run.route.model}
+                seat
+                className="dshx:ml-1 dshx:w-36 dshx:shrink-0 dshx:@max-pane-narrow:ml-0 dshx:@max-pane-narrow:w-auto dshx:@max-pane-narrow:shrink"
+              />
+            )}
+            {!runCards ? null : state.since === undefined ? (
+              <span aria-hidden className="dshx:min-w-12 dshx:shrink-0 dshx:pr-1 dshx:@max-pane-narrow:hidden" data-subagent-dock-clock-seat="" />
+            ) : (
               <>
                 {run.route === undefined ? null : (
                   <span aria-hidden className="dshx:hidden dshx:@max-pane-narrow:inline" data-subagent-dock-separator="">
                     ·
                   </span>
                 )}
-                <LiveElapsed active className="dshx:shrink-0 dshx:pr-1 dshx:text-muted-foreground" since={state.since} />
+                <LiveElapsed
+                  active
+                  className="dshx:min-w-12 dshx:shrink-0 dshx:pr-1 dshx:text-right dshx:text-muted-foreground dshx:@max-pane-narrow:min-w-0 dshx:@max-pane-narrow:text-left"
+                  since={state.since}
+                />
               </>
             )}
           </span>
