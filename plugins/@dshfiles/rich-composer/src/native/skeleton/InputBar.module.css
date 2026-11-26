@@ -254,14 +254,16 @@
   /* Visual refresh T3.1: the composer is the ONE elevated resting object. A 12px card (the composer step of the
      radius scale), one hairline drawn as a ring so it costs no layout, the s1 shadow and an inner top highlight
      (dark's s1 carries its own, so the light highlight is switched off there). Fill: the input surface token (the
-     raised step in dark). Everything else around it stays flat. */
+     raised step in dark). Everything else around it stays flat. Council round 11 C3: the hairline is the kit's 3:1
+     field edge (`--dshx-field-border`, #88827D light, #76706C dark), empty or not, so the main input reads as a text
+     field like the sidebar's search; the controls inside it stay unboxed. */
   border: 0;
   --dsh-composer-card-fill: var(--dsw-specific-input-major);
   --dsh-composer-card-highlight: var(--dshx-tone-bg, transparent);
   border-radius: var(--dsw-radius-lg);
   background: var(--dsh-composer-card-fill);
   box-shadow:
-    0 0 0 1px var(--dshx-tone-line, var(--dsw-alias-border-l2)),
+    0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3)),
     var(--dshx-elevation-1, var(--dsw-elevation-soft)),
     inset 0 1px 0 var(--dsh-composer-card-highlight);
   transition: box-shadow var(--dshx-duration-hover, 80ms) var(--dshx-motion-ease-enter, ease);
@@ -284,10 +286,10 @@
   --dsh-composer-card-highlight: transparent;
 }
 
-/* Focus inside the card strengthens the ring one step (a signal of where typing goes), never the accent. */
+/* Typing keeps the field edge (council round 11 C3: it is already the 3:1 step), never the accent. */
 .card:focus-within {
   box-shadow:
-    0 0 0 1px var(--dshx-tone-border-strong, var(--dsw-alias-border-l3)),
+    0 0 0 1px var(--dshx-field-border, var(--dsw-alias-border-l3)),
     var(--dshx-elevation-1, var(--dsw-elevation-soft)),
     inset 0 1px 0 var(--dsh-composer-card-highlight);
 }

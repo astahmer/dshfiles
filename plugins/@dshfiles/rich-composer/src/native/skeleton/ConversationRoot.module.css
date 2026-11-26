@@ -703,9 +703,10 @@ button.crumbEditable {
   width: calc(100% - var(--dsh-composer-side-clearance, 0px) * 2 + 2px);
   max-width: calc(var(--dsh-composer-card-max-width) + 2px);
   margin-inline: auto;
-  /* Council round 8 C3: the composer card's own fill, so the dock reads as the composer's top, not a panel above it. */
+  /* Council round 8 C3: the composer card's own fill, so the dock reads as the composer's top, not a panel above it.
+     Council round 11 C3: and the card's 3:1 field edge, so the two read as one outlined object. */
   background: var(--dsw-specific-input-major);
-  border: 1px solid var(--dshx-tone-line, var(--dsw-alias-border-l2));
+  border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
   border-radius: var(--dsw-radius-lg);
 }
 
