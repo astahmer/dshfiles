@@ -28,7 +28,8 @@ export const ProjectTonePicker = (props: {
           />
           <Tooltip>
             <TooltipTrigger asChild>
-              {/* The kit swatch's seat and ring (PalettePicker md), so the custom colour reads as a seventh choice and is as easy to hit. */}
+              {/* The kit swatch's seat and ring (PalettePicker md), so the custom colour reads as a seventh choice and is as easy to hit.
+                  `corner-shape: round` with `!`, as the kit's: the Host's unlayered squircle would square a full radius. */}
               <label
                 className="dshx:group/custom-colour dshx:relative dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-full dshx:pointer-coarse:size-11"
                 data-state={isCustom ? 'checked' : 'unchecked'}
@@ -36,12 +37,12 @@ export const ProjectTonePicker = (props: {
                 <span
                   aria-hidden
                   className={cn(
-                    'dshx:flex dshx:size-7 dshx:items-center dshx:justify-center dshx:rounded-full dshx:border-2 dshx:transition-[border-color,box-shadow] dshx:duration-(--dshx-duration-hover) dshx:group-has-focus-visible/custom-colour:ring-2 dshx:group-has-focus-visible/custom-colour:ring-ring',
+                    'dshx:flex dshx:size-7 dshx:items-center dshx:justify-center dshx:rounded-full dshx:[corner-shape:round]! dshx:border-2 dshx:transition-[border-color,box-shadow] dshx:duration-(--dshx-duration-hover) dshx:group-has-focus-visible/custom-colour:ring-2 dshx:group-has-focus-visible/custom-colour:ring-ring',
                     isCustom ? 'dshx:border-foreground' : 'dshx:border-transparent dshx:group-hover/custom-colour:border-border',
                   )}
                 >
                   <span
-                    className="dshx:block dshx:size-5 dshx:rounded-full"
+                    className="dshx:block dshx:size-5 dshx:rounded-full dshx:[corner-shape:round]!"
                     style={
                       props.choice.kind === 'custom'
                         ? { backgroundColor: props.choice.color }

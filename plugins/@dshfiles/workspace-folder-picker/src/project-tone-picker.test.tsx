@@ -81,6 +81,15 @@ describe('ProjectTonePicker', () => {
     expect(classes).toContain('dshx:group-has-focus-visible/custom-colour:ring-2')
   })
 
+  it('keeps the custom seat a true circle under the Host squircle, like the kit swatches beside it', () => {
+    renderPicker({ kind: 'custom', color: '#12ab34' })
+    const label = screen.getByLabelText('Custom colour for dshfiles').closest('label')
+    const ring = label?.querySelector('[aria-hidden]')
+    const tone = ring?.querySelector('span')
+    const kitRing = swatch(0).querySelector('[data-slot="palette-swatch-ring"]')
+    for (const element of [ring, tone, kitRing]) expect(element?.className).toContain('dshx:[corner-shape:round]!')
+  })
+
   it('wraps its label above the swatches when six 44 pt seats do not fit beside it', () => {
     renderPicker({ kind: 'tone', tone: 0 })
     expect(screen.getByText('Project colour').parentElement?.classList).toContain('dshx:flex-wrap')
