@@ -18,6 +18,7 @@ import type { RequestPurpose } from './fold.js'
 import { UsageFormattingModel, type OpenThread } from './format.js'
 import { UsageBreakdownTable, UsageCalendar } from './usage-history.js'
 import { UsageSpendMap } from './usage-spend-map.js'
+import { TrendKey } from './trend-key.js'
 
 const DAY_MS = UsageBucketsModel.DAY_MS
 const CHART_HEIGHT = 220
@@ -194,6 +195,12 @@ export const UsageCharts = (props: {
   )
 
   const trendRows = trendMetric === 'cost' ? series.cost : trendMetric === 'tokens' ? series.groupedTokens : series.groupedRequests
+  const trendKeys = useMemo(
+    () => (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
+    [view?.keys, props.groupBy],
+  )
+  // One series: its name moves into the header and the chart draws no legend (council round 10, D1).
+  const singleSeries = trendKeys.length === 1
   const trendChart = useMemo(() => {
     const formatTrend = (value: number): string => (trendMetric === 'cost' ? UsageFormattingModel.formatCost(value) : UsageFormattingModel.formatCount(value))
     const trendTotal = singleBucketTotal(trendRows, row => row.value)
@@ -225,18 +232,17 @@ export const UsageCharts = (props: {
           },
         },
       },
-      color: {
-        domain: (view?.keys ?? []).map(key => (props.groupBy === 'purpose' ? (purposeLabelsByKey.get(key) ?? key) : key)),
-        range: [...DATA_SERIES],
-        legend: colorLegend({ placement: 'bottom' }),
-      },
+      // One series draws no legend: its name sits in the header (council round 10, D1).
+      color: singleSeries
+        ? { domain: trendKeys, range: [...DATA_SERIES] }
+        : { domain: trendKeys, range: [...DATA_SERIES], legend: colorLegend({ placement: 'bottom' }) },
       tooltip: {
         use: tooltip,
         format: point =>
           `${UsageBucketsModel.bucketKeyLabel(point.datum.label, props.bucket, props.range.to - props.range.from > DAY_MS)} · ${'key' in point.datum ? `${point.datum.key}: ` : ''}${formatTrend(point.datum.value)}`,
       },
     })
-  }, [trendRows, trendMetric, xAxis, view?.keys, props.groupBy, props.bucket, props.range.from, props.range.to])
+  }, [trendRows, trendMetric, xAxis, trendKeys, singleSeries, props.bucket, props.range.from, props.range.to])
   const tokenChart = useMemo(
     () =>
       defineChart({
@@ -349,7 +355,10 @@ export const UsageCharts = (props: {
             <span className="dshx:text-sm dshx:font-semibold dshx:text-foreground">Usage over time</span>
             <SlidingSegments size="sm" aria-label="Usage measure" options={TREND_METRICS} value={trendMetric} onValueChange={setTrendMetric} />
           </span>
-          <span className="dshx:text-xs">{trendCaption({ bucket: props.bucket, groupBy: props.groupBy, metric: trendMetric })}</span>
+          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:text-xs">
+            {trendCaption({ bucket: props.bucket, groupBy: props.groupBy, metric: trendMetric })}
+            {singleSeries && trendKeys[0] !== undefined ? <TrendKey label={trendKeys[0]} color={DATA_SERIES[0]} /> : null}
+          </span>
         </header>
         <Chart
           ariaLabel={`${trendMetric} over time`}

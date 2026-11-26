@@ -12,9 +12,14 @@ type SpendMetric = 'cost' | 'tokens' | 'requests'
 type BreakdownRow = ChartView['breakdown']['model'][number]
 
 const LEAF_LIMIT = 6
-/** End nodes stop at 280 px: one model no longer runs a 1000 px node across the card (council round 5, D1). */
-const LEAF_MAX_WIDTH = 280
 const REST_ID = 'other:rest'
+
+/** The caption names the measure the chart card picked and its unit (council round 10, D1). */
+const METRIC_CAPTIONS = {
+  cost: 'Cost · USD, list-price estimate',
+  tokens: 'Tokens · input, cache and output',
+  requests: 'Requests · model calls',
+} satisfies Record<SpendMetric, string>
 
 /**
  * Each breakdown's card tone on the data ramp, in order, so Accounts and Projects read as their own series instead of
@@ -24,7 +29,7 @@ const DIMENSIONS = [
   { id: 'model', label: 'Models', icon: <BoxIcon aria-hidden />, tone: DATA_SERIES[0] },
   { id: 'provider', label: 'Accounts', icon: <KeyRoundIcon aria-hidden />, tone: DATA_SERIES[1] },
   { id: 'project', label: 'Projects', icon: <FolderIcon aria-hidden />, tone: DATA_SERIES[2] },
-  { id: 'purpose', label: 'Purposes', icon: <TargetIcon aria-hidden />, tone: DATA_SERIES[3] },
+  { id: 'purpose', label: 'Purpose', icon: <TargetIcon aria-hidden />, tone: DATA_SERIES[3] },
 ] as const satisfies readonly { readonly id: ChartQuery['groupBy']; readonly label: string; readonly icon: ReactNode; readonly tone: string }[]
 
 const purposeLabels = new Map<string, string>(Object.entries(UsageFormattingModel.purposeLabels))
@@ -137,7 +142,10 @@ export const UsageSpendMap = (props: {
       data-usage-spend-map
       className={cn(PLAIN_TOTAL, SPEND_MAP_CARD)}
       inset="flush"
-      leafMaxWidth={LEAF_MAX_WIDTH}
+      // One dimension at a time: a "Breakdown by" control in the header and only that dimension's flow, its entries
+      // across the card so labels show in full (council round 10, D1).
+      picker="segments"
+      subtitle={METRIC_CAPTIONS[metric]}
       detailPeriod="this range"
       dimensionId={dimension?.id ?? props.groupBy}
       dimensions={dimensions}

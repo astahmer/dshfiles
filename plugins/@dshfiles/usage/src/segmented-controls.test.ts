@@ -77,7 +77,7 @@ describe('Usage control row and chart header (council round 4, D1)', () => {
     expect(charts).not.toContain('role="toolbar" aria-label="Chart options"')
     const header = /<header className="([^"]*)" data-usage-chart-header>([\s\S]*?)<\/header>/u.exec(charts)
     expect(header?.[1]).not.toContain('dshx:justify-between')
-    const titleRow = /<span className="[^"]*" data-usage-chart-title-row>([\s\S]*?)<\/span>\s*<span className="dshx:text-xs">/u.exec(header?.[2] ?? '')
+    const titleRow = /<span className="[^"]*" data-usage-chart-title-row>([\s\S]*?)<\/span>\s*<span className="[^"]*dshx:text-xs[^"]*">/u.exec(header?.[2] ?? '')
     expect(titleRow?.[1]).toContain('Usage over time')
     expect(titleRow?.[1]).toContain('<SlidingSegments size="sm" aria-label="Usage measure"')
     // The chart is its own hairline card (council round 6, D1): no loose hairline right under the stats card.

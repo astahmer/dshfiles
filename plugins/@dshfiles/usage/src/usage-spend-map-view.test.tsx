@@ -125,8 +125,8 @@ describe('Usage › Where it went (council round 5, D1)', () => {
     )
     expect(/data-node-anchor="leaf:model:m1"[^>]*><span[^>]*>(.*?)<\/span>/u.exec(plain)?.[1]).toBe('m')
   })
-  it('caps the end nodes at 280 px through the kit prop, not a class override', () => {
-    expect(html).toMatch(/<div role="radiogroup" aria-label="Models"[^>]*style="max-width:280px"/u)
+  it('spans the end nodes across the card, so a long account name shows in full (council round 10, D1)', () => {
+    expect(html).not.toMatch(/<div role="radiogroup" aria-label="Models"[^>]*style="max-width/u)
   })
 })
 
@@ -155,5 +155,26 @@ describe('Usage › one card rhythm (council round 6, D1)', () => {
     for (const look of ['dshx:rounded-lg', 'dshx:border', 'dshx:border-border', 'dshx:bg-card', 'dshx:px-4', 'dshx:pt-3.5']) expect(TREND_CARD).toContain(look)
     expect(source).toContain('<ChartFrame className={TREND_CARD}>')
     expect(source).not.toContain('<Panel className="dshx:border-t-0 dshx:pt-1">')
+  })
+})
+
+describe('Usage › Where it went, one dimension at a time (council round 10, D1)', () => {
+  const header = (metric: 'cost' | 'tokens' | 'requests'): string => /<header.*?<\/header>/su.exec(render(metric))?.[0] ?? ''
+
+  it('picks the breakdown with one "Breakdown by" control: Models, Accounts, Projects, Purpose', () => {
+    const html = render('cost')
+    expect(header('cost')).toContain('aria-label="Breakdown by"')
+    const labels = [...header('cost').matchAll(/role="radio"[^>]*>(?:<[^>]+>)*([A-Za-z]+)</gu)].map(match => match[1])
+    expect(labels).toEqual(['Models', 'Accounts', 'Projects', 'Purpose'])
+    // Only the selected dimension's flow: no card per dimension, no route into one.
+    expect(html).not.toContain('data-node-anchor="dim:')
+    expect(html).toContain('data-spend-link="leaf:model:m1"')
+    expect(html).not.toContain('leaf:provider:')
+  })
+
+  it('names the active metric and its unit in the caption', () => {
+    expect(header('cost')).toContain('Cost · USD, list-price estimate')
+    expect(header('tokens')).toContain('Tokens · input, cache and output')
+    expect(header('requests')).toContain('Requests · model calls')
   })
 })
