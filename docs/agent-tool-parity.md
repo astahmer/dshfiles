@@ -794,9 +794,13 @@ Semantics worth knowing:
 - Write methods take an optional `sessionId` and default to the **calling**
   thread, so a thread can rename, fork, pin, stop, re-model, archive or move
   itself.
-- `thread_settle` writes the plugin's own settled status through its settings
-  scope; the Host then refuses every model step that Session proposes, so a late
-  wake ends as `blocked` until `thread_unsettle`.
+- `thread_settle` writes the plugin's own settled status (its `thread_settled`
+  storage domain, no longer the settings namespace); the Host then refuses every
+  model step that Session proposes, so a late wake ends as `blocked` until
+  `thread_unsettle`. The thread list reads and changes the same status through
+  the `thread-sidebar-settled` API (`read`, read-only, and `change`), which has no
+  agent tool of its own: `thread_list` (settled state per thread),
+  `thread_settle` and `thread_unsettle` cover them for the Agent.
 - `thread_archive` never stops running work on its own. A running thread is
   refused with the active families (turn, job, subagent, schedule) named; only
   `stopActivity: true`, which the description ties to an explicit user request,

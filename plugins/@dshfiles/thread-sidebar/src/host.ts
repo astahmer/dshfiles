@@ -55,6 +55,9 @@ import { SessionLineage } from './session-lineage.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { threadSidebarSettings } from './settings.js'
 import { SettledGateModel, type SettledSessionHeader } from './settled-gate.js'
+import { threadSidebarSettledApi } from './settled-api.js'
+import { SettledStore } from './settled-store.js'
+import { SettledThreadsModel } from './settled-threads.js'
 import { ThreadSubscriptionActions } from './subscription-actions.js'
 import { subscriptionChangeEvents, subscriptionNoticeHostLayer, subscriptionNoticer } from './subscription-notices-host.js'
 import { threadSubscriptionsApi } from './subscriptions-api.js'
@@ -374,6 +377,16 @@ export default DshxPlugin.make({
     Api.bind(threadSidebarAutoSettleApi, {
       status: () => AutoSettle.use(autoSettle => autoSettle.status),
       requestSettle: input => AutoSettle.use(autoSettle => autoSettle.requestSettle(input)),
+    }),
+    Api.bind(threadSidebarSettledApi, {
+      read: () => SettledStore.use(store => store.snapshot),
+      change: input =>
+        SettledStore.use(store =>
+          Effect.andThen(
+            store.update(status => ({ status: SettledThreadsModel.applyChange(status, input), result: undefined })),
+            store.snapshot,
+          ),
+        ),
     }),
   ],
 })
