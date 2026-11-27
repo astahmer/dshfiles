@@ -2540,7 +2540,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (!filterOpen) return
     const measure = (): void => {
       const trigger = filterTriggerRef.current
-      if (trigger !== null) setFilterPanelRoom(Math.max(FILTER_PANEL_MIN_ROOM, window.innerHeight - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING))
+      if (trigger === null) return
+      // To the status strip's top, not the window's bottom (council round 32, item 3: at 700px the panel covered it).
+      const strip = document.querySelector('[data-status-strip]')
+      const floor = strip === null || strip.getClientRects().length === 0 ? window.innerHeight : strip.getBoundingClientRect().top
+      setFilterPanelRoom(Math.max(FILTER_PANEL_MIN_ROOM, floor - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING))
     }
     measure()
     window.addEventListener('resize', measure)

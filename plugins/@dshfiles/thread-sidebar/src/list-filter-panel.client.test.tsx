@@ -1272,7 +1272,8 @@ describe('the desktop panel holds its top (round 31, item 7)', () => {
     expect(filterControl).toContain('dshx:max-h-[min(var(--radix-popover-content-available-height),var(--filter-panel-room,100dvh))]')
     expect(client).toMatch(/'--filter-panel-room': `\$\{String\(filterPanelRoom\)\}px`/u)
     expect(filterControl).toContain('style={filterPanelStyle}')
-    expect(client).toContain('window.innerHeight - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING')
+    // To the status strip since round 33 (item 3), the window's bottom without one.
+    expect(client).toContain('floor - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING')
   })
 
   it('fades its foot while more content remains below, and drops the fade at the end', () => {
@@ -1495,5 +1496,15 @@ describe('the count badge has a shape (round 33, item 1)', () => {
     expect(trigger).toContain("<span className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>")
     expect(filterControl).toMatch(/<TooltipContent[^>]*data-thread-list-filter-tooltip=""[^>]*>\s*\{filterTriggerLabel\}/u)
     expect(filterControl).toContain('aria-label={filterTriggerLabel}')
+  })
+})
+
+// Council round 32, item 3: measured at 1440 × 700 with More open, the panel ended at 692 over the status strip (top 675).
+// The room below the trigger now ends 8px above the status strip, or the window's bottom when there is none.
+describe('the desktop panel stops above the status bar (round 33, item 3)', () => {
+  it('measures its room to the status strip top, less 8px', () => {
+    expect(client).toContain("document.querySelector('[data-status-strip]')")
+    expect(client).toMatch(/const floor = strip === null \|\| strip\.getClientRects\(\)\.length === 0 \? window\.innerHeight : strip\.getBoundingClientRect\(\)\.top/u)
+    expect(client).toContain('floor - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING')
   })
 })
