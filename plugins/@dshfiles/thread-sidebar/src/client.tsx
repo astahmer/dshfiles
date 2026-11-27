@@ -112,7 +112,9 @@ import {
   BellIcon,
   BellOffIcon,
   BellRingIcon,
+  BookmarkPlusIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   CircleCheckIcon,
   CircleDashedIcon,
   CirclePauseIcon,
@@ -6666,6 +6668,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
+        {/* Save as… left the panel for this menu, so the sheet opens on the filters (round 28, item 10). */}
+        <DropdownMenuItem
+          onSelect={() => {
+            if (threadViewSettings.views.length >= MAX_THREAD_VIEWS) {
+              setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
+              return
+            }
+            setFilterOpen(false)
+            setPresetPrompt({ mode: 'create' })
+          }}
+        >
+          <BookmarkPlusIcon aria-hidden="true" />
+          {props.tSidebar('threadSidebarPresetSaveAs')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
         <DropdownMenuLabel className="dshx:truncate">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
         <DropdownMenuItem
           onSelect={closeFilterThen(() =>
@@ -6765,8 +6782,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         align="start"
         sideOffset={8}
         collisionPadding={8}
-        aria-label={props.tSidebar('threadSidebarFilter')}
-        className="dshx-root dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:p-0"
+        aria-label={props.tSidebar('threadSidebarFilters')}
+        // The phone sheet opens taller than the kit's 72dvh, so both Status rows show with three presets (round 28, item 10).
+        className="dshx-root dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:p-0 dshx:phone:max-h-[85dvh]!"
       >
         <ListFilterPanel
           t={props.tSidebar}
@@ -6781,13 +6799,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                 searchAbove={0}
                 searchLabel={props.tSidebar('threadSidebarProjectSearch')}
                 searchPlaceholder={props.tSidebar('threadSidebarProjectSearchPlaceholder')}
-                triggerClassName="dshx:w-full dshx:min-w-0 dshx:px-3"
+                // One inline row, "Project · All projects ›", a list row rather than a field (round 28, item 10).
+                triggerClassName="dshx:h-11 dshx:w-full dshx:min-w-0 dshx:rounded-md dshx:border-transparent dshx:bg-transparent dshx:px-0 dshx:hover:border-transparent dshx:hover:bg-accent"
                 triggerContent={
-                  <>
+                  <span className="dshx:flex dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2" data-thread-project-row="">
                     <FolderIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
-                    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{projectFilterLabel}</span>
-                    <ChevronDownIcon className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
-                  </>
+                    <span className="dshx:shrink-0 dshx:text-foreground">{props.tSidebar('threadSidebarGroupProject')}</span>
+                    <span className="dshx:ml-auto dshx:min-w-0 dshx:truncate dshx:text-right dshx:text-muted-foreground">{projectFilterLabel}</span>
+                    <ChevronRightIcon className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" aria-hidden="true" />
+                  </span>
                 }
                 value={projectFilterValue}
               />
@@ -6816,14 +6836,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   onApply: selectThreadViewPreset,
                   onSaveChanges: () => savePresetChanges(),
                   onDiscard: () => selectThreadViewPreset(listThreadView.id),
-                  onSaveAs: () => {
-                    if (threadViewSettings.views.length >= MAX_THREAD_VIEWS) {
-                      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
-                      return
-                    }
-                    setFilterOpen(false)
-                    setPresetPrompt({ mode: 'create' })
-                  },
                   options: presetOptionsMenu,
                 }
               : undefined
@@ -6853,6 +6865,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               : undefined
           }
           reset={{ disabled: resetDisabled, onReset: resetListFilters }}
+          onDone={() => setFilterOpen(false)}
           actions={filterActions}
         />
       </PopoverContent>

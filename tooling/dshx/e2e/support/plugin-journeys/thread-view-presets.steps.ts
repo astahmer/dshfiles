@@ -110,8 +110,8 @@ Then('the custom tabs and hidden controls survive reload', async ({ page }: { pa
 const filterTrigger = (page: Page, name: string) => threadSidebar(page).getByRole('button', { name: `Filter: ${name}`, exact: true })
 
 const saveCurrentFiltersAs = async (page: Page, name: string): Promise<void> => {
-  await ThreadListFilter.openViews(page, threadSidebar(page))
-  await ThreadListFilter.panel(page).getByRole('button', { name: 'Save current filters as preset…', exact: true }).click()
+  // Save as… sits in the presets' ⋯ menu since round 28 (item 10).
+  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Save current filters as preset…')
   const dialog = page.getByRole('dialog', { name: 'Save filters as a preset' })
   await dialog.getByLabel('Preset name').fill(name)
   await dialog.getByRole('button', { name: 'Save preset', exact: true }).click()

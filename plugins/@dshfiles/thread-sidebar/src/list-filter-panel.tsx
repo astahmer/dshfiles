@@ -8,7 +8,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { ArchiveIcon, BellOffIcon, BookmarkPlusIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, BellOffIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useId, useState, type ReactNode } from 'react'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
@@ -77,8 +77,7 @@ export interface ListFilterPanelProps {
     readonly onApply: (id: string) => void
     readonly onSaveChanges: () => void
     readonly onDiscard: () => void
-    readonly onSaveAs: () => void
-    /** The active preset's own verbs (rename, update, delete, mark read…), a small menu beside the heading. */
+    /** The presets' own verbs (save as, rename, update, delete, mark read…), a small menu beside the heading. */
     readonly options: ReactNode
   } | undefined
   readonly status?: { readonly selected: readonly ThreadStatusFilter[]; readonly onChange: (filters: readonly ThreadStatusFilter[]) => void } | undefined
@@ -96,6 +95,8 @@ export interface ListFilterPanelProps {
   readonly reset: { readonly disabled: boolean; readonly onReset: () => void }
   /** The list's other places and settings (Board, Thread list settings, Sidebar settings), quiet rows at the foot. */
   readonly actions: readonly ListFilterAction[]
+  /** Close the panel: the phone sheet's Done. */
+  readonly onDone?: (() => void) | undefined
 }
 
 /**
@@ -168,8 +169,15 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const presets = props.presets
   return (
     <div className="dshx:grid dshx:min-w-0 dshx:divide-y dshx:divide-border" data-thread-list-filter-panel="">
-      <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:py-1.5 dshx:pr-1.5 dshx:pl-3">
-        <h2 className="dshx:text-sm dshx:font-medium">{t('threadSidebarFilter')}</h2>
+      {/* Sticky, so Reset and Done stay in reach while the sheet scrolls (round 28, item 10). A desktop reads "Filters …
+          Reset"; a phone reads "Reset · Filters · Done", the sheet's own close. One word for the button and the title.
+          The phone sheet keeps 20px of its own top padding for the grabber; the header sticks over it (-20px), so no row
+          scrolls by above the header. */}
+      <div
+        className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:phone:-top-5 dshx:items-center dshx:gap-2 dshx:bg-popover dshx:py-1.5 dshx:pr-1.5 dshx:pl-3 dshx:phone:grid dshx:phone:grid-cols-[1fr_auto_1fr] dshx:phone:px-1"
+        data-thread-filter-header=""
+      >
+        <h2 className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:font-medium dshx:phone:text-base dshx:phone:font-semibold">{t('threadSidebarFilters')}</h2>
         <Button
           type="button"
           variant="ghost"
@@ -179,17 +187,24 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           disabled={props.reset.disabled}
           onClick={props.reset.onReset}
           data-thread-filter-reset=""
+          className="dshx:phone:order-first dshx:phone:justify-self-start"
         >
           {t('threadSidebarFilterReset')}
         </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="dshx:hidden dshx:font-semibold dshx:text-foreground dshx:phone:inline-flex dshx:phone:justify-self-end"
+          onClick={props.onDone}
+          data-thread-filter-done=""
+        >
+          {t('threadSidebarDone')}
+        </Button>
       </div>
       {props.project === undefined ? null : (
-        <section className={SECTION} aria-labelledby={`${ids}-project`}>
-          <h3 id={`${ids}-project`} className={HEADING}>
-            {t('threadSidebarGroupProject')}
-          </h3>
-          {props.project}
-        </section>
+        // The phone sheet's project, one inline row: "Project · All projects ›" (round 28, item 10).
+        <div className="dshx:px-3 dshx:py-0.5">{props.project}</div>
       )}
       {presets === undefined ? null : (
         <section className={cn(SECTION, 'dshx:pb-2')} aria-labelledby={`${ids}-presets`} data-thread-presets="">
@@ -256,10 +271,6 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
               </Button>
             </div>
           ) : null}
-          <Button type="button" size="sm" variant="ghost" className={QUIET_ROW} onClick={presets.onSaveAs}>
-            <BookmarkPlusIcon aria-hidden="true" />
-            {t('threadSidebarPresetSaveAs')}
-          </Button>
         </section>
       )}
       {props.status === undefined && props.source === undefined ? null : (

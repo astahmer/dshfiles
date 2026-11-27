@@ -3,7 +3,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
 /**
  * Productivity pass Q5 (T5.3): above the first thread row the list keeps the project picker and one Filter control. Since
  * filter presets (b:xpvk) its trigger names the active preset, "Filter: <preset>[ (edited)]". Since round nine it opens
- * one panel (a dialog named Filter; a bottom sheet on a phone) instead of a menu of submenus: the presets are radios,
+ * one panel (a dialog named Filters; a bottom sheet on a phone) instead of a menu of submenus: the presets are radios,
  * Status is a row of toggle chips with no Any chip (the rarer ones under More statuses, a Clear in its heading), Source and Group by are radio chips, and Board,
  * Thread list settings and Sidebar settings are buttons at its foot. The active preset's own verbs (Rename…, Delete…,
  * Mark all as read…) stay in a small "Preset options" menu beside the Presets heading. The Board page keeps its inline
@@ -19,7 +19,7 @@ const hasMenu = async (scope: Locator): Promise<boolean> => {
 }
 
 /** The open Filter panel. */
-const panel = (page: Page): Locator => page.getByRole('dialog', { name: 'Filter', exact: true })
+const panel = (page: Page): Locator => page.getByRole('dialog', { name: 'Filters', exact: true })
 
 const open = async (scope: Locator): Promise<Locator> => {
   const page = scope.page()
@@ -74,7 +74,7 @@ const selectView = async (page: Page, scope: Locator, name: string): Promise<voi
   await close(page)
 }
 
-/** An item of the active preset's options menu: Rename…, Update with current filters, Delete…, Mark all as read / unread, Manage presets…. */
+/** An item of the presets' options menu: Save current filters as preset…, Rename…, Update with current filters, Delete…, Mark all as read / unread, Manage presets…. */
 const clickViewItem = async (page: Page, scope: Locator, name: string): Promise<void> => {
   await (await open(scope)).getByRole('button', { name: /^Preset options: /u }).click()
   const menu = page.getByRole('menu', { name: /^Preset options/u })

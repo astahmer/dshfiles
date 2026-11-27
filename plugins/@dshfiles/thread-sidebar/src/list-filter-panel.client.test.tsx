@@ -44,7 +44,6 @@ const panel = (overrides: Partial<ListFilterPanelProps> = {}): ListFilterPanelPr
     onApply: vi.fn(),
     onSaveChanges: vi.fn(),
     onDiscard: vi.fn(),
-    onSaveAs: vi.fn(),
     options: <button type="button">options</button>,
   },
   status: { selected: [], onChange: vi.fn() },
@@ -361,5 +360,46 @@ describe('Source and Group by (round 28, item 8)', () => {
   it('names Reset for what it covers', () => {
     render(<ListFilterPanel {...panel()} />)
     expect(screen.getByRole('button', { name: 'threadSidebarFilterResetLabel' }).textContent).toBe('threadSidebarFilterReset')
+  })
+})
+
+// Council round 27, item 10: the phone sheet opens on what it filters, with a sticky Reset · Filters · Done header.
+describe('the phone sheet (round 28, item 10)', () => {
+  it('keeps a sticky header: Reset, the title "Filters", and Done, which only a phone shows', () => {
+    const onDone = vi.fn()
+    render(<ListFilterPanel {...panel({ onDone })} />)
+    const header = screen.getByRole('heading', { name: 'threadSidebarFilters' }).closest('[data-thread-filter-header]')
+    expect(header?.className).toContain('dshx:sticky')
+    expect(header?.className).toContain('dshx:top-0')
+    // On the phone sheet it sticks over the sheet's 20px grabber padding, so no row shows above it.
+    expect(header?.className).toContain('dshx:phone:-top-5')
+    expect(header?.className).toContain('dshx:bg-popover')
+    const done = within(header as HTMLElement).getByRole('button', { name: 'threadSidebarDone' })
+    expect(done.className).toContain('dshx:hidden')
+    expect(done.className).toContain('dshx:phone:inline-flex')
+    fireEvent.click(done)
+    expect(onDone).toHaveBeenCalledOnce()
+    // Reset leads on a phone, before the title.
+    expect(within(header as HTMLElement).getByRole('button', { name: 'threadSidebarFilterResetLabel' }).className).toContain('dshx:phone:order-first')
+  })
+
+  it('moves "Save current filters as preset…" out of the panel, keeping Save and Discard in view while edited', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    expect(screen.queryByText('threadSidebarPresetSaveAs')).toBeNull()
+    expect(screen.getByRole('button', { name: /threadSidebarPresetSaveChanges/u })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })).toBeTruthy()
+  })
+
+  it('opens the sheet at 85dvh, names it Filters, and puts Save as… and an inline Project row where the client builds them', () => {
+    expect(filterControl).toContain('dshx:phone:max-h-[85dvh]!')
+    expect(filterControl).toContain("aria-label={props.tSidebar('threadSidebarFilters')}")
+    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveAs')")
+    // "Project · All projects ›": one row, its label and value inline, not a heading over a field.
+    expect(filterControl).toMatch(/data-thread-project-row=""/u)
+    expect(filterControl).toContain('<ChevronRightIcon')
   })
 })
