@@ -486,6 +486,18 @@
           "testName": "filters the newest matches here and says so when the Host refuses event types"
         },
         {
+          "kind": "unit-test",
+          "id": "chat.find-filters-pending",
+          "file": "plugins/@dshfiles/chat/tests/thread-find-bar.test.tsx",
+          "testName": "shows Searching instead of the previous filter matches while a new filter loads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-filters-reveal",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "lands inside the rows the active filter keeps when it scans a Turn"
+        },
+        {
           "kind": "gherkin",
           "id": "chat.find-in-thread",
           "featureFile": "tooling/dshx/e2e/features/chat.feature"
