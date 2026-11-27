@@ -268,6 +268,9 @@ export class ClientLazyChunks {
         const built = new Map<string, LazyChunkBuild>()
         const retry: string[] = []
         const rebind: string[] = []
+        /** A chunk's own import() target → that chunk, and each chunk's modules, to keep a sibling from copying them. */
+        const parents = new Map<string, string>()
+        const chunkModules = new Map<string, ReadonlySet<string>>()
         const inline = (id: string): void => {
           retry.push(id)
           ClientLazyChunks.release(state, id)
@@ -282,6 +285,13 @@ export class ClientLazyChunks {
           }
           // The entry runs the target itself, or the target cannot be one chunk: keep it in client.js.
           if (chunk.unsupported !== undefined || entryModules.has(id)) {
+            inline(id)
+            continue
+          }
+          // A sibling chunk that bundles modules of the chunk loading it would run a second copy of them (Monaco's
+          // language modules and its core): keep it inside that chunk.
+          const parentModules = chunkModules.get(parents.get(id) ?? '')
+          if (parentModules !== undefined && chunk.modules.some(module => parentModules.has(module) && !isFacade(module))) {
             inline(id)
             continue
           }
@@ -316,12 +326,16 @@ export class ClientLazyChunks {
             if (bound === undefined || (!module.commonJs && names.some(name => !bound.has(name)))) rebind.push(id)
           }
           // Its own import() targets load as sibling chunks; one it also bundles statically is inlined instead.
+          chunkModules.set(id, new Set(chunk.modules))
           for (const [nested, nestedFile] of chunk.nested) {
             if (chunk.modules.includes(nested)) {
               state.inline.add(nested)
               state.cache.delete(id)
               rebind.push(id)
-            } else if (!targets.has(nested)) targets.set(nested, nestedFile)
+            } else if (!targets.has(nested)) {
+              targets.set(nested, nestedFile)
+              parents.set(nested, id)
+            }
           }
           built.set(fileName, chunk)
         }

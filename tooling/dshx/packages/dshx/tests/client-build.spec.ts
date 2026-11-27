@@ -1760,6 +1760,23 @@ describe('client lazy chunks', () => {
     }
   })
 
+  it('inlines a chunk own import() target that shares a module with that chunk, so nothing runs twice', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/engine.ts'), "export const engine = { languages: [] as string[] }\n")
+    await writeFile(resolve(root, 'src/language.ts'), "import { engine } from './engine'\nengine.languages.push('yaml')\nexport const registered = () => engine.languages.join(',')\n")
+    await writeFile(
+      resolve(root, 'src/heavy.ts'),
+      "import { engine } from './engine'\nexport const heavy = () => import('./language').then(module => `${module.registered()} ${engine.languages.length}`)\n",
+    )
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry.replace("import('./heavy').then(module => module.heavy)", "import('./heavy').then(module => module.heavy())"))
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    const heavyFile = chunkOf(report)
+    expect(heavyFile).toBeDefined()
+    expect(report.output.filter(item => item.fileName.startsWith('client.language.'))).toEqual([])
+    const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8'), heavy: await readFile(resolve(root, 'dist', heavyFile!), 'utf8') })
+    await expect(entry.apply()).resolves.toBe('yaml 1')
+  })
+
   it('shares the dshx client module, which the entry plugin resolves to a virtual module', async () => {
     const root = await temporaryProject()
     await writeFile(resolve(root, 'src/heavy.ts'), "import { defineContract } from '@dshfiles/dshx/client'\nexport const heavy = `${typeof defineContract} lazy` + 'only'\n")
