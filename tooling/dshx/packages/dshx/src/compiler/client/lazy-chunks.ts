@@ -439,14 +439,13 @@ export class ClientLazyChunks {
     )
     const unexpected = assets.filter(item => item !== map && !item.fileName.endsWith('.js.map'))
     const code = renderLazyImports(chunk?.code ?? '')
-    const unsupported =
-      chunk === undefined || chunks.length !== 1
-        ? 'it did not bundle into one chunk'
-        : unexpected.length > 0
-          ? `it emits ${unexpected.map(item => item.fileName).join(', ')}`
-          : code.includes(MARKER)
-            ? 'an import() was rendered outside the DSH chunk protocol'
-            : undefined
+    const unsupportedReason = (): string | undefined => {
+      if (chunk === undefined || chunks.length !== 1) return 'it did not bundle into one chunk'
+      if (unexpected.length > 0) return `it emits ${unexpected.map(item => item.fileName).join(', ')}`
+      if (code.includes(MARKER)) return 'an import() was rendered outside the DSH chunk protocol'
+      return undefined
+    }
+    const unsupported = unsupportedReason()
     return {
       code,
       map: map === undefined ? (chunk?.map?.toString() ?? undefined) : typeof map.source === 'string' ? map.source : Buffer.from(map.source).toString('utf8'),

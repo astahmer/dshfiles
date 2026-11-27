@@ -1360,7 +1360,7 @@ describe('client compiler', () => {
       if (!materialized.has(id)) materialized.set(id, factories.get(id)?.(requireModule))
       return materialized.get(id)
     }
-    const sandbox: Record<string, unknown> = {
+    const sandbox = {
       document: { querySelector: () => null, createElement: () => ({ dataset: {}, textContent: '' }), head: { appendChild: () => undefined } },
       window: {
         __ModuleLoader__: {
@@ -1370,6 +1370,7 @@ describe('client compiler', () => {
           },
         },
       },
+      globalThis: {},
     }
     sandbox.globalThis = sandbox
     for (const code of [await readFile(resolve(supplierRoot, 'dist/client.js'), 'utf8'), first, second]) vm.runInNewContext(code, sandbox)
