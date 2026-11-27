@@ -648,7 +648,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "tool-subagent",
       "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
       "ui": false,
-      "features": 2
+      "features": 3
     },
     {
       "name": "traces",
@@ -3606,10 +3606,25 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "vibe-acp-bridge",
       "title": "Run Vibe with DSH's tools through its ACP server",
-      "summary": "Let a Vibe thread call DSH tools, so its edits and commands go through DSH approvals, diffs and undo.",
+      "summary": "Let a Vibe thread call DSH tools, and answer its own edits and commands with the thread approval policy.",
       "destination": "settings",
-      "currentSurface": "settings: AI Accounts › account editor › Runtime paths › Bridge",
-      "reach": [],
+      "currentSurface": "settings: AI Accounts › Mistral Vibe ACP; accounts editor › Runtime paths › Bridge",
+      "reach": [
+        {
+          "text": "click button \"AI accounts\"",
+          "action": "click",
+          "by": "button",
+          "name": "AI accounts",
+          "value": null
+        },
+        {
+          "text": "expect text \"Mistral Vibe ACP\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Mistral Vibe ACP",
+          "value": null
+        }
+      ],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -25427,10 +25442,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect radio \"Arrange manually\"",
+          "text": "expect radio \"Custom, arrange manually\"",
           "action": "expect",
           "by": "radio",
-          "name": "Arrange manually",
+          "name": "Custom, arrange manually",
           "value": null
         },
         {
@@ -27419,10 +27434,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click radio \"Arrange manually\"",
+          "text": "click radio \"Custom, arrange manually\"",
           "action": "click",
           "by": "radio",
-          "name": "Arrange manually",
+          "name": "Custom, arrange manually",
           "value": null
         },
         {
@@ -28559,6 +28574,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "The subagent tool takes an agent handle, so a child starts with that agent's model, preset, instructions and tools.",
       "destination": "none",
       "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#child-turn-guard",
+      "plugin": "tool-subagent",
+      "id": "child-turn-guard",
+      "title": "Keep a delegated child working when its turn hands the task back",
+      "summary": "A subagent that stops early and hands its task back is asked to keep working, a bounded number of times.",
+      "destination": "none",
+      "currentSurface": "host: delegated child turns",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

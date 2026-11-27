@@ -34,7 +34,7 @@ From the onboarding feature catalog: 49 features, the 35 curated ones first.
 4. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
 5. **Use a Google AI plan through the Antigravity CLI** (`ai-accounts`, settings) — Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.
 6. **Spend the Vibe & Studio allowance through the Vibe CLI** (`ai-accounts`, settings) — Use the Vibe and Studio allowance of a signed-in Mistral Vibe login by running the official Vibe CLI for a thread.
-7. **Run Vibe with DSH's tools through its ACP server** (`ai-accounts`, settings) — Let a Vibe thread call DSH tools, so its edits and commands go through DSH approvals, diffs and undo.
+7. **Run Vibe with DSH's tools through its ACP server** (`ai-accounts`, settings) — Let a Vibe thread call DSH tools, and answer its own edits and commands with the thread approval policy.
 8. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.
 9. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
 10. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.

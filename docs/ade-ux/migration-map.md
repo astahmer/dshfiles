@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-587 features from 121 plugins.
+588 features from 121 plugins.
 
 ## Counts
 
@@ -23,7 +23,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
 | Composer |  |  |  | 72 |  |  |  |  |  |  |  |  |  |  | 72 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 44 | 44 |
-| No place of its own | 29 |  | 22 |  |  |  | 1 | 138 |  |  |  | 10 |  |  | 200 |
+| No place of its own | 29 |  | 22 |  |  |  | 1 | 139 |  |  |  | 10 |  |  | 201 |
 
 ## By current left-nav entry
 
@@ -91,7 +91,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | conversation.chat.assistant-actions | 1 | Work 1 |
 | dialog | 5 | Settings 3, No place of its own 1, Thread panel 1 |
 | empty thread view (first run); palette | 1 | Threads 1 |
-| host | 76 | No place of its own 76 |
+| host | 77 | No place of its own 77 |
 | host and client | 1 | No place of its own 1 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
@@ -369,7 +369,7 @@ rail destination (bottom); 73 features.
 | ai-accounts/reference-dashboard: Manage account Models, Settings and Usage | settingsSection | left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs |
 | ai-accounts/stalled-stream-fallback-setting: Turn on the fallback chain for stalled streams | settingsSection | settings: AI Accounts › Failure recovery › Fall back on stalled streams |
 | ai-accounts/strip-short-names: Short names in the sidebar usage strip | settingsSection | settings: AI Accounts › strip short names |
-| ai-accounts/vibe-acp-bridge: Run Vibe with DSH's tools through its ACP server | settingsSection | settings: AI Accounts › account editor › Runtime paths › Bridge |
+| ai-accounts/vibe-acp-bridge: Run Vibe with DSH's tools through its ACP server | settingsSection | settings: AI Accounts › Mistral Vibe ACP; accounts editor › Runtime paths › Bridge |
 | ai-accounts/vibe-cli-route: Spend the Vibe & Studio allowance through the Vibe CLI | settingsSection | dialog: Add AI account › Vibe CLI |
 | backlog/export-backlog: Export the backlog to a file | settingsSection | left-nav: Backlog › Backlog settings › Export |
 | backlog/jev-settings: Configure Jev from the Backlog panel | settingsSection | left-nav: Backlog › Backlog settings |
@@ -601,7 +601,7 @@ cards inline in the active thread; 44 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 200 features.
+palette commands, status items, agent tools, infrastructure; 201 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -769,6 +769,7 @@ palette commands, status items, agent tools, infrastructure; 200 features.
 | thread-sidebar/workbench-sidebar-assemblies: Dock sidebar views as tabs | infrastructure | main-tabs: New tab › Thread Sidebar views |
 | tool-search/agent-tool-access: Tools per agent: enabled and pinned | infrastructure | host: agent tool tool_search_access; contract module @dshfiles/tool-search/access |
 | tool-search/progressive-tool-disclosure: Search and disclose tools per agent | infrastructure | host: tool search (not mounted) |
+| tool-subagent/child-turn-guard: Keep a delegated child working when its turn hands the task back | infrastructure | host: delegated child turns |
 | traces/browser-interaction-traces: Browser interaction traces | infrastructure | host: browser interaction spans |
 | traces/event-loop-stalls: DSH stalls | infrastructure | host: probe; agent tool traces_stalls |
 | traces/otlp-receiver: Built-in trace receiver | infrastructure | host: OTLP receiver (read in left-nav: Traces: Explorer) |
