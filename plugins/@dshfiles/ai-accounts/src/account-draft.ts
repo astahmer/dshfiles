@@ -34,6 +34,7 @@ export class AccountDraftModel {
     cursor: '',
     mistral: '',
     antigravity: '',
+    vibe: '~/.vibe',
   } satisfies Record<AccountKind, string>
 
   /** The authored half of a profile; identity and health are observed, never sent back. */
@@ -46,6 +47,7 @@ export class AccountDraftModel {
     shadowHomePath: profile.shadowHomePath,
     apiKeyEnv: profile.apiKeyEnv,
     ...(profile.authSource !== undefined && { authSource: profile.authSource }),
+    ...(profile.bridge !== undefined && { bridge: profile.bridge }),
     apiBaseUrl: profile.apiBaseUrl,
     badge: profile.badge,
     accentColor: profile.accentColor,
@@ -77,6 +79,7 @@ export class AccountDraftModel {
     left.homePath === right.homePath &&
     left.shadowHomePath === right.shadowHomePath &&
     left.apiKeyEnv === right.apiKeyEnv &&
+    left.bridge === right.bridge &&
     left.authSource === right.authSource &&
     left.apiBaseUrl === right.apiBaseUrl &&
     left.badge === right.badge &&
@@ -159,7 +162,9 @@ export class AccountDraftModel {
       homePath: AccountDraftModel.defaultHome[input.kind],
       shadowHomePath: '',
       apiKeyEnv:
-        input.kind === 'codex' || input.kind === 'github-copilot' || input.kind === 'antigravity' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
+        input.kind === 'codex' || input.kind === 'github-copilot' || input.kind === 'antigravity' || input.kind === 'vibe'
+          ? ''
+          : AccountDraftModel.suggestedApiKeyRef(instanceId),
       apiBaseUrl: '',
       badge: AccountDraftModel.badgeFromName(displayName),
       accentColor: KIND_ACCENT[input.kind],

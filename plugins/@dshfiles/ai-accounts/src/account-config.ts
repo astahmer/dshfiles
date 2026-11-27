@@ -2,6 +2,8 @@ import type { AccountStoreFile } from './account-store.js'
 import type { Distribution } from './account-pool.js'
 import { CodexHomeModel } from './codex-home.js'
 import { CredentialModel } from './credentials.js'
+import { VibeAccountModel } from './vibe-account.js'
+import type { VibeBridge } from './api.js'
 export interface CodexAccountConfig {
   readonly instanceId: string
   readonly displayName: string
@@ -49,12 +51,24 @@ export interface AntigravityAccountConfig {
   readonly enabled: boolean
 }
 
+/** A Mistral Vibe CLI account: the route runs `vibe` with this VIBE_HOME's signed-in session instead of sending HTTP. */
+export interface VibeAccountConfig {
+  readonly instanceId: string
+  readonly displayName: string
+  /** The account's VIBE_HOME; empty means the Host user's `~/.vibe`. */
+  readonly home: string
+  /** `acp` holds one `vibe-acp` process per conversation and bridges DSH's tools; `headless` runs `vibe` per step. */
+  readonly bridge: VibeBridge
+  readonly enabled: boolean
+}
+
 export interface AiAccountsConfig {
   readonly codexAccounts: readonly CodexAccountConfig[]
   readonly opencodeAccounts: readonly OpenCodeAccountConfig[]
   readonly claudeAccounts: readonly ClaudeAccountConfig[]
   readonly githubCopilotAccounts: readonly GitHubCopilotAccountConfig[]
   readonly antigravityAccounts: readonly AntigravityAccountConfig[]
+  readonly vibeAccounts: readonly VibeAccountConfig[]
   readonly opencodeApiKey: string
   readonly distribution: Distribution
   readonly cooldownMs: number
@@ -76,6 +90,7 @@ export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig
   const claudeAccounts: ClaudeAccountConfig[] = []
   const githubCopilotAccounts: GitHubCopilotAccountConfig[] = []
   const antigravityAccounts: AntigravityAccountConfig[] = []
+  const vibeAccounts: VibeAccountConfig[] = []
   for (const account of file.accounts) {
     if (account.kind === 'codex' || account.kind === 'cursor') continue
     if (account.kind === 'github-copilot') {
@@ -84,6 +99,16 @@ export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig
     }
     if (account.kind === 'antigravity') {
       antigravityAccounts.push({ instanceId: account.instanceId, displayName: account.displayName, home: account.homePath, enabled: account.enabled })
+      continue
+    }
+    if (account.kind === 'vibe') {
+      vibeAccounts.push({
+        instanceId: account.instanceId,
+        displayName: account.displayName,
+        home: account.homePath,
+        bridge: VibeAccountModel.bridge(account.bridge),
+        enabled: account.enabled,
+      })
       continue
     }
     if (account.kind === 'claude') {
@@ -114,6 +139,7 @@ export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig
     claudeAccounts,
     githubCopilotAccounts,
     antigravityAccounts,
+    vibeAccounts,
     opencodeApiKey: CredentialModel.readKeyFromEnv('OPENCODE_API_KEY') ?? '',
     distribution: file.distribution,
     cooldownMs: file.cooldownMs,

@@ -22,7 +22,17 @@ import { ShellCommand } from './shell-command.js'
  * whether it holds a login, the identity it presents, and the command that creates one.
  */
 
-export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor', 'mistral', 'antigravity'])
+export const accountKindSchema = Schema.Literals([
+  'codex',
+  'claude',
+  'opencode-go',
+  'commandcode',
+  'github-copilot',
+  'cursor',
+  'mistral',
+  'antigravity',
+  'vibe',
+])
 
 export const createSetupAccountInputSchema = Schema.Struct({ kind: accountKindSchema, requestId: Schema.String.check(Schema.isUUID()) })
 export type CreateSetupAccountInput = typeof createSetupAccountInputSchema.Type
@@ -204,6 +214,11 @@ export const accountProfileSchema = Schema.Struct({
   apiKeyEnv: apiKeyEnvSchema,
   /** Explicit credential ownership; absent preserves legacy environment/CLI discovery precedence. */
   authSource: Schema.optional(Schema.Literals(['cli', 'reference'])),
+  /**
+   * How a Vibe account reaches its plan: `acp` runs one `vibe-acp` process per conversation and bridges DSH's tools
+   * into it, `headless` runs `vibe` once per step without them. Absent means `headless`.
+   */
+  bridge: Schema.optional(Schema.Literals(['acp', 'headless'])),
   /** Command Code accounts may point at a different API base. */
   apiBaseUrl: apiBaseUrlSchema,
   badge: Schema.String.check(Schema.isMaxLength(32)),
@@ -272,6 +287,7 @@ export const accountDraftSchema = Schema.Struct({
   shadowHomePath: accountProfileSchema.fields.shadowHomePath,
   apiKeyEnv: accountProfileSchema.fields.apiKeyEnv,
   authSource: accountProfileSchema.fields.authSource,
+  bridge: accountProfileSchema.fields.bridge,
   apiBaseUrl: accountProfileSchema.fields.apiBaseUrl,
   badge: accountProfileSchema.fields.badge,
   accentColor: accountProfileSchema.fields.accentColor,
@@ -329,6 +345,18 @@ export const accountsFileSchema = Schema.Struct({
   accounts: AiAccountsSchema.list(accountProfileSchema, 64),
 })
 
+/**
+ * The provider's own money for one window, beside the percentage. Billing windows are separate per bucket (an API
+ * credit and a plan's app allowance), so a percent alone can read "100% left" while the credit that pays for the
+ * requests is nearly spent. `limit` is the window's allowance, `used` what it reports spent; both in `currency`.
+ */
+export const usageWindowAmountSchema = Schema.Struct({
+  used: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+  limit: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+  currency: Schema.String.check(Schema.isMaxLength(8)),
+})
+export type UsageWindowAmount = typeof usageWindowAmountSchema.Type
+
 export const usageCardSchema = Schema.Struct({
   status: Schema.Literals(['ok', 'unauthenticated', 'unsupported', 'rate-limited', 'error']),
   message: Schema.NullOr(Schema.String.check(Schema.isMaxLength(300))),
@@ -341,6 +369,8 @@ export const usageCardSchema = Schema.Struct({
       resetsAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
       /** Luna Reserve: drawn on only after an ordinary window is spent. */
       reserve: Schema.optional(Schema.Boolean),
+      /** Absent when the provider reports only a percent. */
+      amount: Schema.optional(usageWindowAmountSchema),
     }),
     6,
   ),
@@ -475,6 +505,12 @@ export const identityResultSchema = Schema.Struct({
 })
 
 export type AccountProfile = typeof accountProfileSchema.Type
+/** The stored transport of a Vibe account: `acp` bridges DSH's tools, `headless` runs `vibe` per step. */
+export type VibeBridge = NonNullable<AccountProfile['bridge']>
+
+/** The bridge an account uses when it never chose one: the headless CLI, until the ACP bridge's settings work lands. */
+export const DEFAULT_VIBE_BRIDGE: VibeBridge = 'headless'
+export const vibeBridge = (value: VibeBridge | undefined): VibeBridge => value ?? DEFAULT_VIBE_BRIDGE
 export type AccountDraft = typeof accountDraftSchema.Type
 export type AccountsFile = typeof accountsFileSchema.Type
 export type AccountKind = typeof accountKindSchema.Type

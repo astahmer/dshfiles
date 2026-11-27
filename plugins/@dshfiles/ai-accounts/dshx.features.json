@@ -465,6 +465,176 @@
       ]
     },
     {
+      "id": "vibe-cli-route",
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ],
+      "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
+      "summary": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key request spends. The CLI's own catalog decides the models (Mistral Large 4, Mistral Medium 3.5, GLM 5.3, GLM 5.3 Flash, DeepSeek V4.1 Flash 1017), their thinking levels and their context windows. Each DSH step replays the transcript, streams the answer and its reasoning, and reports the run's tokens and cost from `export.json`. This is a CLI-agent route: Vibe owns its agent loop and tools, and DSH's tools are not bridged.",
+      "reach": [
+        "click text \"AI Accounts: Accounts\"",
+        "click button \"Add account\"",
+        "click button \"Vibe CLI account\"",
+        "expect button \"Copy Vibe sign-in command\""
+      ],
+      "surfaces": ["client", "host", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Vibe CLI",
+      "configuration": [],
+      "states": ["cli-missing", "signed-out", "signed-in", "streaming", "expired-key"],
+      "failureModes": [
+        "A Host without `vibe` reports the install and `vibe --setup` recovery instead of a spawn error.",
+        "A rejected model alias reports the CLI's own stderr so the alias can be corrected rather than retried silently.",
+        "A process that writes nothing for ten minutes is stopped and names the CLI log under VIBE_HOME.",
+        "The route disables an inherited MISTRAL_API_KEY so the CLI's signed-in session is what pays, not the API credit.",
+        "No quota is guessed: a signed-out profile reports unauthenticated, and the card reads Mistral's own two buckets when the CLI login exists."
+      ],
+      "externalDependencies": [
+        {
+          "id": "vibe-cli",
+          "boundary": "Mistral Vibe 3.1.5 headless mode (`--prompt-file`, `--output streaming`, `--output-dir`, `--model`, `--thinking`) and its `vibe --setup` login; DSH never copies or prints that credential.",
+          "deterministicFake": "vibe-cli.test.ts runs a fake `vibe` that reads the arguments, writes one completed history entry per JSON line and the export.json Vibe writes on exit."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-cli-stream",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-cli.test.ts",
+          "testName": "streams the answer and its reasoning, never a tool call, and reads tokens and cost from export.json"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-catalog",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-provider.test.ts",
+          "testName": "publishes the CLI catalog as one route over the cli transport"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-route",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-routes.test.ts",
+          "testName": "builds a route whose home is the VIBE_HOME the CLI signed in to"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "ai-accounts.vibe-cli-route-browser",
+          "reason": "Host-only transport: adding the account reuses the AI Accounts add-account dialog walked by the existing dashboard scenario, and the route's own catalogue and stream are proven by the fake-vibe unit tests. A browser scenario would only re-render that dialog, since no client surface renders the route itself."
+        }
+      ]
+    },
+    {
+      "id": "vibe-acp-bridge",
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ],
+      "title": "Run Vibe with DSH's tools through its ACP server",
+      "summary": "A Vibe account switched to the ACP bridge holds one `vibe-acp` process per thread: DSH's tools reach it as one stdio MCP server, Vibe publishes each call as `dsh_<tool>` before running it, the DSH step ends with `toolUse` while that call is held, and the tool result in DSH's next request releases it inside the same ACP prompt. A private agent profile in the process folder keeps only Vibe's read-only builtins plus the bridged `dsh_*` tools, so every write, edit and command runs through DSH's approvals, diffs and undo. Context usage, cost and the session's token meta from `usage_update` become per-step ledger numbers.",
+      "surfaces": [
+        "client",
+        "host",
+        "storage"
+      ],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts \u203a account editor \u203a Runtime paths \u203a Bridge",
+      "configuration": [],
+      "states": [
+        "headless",
+        "acp",
+        "starting",
+        "streaming",
+        "awaiting-tools",
+        "idle",
+        "cli-missing",
+        "signed-out",
+        "profile-missing"
+      ],
+      "failureModes": [
+        "A Host without `vibe-acp` reports the install hint and `vibe --setup` instead of a spawn error.",
+        "A signed-out account reports `VIBE_HOME=\u2026 vibe --setup` for its own home instead of a raw ACP error.",
+        "A session where Vibe did not load the managed agent profile fails the step instead of running with Vibe's own write, edit and shell tools enabled.",
+        "Vibe's own mutating builtins are absent from the session, so a model that reaches for `write_file` cannot write outside DSH.",
+        "A process that exits mid-step fails the step with its stderr tail; a cancelled step stops the process and its held call."
+      ],
+      "externalDependencies": [
+        {
+          "id": "vibe-acp",
+          "boundary": "Mistral Vibe 3.x's `vibe-acp` ACP stdio server and its `vibe --setup` login; DSH never copies or prints that credential.",
+          "deterministicFake": "vibe-acp.fixture.ts runs a fake `vibe-acp` that speaks ACP over stdio, projects the session/new MCP server, publishes tools as dsh_<tool>, and holds each bridged call until the ACP update was seen."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-ordering",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp-spike.test.ts",
+          "testName": "publishes a DSH tool as dsh_<tool> and emits its tool_call before the bridge call can be answered"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-tool-round-trip",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "holds a DSH tool call until DSH answers it, then continues the same ACP prompt in the same process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-managed-profile",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "runs Vibe with the managed agent profile: read-only builtins and dsh_* only, DSH instructions, the account home"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-refuses-unsafe-profile",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "refuses to run a step when Vibe did not load the managed profile instead of leaving its own tools enabled"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-usage",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "answers one step with Vibe s text, thinking and this step s share of the session usage"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-permission",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "allows a permission request for a bridged tool, and rejects one the route cannot name"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-switch",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-routes.test.ts",
+          "testName": "carries the per-account bridge, defaulting an account that never chose one to the headless CLI"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-switch-control",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-bridge-switch.test.tsx",
+          "testName": "shows the account s bridge and switches it when the other transport is chosen"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "ai-accounts.vibe-acp-browser",
+          "reason": "Host-only transport: the browser surface is the switch itself, whose pressed state and click are covered by the switch component test, and the route's catalogue, tool round trip, profile and usage by the fake-vibe-acp unit tests. A browser scenario would only re-render the account editor that existing AI Accounts scenarios already walk."
+        }
+      ]
+    },
+    {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
       "summary": "Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.",
@@ -1725,6 +1895,10 @@
     {
       "file": "src/claude-cli.ts",
       "reason": "Claude Code CLI transport of a model stream: each stream runs under agent-telemetry chat <model> span, and the CLI child lives as long as that stream."
+    },
+    {
+      "file": "src/vibe-cli.ts",
+      "reason": "Vibe CLI transport of a model stream: each stream runs under the agent-telemetry chat <model> span, and the `vibe` child lives only as long as that stream."
     },
     {
       "file": "src/antigravity-acp.ts",

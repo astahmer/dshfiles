@@ -14,6 +14,8 @@ import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
 import { Context, Effect, Layer } from 'effect'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { SidebarSettings } from './sidebar-settings.js'
+import { watchThread } from './subscription-actions.js'
+import { ThreadSubscriptions } from './subscriptions-store.js'
 import { createThreadActions, type HostEffect, type ThreadActionDeps, type ThreadActionSet } from './thread-actions.js'
 import { uniqueProjectTitle } from './project-titles.js'
 import { loadThreadDirectories } from './thread-directories-promise.js'
@@ -30,6 +32,7 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
     Effect.gen(function* () {
       const { ctx, packageId } = yield* HostContext
       const settings = yield* SidebarSettings
+      const subscriptions = yield* ThreadSubscriptions
       const sessions = createHostApiClient(ctx, sessionsApi, packageId)
       const continuation = createHostApiClient(ctx, continuationApi, packageId)
       const jj = createHostApiClient(ctx, jjIntegrationApi, packageId)
@@ -134,6 +137,11 @@ export class ThreadActions extends Context.Service<ThreadActions, ThreadActionSe
               { signal: AbortSignal.any([signal, AbortSignal.timeout(PROMPT_TIMEOUT_MS)]) },
             ),
           ).pipe(Effect.asVoid),
+        watch: input =>
+          watchThread(input).pipe(
+            Effect.provideService(ThreadSubscriptions, subscriptions),
+            Effect.mapError(cause => new ThreadHostCallFailed({ cause })),
+          ),
         ownWorkspaceFor: projectId =>
           host(signal => jj.ownWorkspaceFor({ workspaceId: projectId }, { signal })).pipe(
             Effect.map(value => value.workspaceId),

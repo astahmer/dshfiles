@@ -55,6 +55,7 @@ beforeEach(async () => {
         draft('claude_work', 'claude', { homePath: '~/.claude-work' }),
         draft('commandcode_a', 'commandcode'),
         draft('cursor_a', 'cursor'),
+        draft('vibe_work', 'vibe', { homePath: '/synthetic/vibe' }),
       ],
     }),
   )
@@ -75,8 +76,9 @@ describe('host boot against the account store', () => {
     expect(file.accounts.find(account => account.instanceId === 'codex')?.reasoningDefaults['gpt-6-luna']).toBe('low')
     const { routes, rejected } = ProviderRoutes.buildRoutes(configFromAccountsFile(file))
     expect(rejected).toEqual([])
-    expect([...routes.keys()].sort()).toEqual(['claude_work', 'codex', 'commandcode_a'])
+    expect([...routes.keys()].sort()).toEqual(['claude_work', 'codex', 'commandcode_a', 'vibe_work'])
     expect(routes.get('claude_work')?.kind).toBe('claude')
+    expect(routes.get('vibe_work')).toMatchObject({ kind: 'vibe', home: '/synthetic/vibe' })
   })
 
   it('persists account reasoning defaults and paused curation across ordinary saves', async () => {
@@ -117,7 +119,7 @@ describe('host boot against the account store', () => {
     if (original === undefined) return
     await accountStoreService.upsertAccount({ ...original, instanceId: 'commandcode_b' }, 'commandcode_a')
     const after = await accountStoreService.readAccountFile()
-    expect(after.accounts.map(account => account.instanceId)).toEqual(['codex', 'claude_work', 'commandcode_b', 'cursor_a'])
+    expect(after.accounts.map(account => account.instanceId)).toEqual(['codex', 'claude_work', 'commandcode_b', 'cursor_a', 'vibe_work'])
     await expect(accountStoreService.upsertAccount({ ...original, instanceId: 'codex' }, 'commandcode_b')).rejects.toThrow(/already exists/)
   })
 })

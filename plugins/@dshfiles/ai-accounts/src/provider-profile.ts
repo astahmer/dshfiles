@@ -13,6 +13,7 @@ import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/gith
 import type { createCommandCodeProvider } from './commandcode-provider.js'
 import type { createMistralProvider } from './mistral-provider.js'
 import type { createAntigravityProvider } from './antigravity-provider.js'
+import type { createVibeProvider } from './vibe-provider.js'
 
 /** DeepSeek's documented default effort when thinking is on and the request names none. */
 const DEEPSEEK_DEFAULT_EFFORT = 'high'
@@ -127,6 +128,7 @@ export class ProviderProfileModel {
       | ReturnType<typeof createCommandCodeProvider>
       | ReturnType<typeof createMistralProvider>
       | ReturnType<typeof createAntigravityProvider>
+      | ReturnType<typeof createVibeProvider>
     readonly provider: string
     readonly displayName: string
     readonly additionalModelIds: readonly string[]

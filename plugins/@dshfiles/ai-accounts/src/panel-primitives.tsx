@@ -43,7 +43,7 @@ export const ProviderGlyph = (props: { readonly kind: AccountProfile['kind']; re
       props.kind === 'opencode-go' && 'dshx:bg-violet dshx:text-primary-foreground',
     )}
     style={
-      props.kind === 'claude' || props.kind === 'commandcode' || props.kind === 'mistral' || props.kind === 'antigravity'
+      props.kind === 'claude' || props.kind === 'commandcode' || props.kind === 'mistral' || props.kind === 'antigravity' || props.kind === 'vibe'
         ? { backgroundColor: KIND_ACCENT[props.kind], color: 'white' }
         : undefined
     }

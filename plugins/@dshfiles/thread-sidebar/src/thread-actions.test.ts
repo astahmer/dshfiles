@@ -54,6 +54,7 @@ const effectDeps = (deps: FixtureDeps): ThreadActionDeps => ({
   continueIn: hostVerb(deps.continueIn),
   create: hostVerb(deps.create),
   prompt: hostVerb(deps.prompt),
+  watch: hostVerb(deps.watch),
   ownWorkspaceFor: hostVerb(deps.ownWorkspaceFor),
   stop: hostVerb(deps.stop),
   selectModel: hostVerb(deps.selectModel),
@@ -121,6 +122,7 @@ const createDeps = (overrides: Partial<FixtureDeps> = {}): FixtureDeps => ({
   continueIn: async () => ({ sessionId: 'session-continued' }),
   create: async () => ({ sessionId: 'session-new' }),
   prompt: async () => undefined,
+  watch: async () => undefined,
   ownWorkspaceFor: async projectId => projectId,
   stop: async () => undefined,
   selectModel: async input => ({ provider: input.provider, model: input.model }),
@@ -581,12 +583,14 @@ describe('thread actions: lifecycle', () => {
     expect(await actions.create({ input: { projectId: 'project-1', title: 'Fresh' }, caller: agent('session-a'), signal })).toEqual({
       sessionId: 'session-new',
       title: 'Fresh',
+      notify: 'subscribed',
     })
     expect(created).toEqual([{ projectId: 'project-1' }])
 
     const refused = createThreadActions(createDeps({ rename: async () => Promise.reject(new Error('title refused')) }))
     expect(await refused.create({ input: { title: 'Fresh' }, caller: agent('session-a'), signal })).toEqual({
       sessionId: 'session-new',
+      notify: 'subscribed',
     })
   })
 
@@ -612,7 +616,7 @@ describe('thread actions: lifecycle', () => {
         caller: agent('session-a'),
         signal,
       }),
-    ).toEqual({ sessionId: 'session-new', title: 'Delegated brief', prompt: 'accepted' })
+    ).toEqual({ sessionId: 'session-new', title: 'Delegated brief', prompt: 'accepted', notify: 'subscribed' })
     expect(prompts).toEqual([{ sessionId: 'session-new', text: 'Investigate the flaky checkout test.\nDo not touch main.', mode: 'queue' }])
     expect(order).toEqual(['rename', 'prompt'])
   })
@@ -631,6 +635,7 @@ describe('thread actions: lifecycle', () => {
     expect(await actions.create({ input: { text: 'Fix the failing e2e journey' }, caller: agent('session-a'), signal })).toEqual({
       sessionId: 'session-new',
       prompt: 'accepted',
+      notify: 'subscribed',
     })
     expect(prompts).toEqual(['Fix the failing e2e journey'])
   })
@@ -645,7 +650,7 @@ describe('thread actions: lifecycle', () => {
       }),
     )
 
-    expect(await actions.create({ input: {}, caller: agent('session-a'), signal })).toEqual({ sessionId: 'session-new' })
+    expect(await actions.create({ input: {}, caller: agent('session-a'), signal })).toEqual({ sessionId: 'session-new', notify: 'subscribed' })
     expect(prompted).toBe(false)
   })
 
@@ -661,6 +666,7 @@ describe('thread actions: lifecycle', () => {
       title: 'Brief',
       prompt: 'refused',
       promptError: 'prompt rejected',
+      notify: 'subscribed',
     })
   })
 

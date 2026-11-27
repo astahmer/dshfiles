@@ -76,6 +76,7 @@ const accountAuthenticationLabel = (account: Pick<AccountProfile, 'kind' | 'apiK
   if (account.kind === 'codex') return 'ChatGPT (OAuth)'
   if (account.kind === 'github-copilot') return 'GitHub (OAuth)'
   if (account.kind === 'antigravity') return 'Antigravity CLI login'
+  if (account.kind === 'vibe') return 'Vibe CLI login'
   if (account.authSource === 'cli') return account.kind === 'claude' ? 'Claude Code subscription' : 'CLI login'
   if (account.apiKeyEnv !== '') return 'Credential reference'
   if (account.kind === 'claude') return 'Claude Code subscription'

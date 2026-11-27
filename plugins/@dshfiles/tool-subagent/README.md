@@ -91,6 +91,21 @@ nothing. `profiles/web/cordis.patch.yml` names `@dshfiles/tool-subagent` for the
 until its own rows get the same `name` edit. The native `subagent-model-selection-settings` row stays: this fork reads
 its `subagentModelSelection` service. The Host must restart for either change.
 
+## Adding a model route or an account
+
+Once the fork is wired, a route added to the Subagent models setting reaches running threads without a restart
+(2026-11-26: `github-copilot_work/gpt-6.1-terra`, added in a running lead thread, later appeared in its
+`list_subagent_models`).
+
+- Change the list through Settings › Subagent models, or the `settings_set` tool on
+  `subagent-model-selection-settings`: both write through the settings service, so the change applies right away.
+- Editing `profiles/web/cordis.patch.yml` by hand is not instant. The running thread kept the old list until the
+  settings service picked the file up again. Don't take a missing route right after a hand edit as a reason to
+  restart.
+- To use a route before it shows up, or a route the list doesn't allow: `thread_create` a new thread,
+  `thread_select_model` on it (any authorized provider/model, independent of the subagent list), then `thread_prompt`
+  the task. A thread is not a child: it doesn't report back by itself, so read its result when it goes idle.
+
 ## Updating from DSH
 
 ```sh

@@ -4,12 +4,13 @@ import { CopyIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import { ApiKeySetupDialog } from './api-key-setup-dialog.js'
-import { AccountsRules, type AccountDraft } from './api.js'
+import { AccountsRules, vibeBridge, type AccountDraft } from './api.js'
 import { NumberedSection } from './panel-primitives.js'
 import { AccountDraftModel } from './account-draft.js'
 import { shouldOfferCredentialSetup } from './credential-setup-model.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import { ShellCommand } from './shell-command.js'
+import { VibeBridgeSwitch } from './vibe-bridge-switch.js'
 
 const PathField = (props: {
   readonly label: string
@@ -58,12 +59,15 @@ const KEY_FIELD = {
     placeholder: 'MISTRAL_WORK_API_KEY',
   },
   antigravity: null,
+  // A Vibe account's only path is its VIBE_HOME, which gets its own field below; it carries no key reference.
+  vibe: null,
 } satisfies Record<AccountDraft['kind'], { readonly label: string; readonly hint: string; readonly placeholder: string } | null>
 
 const launchCommandFor = (draft: AccountDraft): string | null => {
   if (draft.kind === 'codex' && draft.shadowHomePath.trim() !== '') return ShellCommand.withEnvironment('CODEX_HOME', draft.shadowHomePath, 'codex')
   if (draft.kind === 'claude') return claudeLaunchCommand(draft.homePath.trim())
   if (draft.kind === 'antigravity') return antigravityLaunchCommand(draft.homePath.trim())
+  if (draft.kind === 'vibe') return vibeLaunchCommand(draft.homePath.trim())
   return null
 }
 
@@ -83,6 +87,13 @@ const antigravityLaunchCommand = (homePath: string): string => {
   if (homePath === '' || /^~\/?$/u.test(homePath)) return 'agy'
   if (homePath.startsWith('~/')) return `HOME="$HOME"/${ShellCommand.posixQuote(homePath.slice(2))} agy`
   return ShellCommand.withEnvironment('HOME', homePath, 'agy')
+}
+
+/** `vibe` reads its login from VIBE_HOME; an empty home is the user's own default profile. */
+const vibeLaunchCommand = (homePath: string): string => {
+  if (homePath === '' || /^~\/\.vibe\/?$/u.test(homePath)) return 'vibe --setup'
+  if (homePath.startsWith('~/')) return `VIBE_HOME="$HOME"/${ShellCommand.posixQuote(homePath.slice(2))} vibe --setup`
+  return ShellCommand.withEnvironment('VIBE_HOME', homePath, 'vibe --setup')
 }
 
 export const RuntimePathsSection = (props: {
@@ -177,6 +188,27 @@ export const RuntimePathsSection = (props: {
           placeholder="empty: ~ (agy acp --login)"
           value={draft.homePath}
         />
+      ) : null}
+      {draft.kind === 'vibe' ? (
+        <>
+          <PathField
+            ariaLabel="VIBE_HOME"
+            hint="The folder `vibe --setup` signed in to. Empty uses your own ~/.vibe; a thread on this account draws that plan's Vibe & Studio allowance."
+            label="VIBE_HOME"
+            onChange={homePath => setDraft({ ...draft, homePath })}
+            placeholder="~/.vibe"
+            value={draft.homePath}
+          />
+          <VibeBridgeSwitch
+            bridge={vibeBridge(draft.bridge)}
+            disabled={props.state.saving === true}
+            onChange={bridge => {
+              const next = { ...draft, bridge }
+              setDraft(next)
+              void save(next)
+            }}
+          />
+        </>
       ) : null}
       {keyField === null ? null : (
         <>
