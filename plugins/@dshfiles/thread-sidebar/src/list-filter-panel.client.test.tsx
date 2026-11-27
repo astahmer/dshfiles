@@ -1304,3 +1304,15 @@ describe('More statuses reveals into view (round 31, item 8)', () => {
     }
   })
 })
+
+// Council round 30, item 9: the kit toggle's hover:bg-muted replaced a resting chip's fill with the dark sheet's own
+// step, so a hovered chip lost its shape in dark. A hovered chip keeps its trigger fill; a selected one keeps its thumb.
+describe('a hovered chip keeps its fill (round 31, item 9)', () => {
+  it('overrides the kit hover fill with the trigger fill, and the selected thumb on hover', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
+    const off = screen.getByRole('button', { name: 'threadSidebarUnread' })
+    expect(off.className).toContain('dshx:hover:bg-trigger-fill')
+    const on = screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })
+    expect(on.className).toContain('dshx:data-[state=on]:hover:bg-(--dshx-segment-thumb)')
+  })
+})

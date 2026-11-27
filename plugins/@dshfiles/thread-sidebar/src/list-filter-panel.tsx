@@ -131,10 +131,11 @@ const ShownAnnouncer = (props: { readonly note: { readonly text: string; readonl
 /**
  * A chip (council round 27, item 6): the quiet trigger fill and the secondary ink at rest (no hairline: sixteen edged
  * chips read as a form); selected, the segments' own look (council round 28, item 14): the segment thumb under the
- * segment edge, no shadow (as the thumb), its label the ink at 550, with the check in its seat.
+ * segment edge, no shadow (as the thumb), its label the ink at 550, with the check in its seat. Hover keeps either fill
+ * (council round 30, item 9: the kit toggle's hover fill is the dark sheet's own step, so a hovered chip lost its shape).
  */
 const CHIP =
-  'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:text-foreground dshx:data-[state=on]:border-(--dshx-segment-edge) dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
+  'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:data-[state=on]:border-(--dshx-segment-edge) dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:hover:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
 
 /** What a status chip's seat draws at rest: the glyph the list draws for that state (council round 27, item 9). */
 type ChipMark = WorkStatus | 'unread' | 'muted' | 'archived'
