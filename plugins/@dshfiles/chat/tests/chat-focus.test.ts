@@ -15,6 +15,16 @@ describe('chat focus contract', () => {
     expect(() => ChatFocusModel.encode({ turn: 1.5 })).toThrow()
   })
 
+  it('round-trips a message-sequence focus and refuses invalid shapes', () => {
+    const messageFocus = { seq: 42, type: 'assistant/message' as const, query: 'quartz' }
+    expect(ChatFocusModel.decode(ChatFocusModel.encode(messageFocus))).toEqual(messageFocus)
+    expect(ChatFocusModel.decode(ChatFocusModel.encode({ seq: 0 }))).toEqual({ seq: 0 })
+    expect(ChatFocusModel.decode('dshfiles-chat-focus:{"seq":-1}')).toBeNull()
+    expect(ChatFocusModel.decode('dshfiles-chat-focus:{"seq":10,"type":"tool/call"}')).toBeNull()
+    expect(ChatFocusModel.decode('dshfiles-chat-focus:{"seq":10,"turn":1}')).toBeNull()
+    expect(ChatFocusModel.decode('dshfiles-chat-focus:{"seq":10,"extra":true}')).toBeNull()
+  })
+
   it('keeps one pending request per thread until taken or expired, and announces it', () => {
     const announced: unknown[] = []
     const listener = (event: Event): void => {
@@ -90,5 +100,27 @@ describe('revealChatFocus', () => {
     vi.advanceTimersToNextFrame()
     expect(list.querySelector('[data-chat-anchor-key="u1"]')?.hasAttribute(CHAT_FOCUS_ATTRIBUTE)).toBe(true)
     expect(revealed).not.toHaveBeenCalled()
+  })
+
+  it('navigates to and highlights a message-sequence focus by rendered node key and opens folded prompts', () => {
+    const list = document.createElement('div')
+    list.innerHTML = `
+      <div data-chat-turn="4" data-chat-node-key="node-user-40" data-chat-flow-kind="user" data-prompt-fold="closed">
+        <div id="prompt-body">Long prompt text</div>
+      </div>
+      <div data-chat-turn="4" data-chat-node-key="node-assistant-45" data-chat-flow-kind="assistant-step">Assistant reply</div>`
+    document.body.append(list)
+    const navigate = vi.fn()
+    revealChatFocus({
+      list,
+      focus: { seq: 40, type: 'user/message', query: 'Long' },
+      resolveTurn: () => 4,
+      resolveRow: () => 'node-user-40',
+      navigate,
+    })
+    vi.advanceTimersToNextFrame()
+    expect(navigate).toHaveBeenCalledTimes(1)
+    expect(list.querySelector('[data-chat-node-key="node-user-40"]')?.hasAttribute(CHAT_FOCUS_ATTRIBUTE)).toBe(true)
+    expect(document.getElementById('prompt-body')?.scrollTop).toBe(1)
   })
 })

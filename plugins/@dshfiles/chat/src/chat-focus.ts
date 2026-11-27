@@ -21,20 +21,30 @@ const CHAT_FOCUS_EVENT = 'dshfiles-chat:focus'
 const CHAT_FOCUS_TTL_MS = 30_000
 const FOCUS_PREFIX = 'dshfiles-chat-focus:'
 
-const chatFocusSchema = Schema.Struct({
+const turnFocusSchema = Schema.Struct({
   turn: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
   step: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(0))),
   toolCallId: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
 })
 
-export type ChatFocus = Schema.Schema.Type<typeof chatFocusSchema>
+const messageFocusSchema = Schema.Struct({
+  seq: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  type: Schema.optional(Schema.Literals(['user/message', 'assistant/message'])),
+  query: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512))),
+})
+
+const chatFocusTargetSchema = Schema.Union([turnFocusSchema, messageFocusSchema])
+
+export type ChatFocus = Schema.Schema.Type<typeof turnFocusSchema>
+export type ChatMessageFocus = Schema.Schema.Type<typeof messageFocusSchema>
+export type ChatFocusTarget = Schema.Schema.Type<typeof chatFocusTargetSchema>
 
 /** The contract rejects unknown keys, so a stale writer cannot smuggle fields through the opaque string. */
-const decodeFocus = Schema.decodeUnknownSync(chatFocusSchema, { onExcessProperty: 'error' })
-const decodeFocusOption = Schema.decodeUnknownOption(chatFocusSchema, { onExcessProperty: 'error' })
+const decodeFocus = Schema.decodeUnknownSync(chatFocusTargetSchema, { onExcessProperty: 'error' })
+const decodeFocusOption = Schema.decodeUnknownOption(chatFocusTargetSchema, { onExcessProperty: 'error' })
 
 interface PendingFocus {
-  readonly focus: ChatFocus
+  readonly focus: ChatFocusTarget
   readonly expiresAt: number
 }
 
@@ -49,9 +59,9 @@ const pendingRequests = (): Map<string, PendingFocus> => {
 }
 
 /** The opaque `focus` string of a Conversation View request addressed to Chat. */
-const encode = (focus: ChatFocus): string => `${FOCUS_PREFIX}${JSON.stringify(decodeFocus(focus))}`
+const encode = (focus: ChatFocusTarget): string => `${FOCUS_PREFIX}${JSON.stringify(decodeFocus(focus))}`
 
-const decode = (value: string): ChatFocus | null => {
+const decode = (value: string): ChatFocusTarget | null => {
   if (!value.startsWith(FOCUS_PREFIX)) return null
   try {
     const parsed = decodeFocusOption(JSON.parse(value.slice(FOCUS_PREFIX.length)))
@@ -62,14 +72,14 @@ const decode = (value: string): ChatFocus | null => {
 }
 
 /** Address one focus to a thread's Chat view, whether or not it is mounted yet. */
-const request = (input: { readonly sessionId: string; readonly focus: ChatFocus; readonly now?: number }): void => {
+const request = (input: { readonly sessionId: string; readonly focus: ChatFocusTarget; readonly now?: number }): void => {
   const focus = decodeFocus(input.focus)
   pendingRequests().set(input.sessionId, { focus, expiresAt: (input.now ?? Date.now()) + CHAT_FOCUS_TTL_MS })
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(CHAT_FOCUS_EVENT, { detail: { sessionId: input.sessionId } }))
 }
 
 /** Remove and return the thread's pending focus, or null when there is none or it expired. */
-const take = (sessionId: string, now: number = Date.now()): ChatFocus | null => {
+const take = (sessionId: string, now: number = Date.now()): ChatFocusTarget | null => {
   const requests = pendingRequests()
   const pending = requests.get(sessionId)
   requests.delete(sessionId)
@@ -82,7 +92,8 @@ export class ChatFocusModel {
   /** Window event Chat listens to for a request addressed to the thread it shows. */
   static readonly event = CHAT_FOCUS_EVENT
   static readonly ttlMs = CHAT_FOCUS_TTL_MS
-  static readonly schema = chatFocusSchema
+  static readonly schema = turnFocusSchema
+  static readonly targetSchema = chatFocusTargetSchema
   static readonly encode = encode
   static readonly decode = decode
   static readonly request = request

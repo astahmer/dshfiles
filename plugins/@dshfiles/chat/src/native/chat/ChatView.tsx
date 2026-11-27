@@ -376,10 +376,6 @@ export function ChatView({
   useLayoutEffect(() => {
     if (scroll.followingTail) keepTail()
   }, [scroll.followingTail, keepTail])
-  useChatFocus({
-    sessionId, viewRequest, completeViewRequest, ready: scroll.initialized,
-    railItems, navigateToTurn: scroll.navigateToTurn, listRef: scroll.listRef,
-  })
   const interactionSurfaceRef = useRef<HTMLDivElement>(null)
   const interactionIds = useInteractionIds(ids => ids)
   const textInteraction = useTextInteraction(scroll.columnRef, interactionSurfaceRef, dispatchInteraction, interactionIds)
@@ -493,6 +489,10 @@ export function ChatView({
     if (nodeStore.get(key as NodeKey)?.kind !== 'user') return key
     return rows.find(row => nodeStore.get(row.key as NodeKey)?.kind === 'turn-process')?.key ?? key
   }, [nodeStore])
+  useChatFocus({
+    sessionId, viewRequest, completeViewRequest, ready: scroll.initialized,
+    railItems, navigateToTurn: scroll.navigateToTurn, jumpToTurn, rowFor, listRef: scroll.listRef,
+  })
   const railRef = useRef(railItems)
   railRef.current = railItems
   const activeRef = useRef(activeTurn)
