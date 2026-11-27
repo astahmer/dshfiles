@@ -503,3 +503,18 @@ describe('edges (round 28, item 16)', () => {
     expect(optionsMenu).toMatch(/size="icon-xs"[^>]*?className="[^"]*dshx:-mr-1[^"]*"/su)
   })
 })
+
+// Council round 27, item 12: every control has a 44 × 44 hit area on a coarse pointer, and none takes a tap meant for its
+// neighbour. Measured on iPhone WebKit: chips and segments already held 44 × 44; the 24px buttons in a heading row (the
+// presets' ⋯, Status' Clear) lost 8px of theirs to the row under them. Their rows are 44px on a coarse pointer.
+describe('hit areas (round 28, item 12)', () => {
+  it("gives a heading row that holds a 24px button a 44px row on a coarse pointer, so its hit area stays in the row", () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
+    const presetsHeading = screen.getByRole('heading', { name: 'threadSidebarPresets' }).parentElement
+    expect(presetsHeading?.className).toContain('dshx:pointer-coarse:h-11')
+    // The desktop row keeps its tight -4px margins; a coarse pointer drops them.
+    expect(presetsHeading?.className).toContain('dshx:pointer-coarse:my-0')
+    const statusHeading = screen.getByRole('button', { name: 'threadSidebarFilterClear' }).closest('[data-thread-status-heading]')
+    expect(statusHeading?.className).toContain('dshx:pointer-coarse:h-11')
+  })
+})

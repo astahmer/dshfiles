@@ -244,7 +244,8 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
       )}
       {presets === undefined ? null : (
         <section className={cn(SECTION, 'dshx:pb-2')} aria-labelledby={`${ids}-presets`} data-thread-presets="">
-          <div className="dshx:-my-1 dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+          {/* A 44px row on a coarse pointer, so the ⋯'s 44px hit area stays in it (round 28, item 12). */}
+          <div className="dshx:-my-1 dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:pointer-coarse:my-0 dshx:pointer-coarse:h-11">
             <h3 id={`${ids}-presets`} className={HEADING}>
               {t('threadSidebarPresets')}
             </h3>
@@ -445,7 +446,8 @@ const StatusChips = (props: {
   return (
     <section className="dshx:grid dshx:gap-1.5" aria-labelledby={props.headingId}>
       {/* No status on means any (no Any chip); a ghost Clear stands in the heading while one is on. */}
-      <div className="dshx:flex dshx:h-6 dshx:items-center dshx:justify-between dshx:gap-2" data-thread-status-heading="">
+      {/* A 44px row on a coarse pointer, so Clear's 44px hit area never reaches the chips (round 28, item 12). */}
+      <div className="dshx:flex dshx:h-6 dshx:items-center dshx:justify-between dshx:gap-2 dshx:pointer-coarse:h-11" data-thread-status-heading="">
         <h3 id={props.headingId} className={HEADING}>
           {props.t('threadSidebarFilterStatus')}
         </h3>
