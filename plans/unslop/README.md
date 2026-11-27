@@ -482,6 +482,25 @@ control). The subagent scene lost its failed child from the list on a fresh page
 a race in the session-controller fork's list, which served the checkpoint taken at creation when a Session detached
 before its final save landed. Fixed in `wowzqpwz`, which lists a detached Session from its final projection cut.
 
+### Round nine: faster, less buggy, a calmer list filter (2026-11-27)
+
+Owner: "the UI feels slow and buggy; the phone over Tailscale is very slow", plus an annotation on the list's "Filter:
+Working" menu. Live measurements: Host healthy (lag p99 48 ms); every page load parsed ~25 MB of client JS and ~3 MB of
+API data; the phone was CPU-bound (RTT 100 vs 250 ms made no difference). Spec: `.cache/unslop-audit/r5/council/round-9-perf.md`.
+- Lane J (JS): dshx lazy chunks now share their entry's modules (they were silently inlined before), `lazyView` in the
+  kit, 18 plugins load their pages on demand, the kit is served once from shared-runtime, tool-meta loads the diff
+  renderer on expand, component-gallery leaves the web seed. Boot JS 25.43 → 18.07 MB decoded (−29%), 7.9 → 5.55 MB
+  gzip; phone boot long tasks 10.4 → 7.6 s. Kit code edits now need a page refresh (style edits still hot-reload).
+- Lane D (data): Settings labels 481 → 75 KB; settled thread ids leave Settings for their own store (describe 783 →
+  350 KB on the scratch, ~−520 KB per live load); `tokenUsage` dropped from `session/list`; a resource's first read waits
+  for its event stream (no double attention read); timed snooze ends announced. Scratch load 977 → 571 KB.
+- Lane T (list): the hover strip never reflows or covers the title; the Filter menu became one Filters panel (desktop
+  popover, phone sheet). Council on the panel: round 27 Astra 8.5 / Fable 8 / Opus 7.5; round 28 Astra 9 / Opus 8.5 /
+  Fable 8.5; round-28 fixes in `.cache/unslop-audit/r5/council/round-28-filter-fixes.md` in progress.
+Integrated tip captures (`round-27/`) match round 26 apart from clocks and the new panel button; shot 15 captures again.
+Restart when landing live: Host halves of thread-sidebar, settings-shell, activity-timeline; refresh pages after the
+shared-runtime change.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
