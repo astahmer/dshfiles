@@ -2,27 +2,11 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ThreadFindBar, type ThreadFindBarProps } from '../src/native/chat/ThreadFindBar.tsx'
+import { en } from '../src/native/locale.ts'
 import { ThreadFindPort, type ThreadFindCall } from '../src/thread-find-port.ts'
 
-const LABELS = new Map<string, string>([
-  ['chat.find.label', 'Find in thread'],
-  ['chat.find.placeholder', 'Find in thread'],
-  ['chat.find.searching', 'Searching…'],
-  ['chat.find.none', 'No matches'],
-  ['chat.find.older', 'Older match'],
-  ['chat.find.newer', 'Newer match'],
-  ['chat.find.close', 'Close find'],
-  ['chat.find.filters', 'Filter matches'],
-  ['chat.find.filter.all', 'All'],
-  ['chat.find.filter.assistant', 'Agent'],
-  ['chat.find.filter.user', 'User'],
-  ['chat.find.filter.tools', 'Tools'],
-  ['chat.find.loadedOnly', 'Loaded only'],
-  ['chat.find.notInstalled', 'Not installed'],
-  ['chat.find.failed', 'Failed: {message}'],
-  ['chat.find.retry', 'Retry'],
-  ['chat.find.filterNeedsUpdate', 'Filters cover only the newest {limit} matches'],
-])
+// The shipped English table: a label key the bar uses but the locale lacks shows up as the raw key and fails the queries.
+const LABELS = new Map<string, string>(Object.entries(en))
 
 const t: ThreadFindBarProps['t'] = (key, params) =>
   Object.entries(params ?? {}).reduce((label, [name, value]) => label.replace(`{${name}}`, String(value)), LABELS.get(key) ?? key)
@@ -122,7 +106,7 @@ describe('ThreadFindBar filters', () => {
     await waitFor(() => expect(pending).toHaveLength(1))
     expect(screen.getByText('Searching…')).toBeTruthy()
     expect(screen.queryByText('1 of 2')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Older match' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'Older match (↵)' }).hasAttribute('disabled')).toBe(true)
 
     pending[0]?.()
     await waitFor(() => expect(screen.getByText('1 of 1')).toBeTruthy())
@@ -161,7 +145,7 @@ describe('ThreadFindBar filters', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Agent' }))
     await waitFor(() => expect(screen.getByText('1 of 1')).toBeTruthy())
-    expect(screen.getByText('Filters cover only the newest 500 matches')).toBeTruthy()
+    expect(screen.getByText(/^Filters cover only the newest 500 matches: update @dshfiles\/session-search/)).toBeTruthy()
     expect(screen.queryByRole('alert')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
     expect(calls.slice(1).map(call => call.types)).toEqual([['assistant/message'], undefined])
