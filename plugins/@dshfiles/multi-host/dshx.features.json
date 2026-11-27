@@ -903,7 +903,7 @@
       "externalDependencies": [],
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitem \"Sidebar settings\"",
+        "click button \"Sidebar settings\"",
         "click checkbox \"Show remote threads in a separate group\"",
         "click button \"Remote threads started from this DSH\"",
         "expect heading \"Remote threads\""

@@ -1454,13 +1454,9 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
     await expect(threadSidebar(page).getByRole('button', { name: 'Filter: All threads (edited)', exact: true })).toBeVisible()
     await expect(targetRow).toBeVisible()
     await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
-    // Status and Source are submenus of the Filter menu (productivity pass Q5, T5.3).
-    await ThreadListFilter.openSubmenu(page, threadSidebar(page), /^Status: /u)
-    await expect(page.getByRole('menuitemcheckbox', { name: 'Archived', exact: true })).toHaveAttribute('aria-checked', 'true')
-    await ThreadListFilter.close(page)
-    await ThreadListFilter.openSubmenu(page, threadSidebar(page), /^Source: /u)
-    await expect(page.getByRole('menuitemradio', { name: 'Main threads', exact: true })).toHaveAttribute('aria-checked', 'true')
-    await ThreadListFilter.close(page)
+    // Status and Source are rows of the Filter panel (round nine; submenus of the Filter menu since Q5, T5.3).
+    await ThreadListFilter.expectStatus(page, threadSidebar(page), 'Archived')
+    await ThreadListFilter.expectSource(page, threadSidebar(page), 'Main threads')
   })
   await finishJourneyAssertions(page)
 })
@@ -1593,13 +1589,13 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
   await recordAssertion(page, 'thread-sidebar-turn-finished-outlives-its-client', async () => {
     await page.reload()
     await expect(failedLabel(page)).toBeVisible({ timeout: 60_000 })
-    // The views are the Filter menu's presets (Q5, b:xpvk); each keeps the former tab's name and dot.
+    // The views are the Filter panel's presets (Q5, b:xpvk); each keeps the former tab's name and dot.
     const tabs = await ThreadListFilter.openViews(page, threadSidebar(page))
-    const doneTab = tabs.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
+    const doneTab = tabs.getByRole('radio', { name: 'Done (1), Turn finished', exact: true })
     await expect(doneTab).toBeVisible()
     // A finished turn's default colour is ink since the visual refresh (P1: only waiting on you is coloured).
     await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-muted-foreground/)
-    await expect(tabs.getByRole('menuitemradio', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+    await expect(tabs.getByRole('radio', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
     await ThreadListFilter.close(page)
   })
   const otherTab = await page.context().newPage()
@@ -1609,7 +1605,7 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
       await expect(failedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
         (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
-          .getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
+          .getByRole('radio', { name: 'Done (1), Turn finished', exact: true })
           .getByTestId('thread-view-attention-dot'),
       ).toBeVisible()
       await ThreadListFilter.close(otherTab)
@@ -1617,7 +1613,7 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
       await expect(failedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
       await expect(
         (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
-          .getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })
+          .getByRole('radio', { name: 'Done (1), Turn finished', exact: true })
           .getByTestId('thread-view-attention-dot'),
       ).toBeVisible()
       await ThreadListFilter.close(otherTab)
@@ -1626,15 +1622,15 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
       await openThreadRow(threadRow(otherTab, journey.targetThreadId))
       // Opening it acknowledges the finish (the preset loses its count); the row stays Failed.
       const otherViews = await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab))
-      await expect(otherViews.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 15_000 })
-      await expect(otherViews.getByRole('menuitemradio', { name: ThreadListFilter.viewName('Done') }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+      await expect(otherViews.getByRole('radio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 15_000 })
+      await expect(otherViews.getByRole('radio', { name: ThreadListFilter.viewName('Done') }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
       await ThreadListFilter.close(otherTab)
-      // Read with the menu closed: an open menu hides the list from role queries.
+      // Read with the panel closed, as a user would.
       await expect(failedLabel(otherTab)).toBeVisible()
       await page.bringToFront()
       await page.reload()
       const views = await ThreadListFilter.openViews(page, threadSidebar(page))
-      await expect(views.getByRole('menuitemradio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 30_000 })
+      await expect(views.getByRole('radio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 30_000 })
       await ThreadListFilter.close(page)
     })
   } finally {
@@ -2944,7 +2940,7 @@ Then('every view tab shows its full name', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-full-view-tabs', async () => {
     const views = await ThreadListFilter.openViews(page, threadSidebar(page))
     for (const name of ['All threads', 'Working', 'Done'])
-      await expect(views.getByRole('menuitemradio', { name: ThreadListFilter.viewName(name) })).toContainText(name)
+      await expect(views.getByRole('radio', { name: ThreadListFilter.viewName(name) })).toContainText(name)
     await ThreadListFilter.close(page)
   })
   await finishJourneyAssertions(page)
@@ -2962,10 +2958,11 @@ Then('every view tab fits without scrolling and keeps its full name as tooltip a
     const views = await ThreadListFilter.openViews(page, threadSidebar(page))
     // Each view keeps its name; the accessible name may add the former tab's count and attention ("Working (0)").
     for (const name of ['All threads', 'Working', 'Done'])
-      await expect(views.getByRole('menuitemradio', { name: ThreadListFilter.viewName(name) })).toBeVisible()
+      await expect(views.getByRole('radio', { name: ThreadListFilter.viewName(name) })).toBeVisible()
   })
   await recordAssertion(page, 'thread-sidebar-compact-view-tabs-names', async () => {
-    await page.getByRole('menuitemradio', { name: 'Done', exact: true }).click()
+    await ThreadListFilter.panel(page).getByRole('radio', { name: 'Done', exact: true }).click()
+    await ThreadListFilter.close(page)
     await expect(ThreadListFilter.trigger(threadSidebar(page))).toContainText('Done')
   })
   await finishJourneyAssertions(page)

@@ -37,9 +37,9 @@ describe('phone thread list scope button (council round 10 B1, round 11 B2)', ()
     expect(client).toContain('{scopeSlot !== null ? createPortal(filterMenu, scopeSlot) : (')
     // The phone header keeps nothing but the optional preset chips; empty, it takes no room.
     expect(client).toContain("'dshx:px-3 dshx:pb-1.5 dshx:empty:hidden'")
-    // The project moves into the scope menu as its first section.
-    expect(client).toContain('data-thread-scope-project=""')
-    expect(client).toContain('<DropdownMenuRadioGroup value={projectFilterValue} onValueChange={selectProject}>')
+    // The project leads the Filter panel's phone sheet as its first section: the searchable project picker, no submenu
+    // (round nine).
+    expect(client).toMatch(/project=\{\s*scopeSlot === null \? undefined : \(\s*<Combobox[^>]*?onValueChange=\{selectProject\}/su)
     // The scope button reads "Filters" or the project, with a count of the filters on (council round 11 B2).
     expect(client).toContain('ThreadListScope.label(scopeInput)')
     expect(client).toContain("filters: props.tSidebar('threadSidebarFilters')")

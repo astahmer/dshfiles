@@ -258,8 +258,8 @@
         "expect region \"Threads\"",
         "click tab \"Threads\"",
         "click button \"Filter: *\"",
-        "expect menuitem \"Group: Status\"",
-        "click menuitem \"Board\"",
+        "expect radio \"Status\"",
+        "click button \"Board\"",
         "expect region \"Thread board\"",
         "expect region \"Active column\"",
         "expect button \"Group: *\""
@@ -465,7 +465,6 @@
       "reach": [
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
-        "click menuitem \"Group: *\"",
         "expect text \"Arrange manually\"",
         "press Escape",
         "expect button \"Filter: *\""
@@ -653,10 +652,9 @@
         "press Enter",
         "expect text \"Project header example\"",
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
-        "click button \"Filter: *\"",
-        "click menuitem \"Group: *\"",
-        "click menuitemradio \"Project\"",
+        "click radio \"All threads*\"",
+        "click radio \"Project\"",
+        "press Escape",
         "expect button \"New thread in sample\"",
         "click button \"New thread in sample\"",
         "expect textbox \"Describe what you want to build, / commands, @ files or threads\"",
@@ -795,10 +793,9 @@
       "details": "Group thread rows by activity and filter by any combination of status, source, or attention; include durable Inactive and explicitly selected interrupted child rows in saved views, allow views to overlap, show attention dots only for matching statuses, and independently show or hide each tab's count. Grouping by project keys on the repository identity the Host resolves (origin, else repository root, else the folder), so two checkouts of one repository are one row marked with its checkout count.",
       "reach": [
         "click button \"Filter: *\"",
-        "expect menuitemradio \"Done*\"",
-        "click menuitemradio \"All threads*\"",
-        "click button \"Filter: *\"",
-        "click menuitem \"Thread list settings\"",
+        "expect radio \"Done*\"",
+        "click radio \"All threads*\"",
+        "click button \"Thread list settings\"",
         "click button \"Manage views\"",
         "click button \"Add view\"",
         "expect checkbox \"Working\"",
@@ -1128,32 +1125,32 @@
       "id": "filter-presets",
       "title": "Save and switch thread list filter presets",
       "summary": "Save the thread list's filters as a preset and switch presets in one click.",
-      "details": "The thread list's Filter menu opens on a Presets section: the saved views (All threads, Working, Done and the user's own) as one-click radios, Save current filters as preset…, Save changes and Discard changes once a filter was changed after applying one, and Preset options (Rename…, Update with current filters, Delete… with an Undo notice, Mark all read/unread, Manage presets…). A preset stores the grouping, status and source filters and, when saved with one, the project scope. The Filter button names the active preset (\"Filter: Needs you (edited)\" with a dot while edited). ⌘K lists a \"Filter: ‹preset›\" row per preset, [ and ] step through them in the thread list, and an optional chips row under the header applies one in one tap. Presets live in the thread-sidebar Host settings (threadViews), so every browser and device sees the same ones; the agent reads and changes them with the thread_view_* tools.",
+      "details": "The thread list's Filter panel (one level, beside the list; a bottom sheet on a phone) opens on a Presets section: the saved views (All threads, Working, Done and the user's own) as one-click radios, Save current filters as preset…, Save changes and Discard changes once a filter was changed after applying one, and a Preset options menu beside its heading (Rename…, Update with current filters, Delete… with an Undo notice, Mark all read/unread, Manage presets…). A preset stores the grouping, status and source filters and, when saved with one, the project scope. The Filter button names the active preset (\"Filter: Needs you (edited)\" with a dot while edited). ⌘K lists a \"Filter: ‹preset›\" row per preset, [ and ] step through them in the thread list, and an optional chips row under the header applies one in one tap. Presets live in the thread-sidebar Host settings (threadViews), so every browser and device sees the same ones; the agent reads and changes them with the thread_view_* tools.",
       "reach": [
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
-        "expect group \"Presets\"",
-        "expect menuitemradio \"All threads*\"",
-        "click menuitem \"Save current filters as preset…\"",
+        "expect radiogroup \"Presets\"",
+        "expect radio \"All threads*\"",
+        "click button \"Save current filters as preset…\"",
         "expect dialog \"Save filters as a preset\"",
         "expect textbox \"Preset name\""
       ],
       "reachNarrow": [
         "click button \"Back to Threads\"",
         "click button \"Filter: *\"",
-        "expect group \"Presets\"",
-        "click menuitem \"Save current filters as preset…\"",
+        "expect radiogroup \"Presets\"",
+        "click button \"Save current filters as preset…\"",
         "expect dialog \"Save filters as a preset\""
       ],
       "surfaces": ["client", "host", "tool", "command", "settings", "storage"],
       "surface": "destinationSection",
       "destination": "threads",
-      "currentSurface": "thread-list: Filter menu › Presets",
+      "currentSurface": "thread-list: Filter panel › Presets",
       "configuration": [
         {
           "key": "threadViews.showPresets",
           "defaultValue": "true",
-          "constraints": "Boolean, Host-synced; Thread list settings › Use filter presets. Off: the Filter menu has no Presets section, the button shows the filters themselves, and the keys and ⌘K rows go.",
+          "constraints": "Boolean, Host-synced; Thread list settings › Use filter presets. Off: the Filter panel has no Presets section, the button shows the filters themselves, and the keys and ⌘K rows go.",
           "choices": ["true", "false"],
           "coveredBy": ["thread-sidebar.filter-presets-unit-round-trip"]
         },
@@ -1244,7 +1241,8 @@
       "details": "Apply an opt-in idle policy with per-thread overrides while excluding active, blank, pinned, parked, settled, and explicitly excluded sessions and workspaces. Subagent threads idle for `subagentSettleHours` (24 by default) settle on their own and their running background jobs are stopped. The Host scans on the configured interval, so threads settle with no browser open; other plugins ask it to settle a thread for their own trigger through the auto-settle-api contract, and thread_auto_settle_status reads the last and next scan and the newest automatic settles. Settled threads and their instants live in the sidebar's own `thread_settled` storage domain (moved once from the settings namespace, whose stored values core sends twice per `settings/describe`), served to pages by the `thread-sidebar-settled` API (`read`, `change` and a `changed` event). Settling is the plugin's own status: the thread stays listed and openable, the native archive verb is never called, and the Host pre-step gate stops its model steps until it is unsettled.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Idle policy target\"",
         "click button \"Send message\"",
@@ -1256,7 +1254,7 @@
         "press Escape",
         "press Escape",
         "click button \"Filter: *\"",
-        "click menuitem \"Thread list settings\"",
+        "click button \"Thread list settings\"",
         "expect checkbox \"Mark idle threads done\""
       ],
       "surfaces": ["client", "host", "settings", "integration"],
@@ -1519,21 +1517,23 @@
       "details": "Remote threads started from this DSH join the current view’s status, date, or project groups by default, and their rows archive or restore on the runtime that owns them. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "expect button \"Filter: *\"",
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
-        "click menuitem \"Thread list settings\"",
+        "click button \"Thread list settings\"",
         "expect region \"Thread list settings\""
       ],
       "reachNarrow": [
         "click button \"Back to Threads\"",
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "expect button \"Filter: *\"",
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
-        "click menuitem \"Thread list settings\"",
+        "click button \"Thread list settings\"",
         "expect region \"Thread list settings\""
       ],
       "surfaces": ["client"],
@@ -1605,7 +1605,8 @@
       "details": "Archive a settled thread after a configurable delay counted from the instant it was settled. The settled composer banner withholds its settle age while that age is only \"now\", titles the thread with it once the age says more, shows when the delay will archive it, and offers Archive and the primary Unsettle action that lifts the block; archived, pinned, running, waiting or newly changed threads, and threads settled before the timestamps existed, are never archived by the policy.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Done archive target\"",
         "click button \"Send message\"",
@@ -1614,7 +1615,7 @@
         "click menuitem \"Done\"",
         "expect status \"This thread is done.\"",
         "click button \"Filter: *\"",
-        "click menuitem \"Thread list settings\"",
+        "click button \"Thread list settings\"",
         "expect group \"Archive done threads\""
       ],
       "surfaces": ["client", "settings"],
@@ -1677,7 +1678,8 @@
       "details": "Mute a thread for 1 h, 8 h, 24 h, until tomorrow morning (09:00), a week, or until unmuted, from its row, its context menu or the session header. A muted thread raises no desktop alert, attention group, label or unread dot and keeps its place instead of rising on new activity; a bell-off marker's tooltip gives the time left, and it wakes on its own. Mutes are Host-synced sidebar settings; the Muted filter lists them.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mute target\"",
         "click button \"Send message\"",
@@ -1752,7 +1754,8 @@
       "details": "Mark a thread unread from the sidebar and clear that marker in every browser when the thread is opened. The row dot and its Inbox item are one record: Done in the Inbox clears the dot at once (the attention API publishes a changed event every page re-reads on), and reading the thread resolves the item.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Unread target\"",
         "click button \"Send message\"",
@@ -1997,7 +2000,7 @@
       "details": "The Threads panel toolbar owns a Sidebar settings gear, not fixed app chrome. It opens the original Root-owned Customize sidebar editor inside that panel through an owned React portal seat, so gear and editor follow moves and remain usable with a hidden tab row or collapsed left column. Switch compact/expanded header and density, reorder and hide header/footer entries, and expose overflow through the selected menu or scrolling behavior using the same preferences authority. Standalone/global recovery remains available. The separate list-only sliders control is named Thread list settings; no duplicate preference model or native DOM reparenting is involved.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitem \"Sidebar settings\"",
+        "click button \"Sidebar settings\"",
         "expect heading \"Customize sidebar\"",
         "click button \"Move up: Done\"",
         "expect checkbox \"Done\""
@@ -2436,14 +2439,14 @@
       "details": "Default child lists to open only while a subagent is working, preserve manual toggles, expand recursive child sessions with inherited workspace context, fold or hide finished subagents, group a branch whose parent session is gone under a “parent thread unavailable” header instead of a top-level row, archive or restore that whole branch from the header, and copy credential-free thread URLs.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitem \"Thread list settings\"",
+        "click button \"Thread list settings\"",
         "click button \"Finished subagents: Fold into “N finished”\"",
         "expect menuitemradio \"Hide them\""
       ],
       "reachNarrow": [
         "click button \"Back to Threads\"",
         "click button \"Filter: *\"",
-        "click menuitem \"Thread list settings\"",
+        "click button \"Thread list settings\"",
         "click button \"Finished subagents: Fold into “N finished”\"",
         "expect menuitemradio \"Hide them\""
       ],
@@ -3084,7 +3087,8 @@
       "details": "Resolve a target Host session and insert its native reference chip at the active composer's caret, from the sidebar row menu, from a main-view tab's menu, or by dragging a thread row or thread tab and dropping it on a composer. A drag carries only the plugin's own thread-mention type, so a rich editor never receives stray plain text; the composer under the pointer outlines and shows a drop hint, and only that composer inserts. Resolving, unavailable, and draft-changed outcomes surface as notices instead of changing the draft.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "click button \"New thread\"",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Mention target\"",
         "click button \"Send message\"",
@@ -3196,7 +3200,8 @@
       "details": "List the current Session's user-invocable skills in the @ menu and route selection through the existing /skill invocation.",
       "reach": [
         "click button \"Filter: *\"",
-        "click menuitemradio \"All threads*\"",
+        "click radio \"All threads*\"",
+        "press Escape",
         "click button \"New thread\"",
         "press Escape",
         "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@e2e-skill-mentions\"",
@@ -3253,8 +3258,8 @@
         "expect region \"Needs you\"",
         "expect button \"Resume all\"",
         "click button \"Filter: *\"",
-        "click menuitem \"Group: *\"",
-        "click menuitemradio \"Arrange manually\"",
+        "click radio \"Arrange manually\"",
+        "press Escape",
         "expect region \"Usage limit\"",
         "expect button \"Resume this thread\""
       ],
@@ -3871,7 +3876,7 @@
         "expect heading \"Traces\"",
         "click tab \"Threads\"",
         "click button \"Filter: *\"",
-        "expect menuitem \"Board\""
+        "expect button \"Board\""
       ],
       "surfaces": ["client"],
       "surface": "destinationSection",

@@ -4,10 +4,10 @@ import { describe, expect, it } from 'vitest'
 const read = (file: string): string => readFileSync(new URL(`./${file}`, import.meta.url), 'utf8')
 
 describe('one overflow glyph (council round 15 A2)', () => {
-  // Every overflow trigger the list draws: the row's hover strip and touch menu, the folder rows, the sidebar header,
-  // the usage-limit rows and the navigation rail's More.
+  // Every overflow trigger the list draws: the row's hover strip and touch menu, the Filter panel's Preset options
+  // (round nine), the folder rows, the sidebar header, the usage-limit rows and the navigation rail's More.
   it.each([
-    ['client.tsx', 2],
+    ['client.tsx', 3],
     ['sidebar-folders.tsx', 2],
     ['sidebar-shell.tsx', 1],
     ['usage-limit-section.tsx', 1],

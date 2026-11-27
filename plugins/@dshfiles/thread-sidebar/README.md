@@ -2,7 +2,7 @@
 
 ![All threads grouped by status: line 1 is the thread (status glyph, title, time), line 2 is where it runs (project mark and name, a branch icon for its own workspace with one state word such as "1 to land"), and a working row says what it does now ("Running sleep 1800 · 1m 15s")](docs/screenshots/status-grouped-thread-list.png)
 
-![Group by project, one click from the Filter menu: each section shows the project mark, name and count](docs/screenshots/group-by-project.png)
+![Group by project, one click from the Filter panel: each section shows the project mark, name and count](docs/screenshots/group-by-project.png)
 
 ![The rail of destinations beside the thread list: the default Sidebar pane](docs/screenshots/destination-rail.png)
 
@@ -10,9 +10,9 @@
 
 ![Copy DSH URL for agents and Pair a phone in the rail's DSH actions, directly above Settings](docs/screenshots/rail-actions.png)
 
-![Above the first row: one search field, the project picker and one Filter menu (presets, Group by project, Group, Status, Source, Board, settings); a changed filter marks the preset edited and offers Save changes](docs/screenshots/list-filter-menu.png)
+![Above the first row: one search field, the project picker and one Filter panel beside the list (presets, Status, Source, Group by, Board, settings, Reset); a changed filter marks the preset edited and offers Save changes](docs/screenshots/list-filter-menu.png)
 
-![Filter presets: the Filter button names the active preset, and the menu's Presets section switches between them in one click](docs/screenshots/filter-presets.png)
+![Filter presets: the Filter button names the active preset, and the panel's Presets section switches between them in one click](docs/screenshots/filter-presets.png)
 
 ![On a phone the rail becomes a bottom tab bar; More lists the other destinations](docs/screenshots/phone-tab-bar.png)
 
@@ -541,7 +541,16 @@ and keeps the rest for Back and Forward.
 
 ![An acknowledged recent idle thread remains in the date-grouped Done view.](docs/screenshots/thread-list-views-done.png)
 
-**Filter presets** (b:xpvk). The saved views are the Filter menu's presets: its
+**The Filter panel** (round nine). The Filter button opens one panel beside the
+list (the bottom sheet on a phone, which leads with the project picker), not a
+menu of submenus: every value shows where it sits and applies at once, so the
+rows it filters stay in view. Under a **Reset** (back to All threads with no
+filter on) come the presets, **Status** chips (Any and the activity statuses;
+**More statuses** opens why a thread waits and where it is stored, and stays
+open while one of those is on), **Source** (All / Main / Subagents) and **Group
+by** chips, then Board, Thread list settings and Sidebar settings.
+
+**Filter presets** (b:xpvk). The saved views are the Filter panel's presets: its
 **Presets** section comes first, one radio per enabled view, the active one
 checked, and the Filter button names it (`Filter: Needs you`). Changing a group,
 status or source filter afterwards never rewrites the preset: the change is a
@@ -551,7 +560,8 @@ changes**; changing the filters back drops the draft. **Save current filters as
 preset…** names a new preset (a dialog, pinned to the top on a phone so the
 keyboard never covers it) that stores the
 grouping, filters and the current project scope (`projectFilter`: an id, `''` for
-Unassigned, `null` for All projects), and applies it. **Preset options** holds
+Unassigned, `null` for All projects), and applies it. **Preset options** (the ⋯
+beside the Presets heading) holds
 **Rename…**, **Update with current filters**, **Delete…** (a confirmation, then an
 Undo notice that puts the preset back where it was), Mark all read / unread and
 **Manage presets…** (the view manager, where a built-in can be hidden). A built-in
