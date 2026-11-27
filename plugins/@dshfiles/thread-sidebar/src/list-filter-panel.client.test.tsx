@@ -575,3 +575,23 @@ describe('the More statuses disclosure, placed (round 29, item 3)', () => {
     expect(more.getAttribute('aria-expanded')).toBe('true')
   })
 })
+
+// Council round 28, item 4: the bare check means "on" only; Done at rest draws the row menu's circle-check.
+describe('the Done chip at rest (round 29, item 4)', () => {
+  it("draws the circle-check in the secondary ink at rest, and the bare check only while it is on", () => {
+    const { unmount } = render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    const seat = screen.getByRole('button', { name: 'threadSidebarSettled' }).querySelector('[data-chip-seat]')
+    const mark = seat?.querySelector('[data-chip-mark]')
+    expect(mark?.getAttribute('data-chip-mark')).toBe('done')
+    expect(mark?.getAttribute('class')).toContain('lucide-circle-check')
+    expect(mark?.getAttribute('class')).toContain('dshx:size-3')
+    expect(mark?.getAttribute('class')).toContain('dshx:text-muted-foreground')
+    expect(seat?.querySelector('[data-chip-check]')).toBeNull()
+    unmount()
+    render(<ListFilterPanel {...panel({ status: { selected: ['settled'], onChange: vi.fn() } })} />)
+    const on = screen.getByRole('button', { name: 'threadSidebarSettled' }).querySelector('[data-chip-seat]')
+    expect(on?.querySelector('[data-chip-check]')).not.toBeNull()
+    expect(on?.querySelector('[data-chip-mark]')).toBeNull()
+  })
+})

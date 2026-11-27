@@ -8,7 +8,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { ArchiveIcon, BellOffIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, BellOffIcon, CheckIcon, CircleCheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { plural } from '@dshfiles/dshx/client'
 import { useId, useState, type ReactNode } from 'react'
@@ -154,6 +154,9 @@ const ChipMarkGlyph = (props: { readonly mark: ChipMark }): JSX.Element => {
       return <BellOffIcon className="dshx:size-3" data-chip-mark="muted" />
     case 'archived':
       return <ArchiveIcon className="dshx:size-3" strokeWidth={1.5} data-chip-mark="archived" />
+    case 'done':
+      // The row menu's Done mark, never the bare check, which means "on" in this seat (council round 28, item 4).
+      return <CircleCheckIcon className="dshx:size-3 dshx:text-muted-foreground" strokeWidth={1.5} data-chip-mark="done" />
     default:
       // The list's glyph at the count-chip size; a filter is not a live state, so the working ring holds still.
       return <StatusGlyph status={props.mark} size="small" decorative data-chip-mark={props.mark} className="dshx:[&_[data-glyph-spinner]]:animate-none" />
