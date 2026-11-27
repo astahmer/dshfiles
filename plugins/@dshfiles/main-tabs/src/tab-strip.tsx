@@ -20,7 +20,7 @@ import type { TabsEvent } from './tabs-machine.js'
 
 export type { TabView, TabStatus } from '@dshfiles/workbench/tabs'
 import { DEFAULT_CLOSE_BUTTON_POSITION, TabProjectMark, type CloseButtonPosition, type TabProjectChip, type TabView, type TabStatus } from '@dshfiles/workbench/tabs'
-import { TabComposeGlyph, TabDestinationGlyph, TabStatusGlyph } from '@dshfiles/workbench/tab-status'
+import { TabComposeGlyph, TabDestinationGlyph, TabIdleGlyph, TabStatusGlyph } from '@dshfiles/workbench/tab-status'
 
 /** What one dragged tab can move into: a thread's aside, or a panel with both a main tab and a right-sidebar tab. */
 type DraggedMove =
@@ -369,7 +369,7 @@ export const TabStrip = (props: TabStripProps): ReactElement => {
                         {closeButtonPosition === 'left' ? closeButton : null}
                         <span className="dshx:flex dshx:min-w-0 dshx:flex-auto dshx:items-center dshx:gap-[5px] dshx:overflow-hidden dshx:leading-[1.4]">
                           {tab.kind === 'start' ? <CompassGlyph size={16} className="dshx:flex-none dshx:text-(--dsw-alias-label-tertiary)" /> : null}
-                          {tab.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? (project === undefined ? <TabComposeGlyph active={tab.active} /> : null) : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : null}
+                          {tab.kind === 'thread' ? <span className="dshx:flex dshx:size-4 dshx:flex-none dshx:items-center dshx:justify-center" data-tab-status-slot="">{tab.status === null ? (project === undefined ? <TabComposeGlyph active={tab.active} /> : <TabIdleGlyph />) : <TabStatusGlyph status={tab.status} decorative className="dshx:flex-none dshx:transition-opacity dshx:duration-(--dshx-duration-fade) dshx:starting:opacity-0" />}</span> : null}
                           {tab.kind === 'panel' && tab.destination !== undefined ? (
                             // A page names its destination with the rail glyph, in its nav tone on its tile while active
                             // (round five B4, round nine B2); a page with its own place glyph (AI accounts, Plugins) shows that one.

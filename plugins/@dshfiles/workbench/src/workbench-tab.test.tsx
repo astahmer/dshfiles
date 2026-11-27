@@ -252,6 +252,31 @@ describe('workbench semantic tab chrome', () => {
     expect(document.querySelector('[data-tab-compose]')).toBeNull()
   })
 
+  it('draws the list\'s Idle ring in the seat of a thread tab with a project and no status (council round 34, B4)', () => {
+    const tab = fixture({ projectNames: { 'workspace-a': 'NixConfig' } })
+    tab.update({ status: null, workspaceId: 'workspace-a' })
+    const seat = (): HTMLElement | null => tab.view.container.querySelector<HTMLElement>('[data-tab-status-slot]')
+    // Seat before the project tile before the title, in both states: nothing between them changes.
+    const order = (): readonly string[] => {
+      const mark = tab.view.container.querySelector('[data-workbench-tab-project]')
+      const title = screen.getByText('Thread A')
+      const after = (a: Element | null | undefined, b: Element | null): boolean => a !== null && a !== undefined && b !== null && (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+      return after(seat(), mark) && after(mark, title) ? ['seat', 'project'] : ['seat']
+    }
+    const ring = seat()?.querySelector('[data-tab-idle]')
+    expect(ring?.getAttribute('data-status')).toBe('idle')
+    expect(ring?.getAttribute('aria-hidden')).toBe('true')
+    expect(seat()?.childElementCount).toBe(1)
+    expect(order()).toEqual(['seat', 'project'])
+    // A turn starts: the same seat holds its working ring, so the title does not move.
+    tab.update({ status: 'running', workspaceId: 'workspace-a' })
+    expect(seat()?.querySelector('[data-tab-idle]')).toBeNull()
+    expect(seat()?.querySelector('[data-tab-status="running"]')).not.toBeNull()
+    expect(seat()?.childElementCount).toBe(1)
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(order()).toEqual(['seat', 'project'])
+  })
+
   it('keeps the ProjectMark, not a destination glyph, on a thread tab', () => {
     fixture()
     expect(document.querySelector('[data-tab-destination]')).toBeNull()

@@ -36,6 +36,14 @@ export const TabStatusGlyph = (props: {
   />
 )
 
+/**
+ * A thread tab with no live status (council round 34, B4): the thread list's own Idle ring, in its ink, so the 16px seat a
+ * running thread needs (F13: the title never moves when a turn starts or ends) is never an empty gap before the project.
+ */
+export const TabIdleGlyph = (props: { readonly className?: string }): JSX.Element => (
+  <StatusGlyph status="idle" decorative data-tab-idle="" {...(props.className === undefined ? {} : { className: props.className })} />
+)
+
 const DESTINATION_GLYPHS = {
   'messages-square': MessagesSquareIcon,
   inbox: InboxIcon,

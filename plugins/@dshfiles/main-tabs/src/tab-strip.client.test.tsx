@@ -200,6 +200,36 @@ describe('TabStrip layout', () => {
     expect(document.querySelectorAll('[data-tab-status-slot]')).toHaveLength(1)
   })
 
+  it('draws the list\'s Idle ring in the seat of a thread tab with a project and no status (council round 34, B4)', () => {
+    const projectNames = new Map([['workspace-1', 'dshfiles']])
+    const shape = (): readonly string[] => {
+      const seat = document.querySelector('[data-tab-status-slot]')
+      // Seat, then project tile, then title: the title keeps its place whether or not a turn runs (F13).
+      const parts = Array.from(seat?.parentElement?.children ?? []).map(child => (child === seat ? 'seat' : child.hasAttribute('data-tab-project') ? 'project' : child.tagName))
+      return parts.slice(0, 2)
+    }
+    const idle = tabs.map(tab => (tab.kind === 'thread' ? { ...tab, status: null } : tab))
+    const { rerender } = render(<TabStrip tabs={idle} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={projectNames} />)
+    const seat = (): Element | null => document.querySelector('[data-tab-status-slot]')
+    // Never an empty 16px gap before the tile: the Idle ring the thread row draws, in its ink.
+    expect(seat()?.childElementCount).toBe(1)
+    const ring = seat()?.querySelector('[data-tab-idle]')
+    expect(ring?.getAttribute('data-slot')).toBe('status-glyph')
+    expect(ring?.getAttribute('data-status')).toBe('idle')
+    expect(ring?.getAttribute('aria-hidden')).toBe('true')
+    expect(seat()?.querySelector('[data-tab-compose]')).toBeNull()
+    expect(seat()?.className).toContain('dshx:size-4')
+    const idleShape = shape()
+    rerender(<TabStrip tabs={tabs} send={() => {}} t={t} newTabKeys="" renameThread={async () => {}} projectNames={projectNames} />)
+    // Working: the same seat, one glyph, the same order, so the title's x does not change.
+    expect(seat()?.querySelector('[data-tab-idle]')).toBeNull()
+    expect(seat()?.querySelector('[data-tab-status="running"]')).not.toBeNull()
+    expect(seat()?.childElementCount).toBe(1)
+    expect(seat()?.className).toContain('dshx:size-4')
+    expect(shape()).toEqual(idleShape)
+    expect(idleShape).toEqual(['seat', 'project'])
+  })
+
   it('draws a page tab\'s destination glyph, in its nav tone only on the active tab (round five B4)', () => {
     const pages = tabs.map(tab =>
       tab.kind === 'panel' ? { ...tab, destination: { id: 'work', icon: 'list-todo' } as const } : { ...tab, active: false },
