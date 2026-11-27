@@ -22,6 +22,9 @@ const element = (found: Element | null | undefined): HTMLElement => {
 
 // A path, not a URL: under jsdom `URL` is the window's, which Node's fs does not take.
 const client = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
+const locales = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'locales.ts'), 'utf8')
+/** The English table is the first one in the file. */
+const english = locales.slice(0, locales.indexOf('const zh'))
 /** The list's one Filter control, from its declaration to the list's markup. */
 const filterControl = client.slice(client.indexOf('const filterMenu = ('), client.indexOf('<TooltipProvider delayDuration={500}>'))
 
@@ -753,5 +756,28 @@ describe('one selected look (round 29, item 14)', () => {
     expect(chip.className).toContain('dshx:data-[state=on]:border-(--dshx-segment-edge)')
     expect(chip.className).toContain('dshx:data-[state=on]:shadow-xs')
     expect(chip.className).not.toContain('dshx:data-[state=on]:border-field-border')
+  })
+})
+
+// Council round 28, item 15: the subgroup holding Idle and Turn finished is "Thread state", not "Waiting on you"; its
+// label and Storage's are 11px tertiary, 8px over their chips.
+describe('status subgroup labels (round 29, item 15)', () => {
+  it('names the second subgroup Thread state and sets both labels at 11px tertiary with 8px above', () => {
+    expect(english).toContain("threadSidebarFilterGroupAttention: 'Thread state',")
+    render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    for (const name of ['threadSidebarFilterGroupAttention', 'threadSidebarFilterGroupStorage']) {
+      const group = screen.getByRole('group', { name })
+      const label = element(document.getElementById(group.getAttribute('aria-labelledby') ?? ''))
+      for (const token of ['dshx:text-2xs', 'dshx:text-(--dsw-alias-label-tertiary)', 'dshx:pt-2']) expect(label.className).toContain(token)
+    }
+  })
+
+  it.each(['light', 'dark'] as const)('keeps the tertiary label at AA on the popover and the phone sheet (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const tertiary = p.neutral[8]
+    const popover = p.neutral[scheme === 'light' ? 0 : 2]
+    if (tertiary === undefined || popover === undefined) throw new Error('The palette has no tertiary or popover step.')
+    expect(PaletteMath.contrastRatio(tertiary, popover)).toBeGreaterThanOrEqual(4.5)
   })
 })

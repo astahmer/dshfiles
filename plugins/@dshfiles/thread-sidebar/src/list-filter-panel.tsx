@@ -572,8 +572,8 @@ const StatusChips = (props: {
           {expanded
             ? THREAD_STATUS_FILTER_GROUPS.slice(1).map(group => (
                 <div key={group.id} role="group" aria-labelledby={`${moreId}-${group.id}`} className={STATUS_ROW} data-thread-status-group="">
-                  {/* The group's label starts its own line: its full width breaks the row. */}
-                  <span id={`${moreId}-${group.id}`} className="dshx:w-full dshx:pt-1 dshx:text-xs dshx:text-muted-foreground">
+                  {/* The group's label starts its own line: its full width breaks the row. 11px tertiary, 8px above (round 29). */}
+                  <span id={`${moreId}-${group.id}`} className="dshx:w-full dshx:pt-2 dshx:text-2xs dshx:text-(--dsw-alias-label-tertiary)">
                     {props.t(threadStatusFilterGroupLabelKeys[group.id])}
                   </span>
                   {group.filters.map(chip)}
