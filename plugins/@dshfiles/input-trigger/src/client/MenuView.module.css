@@ -121,15 +121,15 @@
   line-height: 18px;
 }
 
-/* Right-aligned so every description ends at the same edge and the titles
-   read as one left column. */
+/* dshfiles: left-aligned, so every description starts after its title. Right-aligned, a short one sat at the row's
+   edge while a long one, truncated, filled the row from the title: two alignments in one list. */
 .itemDescription {
   flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
+  text-align: left;
   color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
   line-height: 18px;

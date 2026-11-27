@@ -42,4 +42,12 @@ describe('the +, @ and / lists on a phone (unslop phone 3, U7)', () => {
     const menu = inMedia('(max-width: 639.98px), (pointer: coarse) and (max-height: 500px)', ':global(html[data-shell-phone-nav]) .menu').join(' ')
     expect(menu).toContain('border-radius: var(--dsw-radius-panel, 16px)')
   })
+
+  // A short description sat at the row's right edge while a long one, truncated, started after the title: two
+  // alignments in one list. Every description starts after its title.
+  it('starts every description after its title, short or truncated', () => {
+    const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/gu)].filter(rule => (rule[1] ?? '').split(',').some(part => part.trim() === '.itemDescription'))
+    const alignments = rules.flatMap(rule => [...(rule[2] ?? '').matchAll(/text-align:\s*([^;]+);/gu)].map(match => match[1]?.trim()))
+    expect(alignments).toEqual(['left'])
+  })
 })
