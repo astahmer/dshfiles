@@ -725,6 +725,7 @@ async function clientConfig(
         ]
   const dshxRuntimeStore = options.sharedRuntime !== undefined && options.sharedDshxRuntime === true ? await realpath(resolve(RUNTIME_ROOT, '..')) : undefined
   // A lazy chunk keeps only module transforms and guards: the entry owns CSS, capabilities, declarations and manifests.
+  // Modules the entry also bundles resolve to facades over the entry's shared table (ClientLazyChunks.chunkPlugin).
   const plugins =
     lazy === undefined
       ? [
@@ -740,6 +741,7 @@ async function clientConfig(
                   state: lazyState,
                   sourcemap: sourcemap !== false,
                   watch,
+                  entryId: VIRTUAL_CLIENT_ENTRY,
                   buildChunk: async (chunkInput, fileName) => {
                     const config = await clientConfig(paths, options, watch, lazyState, runtime, { input: chunkInput, fileName })
                     const result = await build({ ...config, build: { ...config.build, write: false, watch: null } })
@@ -797,6 +799,7 @@ async function clientConfig(
         ]
       : [
           clientEntryPlugin(paths, options),
+          ClientLazyChunks.chunkPlugin({ root: paths.root, state: lazyState, packageId: options.packageId }),
           ClientCompilerGuards.clientGuardPlugin(externals, options.packageId, bundleDependencies),
           ...userPlugins,
           ...consumer,

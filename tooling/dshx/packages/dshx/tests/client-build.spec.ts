@@ -1617,6 +1617,7 @@ describe('client lazy chunks', () => {
   /** The fixture entry exports `apply`, which resolves the lazy module's value. */
   const lazyEntryShape = Schema.Struct({ apply: FunctionSchema })
 
+  /** Like the DSH Module Loader: a chunk's `require(<owner id>)` returns the owner's already-run exports. */
   const loadChunks = (files: Readonly<Record<string, string>>) => {
     const factories = new Map<string, ModuleFactory>()
     const registrationShape = Schema.Struct({ id: Schema.String, chunk: Schema.optional(Schema.String), factory: ModuleFactorySchema })
@@ -1624,15 +1625,21 @@ describe('client lazy chunks', () => {
       const registration = Schema.decodeUnknownSync(registrationShape)(captureRegistration(code))
       factories.set(registration.chunk ?? 'client.js', registration.factory)
     }
+    let ownerExports: ModuleExports | undefined
     const require = Object.assign(
       (spec: string) => {
         if (spec.startsWith('./')) throw new Error(`unexpected synchronous require ${spec}`)
+        if (spec === '@dshx/fixture-plugin') return ownerExports
         return {}
       },
       { async: async (spec: string) => factories.get(spec.replace(/^\.\//u, ''))!(require) },
     )
-    return { entry: Schema.decodeUnknownSync(lazyEntryShape)(factories.get('client.js')!(require)), factories }
+    ownerExports = factories.get('client.js')!(require)
+    return { entry: Schema.decodeUnknownSync(lazyEntryShape)(ownerExports), factories, require }
   }
+
+  const chunkOf = (report: Awaited<ReturnType<typeof buildClient>>): string | undefined =>
+    report.output.find(item => /^client\.heavy\.[0-9a-f]{8}\.js$/u.test(item.fileName))?.fileName
 
   it('emits a self-contained chunk loaded through require.async and runs it', async () => {
     const root = await temporaryProject()
@@ -1670,18 +1677,74 @@ describe('client lazy chunks', () => {
     expect(await names()).not.toEqual(first)
   })
 
-  it('keeps a target inlined when it shares a module with the entry', async () => {
+  it('emits a chunk that shares a module with the entry and reads the entry instance', async () => {
     const root = await temporaryProject()
-    await writeFile(resolve(root, 'src/state.ts'), 'export const registry = new Map<string, string>()\n')
-    await writeFile(resolve(root, 'src/heavy.ts'), "import { registry } from './state'\nexport const heavy = registry.get('key') ?? 'missing'\n")
+    await writeFile(
+      resolve(root, 'src/state.ts'),
+      "export const registry = new Map<string, string>()\nexport default { label: 'state' + 'onlymarker' }\nexport const unusedByEntry = () => 'chunk-' + 'reads-unused'\n",
+    )
+    await writeFile(
+      resolve(root, 'src/heavy.ts'),
+      "import state, { registry, unusedByEntry } from './state'\nexport const heavy = [registry.get('key') ?? 'missing', state.label, unusedByEntry(), 'lazy' + 'only'].join(' ')\n",
+    )
     await writeFile(
       resolve(root, 'src/client.tsx'),
       lazyEntry.replace('export function apply()', "import { registry } from './state'\nregistry.set('key', 'shared-state')\nexport function apply()"),
     )
+    for (const minify of [false, true]) {
+      const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist', minify })
+      const chunkFile = chunkOf(report)
+      expect(chunkFile).toBeDefined()
+      const entryCode = await readFile(resolve(root, 'dist/client.js'), 'utf8')
+      const chunkCode = await readFile(resolve(root, 'dist', chunkFile!), 'utf8')
+      expect(entryCode).not.toContain('lazyonly')
+      // One copy of the shared module, in the entry; the chunk only reads it.
+      expect(entryCode).toContain('onlymarker')
+      expect(chunkCode).not.toContain('onlymarker')
+      const { entry } = loadChunks({ entry: entryCode, chunk: chunkCode })
+      await expect(entry.apply()).resolves.toBe('shared-state stateonlymarker chunk-reads-unused lazyonly')
+    }
+  })
+
+  it('shares a CommonJS dependency with the entry as the same module.exports', async () => {
+    const root = await temporaryProject()
+    await mkdir(resolve(root, 'node_modules/fake-cjs'), { recursive: true })
+    await writeFile(resolve(root, 'node_modules/fake-cjs/package.json'), JSON.stringify({ name: 'fake-cjs', version: '1.0.0', main: 'index.js' }))
+    await writeFile(resolve(root, 'node_modules/fake-cjs/index.js'), "module.exports = { counter: { n: 0 }, tag: 'cjs' + 'onlymarker' }\n")
+    await writeFile(resolve(root, 'src/heavy.ts'), "import cjs, { counter } from 'fake-cjs'\nexport const heavy = `${cjs.counter.n}/${counter === cjs.counter}`\n")
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      lazyEntry.replace('export function apply()', "import cjs from 'fake-cjs'\ncjs.counter.n = 7\nexport const tag = cjs.tag\nexport function apply()"),
+    )
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    const chunkFile = chunkOf(report)
+    expect(chunkFile).toBeDefined()
+    const chunkCode = await readFile(resolve(root, 'dist', chunkFile!), 'utf8')
+    expect(chunkCode).not.toContain('onlymarker')
+    const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8'), chunk: chunkCode })
+    await expect(entry.apply()).resolves.toBe('7/true')
+  })
+
+  it('fails loudly when a sharing chunk runs without its owner, never with a second copy', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/state.ts'), 'export const registry = new Map<string, string>()\n')
+    await writeFile(resolve(root, 'src/heavy.ts'), "import { registry } from './state'\nexport const heavy = registry.size\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry.replace('export function apply()', "import { registry } from './state'\nregistry.set('a', 'b')\nexport function apply()"))
+    const chunkFile = chunkOf(await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' }))
+    expect(chunkFile).toBeDefined()
+    const { factories } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8'), chunk: await readFile(resolve(root, 'dist', chunkFile!), 'utf8') })
+    // An owner that is missing, or an older owner build without the shared table.
+    for (const owner of [undefined, {}]) expect(() => factories.get(chunkFile!)!(() => owner)).toThrow(/@dshx\/fixture-plugin.*rebuild/u)
+  })
+
+  it('still inlines a target that the entry also imports statically', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/heavy.ts'), "export const heavy = 'both-' + 'ways'\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry.replace('export function apply()', "export { heavy as eager } from './heavy'\nexport function apply()"))
     const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
     expect(report.output.filter(item => item.fileName.startsWith('client.heavy.'))).toEqual([])
     const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8') })
-    await expect(entry.apply()).resolves.toBe('shared-state')
+    await expect(entry.apply()).resolves.toBe('both-ways')
   })
 
   it('keeps a target that imports CSS inlined so the entry still owns the sheet', async () => {
