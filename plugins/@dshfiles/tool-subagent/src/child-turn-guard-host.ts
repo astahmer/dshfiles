@@ -64,11 +64,12 @@ export const installChildTurnGuard = (ctx: Context, config: ChildTurnGuardConfig
     return
   }
 
+  const workRules = ChildTurnGuard.workRules(policy)
   const trackers = new Map<string, ChildTurnTracker>()
   const trackerFor = (session: Session): ChildTurnTracker => {
     const existing = trackers.get(session.id)
     if (existing !== undefined) return existing
-    const created = new ChildTurnTracker()
+    const created = new ChildTurnTracker(workRules)
     trackers.set(session.id, created)
     return created
   }
@@ -83,7 +84,7 @@ export const installChildTurnGuard = (ctx: Context, config: ChildTurnGuardConfig
         tracker.turnStarted(event.data.turn)
         return
       case 'tool/call':
-        tracker.toolCalled(event.data.turn)
+        tracker.toolCalled(event.data.turn, { name: event.data.name, arguments: event.data.arguments })
         return
       case 'assistant/message':
         tracker.assistantSpoke(event.data.turn, assistantText(event.data.message))
@@ -133,7 +134,14 @@ export const installChildTurnGuard = (ctx: Context, config: ChildTurnGuardConfig
       return
     }
     resumesSpent.set(agent, resumes + 1)
-    ctx.logger.info('tool-subagent: resuming child %s after a hand-back (turn %d, resume %d of %d)', childLabel(agent), turn, resumes + 1, policy.maxResumes)
+    ctx.logger.info(
+      'tool-subagent: resuming child %s after a hand-back (turn %d, %d tool call(s), no file change; resume %d of %d)',
+      childLabel(agent),
+      turn,
+      observation?.toolCalls ?? 0,
+      resumes + 1,
+      policy.maxResumes,
+    )
     agent.steer(createUserMessage({ content: [{ type: 'text', text: policy.resumeMessage }], source: CHILD_TURN_GUARD_SOURCE }))
   }
 

@@ -241,7 +241,8 @@
               modelSelection: true
               modelDiscovery: true
               # Resume a delegated child whose completed turn hands the task back instead of implementing it.
-              # `enabled: false` is the off switch; a turn with minToolCalls calls is work.
+              # `enabled: false` is the off switch; a turn that edited files or committed is never resumed,
+              # and minToolCalls only resumes a turn that quit with no closing text.
               # See plugins/@dshfiles/tool-subagent/README.md#the-child-turn-guard.
               childTurnGuard:
                 enabled: true
