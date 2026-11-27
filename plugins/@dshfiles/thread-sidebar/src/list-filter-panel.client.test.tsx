@@ -667,3 +667,14 @@ describe('the panel scrolls under its header (round 29, item 7)', () => {
     expect(filterControl).toMatch(/className="dshx-root dshx:flex dshx:w-80 dshx:max-w-\[calc\(100vw-1rem\)\] dshx:flex-col dshx:overflow-hidden dshx:p-0/u)
   })
 })
+
+// Council round 28, item 8: the closed desktop trigger says a filter is on with the phone's count badge, no lone dot.
+describe('the closed trigger (round 29, item 8)', () => {
+  it('draws the filters-on count badge on a desktop and a phone alike, and no edited dot or status mark', () => {
+    const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
+    expect(trigger).toContain('{scopeCount === null ? null : (')
+    expect(trigger).toContain('data-testid="thread-scope-count"')
+    expect(trigger).not.toContain('thread-preset-edited-dot')
+    expect(trigger).not.toContain('thread-view-attention-dot')
+  })
+})

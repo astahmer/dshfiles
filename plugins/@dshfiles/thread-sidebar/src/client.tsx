@@ -6596,14 +6596,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     filters: props.tSidebar('threadSidebarFilters'),
   }
   const scopeCount = ThreadListScope.count(scopeInput)
-  // The trigger marks the active preset as its row does: the diamond while one of its rows needs you, else the cross.
-  const activeViewAttention =
-    activeViewTab === undefined
-      ? []
-      : threadViewAttentionEntries
-          .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: activeViewTab.view.statusFilters, sourceFilter: activeViewTab.view.sourceFilter }))
-          .map(entry => presetAttentionOf((threadStatusById.get(entry.thread.id) ?? childStatusById.get(entry.thread.id))?.status, entry.attentionLabel))
-  const activeViewMark = activeViewAttention.includes('needs-you') ? 'needs-you' : activeViewAttention.includes('failed') ? 'failed' : undefined
   // The Filter panel (round nine, owner annotation): one level instead of five submenus, every value shown where it
   // sits, a change applied at once beside the list; a footer for the list's other places; a phone sheet (the kit's).
   const closeFilterThen =
@@ -6755,22 +6747,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           <span className="dshx:truncate">
             {scopeSlot === null ? (presetsOn ? activeViewShortLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
-          {scopeSlot === null || scopeCount === null ? null : (
-            // How many filters are on (council round 11 B2); the accessible name already spells them out.
+          {scopeCount === null ? null : (
+            // How many filters are on (council round 11 B2), on a desktop as on a phone (round 29, item 8): "All 2". The
+            // accessible name already spells them out; the edited preset reads "(edited)" there, no dot.
             <Badge aria-hidden="true" data-testid="thread-scope-count" className="dshx:h-4.5 dshx:min-w-4.5 dshx:px-1 dshx:py-0 dshx:tabular-nums">
               {scopeCount}
             </Badge>
-          )}
-          {scopeSlot !== null ? null : presetEdited ? (
-            <span
-              aria-hidden="true"
-              data-testid="thread-preset-edited-dot"
-              className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary"
-            />
-          ) : null}
-          {scopeSlot !== null || activeViewMark === undefined ? null : (
-            // The active preset's mark, the same glyph its row in the panel draws (round 28, item 1).
-            <StatusGlyph status={activeViewMark} decorative data-testid="thread-view-attention-dot" />
           )}
           {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
           {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
