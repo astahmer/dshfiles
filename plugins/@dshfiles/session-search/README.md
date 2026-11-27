@@ -62,6 +62,10 @@ in seq order, with a short snippet:
 - The default limit is 200 and the most is 1 000; `hasMore` says when a thread has more.
 - `newest: true` keeps the newest `limit` matches instead of the oldest (still in seq order): Chat's find bar starts
   from the tail, so it asks for the newest 500.
+- `types` (1 to 16 event types, ORed) keeps only those events, before `limit` applies: `["assistant/message"]`,
+  `["user/message"]`, `["tool/call", "tool/result"]`. A filter of user and assistant messages only reads the
+  conversation table once it is backfilled. Omitting `types` matches every indexed type. A Host older than `types`
+  rejects the key (dshx decodes input strictly); Chat's find bar then filters the newest matches itself.
 - An archived Session is indexed for that request, as a targeted search is.
 - A match is one event: several hits inside one tool output count once. Core's text extraction leaves model thinking
   out of the index, and tool payloads are capped at 8 KB per event, so neither a thought nor a hit past that cap is
