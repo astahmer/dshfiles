@@ -6744,8 +6744,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     </DropdownMenu>
   )
   const filterPanelStyle: FilterPanelRoomStyle | undefined = filterPanelRoom === null ? undefined : { '--filter-panel-room': `${String(filterPanelRoom)}px` }
+  // The trigger's full name: "Filter: All threads (edited), 2 filters on". Also its tooltip on a desktop, where the button
+  // shows a badge and a truncating name (council round 32, item 1).
+  const filterTriggerLabel = `${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}${scopeSlot === null || scopeInput.project === null ? '' : ` · ${scopeInput.project}`}${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}`
   const filterMenu = (
     <Popover open={filterOpen} onOpenChange={setFilterOpen}>
+      {/* The desktop trigger's tooltip says its whole name on hover and focus; the phone scope button shows no tooltip. */}
+      <Tooltip {...(scopeSlot === null && !filterOpen ? {} : { open: false })}>
+      <TooltipTrigger asChild>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -6777,7 +6783,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // adds the project it holds.
           // …and how many filters are on, as the count beside it shows (council round 29, item 11): "Filter: All threads,
           // 2 filters on".
-          aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}${scopeSlot === null || scopeInput.project === null ? '' : ` · ${scopeInput.project}`}${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}`}
+          aria-label={filterTriggerLabel}
           data-preset-edited={presetEdited ? '' : undefined}
           data-thread-list-scope-button={scopeSlot === null ? undefined : ''}
           data-scope-narrowed={scopeSlot !== null && ThreadListScope.narrowed(scopeInput) ? '' : undefined}
@@ -6785,10 +6791,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {scopeSlot === null && scopeCount !== null ? (
             // On a desktop with filters on, the count takes the funnel's slot (council round 31, item 1): a 16px filter
             // badge, so it reads as filters on, not as a result count, and the name gets the funnel's room ("All threads").
+            // Its fill is the ink at 20% (council round 32, item 1: bg-muted sat ~1.05:1 on the button): 1.5:1 off the
+            // button in light, 1.8:1 in dark, the numeral 9.4:1 / 6.8:1 on it.
             <span
               aria-hidden="true"
               data-testid="thread-scope-count"
-              className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:tabular-nums"
+              className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-primary)_20%,transparent)] dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:tabular-nums"
             >
               {scopeCount}
             </span>
@@ -6797,7 +6805,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           )}
           {/* The preset's full name, \"All threads\" not \"All\" (council round 30, item 2: \"All 2\" read as two results), in the
               ink while the count pill beside it says filters are on. */}
-          <span className={cn('dshx:truncate', scopeSlot === null && scopeCount !== null && 'dshx:text-foreground')}>
+          <span className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>
             {scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
           {scopeSlot !== null && scopeCount !== null ? (
@@ -6805,7 +6813,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             <Badge
               aria-hidden="true"
               data-testid="thread-scope-count"
-              className="dshx:h-4 dshx:min-w-4 dshx:rounded-full dshx:border-transparent dshx:bg-muted dshx:px-1.25 dshx:py-0 dshx:text-2xs dshx:font-medium dshx:text-foreground dshx:tabular-nums"
+              className="dshx:h-4 dshx:min-w-4 dshx:rounded-full dshx:border-transparent dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-primary)_20%,transparent)] dshx:px-1.25 dshx:py-0 dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:tabular-nums"
             >
               {scopeCount}
             </Badge>
@@ -6814,6 +6822,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
         </Button>
       </PopoverTrigger>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" data-thread-list-filter-tooltip="">
+        {filterTriggerLabel}
+      </TooltipContent>
+      </Tooltip>
       <PopoverContent
         // Beside the list on a desktop, so the rows it filters stay in view; the kit makes it the bottom sheet on a phone.
         side="right"

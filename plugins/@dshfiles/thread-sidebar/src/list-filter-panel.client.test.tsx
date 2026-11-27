@@ -1094,11 +1094,13 @@ describe('the trigger count (round 30, item 11)', () => {
   it('draws the count as a 16px neutral pill: the muted fill, the ink, 11px, 5px across', () => {
     // The phone's pill (the desktop count moved into the funnel slot in round 32).
     const badge = trigger.slice(trigger.indexOf('<Badge'))
-    for (const token of ['dshx:h-4', 'dshx:bg-muted', 'dshx:text-foreground', 'dshx:text-2xs', 'dshx:px-1.25', 'dshx:rounded-full']) expect(badge.slice(0, 400)).toContain(token)
+    // The ink at 20% since round 33 (item 1).
+    for (const token of ['dshx:h-4', 'dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-primary)_20%,transparent)]', 'dshx:text-foreground', 'dshx:text-2xs', 'dshx:px-1.25', 'dshx:rounded-full']) expect(badge.slice(0, 400)).toContain(token)
   })
 
   it('names the trigger with the count of filters on: "Filter: All threads, 2 filters on"', () => {
-    expect(trigger).toContain("${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}")
+    // Built once as the trigger's label since round 33 (item 1), which is also its tooltip.
+    expect(client).toContain("${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}")
     expect(english).toContain("threadSidebarFiltersOn_other: '{count} filters on',")
   })
 })
@@ -1192,7 +1194,8 @@ describe('the closed desktop trigger reads as a state (round 31, item 2)', () =>
   it('shows the full preset name, truncating, in the ink while a filter count shows', () => {
     expect(trigger).toContain('{scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}')
     expect(client).not.toContain('const activeViewShortLabel')
-    expect(trigger).toMatch(/className=\{cn\('dshx:truncate', scopeSlot === null && scopeCount !== null && 'dshx:text-foreground'\)\}/u)
+    // On a phone too since round 33 (item 1).
+    expect(trigger).toMatch(/className=\{cn\('dshx:truncate', scopeCount !== null && 'dshx:text-foreground'\)\}/u)
   })
 })
 
@@ -1376,9 +1379,9 @@ it('names the third status group Set aside and the manual grouping Custom (round
 describe('the desktop trigger fits its name (round 32, item 1)', () => {
   const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
   it('draws the count badge in the funnel slot on a desktop while filters are on, the funnel otherwise', () => {
-    expect(trigger).toMatch(/\{scopeSlot === null && scopeCount !== null \? \([\s\S]{0,400}?<span\s+aria-hidden="true"\s+data-testid="thread-scope-count"[\s\S]{0,400}?<ListFilterIcon/u)
+    expect(trigger).toMatch(/\{scopeSlot === null && scopeCount !== null \? \([\s\S]{0,800}?<span\s+aria-hidden="true"\s+data-testid="thread-scope-count"[\s\S]{0,400}?<ListFilterIcon/u)
     const badge = trigger.slice(trigger.indexOf('data-testid="thread-scope-count"'), trigger.indexOf('<ListFilterIcon'))
-    for (const token of ['dshx:size-4', 'dshx:rounded-full', 'dshx:bg-muted', 'dshx:text-2xs', 'dshx:font-semibold', 'dshx:tabular-nums']) expect(badge).toContain(token)
+    for (const token of ['dshx:size-4', 'dshx:rounded-full', 'dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-primary)_20%,transparent)]', 'dshx:text-2xs', 'dshx:font-semibold', 'dshx:tabular-nums']) expect(badge).toContain(token)
     // The phone keeps its trailing pill after "Filters".
     expect(trigger).toContain('{scopeSlot !== null && scopeCount !== null ? (')
   })
@@ -1451,4 +1454,40 @@ describe('Discard is the quiet action (round 32, item 5)', () => {
 it('names the Custom segment with its visible word first (round 32, item 6)', () => {
   expect(english).toContain("threadSidebarGroupManualName: 'Custom, arrange manually',")
   expect(filterControl).toContain("status: { short: props.tSidebar('threadSidebarGroupManualShort'), name: props.tSidebar('threadSidebarGroupManualName') }")
+})
+
+// Council round 32, item 1: the count badge's bg-muted sat ~1.05:1 on the trigger fill, so \"2 All threads\" read as a
+// result count. Both badges (desktop and phone) take the ink at 20% over the button (≥ 1.4:1 against it), the numeral in
+// the ink (≥ 4.5:1); the phone label turns ink while a count shows; and the trigger's full name is its kit tooltip.
+describe('the count badge has a shape (round 33, item 1)', () => {
+  const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
+  const BADGE_FILL = 'dshx:bg-[color-mix(in_oklab,var(--dsw-alias-label-primary)_20%,transparent)]'
+  it('fills both badges with the ink at 20%, not the muted step', () => {
+    const badges = trigger.split('data-testid="thread-scope-count"').slice(1).map(rest => rest.slice(0, 600))
+    expect(badges).toHaveLength(2)
+    for (const badge of badges) {
+      expect(badge).toContain(BADGE_FILL)
+      expect(badge).not.toContain('dshx:bg-muted')
+      expect(badge).toContain('dshx:font-semibold')
+    }
+  })
+
+  it.each(['light', 'dark'] as const)('holds the badge 1.4:1 off the button and its numeral at AA on it (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const ink = p.neutral[10]
+    const [bg, panelStep] = [p.neutral[0], p.neutral[1]]
+    if (ink === undefined || bg === undefined || panelStep === undefined) throw new Error('The palette has no ink or surface step.')
+    for (const surface of [bg, panelStep, p.navSurface]) {
+      const button = paint(surface, p.triggerFill)
+      const badge = paint(button, { ...ink, alpha: 0.2 })
+      expect(PaletteMath.contrastRatio(badge, button)).toBeGreaterThanOrEqual(1.4)
+      expect(PaletteMath.contrastRatio(ink, badge)).toBeGreaterThanOrEqual(4.5)
+    }
+  })
+
+  it('draws the phone label in the ink while a count shows, and gives the desktop trigger its full name as a tooltip', () => {
+    expect(trigger).toContain("<span className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>")
+    expect(filterControl).toMatch(/<TooltipContent[^>]*data-thread-list-filter-tooltip=""[^>]*>\s*\{filterTriggerLabel\}/u)
+    expect(filterControl).toContain('aria-label={filterTriggerLabel}')
+  })
 })
