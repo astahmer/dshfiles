@@ -70,6 +70,19 @@ describe('session-search Effect Host bridge', { timeout: 30_000 }, () => {
           value: { output: { ownsService: true, hasMore: false, matches: [{ seq: 1, type: 'user/message', snippet: 'owner index' }] } },
         },
       })
+      const messages = await host.connection.requestApi({
+        packageId: '@dshfiles/session-search',
+        apiId: 'session-search',
+        method: 'searchMessages',
+        version: 1,
+        input: { text: 'owner ind', role: 'user' },
+      })
+      expect(await messages.json()).toMatchObject({
+        result: {
+          ok: true,
+          value: { output: { ownsService: true, hasMore: false, matches: [{ sessionId, seq: 1, role: 'user', snippet: 'owner index' }] } },
+        },
+      })
     } finally {
       await host.dispose()
     }

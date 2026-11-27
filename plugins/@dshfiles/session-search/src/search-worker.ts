@@ -188,6 +188,7 @@ const Handlers = SearchWorkerRpcs.toLayer(
           }
           return yield* timedSearch(readIndex.findInSession(request))
         }),
+      SearchMessages: request => timedSearch(readIndex.searchMessages(request)),
       PromptHistory: request => timedSearch(index.promptHistory(request)),
       Health: () => health,
       Nudge: () => Effect.andThen(Queue.offer(wake, undefined), health),

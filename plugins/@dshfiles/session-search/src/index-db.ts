@@ -8,7 +8,7 @@ import * as Effect from 'effect/Effect'
 import * as Schema from 'effect/Schema'
 import { SqlClient } from 'effect/sql'
 import * as SchemaGetter from 'effect/SchemaGetter'
-import type { HistoryPrompt, IndexHealth, PromptHistoryRequest } from './api-schemas.js'
+import type { HistoryPrompt, IndexHealth, MessageRoleFilter, MessageSearchMatch, MessageSearchRequest, PromptHistoryRequest } from './api-schemas.js'
 import { FtsQuery } from './fts-query.js'
 import { withoutUndefined } from './optional-fields.js'
 import type { EventFilters, FindInSessionRequest, SearchMatch, SessionEventSearchRequest, SessionHeaderRow, SessionSearchRequest } from './protocol.js'
@@ -319,6 +319,15 @@ const eventFilterClauses = (filters: EventFilters | undefined) => {
 /** Documents a search scores before it falls back to every match; see `#rankedRows`. */
 const RANK_CAP = 2_000
 
+/** Most matching messages kept from one thread in a cross-thread search, so one busy thread cannot hide the rest. */
+const MAX_MESSAGES_PER_SESSION = 3
+
+const typesForMessageRole = (role: MessageRoleFilter): readonly string[] => {
+  if (role === 'user') return ['user/message']
+  if (role === 'assistant') return ['assistant/message']
+  return ['user/message', 'assistant/message']
+}
+
 const CONVERSATION_TYPES: ReadonlySet<string> = new Set(['user/message', 'assistant/message'])
 const CONVERSATION_SURFACE = 'current'
 const isConversation = (document: { readonly type: string; readonly surface: string }): boolean =>
@@ -569,15 +578,17 @@ export class SearchIndex {
 
   readonly rankedRows = (input: {
     readonly table: DocumentTable
-    /** An FTS5 expression built by `FtsQuery.of`, never raw user text. */
+    /** An FTS5 expression built by `FtsQuery.of` or `findExpression`, never raw user text. */
     readonly query: string
     readonly filters: readonly string[]
     readonly bindings: readonly (string | number)[]
     readonly limit: number
     readonly offset: number
     readonly sessionId: string | undefined
+    readonly perSessionLimit?: number
   }) =>
     Effect.gen({ self: this }, function* () {
+      const perSessionLimit = input.perSessionLimit ?? 1
       const read = (rankCap: number | undefined) => {
         const table = input.table
         const where = [`${table} MATCH ?`, ...(input.sessionId === undefined ? [] : ['d.session_id = ?']), ...input.filters].join(' AND ')
@@ -586,6 +597,7 @@ export class SearchIndex {
           ...(input.sessionId === undefined ? [] : [input.sessionId]),
           ...input.bindings,
           ...(rankCap === undefined ? [] : [rankCap]),
+          perSessionLimit,
           input.limit,
           input.offset,
           MARKER_START,
@@ -605,7 +617,7 @@ export class SearchIndex {
                  row_number() OVER (PARTITION BY session_id ORDER BY score ASC, document_length ASC, time DESC, seq DESC) AS event_rank
           FROM matched
         ), page AS (
-          SELECT document_rowid, score, document_length, time, session_id, seq FROM ranked WHERE event_rank = 1
+          SELECT document_rowid, score, document_length, time, session_id, seq FROM ranked WHERE event_rank <= ?
           ORDER BY score ASC, document_length ASC, time DESC, session_id ASC, seq DESC LIMIT ? OFFSET ?
         )
         SELECT d.session_id AS session_id, d.seq AS seq, d.type AS type, d.time AS time, d.surface AS surface,
@@ -699,6 +711,37 @@ export class SearchIndex {
         hasMore: rows.length > request.limit,
         revision,
       }
+    })
+
+  readonly searchMessages = (request: MessageSearchRequest) =>
+    Effect.gen({ self: this }, function* () {
+      const filters: EventFilters = [
+        { kind: 'type', values: typesForMessageRole(request.role) },
+        { kind: 'surface', values: [CONVERSATION_SURFACE] },
+      ]
+      const route = yield* this.route(filters)
+      const events = eventFilterClauses(route.filters)
+      const rows = yield* this.rankedRows({
+        table: route.table,
+        query: request.query,
+        filters: ['s.parent_session IS NULL', 'coalesce(s.delegation_depth, 0) = 0', ...events.clauses],
+        bindings: events.bindings,
+        limit: request.limit + 1,
+        offset: 0,
+        sessionId: undefined,
+        perSessionLimit: MAX_MESSAGES_PER_SESSION,
+      })
+      const matches: readonly MessageSearchMatch[] = rows.slice(0, request.limit).map(row =>
+        withoutUndefined({
+          sessionId: row.session_id,
+          seq: row.seq,
+          role: row.type === 'user/message' ? ('user' as const) : ('assistant' as const),
+          time: row.time,
+          snippet: DocumentText.snippet(row.marked_text, 240),
+          cwd: row.cwd ?? undefined,
+        }),
+      )
+      return { matches, hasMore: rows.length > request.limit }
     })
 
   readonly findInSession = (request: FindInSessionRequest) =>

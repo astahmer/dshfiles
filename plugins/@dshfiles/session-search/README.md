@@ -87,6 +87,18 @@ thread, newest first, each text once. `@dshfiles/prompt-stash` calls it for its 
   migration backfills from `session_documents` once, in the worker.
 - Reindexing or forgetting (archiving) a thread drops its rows with its documents.
 
+## Cross-thread message search
+
+The `searchMessages` method of the `session-search` API searches `user/message` and `assistant/message` documents on the
+current surface across every top-level thread, leaving out tool calls, tool results, thinking and subagent threads.
+`@dshfiles/command-palette` calls it for its **Messages** tab.
+
+- `role` narrows the lookup to `user`, `assistant`, or `all` (default).
+- Searches route through `conversation_documents` once backfilled (falling back to `session_documents` before backfill),
+  keep up to 3 top-ranked matches per thread so one busy thread cannot drown out the rest, and return each match's
+  `sessionId`, event `seq`, `role`, timestamp, snippet and optional `cwd`.
+- `ownsService: false` means another plugin owns `sessionQuery` and this index is not built.
+
 ## Measured
 
 Bench: `pnpm bench:owned` (gated on `OWNED_BENCH=1`; it copies a byte-bounded subset of the newest logs the stock index

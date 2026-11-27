@@ -147,6 +147,54 @@
           "source": "api-dispatch"
         }
       ]
+    },
+    {
+      "id": "message-search",
+      "title": "Search user and assistant messages across threads",
+      "summary": "Search current-surface user/message and assistant/message documents across top-level threads, optionally narrowed by role (all, user, assistant), routing through conversation_documents once backfilled and returning each hit's sessionId, event seq, role, time and snippet for the command palette Messages tab.",
+      "surfaces": ["host", "storage", "api"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: session-search searchMessages API (read by @dshfiles/command-palette)",
+      "configuration": [],
+      "states": ["matches", "no-match", "not-owner"],
+      "failureModes": [
+        "Tool calls, tool results, shadowed events and subagent threads are excluded from results.",
+        "Text without a letter or digit returns no matches instead of an FTS5 syntax error.",
+        "When another plugin owns sessionQuery, ownsService is false and the palette reports message search unavailable."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-search.message-search-roles",
+          "file": "plugins/@dshfiles/session-search/tests/search-messages.spec.ts",
+          "testName": "searches only current user and assistant messages across top-level threads and filters by role"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-search.message-search-caps-and-backfill",
+          "file": "plugins/@dshfiles/session-search/tests/search-messages.spec.ts",
+          "testName": "caps matches per thread, reports hasMore, and works both before and after conversation backfill"
+        },
+        {
+          "kind": "unit-test",
+          "id": "session-search.message-search-host-api",
+          "file": "plugins/@dshfiles/session-search/src/host-effect.test.ts",
+          "testName": "reads the owned worker index through the Effect API bridge"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "session-search.message-search-no-browser-surface",
+          "reason": "The Messages tab that calls this API belongs to @dshfiles/command-palette and is verified by its own catalog."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

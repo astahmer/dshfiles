@@ -6,6 +6,9 @@ import {
   findMatchSchema,
   historyPromptSchema,
   indexHealthSchema,
+  MESSAGE_SEARCH_LIMIT_MAX,
+  messageRoleFilterSchema,
+  messageSearchMatchSchema,
   PROMPT_HISTORY_CHARS_MAX,
   PROMPT_HISTORY_LIMIT_MAX,
   PROMPT_HISTORY_WINDOW_MAX,
@@ -74,6 +77,18 @@ export const sessionSearchApi = defineApi({
       output: Schema.Struct({ ownsService: Schema.Boolean, prompts: Schema.Array(historyPromptSchema) }),
       description:
         'The prompts people sent across every top-level thread, newest first, each text once: only the newest `window` prompts no longer than `maxChars` characters, narrowed to those containing every word of `text` when given. Subagent threads and messages sent by a plugin or agent are left out. Read-only.',
+      readOnly: true,
+    }),
+    // Added after promptHistory: a Host started before it answers with an unknown-endpoint error.
+    searchMessages: method({
+      input: Schema.Struct({
+        text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+        role: Schema.optional(messageRoleFilterSchema),
+        limit: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(MESSAGE_SEARCH_LIMIT_MAX))),
+      }),
+      output: Schema.Struct({ ownsService: Schema.Boolean, matches: Schema.Array(messageSearchMatchSchema), hasMore: Schema.Boolean }),
+      description:
+        'Search user and assistant messages across every top-level thread whose indexed text contains all words of `text` (the last word may be a prefix). Tool calls, tool results, thinking and subagent threads are left out; `role` narrows to `user`, `assistant`, or `all` (default). Read-only.',
       readOnly: true,
     }),
   },
