@@ -127,4 +127,37 @@ describe('SearchIndex.findInSession', () => {
       [4, 'assistant/message'],
     ])
   })
+
+  it('reads the conversation table for message filters once it is backfilled, current surface only', async () => {
+    const path = await openIndex()
+    const outcome = await runWithIndex(path, function* (index) {
+      yield* commit(index, 'session-a', [
+        { type: 'user/message', surface: 'current', text: 'quartz question' },
+        { type: 'assistant/message', surface: 'shadowed', text: 'quartz rewound reply' },
+        { type: 'tool/result', surface: 'current', text: 'quartz tool output' },
+        { type: 'assistant/message', surface: 'current', text: 'quartz answer' },
+      ])
+      yield* commit(index, 'session-b', [{ type: 'assistant/message', surface: 'current', text: 'quartz elsewhere' }])
+      while (!(yield* index.backfillConversation(100))) {}
+      const query = findExpression('quartz') ?? ''
+      return {
+        ready: yield* index.conversationReady(),
+        assistant: yield* index.findInSession({ sessionId: 'session-a', query, limit: 10, types: ['assistant/message'] }),
+        messages: yield* index.findInSession({
+          sessionId: 'session-a',
+          query,
+          limit: 1,
+          newest: true,
+          types: ['assistant/message', 'user/message', 'user/message'],
+        }),
+        mixed: yield* index.findInSession({ sessionId: 'session-a', query, limit: 10, types: ['assistant/message', 'tool/result'] }),
+      }
+    })
+
+    expect(outcome.ready).toBe(true)
+    expect(outcome.assistant.matches.map(match => match.seq)).toEqual([3])
+    expect(outcome.messages.matches.map(match => match.seq)).toEqual([3])
+    expect(outcome.messages.hasMore).toBe(true)
+    expect(outcome.mixed.matches.map(match => match.seq)).toEqual([2, 3])
+  })
 })
