@@ -207,7 +207,7 @@ describe('the status sub-groups (round 28, item 4)', () => {
   it('puts each status group in its own labelled group, and every chip in one', () => {
     render(<ListFilterPanel {...panel()} />)
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
-    const status = screen.getByRole('toolbar', { name: 'threadSidebarFilterStatus' })
+    const status = screen.getByRole('group', { name: 'threadSidebarFilterStatus' })
     const groups = within(status).getAllByRole('group')
     expect(groups.map(group => group.getAttribute('aria-label') ?? document.getElementById(group.getAttribute('aria-labelledby') ?? '')?.textContent)).toEqual([
       'threadSidebarFilterGroupActivity',
@@ -215,7 +215,7 @@ describe('the status sub-groups (round 28, item 4)', () => {
       'threadSidebarFilterGroupStorage',
     ])
     // No label is hidden from assistive tech, and the stored Done chip sits in the Storage group.
-    // A chip's seat is decoration beside its label; nothing else in the toolbar is hidden.
+    // A chip's seat is decoration beside its label; nothing else in the status group is hidden.
     expect(
       Array.from(status.querySelectorAll('[aria-hidden="true"]')).filter(element => element.closest('[data-chip-seat], [data-thread-status-more]') === null),
     ).toEqual([])
@@ -332,7 +332,7 @@ describe('Source and Group by (round 28, item 8)', () => {
     expect(manual.textContent).toBe('Manual')
     // Its own top-level block, so the panel's hairline divides it from the filters; the filters hold no grouping.
     expect(display.parentElement?.hasAttribute('data-thread-list-filter-panel')).toBe(true)
-    expect(screen.getByRole('toolbar', { name: 'threadSidebarFilterStatus' }).closest('section')?.contains(group)).toBe(false)
+    expect(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }).closest('section')?.contains(group)).toBe(false)
   })
 
   it('names Reset for what it covers', () => {
@@ -621,13 +621,14 @@ describe('Save and Discard in the edited row (round 29, item 6)', () => {
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     const { container, rerender } = render(<ListFilterPanel {...base} />)
-    const section = (): HTMLElement => element(container.querySelector('[data-thread-presets]'))
-    const rowsBefore = section().children.length
+    // Laid over the edited row (absolutely, outside the radiogroup since round 30), so no row is added or moved.
+    const group = (): HTMLElement => screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })
+    const rowsBefore = group().children.length
     rerender(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
-    expect(section().children.length).toBe(rowsBefore)
-    const row = element(screen.getByRole('radio', { name: /^Working, /u }).closest('[data-preset-row]'))
-    const save = within(row).getByRole('button', { name: 'threadSidebarPresetSaveChanges' })
-    const discard = within(row).getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })
+    expect(group().children.length).toBe(rowsBefore)
+    expect(element(container.querySelector('[data-preset-actions]')).className).toContain('dshx:absolute')
+    const save = screen.getByRole('button', { name: 'threadSidebarPresetSaveChanges' })
+    const discard = screen.getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })
     for (const button of [save, discard]) {
       expect(button.className).toContain('dshx:size-6')
       expect(button.className).toContain('dshx:pointer-coarse:h-11')
@@ -670,7 +671,7 @@ describe('chip widths (round 29, item 9)', () => {
   it('wraps every status chip label in a segment label that reserves the selected weight', () => {
     render(<ListFilterPanel {...panel()} />)
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
-    const chips = within(screen.getByRole('toolbar', { name: 'threadSidebarFilterStatus' }))
+    const chips = within(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }))
       .getAllByRole('button')
       .filter(chip => !chip.hasAttribute('data-thread-status-more'))
     expect(chips.length).toBeGreaterThan(10)
@@ -715,12 +716,11 @@ describe('the built-in All threads (round 29, item 13)', () => {
     if (presets === undefined) throw new Error('The fixture has presets.')
     const onSaveAs = vi.fn()
     render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'all', edited: true, builtInId: 'all', onSaveAs }} />)
-    const row = element(screen.getByRole('radio', { name: /^All threads/u }).closest('[data-preset-row]'))
-    expect(within(row).queryByRole('button', { name: 'threadSidebarPresetSaveChanges' })).toBeNull()
-    fireEvent.click(within(row).getByRole('button', { name: 'threadSidebarPresetSaveAsNew' }))
+    expect(screen.queryByRole('button', { name: 'threadSidebarPresetSaveChanges' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarPresetSaveAsNew' }))
     expect(onSaveAs).toHaveBeenCalledOnce()
     expect(presets.onSaveChanges).not.toHaveBeenCalled()
-    expect(within(row).getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })).toBeTruthy()
   })
 
   it('knows All threads as the built-in preset', () => {
@@ -937,7 +937,8 @@ describe('preset end columns (round 30, item 6)', () => {
     if (presets === undefined) throw new Error('The fixture has presets.')
     const { container } = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
     // The row's 6px padding, the 20px column and an 8px gap: the buttons end 34px from the row's end.
-    expect(element(container.querySelector('[data-preset-actions]')).className).toContain('dshx:right-[34px]')
+    // Outside the radiogroup since round 30 (item 13): the row ends 6px inside the section, so 40px from the section.
+    expect(element(container.querySelector('[data-preset-actions]')).className).toContain('dshx:right-10')
   })
 
   it('counts an edited preset by what the list draws, in its row and its name', () => {
@@ -971,5 +972,35 @@ describe('labelled Save and Discard on a phone (round 30, item 8)', () => {
   it('says Save as new… for the built-in preset', () => {
     render(edited('all'))
     expect(screen.getByRole('button', { name: 'threadSidebarPresetSaveAsNew' }).querySelector('[data-row-button-text]')?.textContent).toBe('threadSidebarPresetSaveAsNewShort')
+  })
+})
+
+// Council round 29, item 13: roles that match the keys, Save and Discard outside the radiogroup, and a live region that
+// names the change when the count does not move.
+describe('roles and announcements (round 30, item 13)', () => {
+  it('groups the status chips as a labelled group, not a toolbar of several Tab stops', () => {
+    render(<ListFilterPanel {...panel()} />)
+    expect(screen.queryByRole('toolbar')).toBeNull()
+    expect(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }).hasAttribute('data-thread-status-filters')).toBe(true)
+  })
+
+  it('keeps Save and Discard outside the radiogroup', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const group = screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })
+    for (const name of ['threadSidebarPresetSaveChanges', 'threadSidebarPresetDiscardChanges']) expect(group.contains(screen.getByRole('button', { name }))).toBe(false)
+    expect(within(group).getAllByRole('radio').length).toBe(3)
+  })
+
+  it('names the change in the live region, so a change that leaves the count alone is still heard', () => {
+    const base = panel({ shown: '5 threads shown' })
+    render(<ListFilterPanel {...base} />)
+    expect(screen.getByRole('status').textContent).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarUnread' }))
+    expect(screen.getByRole('status').textContent).toBe('threadSidebarFilterChangeOn, 5 threads shown')
+    fireEvent.click(screen.getByRole('radio', { name: 'Main threads' }))
+    expect(screen.getByRole('status').textContent).toBe('Main threads, 5 threads shown')
   })
 })

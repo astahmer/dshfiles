@@ -226,11 +226,22 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const panelRef = useRef<HTMLDivElement | null>(null)
   const actionsRef = useRef<HTMLDivElement | null>(null)
   // The edited row's Save and Discard: their width, so the label gives way to exactly them (their text on a phone).
-  const [actionsWidth, setActionsWidth] = useState(0)
+  const [actionsBox, setActionsBox] = useState({ width: 0, top: 0, height: 0 })
+  const actionsWidth = actionsBox.width
   const editingId = presets?.edited === true ? presets.activeId : undefined
+  const presetsRef = useRef<HTMLElement | null>(null)
+  // Save and Discard live outside the radiogroup (council round 29, item 13), laid over the edited row: its top and
+  // height, measured against the presets section, and their own width, which the row's label gives way to.
   useLayoutEffect(() => {
-    setActionsWidth(actionsRef.current?.offsetWidth ?? 0)
-  }, [editingId])
+    const actions = actionsRef.current
+    const section = presetsRef.current
+    const row = section?.querySelector('[data-preset-active]')
+    if (actions === null || section === null || row === null || row === undefined) return
+    const rowBox = row.getBoundingClientRect()
+    setActionsBox({ width: actions.offsetWidth, top: rowBox.top - section.getBoundingClientRect().top, height: rowBox.height })
+  }, [editingId, presets?.items.length])
+  /** The last change, named for the live region. */
+  const [change, setChange] = useState<string | undefined>(undefined)
   /** Save and Discard vanish as they act: focus moves to the preset row first, never to the page (round 28, item 18). */
   const focusPresetThen =
     (action: () => void): (() => void) =>
@@ -246,7 +257,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
       className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:divide-y dshx:divide-border dshx:overflow-y-auto dshx:overscroll-contain"
       data-thread-list-filter-panel=""
     >
-      <ShownAnnouncer shown={props.shown} />
+      {/* The change and the count it leaves (council round 29, item 13): "Unread on, 5 threads shown" is heard even when the
+          count does not move. */}
+      <ShownAnnouncer shown={change === undefined || props.shown === undefined ? props.shown : `${change}, ${props.shown}`} />
       {/* Sticky, so Reset and Done stay in reach while the sheet scrolls (round 28, item 10). A desktop reads "Filters …
           Reset"; a phone reads "Reset · Filters · Done", the sheet's own close. One word for the button and the title.
           The panel scrolls, not the sheet, so the grabber's 20px stays above the header. */}
@@ -263,7 +276,10 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           aria-label={t('threadSidebarFilterResetLabel')}
           aria-describedby={`${ids}-reset-scope`}
           disabled={props.reset.disabled}
-          onClick={props.reset.onReset}
+          onClick={() => {
+            setChange(t('threadSidebarFilterChangeReset'))
+            props.reset.onReset()
+          }}
           data-thread-filter-reset=""
           className="dshx:phone:order-first dshx:phone:justify-self-start"
         >
@@ -288,7 +304,7 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
         <div className="dshx:px-3 dshx:py-0.5">{props.project}</div>
       )}
       {presets === undefined ? null : (
-        <section className={cn(SECTION, 'dshx:pb-2')} aria-labelledby={`${ids}-presets`} data-thread-presets="">
+        <section ref={presetsRef} className={cn(SECTION, 'dshx:relative dshx:pb-2')} aria-labelledby={`${ids}-presets`} data-thread-presets="">
           {/* A 44px row on a coarse pointer, so the ⋯'s 44px hit area stays in it (round 28, item 12). */}
           <div className="dshx:-my-1 dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:pointer-coarse:my-0 dshx:pointer-coarse:h-11">
             <h3 id={`${ids}-presets`} className={HEADING}>
@@ -303,7 +319,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
             // An edited preset keeps its identity (council round 28, item 5): it stays checked, marked edited.
             value={presets.activeId}
             // Pressing the checked row again would clear the group: it is a no-op (Discard, in the row, drops edits).
-            onValueChange={value => (value === '' || value === presets.activeId ? undefined : presets.onApply(value))}
+            onValueChange={value => {
+              if (value === '' || value === presets.activeId) return
+              setChange(presets.items.find(item => item.id === value)?.label)
+              presets.onApply(value)
+            }}
             // Rows that stand apart: with spacing the kit keeps each row's own rounded corners (round 28, item 13).
             spacing={0.5}
             className="dshx:-mx-1.5 dshx:grid dshx:w-auto dshx:gap-0.5"
@@ -312,9 +332,7 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
               const active = preset.id === presets.activeId
               const editing = active && presets.edited
               return (
-                // The row: the preset's radio and, while it is edited, its Save and Discard over the row's end, so the
-                // sections below never move as an edit starts (council round 28, item 6).
-                <div key={preset.id} className="dshx:relative" data-preset-row="">
+                <div key={preset.id} data-preset-row="">
                 <ToggleGroupItem
                   value={preset.id}
                   // An edited preset is announced, not only drawn (round 28, item 3): its name says so, and it stays the
@@ -344,9 +362,23 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                     {preset.count === null || preset.count === 0 ? '' : preset.count}
                   </span>
                 </ToggleGroupItem>
-                {editing ? (
-                  // After the "edited" tag, before the count column: the row's 6px, the 20px column and an 8px gap (34px).
-                  <div ref={actionsRef} className="dshx:absolute dshx:inset-y-0 dshx:right-[34px] dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:gap-0" data-preset-actions="">
+                </div>
+              )
+            })}
+          </ToggleGroup>
+          {(() => {
+            const preset = presets.items.find(item => item.id === presets.activeId)
+            if (!presets.edited || preset === undefined) return null
+            return (
+              // After the row's "edited" tag, before its count column: the row ends 6px inside the section, then its 6px
+              // padding, the 20px column and an 8px gap (40px). Over the edited row, but outside the radiogroup, so it
+              // holds only radios (council round 29, item 13).
+              <div
+                ref={actionsRef}
+                className="dshx:absolute dshx:right-10 dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:gap-0"
+                style={{ top: `${String(actionsBox.top)}px`, height: `${String(actionsBox.height)}px` }}
+                data-preset-actions=""
+              >
                     {preset.id === presets.builtInId ? (
                       // The built-in All threads is never overwritten (council round 28, item 13): its edits become a new preset.
                       <RowIconButton label={t('threadSidebarPresetSaveAsNew')} text={t('threadSidebarPresetSaveAsNewShort')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
@@ -365,17 +397,14 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                     <RowIconButton label={t('threadSidebarPresetDiscardChanges')} text={t('threadSidebarPresetDiscardShort')} onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
                       <RotateCcwIcon />
                     </RowIconButton>
-                  </div>
-                ) : null}
-                </div>
-              )
-            })}
-          </ToggleGroup>
+              </div>
+            )
+          })()}
         </section>
       )}
       {props.status === undefined && props.source === undefined ? null : (
         <div className="dshx:grid dshx:gap-3 dshx:px-3 dshx:pt-2.5 dshx:pb-3">
-          {props.status === undefined ? null : <StatusChips t={t} headingId={`${ids}-status`} {...props.status} />}
+          {props.status === undefined ? null : <StatusChips t={t} headingId={`${ids}-status`} {...props.status} onNote={setChange} />}
           {props.source === undefined ? null : (
             <section className="dshx:grid dshx:gap-1.5" aria-labelledby={`${ids}-source`}>
               <h3 id={`${ids}-source`} className={HEADING}>
@@ -385,7 +414,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                 labelledBy={`${ids}-source`}
                 value={props.source.value}
                 options={THREAD_SOURCE_FILTER_OPTIONS.map(option => ({ value: option, ...props.sourceLabels[option] }))}
-                onChange={value => (isSourceFilter(value) ? props.source?.onChange(value) : undefined)}
+                onChange={(value, name) => {
+                  if (!isSourceFilter(value)) return
+                  setChange(name)
+                  props.source?.onChange(value)
+                }}
               />
             </section>
           )}
@@ -402,9 +435,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
             labelledBy={`${ids}-group`}
             value={props.group.value}
             options={props.group.options.map(option => ({ value: option, ...(props.group?.labels[option] ?? { short: option, name: option }) }))}
-            onChange={value => {
+            onChange={(value, name) => {
               const option = props.group?.options.find(candidate => candidate === value)
-              if (option !== undefined) props.group?.onChange(option)
+              if (option === undefined) return
+              setChange(t('threadSidebarFilterChangeGroup', { name }))
+              props.group?.onChange(option)
             }}
             data-thread-group-by=""
           />
@@ -446,7 +481,8 @@ const Segmented = (props: {
   readonly labelledBy: string
   readonly value: string
   readonly options: readonly { readonly value: string; readonly short: string; readonly name: string }[]
-  readonly onChange: (value: string) => void
+  /** The chosen value and its full name, which the panel's live region says. */
+  readonly onChange: (value: string, name: string) => void
   readonly 'data-thread-group-by'?: string
 }): JSX.Element => (
   <ToggleGroup
@@ -454,7 +490,10 @@ const Segmented = (props: {
     aria-labelledby={props.labelledBy}
     value={props.value}
     // Picking the chosen segment again would clear the group: a segmented control always holds one value.
-    onValueChange={value => (value === '' ? undefined : props.onChange(value))}
+    onValueChange={value => {
+      const option = props.options.find(candidate => candidate.value === value)
+      if (option !== undefined) props.onChange(value, option.name)
+    }}
     spacing={1}
     data-segmented=""
     data-thread-group-by={props['data-thread-group-by']}
@@ -491,6 +530,8 @@ const StatusChips = (props: {
   readonly headingId: string
   readonly selected: readonly ThreadStatusFilter[]
   readonly onChange: (filters: readonly ThreadStatusFilter[]) => void
+  /** Name the change for the panel's live region: "Unread on". */
+  readonly onNote: (change: string) => void
 }): JSX.Element => {
   const [opened, setOpened] = useState(false)
   const moreId = useId()
@@ -501,6 +542,16 @@ const StatusChips = (props: {
   const expanded = opened || forced
   const leading = props.selected.filter(isLeadingStatus)
   const revealed = props.selected.filter(filter => !isLeadingStatus(filter))
+  /** Apply a group's next value, naming the chip it turned on or off. */
+  const toggle = (next: readonly ThreadStatusFilter[], others: readonly ThreadStatusFilter[]): void => {
+    const combined = nextStatusFilters([...next, ...others])
+    const on = combined.find(filter => !props.selected.includes(filter))
+    const off = props.selected.find(filter => !combined.includes(filter))
+    const flipped = on ?? off
+    if (flipped !== undefined)
+      props.onNote(props.t(on === undefined ? 'threadSidebarFilterChangeOff' : 'threadSidebarFilterChangeOn', { name: props.t(threadStatusFilterLabelKeys[flipped]) }))
+    props.onChange(combined)
+  }
   const chip = (filter: ThreadStatusFilter): JSX.Element => (
     <ToggleGroupItem key={filter} value={filter} className={CHIP}>
       <ChipSeat on={props.selected.includes(filter)} filter={filter} />
@@ -527,6 +578,7 @@ const StatusChips = (props: {
             onClick={event => {
               // Clear vanishes as it acts: focus moves to the first chip, never to the page (council round 28, item 18).
               event.currentTarget.closest('section')?.querySelector<HTMLElement>('[data-thread-status-filters] [data-slot="toggle-group-item"]')?.focus()
+              props.onNote(props.t('threadSidebarFilterChangeCleared'))
               props.onChange([])
             }}
           >
@@ -534,14 +586,14 @@ const StatusChips = (props: {
           </Button>
         )}
       </div>
-      <div className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2" role="toolbar" aria-labelledby={props.headingId} data-thread-status-filters="">
+      <div className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2" role="group" aria-labelledby={props.headingId} data-thread-status-filters="">
         <ToggleGroup
           type="multiple"
           // One labelled group per status group (round 28, item 4), so a screen reader hears which "Done" a chip is.
           aria-label={props.t(threadStatusFilterGroupLabelKeys[LEADING_STATUS_GROUP.id])}
           role="group"
           value={leading}
-          onValueChange={next => props.onChange(nextStatusFilters([...next, ...revealed]))}
+          onValueChange={next => toggle(nextStatusFilters(next), revealed)}
           spacing={1}
           className={STATUS_ROW}
           data-thread-status-group=""
@@ -579,8 +631,10 @@ const StatusChips = (props: {
         <ToggleGroup
           type="multiple"
           id={moreId}
+          // Not a toolbar (Radix's default): it only holds the labelled status groups (council round 29, item 13).
+          role="none"
           value={revealed}
-          onValueChange={next => props.onChange(nextStatusFilters([...leading, ...next]))}
+          onValueChange={next => toggle(nextStatusFilters(next), leading)}
           spacing={1}
           className="dshx:grid dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2"
           data-thread-status-more-region=""
