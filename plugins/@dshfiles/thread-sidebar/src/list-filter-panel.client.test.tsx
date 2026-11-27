@@ -1055,3 +1055,22 @@ describe('the Source section (round 30, item 9)', () => {
     expect(source.contains(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }))).toBe(false)
   })
 })
+
+// Council round 29, item 10 (WCAG 2.4.3): the presets ⋯ comes right after the Presets heading in DOM order, before the
+// preset radios. It already does; the round-29 keyboard log listed it last only because the panel opens on the checked
+// preset and Tab wraps inside the panel. This pins the order: Reset, ⋯, the presets, the chips, More, Source, Group by.
+describe('the panel Tab order (round 30, item 10)', () => {
+  it('reaches the presets ⋯ right after Reset and before the preset radios', () => {
+    const { container } = render(<ListFilterPanel {...panel({ reset: { disabled: false, onReset: vi.fn() } })} />)
+    const stops = Array.from(container.querySelectorAll<HTMLElement>('button, [tabindex]')).filter(
+      node => node.getAttribute('tabindex') !== '-1' && !node.hasAttribute('disabled') && !node.className.includes('dshx:hidden '),
+    )
+    const names = stops.map(node => node.getAttribute('aria-label') ?? node.textContent)
+    // The radiogroup is the roving group's one Tab stop (Radix hands focus to its checked radio).
+    expect(names.slice(0, 3)).toEqual(['threadSidebarFilterResetLabel', 'options', 'threadSidebarPresets'])
+    const heading = screen.getByRole('heading', { name: 'threadSidebarPresets' })
+    const options = screen.getByRole('button', { name: 'options' })
+    expect(heading.compareDocumentPosition(options) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(options.compareDocumentPosition(screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+  })
+})
