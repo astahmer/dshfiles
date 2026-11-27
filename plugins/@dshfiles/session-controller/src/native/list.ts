@@ -199,6 +199,7 @@ export class ApiSessionList {
     ctx.on('session/event', forgetProjections)
     ctx.on('session/disposed', session => {
       forgetProjections(session)
+      this.keepFinalCut(session)
       this.persistedChanged('disposed', session)
     })
     ctx.effect(() => () => {
@@ -477,6 +478,7 @@ export class ApiSessionList {
     if (this.persisted !== records || this.ctx.sessions.get(id) !== undefined) return
     if (stored === undefined) {
       records.delete(id)
+      this.coldProjections.delete(id)
       return
     }
     records.set(id, {
@@ -485,6 +487,22 @@ export class ApiSessionList {
       persisted: true,
       ...(stored.formatStatus === undefined ? {} : { formatStatus: stored.formatStatus }),
     })
+  }
+
+  /**
+   * dshfiles: serve a detached Session from its final projection cut, the cut the projection cache's detach write
+   * stores. That write lands later on the cache's own chain and announces nothing, so a list in between read the
+   * previous checkpoint and memoized it for good: a cold Session raises no further event. A subagent whose first turn
+   * failed at once kept its creation checkpoint (`blank: true`, no model route) and left its parent's thread list.
+   * @param session - the Session being detached; its projection cells outlive the store entry.
+   */
+  private keepFinalCut(session: Session): void {
+    try {
+      const block = hintsOf('cached', this.readBlock(session.header, session))
+      if (block !== undefined) this.coldProjections.set(session.id, block)
+    } catch (error) {
+      this.ctx.logger.warn(`api-session.list: the final projection cut of "${session.id}" was not kept; its row reads the cache: ${String(error)}`)
+    }
   }
 
   private settleColdMetadata(id: string, metadata: SessionListMetadata | undefined): void {

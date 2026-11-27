@@ -1,6 +1,6 @@
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
-import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { type Session, SessionId } from '@deepseek-ai/dsh-session'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import type { SessionRecord } from '@deepseek-ai/dsh-session-query'
@@ -46,6 +46,43 @@ it('reads a cold Session projection once per list until that Session attaches', 
   ctx.emit('session/created', session)
   await list.list()
   expect(reads).toEqual(['cold-one', 'cold-one'])
+})
+
+it("lists a detached Session from its final cut while the cache still holds the creation checkpoint", async () => {
+  const ctx = new Context()
+  contexts.add(ctx)
+  await ctx.plugin(SessionStore)
+  await ctx.plugin(SessionProjectionRegistry)
+  await ctx.plugin(AgentRegistry)
+  const list = new ApiSessionList(ctx, 8)
+  await list.initialize()
+  const records: SessionRecord[] = []
+  // SAFETY: list() reads only listSessions from the query service.
+  ctx.provide('sessionQuery', { listSessions: async () => records } as never)
+  // SAFETY: the cold path calls only these two methods. The cache writes its detach checkpoint on its own chain and
+  // announces nothing when it lands; until then it serves the checkpoint taken at creation, before any turn started.
+  ctx.provide('sessionProjectionCache', {
+    cachedSnapshot: () => ({ asOfSeq: 0, values: { sessionListMetadata: { blank: true, lastPromptAt: null } } }),
+    cachedPredecessorTitle: () => undefined,
+  } as never)
+  let session: Session | undefined
+  const fiber = ctx.plugin({
+    name: 'failed-subagent-child',
+    inject: ['sessions'],
+    apply: (child: Context) => {
+      session = child.sessions.create(SessionId('failed-child'), { meta: { createdAt: 100, cwd: resolve('cold-list-detach-fixture') } })
+    },
+  })
+  await fiber
+  if (session === undefined) throw new Error('the fixture creates the Session')
+  records.push({ header: session.header, live: false, persisted: true })
+  // A subagent whose first turn fails at once: the turn started, so the thread is not blank.
+  session.append('turn/start', { turn: 1 })
+  await fiber.dispose()
+  expect(ctx.sessions.get(SessionId('failed-child'))).toBeUndefined()
+
+  const [row] = await list.list()
+  expect(row).toMatchObject({ sessionId: 'failed-child', blank: false, agentAvailable: false })
 })
 
 const storedEvent = (event: { readonly seq: number; readonly time: number; readonly type: string; readonly data?: object }): SessionEvent =>
