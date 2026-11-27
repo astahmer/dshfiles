@@ -113,7 +113,6 @@ import {
   BellIcon,
   BellOffIcon,
   BellRingIcon,
-  BookmarkPlusIcon,
   ChevronDownIcon,
   ChevronRightIcon,
   CircleCheckIcon,
@@ -6678,11 +6677,11 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             setPresetPrompt({ mode: 'create' })
           }}
         >
-          <BookmarkPlusIcon aria-hidden="true" />
           {props.tSidebar('threadSidebarPresetSaveAs')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="dshx:truncate">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
+        {/* One text edge (no verb carries an icon) and the preset's name as a quiet label (council round 28, item 12). */}
+        <DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
         <DropdownMenuItem
           onSelect={closeFilterThen(() =>
             setPresetPrompt({
@@ -6695,7 +6694,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           {props.tSidebar('threadSidebarPresetRename')}
         </DropdownMenuItem>
         <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
-          {props.tSidebar('threadSidebarPresetUpdate')}
+          {/* One verb name, as on the edited row's button. */}
+          {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"

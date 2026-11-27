@@ -708,3 +708,15 @@ describe('one Group by label (round 29, item 11)', () => {
     expect(document.getElementById(reset.getAttribute('aria-describedby') ?? '')?.textContent).toBe('threadSidebarFilterResetScope')
   })
 })
+
+// Council round 28, item 12: the preset ⋯ menu: its name as a quiet kit label, one text edge, one verb name.
+describe('the preset menu (round 29, item 12)', () => {
+  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+  it('labels the menu with the preset name in 12px secondary, puts every verb on one text edge and names Save one way', () => {
+    expect(optionsMenu).toContain('<DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">')
+    // No verb carries an icon, so every label starts on one edge.
+    expect(optionsMenu).not.toMatch(/Icon aria-hidden/u)
+    expect(optionsMenu).not.toContain("'threadSidebarPresetUpdate'")
+    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })")
+  })
+})

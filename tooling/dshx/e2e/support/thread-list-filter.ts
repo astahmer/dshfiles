@@ -74,7 +74,7 @@ const selectView = async (page: Page, scope: Locator, name: string): Promise<voi
   await close(page)
 }
 
-/** An item of the presets' options menu: Save current filters as preset…, Rename…, Update with current filters, Delete…, Mark all as read / unread, Manage presets…. */
+/** An item of the presets' options menu: Save current filters as preset…, Rename…, Save changes to “‹preset›”, Delete…, Mark all as read / unread, Manage presets…. */
 const clickViewItem = async (page: Page, scope: Locator, name: string): Promise<void> => {
   await (await open(scope)).getByRole('button', { name: /^Preset options: /u }).click()
   const menu = page.getByRole('menu', { name: /^Preset options/u })
