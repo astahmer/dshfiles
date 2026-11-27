@@ -466,6 +466,16 @@ annotation marker, a clipped phone submenu sheet, picker description alignment, 
 `main` itself has. Follow-up (colour decision): the turn rail's read boundary draws like a turn tick; accent ink would
 set it apart.
 
+Upstream moved twice more during the merge, each merged the same way. `1b545538` (#290 Settings: DSH defaults vs
+plugins, a source filter, Plugins by category, plugin on/off controls): upstream's capability kept, drawn in the
+branch's task groups and row anatomy; the filter heads the side column; no per-row source marks; four merged-tree gaps
+found by side-by-side shots fixed (`.cache/unslop-audit/merge-1b545538/`). `86ac34ba` (#333 agent tool access, Codex
+model discovery): agent `tone` round-trips through upstream's new verbs, AI accounts keeps kit model names with
+upstream's Context window column, the kit checkbox gains upstream's indeterminate state, and the composer now declares
+an `AgentMentionTones` registry that agents fills, breaking the agents ↔ rich-composer cycle
+(`.cache/unslop-audit/merge-86ac34ba/`). Open: badge tint for Plugin vs DSH default; the Settings and agents e2e
+journeys were updated but not run.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
