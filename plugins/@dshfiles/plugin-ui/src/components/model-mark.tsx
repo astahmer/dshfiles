@@ -1,4 +1,4 @@
-import { BoxIcon } from 'lucide-react'
+import { BoxIcon, CpuIcon } from 'lucide-react'
 import { cn } from '../lib/utils.js'
 import { BRAND_COLOURS } from '../theme/brand-colours.js'
 
@@ -86,7 +86,13 @@ const FamilyGlyph = (props: { readonly family: ModelFamily; readonly className?:
   }
 }
 
-/** A 16 px mark before a model id; an unknown family keeps the same empty seat, so the ids stay aligned. */
+/**
+ * An unknown family's glyph (council round 34 A3): a 14 px neutral chip in tertiary ink (4.3:1 or more on every fill), never
+ * a brand guess. It replaces round 21's empty seat, which read as an icon that failed to load.
+ */
+const NeutralGlyph = (): JSX.Element => <CpuIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-faint-foreground" />
+
+/** A 16 px mark before a model id; an unknown family draws the neutral chip in the same seat, so the ids stay aligned. */
 export const ModelMark = (props: { readonly modelId: string; readonly className?: string }): JSX.Element => {
   const family = modelFamily(props.modelId)
   return (
@@ -95,7 +101,7 @@ export const ModelMark = (props: { readonly modelId: string; readonly className?
       data-model-mark={family ?? 'none'}
       className={cn('dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', props.className)}
     >
-      {family === undefined ? null : <FamilyGlyph family={family} />}
+      {family === undefined ? <NeutralGlyph /> : <FamilyGlyph family={family} />}
     </span>
   )
 }
@@ -142,8 +148,9 @@ export interface RouteModelProps {
    */
   readonly size?: 'sm' | 'md' | undefined
   /**
-   * Keep an empty 16 px mark seat when no family is known (round 21 D5), so names in stacked rows (the list's child
-   * rows, the dock, the transcript rows) share one start edge. Off by default: inline, an unknown family draws no seat.
+   * Keep the 16 px mark seat when no family is known (round 21 D5), so names in stacked rows (the list's child rows, the
+   * dock, the transcript rows) share one start edge; the seat holds the neutral chip (round 34 A3). Off by default:
+   * inline, an unknown family draws no seat.
    */
   readonly seat?: boolean | undefined
   readonly className?: string | undefined
@@ -151,8 +158,8 @@ export interface RouteModelProps {
 
 /**
  * A route's model as a subagent surface shows it (council round 17 A1): the 16 px brand mark and the display name in
- * secondary ink, 6px apart. The name truncates; the mark never shrinks. An unknown family draws no mark (no guess) and,
- * unless `seat` asks for an empty 16 px seat, no seat; no model renders nothing. In light the mark is drawn at 85% brightness: the brand colours sit at 2.4–3.6:1
+ * secondary ink, 6px apart. The name truncates; the mark never shrinks. An unknown family draws no brand mark (no guess) and,
+ * unless `seat` asks for its 16 px seat (with the neutral chip), no seat; no model renders nothing. In light the mark is drawn at 85% brightness: the brand colours sit at 2.4–3.6:1
  * on the light fills, and a row that shows a subagent can be panel, raised or selected; at 85% every mark holds 3:1 on
  * all four fills (tests/route-model). Dark keeps the brand colour (4.1:1 or more).
  */
@@ -169,7 +176,11 @@ export const RouteModel = ({ provider, model, size = 'sm', seat = false, classNa
         className,
       )}
     >
-      {identity.mark === undefined && seat ? <span aria-hidden data-model-mark="none" className="dshx:inline-flex dshx:size-4 dshx:shrink-0" /> : null}
+      {identity.mark === undefined && seat ? (
+        <span aria-hidden data-model-mark="none" className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center">
+          <NeutralGlyph />
+        </span>
+      ) : null}
       {identity.mark === undefined ? null : (
         <span
           aria-hidden

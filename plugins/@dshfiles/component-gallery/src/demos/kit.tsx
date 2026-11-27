@@ -468,7 +468,7 @@ export const kitDemos: readonly GalleryDemo[] = [
     id: 'kit-route-model',
     title: 'RouteModel',
     description:
-      "A subagent's model: the provider's 16px mark and the picker's name in secondary ink. No family, no mark (stacked rows pass `seat` to keep an empty seat); no model, nothing.",
+      "A subagent's model: the provider's 16px mark and the picker's name in secondary ink. No family, no brand mark (stacked rows pass `seat` to keep the seat, which holds a neutral chip); no model, nothing.",
     source: "import { RouteModel, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'",
     static: true,
     render: () => (

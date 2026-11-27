@@ -45,10 +45,10 @@ describe('A route model identity (council round 17 A1: the subagent model is eas
     expect(renderToStaticMarkup(<RouteModel provider="openai" />)).toBe('')
   })
 
-  it('keeps an empty 16 px seat for an unknown family with `seat`, so stacked names share one start edge (round 21 D5)', () => {
+  it('keeps the 16 px seat for an unknown family with `seat` and draws a neutral chip in it, never an empty slot (round 21 D5, round 34 A3)', () => {
     const seated = renderToStaticMarkup(<RouteModel provider="local" model="step-5-preview" seat />)
     expect(seated).toMatch(
-      /^<span data-slot="route-model" data-model-family="none" class="[^"]*dshx:gap-1\.5[^"]*"><span aria-hidden="true" data-model-mark="none" class="dshx:inline-flex dshx:size-4 dshx:shrink-0[^"]*"><\/span><span class="dshx:min-w-0 dshx:truncate">step-5-preview<\/span><\/span>$/u,
+      /^<span data-slot="route-model" data-model-family="none" class="[^"]*dshx:gap-1\.5[^"]*"><span aria-hidden="true" data-model-mark="none" class="dshx:inline-flex dshx:size-4 dshx:shrink-0[^"]*"><svg[^>]*class="lucide lucide-cpu[^"]*dshx:size-3\.5[^"]*dshx:text-faint-foreground[^"]*"[^>]*>.*<\/svg><\/span><span class="dshx:min-w-0 dshx:truncate">step-5-preview<\/span><\/span>$/u,
     )
     // A known family draws the same mark with or without `seat`; no model still renders nothing.
     expect(renderToStaticMarkup(<RouteModel provider="openai-codex" model="gpt-6.2-astra" seat />)).toBe(
@@ -73,6 +73,8 @@ describe('A route model identity (council round 17 A1: the subagent model is eas
     for (const [index, fill] of fills.entries()) {
       const surface = palette.neutral[index]!
       expect(PaletteMath.contrastRatio(palette.neutral[9]!, surface), `secondary ink on ${fill}`).toBeGreaterThanOrEqual(4.5)
+      // The unknown family's neutral chip is drawn in tertiary ink (neutral 8): a glyph, 3:1 on every fill (round 34 A3).
+      expect(PaletteMath.contrastRatio(palette.neutral[8]!, surface), `neutral chip on ${fill}`).toBeGreaterThanOrEqual(3)
       for (const [family, hex] of Object.entries(BRAND_COLOURS))
         expect(PaletteMath.contrastRatio(PaletteMath.hexToOklch(darken(hex, factor)), surface), `${family} mark on ${fill}`).toBeGreaterThanOrEqual(3)
     }

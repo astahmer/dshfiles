@@ -127,13 +127,13 @@ describe('usage history views', () => {
       breakdown: { ...view.breakdown, model: modelRow === undefined ? [] : [{ ...modelRow, key: 'gpt-6-luna' }, { ...modelRow, key: 'step-5-preview', cost: 0.01 }] },
     }
 
-    it('draws the 16 px provider mark "Where it went" draws before each model, an empty seat for an unknown one', () => {
+    it('draws the 16 px provider mark "Where it went" draws before each model, the neutral chip for an unknown one', () => {
       const markup = renderToStaticMarkup(<UsageBreakdownTable view={branded} groupBy="model" onShowRequests={() => 'opened'} />)
       const cells = markup.match(/<tbody[^>]*>.*<\/tbody>/su)?.[0].match(/<td class="[^"]*dshx:min-w-40[^"]*">.*?<\/td>/gsu) ?? []
       expect(cells).toHaveLength(2)
       expect(cells[0]).toMatch(/<button[^>]*><span aria-hidden="true" data-model-mark="openai" class="[^"]*dshx:size-4[^"]*">.*?<\/span><span[^>]*dshx:truncate[^>]*>gpt-6-luna<\/span><\/button>/su)
-      // An unknown family keeps the seat, so the names stay on one edge.
-      expect(cells[1]).toMatch(/data-model-mark="none"[^>]*><\/span><span[^>]*>step-5-preview<\/span>/su)
+      // An unknown family keeps the seat, so the names stay on one edge; it holds the kit's neutral chip (round 34 A3).
+      expect(cells[1]).toMatch(/data-model-mark="none"[^>]*><svg[^>]*lucide-cpu.*?<\/svg><\/span><span[^>]*>step-5-preview<\/span>/su)
       // Accounts take the mark too (as in "Where it went"); projects and purposes have no provider.
       expect(renderToStaticMarkup(<UsageBreakdownTable view={view} groupBy="provider" onShowRequests={() => 'opened'} />)).toContain('data-model-mark="openai"')
       const projects: ChartView = { ...view, breakdown: { ...view.breakdown, project: view.breakdown.provider } }

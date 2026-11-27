@@ -303,8 +303,9 @@ model)` is the rule behind it, for a surface that lays the parts out itself: `{ 
 picker shows it (an account provider's own `<provider>/` prefix drops, and so does a vendor prefix naming the same
 family as the rest: `google/gemini-3.8-flash` → `gemini-3.8-flash`), the mark from the model id first and the
 provider only as a fallback, and `undefined` without a model. A family no token names draws the name alone; nothing is
-guessed. In stacked rows (a list's child rows, a dock, transcript rows) pass `seat`: an unknown family then keeps an
-empty 16px mark seat, so every name starts on one edge. Pass route parts you may show: the kit does not screen secrets.
+guessed. In stacked rows (a list's child rows, a dock, transcript rows) pass `seat`: an unknown family then keeps the
+16px mark seat, so every name starts on one edge, and the seat holds a 14px neutral chip (lucide `Cpu`) in tertiary
+ink instead of an empty slot that reads as a failed icon. `ModelMark` draws the same chip for an unknown id. Pass route parts you may show: the kit does not screen secrets.
 
 ## Shared components
 

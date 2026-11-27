@@ -18,13 +18,13 @@ describe('AI accounts marks (council round 2, D4)', () => {
     expect(modelFamily('step-5-preview')).toBeUndefined()
   })
 
-  it('draws a 16 px provider mark before a model id, and an empty seat of the same size for an unknown family', () => {
+  it('draws a 16 px provider mark before a model id, and the kit neutral chip in the same seat for an unknown family', () => {
     for (const id of ['gpt-6-luna', 'deepseek/deepseek-v4-flash', 'claude-sonnet-5-5', 'google/gemini-3.8-flash']) {
       const markup = renderToStaticMarkup(<ModelMark modelId={id} />)
       expect(markup, id).toMatch(/^<span aria-hidden="true" data-model-mark="[a-z]+" class="[^"]*dshx:size-4[^"]*"><svg/u)
     }
     expect(renderToStaticMarkup(<ModelMark modelId="step-5-preview" />)).toMatch(
-      /^<span aria-hidden="true" data-model-mark="none" class="[^"]*dshx:size-4[^"]*"><\/span>$/u,
+      /^<span aria-hidden="true" data-model-mark="none" class="[^"]*dshx:size-4[^"]*"><svg[^>]*lucide-cpu/u,
     )
   })
 

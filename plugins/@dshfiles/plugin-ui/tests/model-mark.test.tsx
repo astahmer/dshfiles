@@ -13,15 +13,17 @@ describe('Kit model marks (council round 5 D1: one brand mark for AI accounts an
     expect(modelFamily('step-5-preview')).toBeUndefined()
   })
 
-  it('draws a 16 px provider mark before a model id, and an empty seat of the same size for an unknown family', () => {
+  it('draws a 16 px provider mark before a model id, and a neutral chip glyph in the same seat for an unknown family', () => {
     for (const id of ['gpt-6-luna', 'deepseek/deepseek-v4-flash', 'claude-sonnet-5-5', 'google/gemini-3.8-flash', 'mistral-large-4']) {
       const markup = renderToStaticMarkup(<ModelMark modelId={id} />)
       expect(markup, id).toMatch(/^<span aria-hidden="true" data-model-mark="[a-z]+" class="[^"]*dshx:size-4[^"]*"><svg/u)
       // The mark is decoration beside a visible name: the glyph carries no second accessible name.
       expect(markup, id).not.toContain('aria-label')
     }
+    // Council round 34 A3: an empty seat read as a failed icon. An unknown family draws a 14 px neutral chip (lucide Cpu) in
+    // tertiary ink, never a brand guess.
     expect(renderToStaticMarkup(<ModelMark modelId="step-5-preview" />)).toMatch(
-      /^<span aria-hidden="true" data-model-mark="none" class="[^"]*dshx:size-4[^"]*"><\/span>$/u,
+      /^<span aria-hidden="true" data-model-mark="none" class="[^"]*dshx:size-4[^"]*"><svg[^>]*class="lucide lucide-cpu[^"]*dshx:size-3\.5[^"]*dshx:text-faint-foreground[^"]*"/u,
     )
   })
 
