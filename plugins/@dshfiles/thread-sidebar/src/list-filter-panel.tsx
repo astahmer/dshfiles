@@ -10,7 +10,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { BookmarkPlusIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Fragment, useId, useState, type ReactNode } from 'react'
+import { useId, useState, type ReactNode } from 'react'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 import { threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, type ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
@@ -109,6 +109,8 @@ const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
 const QUIET_ROW = 'dshx:-mx-1.5 dshx:justify-start dshx:justify-self-stretch dshx:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:pointer-coarse:h-11'
 const HEADING = 'dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
 const ALL_STATUSES = 'all'
+/** One status group's chips: a wrapping row. */
+const STATUS_ROW = 'dshx:flex dshx:w-full dshx:flex-wrap dshx:gap-1 dshx:pointer-coarse:gap-2'
 
 const isStatusFilter = (value: string): value is ThreadStatusFilter =>
   value !== ALL_STATUSES && THREAD_STATUS_FILTER_OPTIONS.some(option => option === value)
@@ -320,24 +322,27 @@ const StatusChips = (props: {
         value={props.selected.length === 0 ? [ALL_STATUSES] : [...props.selected]}
         onValueChange={next => props.onChange(nextStatusFilters(props.selected, next))}
         spacing={1}
-        className="dshx:w-full dshx:flex-wrap dshx:gap-1 dshx:pointer-coarse:gap-2"
+        // One labelled group per status group (round 28, item 4), so a screen reader hears which "Done" a chip is.
+        className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2"
         data-thread-status-filters=""
       >
-        <ToggleGroupItem value={ALL_STATUSES} className={CHIP}>
-          {props.t('threadSidebarFilterNone')}
-        </ToggleGroupItem>
-        {LEADING_STATUS_GROUP.filters.map(filter => (
-          <ToggleGroupItem key={filter} value={filter} className={CHIP}>
-            {props.t(threadStatusFilterLabelKeys[filter])}
+        <div role="group" aria-label={props.t(threadStatusFilterGroupLabelKeys[LEADING_STATUS_GROUP.id])} className={STATUS_ROW} data-thread-status-group="">
+          <ToggleGroupItem value={ALL_STATUSES} className={CHIP}>
+            {props.t('threadSidebarFilterNone')}
           </ToggleGroupItem>
-        ))}
+          {LEADING_STATUS_GROUP.filters.map(filter => (
+            <ToggleGroupItem key={filter} value={filter} className={CHIP}>
+              {props.t(threadStatusFilterLabelKeys[filter])}
+            </ToggleGroupItem>
+          ))}
+        </div>
         {/* The disclosure's region stays mounted (its aria-controls target); it holds the other groups while open. */}
-        <div id={moreId} className="dshx:contents" data-thread-status-more-region="">
+        <div id={moreId} className="dshx:grid dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2" data-thread-status-more-region="">
           {expanded
             ? THREAD_STATUS_FILTER_GROUPS.slice(1).map(group => (
-                <Fragment key={group.id}>
-                  {/* A later group starts its own line under a small label: the line break is the label's full width. */}
-                  <span className="dshx:w-full dshx:pt-1 dshx:text-xs dshx:text-muted-foreground" aria-hidden="true">
+                <div key={group.id} role="group" aria-labelledby={`${moreId}-${group.id}`} className={STATUS_ROW} data-thread-status-group="">
+                  {/* The group's label starts its own line: its full width breaks the row. */}
+                  <span id={`${moreId}-${group.id}`} className="dshx:w-full dshx:pt-1 dshx:text-xs dshx:text-muted-foreground">
                     {props.t(threadStatusFilterGroupLabelKeys[group.id])}
                   </span>
                   {group.filters.map(filter => (
@@ -345,7 +350,7 @@ const StatusChips = (props: {
                       {props.t(threadStatusFilterLabelKeys[filter])}
                     </ToggleGroupItem>
                   ))}
-                </Fragment>
+                </div>
               ))
             : null}
         </div>

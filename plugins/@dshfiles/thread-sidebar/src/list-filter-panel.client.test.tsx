@@ -224,3 +224,23 @@ describe('an edited preset (round 28, item 3)', () => {
     expect(screen.getByRole('radio', { name: 'All threads' }).getAttribute('aria-current')).toBe('true')
   })
 })
+
+// Council round 27, item 4: the status sub-groups reach assistive tech ("Done" is a preset and a stored status).
+describe('the status sub-groups (round 28, item 4)', () => {
+  it('puts each status group in its own labelled group, and every chip in one', () => {
+    render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    const status = screen.getByRole('toolbar', { name: 'threadSidebarFilterStatus' })
+    const groups = within(status).getAllByRole('group')
+    expect(groups.map(group => group.getAttribute('aria-label') ?? document.getElementById(group.getAttribute('aria-labelledby') ?? '')?.textContent)).toEqual([
+      'threadSidebarFilterGroupActivity',
+      'threadSidebarFilterGroupAttention',
+      'threadSidebarFilterGroupStorage',
+    ])
+    // No label is hidden from assistive tech, and the stored Done chip sits in the Storage group.
+    expect(status.querySelector('[aria-hidden="true"]:not(svg):not([data-slot="status-glyph"])')).toBeNull()
+    expect(within(groups[2] as HTMLElement).getByRole('button', { name: 'threadSidebarSettled' })).toBeTruthy()
+    const chips = within(status).getAllByRole('button')
+    expect(chips.every(chip => chip.closest('[role="group"]') !== null)).toBe(true)
+  })
+})
