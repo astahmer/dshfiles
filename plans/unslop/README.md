@@ -451,6 +451,21 @@ workspace-folder-picker, backlog and agents. Follow-ups: browser scenarios for t
 returning the palette, raw `@{luna}` in thread titles and the Resume bar, three stale workspace-folder-picker reach
 steps.
 
+### Upstream merge: main through `534773f0` (2026-11-27)
+
+Merge revision `ykvkvpxt` (parents `70d2e48a`, `534773f0`; 91 upstream commits, 41 conflicted files), then fixes on top.
+Upstream and this branch were captured side by side on the surfaces both changed
+(`.cache/unslop-audit/merge-534773f0/pairs/`). Decisions: the Live work dock, phone lists, grouped row menu, jobs
+dock, History header and Messages page keep this branch's design. Upstream's Keep screen on goes under More, its
+picker sheet gets our touch density, its Stale work uses the shared Stale glyph, and its Undo, generated-file fold,
+one-diff phone view and topic removal are kept. From upstream's run cards, an opened phone dock row is never cut off.
+Fixed after the merge: three paragraph summaries that broke the catalog rule (chat, rich-composer and thread-sidebar
+did not build), copy and design-token findings, undeclared native-fork files, the landscape keycap rule, phone code
+cards clipped by upstream's flow-item containment, upstream's literal `{bookmark}`, 40 px terminal keys, the 18 px
+annotation marker, a clipped phone submenu sheet, picker description alignment, and three `features:check` failures
+`main` itself has. Follow-up (colour decision): the turn rail's read boundary draws like a turn tick; accent ink would
+set it apart.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
