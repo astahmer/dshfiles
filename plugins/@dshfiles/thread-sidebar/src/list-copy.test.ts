@@ -83,3 +83,9 @@ test('a setting description is one or two sentences', () => {
 test("the hover actions setting says the actions a narrow row cannot fit stay in its ⋯ menu (round 28, item 11)", () => {
   expect(/threadSidebarRowActionsHint: ["'][^\n]*⋯ menu[^\n]*["'],/u.test(english)).toBe(true)
 })
+
+test('the hover actions setting says actions show when the title leaves room (round 30, item 14)', () => {
+  // Since round 29 an action shows only where it clears the title's last glyph, not \"the first ones that fit\".
+  expect(/threadSidebarRowActionsHint: [^\n]*when the title leaves room[^\n]*⋯ menu/u.test(english)).toBe(true)
+  expect(english).not.toContain('A narrow row shows the first ones that fit')
+})

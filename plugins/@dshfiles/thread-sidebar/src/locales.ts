@@ -657,7 +657,7 @@ const en = {
   threadSidebarRowStatusDot: 'Status dot',
   threadSidebarRowActions: 'Hover actions',
   threadSidebarRowActionDismiss: 'Dismiss reminder',
-  threadSidebarRowActionsHint: "Buttons drawn on a thread row while the pointer is over it. Drag a row, or move it, to set their left-to-right order. A narrow row shows the first ones that fit; the rest stay in the row's ⋯ menu.",
+  threadSidebarRowActionsHint: "Buttons drawn on a thread row while the pointer is over it, when the title leaves room for them; the rest stay in the row's ⋯ menu. Drag a row, or move it, to set their left-to-right order.",
   /** Children whose turn failed, in the one count formula (`6 working · 2 failed`, round 22 items 2 and 3). */
   threadSidebarFailedCount: '{count} failed',
 }
@@ -1309,7 +1309,7 @@ const zh = {
   threadSidebarRowStatusDot: '状态点',
   threadSidebarRowActions: '悬停操作',
   threadSidebarRowActionDismiss: '忽略提醒',
-  threadSidebarRowActionsHint: '指针悬停在会话行上时显示的按钮；拖动或移动列表项即可设置其从左到右的顺序。较窄的行只显示放得下的前几个，其余在行的 ⋯ 菜单中。',
+  threadSidebarRowActionsHint: '指针悬停在会话行上、且标题留有空间时显示的按钮；其余在行的 ⋯ 菜单中。拖动或移动列表项即可设置其从左到右的顺序。',
   threadSidebarFailedCount: '{count} 个失败',
 }
 
