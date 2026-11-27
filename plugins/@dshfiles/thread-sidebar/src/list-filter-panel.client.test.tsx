@@ -180,9 +180,9 @@ describe('the More statuses disclosure (round 28, item 2)', () => {
 
   it('cannot fold while one of the statuses it holds is on', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
-    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
-    expect(more.getAttribute('aria-expanded')).toBe('true')
-    expect(more.getAttribute('aria-disabled')).toBe('true')
+    // No control to fold (council round 34, A6): the held status shows, and a label says why.
+    expect(screen.queryByRole('button', { name: 'threadSidebarFilterFewerStatuses' })).toBeNull()
+    expect(document.querySelector('[data-thread-status-forced]')).not.toBeNull()
     expect(screen.getByRole('button', { name: 'threadSidebarArchived', pressed: true })).toBeTruthy()
   })
 })
@@ -552,14 +552,11 @@ describe('the More statuses disclosure, placed (round 29, item 3)', () => {
     expect(region?.contains(screen.getByRole('button', { name: 'threadSidebarWorking' }))).toBe(false)
   })
 
-  it('stays open while a revealed status is on with aria-disabled and a description, never disabled', () => {
+  it('stays open while a revealed status is on, with no control that cannot act (council round 34, A6)', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
-    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
-    expect(more.hasAttribute('disabled')).toBe(false)
-    expect(more.getAttribute('aria-disabled')).toBe('true')
-    expect(document.getElementById(more.getAttribute('aria-describedby') ?? '')?.textContent).toBe('threadSidebarFilterFoldHintOne')
-    fireEvent.click(more)
-    expect(more.getAttribute('aria-expanded')).toBe('true')
+    expect(document.querySelector('[data-thread-status-more]')).toBeNull()
+    expect(document.querySelector('[aria-disabled="true"]')).toBeNull()
+    expect(document.querySelector('[data-thread-status-more-region] button')).not.toBeNull()
   })
 })
 
@@ -868,15 +865,11 @@ describe('the built-in preset menu (round 30, item 2)', () => {
 
 // Council round 29, item 3: the forced-open disclosure says why on screen, and never folds under the pointer.
 describe('the forced-open disclosure (round 30, item 3)', () => {
-  it('shows the fold hint on screen, which the button is described by', () => {
+  it('says why on screen, in one label (council round 34, A6)', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
-    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
-    const hint = element(document.getElementById(more.getAttribute('aria-describedby') ?? ''))
-    // Names its cause since round 33 (item 7).
-    expect(hint.textContent).toBe('threadSidebarFilterFoldHintOne')
-    expect(hint.className).not.toContain('sr-only')
-    // On screen; its style is round 31's group-label line (item 5).
-    expect(hint.getClientRects).toBeDefined()
+    const label = element(document.querySelector('[data-thread-status-forced]'))
+    expect(label.textContent).toBe('threadSidebarFilterMoreSelected')
+    expect(label.className).not.toContain('sr-only')
   })
 
   it('stays open after the last revealed status is turned off, so nothing folds under the pointer', () => {
@@ -1217,20 +1210,6 @@ describe('the preset menu fits the panel (round 31, item 4)', () => {
     expect(optionsMenu).toMatch(/\{activeIsBuiltIn \? null : \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuLabel/u)
     expect(optionsMenu).toContain('aria-describedby={activeIsBuiltIn ? builtInHintId : undefined}')
     expect(optionsMenu).toContain('id={builtInHintId}')
-  })
-})
-
-// Council round 30, item 5: the forced-open hint is its own line under Fewer statuses, at the label's x (36px), in the
-// group-label style, and the control is no fainter than its explanation.
-describe('the forced-open hint line (round 31, item 5)', () => {
-  it('sits on its own line at the label x in 11px tertiary, and the button keeps its full ink', () => {
-    render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
-    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
-    const hint = element(document.getElementById(more.getAttribute('aria-describedby') ?? ''))
-    expect(more.nextElementSibling).toBe(hint)
-    expect(hint.tagName).toBe('P')
-    for (const token of ['dshx:pl-6', 'dshx:text-2xs', 'dshx:text-(--dsw-alias-label-tertiary)']) expect(hint.className).toContain(token)
-    expect(more.className).not.toContain('opacity-60')
   })
 })
 
@@ -1575,19 +1554,43 @@ describe('desktop Save stands out (round 33, item 6)', () => {
   })
 })
 
-// Council round 32, item 7: the forced hint names what holds the region open: "Archived is on. Turn it off to fold."
-describe('the fold hint names its cause (round 33, item 7)', () => {
+// Council round 32, item 7, then round 34, A6 (Astra's wording): a forced "Fewer statuses" read as a disabled control
+// with a hint line under it. While a revealed status is on, one plain label stands in its place and names what holds it.
+describe('a forced More statuses is one plain label (council round 34, A6)', () => {
   const words: Readonly<Record<string, string>> = threadSidebarDictionaries.en
   const translate: ListFilterPanelProps['t'] = (key, params) => (words[key] ?? key).replace(/\{(\w+)\}/gu, (_, name: string) => String(params?.[name] ?? ''))
-  const hint = (): string => element(document.querySelector('[data-thread-status-fold-hint]')).textContent ?? ''
-  it('says which revealed status is on, singular or plural, and sits at the label x', () => {
+  const label = (): HTMLElement => element(document.querySelector('[data-thread-status-forced]'))
+  it('names what is selected, singular or plural', () => {
     const { rerender } = render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} t={translate} />)
-    expect(hint()).toBe('Archived is on. Turn it off to fold.')
-    expect(element(document.querySelector('[data-thread-status-fold-hint]')).className).toContain('dshx:pl-6')
+    expect(label().textContent).toBe('More statuses · Archived selected')
     rerender(<ListFilterPanel {...panel({ status: { selected: ['muted', 'archived'], onChange: vi.fn() } })} t={translate} />)
-    expect(hint()).toBe('Muted and Archived are on. Turn them off to fold.')
+    expect(label().textContent).toBe('More statuses · Muted and Archived selected')
     rerender(<ListFilterPanel {...panel({ status: { selected: ['working', 'interrupted', 'muted', 'archived'], onChange: vi.fn() } })} t={translate} />)
-    expect(hint()).toBe('Interrupted, Muted and Archived are on. Turn them off to fold.')
+    expect(label().textContent).toBe('More statuses · Interrupted, Muted and Archived selected')
+  })
+
+  it('is not a control: no button, no focus, no hover fill, the default cursor, and no hint line under it', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} t={translate} />)
+    const forced = label()
+    expect(forced.tagName).toBe('P')
+    expect(forced.closest('button')).toBeNull()
+    expect(forced.querySelector('button, [tabindex]')).toBeNull()
+    expect(forced.hasAttribute('tabindex')).toBe(false)
+    expect(forced.className).toContain('dshx:cursor-default')
+    expect(forced.className).not.toMatch(/hover:/u)
+    // At the disclosure's label x (24px into the section, where "More statuses" starts) in the secondary ink.
+    for (const token of ['dshx:pl-6', 'dshx:text-xs', 'dshx:text-muted-foreground']) expect(forced.className).toContain(token)
+    expect(screen.queryByText(/Turn (?:it|them) off to fold/u)).toBeNull()
+    expect(document.querySelector('[data-thread-status-fold-hint]')).toBeNull()
+    expect(screen.queryByRole('button', { name: /statuses/u })).toBeNull()
+  })
+
+  it('gives the disclosure back, open, once nothing holds it', () => {
+    const base = panel({ status: { selected: ['archived'], onChange: vi.fn() } })
+    const { rerender } = render(<ListFilterPanel {...base} t={translate} />)
+    rerender(<ListFilterPanel {...base} status={{ selected: [], onChange: vi.fn() }} t={translate} />)
+    expect(document.querySelector('[data-thread-status-forced]')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Fewer statuses' }).getAttribute('aria-expanded')).toBe('true')
   })
 })
 

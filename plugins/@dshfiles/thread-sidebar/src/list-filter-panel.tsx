@@ -610,8 +610,9 @@ const isLeadingStatus = (filter: ThreadStatusFilter): boolean => LEADING_STATUS_
 
 /**
  * Status: the activity chips; then More statuses, a disclosure directly under them (council round 28, item 3) that
- * opens why a thread waits and where it is stored, each on its own labelled line. It reads Fewer statuses while open,
- * and while one of the statuses it reveals is on it stays open: `aria-disabled` with a description of how to fold it.
+ * opens why a thread waits and where it is stored, each on its own labelled line. It reads Fewer statuses while open.
+ * While one of the statuses it reveals is on it stays open, and the disclosure gives way to one plain label that says
+ * why (council round 34, A6): "More statuses · Archived selected", nothing to press, hover or focus.
  * The leading row and the revealed rows are two roving groups, so the first revealed chip is the next Tab stop.
  */
 const StatusChips = (props: {
@@ -646,17 +647,14 @@ const StatusChips = (props: {
   const expanded = opened || forced
   const leading = props.selected.filter(isLeadingStatus)
   const revealed = props.selected.filter(filter => !isLeadingStatus(filter))
-  // What holds the region open, named (council round 32, item 7): "Archived is on. Turn it off to fold."
+  // What holds the region open, named (council round 32, item 7; round 34, A6): "More statuses · Archived selected".
   const holding = THREAD_STATUS_FILTER_GROUPS.slice(1)
     .flatMap(group => group.filters)
     .filter(filter => revealed.includes(filter))
     .map(filter => props.t(threadStatusFilterLabelKeys[filter]))
-  const foldHint =
-    holding.length === 1
-      ? props.t('threadSidebarFilterFoldHintOne', { name: holding[0] ?? '' })
-      : props.t('threadSidebarFilterFoldHintMany', {
-          names: `${holding.slice(0, -1).join(props.t('threadSidebarListComma'))}${props.t('threadSidebarListAnd')}${holding.at(-1) ?? ''}`,
-        })
+  const forcedLabel = props.t('threadSidebarFilterMoreSelected', {
+    names: holding.length === 1 ? (holding[0] ?? '') : `${holding.slice(0, -1).join(props.t('threadSidebarListComma'))}${props.t('threadSidebarListAnd')}${holding.at(-1) ?? ''}`,
+  })
   /** Apply a group's next value, naming the chip it turned on or off. */
   const toggle = (next: readonly ThreadStatusFilter[], others: readonly ThreadStatusFilter[]): void => {
     const combined = nextStatusFilters([...next, ...others])
@@ -715,36 +713,35 @@ const StatusChips = (props: {
         >
           {LEADING_STATUS_GROUP.filters.map(chip)}
         </ToggleGroup>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-expanded={expanded}
-          aria-controls={moreId}
-          // A status in force never hides: while one of these is on, the disclosure stays open and says how to fold it.
-          aria-disabled={forced ? true : undefined}
-          aria-describedby={forced ? `${moreId}-hint` : undefined}
-          className={cn(QUIET_ROW, 'dshx:justify-self-start')}
-          onClick={() => {
-            if (forced) return
-            revealRequested.current = !opened
-            setOpened(current => !current)
-          }}
-          data-thread-status-more=""
-        >
-          <ChevronDownIcon
-            aria-hidden="true"
-            className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-hover)', expanded && 'dshx:rotate-180')}
-          />
-          {props.t(expanded ? 'threadSidebarFilterFewerStatuses' : 'threadSidebarFilterMoreStatuses')}
-        </Button>
         {forced ? (
-          // Why it will not fold (council round 29, item 3): its own line under it, at its label's x (36px), in the group
-          // label style (council round 30, item 5); also its description for a screen reader.
-          <p id={`${moreId}-hint`} className="dshx:-mt-1 dshx:pl-6 dshx:text-2xs dshx:text-(--dsw-alias-label-tertiary)" data-thread-status-fold-hint="">
-            {foldHint}
+          // A status in force never hides (council round 29, item 3). While one is on, a plain label stands where the
+          // disclosure was, at its label's x and height, in the secondary ink with no hover fill or pointer (council round
+          // 34, A6, Astra's wording): it read as a disabled "Fewer statuses" with a hint line under it.
+          // Three held statuses run past one line at 320px: it wraps rather than cutting the names it exists to say.
+          <p className="dshx:flex dshx:min-h-7 dshx:min-w-0 dshx:cursor-default dshx:items-center dshx:py-1 dshx:pl-6 dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:min-h-11" data-thread-status-forced="">
+            {forcedLabel}
           </p>
-        ) : null}
+        ) : (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-expanded={expanded}
+            aria-controls={moreId}
+            className={cn(QUIET_ROW, 'dshx:justify-self-start')}
+            onClick={() => {
+              revealRequested.current = !opened
+              setOpened(current => !current)
+            }}
+            data-thread-status-more=""
+          >
+            <ChevronDownIcon
+              aria-hidden="true"
+              className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-hover)', expanded && 'dshx:rotate-180')}
+            />
+            {props.t(expanded ? 'threadSidebarFilterFewerStatuses' : 'threadSidebarFilterMoreStatuses')}
+          </Button>
+        )}
         {/* The disclosure's region stays mounted (its aria-controls target); it holds the other groups while open. */}
         <ToggleGroup
           type="multiple"
