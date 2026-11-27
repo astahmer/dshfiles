@@ -477,7 +477,8 @@
         }
       ],
       "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
-      "summary": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key request spends. The CLI's own catalog decides the models (Mistral Large 4, Mistral Medium 3.5, GLM 5.3, GLM 5.3 Flash, DeepSeek V4.1 Flash 1017), their thinking levels and their context windows. Each DSH step replays the transcript, streams the answer and its reasoning, and reports the run's tokens and cost from `export.json`. This is a CLI-agent route: Vibe owns its agent loop and tools, and DSH's tools are not bridged.",
+      "summary": "Use the Vibe and Studio allowance of a signed-in Mistral Vibe login by running the official Vibe CLI for a thread.",
+      "details": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key request spends. The CLI's own catalog decides the models (Mistral Large 4, Mistral Medium 3.5, GLM 5.3, GLM 5.3 Flash, DeepSeek V4.1 Flash 1017), their thinking levels and their context windows. Each DSH step replays the transcript, streams the answer and its reasoning, and reports the run's tokens and cost from `export.json`. This is a CLI-agent route: Vibe owns its agent loop and tools, and DSH's tools are not bridged.",
       "reach": [
         "click text \"AI Accounts: Accounts\"",
         "click button \"Add account\"",
@@ -543,7 +544,8 @@
         }
       ],
       "title": "Run Vibe with DSH's tools through its ACP server",
-      "summary": "A Vibe account switched to the ACP bridge holds one `vibe-acp` process per thread: DSH's tools reach it as one stdio MCP server, Vibe publishes each call as `dsh_<tool>` before running it, the DSH step ends with `toolUse` while that call is held, and the tool result in DSH's next request releases it inside the same ACP prompt. A private agent profile in the process folder keeps only Vibe's read-only builtins plus the bridged `dsh_*` tools, so every write, edit and command runs through DSH's approvals, diffs and undo. Context usage, cost and the session's token meta from `usage_update` become per-step ledger numbers.",
+      "summary": "Let a Vibe thread call DSH tools, so its edits and commands go through DSH approvals, diffs and undo.",
+      "details": "A Vibe account switched to the ACP bridge holds one `vibe-acp` process per thread: DSH's tools reach it as one stdio MCP server, Vibe publishes each call as `dsh_<tool>` before running it, the DSH step ends with `toolUse` while that call is held, and the tool result in DSH's next request releases it inside the same ACP prompt. A private agent profile in the process folder keeps only Vibe's read-only builtins plus the bridged `dsh_*` tools, so every write, edit and command runs through DSH's approvals, diffs and undo. Context usage, cost and the session's token meta from `usage_update` become per-step ledger numbers.",
       "surfaces": [
         "client",
         "host",
