@@ -32,6 +32,8 @@ const packageIdFromExternal = external => /^@dshfiles\/[^/]+/.exec(external)?.[0
 // tool-bash and tool-fs replace the stock bash and filesystem tools; measured Sessions showed too little gain to seed
 // them (docs/tool-diet.md), so the web seed keeps the stock tools and a profile owner opts into the forks.
 // opencode-compat loads third-party OpenCode plugin code into the Host, so a profile owner selects it deliberately.
+// component-gallery is a plugin author's reference page; its ~0.5 MB client was parsed on every page load for users
+// who never open it, so plugin authors add it to their own profile.
 const optInWebBundles = new Set([
   '@dshfiles/tool-search',
   '@dshfiles/resource-packs',
@@ -41,6 +43,7 @@ const optInWebBundles = new Set([
   '@dshfiles/tool-bash',
   '@dshfiles/tool-fs',
   '@dshfiles/opencode-compat',
+  '@dshfiles/component-gallery',
 ])
 
 /** A seeded profile reconciles only this region, so a stock-row override above it never reaches an existing profile. */

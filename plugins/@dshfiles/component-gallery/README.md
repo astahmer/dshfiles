@@ -7,6 +7,19 @@ and interaction components, the motion primitives and the base kit. Open **Setti
 sidebar. Tabs switch categories; the filter matches titles, descriptions and import paths; **Replay** restarts one
 card and **Replay all** restarts the page. Each card shows the import a plugin writes to use the component.
 
+## Install (opt-in)
+
+It is not in the `profiles/web` seed: it is a plugin author's reference page, and its client (about 0.5 MB) would be
+parsed on every page load for people who never open it. A seeded profile keeps exactly its seed's `@dshfiles/*` bundles,
+so the `web` profile drops it at its next `pnpm profile:sync`. Add it to a profile without a seed (a plugin author's
+`probe` profile, say), then restart that DSH:
+
+```sh
+pnpm profile:sync --profile <name> --bundle @dshfiles/component-gallery   # or: dshx add @dshfiles/component-gallery --profile <name>
+```
+
+The e2e journey (`pnpm check:e2e component-gallery`) boots its own profile with the bundle, so it is unaffected.
+
 It is not Storybook: no stories format, no addons, no separate server. A demo is a plain entry in
 `src/demos/<category>.tsx`; the component itself always lives in `@dshfiles/plugin-ui`, so the gallery never owns UI
 another plugin needs.

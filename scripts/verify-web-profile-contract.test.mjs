@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import test from 'node:test'
 import { sessionSearchOwnershipErrors, webProfileContractErrors } from './verify-web-profile-contract.mjs'
 
@@ -74,6 +75,14 @@ test('accepts a declared opt-in bundle omitted from the web profile', () => {
 test('keeps Manuel-only Resources opt-in without changing web defaults', () => {
   const localBundle = { name: '@dshfiles/resource-packs', dsh: { bundle: { patch: './cordis.patch.yml' } } }
   assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, localBundle]), [])
+})
+
+test('leaves the developer-only component gallery out of the web seed, as a declared opt-in', async () => {
+  const seed = JSON.parse(await readFile(new URL('../profiles/web/package.json', import.meta.url), 'utf8'))
+  const gallery = '@dshfiles/component-gallery'
+  assert.equal(seed.dependencies[gallery], undefined)
+  assert.equal(seed.dsh.profile.bundles.includes(gallery), false)
+  assert.deepEqual(webProfileContractErrors(profile, [provider, consumer, { name: gallery, dsh: { bundle: { patch: './cordis.patch.yml' } } }]), [])
 })
 
 const disableInsideRegion = `# BEGIN NIX-MANAGED DSH PLUGINS
