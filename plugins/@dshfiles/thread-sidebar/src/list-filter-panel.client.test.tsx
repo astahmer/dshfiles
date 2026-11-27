@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render as renderUi, screen, within } from '@testing
 import type { ReactElement } from 'react'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, presetAttentionOf, type ListFilterPanelProps } from './list-filter-panel.js'
+import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, type ListFilterPanelProps } from './list-filter-panel.js'
 
 afterEach(cleanup)
 
@@ -49,9 +49,9 @@ const panel = (overrides: Partial<ListFilterPanelProps> = {}): ListFilterPanelPr
   t: key => key,
   presets: {
     items: [
-      { id: 'all', label: 'All threads', count: null, needsYou: 0, failed: 0 },
-      { id: 'working', label: 'Working', count: 2, needsYou: 0, failed: 0 },
-      { id: 'done', label: 'Done', count: 3, needsYou: 1, failed: 0 },
+      { id: 'all', label: 'All threads', count: null },
+      { id: 'working', label: 'Working', count: 2 },
+      { id: 'done', label: 'Done', count: 3 },
     ],
     activeId: 'all',
     edited: false,
@@ -87,7 +87,7 @@ describe('the Filter panel', () => {
     expect(screen.queryAllByRole('menuitem')).toHaveLength(0)
     const presets = screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })
     expect(within(presets).getByRole('radio', { name: 'All threads' }).getAttribute('aria-checked')).toBe('true')
-    expect(within(presets).getByRole('radio', { name: 'Done, threadSidebarPresetThreads_other, threadSidebarPresetNeedsYou_other' }).getAttribute('aria-checked')).toBe('false')
+    expect(within(presets).getByRole('radio', { name: 'Done, threadSidebarPresetThreads_other' }).getAttribute('aria-checked')).toBe('false')
     expect(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: false })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'All sources' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('radio', { name: 'Status' }).getAttribute('aria-checked')).toBe('true')
@@ -489,10 +489,6 @@ describe('preset tallies (round 29, item 2)', () => {
     ({
       threadSidebarPresetThreads_one: '1 thread',
       threadSidebarPresetThreads_other: `${String(params?.['count'])} threads`,
-      threadSidebarPresetNeedsYou_one: `${String(params?.['count'])} needs you`,
-      threadSidebarPresetNeedsYou_other: `${String(params?.['count'])} need you`,
-      threadSidebarPresetFailedCount_one: `${String(params?.['count'])} failed`,
-      threadSidebarPresetFailedCount_other: `${String(params?.['count'])} failed`,
     })[key] ?? key
 
   it('counts the rows a preset shows, in secondary ink, and names it from what is drawn', () => {
@@ -507,9 +503,9 @@ describe('preset tallies (round 29, item 2)', () => {
         presets={{
           ...presets,
           items: [
-            { id: 'working', label: 'Working', count: 2, needsYou: 0, failed: 0 },
-            { id: 'done', label: 'Done', count: 3, needsYou: 1, failed: 2 },
-            { id: 'empty', label: 'Empty', count: 0, needsYou: 0, failed: 0 },
+            { id: 'working', label: 'Working', count: 2 },
+            { id: 'done', label: 'Done', count: 3 },
+            { id: 'empty', label: 'Empty', count: 0 },
           ],
         }}
       />,
@@ -518,21 +514,10 @@ describe('preset tallies (round 29, item 2)', () => {
     expect(working.querySelector('[data-preset-count]')?.textContent).toBe('2')
     expect(working.querySelector('[data-preset-count]')?.className).toContain('dshx:text-muted-foreground')
     expect(working.querySelector('[data-slot="status-glyph"]')).toBeNull()
-    const done = screen.getByRole('radio', { name: 'Done, 3 threads, 1 needs you, 2 failed' })
-    // The diamond before the cross, both only because a row in the preset needs you or failed.
-    expect(Array.from(done.querySelectorAll('[data-slot="status-glyph"]')).map(glyph => glyph.getAttribute('data-status'))).toEqual(['needs-you', 'failed'])
+    expect(screen.getByRole('radio', { name: 'Done, 3 threads' }).querySelector('[data-slot="status-glyph"]')).toBeNull()
     const empty = screen.getByRole('radio', { name: 'Empty' })
     expect(empty.querySelector('[data-preset-count]')).toBeNull()
     expect(empty.querySelector('[data-slot="status-glyph"]')).toBeNull()
-  })
-
-  it('reads a row as needing you or failed from its status, else from its attention label; never from an unread finish', () => {
-    expect(presetAttentionOf('needs-you', undefined)).toBe('needs-you')
-    expect(presetAttentionOf('failed', undefined)).toBe('failed')
-    expect(presetAttentionOf('ready', 'threadSidebarTurnFinished')).toBeUndefined()
-    expect(presetAttentionOf(undefined, 'threadSidebarApprovalNeeded')).toBe('needs-you')
-    expect(presetAttentionOf(undefined, 'threadSidebarInterrupted')).toBe('failed')
-    expect(presetAttentionOf(undefined, 'threadSidebarTurnFinished')).toBeUndefined()
   })
 })
 
@@ -902,5 +887,22 @@ describe('the forced-open disclosure (round 30, item 3)', () => {
     expect(more.hasAttribute('aria-disabled')).toBe(false)
     fireEvent.click(more)
     expect(more.getAttribute('aria-expanded')).toBe('false')
+  })
+})
+
+// Council round 29, item 7 (lead's choice): every preset held a thread that needs you, so every row drew the diamond and
+// said nothing new; the list header already shows the marks. Preset rows keep their count, and no mark.
+describe('preset rows draw no mark (round 30, item 7)', () => {
+  it('draws no diamond or cross on any preset row, and names a row by its label and count only', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const rows = [{ ...presets.items[2], id: 'done', label: 'Done', count: 3, needsYou: 1, failed: 2 }]
+    // SAFETY: the extra fields are what the round-29 row type carried; the round-30 type ignores them.
+    render(<ListFilterPanel {...base} presets={{ ...presets, items: rows as unknown as typeof presets.items }} />)
+    const done = screen.getByRole('radio', { name: 'Done, threadSidebarPresetThreads_other' })
+    expect(done.querySelector('[data-slot="status-glyph"]')).toBeNull()
+    expect(done.querySelector('[data-preset-count]')?.textContent).toBe('3')
+    expect(english).not.toContain('threadSidebarPresetNeedsYou_one')
   })
 })

@@ -1592,9 +1592,9 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     await page.reload()
     await expect(failedLabel(page)).toBeVisible({ timeout: 60_000 })
     await expect(unreadRow(page)).toHaveAttribute('data-unread', '')
-    // The Done preset counts its rows and marks the failed one with the list's cross.
+    // The Done preset counts its rows; preset rows draw no status mark (round 30, item 7).
     const tabs = await ThreadListFilter.openViews(page, threadSidebar(page))
-    await expect(tabs.getByRole('radio', { name: /^Done, \d+ threads?, \d+ failed$/u })).toBeVisible()
+    await expect(tabs.getByRole('radio', { name: /^Done, \d+ threads?$/u })).toBeVisible()
     await ThreadListFilter.close(page)
   })
   const otherTab = await page.context().newPage()

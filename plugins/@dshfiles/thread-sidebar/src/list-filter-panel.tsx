@@ -13,7 +13,6 @@ import { ArchiveIcon, BellOffIcon, BookmarkPlusIcon, CheckIcon, CircleCheckIcon,
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { plural } from '@dshfiles/dshx/client'
 import { useId, useRef, useState, type ReactNode } from 'react'
-import type { ThreadAttentionLabel } from './attention-presentation.js'
 import { threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, type ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
   THREAD_SOURCE_FILTER_OPTIONS,
@@ -29,39 +28,15 @@ export interface ListFilterPreset {
   readonly label: string
   /** How many rows the preset shows; null when its count is turned off. A zero draws nothing. */
   readonly count: number | null
-  /** Of those rows, how many need you and how many failed: the only states a preset marks. */
-  readonly needsYou: number
-  readonly failed: number
 }
-
-/** The attention labels that mean a row needs you or failed when it has no status glyph. */
-const LABEL_ATTENTION = {
-  threadSidebarApprovalNeeded: 'needs-you',
-  threadSidebarInputNeeded: 'needs-you',
-  threadSidebarTurnFinished: undefined,
-  threadSidebarNeedsResume: 'failed',
-  threadSidebarInterrupted: 'failed',
-} as const satisfies Record<ThreadAttentionLabel, 'needs-you' | 'failed' | undefined>
 
 /**
- * What a row adds to its preset's mark (council round 28, item 2): needs you or failed, from its status glyph, else
- * from its attention label. A finished turn or an unread mark is not something the preset marks.
+ * The preset row's accessible name, built from what it draws: "Done, 3 threads". Preset rows draw no status mark
+ * (council round 29, item 7): every preset held a thread that needs you, so the diamond said nothing; the list header
+ * shows the marks.
  */
-export const presetAttentionOf = (status: WorkStatus | undefined, attentionLabel: ThreadAttentionLabel | undefined): 'needs-you' | 'failed' | undefined => {
-  if (status !== undefined) return status === 'needs-you' || status === 'failed' ? status : undefined
-  return attentionLabel === undefined ? undefined : LABEL_ATTENTION[attentionLabel]
-}
-
-/** The preset row's accessible name, built from what it draws: "Done, 3 threads, 1 needs you". */
 const presetName = (t: ThreadSidebarTranslate, preset: ListFilterPreset): string =>
-  [
-    preset.label,
-    preset.count === null || preset.count === 0 ? undefined : plural(t, 'threadSidebarPresetThreads', preset.count),
-    preset.needsYou === 0 ? undefined : plural(t, 'threadSidebarPresetNeedsYou', preset.needsYou),
-    preset.failed === 0 ? undefined : plural(t, 'threadSidebarPresetFailedCount', preset.failed),
-  ]
-    .filter((part): part is string => part !== undefined)
-    .join(', ')
+  preset.count === null || preset.count === 0 ? preset.label : `${preset.label}, ${plural(t, 'threadSidebarPresetThreads', preset.count)}`
 
 export interface ListFilterAction {
   readonly id: string
@@ -346,9 +321,6 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                       </span>
                     ) : null}
                   </span>
-                  {/* Marked only for rows that need you or failed (the diamond before the cross), never for an unread count. */}
-                  {preset.needsYou === 0 ? null : <StatusGlyph status="needs-you" decorative data-testid="thread-view-attention-dot" />}
-                  {preset.failed === 0 ? null : <StatusGlyph status="failed" decorative />}
                   {/* A plain row count in the secondary ink; a zero draws nothing (DESIGN.md › Layout › Counts). */}
                   {preset.count === null || preset.count === 0 ? null : (
                     <span className="dshx:min-w-4 dshx:shrink-0 dshx:text-right dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-preset-count="">

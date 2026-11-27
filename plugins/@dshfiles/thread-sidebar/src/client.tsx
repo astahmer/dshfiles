@@ -95,7 +95,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ListHeaderExtras } from './list-header-extras.js'
 import { HoverStripFit } from './hover-strip-fit.js'
-import { filterPanelInitialFocus, ListFilterPanel, presetAttentionOf, type ListFilterAction } from './list-filter-panel.js'
+import { filterPanelInitialFocus, ListFilterPanel, type ListFilterAction } from './list-filter-panel.js'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ThreadListScope } from './list-scope.js'
 import { PresetChips, PresetDeleteDialog, PresetNameDialog, type PresetNamePrompt } from './filter-presets.js'
@@ -4602,32 +4602,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     const listView = { statusFilters: threadView.statusFilters, sourceFilter: threadView.sourceFilter }
     return sourceFilteredThreadEntries.filter(entry => matchesListStatus(entry, listView))
   }, [matchesListStatus, sourceFilteredThreadEntries, threadView.sourceFilter, threadView.statusFilters])
-  // Each preset's rows, as the list would show them, and how many of them need you or failed (round 29, item 2):
-  // counted only while the Filter panel is open, since matching every row per preset on each render was the sidebar's
-  // hottest loop while a turn streams.
+  // Each preset's rows, as the list would show them (round 29, item 2): counted only while the Filter panel is open,
+  // since matching every row per preset on each render was the sidebar's hottest loop while a turn streams.
   const presetTallies = useMemo(() => {
-    const tallies = new Map<string, { readonly count: number; readonly needsYou: number; readonly failed: number }>()
+    const tallies = new Map<string, number>()
     if (!filterOpen) return tallies
     for (const view of threadViewSettings.views) {
-      if (!view.enabled) continue
-      let count = 0
-      let needsYou = 0
-      let failed = 0
-      for (const entry of threadEntriesForSource(view.sourceFilter)) {
-        if (!matchesListStatus(entry, view)) continue
-        count += 1
-        const id = entry.session.id
-        const attention = presetAttentionOf(
-          (threadStatusById.get(id) ?? childStatusById.get(id))?.status,
-          ThreadViewModel.mostUrgentAttentionLabel(attentionLabelsByRow.get(id) ?? []),
-        )
-        if (attention === 'needs-you') needsYou += 1
-        else if (attention === 'failed') failed += 1
-      }
-      tallies.set(view.id, { count, needsYou, failed })
+      if (view.enabled) tallies.set(view.id, threadEntriesForSource(view.sourceFilter).filter(entry => matchesListStatus(entry, view)).length)
     }
     return tallies
-  }, [attentionLabelsByRow, childStatusById, filterOpen, matchesListStatus, threadEntriesForSource, threadStatusById, threadViewSettings.views])
+  }, [filterOpen, matchesListStatus, threadEntriesForSource, threadViewSettings.views])
   const groupedAttentionRows = useMemo(() => {
     const filterRows = (rows: readonly SessionSummary[], label: ThreadAttentionLabel): SessionSummary[] => {
       if (threadView.groupBy !== 'status' || isBoard) return []
@@ -6836,14 +6820,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             presetsOn
               ? {
                   items: viewTabs.map(({ view, label }) => {
-                    const tally = presetTallies.get(view.id)
-                    return {
-                      id: view.id,
-                      label,
-                      count: view.showCount === false ? null : (tally?.count ?? null),
-                      needsYou: tally?.needsYou ?? 0,
-                      failed: tally?.failed ?? 0,
-                    }
+                    return { id: view.id, label, count: view.showCount === false ? null : (presetTallies.get(view.id) ?? null) }
                   }),
                   activeId: listThreadView.id,
                   edited: presetEdited,
