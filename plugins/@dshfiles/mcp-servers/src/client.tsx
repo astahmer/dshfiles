@@ -15,11 +15,10 @@ import { MCP_LOCALE_NAMESPACE, mcpServersLocale, type McpServersTranslate } from
 import { mcpServersApi } from './api.js'
 import { McpMentionModel, createMcpMentionSource } from './mcp-mentions.js'
 import { createQuickPanelContribution, SessionQuickPanels, type QuickPanelState } from './quick-panel.js'
+import { McpQuickPanel } from './mcp-quick-panel.js'
 
-/** The MCP servers manager and quick panel load when one first opens, not at page boot. */
-const views = () => import('./lazy-views.js')
-const ManagerView = lazyView(() => views().then(module => module.LazyViews.ManagerView), { label: 'MCP servers' })
-const McpQuickPanel = lazyView(() => views().then(module => module.LazyViews.McpQuickPanel), { label: 'MCP servers' })
+/** The MCP servers manager loads when it first opens, not at page boot. */
+const ManagerView = lazyView(() => import('./manager-view.js').then(module => module.ManagerView), { label: 'MCP servers' })
 
 const PANEL_ID = 'mcp-servers'
 
