@@ -98,6 +98,7 @@ const pending = new Map()
 let nextId = 1
 const request = (method, params) =>
   new Promise((resolve, reject) => {
+    // oxlint-disable-next-line antislop/no-passthrough-variable -- the id this request owns, fixed before nextId moves on for the next one
     const id = nextId
     nextId += 1
     pending.set(id, { resolve, reject })
@@ -110,19 +111,12 @@ const request = (method, params) =>
   })
 
 const updates = []
-let promptResult
-const waiters = []
-const finishPrompt = value => {
-  promptResult = value
-  for (const resolve of waiters.splice(0)) resolve(value)
-}
 
-/** Answer one session/prompt and collect every update it produced. */
+/** Answer one session/prompt and collect every update it produced: ACP answers the prompt after its last update. */
 const prompt = async text => {
   updates.length = 0
-  const answered = new Promise(resolve => waiters.push(resolve))
-  const result = await Promise.all([request('session/prompt', { sessionId, prompt: [{ type: 'text', text }] }), answered])
-  return { result: result[0], updates: [...updates] }
+  const result = await request('session/prompt', { sessionId, prompt: [{ type: 'text', text }] })
+  return { result, updates: [...updates] }
 }
 
 let sessionId
