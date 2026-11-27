@@ -6753,7 +6753,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // Filter presets (b:xpvk): the trigger names the active preset ("Filter: Needs you (edited)"), not the
           // filters it holds; the Status and Source rows inside the menu still spell those out. The phone scope button
           // adds the project it holds.
-          aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}${scopeSlot === null || scopeInput.project === null ? '' : ` · ${scopeInput.project}`}`}
+          // …and how many filters are on, as the count beside it shows (council round 29, item 11): "Filter: All threads,
+          // 2 filters on".
+          aria-label={`${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}${scopeSlot === null || scopeInput.project === null ? '' : ` · ${scopeInput.project}`}${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}`}
           data-preset-edited={presetEdited ? '' : undefined}
           data-thread-list-scope-button={scopeSlot === null ? undefined : ''}
           data-scope-narrowed={scopeSlot !== null && ThreadListScope.narrowed(scopeInput) ? '' : undefined}
@@ -6763,9 +6765,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             {scopeSlot === null ? (presetsOn ? activeViewShortLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
           {scopeCount === null ? null : (
-            // How many filters are on (council round 11 B2), on a desktop as on a phone (round 29, item 8): "All 2". The
-            // accessible name already spells them out; the edited preset reads "(edited)" there, no dot.
-            <Badge aria-hidden="true" data-testid="thread-scope-count" className="dshx:h-4.5 dshx:min-w-4.5 dshx:px-1 dshx:py-0 dshx:tabular-nums">
+            // How many filters are on (council round 11 B2), on a desktop as on a phone (round 29, item 8): "All 2". A
+            // neutral pill (council round 29, item 11): the muted fill, the ink, 11px, 16px tall; the name says it too.
+            <Badge
+              aria-hidden="true"
+              data-testid="thread-scope-count"
+              className="dshx:h-4 dshx:min-w-4 dshx:rounded-full dshx:border-transparent dshx:bg-muted dshx:px-1.25 dshx:py-0 dshx:text-2xs dshx:font-medium dshx:text-foreground dshx:tabular-nums"
+            >
               {scopeCount}
             </Badge>
           )}

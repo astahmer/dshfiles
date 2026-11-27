@@ -1074,3 +1074,17 @@ describe('the panel Tab order (round 30, item 10)', () => {
     expect(options.compareDocumentPosition(screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
   })
 })
+
+// Council round 29, item 11: the closed trigger's count is a neutral pill, and the trigger's name says it.
+describe('the trigger count (round 30, item 11)', () => {
+  const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
+  it('draws the count as a 16px neutral pill: the muted fill, the ink, 11px, 5px across', () => {
+    const badge = trigger.slice(trigger.indexOf('data-testid="thread-scope-count"'))
+    for (const token of ['dshx:h-4', 'dshx:bg-muted', 'dshx:text-foreground', 'dshx:text-2xs', 'dshx:px-1.25', 'dshx:rounded-full']) expect(badge.slice(0, 400)).toContain(token)
+  })
+
+  it('names the trigger with the count of filters on: "Filter: All threads, 2 filters on"', () => {
+    expect(trigger).toContain("${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}")
+    expect(english).toContain("threadSidebarFiltersOn_other: '{count} filters on',")
+  })
+})

@@ -1080,7 +1080,7 @@ Then('the board shows only columns, grouped and filtered independently from the 
   await page.getByRole('combobox', { name: 'Search projects', exact: true }).fill('Unassigned')
   await page.getByRole('option', { name: 'Unassigned', exact: true }).click()
   await expect(board.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
-  await expect(board.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
+  await expect(board.getByRole('button', { name: ThreadListFilter.triggerNamed('Filter: Working · Subagent threads') })).toBeVisible()
   await expect(board.getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('Unassigned')
   await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Arrange manually')
   await expect(threadSidebar(page).getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('All projects')
@@ -1094,7 +1094,7 @@ Then('the board shows only columns, grouped and filtered independently from the 
   await openThreadBoard(page)
   const reloadedBoard = threadBoard(page)
   await expect(reloadedBoard.getByRole('button', { name: 'Group: Project', exact: true })).toBeVisible()
-  await expect(reloadedBoard.getByRole('button', { name: 'Filter: Working · Subagent threads', exact: true })).toBeVisible()
+  await expect(reloadedBoard.getByRole('button', { name: ThreadListFilter.triggerNamed('Filter: Working · Subagent threads') })).toBeVisible()
   await expect(reloadedBoard.getByRole('combobox', { name: 'Project filter', exact: true })).toHaveText('Unassigned')
   await finishJourneyAssertions(page)
 })
@@ -1412,7 +1412,7 @@ When('a Host thread is archived and the view is grouped and filtered', async ({ 
   await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
   await setThreadStatusFilters(page, 'Filter: Archived · Main threads', ['Working', 'Archived'])
   // Filter presets (b:xpvk): the trigger names the preset the filters started from, marked edited until saved.
-  await expect(threadSidebar(page).getByRole('button', { name: 'Filter: All threads (edited)', exact: true })).toBeVisible()
+  await expect(threadSidebar(page).getByRole('button', { name: ThreadListFilter.triggerNamed('Filter: All threads (edited)') })).toBeVisible()
   await expect(targetRow).toBeVisible()
   await setThreadStatusFilters(page, 'Filter: Working · Archived · Main threads', ['Archived'])
 
@@ -1443,7 +1443,7 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
     // Wait for the reloaded sidebar to render the synced view before touching a header: while Host settings load, a
     // header it shows can still be replaced, and a click on that detached node never reaches the page.
     await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Date')
-    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: All threads (edited)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: ThreadListFilter.triggerNamed('Filter: All threads (edited)') })).toBeVisible()
     const todayHeader = threadSidebar(page).getByRole('button', { name: /^Today/u })
     await expect(todayHeader).toBeVisible()
     await expect(todayHeader).toHaveAttribute('aria-expanded', 'false')
@@ -1451,7 +1451,7 @@ Then('only matching rows remain visible after reload', async ({ page }: { page: 
     await todayHeader.click()
     await expect(targetRow).toBeVisible()
     await ThreadListFilter.expectGroup(page, threadSidebar(page), 'Date')
-    await expect(threadSidebar(page).getByRole('button', { name: 'Filter: All threads (edited)', exact: true })).toBeVisible()
+    await expect(threadSidebar(page).getByRole('button', { name: ThreadListFilter.triggerNamed('Filter: All threads (edited)') })).toBeVisible()
     await expect(targetRow).toBeVisible()
     await expect(threadSidebar(page).getByRole('region', { name: 'Today', exact: true })).toContainText(displayTitle)
     // Status and Source are rows of the Filter panel (round nine; submenus of the Filter menu since Q5, T5.3).

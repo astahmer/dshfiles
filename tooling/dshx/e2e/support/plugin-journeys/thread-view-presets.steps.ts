@@ -69,7 +69,7 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await tabs.getByRole('radio', { name: 'Needs focus', exact: true }).click()
   await ThreadListFilter.expectGroup(page, sidebar, 'Date')
   // Filter presets (b:xpvk): the trigger names the preset, not the filters it holds.
-  await expect(sidebar.getByRole('button', { name: 'Filter: Needs focus', exact: true })).toBeVisible()
+  await expect(sidebar.getByRole('button', { name: ThreadListFilter.triggerNamed('Filter: Needs focus') })).toBeVisible()
 
   await openSidebarSettings(page)
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show group button', exact: true }).click()

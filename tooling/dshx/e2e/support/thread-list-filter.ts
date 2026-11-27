@@ -9,6 +9,11 @@ import { expect, type Locator, type Page } from '@playwright/test'
  * Mark all as read…) stay in a small "Preset options" menu beside the Presets heading. The Board page keeps its inline
  * Group and Filter buttons, so each helper uses a direct button first when the scope still has one.
  */
+/**
+ * The trigger named `name` ("Filter: Working"), with or without the filters-on count its name ends with since round 30
+ * ("Filter: Working, 1 filter on").
+ */
+const triggerNamed = (name: string): RegExp => new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?:, \\d+ filters? on)?$`, 'u')
 const trigger = (scope: Locator): Locator => scope.getByRole('button', { name: /^Filter: /u }).filter({ visible: true }).first()
 /** The list's Filter panel (marked); the Board page keeps inline Group and Filter buttons instead. */
 const hasMenu = async (scope: Locator): Promise<boolean> => {
@@ -125,7 +130,7 @@ const selectSource = async (page: Page, scope: Locator, triggerName: string, nam
     await close(page)
     return
   }
-  await scope.getByRole('button', { name: triggerName, exact: true }).click()
+  await scope.getByRole('button', { name: triggerNamed(triggerName) }).click()
   await page.getByRole('menuitemradio', { name, exact: true }).click()
   await settled(page)
 }
@@ -152,7 +157,7 @@ const setStatus = async (page: Page, scope: Locator, triggerName: string, labels
     await close(page)
     return
   }
-  await scope.getByRole('button', { name: triggerName, exact: true }).click()
+  await scope.getByRole('button', { name: triggerNamed(triggerName) }).click()
   for (const label of labels) {
     const item = page.getByRole('menuitemcheckbox', { name: label, exact: true })
     const shouldBeChecked = label === 'All threads' ? selected.length === 0 : selected.includes(label)
@@ -188,6 +193,7 @@ const expectGroup = async (page: Page, scope: Locator, name: string): Promise<vo
 }
 
 export const ThreadListFilter = {
+  triggerNamed,
   trigger,
   hasMenu,
   panel,
