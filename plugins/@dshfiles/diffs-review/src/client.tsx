@@ -13,12 +13,16 @@ import { createWorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/pi
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useSyncExternalStore } from 'react'
 import { MAX_REVIEW_REVISIONS } from './api.js'
-import { ChangesFacet } from './changes-facet.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { ChangesScopeModel, type ChangesRequest } from './changes-scope.js'
-import { DiffsReviewPanel, type OpenInThread } from './panel.js'
+import type { OpenInThread } from './panel.js'
 import { PageReviewContextModel } from './review-page-context.js'
 import { ReviewedMarksModel } from './reviewed.js'
 import { createSessionFocus } from './session-focus.js'
+
+/** The Review page and the Changes facet load when one first opens, not at page boot. */
+const DiffsReviewPanel = lazyView(() => import('./lazy-views.js').then(module => module.DiffsReviewPanel), { label: 'Review' })
+const ChangesFacet = lazyView(() => import('./lazy-views.js').then(module => module.ChangesFacet), { label: 'Changes' })
 
 const PANEL_ID = 'diffs-review'
 /** The Review page's id while this plugin was pulls-review: a saved workbench tab still opens it (hidden from Add). */
