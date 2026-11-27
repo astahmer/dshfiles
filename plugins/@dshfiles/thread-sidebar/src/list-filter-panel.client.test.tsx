@@ -485,7 +485,7 @@ describe('hit areas (round 28, item 12)', () => {
 
 // Council round 28, item 2: a preset's number and mark say one thing to eyes and ears.
 describe('preset tallies (round 29, item 2)', () => {
-  const counting = (key: string, params?: Record<string, unknown>): string =>
+  const counting = (key: string, params?: { readonly count?: number }): string =>
     ({
       threadSidebarPresetThreads_one: '1 thread',
       threadSidebarPresetThreads_other: `${String(params?.['count'])} threads`,
@@ -502,6 +502,7 @@ describe('preset tallies (round 29, item 2)', () => {
     render(
       <ListFilterPanel
         {...base}
+        // SAFETY: the panel only calls `t` with its own keys and a `{ count }` param, which `counting` answers.
         t={counting as ListFilterPanelProps['t']}
         presets={{
           ...presets,
