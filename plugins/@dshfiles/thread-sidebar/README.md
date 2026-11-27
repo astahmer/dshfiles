@@ -541,14 +541,21 @@ and keeps the rest for Back and Forward.
 
 ![An acknowledged recent idle thread remains in the date-grouped Done view.](docs/screenshots/thread-list-views-done.png)
 
-**The Filter panel** (round nine). The Filter button opens one panel beside the
-list (the bottom sheet on a phone, which leads with the project picker), not a
-menu of submenus: every value shows where it sits and applies at once, so the
-rows it filters stay in view. Under a **Reset** (back to All threads with no
-filter on) come the presets, **Status** chips (Any and the activity statuses;
-**More statuses** opens why a thread waits and where it is stored, and stays
-open while one of those is on), **Source** (All / Main / Subagents) and **Group
-by** chips, then Board, Thread list settings and Sidebar settings.
+**The Filters panel** (round nine, refined in round 28). The Filter button opens
+one panel beside the list, not a menu of submenus: every value shows where it
+sits and applies at once, so the rows it filters stay in view, and a polite live
+region says how many threads the change leaves. It opens on the preset in force.
+Its sticky header reads **Filters … Reset**; on a phone it is the kit's bottom
+sheet (85dvh, the popover fill) with **Reset · Filters · Done** and the project
+as one inline row (Project · All projects ›). Then come the presets (each marked
+with its rows' own glyph, nothing at a count of 0), **Status** chips (each with
+its status glyph, a check while on; no status on means any, and **Clear** sits in
+the heading; **More statuses** is a disclosure for why a thread waits and where
+it is stored, one labelled group each), and **Source** as a segmented control
+(All / Main / Subagents). **Reset filters** covers those: back to All threads
+with no filter on, the grouping kept. Under its own hairline, **Display** holds
+**Group by** (Status / Project / Date / Manual / None, a segmented control), and
+the foot Board, Thread list settings and Sidebar settings.
 
 **Filter presets** (b:xpvk). The saved views are the Filter panel's presets: its
 **Presets** section comes first, one radio per enabled view, the active one
@@ -557,7 +564,7 @@ status or source filter afterwards never rewrites the preset: the change is a
 Host-synced `threadViews.draft`, the button reads `Filter: Needs you (edited)`
 with a dot, and the section offers **Save changes to “Needs you”** and **Discard
 changes**; changing the filters back drops the draft. **Save current filters as
-preset…** names a new preset (a dialog, pinned to the top on a phone so the
+preset…** (first in the presets' ⋯ menu) names a new preset (a dialog, pinned to the top on a phone so the
 keyboard never covers it) that stores the
 grouping, filters and the current project scope (`projectFilter`: an id, `''` for
 Unassigned, `null` for All projects), and applies it. **Preset options** (the ⋯
@@ -701,7 +708,9 @@ button; the context menu keeps every action. The strip never takes the title's p
 gets the time slot plus a quarter of the title, so the title keeps three quarters
 of its width under the pointer and a click aimed at it opens the thread. The
 actions past that budget give way from the strip's end (a 260px row shows two
-seats, the first action and `⋯`); they stay in the row menu.
+seats, the first action and `⋯`); they stay in the row menu. The strip lies over
+the time slot and the title's end fades under it, so nothing re-truncates on
+hover; it fades in on enter and leaves at once.
 
 By default a row shows **one** verb on hover, Done, and a `⋯` that opens the
 row menu (a row that needs a resume adds Resume and Dismiss; an archived row shows
