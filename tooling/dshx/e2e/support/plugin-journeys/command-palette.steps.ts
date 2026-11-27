@@ -1,4 +1,5 @@
 import { expect, type Page } from '@playwright/test'
+import { FAKE_COMMAND_CODE_MODEL } from '../../../packages/dshx/src/scratch/fake-command-code.js'
 import { Then, When } from '../bdd.js'
 import { finishJourneyAssertions, recordAssertion } from '../steps.js'
 import { selectModelForNewThread } from '../threads.js'
@@ -89,15 +90,65 @@ Then('the Backlog capture composer opens with {string}', async ({ page }: { page
   await finishJourneyAssertions(page)
 })
 
-Then('Everything, Threads, Files, and Backlog tabs are available', async ({ page }: { page: Page }) => {
+Then('Everything, Threads, Messages, Files, and Backlog tabs are available', async ({ page }: { page: Page }) => {
   const tabs = paletteDialog(page).getByRole('tab')
   await recordAssertion(page, 'palette-search-tabs-are-visible', async () => {
-    await expect(tabs).toHaveCount(4)
+    await expect(tabs).toHaveCount(5)
     await expect(tabs.nth(0)).toHaveAccessibleName('Everything')
     await expect(tabs.nth(1)).toHaveAccessibleName('Threads')
-    await expect(tabs.nth(2)).toHaveAccessibleName('Files')
-    await expect(tabs.nth(3)).toHaveAccessibleName('Backlog')
+    await expect(tabs.nth(2)).toHaveAccessibleName('Messages')
+    await expect(tabs.nth(3)).toHaveAccessibleName('Files')
+    await expect(tabs.nth(4)).toHaveAccessibleName('Backlog')
   })
+})
+
+const NEW_THREAD_COMPOSER = /^Describe what you want to build, \/ commands, @ files or (?:threads|sessions)$/u
+const THREAD_COMPOSER = /^Message or run a task, \/ commands, @ files or (?:threads|sessions)$/u
+
+When('a new thread in the selected project is sent {string}', async ({ page }: { page: Page }, text: string) => {
+  await page.getByRole('button', { name: 'New thread', exact: true }).first().click()
+  await expect(page.getByRole('button', { name: /^Choose (?:project|workspace)$/u })).not.toHaveText('')
+  await selectModelForNewThread(page, FAKE_COMMAND_CODE_MODEL)
+  const composer = page.getByRole('textbox', { name: NEW_THREAD_COMPOSER, exact: true })
+  await composer.fill(text)
+  await composer.press('Enter')
+  await expect(page.getByRole('textbox', { name: THREAD_COMPOSER, exact: true })).toBeVisible()
+})
+
+When('the Messages tab is selected', async ({ page }: { page: Page }) => {
+  await paletteDialog(page).getByRole('tab', { name: 'Messages' }).click()
+})
+
+When('the {string} sender filter is selected', async ({ page }: { page: Page }, sender: string) => {
+  const filter = paletteDialog(page).getByRole('group', { name: 'Filter messages by sender' }).getByRole('button', { name: sender, exact: true })
+  await filter.click()
+  await expect(filter).toHaveAttribute('aria-pressed', 'true')
+})
+
+const messageResult = (page: Page, text: string) => paletteDialog(page).getByRole('option').filter({ hasText: text })
+
+Then('message search lists {string} for the query {string}', async ({ page }: { page: Page }, text: string, query: string) => {
+  await recordAssertion(page, 'message-search-finds-a-sent-prompt-across-threads', async () => {
+    // The index ingests a committed prompt within seconds; typing the query again searches the fresh index.
+    await expect(async () => {
+      await paletteInput(page).fill('')
+      await paletteInput(page).fill(query)
+      await expect(messageResult(page, text)).toBeVisible({ timeout: 2_000 })
+    }).toPass({ timeout: 30_000 })
+    await expect(messageResult(page, text).getByText('User', { exact: true })).toBeVisible()
+  })
+})
+
+When('the message {string} is picked', async ({ page }: { page: Page }, text: string) => {
+  await messageResult(page, text).click()
+  await expect(paletteDialog(page)).not.toBeVisible()
+})
+
+Then('Chat scrolls to and highlights {string}', async ({ page }: { page: Page }, text: string) => {
+  await recordAssertion(page, 'message-search-reveals-the-picked-message-in-chat', () =>
+    expect(page.locator('[data-chat-focus]').filter({ hasText: text })).toBeVisible({ timeout: 10_000 }),
+  )
+  await finishJourneyAssertions(page)
 })
 
 Then('the Threads tab is active', async ({ page }: { page: Page }) => {

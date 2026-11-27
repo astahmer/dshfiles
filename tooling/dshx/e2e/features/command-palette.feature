@@ -21,6 +21,18 @@ Feature: Command palette
     Then thread content search finds the message and opens its thread
     Then the content-search index exists under the isolated DSH home
 
+  @scenario:command-palette.message-search
+  Scenario: Message search finds a prompt sent in another thread and reveals it in Chat
+    Given the isolated plugin composition of "@dshfiles/command-palette, @dshfiles/session-search, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a new thread in the selected project is sent "Deploy the quartz service to staging"
+    When the command palette is opened
+    And the Messages tab is selected
+    And the "User" sender filter is selected
+    Then message search lists "Deploy the quartz service to staging" for the query "quartz"
+    When the message "Deploy the quartz service to staging" is picked
+    Then Chat scrolls to and highlights "Deploy the quartz service to staging"
+
   @scenario:session-search.index-lifecycle
   Scenario: Session-search starts its worker index in a scratch DSH
     Given the isolated session-search plugin profile is booted
@@ -80,7 +92,7 @@ Feature: Command palette
   Scenario: Thread tabs, prefixes, and Escape navigation stay inside the palette
     Given the isolated plugin profile "@dshfiles/command-palette" is booted
     When the command palette is opened
-    Then Everything, Threads, Files, and Backlog tabs are available
+    Then Everything, Threads, Messages, Files, and Backlog tabs are available
     When the Threads tab is selected
     Then the Threads tab is active
     When the palette query is "thread:session-e2e-missing"
