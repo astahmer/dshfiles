@@ -511,8 +511,8 @@ export default defineClient({
       const entries = sectionEntries.getSnapshot()
       const catalog = ctx.shortcuts.catalog.getSnapshot()
       const hub = hubShown.getSnapshot()
-      // The docked hub keeps its own filter, so the column follows only the stage page's.
-      const filter = hub === undefined ? originFilter.getSnapshot() : 'all'
+      // The column lists the categories the shown page keeps: the stage page's filter, or the docked pane's own.
+      const filter = hub === undefined ? originFilter.getSnapshot() : hub.originFilter
       const open = hub !== undefined || snapshot.matches('tab')
       const sectionId = hub === undefined ? snapshot.context.sectionId : hub.activeId
       const query = hub === undefined ? snapshot.context.query : hub.query

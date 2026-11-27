@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import type { ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
-import type { GroupedEntries } from './settings-groups.js'
+import type { GroupedEntries, SettingsOriginFilter } from './settings-groups.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
 import type { FieldTarget } from './shell-machine.js'
 
@@ -71,10 +71,11 @@ export const createSettingsHubRouter = () => {
   }
 }
 
-/** What a shown Settings pane displays: its category and its search. */
+/** What a shown Settings pane displays: its category, its search and its All / DSH / Plugins filter. */
 export interface SettingsHubShown {
   readonly activeId: string | undefined
   readonly query: string
+  readonly originFilter: SettingsOriginFilter
 }
 
 const NO_COLUMNS: ObservableSnapshot<number> = { getSnapshot: () => 0, subscribe: () => () => undefined }
@@ -101,6 +102,8 @@ export const createSettingsWorkbenchHub = (sources: {
     const [field, setField] = useState(initial?.field)
     const [target, setTarget] = useState(initial?.target)
     const [query, setQuery] = useState(initial?.query ?? '')
+    // Each pane's own source filter (repeated panes keep their presentation state); the column lists what it keeps.
+    const [originFilter, setOriginFilter] = useState<SettingsOriginFilter>('all')
     const visible = useRef(props.visible !== false)
     visible.current = props.visible !== false
     const [host, setHost] = useState<HTMLDivElement | null>(null)
@@ -130,9 +133,9 @@ export const createSettingsWorkbenchHub = (sources: {
     const report = sources.report
     useEffect(() => {
       if (!shown || report === undefined) return
-      report({ activeId, query })
+      report({ activeId, query, originFilter })
       return () => report(undefined)
-    }, [shown, activeId, query, report])
+    }, [shown, activeId, query, originFilter, report])
     const view = sources.view({ groups, activeId, field, query })
     const owner: SettingsSectionOwnerProps & {
       readonly openSection: (sectionId: string) => void
@@ -175,6 +178,8 @@ export const createSettingsWorkbenchHub = (sources: {
               setTarget(undefined)
             }}
             onSearch={setQuery}
+            onOriginFilter={setOriginFilter}
+            originFilter={originFilter}
           />
         )}
       </div>
