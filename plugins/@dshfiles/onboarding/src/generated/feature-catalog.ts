@@ -522,7 +522,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "settings-shell",
       "description": "VS Code-style DSH Settings shell with plugin settings, search, and notices for new DSH releases.",
       "ui": true,
-      "features": 14
+      "features": 16
     },
     {
       "name": "settings-subagent",
@@ -23924,6 +23924,146 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "text",
           "name": "Key",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "settings-shell#settings-origin-distinction",
+      "plugin": "settings-shell",
+      "id": "settings-origin-distinction",
+      "title": "Tell DSH defaults from plugin categories",
+      "summary": "An All / DSH / Plugins filter beside the Settings search narrows the categories, the side column and the search results by who ships them.",
+      "destination": "settings",
+      "currentSurface": "settings: source filter beside the search, origin badge in the page header",
+      "reach": [
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "expect group \"Filter categories by source\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Filter categories by source",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "expect group \"Filter categories by source\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Filter categories by source",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "settings-shell#dshfiles-plugins-page",
+      "plugin": "settings-shell",
+      "id": "dshfiles-plugins-page",
+      "title": "Plugins by category",
+      "summary": "Turn installed plugins on or off grouped by area, with search, source and status filters and a Settings link for each plugin.",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins › Plugins by category",
+      "reach": [
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Settings: General\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Settings: General"
+        },
+        {
+          "text": "click option \"Settings: General*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Settings: General*",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugins by category\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugins by category",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Enable *\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Enable *",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugins by category\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugins by category",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Enable *\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Enable *",
           "value": null
         }
       ],

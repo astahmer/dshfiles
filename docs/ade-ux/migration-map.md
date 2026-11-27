@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-575 features from 121 plugins.
+577 features from 121 plugins.
 
 ## Counts
 
@@ -19,7 +19,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Agents |  |  |  |  | 5 |  | 1 |  |  |  |  |  |  |  | 6 |
 | Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
 | Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
-| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 65 |  |  |  | 69 |
+| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 67 |  |  |  | 71 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
 | Composer |  |  |  | 70 |  |  |  |  |  |  |  |  |  |  | 70 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 44 | 44 |
@@ -110,7 +110,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | rail | 13 | Knowledge 6, Settings 4, No place of its own 1, Threads 1, Work 1 |
 | right sidebar | 1 | Threads 1 |
 | right-pane | 10 | Thread panel 8, No place of its own 2 |
-| settings | 38 | Settings 35, No place of its own 3 |
+| settings | 40 | Settings 37, No place of its own 3 |
 | Settings | 1 | Settings 1 |
 | Settings › General › Appearance; agent tools theme_get / theme_set | 1 | Settings 1 |
 | Settings › General › Status bar | 1 | Settings 1 |
@@ -351,7 +351,7 @@ rail destination; 14 features.
 
 ### Settings
 
-rail destination (bottom); 69 features.
+rail destination (bottom); 71 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -394,11 +394,13 @@ rail destination (bottom); 69 features.
 | secret-catalog/scoped-alias-catalog: Browse secrets by scope and environment | settingsSection | left-nav: Secrets |
 | settings-models/models-settings: Models settings and provider onboarding | settingsSection | settings: Models section |
 | settings-shell/dsh-release-notice: DSH release notice and summary | settingsSection | sidebar: Settings trigger release mark › General |
+| settings-shell/dshfiles-plugins-page: Plugins by category | settingsSection | settings: Plugins › Plugins by category |
 | settings-shell/modified-settings: Modified settings and reset to default | settingsSection | settings: Reset to default |
 | settings-shell/open-config-menu: Open the configuration file elsewhere | settingsSection | settings: Open configuration file |
 | settings-shell/plugin-enablement-tools: List and switch plugin entries, from Settings or an Agent | settingsSection | settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled |
 | settings-shell/plugin-settings-controls: Plugin settings with real controls | settingsSection | settings: plugin pages |
 | settings-shell/settings-json-editor: Edit plugin settings as JSON | settingsSection | settings: plugin page › JSON |
+| settings-shell/settings-origin-distinction: Tell DSH defaults from plugin categories | settingsSection | settings: source filter beside the search, origin badge in the page header |
 | settings-shell/settings-search: Search Settings inline | settingsSection | settings: Search settings |
 | settings-shell/settings-search-entries: Search section controls and open them at the control | settingsSection | settings: Search settings › section controls |
 | settings-shell/settings-shell-port: Settings shell | settingsSection | rail: Settings; palette: Settings: General |
