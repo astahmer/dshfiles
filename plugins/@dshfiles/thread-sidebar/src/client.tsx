@@ -6692,8 +6692,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           <OverflowGlyph />
         </Button>
       </DropdownMenuTrigger>
-      {/* A fixed 256px, aligned to the ⋯'s end, so it stays inside the 320px panel (council round 30, item 4). */}
-      <DropdownMenuContent align="end" className="dshx-root dshx:w-64" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
+      {/* A fixed 256px, aligned to the ⋯'s end, so it stays inside the 320px panel (council round 30, item 4). As the sheet
+          opened from the Filters sheet on a phone, it pads 12px so its items start at the Filters sheet's 20px text edge
+          (council round 32, item 8). */}
+      <DropdownMenuContent align="end" className="dshx-root dshx:w-64 dshx:phone:px-3!" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
         {/* The built-in All threads shows no dead rows (council round 29, item 2): one caption says why, and describes
             the one way to keep its changes (a <p> in a menu is skipped unless an item points at it: round 30, item 4). */}
         {activeIsBuiltIn ? (

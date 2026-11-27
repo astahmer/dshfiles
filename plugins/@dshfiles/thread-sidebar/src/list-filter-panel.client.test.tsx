@@ -1206,7 +1206,7 @@ describe('the closed desktop trigger reads as a state (round 31, item 2)', () =>
 describe('the preset menu fits the panel (round 31, item 4)', () => {
   const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
   it('is 256px wide, end-aligned, its caption wrapping', () => {
-    expect(optionsMenu).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64"')
+    expect(optionsMenu).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64')
     expect(optionsMenu).not.toContain('dshx:min-w-52')
     expect(optionsMenu).toMatch(/data-preset-built-in-hint=""[^>]*>|className="[^"]*dshx:whitespace-normal[^"]*"[^>]*data-preset-built-in-hint/u)
     expect(english).toContain("threadSidebarPresetBuiltInHint: 'Built in. Save changes as a new preset.',")
@@ -1588,4 +1588,12 @@ describe('the fold hint names its cause (round 33, item 7)', () => {
     rerender(<ListFilterPanel {...panel({ status: { selected: ['working', 'interrupted', 'muted', 'archived'], onChange: vi.fn() } })} t={translate} />)
     expect(hint()).toBe('Interrupted, Muted and Archived are on. Turn them off to fold.')
   })
+})
+
+// Council round 32, item 8: one content inset across the Filters sheet and the ⋯ sheet opened from it. Measured at 390px:
+// the Filters sheet's text starts at 20px (the kit sheet's 8 and the section's 12), the ⋯ sheet's at 16 (8 and the
+// item's 8). On a phone the ⋯ sheet pads 12px, so its items start at 20 too.
+it('gives the presets ⋯ sheet the Filters sheet content inset on a phone (round 33, item 8)', () => {
+  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+  expect(optionsMenu).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64 dshx:phone:px-3!"')
 })
