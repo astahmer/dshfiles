@@ -726,6 +726,8 @@ function backdropCss(scope: string, theme: SchemeTheme, backdrop: Backdrop, scen
     // The turn rail: previous, its ticks and next on a slim, centred pill of that surface with a soft hairline, the
     // arrows always shown; the filter on its own round chip above it.
     '  --dshx-backdrop-rail-pad: 2px;',
+    // The pill is the track here: chat's resting 8% ink fill under the ticks steps aside (council round 34 B2).
+    '  --dshx-backdrop-rail-fill: transparent;',
     '  --dshx-backdrop-rail-gap: 4px;',
     '  --dshx-backdrop-rail-inset: 4px;',
     '  --dshx-backdrop-rail-align: center;',
