@@ -232,6 +232,7 @@ import { RunningJobsModel } from './running-jobs.js'
 import type { ThreadWorkStatus } from './thread-status-client.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
 import { filterTriggerTipAdds, textTruncated, useEditedSuffixFit, useFilterTriggerTip } from './list-filter-trigger.js'
+import { markShownCounts } from './mark-shown.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -6633,25 +6634,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       setFilterOpen(false)
       action()
     }
+  // Each verb counts the rows it changes, and hides when it would change none (council round 34, B11): "Mark 5 shown as
+  // read" over 5 rows of which 2 were unread promised three changes it never made.
+  const markCounts = markShownCounts(shownThreadIds, sessionId => attention.records.has(sessionId))
   const markViewActions: ListFilterAction[] = [
-    {
-      id: 'mark-read',
-      label: plural(props.tSidebar, 'threadSidebarMarkShownRead', shownThreadIds.length),
-      icon: null,
-      disabled: !attention.available || !shownThreadIds.some(sessionId => attention.records.has(sessionId)),
-      onSelect: clearActiveViewUnread,
-    },
-    // Only while something shown is read: otherwise it would mark nothing.
-    ...(shownThreadIds.some(sessionId => !attention.records.has(sessionId))
-      ? [
-          {
-            id: 'mark-unread',
-            label: plural(props.tSidebar, 'threadSidebarMarkShownUnread', shownThreadIds.length),
-            icon: null,
-            disabled: !attention.available,
-            onSelect: markActiveViewUnread,
-          },
-        ]
+    ...(markCounts.toRead > 0
+      ? [{ id: 'mark-read', label: plural(props.tSidebar, 'threadSidebarMarkShownRead', markCounts.toRead), icon: null, disabled: !attention.available, onSelect: clearActiveViewUnread }]
+      : []),
+    ...(markCounts.toUnread > 0
+      ? [{ id: 'mark-unread', label: plural(props.tSidebar, 'threadSidebarMarkShownUnread', markCounts.toUnread), icon: null, disabled: !attention.available, onSelect: markActiveViewUnread }]
       : []),
   ]
   const filterActions: ListFilterAction[] = [
@@ -6755,8 +6746,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={closeFilterThen(() => setViewsManagerOpen(true))}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
-        {/* Last, after a separator, and saying their scope (council round 32, item 4): "Mark 5 shown as read". */}
-        <DropdownMenuSeparator />
+        {/* Last, after a separator, and saying their scope (council round 32, item 4): "Mark 2 shown as read". */}
+        {markViewActions.length === 0 ? null : <DropdownMenuSeparator />}
         {markViewActions.map(action => (
           <DropdownMenuItem key={action.id} disabled={action.disabled === true} onSelect={action.onSelect}>
             {action.label}

@@ -9,6 +9,7 @@ import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/p
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { threadSidebarDictionaries } from './locales.js'
 import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, type ListFilterPanelProps } from './list-filter-panel.js'
+import { markShownCounts } from './mark-shown.js'
 
 afterEach(cleanup)
 
@@ -1497,16 +1498,14 @@ describe('the desktop panel stops above the status bar (round 33, item 3)', () =
 // "unread" shows only while something shown is read.
 describe('the mark verbs say their scope (round 33, item 4)', () => {
   const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
-  it('counts the shown rows in both labels and acts on them', () => {
+  it('says the shown scope in both labels and acts on the shown rows', () => {
     expect(english).toContain("threadSidebarMarkShownRead_other: 'Mark {count} shown as read',")
     expect(english).toContain("threadSidebarMarkShownUnread_other: 'Mark {count} shown as unread',")
-    expect(client).toContain("plural(props.tSidebar, 'threadSidebarMarkShownRead', shownThreadIds.length)")
     expect(client).toContain('const shownThreadIds = visibleThreadEntries.map(entry => entry.session.id)')
     expect(client).not.toContain('const activeViewThreadIds')
   })
 
-  it('offers unread only while something shown is read, and lists both last, after a separator', () => {
-    expect(client).toMatch(/\.\.\.\(shownThreadIds\.some\(sessionId => !attention\.records\.has\(sessionId\)\)\s*\?/u)
+  it('lists both last, after a separator', () => {
     const manage = optionsMenu.indexOf("props.tSidebar('threadSidebarPresetManage')")
     const marks = optionsMenu.indexOf('{markViewActions.map(action => (')
     expect(manage).toBeGreaterThan(-1)
@@ -1611,4 +1610,30 @@ it('marks the active preset with aria-checked only (round 33, item 9)', () => {
   render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
   for (const radio of within(screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })).getAllByRole('radio')) expect(radio.hasAttribute('aria-current')).toBe(false)
   expect(screen.getByRole('radio', { name: /^Working, /u }).getAttribute('aria-checked')).toBe('true')
+})
+
+// Council round 34, B11 (round-33 follow-ups 5 and 6): "Mark 5 shown as read" over five rows of which two were unread
+// promised changes it never made. Each verb counts the shown rows it changes and is gone at zero; the preset rows'
+// accessible names carry their count ("Working, 2 threads").
+describe('the mark verbs count what they change (council round 34, B11)', () => {
+  it('counts the unread rows for read and the read rows for unread', () => {
+    const unread = new Set(['b', 'd'])
+    expect(markShownCounts(['a', 'b', 'c', 'd', 'e'], id => unread.has(id))).toEqual({ toRead: 2, toUnread: 3 })
+    expect(markShownCounts(['a'], () => false)).toEqual({ toRead: 0, toUnread: 1 })
+    expect(markShownCounts([], () => true)).toEqual({ toRead: 0, toUnread: 0 })
+  })
+
+  it('labels each verb with its own count and leaves it out at zero, separator included', () => {
+    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+    expect(client).toContain('const markCounts = markShownCounts(shownThreadIds, sessionId => attention.records.has(sessionId))')
+    expect(client).toMatch(/\.\.\.\(markCounts\.toRead > 0\s*\?\s*\[\{ id: 'mark-read', label: plural\(props\.tSidebar, 'threadSidebarMarkShownRead', markCounts\.toRead\)/u)
+    expect(client).toMatch(/\.\.\.\(markCounts\.toUnread > 0\s*\?\s*\[\{ id: 'mark-unread', label: plural\(props\.tSidebar, 'threadSidebarMarkShownUnread', markCounts\.toUnread\)/u)
+    expect(client).not.toContain("plural(props.tSidebar, 'threadSidebarMarkShownRead', shownThreadIds.length)")
+    expect(optionsMenu).toContain('{markViewActions.length === 0 ? null : <DropdownMenuSeparator />}')
+  })
+
+  it('names each preset row with its count', () => {
+    render(<ListFilterPanel {...panel()} />)
+    expect(screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other' })).toBeTruthy()
+  })
 })
