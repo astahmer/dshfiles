@@ -182,40 +182,74 @@ const fetchMistralCatalog = async (apiKey: string, signal?: AbortSignal): Promis
 
 const subscriptionSchema = Schema.Struct({ plan_name: Schema.String, vibe_payg_enabled: Schema.optional(Schema.NullOr(Schema.Boolean)) })
 export type MistralSubscription = typeof subscriptionSchema.Type
+/** One included monthly bucket: the Vibe & Studio allowance or the API credit, each with its own percentage. */
+const budgetDetailSchema = Schema.Struct({
+  usage_percentage: Schema.Number.check(Schema.isFinite()),
+  initial_budget: Schema.optional(Schema.NullOr(Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)))),
+  currency: Schema.optional(Schema.NullOr(Schema.String.check(Schema.isMaxLength(8)))),
+  reset_at: Schema.optional(Schema.NullOr(Schema.String)),
+  payg_enabled: Schema.optional(Schema.NullOr(Schema.Boolean)),
+})
+type MistralBudgetDetail = typeof budgetDetailSchema.Type
+/**
+ * `GET /v1/billing/budget` carries both included buckets in one response: `vibe_budget` for the Vibe & Studio
+ * allowance, `api_budget` for the API credit that every plain API-key request draws (2026-11-27 capture). Vibe's own
+ * reader predates `api_budget` and reads only `vibe_budget` (`vibe/app_server/_billing.py`), which is why a card built
+ * on its model can say "100% left" while the API credit is nearly spent.
+ */
 const budgetSchema = Schema.Struct({
-  vibe_budget: Schema.optional(
-    Schema.NullOr(
-      Schema.Struct({
-        usage_percentage: Schema.Number.check(Schema.isFinite()),
-        reset_at: Schema.optional(Schema.NullOr(Schema.String)),
-        payg_enabled: Schema.optional(Schema.NullOr(Schema.Boolean)),
-      }),
-    ),
-  ),
+  vibe_budget: Schema.optional(Schema.NullOr(budgetDetailSchema)),
+  api_budget: Schema.optional(Schema.NullOr(budgetDetailSchema)),
 })
 export type MistralBudget = typeof budgetSchema.Type
 
 const MISTRAL_NO_BUDGET_MESSAGE =
-  'Mistral reported no Vibe allowance for this key (an API-only key, or a member without usage permission). Check usage in console.mistral.ai.'
+  'Mistral reported no allowance or API credit for this key (an API-only key, or a member without usage permission). Check usage in console.mistral.ai.'
+
+const WINDOW_LABELS = { api: 'API credit', vibe: 'Vibe & Studio allowance' } as const
+
+/** The window a bucket becomes: percent left, its reset, and the credit it is spending when Mistral reports amounts. */
+const budgetWindow = (label: string, detail: MistralBudgetDetail): UsageCard['windows'][number] => {
+  const resetsAt = detail.reset_at === undefined || detail.reset_at === null ? Number.NaN : Date.parse(detail.reset_at)
+  const limit = detail.initial_budget === undefined || detail.initial_budget === null ? null : detail.initial_budget
+  const currency = detail.currency === undefined || detail.currency === null || detail.currency.trim() === '' ? null : detail.currency.trim()
+  const amount =
+    limit === null || currency === null ? {} : { amount: { used: Math.round(((limit * detail.usage_percentage) / 100) * 100) / 100, limit, currency } }
+  return {
+    label,
+    percentRemaining: ProviderUsageModel.remainingFromUsed(detail.usage_percentage),
+    resetsAt: Number.isFinite(resetsAt) ? resetsAt : null,
+    ...amount,
+  }
+}
+
+/** The tightest bucket decides the card's status: the API credit can be spent while the Vibe allowance is untouched. */
+const tightestBudget = (budgets: readonly { readonly label: string; readonly detail: MistralBudgetDetail }[]) =>
+  [...budgets].sort((left, right) => right.detail.usage_percentage - left.detail.usage_percentage)[0]
 
 /** Turn Vibe's billing reads into a card; `null` reads are the 403/404 Vibe also treats as "no data". */
 const mistralUsageCard = (subscription: MistralSubscription | null, budget: MistralBudget | null): UsageCard => {
   const planName = subscription === null ? null : subscription.plan_name.trim().slice(0, 64) || null
-  const detail = budget?.vibe_budget
-  if (detail === undefined || detail === null) return { ...ProviderUsageModel.emptyUsage('unsupported', MISTRAL_NO_BUDGET_MESSAGE), plan: planName }
-  const resetsAt = detail.reset_at === undefined || detail.reset_at === null ? Number.NaN : Date.parse(detail.reset_at)
+  const vibe = budget?.vibe_budget ?? null
+  const api = budget?.api_budget ?? null
+  if (vibe === null && api === null) return { ...ProviderUsageModel.emptyUsage('unsupported', MISTRAL_NO_BUDGET_MESSAGE), plan: planName }
+  const budgets = [
+    ...(api === null ? [] : [{ label: WINDOW_LABELS.api, detail: api }]),
+    ...(vibe === null ? [] : [{ label: WINDOW_LABELS.vibe, detail: vibe }]),
+  ]
+  const tightest = tightestBudget(budgets)
+  const spent = tightest !== undefined && tightest.detail.usage_percentage >= 100
   return {
-    status: detail.usage_percentage >= 100 && detail.payg_enabled !== true ? 'rate-limited' : 'ok',
-    message: detail.payg_enabled === true ? 'Pay-as-you-go continues after the monthly allowance.' : null,
+    status: spent && tightest?.detail.payg_enabled !== true ? 'rate-limited' : 'ok',
+    message:
+      spent && tightest !== undefined
+        ? tightest.detail.payg_enabled === true
+          ? `Pay-as-you-go continues after the ${tightest.label} is spent.`
+          : `The ${tightest.label} is spent and pay-as-you-go is off: requests fail until it resets.`
+        : null,
     identity: null,
     plan: planName,
-    windows: [
-      {
-        label: 'Monthly allowance',
-        percentRemaining: ProviderUsageModel.remainingFromUsed(detail.usage_percentage),
-        resetsAt: Number.isFinite(resetsAt) ? resetsAt : null,
-      },
-    ],
+    windows: budgets.map(entry => budgetWindow(entry.label, entry.detail)),
     bankedResets: 0,
     bankedResetExpiries: [],
   }

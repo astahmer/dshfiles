@@ -120,13 +120,40 @@ describe('Mistral model catalog', () => {
 })
 
 describe('Mistral plan quota', () => {
-  it('maps the Vibe monthly budget to one window', () => {
-    const card = mistralUsageCard({ plan_name: 'Pro', vibe_payg_enabled: false }, { vibe_budget: { usage_percentage: 42.5, reset_at: '2026-12-01T00:00:00Z' } })
-    expect(card).toMatchObject({
-      status: 'ok',
-      plan: 'Pro',
-      windows: [{ label: 'Monthly allowance', percentRemaining: 57.5, resetsAt: Date.parse('2026-12-01T00:00:00Z') }],
-    })
+  const bothBudgets = {
+    vibe_budget: { usage_percentage: 0.0008, initial_budget: 255, currency: 'EUR', reset_at: '2026-12-01T00:00:00Z', payg_enabled: false },
+    api_budget: { usage_percentage: 84.43782544, initial_budget: 25.5, currency: 'EUR', reset_at: '2026-12-01T00:00:00Z', payg_enabled: false },
+  }
+
+  it('reads the API credit and the Vibe allowance from the one budget response as two windows', () => {
+    const card = mistralUsageCard({ plan_name: 'Pro', vibe_payg_enabled: false }, bothBudgets)
+    expect(card.plan).toBe('Pro')
+    expect(card.windows).toEqual([
+      {
+        label: 'API credit',
+        percentRemaining: 15.6,
+        resetsAt: Date.parse('2026-12-01T00:00:00Z'),
+        amount: { used: 21.53, limit: 25.5, currency: 'EUR' },
+      },
+      {
+        label: 'Vibe & Studio allowance',
+        percentRemaining: 100,
+        resetsAt: Date.parse('2026-12-01T00:00:00Z'),
+        amount: { used: 0, limit: 255, currency: 'EUR' },
+      },
+    ])
+  })
+
+  it('reports a spent API credit as rate limited while the Vibe allowance is untouched', () => {
+    const card = mistralUsageCard(null, { ...bothBudgets, api_budget: { ...bothBudgets.api_budget, usage_percentage: 101.2 } })
+    expect(card.status).toBe('rate-limited')
+    expect(card.message).toBe('The API credit is spent and pay-as-you-go is off: requests fail until it resets.')
+    expect(card.windows[0]).toMatchObject({ label: 'API credit', percentRemaining: 0, amount: { used: 25.81, limit: 25.5, currency: 'EUR' } })
+  })
+
+  it("keeps one window when a key only reports the Vibe allowance, as Vibe's own reader expects", () => {
+    const card = mistralUsageCard({ plan_name: 'Pro' }, { vibe_budget: { usage_percentage: 42.5, reset_at: '2026-12-01T00:00:00Z' } })
+    expect(card).toMatchObject({ status: 'ok', windows: [{ label: 'Vibe & Studio allowance', percentRemaining: 57.5 }] })
   })
 
   it('reports an exhausted allowance as rate limited unless pay-as-you-go continues', () => {
@@ -134,7 +161,12 @@ describe('Mistral plan quota', () => {
       status: 'rate-limited',
       windows: [{ percentRemaining: 0, resetsAt: null }],
     })
-    expect(mistralUsageCard(null, { vibe_budget: { usage_percentage: 130, payg_enabled: true } }).status).toBe('ok')
+    expect(mistralUsageCard(null, { vibe_budget: { usage_percentage: 130, payg_enabled: true } })).toMatchObject({ status: 'ok' })
+  })
+
+  it('keeps a window without amounts when the bucket reports no limit or currency', () => {
+    const card = mistralUsageCard(null, { api_budget: { usage_percentage: 50, initial_budget: 25.5 } })
+    expect(card.windows).toEqual([{ label: 'API credit', percentRemaining: 50, resetsAt: null }])
   })
 
   it('never guesses a percentage when no budget is reported', () => {
