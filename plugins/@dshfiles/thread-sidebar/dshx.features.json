@@ -1125,14 +1125,14 @@
       "id": "filter-presets",
       "title": "Save and switch thread list filter presets",
       "summary": "Save the thread list's filters as a preset and switch presets in one click.",
-      "details": "The thread list's Filter panel (one level, beside the list; a bottom sheet on a phone) opens on a Presets section: the saved views (All threads, Working, Done and the user's own) as one-click radios, Save changes and Discard changes once a filter was changed after applying one, and a Preset options menu beside its heading (Save current filters as preset…, Rename…, Save changes to “‹preset›”, Delete… with an Undo notice, Mark all read/unread, Manage presets…). A preset stores the grouping, status and source filters and, when saved with one, the project scope. The Filter button names the active preset (\"Filter: Needs you (edited)\" with a dot while edited). ⌘K lists a \"Filter: ‹preset›\" row per preset, [ and ] step through them in the thread list, and an optional chips row under the header applies one in one tap. Presets live in the thread-sidebar Host settings (threadViews), so every browser and device sees the same ones; the agent reads and changes them with the thread_view_* tools.",
+      "details": "The thread list's Filter panel (one level, beside the list; a bottom sheet on a phone) opens on a Presets section: the saved views (All threads, Working, Done and the user's own) as one-click radios, Save changes and Discard changes once a filter was changed after applying one, and a Preset options menu beside its heading (Save as new preset…, Rename…, Save changes to “‹preset›”, Delete… with an Undo notice, Mark all read/unread, Manage presets…). A preset stores the grouping, status and source filters and, when saved with one, the project scope. The Filter button names the active preset (\"Filter: Needs you (edited)\" with a dot while edited). ⌘K lists a \"Filter: ‹preset›\" row per preset, [ and ] step through them in the thread list, and an optional chips row under the header applies one in one tap. Presets live in the thread-sidebar Host settings (threadViews), so every browser and device sees the same ones; the agent reads and changes them with the thread_view_* tools.",
       "reach": [
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
         "expect radiogroup \"Presets\"",
         "expect radio \"All threads*\"",
         "click button \"Preset options: *\"",
-        "click menuitem \"Save current filters as preset…\"",
+        "click menuitem \"Save as new preset…\"",
         "expect dialog \"Save filters as a preset\"",
         "expect textbox \"Preset name\""
       ],
@@ -1141,7 +1141,7 @@
         "click button \"Filter: *\"",
         "expect radiogroup \"Presets\"",
         "click button \"Preset options: *\"",
-        "click menuitem \"Save current filters as preset…\"",
+        "click menuitem \"Save as new preset…\"",
         "expect dialog \"Save filters as a preset\""
       ],
       "surfaces": ["client", "host", "tool", "command", "settings", "storage"],
@@ -1181,7 +1181,7 @@
         "A filter change after applying a preset never rewrites the preset: it is a draft until Save changes; changing back to the preset's own filters drops the draft.",
         "Applying a preset, the active one included, drops the draft; a preset saved with a project scope sets the project picker, a built-in leaves it alone.",
         "Delete asks for confirmation, refuses the last enabled preset, and its Undo notice puts the preset back at its position (active again if it was); the agent's thread_view_delete needs confirm: true and returns the preset and position thread_view_create restores.",
-        "At 12 presets Save current filters as preset… explains the limit instead of failing."
+        "At 12 presets Save as new preset… explains the limit instead of failing."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1232,7 +1232,7 @@
         }
       ],
       "onboarding": {
-        "firstAction": "Set the thread list's filters, then choose Filters › ⋯ › Save current filters as preset… and name it.",
+        "firstAction": "Set the thread list's filters, then choose Filters › ⋯ › Save as new preset… and name it.",
         "doneWhen": "The Filter button shows your preset's name and one click in its Presets section brings the filters back."
       }
     },

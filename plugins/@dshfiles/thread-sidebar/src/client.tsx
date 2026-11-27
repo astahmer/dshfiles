@@ -6688,34 +6688,44 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
         {/* Save as… left the panel for this menu, so the sheet opens on the filters (round 28, item 10). */}
         <DropdownMenuItem onSelect={saveFiltersAsPreset}>
-          {props.tSidebar('threadSidebarPresetSaveAs')}
+          {/* One verb name, as on the edited built-in row's button (council round 29, item 2). */}
+          {props.tSidebar('threadSidebarPresetSaveAsNew')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* One text edge (no verb carries an icon) and the preset's name as a quiet label (council round 28, item 12). */}
         <DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
-        <DropdownMenuItem
-          disabled={activeIsBuiltIn}
-          onSelect={closeFilterThen(() =>
-            setPresetPrompt({
-              mode: 'rename',
-              viewId: listThreadView.id,
-              name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
-            }),
-          )}
-        >
-          {props.tSidebar('threadSidebarPresetRename')}
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled={!presetEdited || activeIsBuiltIn} onSelect={() => savePresetChanges()}>
-          {/* One verb name, as on the edited row's button. */}
-          {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          variant="destructive"
-          disabled={activeIsBuiltIn || threadViewSettings.views.length === 1 || viewTabs.length === 1}
-          onSelect={closeFilterThen(() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' }))}
-        >
-          {props.tSidebar('threadSidebarPresetDelete')}
-        </DropdownMenuItem>
+        {/* The built-in All threads shows no dead rows (council round 29, item 2): one line says why, and Save as new
+            preset… above is its way to keep the changes. */}
+        {activeIsBuiltIn ? (
+          <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground" data-preset-built-in-hint="">
+            {props.tSidebar('threadSidebarPresetBuiltInHint')}
+          </p>
+        ) : (
+          <>
+            <DropdownMenuItem
+              onSelect={closeFilterThen(() =>
+                setPresetPrompt({
+                  mode: 'rename',
+                  viewId: listThreadView.id,
+                  name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
+                }),
+              )}
+            >
+              {props.tSidebar('threadSidebarPresetRename')}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
+              {/* One verb name, as on the edited row's button. */}
+              {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              disabled={threadViewSettings.views.length === 1 || viewTabs.length === 1}
+              onSelect={closeFilterThen(() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' }))}
+            >
+              {props.tSidebar('threadSidebarPresetDelete')}
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuSeparator />
         {markViewActions.map(action => (
           <DropdownMenuItem key={action.id} disabled={action.disabled === true} onSelect={action.onSelect}>

@@ -373,7 +373,7 @@ describe('the phone sheet (round 28, item 10)', () => {
     expect(filterControl).toContain('dshx:phone:max-h-[85dvh]!')
     expect(filterControl).toContain("aria-label={props.tSidebar('threadSidebarFilters')}")
     const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
-    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveAs')")
+    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveAsNew')")
     // "Project · All projects ›": one row, its label and value inline, not a heading over a field.
     expect(filterControl).toMatch(/data-thread-project-row=""/u)
     expect(filterControl).toContain('<ChevronRightIcon')
@@ -738,9 +738,7 @@ describe('the built-in All threads (round 29, item 13)', () => {
     expect(within(row).getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })).toBeTruthy()
   })
 
-  it('disables Rename, Save changes and Delete in the menu while All threads is the active preset', () => {
-    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
-    expect(optionsMenu.match(/disabled=\{[^}]*activeIsBuiltIn/gu)?.length).toBe(3)
+  it('knows All threads as the built-in preset', () => {
     expect(client).toContain('const activeIsBuiltIn = listThreadView.id === ALL_THREADS_VIEW_ID')
   })
 })
@@ -859,5 +857,22 @@ describe('no edited dot (round 30, item 1)', () => {
     expect(container.querySelector('[data-preset-edited-dot]')).toBeNull()
     const seat = element(container.querySelector('[data-preset-active] [data-preset-seat]'))
     expect(seat.children).toHaveLength(1)
+  })
+})
+
+// Council round 29, item 2: the built-in preset's menu has no dead rows, says why in one line, and names its one save
+// verb as the row button does.
+describe('the built-in preset menu (round 30, item 2)', () => {
+  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+  it('hides Rename, Save changes and Delete for All threads and shows the built-in line under its label', () => {
+    expect(optionsMenu).not.toMatch(/disabled=\{[^}]*activeIsBuiltIn/u)
+    expect(optionsMenu).toMatch(/\{activeIsBuiltIn \? \(\s*<p className="dshx:px-2 dshx:pb-1\.5 dshx:text-xs dshx:text-muted-foreground"[^>]*>\s*\{props\.tSidebar\('threadSidebarPresetBuiltInHint'/u)
+    expect(english).toContain("threadSidebarPresetBuiltInHint: 'All threads is built in. Save your changes as a new preset.',")
+  })
+
+  it('calls its save verb Save as new preset… in the menu and on the row alike', () => {
+    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveAsNew')")
+    expect(client).not.toContain("'threadSidebarPresetSaveAs')")
+    expect(english).not.toContain('Save current filters as preset')
   })
 })

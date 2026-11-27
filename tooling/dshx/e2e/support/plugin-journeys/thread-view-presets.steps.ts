@@ -111,7 +111,7 @@ const filterTrigger = (page: Page, name: string) => threadSidebar(page).getByRol
 
 const saveCurrentFiltersAs = async (page: Page, name: string): Promise<void> => {
   // Save as… sits in the presets' ⋯ menu since round 28 (item 10).
-  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Save current filters as preset…')
+  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Save as new preset…')
   const dialog = page.getByRole('dialog', { name: 'Save filters as a preset' })
   await dialog.getByLabel('Preset name').fill(name)
   await dialog.getByRole('button', { name: 'Save preset', exact: true }).click()
