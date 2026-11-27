@@ -1706,6 +1706,37 @@ describe('client lazy chunks', () => {
     }
   })
 
+  it('shares a module whose exports come through export * from other modules', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/kit-impl.ts'), "export const counter = { n: 0 }\nexport const useThing = () => 'thing-' + String(counter.n)\n")
+    await writeFile(resolve(root, 'src/kit-deep.ts'), "export * from './kit-impl'\nexport const deep = 'deep'\n")
+    await writeFile(resolve(root, 'src/kit.ts'), "export * from './kit-deep'\nexport const own = 'own'\n")
+    await writeFile(resolve(root, 'src/heavy.ts'), "import { deep, own, useThing } from './kit'\nexport const heavy = [useThing(), deep, own].join(' ')\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry.replace('export function apply()', "import { counter, own } from './kit'\ncounter.n = 3\nexport const kit = own\nexport function apply()"))
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    const chunkFile = chunkOf(report)
+    expect(chunkFile).toBeDefined()
+    const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8'), chunk: await readFile(resolve(root, 'dist', chunkFile!), 'utf8') })
+    await expect(entry.apply()).resolves.toBe('thing-3 deep own')
+  })
+
+  it('shares a module that re-exports a virtual module with export *, as plugin-ui/query re-exports a shared-runtime facade', async () => {
+    const root = await temporaryProject()
+    const virtualLibrary: Plugin = {
+      name: 'virtual-library',
+      resolveId: source => (source === 'virtual-library' ? '\0virtual-library' : null),
+      load: id => (id === '\0virtual-library' ? { code: "export const useThing = () => 'virtual-thing'\nexport const other = 1\n", moduleSideEffects: false } : null),
+    }
+    await writeFile(resolve(root, 'src/kit.ts'), "export * from 'virtual-library'\nexport const registry = new Map<string, string>()\n")
+    await writeFile(resolve(root, 'src/heavy.ts'), "import { registry, useThing } from './kit'\nexport const heavy = `${useThing()} ${registry.get('k') ?? 'missing'}`\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry.replace('export function apply()', "import { registry } from './kit'\nregistry.set('k', 'shared')\nexport function apply()"))
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist', vite: { plugins: [virtualLibrary] } })
+    const chunkFile = chunkOf(report)
+    expect(chunkFile).toBeDefined()
+    const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8'), chunk: await readFile(resolve(root, 'dist', chunkFile!), 'utf8') })
+    await expect(entry.apply()).resolves.toBe('virtual-thing shared')
+  })
+
   it('shares a CommonJS dependency with the entry as the same module.exports', async () => {
     const root = await temporaryProject()
     await mkdir(resolve(root, 'node_modules/fake-cjs'), { recursive: true })

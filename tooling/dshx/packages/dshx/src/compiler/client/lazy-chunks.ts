@@ -63,6 +63,32 @@ const isBundlerHelper = (id: string): boolean => id.startsWith('\0rolldown/') ||
 /** Modules a chunk may hold beside its entry: facades that read one shared instance, and stateless helpers. */
 const isFacade = (id: string): boolean => SharedRuntime.isFacade(id) || id.startsWith(CHUNK_SHARED_PREFIX) || isBundlerHelper(id)
 
+const STAR_REEXPORT = /export\s*\*\s*from\s*(['"])([^'"]+)\1/gu
+
+/**
+ * Every name a module exports. Rolldown's `ModuleInfo.exports` can leave out names an `export * from` brings in (a
+ * star over a virtual module, such as plugin-ui/query over the shared runtime's react-query facade), so the star
+ * sources are followed. `undefined` when a star source is external: its names exist only at runtime.
+ */
+const exportNames = async (context: Rollup.PluginContext, id: string, seen: Set<string> = new Set()): Promise<readonly string[] | undefined> => {
+  if (seen.has(id)) return []
+  seen.add(id)
+  const info = context.getModuleInfo(id)
+  if (info === null) return undefined
+  if (info.inputFormat === 'cjs') return info.exports
+  const names = new Set(info.exports)
+  for (const match of (info.code ?? '').matchAll(STAR_REEXPORT)) {
+    const source = match[2]
+    if (source === undefined) continue
+    const target = await context.resolve(source, id)
+    if (target === null || target.external !== false) return undefined
+    const starred = await exportNames(context, target.id, seen)
+    if (starred === undefined) return undefined
+    for (const name of starred) if (name !== 'default') names.add(name)
+  }
+  return [...names]
+}
+
 /** A stable table key: the module's path from the package root, hashed, so a key never leaks a machine path. */
 const sharedKey = (root: string, id: string): string =>
   createHash('sha256')
@@ -192,9 +218,14 @@ export class ClientLazyChunks {
             continue
           }
           if (shared.length > 0) {
-            for (const module of shared) {
-              const info = this.getModuleInfo(module)
-              state.shared.set(sharedKey(options.root, module), { id: module, names: info?.exports ?? [], commonJs: info?.inputFormat === 'cjs' })
+            const described = await Promise.all(shared.map(async module => ({ module, names: await exportNames(this, module) })))
+            // A star re-export of an external module has names only its runtime knows: keep that target in client.js.
+            if (described.some(entry => entry.names === undefined)) {
+              retry.push(id)
+              continue
+            }
+            for (const { module, names } of described) {
+              state.shared.set(sharedKey(options.root, module), { id: module, names: names ?? [], commonJs: this.getModuleInfo(module)?.inputFormat === 'cjs' })
             }
             state.cache.delete(id)
             newlyShared.push(id)
