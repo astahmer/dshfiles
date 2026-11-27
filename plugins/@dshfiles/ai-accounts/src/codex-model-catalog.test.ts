@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs'
+import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
 import { recordSpans } from '@dshfiles/dshx/tracing'
 import type { Credential, OAuthCredential } from '@earendil-works/pi-ai'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
-import { Context, Effect } from 'effect'
+import { Context, Effect, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 import { CODEX_MAX_OUTPUT_TOKENS, CodexModelCatalog, type CodexModelsPayload } from './codex-model-catalog.js'
 import { isCodexFastModeModel } from './codex-fast-mode.js'
@@ -20,8 +21,7 @@ type CodexModelsSample = {
   readonly models: readonly { readonly [key: string]: CodexModelsPayload }[]
 }
 const fixture = (): CodexModelsSample => {
-  const sample: CodexModelsSample = JSON.parse(readFileSync(new URL('./fixtures/codex-models.json', import.meta.url), 'utf8'))
-  return sample
+  return decodeJson(Schema.Struct({ models: Schema.Array(jsonObjectSchema) }), readFileSync(new URL('./fixtures/codex-models.json', import.meta.url), 'utf8'))
 }
 
 const codexRoute: CodexRoute = {
