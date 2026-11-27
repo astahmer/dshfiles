@@ -2255,7 +2255,13 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                 >
                   {hoverActions.map(({ action, element }) => (
                     // Hidden until `HoverStripFit` measures the row and finds the seat clear of the title; `⋯` keeps it.
-                    <span key={action} data-strip-seat="" className="dshx:hidden dshx:data-[strip-on]:contents">
+                    <span
+                      key={action}
+                      data-strip-seat=""
+                      // Every verb but Open in side panel changes the thread: it keeps a seat's distance from the title.
+                      data-strip-changes={action === 'aside' ? undefined : ''}
+                      className="dshx:hidden dshx:data-[strip-on]:contents"
+                    >
                       {element}
                     </span>
                   ))}

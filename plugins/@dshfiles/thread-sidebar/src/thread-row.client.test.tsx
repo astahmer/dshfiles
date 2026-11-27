@@ -812,12 +812,12 @@ describe('the hover strip without reflow (round 28, item 11)', () => {
 describe('the hover strip beside the title (round 29, item 1)', () => {
   it('fits an action only when its button starts clear of the last glyph, so a click on the title opens the row', () => {
     // A 300px row whose strip ends at 294: a 9px title leaves room for three actions, a 169px one for none.
-    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 120, actions: 5 })).toBe(5)
-    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5 })).toBe(2)
-    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 240, actions: 5 })).toBe(0)
-    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 260, actions: 1 })).toBe(0)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 120, actions: 5, firstChangesState: false })).toBe(5)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5, firstChangesState: false })).toBe(2)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 240, actions: 5, firstChangesState: false })).toBe(0)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 260, actions: 1, firstChangesState: false })).toBe(0)
     for (let glyph = 40; glyph <= 270; glyph += 1) {
-      const fit = HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: glyph, actions: 8 })
+      const fit = HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: glyph, actions: 8, firstChangesState: false })
       const left = 294 - (fit + 1) * 24 - fit * 2
       if (fit > 0) expect(left, `title ending at ${glyph}`).toBeGreaterThanOrEqual(glyph + 8)
     }
@@ -852,8 +852,9 @@ describe('the hover strip beside the title (round 29, item 1)', () => {
     document.createRange = createRange
     const on = Array.from(container.querySelectorAll('[data-strip-seat]')).map(seat => seat.hasAttribute(STRIP_SEAT_ON))
     expect(on.length).toBeGreaterThan(2)
-    // 294 - 3 seats (24) - 2 gaps = 218 ≥ 210 + 8: two actions and ⋯.
-    expect(on).toEqual(on.map((_, index) => index < 2))
+    // The first action changes the thread, so it needs 8px plus a seat (34px): 294 - 2 seats - 1 gap = 244 ≥ 210 + 34,
+    // but two actions (218) would not be: one action and ⋯.
+    expect(on).toEqual(on.map((_, index) => index < 1))
   })
 })
 
@@ -871,5 +872,27 @@ describe('a hovered attention row (round 29, item 10)', () => {
     cleanup()
     const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
     expect(idle.querySelector<HTMLElement>('article > div')?.className).toContain('dshx:hover:bg-accent/60')
+  })
+})
+
+// Council round 28, item 1, second half: no state-changing verb (Done, Snooze…) sits first next to the title. Measured
+// on the scratch: "Cart badge count" drew [Done, ⋯] 39px after its title. A first seat that changes the thread's state
+// needs one more seat of clearance; Open in side panel, which changes nothing, keeps the 8px.
+describe('a state-changing verb beside the title (round 29, item 1)', () => {
+  it('needs a full seat more clearance when the first action changes the thread', () => {
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5, firstChangesState: false })).toBe(2)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5, firstChangesState: true })).toBe(1)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 215, actions: 5, firstChangesState: false })).toBe(1)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 215, actions: 5, firstChangesState: true })).toBe(0)
+  })
+
+  it('marks every seat but Open in side panel as changing the thread, and reads the first one', async () => {
+    const container = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const seats = Array.from(container.querySelectorAll<HTMLElement>('[data-row-strip] > [data-strip-seat]'))
+    expect(seats.length).toBeGreaterThan(1)
+    for (const seat of seats) {
+      const name = seat.querySelector('button')?.getAttribute('aria-label') ?? ''
+      expect(seat.hasAttribute('data-strip-changes'), name).toBe(name !== 'threadSidebarOpenInSidePanel')
+    }
   })
 })
