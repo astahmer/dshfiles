@@ -8,8 +8,21 @@
     "path": "packages/subagent/tool-subagent"
   },
   "files": [
-    { "upstream": "src", "local": "src/native" },
-    { "upstream": "locale", "local": "locale" }
+    {
+      "upstream": "src",
+      "local": "src/native"
+    },
+    {
+      "upstream": "locale",
+      "local": "locale"
+    }
   ],
-  "delta": ["src/native/index.ts", "src/native/model-selection-state.ts"]
+  "delta": [
+    "src/native/index.ts",
+    "src/native/list-models.ts",
+    "src/native/model-selection-state.ts"
+  ],
+  "added": [
+    "src/native/agent-selection.ts"
+  ]
 }

@@ -14,6 +14,8 @@ import type { ToolDefinition } from '@deepseek-ai/dsh-tools'
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
 import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
+import { SessionId } from '@deepseek-ai/dsh-session'
+import { randomUUID } from 'node:crypto'
 import {
   assertSubagentMaxDepth,
   delegationDepthOf,
@@ -30,6 +32,8 @@ import type { DelegationModelRequest } from './model-selection.ts'
 import { registerListSubagentModels } from './list-models.ts'
 import { SubagentPresetSelection, type PresetSelectionConfig, type PresetSelectionRequest } from './preset-selection.ts'
 import type {} from './model-selection-settings.ts'
+import type {} from '../agent-resolver.ts'
+import { AGENT_PARAMETER_DESCRIPTION, agentPrompt, agentRouteOptions, selectSubagentAgent } from './agent-selection.ts'
 import {
   followedSubagentModelSelectionProjectionDefinition,
   followingSubagentModelSelection,
@@ -242,6 +246,13 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
           required: true,
           description: wording.promptDescription,
         },
+        // dshfiles delta: a fresh child may start as a configured agent; a fork always runs as the parent's agent.
+        ...subagentProvider.inheritsParentContext ? {} : {
+          agent: {
+            type: 'string' as const,
+            description: AGENT_PARAMETER_DESCRIPTION,
+          },
+        },
         ...presets.choices === undefined ? {} : {
           agent_preset: {
             type: 'string' as const,
@@ -284,16 +295,35 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
           throw new Error('subagent tool requires a calling agent (exec.agent was undefined)')
         }
 
+        // dshfiles delta: the agent decides the child's route, preset, preamble and recorded thread agent.
+        const chosenAgent = selectSubagentAgent({
+          requested: (args as { agent?: unknown }).agent,
+          resolver: ctx.get('dshfilesSubagentAgents'),
+          parent,
+          provider: subagentProvider,
+          toolName,
+        })
         const routes = subagentModelSelectionPolicy(subagentModelSelectionProjectionHandle, parent.session)
         const modelSelectionPolicy = routes === undefined ? undefined : { routes }
-        const agentPreset = presets.resolve(args as PresetSelectionRequest)
+        const presetRequest = args as PresetSelectionRequest
+        // An explicit agent_preset wins over the agent's preset, which wins over the configured default.
+        const agentPreset = presetRequest.agent_preset === undefined && chosenAgent !== undefined && chosenAgent.preset !== null
+          ? chosenAgent.preset
+          : presets.resolve(presetRequest)
         const modelRequest = args as DelegationModelRequest
         const parentOptions = parentAgentOptionsForDelegation(parent)
+        // Explicit provider/model in the call win (and stay under the Session policy); else the agent's route, which
+        // the user configured, is admitted without the policy.
+        const routeAgent = chosenAgent !== undefined && chosenAgent.route !== null && !hasDelegationModelRequest(modelRequest)
+          ? chosenAgent
+          : undefined
+        const agentRoute = routeAgent !== undefined
+        const baseAgentOptions = routeAgent === undefined ? config.agentOptions : agentRouteOptions(config.agentOptions, routeAgent)
         const requiresRoutePreflight = hasDelegationModelRequest(modelRequest)
-          || hasConfiguredLlmSelection(config.agentOptions)
+          || hasConfiguredLlmSelection(baseAgentOptions)
         const configuredChildAgentOptions = requiresRoutePreflight && providerRouteDefaults !== undefined
-          ? { ...providerRouteDefaults, ...config.agentOptions }
-          : config.agentOptions
+          ? { ...providerRouteDefaults, ...baseAgentOptions }
+          : baseAgentOptions
         const requestedChildAgentOptions = requestedAgentOptions(
           configuredChildAgentOptions,
           modelRequest,
@@ -306,7 +336,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
           if (llm === undefined) {
             throw new Error('cannot resolve the selected child LLM route because the `llm` service is unavailable')
           }
-          const inheritParentReasoningEffort = providerRouteDefaults === undefined && !hasDelegationModelRequest(modelRequest)
+          const inheritParentReasoningEffort = providerRouteDefaults === undefined && !hasDelegationModelRequest(modelRequest) && !agentRoute
           await preflightChildLlmRoute(
             llm,
             parentOptions,
@@ -322,15 +352,23 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         const maxDepth = ctx.subagents.resolveMaxDepth(config.maxDepth)
         const request = {
           ...args.cwd === undefined ? {} : { cwd: args.cwd },
-          prompt: [{ type: 'text', text: args.prompt }] as ContentBlock[],
+          prompt: [{ type: 'text', text: agentPrompt(chosenAgent, args.prompt) }] as ContentBlock[],
           parent,
           ...agentPreset === undefined ? {} : { agentPreset },
           ...requestedChildAgentOptions !== undefined ? { agentOptions: requestedChildAgentOptions } : {},
           ...maxDepth !== undefined ? { maxDepth } : {},
         }
 
+        // The child's agent is recorded under a reserved id before the child exists, so its first request already
+        // gets that agent's tools.
+        const childId = chosenAgent === undefined ? undefined : SessionId(randomUUID())
+        if (chosenAgent !== undefined && childId !== undefined) {
+          await chosenAgent.record(childId)
+          exec.signal.throwIfAborted()
+        }
         const started = await ctx.subagents.startActivation({
           provider: config.provider,
+          ...childId === undefined ? {} : { childId },
           label: args.description,
           ...args.name === undefined ? {} : { name: args.name },
           ...request,

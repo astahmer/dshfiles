@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { defineApi, dshxRegistryApi, isApiOwnerMissing, method, type ApiCaller, type RegistryListing } from '../src/api/index.js'
 import { publishedJsonSchema, toToolSchema } from '../src/api/json-schema.js'
 import { ApiRuntimeModel } from '../src/api/runtime.js'
-import { createHostApiClient, defineHost, isApiServed, listApis } from '../src/host/index.js'
+import { createHostApiClient, defineHost, isApiServed, listApis, toolSources } from '../src/host/index.js'
 import { createTestHost } from '../src/testing/index.js'
 
 const threads = defineApi({
@@ -198,6 +198,7 @@ describe('API registry', () => {
     expect(served?.methods[0]?.description).toBe('Revisions of a thread workspace not yet on main.')
     expect(served?.methods[0]?.input).toMatchObject({ type: 'object', properties: { path: { type: 'string', minLength: 1 } } })
     expect(listing.tools.find(tool => tool.name === 'test_thread_land')).toMatchObject({ source: 'api', owner: '@test/threads' })
+    expect(toolSources(host.ctx)('test_thread_land')).toEqual({ source: 'api', owner: '@test/threads' })
     expect(listing.tools.find(tool => tool.name === 'dshx_capabilities')).toMatchObject({ source: 'tool' })
     expect(listing.skills).toEqual([])
     expect(listApis(first.ctx).map(api => `${api.owner}/${api.id}`)).toEqual([
@@ -252,6 +253,10 @@ describe('API registry', () => {
       { name: 'test_write', description: 'Write.', source: 'plugin', owner: '@test/tools', readOnly: false, enabled: true },
     ])
     expect(listing.tools.find(tool => tool.name === 'dshx_capabilities')).toMatchObject({ source: 'tool', readOnly: true })
+    const sourceOf = toolSources(host.ctx)
+    expect(sourceOf('test_read')).toEqual({ source: 'plugin', owner: '@test/tools' })
+    expect(sourceOf('dshx_capabilities')).toEqual({ source: 'tool' })
+    expect(sourceOf('mcp__github__list_issues')).toEqual({ source: 'mcp' })
     expect(listing.skills).toEqual([
       {
         name: 'verify',

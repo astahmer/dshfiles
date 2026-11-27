@@ -1,5 +1,5 @@
 import type { ThreadSidebarTranslate } from './thread-view-manager.js'
-import { type ThreadDirectories, WorkspacePaths, workspaceName } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspacePaths, workspaceName } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 /** What a row reads of a jj thread workspace from jj-integration's inventory. */
 export interface OwnWorkspaceThread {

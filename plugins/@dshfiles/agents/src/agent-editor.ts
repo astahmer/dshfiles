@@ -1,8 +1,19 @@
-import { AGENT_DELEGATION_UNRESTRICTED, AGENT_HANDLE_PATTERN, agentLimits, Agents, type Agent, type AgentDraft, type AgentRoute } from './agent.js'
+import {
+  AGENT_DELEGATION_UNRESTRICTED,
+  AGENT_SUBAGENTS_UNRESTRICTED,
+  AGENT_HANDLE_PATTERN,
+  agentLimits,
+  Agents,
+  type Agent,
+  type AgentDraft,
+  type AgentRoute,
+  type AgentTools,
+} from './agent.js'
 import type { AgentModelOption } from './dispatch.js'
+import { ToolTrees } from './tool-tree.js'
 
 /** The fields the editor can flag; each maps to one control so a message sits under the field it is about. */
-export type AgentField = 'name' | 'handle' | 'glyph' | 'memoryScope' | 'peers' | 'route' | 'instructions' | 'routine'
+export type AgentField = 'name' | 'handle' | 'glyph' | 'memoryScope' | 'peers' | 'route' | 'instructions' | 'routine' | 'subagents'
 
 /** A problem with a recovery the editor can offer as a button, so no message is a dead end. */
 export type AgentFix =
@@ -11,6 +22,7 @@ export type AgentFix =
   | { readonly kind: 'clear-memory-scope'; readonly label: string }
   | { readonly kind: 'messaging-none'; readonly label: string }
   | { readonly kind: 'reset-route'; readonly label: string }
+  | { readonly kind: 'subagent-default-parent'; readonly label: string }
 
 export interface AgentIssue {
   readonly field: AgentField
@@ -76,6 +88,19 @@ const sameJson = (left: unknown, right: unknown): boolean => JSON.stringify(left
 
 const routeKey = (route: AgentRoute): string => `${route.provider}/${route.model}`
 
+type AccessEntries = AgentTools['tools']
+
+/** Entries in sorted key order with fields in a fixed order, so two equal access configs compare equal as JSON. */
+const canonicalEntries = (entries: AccessEntries): AccessEntries =>
+  Object.fromEntries(
+    Object.keys(entries)
+      .sort()
+      .flatMap(key => {
+        const entry = ToolTrees.normalizedEntry(entries[key])
+        return entry === undefined ? [] : [[key, entry]]
+      }),
+  )
+
 /** Pure editor rules behind the Agents panel: draft shape, dirtiness, review, duplicate and templates. */
 export class AgentEditor {
   /** The editable fields of a saved agent (or another draft), in one fixed key order; a blank draft for null. */
@@ -94,6 +119,11 @@ export class AgentEditor {
         agent === null
           ? { ...AGENT_DELEGATION_UNRESTRICTED, handles: [] }
           : { messaging: agent.delegation.messaging, handles: [...agent.delegation.handles], subagents: agent.delegation.subagents },
+      tools: agent === null ? { tools: {}, groups: {} } : { tools: canonicalEntries(agent.tools.tools), groups: canonicalEntries(agent.tools.groups) },
+      subagents:
+        agent === null
+          ? { ...AGENT_SUBAGENTS_UNRESTRICTED }
+          : { allowed: agent.subagents.allowed === 'any' ? 'any' : [...agent.subagents.allowed], default: agent.subagents.default },
       enabled: agent?.enabled ?? true,
     }
   }
@@ -268,6 +298,23 @@ export class AgentEditor {
 
     if (draft.routine.length > agentLimits.routine)
       errors.push({ field: 'routine', message: `A routine holds up to ${String(agentLimits.routine)} characters.` })
+
+    const { allowed, default: subagentDefault } = draft.subagents
+    if (allowed !== 'any' && subagentDefault !== null && !allowed.includes(subagentDefault)) {
+      errors.push({
+        field: 'subagents',
+        message: `The default subagent @${subagentDefault} is not in the allowed list, so it could never run.`,
+        fix: { kind: 'subagent-default-parent', label: "Use the parent thread's agent" },
+      })
+    } else {
+      const named = [...(allowed === 'any' ? [] : allowed), ...(subagentDefault === null ? [] : [subagentDefault])]
+      const unknown = [...new Set(named)].filter(peer => !taken.has(peer) && peer !== handle)
+      if (unknown.length > 0)
+        warnings.push({
+          field: 'subagents',
+          message: `${unknown.map(peer => `@${peer}`).join(', ')} is not a saved agent; a subagent cannot run as it until it exists.`,
+        })
+    }
 
     return { errors, warnings, handle }
   }

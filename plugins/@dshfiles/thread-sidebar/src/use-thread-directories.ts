@@ -1,7 +1,7 @@
 import { useResource } from '@dshfiles/dshx/client'
 import { useMemo } from 'react'
 import { threadSidebarThreadDirectoriesApi } from './thread-directories-api.js'
-import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 /**
  * Where the VCS providers put the listed projects' thread workspaces. Every caller on the page shares one read per

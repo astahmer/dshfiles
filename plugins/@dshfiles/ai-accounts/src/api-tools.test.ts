@@ -76,6 +76,7 @@ describe('ai-accounts tool exposure', () => {
       'ai_accounts_resume_continuation',
       'ai_accounts_save_account',
       'ai_accounts_set_auto_retry',
+      'ai_accounts_set_context_window',
       'ai_accounts_set_distribution',
       'ai_accounts_set_extra_usage',
       'ai_accounts_set_native_provider',

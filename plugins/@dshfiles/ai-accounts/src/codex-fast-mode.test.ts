@@ -80,7 +80,17 @@ describe('Codex Fast mode', () => {
       .map(model => model.id)
       .sort()
 
-    expect(supportedModelIds).toEqual(['gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-astra', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'])
+    expect(supportedModelIds).toEqual([
+      'gpt-5.6-luna',
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-6-astra',
+      'gpt-6-luna',
+      'gpt-6-sol',
+      'gpt-6.1-sol',
+      'gpt-6.2-astra',
+      'gpt-6.2-sol',
+    ])
     expect(isCodexFastModeModel({ api: 'openai-codex-responses', id: 'gpt-5.4' })).toBe(false)
     expect(isCodexFastModeModel({ api: 'openai-responses', id: modelId })).toBe(false)
     expect(fastMode.status({ sessionId, provider: providerId, model: modelId })).toEqual({ available: true, enabled: false })

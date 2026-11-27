@@ -74,6 +74,8 @@ export const toolCallDefinition = (input: {
   readonly pipeline: ToolExecutionPipeline
   /** Names the proxy never dispatches: itself and tool_search. */
   readonly reserved: ReadonlySet<string>
+  /** Why this agent may not call `name` (its tool access disables it), or undefined. Checked before any lookup. */
+  readonly refuse?: (name: string) => string | undefined
 }): ToolDefinition => {
   const nestedContent = new Map<ToolExecutionToken, readonly ContentBlock[]>()
   const target = (name: string) => (input.reserved.has(name) ? undefined : input.tools.get(name, input.agent))
@@ -100,6 +102,8 @@ export const toolCallDefinition = (input: {
       if (Exit.isFailure(exit)) throw failure(`Invalid tool_call arguments: ${String(exit.cause)}`)
       const call = exit.value
       if (input.reserved.has(call.name)) throw failure(`tool_call cannot call ${call.name}; call it directly.`)
+      const refusal = input.refuse?.(call.name)
+      if (refusal !== undefined) throw failure(refusal)
       const definition = input.reserved.has(call.name) ? undefined : input.tools.executable(call.name, input.agent, exec.toolSet)
       if (definition === undefined) throw failure(`Unknown tool "${call.name}". Find it with tool_search first, then pass its exact name.`)
       const callArgs = call.args ?? {}

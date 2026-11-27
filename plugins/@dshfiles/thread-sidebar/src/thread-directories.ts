@@ -4,4 +4,4 @@
  */
 export { threadSidebarThreadDirectoriesApi } from './thread-directories-api.js'
 export { useThreadDirectories } from './use-thread-directories.js'
-export { WorkspacePaths, type ThreadDirectories } from './workspace-paths.js'
+export { WorkspacePaths, type ThreadDirectories } from '@dshfiles/vcs-provider-port/workspace-attribution'

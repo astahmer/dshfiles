@@ -21,7 +21,7 @@ import type {} from '@deepseek-ai/dsh-schedule'
 import type { ScheduleRecord } from '@deepseek-ai/dsh-schedule'
 import { loadThreadDirectories } from './thread-directories-promise.js'
 import type { ScannedReminder } from './reminder-wake.js'
-import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 type SessionListItem = Awaited<ReturnType<CordisContext['sessionController']['list']>>['items'][number]
 

@@ -49,7 +49,7 @@ export class Indexer extends Context.Service<
         const registry = yield* ToolRegistry
         const running = yield* FiberHandle.make<void, never>()
         // The panel is the only reason to fold session logs periodically: no read in this window means nobody is looking.
-        const demand = yield* Ref.make(0)
+        const demand = yield* Ref.make(Number.NEGATIVE_INFINITY)
         const outcome = yield* Ref.make<{ readonly lastIndexedAt: number | null; readonly lastError: string | null }>({ lastIndexedAt: null, lastError: null })
         const syncedToolSources = yield* Ref.make(Option.none<ReadonlyMap<string, ToolSourceMetadata>>())
 
@@ -85,8 +85,9 @@ export class Indexer extends Context.Service<
 
         return Indexer.of({
           pass: FiberHandle.run(running, recorded, { onlyIfMissing: true }).pipe(Effect.andThen(FiberHandle.awaitEmpty(running))),
-          touch: Ref.set(demand, Date.now()),
-          demanded: Ref.get(demand).pipe(Effect.map(at => Date.now() - at <= DEMAND_WINDOW_MS)),
+          // Read the clock on every touch: a timestamp captured here would date every read to activation.
+          touch: Effect.flatMap(Clock.currentTimeMillis, now => Ref.set(demand, now)),
+          demanded: Effect.zipWith(Ref.get(demand), Clock.currentTimeMillis, (at, now) => now - at <= DEMAND_WINDOW_MS),
           status: Effect.gen(function* () {
             const counts = yield* repo.counts()
             const current = yield* Ref.get(outcome)

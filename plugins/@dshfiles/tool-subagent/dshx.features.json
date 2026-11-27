@@ -6,9 +6,14 @@
       "id": "live-model-selection-policy",
       "title": "Subagent model routes follow the saved setting in running threads",
       "summary": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/model-selection-policy event, and the policy projection keeps the latest one, so a route added after a thread started is accepted without a new thread.",
-      "surfaces": ["host"],
+      "surfaces": [
+        "host"
+      ],
       "configuration": [],
-      "states": ["enabled", "disabled-mid-session"],
+      "states": [
+        "enabled",
+        "disabled-mid-session"
+      ],
       "failureModes": [
         "A profile whose preset-standard delegation rows still name @deepseek-ai/dsh-tool-subagent keeps the frozen per-Session route list.",
         "A thread that started with model selection off keeps a tool without provider/model fields until a new thread; turning the setting off mid-thread keeps the last recorded routes."
@@ -42,6 +47,66 @@
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tools: subagent, subagent_fork, list_subagent_models"
+    },
+    {
+      "id": "subagent-agent-argument",
+      "title": "subagent starts a child as a configured agent",
+      "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's route (explicit provider/model win and stay under the Session policy; the agent's own route is admitted because the user configured it), its preset (explicit agent_preset wins) and a bounded preamble before the task; the tool reserves the child's Session id and records its agent before starting it, so the child's first request has that agent's tools. subagent_fork takes no agent. list_subagent_models without arguments also lists the agents the caller may start.",
+      "surfaces": [
+        "host"
+      ],
+      "configuration": [],
+      "states": [
+        "no-provider",
+        "inherit",
+        "agent",
+        "refused"
+      ],
+      "failureModes": [
+        "Without @dshfiles/agents loaded, agent is refused with the plugin to enable; omitting it keeps upstream behavior.",
+        "A backend outside the Host (no reserved child ids) refuses agent, since the agent's tools could not apply to it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.agent-schema",
+          "file": "plugins/@dshfiles/tool-subagent/src/agent-selection.test.ts",
+          "testName": "declares agent on subagent only, with a constant description, whether or not a resolver is loaded"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.agent-record-first",
+          "file": "plugins/@dshfiles/tool-subagent/src/agent-selection.test.ts",
+          "testName": "records the agent before startActivation is called"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.agent-precedence",
+          "file": "plugins/@dshfiles/tool-subagent/src/agent-selection.test.ts",
+          "testName": "lets explicit provider/model win over the agent route, under the Session policy"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.agent-refused",
+          "file": "plugins/@dshfiles/tool-subagent/src/agent-selection.test.ts",
+          "testName": "refuses with the resolver message and starts nothing"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "tool-subagent.agent-no-browser-surface",
+          "reason": "Host-only tool argument: the native tool cards are unchanged, and the real-runtime unit tests drive the tool calls."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "surface": "agentToolOnly",
+      "destination": "none",
+      "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)"
     }
   ]
 }

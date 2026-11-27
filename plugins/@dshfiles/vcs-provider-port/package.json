@@ -25,6 +25,10 @@
       "types": "./src/detect.ts",
       "default": "./dist/detect.js"
     },
+    "./workspace-attribution": {
+      "types": "./src/workspace-attribution.ts",
+      "default": "./dist/workspace-attribution.js"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
