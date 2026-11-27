@@ -35,6 +35,15 @@ test('the page-load thread route is offered until a list resolves it, never to a
   assert.equal(route.pending('http://localhost:3080/?thread=thr_stale'), null)
 })
 
+test('the page-load thread route survives a phone history layer rewriting the URL before the list mounts', () => {
+  const loaded = new PageLoadThreadRoute('http://localhost:3080/?thread=thr_linked&workspace=ws')
+  // The stack layer consumed its pushed entry with history.back(): the base entry has no thread.
+  assert.equal(loaded.pending('http://localhost:3080/'), 'thr_linked')
+  const lazy = new PageLoadThreadRoute()
+  assert.equal(lazy.pending('http://localhost:3080/?thread=thr_linked'), 'thr_linked')
+  assert.equal(lazy.pending('http://localhost:3080/'), 'thr_linked')
+})
+
 test('a page loaded without a thread route never treats a URL written later as one', () => {
   const route = new PageLoadThreadRoute()
   assert.equal(route.pending('http://localhost:3080/'), null)

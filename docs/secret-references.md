@@ -151,6 +151,35 @@ copies the value Host-side into that DSH credential. Binding accounts to
 `secret:` references directly would mean a second credential source across
 those paths, not a field attribute.
 
+## Where a global alias lives
+
+A settings field resolves with `cwd: null`, so it can only see **global** aliases: an alias that exists in one
+project's `.secret.json` or a `.secret.local.json` never resolves there, and the repair card reports it as such.
+
+The global scope is `~/.config/secret/config.json`. On this machine that path is a symlink into the nixfiles clone
+(`assets/secret/global.json`), so aliases sync through git. `secret set ALIAS --global` edits the clone's working
+copy: the alias is live immediately but only survives a checkout move, a reapply or another lane's history edit once
+that file is committed. An alias that is only in the working copy is the usual reason a reference that “worked
+yesterday” stops resolving.
+
+**A lost alias is no longer fatal.** `secret set ALIAS --global` names its vault item `global/ALIAS`, and a read now
+falls back to a unique vault item with that name, so a machine that only unlocked the vault still resolves
+`secret:ALIAS` with no config entry at all. Config still wins, an ambiguous name is refused, and the Catalog reports
+such an item as resolved. Declaring the alias keeps four things the fallback cannot carry: the `env` variable name for
+`secret run`/`env`, a field other than `password`, id pinning, and `secret doctor` coverage. `secret unaliased` lists
+what resolves this way; the picker still offers declared aliases only.
+
+```sh
+secret id ALIAS            # declared alias or the global/<alias> vault item, never prints a value
+secret unaliased           # vault items that resolve by name with no alias
+secret doctor              # every configured alias, plus the unaliased global items
+pnpm run check:secret-refs # every secret: reference in the live and seeded profile configs
+```
+
+`check:secret-refs` fails when neither a scope nor the vault answers, and warns on an alias only a project or
+machine-local scope supplies. Run it after editing a profile or the secret config; it reads alias metadata only,
+never a value.
+
 ## Verifying
 
 ```sh
@@ -159,6 +188,7 @@ pnpm --dir plugins/@dshfiles/secret-catalog test
 pnpm --dir plugins/@dshfiles/backlog test
 pnpm run check:e2e secret-catalog   # reveal/copy journeys
 pnpm run check:e2e backlog          # secret-bound setting and inline secret-link reveal
+pnpm run check:secret-refs          # every profile's secret: references resolve in the global scope
 ```
 
 Modal fields need the browser check: unit tests cannot catch an affordance

@@ -3,17 +3,15 @@
   "features": [
     {
       "id": "agent-directory",
-      "title": "Discover Agents and workspace channels",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first, and keep same-directory Agents on one hashed workspace topic.",
+      "title": "Discover Agents and peers",
+      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: peer mail is direct and needs no registration.",
       "surfaces": ["tool", "host", "client"],
       "surface": "destinationSection",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "configuration": [],
-      "states": ["no-agents", "live-agent", "related-peers-first", "include-all", "workspace-subscribed", "workspace-subscription-missing", "opted-out"],
+      "states": ["no-agents", "live-agent", "related-peers-first", "include-all"],
       "failureModes": [
-        "A missing workspace cwd cannot derive a workspace topic.",
-        "A workspace topic hashes cwd and is not a DSH Workspace registry id or a JJ workspace/revision id.",
         "The listing carries title, status, parent Session id and relation only; it contains no task text, transcript content or path.",
         "For an Agent's own parent or children, native send_message and subagent results are the channel; the peer tools serve separate top-level threads.",
         "Task-board access remains available only through existing Agent Teams tools to Team members; arbitrary non-Team child task state is not exposed.",
@@ -25,12 +23,6 @@
           "kind": "gherkin",
           "id": "agent-communication.host-report",
           "featureFile": "tooling/dshx/e2e/features/agent-communication.feature"
-        },
-        {
-          "kind": "unit-test",
-          "id": "agent-communication.lifecycle-workspace-subscribers",
-          "file": "plugins/@dshfiles/agent-communication/src/agent-lifecycle.test.ts",
-          "testName": "subscribes every Agent in a shared working directory exactly once"
         },
         {
           "kind": "unit-test",
@@ -58,25 +50,45 @@
     },
     {
       "id": "passive-messaging",
-      "title": "Store and browse passive messages",
-      "summary": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging or starting execution.",
+      "title": "Durable direct peer mail with a bounded request wake",
+      "summary": "Direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request wakes an idle recipient through a plugin-source pointer message under a cooldown and an hourly cap, while notices stay passive.",
       "surfaces": ["tool", "host", "storage", "client"],
       "surface": "destinationSection",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
-      "configuration": [],
-      "states": ["passive", "unread", "read", "acknowledged", "paged", "searched", "notice-intent", "request-intent", "idempotent-retry"],
+      "configuration": [
+        {
+          "key": "wakeOnRequest",
+          "defaultValue": "true",
+          "constraints": "A direct request wakes an idle recipient with a pointer message; notices stay passive. Turn it off for passive mail only.",
+          "coveredBy": ["agent-communication.request-wake"]
+        }
+      ],
+      "states": [
+        "passive",
+        "unread",
+        "read",
+        "acknowledged",
+        "paged",
+        "searched",
+        "notice-intent",
+        "request-intent",
+        "request-wake",
+        "wake-suppressed",
+        "idempotent-retry"
+      ],
       "failureModes": [
-        "Peer text remains untrusted data.",
+        "Peer text remains untrusted data: a wake carries a pointer to the inbox, never the message body.",
         "A stale cursor requires refreshing the conversation.",
-        "intent and priority are metadata only; neither starts, resumes, or redirects an Agent.",
+        "Only direct requests wake; notices never start, resume, or redirect an Agent.",
+        "Wakes are suppressed by a per-recipient cooldown (a burst shares one turn), an undirected pair cooldown (a reply cannot bounce straight back), and an hourly cap; a failure to wake leaves the stored mail for the next turn.",
         "A dedupeKey is scoped to one sender and one target; reusing it for a different target stores a new message.",
-        "A completed recipient stays completed; a stored message is read only during a later natural execution."
+        "A completed recipient stays completed; a stored notice is read only during a later natural execution."
       ],
       "externalDependencies": [],
       "onboarding": {
-        "firstAction": "Open Agents › Messages and post a message to a topic.",
-        "doneWhen": "Your message shows in the topic's history.",
+        "firstAction": "Open Agents \u203a Messages and send a direct message to a live Agent.",
+        "doneWhen": "Your message shows in that Agent\u2019s conversation.",
         "open": {
           "panel": "agent-communication"
         }
@@ -91,7 +103,7 @@
           "kind": "unit-test",
           "id": "agent-communication.service-passive-read-receipts",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
-          "testName": "stores topic messages passively and tracks explicit inbox reads separately from acknowledgements"
+          "testName": "keeps direct messages available after reopen until the recipient acknowledges them"
         },
         {
           "kind": "unit-test",
@@ -104,6 +116,12 @@
           "id": "agent-communication.service-intent-metadata",
           "file": "tooling/dshx/packages/dshx/tests/communication.service.spec.ts",
           "testName": "records intent and correlation metadata without changing passive delivery"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agent-communication.request-wake",
+          "file": "plugins/@dshfiles/agent-communication/src/mail-wake.test.ts",
+          "testName": "wakes only a request, never a notice, a disabled setting or itself"
         },
         {
           "kind": "unit-test",
@@ -179,22 +197,26 @@
     },
     {
       "id": "human-browser",
-      "title": "Post messages from the communication browser",
-      "summary": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
-      "reach": ["click tab \"Agents\"", "click button \"Messages\"", "expect combobox \"Message a thread…\""],
+      "title": "Send direct messages from the Messages panel",
+      "summary": "A human picks a live or dormant Agent thread and sends a direct message; the panel returns a storage receipt. A request wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
+      "reach": ["click tab \"Agents\"", "click button \"Messages\"", "expect combobox \"Message a thread\u2026\""],
       "reachNarrow": [
         "click button \"More\"",
         "click button \"Agents Configured agents and their messages.\"",
         "click button \"Messages\"",
-        "expect combobox \"Message a thread…\""
+        "expect combobox \"Message a thread\u2026\""
       ],
       "surfaces": ["host", "client", "storage"],
       "surface": "destinationSection",
       "destination": "agents",
-      "currentSurface": "left-nav: Messages › post",
+      "currentSurface": "left-nav: Messages \u203a post",
       "configuration": [],
-      "states": ["channel-message", "direct-message", "zero-recipients", "offline-recipient", "passive-arrival"],
-      "failureModes": ["Invalid or ambiguous targets are rejected.", "A successful post may have zero captured recipients."],
+      "states": ["direct-message", "zero-recipients", "offline-recipient", "request-wake", "notice-passive"],
+      "failureModes": [
+        "Invalid or ambiguous targets are rejected.",
+        "A successful post may have zero captured recipients.",
+        "Peer text stays untrusted data; the wake is a pointer, never the message body."
+      ],
       "externalDependencies": [],
       "verification": [
         {

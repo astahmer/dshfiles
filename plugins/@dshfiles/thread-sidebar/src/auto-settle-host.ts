@@ -5,7 +5,9 @@ import { AutoSettleScanModel, type ScannedSession } from './auto-settle-scan.js'
 import { SidebarOrganization } from './organization.js'
 import { OutsideReload } from './outside-reload-promise.js'
 import type { RebasedThread } from './rebased-threads.js'
-import type { HostCallFailed, SidebarSettingsWriteFailed } from './sidebar-errors.js'
+import type { ScannedReminder } from './reminder-wake.js'
+import { HostCallFailed, type SidebarSettingsWriteFailed } from './sidebar-errors.js'
+import { RecoveryStore } from './restart-recovery.js'
 import { SidebarHost } from './sidebar-host-promise.js'
 import { SidebarSettings } from './sidebar-settings.js'
 
@@ -15,6 +17,10 @@ export interface AutoSettleSnapshot {
   readonly archivedSessionIds: ReadonlySet<string>
   readonly pinnedSessionIds: ReadonlySet<string>
   readonly settledSessionIds: ReadonlySet<string>
+  /** Active reminders per target Session: a thread holding one is never settled. */
+  readonly reminders: readonly ScannedReminder[]
+  /** Threads waiting for a resume after a restart or a crash: settling one would reject that resume. */
+  readonly interruptedSessionIds: ReadonlySet<string>
 }
 
 /** What a scan reads from the Host: the Sessions and their workspaces, and jj-integration's thread workspaces. */
@@ -33,8 +39,10 @@ export class AutoSettleSources extends Context.Service<
     Effect.gen(function* () {
       const host = yield* SidebarHost
       const settings = yield* SidebarSettings
+      const recoveries = yield* RecoveryStore
       return AutoSettleSources.of({
         snapshot: Effect.gen(function* () {
+          const workingJobSessionIds = new Set(yield* host.workingJobSessionIds)
           const sessions = (yield* host.sessions).map(item => ({
             id: item.sessionId,
             running: item.running,
@@ -42,6 +50,7 @@ export class AutoSettleSources extends Context.Service<
             updatedAt: item.updatedAt,
             parentId: item.parentSessionId,
             pendingInteraction: item.pendingQuestions > 0,
+            workingJobs: workingJobSessionIds.has(item.sessionId),
             cwd: item.cwd,
           }))
           return {
@@ -54,6 +63,12 @@ export class AutoSettleSources extends Context.Service<
             archivedSessionIds: new Set(yield* host.archivedSessionIds),
             pinnedSessionIds: new Set(yield* host.pinnedSessionIds),
             settledSessionIds: new Set(yield* settings.settledSessionIds),
+            reminders: yield* host.reminders,
+            interruptedSessionIds: new Set(
+              (yield* recoveries.list.pipe(Effect.mapError(cause => new HostCallFailed({ operation: 'read recoveries', cause })))).map(
+                entry => entry.sessionId,
+              ),
+            ),
           }
         }),
         rebasedThreads: host.rebasedThreads,

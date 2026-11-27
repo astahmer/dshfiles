@@ -24,8 +24,8 @@ const effortsFor = (id: string): readonly MistralEffort[] | undefined => EFFORT_
 
 /**
  * Models Mistral documents as reading images, with their dash variants (docs.mistral.ai/models, read 2026-11-06).
- * pi-ai 1.3.0 gives only Large 4 image input, and GLM 5.3 Flash borrows the text-only GLM 5.3. A catalog entry that
- * leaves vision out does not hide it.
+ * pi-ai 1.6 catalogs all three with image input; older pi-ai lists DeepSeek V4.1 Flash as text only, and a discovered
+ * entry (Mistral's `/v1/models`, a dated variant) can still leave vision out. Such an entry does not hide it.
  */
 const IMAGE_INPUT_MODELS = ['mistral-large-4', 'zai-glm-5-3-flash', 'deepseek-v4-1-flash']
 const TEXT_AND_IMAGE = ['text', 'image'] as const
@@ -50,7 +50,6 @@ export const mistralTemplateId = (id: string, known: readonly string[]): string 
   const base = known.filter(model => id.startsWith(`${model}-`)).sort((left, right) => right.length - left.length)[0]
   if (base !== undefined) return base
   const family = [
-    ['devstral-small', 'devstral-small-2507'],
     ['devstral', 'devstral-latest'],
     ['codestral', 'codestral-latest'],
     ['magistral', 'magistral-medium-latest'],
@@ -65,7 +64,8 @@ export const mistralTemplateId = (id: string, known: readonly string[]): string 
 }
 
 /**
- * Mistral-hosted models pi-ai 1.3.0 does not catalog, as their Mistral model pages document them (read 2026-11-06).
+ * Mistral-hosted models older pi-ai catalogs lack, as their Mistral model pages document them (read 2026-11-06). An
+ * entry pi-ai now catalogs (1.5 lists DeepSeek V4.1 Flash 1017) is skipped, so pi-ai's own values win.
  * Each borrows its template's transport; "1M" and "128k" are written as pi-ai writes them for GLM 5.3.
  */
 const HOSTED_MODELS = [

@@ -55,6 +55,13 @@ export const ProviderGlyph = (props: { readonly kind: AccountKind; readonly clas
           <path d="M0 0h1v5H0zM4 0h1v5H4zM1 1h1v1H1zM3 1h1v1H3zM2 2h1v1H2zM1 2h1v1H1zM3 2h1v1H3z" fill="currentColor" />
         </svg>
       )
+    case 'antigravity':
+      // Gemini's four-point spark.
+      return (
+        <svg aria-label={label} className={className} role="img" style={style} viewBox="0 0 24 24">
+          <path d="M12 0c.4 6.4 5.6 11.6 12 12-6.4.4-11.6 5.6-12 12-.4-6.4-5.6-11.6-12-12C6.4 11.6 11.6 6.4 12 0Z" fill="currentColor" />
+        </svg>
+      )
     case 'cursor':
       return <MousePointer2Icon aria-label={label} className={className} role="img" style={style} />
   }

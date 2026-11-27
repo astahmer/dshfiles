@@ -6,8 +6,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createCommunicationService, type CommunicationAgent, type CommunicationService } from '@dshfiles/dshx/communication'
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { Effect, Layer } from 'effect'
-import { initializeCommunicationAgent } from './agent-lifecycle.js'
 import { CommunicationOperations } from './api-operations.js'
 import { CommunicationHub } from './communication-hub-promise.js'
 import { HostAgents } from './host-edge-promise.js'
@@ -56,12 +56,6 @@ const registryFor = (agents: readonly TestAgent[], ownership: Readonly<Record<st
   isOwnedBy: (candidate: TestAgent, owner: TestAgent) => (ownership[owner.id] ?? []).includes(candidate.id),
 })
 
-const register = async (service: CommunicationService, agent: TestAgent): Promise<void> => {
-  await Effect.runPromise(
-    initializeCommunicationAgent({ agentId: agent.id, workspaceCwd: agent.session.header.cwd }).pipe(Effect.provide(CommunicationHub.fromService(service))),
-  )
-}
-
 afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map(root => rm(root, { recursive: true, force: true })))
 })
@@ -71,17 +65,17 @@ describe('Agent communication integration', () => {
     const service = await createService()
     const agentA = createAgent({ id: 'session-a', status: 'running', cwd })
     const agentB = createAgent({ id: 'session-b', status: 'idle', cwd })
-    await register(service, agentA)
-    await register(service, agentB)
-    const topic = LiveAgentDirectoryModel.communicationWorkspaceTopic(cwd)
-    expect(topic).toBeDefined()
+    const message = await service.send({
+      sender: { kind: 'agent', id: agentA.id },
+      toAgentId: agentB.id,
+      text: 'The build passed.',
+      intent: 'notice',
+    })
 
-    const message = await service.publish({ sender: { kind: 'agent', id: agentA.id }, topic: topic ?? '', text: 'The build passed.', intent: 'notice' })
-
-    expect(await service.inbox({ principal: { kind: 'agent', id: agentB.id }, topic })).toMatchObject([
+    expect(await service.inbox({ principal: { kind: 'agent', id: agentB.id } })).toMatchObject([
       { id: message.id, intent: 'notice', sender: { kind: 'agent', id: agentA.id } },
     ])
-    expect(await service.inbox({ principal: { kind: 'agent', id: agentA.id }, topic })).toEqual([])
+    expect(await service.inbox({ principal: { kind: 'agent', id: agentA.id } })).toEqual([])
     expect(agentA.interference).toEqual([])
     expect(agentB.interference).toEqual([])
     expect(agentB.status).toBe('idle')
@@ -91,25 +85,22 @@ describe('Agent communication integration', () => {
     const service = await createService()
     const completed = createAgent({ id: 'session-completed', status: 'idle', cwd })
     const sender = createAgent({ id: 'session-sender', status: 'running', cwd })
-    await register(service, completed)
-    await register(service, sender)
 
     const liveAfterCompletion = [sender]
     expect(liveAfterCompletion.some(agent => agent.id === completed.id)).toBe(false)
 
     const message = await service.send({ sender: { kind: 'agent', id: sender.id }, toAgentId: completed.id, text: 'Relevant follow-up.', intent: 'notice' })
 
-    expect(await service.browseMessages({ agentId: completed.id })).toMatchObject({ totalMatching: 1, items: [{ id: message.id, topic: null }] })
-    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox' })).toMatchObject([
+    expect(await service.browseMessages({ agentId: completed.id })).toMatchObject({ totalMatching: 1, items: [{ id: message.id }] })
+    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id } })).toMatchObject([
       { id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] },
     ])
-    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox' })).toHaveLength(0)
-    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox', includeSeen: true })).toMatchObject([{ id: message.id }])
+    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id } })).toHaveLength(0)
+    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, includeSeen: true })).toMatchObject([{ id: message.id }])
 
-    await register(service, completed)
-    const replayed = await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox' })
+    const replayed = await service.inbox({ principal: { kind: 'agent', id: completed.id } })
     expect(replayed).toEqual([])
-    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, topic: 'inbox', includeSeen: true })).toMatchObject([{ id: message.id }])
+    expect(await service.inbox({ principal: { kind: 'agent', id: completed.id }, includeSeen: true })).toMatchObject([{ id: message.id }])
     expect(await service.browseMessages({ agentId: completed.id })).toMatchObject({ totalMatching: 1 })
     expect(completed.interference).toEqual([])
     expect(sender.interference).toEqual([])
@@ -207,8 +198,8 @@ describe('Agent communication integration', () => {
         ),
     }
 
-    const notice = await operations.postMessage({ topic: 'workspace/demo', text: 'FYI.' })
-    const request = await operations.postMessage({ topic: 'workspace/demo', text: 'Please review.', intent: 'request' })
+    const notice = await operations.postMessage({ agentId: recipient.id, text: 'FYI.' })
+    const request = await operations.postMessage({ agentId: recipient.id, text: 'Please review.', intent: 'request' })
     const direct = await service.send({ sender: { kind: 'agent', id: sender.id }, toAgentId: recipient.id, text: 'Please run the checks.', intent: 'request' })
 
     expect(notice.intent).toBe('notice')
@@ -264,17 +255,15 @@ describe('Agent communication integration', () => {
     expect(await service.browseMessages({ agentId: staleId })).toMatchObject({ totalMatching: 1 })
 
     const reopened = createCommunicationService({ statePath, now: () => now })
-    expect(await reopened.inbox({ principal: { kind: 'agent', id: staleId }, topic: 'inbox' })).toMatchObject([
-      { id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] },
-    ])
+    expect(await reopened.inbox({ principal: { kind: 'agent', id: staleId } })).toMatchObject([{ id: message.id, recipients: [{ readAt: 1_800_000_000_000 }] }])
 
     await expect(reopened.acknowledge({ kind: 'agent', id: staleId }, '00000000-0000-4000-8000-000000000000')).rejects.toMatchObject({
       code: 'message-not-found',
     })
     expect(await reopened.browseMessages({ agentId: staleId })).toMatchObject({ totalMatching: 1 })
 
-    const persisted: unknown = JSON.parse(await readFile(statePath, 'utf8'))
-    expect(persisted).toMatchObject({ schemaVersion: 4, messages: [{ id: message.id, topic: null }] })
+    const persisted = decodeJson(jsonValueSchema, await readFile(statePath, 'utf8'))
+    expect(persisted).toMatchObject({ schemaVersion: 5, messages: [{ id: message.id }] })
   })
 
   it('G: a completed workspace agent is not reopened to gather integration context', async () => {
@@ -283,8 +272,6 @@ describe('Agent communication integration', () => {
     const service = createCommunicationService({ statePath: join(root, 'state.json'), now: () => now })
     const completed = createAgent({ id: 'session-workspace-owner', status: 'idle', cwd })
     const orchestrator = createAgent({ id: 'session-orchestrator', status: 'running', cwd })
-    await register(service, completed)
-    await register(service, orchestrator)
 
     const completion = await service.send({
       sender: { kind: 'agent', id: completed.id },
@@ -300,7 +287,7 @@ describe('Agent communication integration', () => {
     ).toBeUndefined()
     expect(await service.browseMessages({ agentId: completed.id })).toMatchObject({ totalMatching: 1 })
 
-    const inbox = await service.inbox({ principal: { kind: 'agent', id: orchestrator.id }, topic: 'inbox' })
+    const inbox = await service.inbox({ principal: { kind: 'agent', id: orchestrator.id } })
     expect(inbox.map(item => item.id)).toEqual([completion.id])
     expect(inbox[0]?.intent).toBe('request')
     expect(await service.browseMessages({ agentId: completed.id })).toMatchObject({ totalMatching: 1 })

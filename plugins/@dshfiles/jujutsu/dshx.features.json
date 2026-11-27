@@ -734,7 +734,7 @@
     {
       "id": "workspace-cleanup",
       "title": "Clean up idle JJ workspaces",
-      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected; empty undescribed revisions are also abandoned by the cleanup job. Every preview names why each kept workspace was kept. Other JJ workspaces remain manual-only and require explicit selection. A thread workspace row names the background processes its removal stops first (Stops vite, node) and the terminals it keeps.",
+      "summary": "The repository menu's Clean up workspaces dialog previews eligible workspaces and untracked folders for all ages, or 1h, 6h, 24h, or 7d inactivity windows. A managed thread or secondary workspace whose checkout folder is missing is marked in the list and can be explicitly selected; the Host checks unlanded work and Session activity, forgets only a missing secondary's JJ registration, and never removes its path. Untracked folders remain protected for their first hour. Users can expand categories, select individual rows or all candidates, and start a background job that only removes the selected rows after rechecking eligibility. Unlanded work and uncommitted changes stay protected, except the separate Stale work group: it holds pending work Land calls Stale (the bookmark moved past it and nobody changed it for the stale window) and is never selected by default, so choosing it is the one explicit way cleanup abandons those revisions. Empty undescribed revisions are also abandoned by the cleanup job. Every preview names why each kept workspace was kept. Other JJ workspaces remain manual-only and require explicit selection. A thread workspace row names the background processes its removal stops first (Stops vite, node) and the terminals it keeps.",
       "reach": [
         "click tab \"Land\"",
         "click button \"History\"",
@@ -768,9 +768,9 @@
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Clean up workspaces",
       "configuration": [],
-      "states": ["preset-threshold", "preview", "row-selection", "category-selection", "queued", "running", "done", "failed"],
+      "states": ["preset-threshold", "preview", "row-selection", "category-selection", "stale-work-selection", "queued", "running", "done", "failed"],
       "failureModes": [
-        "A workspace with unlanded work, a busy Session or a queued integration is kept.",
+        "A workspace with unlanded work, a busy Session or a queued integration is kept; only a Stale row the user selected abandons its pending revisions.",
         "A second click on the same scope attaches to the job already running instead of queuing it twice.",
         "A Host restart drops the trail with the job; what it already removed stays removed.",
         "The trail under the panel header shows only the jobs of the panel's project, including cleanups asked from one of its thread workspaces; a failed job or a workspace it could not remove stays on that project's panel with its reason, a recovery that never forces unlanded work and a Review cleanup… button, until dismissed or replaced by a later cleanup of the project.",

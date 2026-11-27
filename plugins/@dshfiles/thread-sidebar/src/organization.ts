@@ -81,6 +81,8 @@ export interface SidebarPreferences {
   idleMinutes: number
   /** Settle a finished subagent thread after this many idle hours and stop its jobs; 0 leaves subagents to the idle rule. */
   subagentSettleHours: number
+  /** Lift a thread's settled or archived status before one of its reminders is due, so the reminder always runs. */
+  remindersWakeEnabled: boolean
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
   excludedSessionIds: string[]
@@ -214,6 +216,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   settledArchiveDelay: 'disabled',
   idleMinutes: 120,
   subagentSettleHours: 24,
+  remindersWakeEnabled: true,
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],
   excludedSessionIds: [],
@@ -780,13 +783,13 @@ const sectionDropPlan = (section: SidebarSection): SectionDropPlan => {
 
 /**
  * The part of a section drop a remote row can honour. Parked, settled and the idle override are this sidebar's own
- * sets, keyed by Session id; pin, unpin and archive are Host verbs on the runtime that owns the Session, so a
- * remote row never unpins and never enters Pinned or Archived.
+ * sets, keyed by Session id; archive and unarchive run on the runtime owning the Session through multi-host; pin stays
+ * a Host verb this sidebar only mirrors, so a remote row never enters Pinned and never unpins.
  * @returns the plan to apply, or null for a section a mirrored Session cannot move into.
  */
 const remoteSectionDropPlan = (section: SidebarSection): SectionDropPlan | null => {
   const plan = sectionDropPlan(section)
-  return plan.archive || plan.pin ? null : { ...plan, unarchive: false, unpin: false }
+  return plan.pin ? null : { ...plan, unpin: false }
 }
 
 /** The sections a remote row offers, in render order. */

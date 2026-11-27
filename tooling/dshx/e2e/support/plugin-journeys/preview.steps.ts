@@ -94,8 +94,10 @@ Then('the preview page is listed beside the server and its snapshot holds the pa
   })
   await recordAssertion(page, 'preview-snapshot-holds-page-text', async () => {
     await page.keyboard.press('Escape')
+    // This composition renders the stock Chat, whose settled-turn fold reads "Completed in 7s"; the owned fork
+    // (@dshfiles/chat) reads "Worked for 7s". The step opens whichever transcript is there instead of assuming one.
     await page
-      .getByRole('button', { name: /^Worked for / })
+      .getByRole('button', { name: /^(Worked for|Completed in) / })
       .last()
       .click()
     await page.getByRole('button', { name: 'Called tools', exact: true }).last().click()

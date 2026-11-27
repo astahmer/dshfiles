@@ -290,3 +290,26 @@
   display: inline-flex;
   color: var(--dsw-alias-menu-icon);
 }
+
+/* Phone: the picker is a touch sheet. The kit's phone rule gives it the sheet
+   geometry, surface and grabber once `[data-trigger-menu]` is listed there; this
+   keeps its rows at a comfortable size. */
+@media (max-width: 639.98px) {
+  /* One scroller: the sheet surface clamps at 72dvh and scrolls; the list inside
+     grows instead of nesting a second scrollbar. */
+  .viewport {
+    overflow-y: visible;
+  }
+
+  .item {
+    min-height: 44px;
+    padding: 10px 10px;
+    font-size: 15px;
+  }
+
+  .itemIcon,
+  .itemIcon svg {
+    width: 18px;
+    height: 18px;
+  }
+}

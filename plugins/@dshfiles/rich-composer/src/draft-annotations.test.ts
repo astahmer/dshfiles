@@ -125,5 +125,8 @@ describe('draft annotations', () => {
     shell.setDraft('Fix it')
     shell.submit()
     await vi.waitFor(() => expect(sent).toEqual(['Annotation 1 on your previous reply:\n> Four helpers are now running\n\nComment: phone too?\n\nFix it']))
+    // The accepted send moves it from the draft into the session's review history.
+    expect(shell.annotations.snapshot()).toEqual([])
+    expect(shell.sentAnnotations.snapshot()).toMatchObject([{ text: 'Four helpers are now running', comment: 'phone too?', source: '' }])
   })
 })

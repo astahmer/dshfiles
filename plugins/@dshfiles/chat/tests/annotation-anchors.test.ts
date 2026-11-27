@@ -1,0 +1,118 @@
+// @vitest-environment jsdom
+import { afterEach, describe, expect, it } from 'vitest'
+import { SelectionAnnotation } from '../src/annotate-selection.ts'
+import { annotationAnchors, columnLeft, markerPlacement, stackTops, type AnnotationAnchor } from '../src/native/chat/annotation-anchors.ts'
+
+// jsdom has no layout; an empty rect stands in for whatever the browser measured.
+Range.prototype.getBoundingClientRect ??= () => DOMRect.fromRect()
+Range.prototype.getClientRects ??= () => document.createElement('div').getClientRects()
+
+const cleanups: (() => void)[] = []
+afterEach(() => {
+  for (const cleanup of cleanups.splice(0)) cleanup()
+})
+
+const render = (html: string): HTMLElement => {
+  const container = document.createElement('div')
+  container.innerHTML = html
+  document.body.append(container)
+  cleanups.push(() => container.remove())
+  return container
+}
+
+describe('SelectionAnnotation.rangeOf', () => {
+  it('maps a quote onto the text that holds it, ignoring markup and extra whitespace', () => {
+    const container = render('<p id="block">Hook ordering. <strong>Free-form</strong> middleware ends\nhere.</p>')
+    const block = container.querySelector('#block')
+    if (block === null) throw new Error('fixture missing')
+    expect(SelectionAnnotation.rangeOf({ block, text: 'Free-form middleware' })?.toString()).toBe('Free-form middleware')
+  })
+
+  it('returns undefined when the paragraph no longer holds the quote', () => {
+    const container = render('<p id="block">Delta epsilon.</p>')
+    const block = container.querySelector('#block')
+    if (block === null) throw new Error('fixture missing')
+    expect(SelectionAnnotation.rangeOf({ block, text: 'Zeta eta.' })).toBeUndefined()
+  })
+})
+
+const column = { left: 100, top: 0, right: 780, bottom: 900 }
+const bound = { top: 40, bottom: 800 }
+
+const anchor = (marker: { left: number; top: number; right: number; bottom: number } = { left: 100, top: 200, right: 700, bottom: 240 }): AnnotationAnchor => ({
+  annotation: { id: 'draft:1', text: 'Where do operations stop?', comment: '', source: 'step=s1&block=0', sent: false },
+  block: document.createElement('p'),
+  bounds: { left: 100, top: 200, right: marker.right, bottom: marker.bottom },
+  text: marker,
+  marker,
+})
+
+describe('markerPlacement', () => {
+  it('sits in the gutter just past the quoted paragraph', () => {
+    expect(markerPlacement({ anchor: anchor(), mode: 'popover', column, bound, windowWidth: 1400 })).toEqual({ left: 710, top: 201 })
+  })
+
+  it('sits past the quoted line in inline shape, clamped to the window', () => {
+    expect(markerPlacement({ anchor: anchor(), mode: 'inline', column, bound, windowWidth: 1400 })).toEqual({ left: 704, top: 201 })
+    expect(markerPlacement({ anchor: anchor(), mode: 'inline', column, bound, windowWidth: 710 }).left).toBe(684)
+  })
+
+  it('never lands under the composer', () => {
+    const low = anchor({ left: 100, top: 790, right: 700, bottom: 830 })
+    expect(markerPlacement({ anchor: low, mode: 'popover', column, bound, windowWidth: 1400 }).top).toBe(bound.bottom - 18 - 4)
+  })
+})
+
+describe('annotationAnchors visibility', () => {
+  const band = { top: 40, bottom: 800 }
+  const annotation = { id: 'draft:1', text: 'Alpha beta', comment: '', source: 'step=step-1&block=0', sent: false }
+
+  // One rendered passage with its quoted text; jsdom has no layout, so the quote's rect is stubbed per test.
+  const anchorsAt = (quoteTop: number, quoteHeight = 20) => {
+    const container = render('<div data-chat-flow-kind="assistant-step" data-chat-flow-key="step-1"><p id="block">Alpha beta gamma.</p></div>')
+    const original = Range.prototype.getBoundingClientRect
+    Range.prototype.getBoundingClientRect = () => DOMRect.fromRect({ x: 100, y: quoteTop, width: 120, height: quoteHeight })
+    cleanups.push(() => {
+      Range.prototype.getBoundingClientRect = original
+    })
+    return annotationAnchors({ container, annotations: [annotation], mode: 'column', band })
+  }
+
+  it('keeps the marker while the quoted passage is on screen', () => {
+    expect(anchorsAt(200)).toHaveLength(1)
+    expect(anchorsAt(795)).toHaveLength(1)
+  })
+
+  it('drops the marker once the quoted passage scrolled above the transcript', () => {
+    expect(anchorsAt(-60)).toHaveLength(0)
+    expect(anchorsAt(20)).toHaveLength(0)
+  })
+
+  it('drops the marker once the quoted passage scrolled below the composer', () => {
+    expect(anchorsAt(820)).toHaveLength(0)
+  })
+
+  it('drops a quoted passage without layout, like one inside a folded group', () => {
+    expect(anchorsAt(200, 0)).toHaveLength(0)
+  })
+})
+
+describe('columnLeft', () => {
+  it('uses the gap beside the quoted paragraphs when the pane fits it', () => {
+    expect(columnLeft({ contentRight: 780, width: 248, boundRight: 1400, gap: 24 })).toBe(804)
+  })
+
+  it('declines when the pane leaves no room', () => {
+    expect(columnLeft({ contentRight: 780, width: 248, boundRight: 1040, gap: 24 })).toBeUndefined()
+  })
+})
+
+describe('stackTops', () => {
+  it('pushes a card below the one above it', () => {
+    expect(stackTops({ tops: [200, 230], heights: [80, 60], gap: 8, bound })).toEqual([200, 288])
+  })
+
+  it('keeps a tall card inside the band', () => {
+    expect(stackTops({ tops: [760], heights: [120], gap: 8, bound: { top: 40, bottom: 800 } })).toEqual([676])
+  })
+})

@@ -33,6 +33,7 @@ export class AccountDraftModel {
     'github-copilot': '',
     cursor: '',
     mistral: '',
+    antigravity: '',
   } satisfies Record<AccountKind, string>
 
   /** The authored half of a profile; identity and health are observed, never sent back. */
@@ -155,7 +156,8 @@ export class AccountDraftModel {
       enabled: true,
       homePath: AccountDraftModel.defaultHome[input.kind],
       shadowHomePath: '',
-      apiKeyEnv: input.kind === 'codex' || input.kind === 'github-copilot' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
+      apiKeyEnv:
+        input.kind === 'codex' || input.kind === 'github-copilot' || input.kind === 'antigravity' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
       apiBaseUrl: '',
       badge: AccountDraftModel.badgeFromName(displayName),
       accentColor: KIND_ACCENT[input.kind],

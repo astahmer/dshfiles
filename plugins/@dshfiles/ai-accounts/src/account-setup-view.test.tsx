@@ -63,12 +63,12 @@ const deferred = <Value,>() => {
   }
 }
 
-const syntheticLoginHints: Partial<Record<AccountKind, string>> = {
-  claude: 'CLAUDE_CONFIG_DIR="/synthetic/claude/shared" claude auth login',
-  codex: 'CODEX_HOME="/synthetic/codex/auth" codex login',
-  commandcode: 'cmd login',
-  cursor: 'cursor-agent login',
-}
+const syntheticLoginHints = new Map<AccountKind, string>([
+  ['claude', 'CLAUDE_CONFIG_DIR="/synthetic/claude/shared" claude auth login'],
+  ['codex', 'CODEX_HOME="/synthetic/codex/auth" codex login'],
+  ['commandcode', 'cmd login'],
+  ['cursor', 'cursor-agent login'],
+])
 const profile = (kind: AccountKind = 'claude') =>
   Schema.decodeUnknownSync(accountProfileSchema)({
     ...AccountDraftModel.newAccountDraft({ kind, existing: [] }),
@@ -83,7 +83,7 @@ const profile = (kind: AccountKind = 'claude') =>
     plan: null,
     state: 'unconfigured',
     // Synthetic Host metadata, not a client-generated command or a real auth-file read.
-    loginHint: syntheticLoginHints[kind] ?? '',
+    loginHint: syntheticLoginHints.get(kind) ?? '',
     detail: null,
   })
 const pending = (operationId: string, kind: AccountKind = 'claude'): AccountConnectionSnapshot => ({
@@ -429,6 +429,12 @@ describe('actual account setup view with operation-owned QueryClient data', () =
     await expand('Import from Secret Catalog')
     expect(button('Browse project/local secrets…')).toBeTruthy()
     expect(field('API key or setup token value').type).toBe('password')
+  })
+
+  it('warns that driving agy from another client is use-at-your-own-risk', async () => {
+    await mount()
+    await click('Antigravity account')
+    expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Use at your own risk')
   })
 
   it('returns OpenCode Go from an existing credential to manual key entry', async () => {

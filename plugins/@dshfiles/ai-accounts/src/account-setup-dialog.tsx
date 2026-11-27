@@ -1,5 +1,6 @@
 import { useApi } from '@dshfiles/dshx/client'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
@@ -35,6 +36,19 @@ const CONNECTION_NOTES = new Map<AccountProfile['kind'], string>([
     'Browser sign-in stages credentials privately before confirmation. Existing CLI homes are read in place, never copied or deleted. Custom shared homes need a distinct auth overlay.',
   ],
   ['cursor', 'Cursor tracks quota only, without a DSH model route. CLI login and named credentials stay separate.'],
+  [
+    'antigravity',
+    'DSH never reads this Google login: each conversation runs the official `agy acp` server, which signs in from the account home. Verification opens one ACP session without a prompt to read the plan and its models, so it spends no quota.',
+  ],
+])
+
+const CLI_SIGN_IN_HINTS = new Map<AccountProfile['kind'], string>([
+  ['claude', 'Use your Claude subscription. No API key needed.'],
+  ['mistral', 'Use the Le Chat or Vibe plan key that `vibe --setup` (Launch browser) saved in ~/.vibe/.env on this Host. DSH reads it in place.'],
+  [
+    'antigravity',
+    'Use your Google account through the official Antigravity CLI (agy) on this Host. Run the sign-in command in a terminal, open the link, paste the code back, then verify. Gemini 4 needs Google AI Pro or Ultra.',
+  ],
 ])
 
 interface SetupPorts {
@@ -333,13 +347,17 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
             <fieldset disabled={busy} className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-3">
               {step === 'cli' && (
                 <>
-                  <p className="dshx:text-sm dshx:text-muted-foreground">
-                    {account.kind === 'claude'
-                      ? 'Use your Claude subscription. No API key needed.'
-                      : account.kind === 'mistral'
-                        ? 'Use the Le Chat or Vibe plan key that `vibe --setup` (Launch browser) saved in ~/.vibe/.env on this Host. DSH reads it in place.'
-                        : 'Use an existing CLI login on this Host.'}
-                  </p>
+                  <p className="dshx:text-sm dshx:text-muted-foreground">{CLI_SIGN_IN_HINTS.get(account.kind) ?? 'Use an existing CLI login on this Host.'}</p>
+                  {account.kind === 'antigravity' ? (
+                    <Alert variant="warning">
+                      <AlertDescription>
+                        <p>
+                          Use at your own risk. Google does not support driving <code>agy</code> from another client, so this route depends on the CLI as it
+                          ships today and may stop working at any time.
+                        </p>
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
                   <details className="dshx:text-xs">
                     <summary className="dshx:cursor-pointer dshx:text-muted-foreground">Sign-in command</summary>
                     <pre className="dshx:mt-2 dshx:overflow-x-auto dshx:rounded-md dshx:bg-muted dshx:p-3 dshx:text-xs">
@@ -347,7 +365,11 @@ const AccountSetupSession = (props: SetupPorts & { readonly request: AccountSetu
                     </pre>
                   </details>
                   <Button variant="outline" onClick={() => void writeClipboard(account.loginHint ?? '')}>
-                    {account.kind === 'claude' ? 'Copy Claude Code sign-in command' : 'Copy CLI sign-in command'}
+                    {account.kind === 'claude'
+                      ? 'Copy Claude Code sign-in command'
+                      : account.kind === 'antigravity'
+                        ? 'Copy Antigravity sign-in command'
+                        : 'Copy CLI sign-in command'}
                   </Button>
                   <Button onClick={complete}>
                     {snapshot.matches('verifying')

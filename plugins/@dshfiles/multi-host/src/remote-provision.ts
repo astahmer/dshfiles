@@ -28,7 +28,7 @@ export interface ProvisionPlanStep {
   readonly commands: string[]
 }
 
-const titles: Record<ProvisionStepId, string> = {
+const titles = {
   node: 'Official Node build',
   checkout: 'dshfiles checkout',
   install: 'Workspace dependencies',
@@ -36,7 +36,7 @@ const titles: Record<ProvisionStepId, string> = {
   cli: 'DSH CLI',
   profile: 'web profile',
   runtime: 'headless runtime',
-}
+} satisfies Record<ProvisionStepId, string>
 
 const directoryOf = (path: string | undefined): string | undefined => (path === undefined ? undefined : posix.dirname(path))
 
@@ -319,7 +319,7 @@ export interface ProvisionRun {
   readonly remaining: ProvisionStepId[]
 }
 
-const stepTimeouts: Record<ProvisionStepId, number> = {
+const stepTimeouts = {
   node: 300_000,
   checkout: 300_000,
   install: 600_000,
@@ -327,7 +327,7 @@ const stepTimeouts: Record<ProvisionStepId, number> = {
   cli: 300_000,
   profile: 300_000,
   runtime: 180_000,
-}
+} satisfies Record<ProvisionStepId, number>
 
 const failureDetail = ({ id, result }: { readonly id: ProvisionStepId; readonly result: RemoteExecResult }): string => {
   if (result.timedOut) return `${id} timed out`

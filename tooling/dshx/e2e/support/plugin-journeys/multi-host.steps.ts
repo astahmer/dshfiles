@@ -136,6 +136,7 @@ const inventoryStatusSchema = Schema.Union([
         cwd: Schema.optional(Schema.String),
       }),
     ),
+    archivedSessionIds: Schema.Array(Schema.String),
   }),
   withUnknownProperties({ ok: Schema.Literal(false), code: Schema.String, message: Schema.String }),
 ])
@@ -1710,6 +1711,7 @@ Then('the manager lists it as started on the host', async ({ page }: { readonly 
           runtime: { id: observed.runtimeId, hostId: status.runtime.hostId, name: status.runtime.name, identity: null, connected: true },
           workspaces: [],
           sessions: status.sessions.map(session => ({ ...session, runtimeId: observed.runtimeId })),
+          archivedSessionIds: status.archivedSessionIds,
         },
       },
     ],

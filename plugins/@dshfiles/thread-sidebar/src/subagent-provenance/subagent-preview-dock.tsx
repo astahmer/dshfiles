@@ -5,6 +5,7 @@ import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
+import { ElapsedClock } from '@dshfiles/plugin-ui/components/motion/elapsed-clock'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings, type SubagentPreviewTranslate } from './subagent-live-preview.js'
@@ -17,7 +18,7 @@ const ID_SEPARATOR = '\n'
 const ignoreTurnState = (): void => undefined
 
 /** The card's fixed labels come from the same namespace as the row it replaces. */
-const runLabels = (input: { readonly t: SubagentPreviewTranslate; readonly armed: boolean }): Partial<AgentRunStatusLabels> => ({
+const runLabels = (input: { readonly t: SubagentPreviewTranslate; readonly armed: boolean; readonly label: string }): Partial<AgentRunStatusLabels> => ({
   running: input.t('subagentPreviewWorking'),
   done: input.t('subagentPreviewFinished'),
   stopped: input.t('subagentPreviewInterrupted'),
@@ -25,6 +26,7 @@ const runLabels = (input: { readonly t: SubagentPreviewTranslate; readonly armed
   step: input.t('subagentRunStep'),
   elapsed: input.t('subagentRunElapsed'),
   stop: input.t(input.armed ? 'subagentPreviewConfirmStop' : 'subagentPreviewStop'),
+  collapse: input.t('subagentRunCollapse', { label: input.label }),
 })
 
 const DockRow = (
@@ -32,6 +34,7 @@ const DockRow = (
 ): JSX.Element => {
   const { parentId, childId, preview, runCards } = props
   const [open, setOpen] = useState(false)
+  const [collapsed, setCollapsed] = useState(false)
   const label = props.useSessions(
     list =>
       list.projectionsBySession[SessionId(parentId)]?.values.subagentCatalog?.find(entry => entry.id === childId)?.label ??
@@ -42,33 +45,59 @@ const DockRow = (
   const run = useSubagentRun({ childId, enabled: runCards, retainChild: preview.retainChild, useSessions: props.useSessions })
   const { stop, armed, requestStop, cancel } = useSubagentStop({ binding: run?.binding, t: preview.t })
   const toggle = (): void => setOpen(value => !value)
+  const collapse = (): void => {
+    setCollapsed(true)
+    setOpen(false)
+  }
+  const summary = (input: {
+    readonly expanded: boolean
+    readonly toggleLabel: string
+    readonly elapsedFrom?: number
+    readonly onToggle: () => void
+  }): JSX.Element => (
+    <button
+      type="button"
+      aria-expanded={input.expanded}
+      aria-label={input.toggleLabel}
+      className="dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-left dshx:hover:bg-accent dshx:pointer-coarse:h-11"
+      onClick={input.onToggle}
+    >
+      <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', input.expanded && 'dshx:rotate-90')} />
+      <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
+      <span className="dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:sr-only">{preview.t('subagentPreviewKind')}</span>
+      <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{label}</span>
+      {input.elapsedFrom === undefined ? null : (
+        <ElapsedClock
+          startedAt={input.elapsedFrom}
+          aria-label={preview.t('subagentRunElapsed')}
+          className="dshx:shrink-0 dshx:font-mono dshx:text-muted-foreground"
+        />
+      )}
+      <span role="status" className="dshx:shrink-0">
+        <Badge variant="secondary">{state}</Badge>
+      </span>
+    </button>
+  )
   return (
     <section
       aria-label={`${preview.t('subagentPreviewKind')}: ${label}`}
       className={cn(
-        'dshx-root dshx:@container dshx:my-1 dshx:min-w-0 dshx:overflow-hidden dshx:rounded-lg dshx:text-xs',
-        run === undefined && 'dshx:bg-background dshx:border dshx:border-border',
+        'dshx-root dshx:@container dshx:my-1 dshx:min-w-0 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-lg dshx:text-xs',
+        (run === undefined || collapsed) && 'dshx:bg-background dshx:border dshx:border-border',
       )}
       data-dshfiles-live-preview="agent"
       data-dshfiles-live-preview-seat="dock"
       data-state="working"
     >
       {run === undefined ? (
-        <button
-          type="button"
-          aria-expanded={open}
-          aria-label={preview.t('subagentPreviewToggle', { label })}
-          className="dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:px-2 dshx:text-left dshx:hover:bg-accent"
-          onClick={toggle}
-        >
-          <ChevronRightIcon aria-hidden className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', open && 'dshx:rotate-90')} />
-          <BotIcon aria-hidden className="dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground" />
-          <span className="dshx:shrink-0 dshx:text-muted-foreground dshx:@max-pane-narrow:sr-only">{preview.t('subagentPreviewKind')}</span>
-          <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{label}</span>
-          <span role="status" className="dshx:shrink-0">
-            <Badge variant="secondary">{state}</Badge>
-          </span>
-        </button>
+        summary({ expanded: open, toggleLabel: preview.t('subagentPreviewToggle', { label }), onToggle: toggle })
+      ) : collapsed ? (
+        summary({
+          expanded: false,
+          toggleLabel: preview.t('subagentRunExpand', { label }),
+          elapsedFrom: run.startedAt,
+          onToggle: () => setCollapsed(false),
+        })
       ) : (
         <>
           <SubagentRunCard
@@ -76,9 +105,10 @@ const DockRow = (
             heading={label}
             stepLabel={subagentRunStepLabel({ t: preview.t, tool: run.tool })}
             openLabel={preview.t('subagentPreviewOpenThread')}
-            labels={runLabels({ t: preview.t, armed })}
+            labels={runLabels({ t: preview.t, armed, label })}
             onStop={requestStop}
             onOpen={() => preview.openChild(childId)}
+            onCollapse={collapse}
           />
           <div className="dshx:flex dshx:items-center dshx:gap-1">
             {armed ? (
@@ -103,7 +133,7 @@ const DockRow = (
       {stop.kind === 'failed' ? (
         <p className="dshx:mx-2 dshx:my-1 dshx:text-destructive">{preview.t('subagentPreviewStopFailed', { error: stop.message })}</p>
       ) : null}
-      {open ? (
+      {open && !collapsed ? (
         <div className="dshx:border-t dshx:border-border dshx:p-2">
           <SubagentLivePreview {...preview} childId={childId} state="working" onTurnState={ignoreTurnState} showActions={run === undefined} />
         </div>

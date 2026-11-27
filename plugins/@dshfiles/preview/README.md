@@ -13,7 +13,8 @@ Three things a thread needs while it builds a web app:
   `ui-sidebar-browser` row, which the `web` seed enables), or in a new browser tab when no pane takes it. A page link
   in the chat and `preview_reveal` open the same tab; a link to an image opens the image viewer instead. A server this
   browser has not opened yet gets a **Preview** button beside the chip (× dismisses it); `autoOpenDevServers` opens it
-  in the tab beside the thread on screen without the click.
+  in the tab beside the thread on screen without the click. Before a URL reaches that tab the Host checks it once
+  (below), so a site that refuses embedding or a port nothing answers on never becomes the tab's permanent blank page.
 - **Agent browser.** **Watch** on a preview page opens the thread panel's **Agent browser** tab: the agent's own
   headless page, mirrored about twice a second while the tab and window are visible (an unchanged frame sends only its
   hash). Clicks, scrolls, typed text and named keys replay on that page, so you can see and take over what the agent
@@ -21,6 +22,30 @@ Three things a thread needs while it builds a web app:
 
 The dev-server list is also the **Dev servers** tab of **Observe › Processes** (every thread that runs a job) and part of
 the thread panel's **Jobs** tab, through `@dshfiles/background-jobs/process-views`.
+
+## Pages the Browser tab cannot show
+
+That tab is the native package's iframe, and an iframe never learns why a cross-origin document stayed out: Chrome
+draws its own grey page, `load` fires, `error` does not. A site that sends `X-Frame-Options: deny`/`sameorigin` or a
+`Content-Security-Policy: frame-ancestors` list that cannot name the pane looks exactly like a stopped dev server, and
+that is most of the web (github.com, google.com, x.com, chatgpt.com all refuse).
+
+So the Host answers first. `previewApi.probeEmbed({ url })` requests the address once (headers only, body cancelled,
+5 s, no cookies), classifies the two framing headers and reachability, and returns `verdict`: `open`, `refused` or
+`unreachable`.
+
+| Verdict       | What the user gets                                                                                                                                                                                                      |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `open`        | The pane, as before.                                                                                                                                                                                                    |
+| `refused`     | A notice naming the header, and a browser tab (a top-level page is not framed, so it loads). A chat link goes straight to that tab; a link already opened in the pane reports it in a toast whose action opens the tab. |
+| `unreachable` | A notice that the dev server has probably stopped, and no tab (it would show the browser's own dead page). Start the server again and Open.                                                                             |
+
+Answers are cached in the browser for 60 s, so the first click may still open the pane and the next one already knows;
+a listed dev server is warmed before the click. Nothing is prefetched on a page the user never opens.
+
+**Not covered:** an address typed straight into the tab. That pane is the native package; it cannot report a refusal,
+and dshfiles does not fork it ([native forks](../../../docs/native-forks.md)). Use **Open web page…** (chat, which probes
+first) or the `preview_*` agent tools for a page that refuses framing.
 
 ## Agent tools
 

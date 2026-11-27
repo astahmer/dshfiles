@@ -14,12 +14,18 @@ import type { CodeFenceProps, CodeFenceRenderer } from '../src/code-fences.tsx'
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
   const React = await import('react')
   const Delegate = React.createContext<{ readonly renderCode?: ((fence: MarkdownDelegateFenceInfo) => ReactNode) | undefined }>({})
-  const MarkdownDelegateProvider = ({ children, ...delegate }: { readonly children: ReactNode; readonly renderCode?: (fence: MarkdownDelegateFenceInfo) => ReactNode }) =>
-    React.createElement(Delegate.Provider, { value: delegate }, children)
+  const MarkdownDelegateProvider = ({
+    children,
+    ...delegate
+  }: {
+    readonly children: ReactNode
+    readonly renderCode?: (fence: MarkdownDelegateFenceInfo) => ReactNode
+  }) => React.createElement(Delegate.Provider, { value: delegate }, children)
   const useMarkdownDelegate = () => React.useContext(Delegate)
   const CodeBlock = (props: { readonly code: string; readonly lang?: string | undefined; readonly showHeader?: boolean | undefined }) =>
     React.createElement('pre', { 'data-native-code': props.lang ?? '', 'data-header': String(props.showHeader ?? true) }, props.code)
-  const FenceCodeBlock = (props: { readonly code: string; readonly lang?: string | undefined }) => React.createElement(CodeBlock, { code: `${props.code}\n`, lang: props.lang })
+  const FenceCodeBlock = (props: { readonly code: string; readonly lang?: string | undefined }) =>
+    React.createElement(CodeBlock, { code: `${props.code}\n`, lang: props.lang })
   const FenceMathBlock = (props: { readonly code: string }) => React.createElement('math', null, props.code)
   const Seat = (props: { readonly lang: string; readonly code: string; readonly streaming: boolean }) => {
     const { renderCode } = useMarkdownDelegate()
@@ -29,12 +35,16 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
   }
   /** Fences are `lang:code` lines; anything else is a paragraph. */
   const MarkdownText = (props: { readonly text: string; readonly streaming?: boolean }) =>
-    React.createElement('div', { 'data-markdown': '' }, props.text.split('\n').map((line, index) => {
-      const fence = /^(\w+):(.*)$/.exec(line)
-      return fence === null
-        ? React.createElement('p', { key: index }, line)
-        : React.createElement(Seat, { key: index, lang: fence[1] ?? '', code: fence[2] ?? '', streaming: props.streaming ?? false })
-    }))
+    React.createElement(
+      'div',
+      { 'data-markdown': '' },
+      props.text.split('\n').map((line, index) => {
+        const fence = /^(\w+):(.*)$/.exec(line)
+        return fence === null
+          ? React.createElement('p', { key: index }, line)
+          : React.createElement(Seat, { key: index, lang: fence[1] ?? '', code: fence[2] ?? '', streaming: props.streaming ?? false })
+      }),
+    )
   return { CodeBlock, FenceCodeBlock, FenceMathBlock, MarkdownDelegateProvider, MarkdownText, useMarkdownDelegate }
 })
 

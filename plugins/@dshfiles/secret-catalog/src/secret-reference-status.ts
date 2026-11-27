@@ -1,7 +1,7 @@
 import { formatSecretReference, parseSecretReference, type SecretScope } from '@dshfiles/credential-port'
 import { secretScopeSchemaEffect } from '@dshfiles/credential-port/effect'
 import { Effect, Option, Result, Schema } from 'effect'
-import { SecretCatalog, type SecretCatalogFailure } from './secret-catalog.js'
+import { SecretCatalog, type SecretCatalogFailure, type UnaliasedSecret } from './secret-catalog.js'
 import { inspectGlobalSecretConfig } from './secret-global-config.js'
 import type { SecretReferenceElsewhere, SecretReferenceState, SecretReferenceStatus } from './secret-reference-status-schema.js'
 
@@ -69,6 +69,17 @@ export const checkSecretReference = Effect.fn('secret reference check')(function
   const matches = sameAlias.filter(row => row.environment === reference.environment)
   const scopes = [...new Set(matches.map(row => row.scope))].sort()
   if (sameAlias.length === 0) {
+    // A vault item named global/<alias> is enough for a read: the CLI resolves it without any config entry.
+    const vaultItem =
+      input.cwd === null && reference.environment === 'prod'
+        ? (yield* catalog.unaliased.pipe(Effect.orElseSucceed((): readonly UnaliasedSecret[] => []))).find(row => row.alias === reference.alias)
+        : undefined
+    if (vaultItem !== undefined) {
+      const fromVault = { ...named, scope: 'global' as const, writeScope: 'global' as const, scopes: ['global'] }
+      const revealed = yield* Effect.result(catalog.reveal({ alias: reference.alias, scope: 'global', cwd: null, environment: reference.environment }))
+      if (Result.isFailure(revealed)) return { ...fromVault, state: cliState(revealed.failure) } satisfies SecretReferenceStatus
+      return { ...fromVault, state: revealed.success.length === 0 ? 'value-empty' : 'resolved' } satisfies SecretReferenceStatus
+    }
     const folders = (input.probeFolders ?? []).filter(folder => folder !== input.cwd)
     const elsewhere = yield* elsewhereIn({ alias: reference.alias, folders })
     return { ...named, state: 'alias-missing', elsewhere } satisfies SecretReferenceStatus

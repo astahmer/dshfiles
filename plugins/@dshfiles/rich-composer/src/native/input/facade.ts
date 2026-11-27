@@ -30,6 +30,7 @@ import { resolveDraftInput, snapshotDraft } from '../draft.ts'
 import { DraftEditorRuntime } from './editor/runtime.ts'
 import type { QuoteNodeLabels } from './editor/QuoteNode.tsx'
 import { DraftAnnotations, type DraftAnnotation } from './draft-annotations.ts'
+import { SentAnnotations, type SentAnnotationHistory } from './sent-annotations.ts'
 import type { EditorProjection } from './editor/projection.ts'
 
 /** Popup face the shell needs (dismissal only; typed structurally to avoid a value import). */
@@ -43,6 +44,8 @@ export interface PopupDismissFace {
  * owns the lexicon subscription through the Session scope's inject lifecycle.
  */
 export interface SessionInputDeps {
+  /** Host-backed sent-annotation history for this Session; absent when the composer runs without one. */
+  annotationHistory?: SentAnnotationHistory | undefined
   /** Session-scope ctx handed to claim.submit transactions. */
   actx: Context
   /** Snapshot the Session facts before asynchronous command arbitration. */
@@ -144,6 +147,8 @@ export class SessionInputShell implements SessionInput {
   readonly notices: SnapshotStore<InputNotice | null> = createSnapshotStore<InputNotice | null>(null)
   /** Conversation passages quoted into this draft; they ride the next plain message. */
   readonly annotations = new DraftAnnotations()
+  /** Annotations already carried by sent messages; the review layer keeps them after the draft clears. */
+  readonly sentAnnotations: SentAnnotations
   /** Annotations taken by an in-flight send, keyed by its attempt, so a failed send gives them back. */
   private readonly annotationFlights = new Map<number, readonly DraftAnnotation[]>()
   /** The shell-owned editor (text + chip truth); the composer binds its contenteditable to it. */
@@ -186,6 +191,7 @@ export class SessionInputShell implements SessionInput {
   private readonly unsubscribeInbox: (() => void) | undefined
 
   constructor(private readonly deps: SessionInputDeps) {
+    this.sentAnnotations = new SentAnnotations(deps.annotationHistory)
     this.draftEditor = new DraftEditorRuntime({
       onUpdate: () => { this.onEditorUpdate() },
       quoteLabels: () => this.quoteLabels(),
@@ -847,12 +853,15 @@ export class SessionInputShell implements SessionInput {
     this.dispatchRun(({ type: 'sink-settled', attempt, ok: accepted, outcome }))
   }
 
-  /** An accepted send removes the annotations it carried; any other outcome leaves them on the draft. */
+  /** An accepted send moves its annotations to the session's history; any other outcome leaves them on the draft. */
   private settleAnnotations(attempt: SubmitAttempt, accepted: boolean): void {
     const sent = this.annotationFlights.get(attempt.seq)
     this.annotationFlights.delete(attempt.seq)
     if (!accepted || sent === undefined) return
-    for (const annotation of sent) this.annotations.remove(annotation.id)
+    for (const annotation of sent) {
+      this.sentAnnotations.add({ text: annotation.text, comment: annotation.comment, source: annotation.source })
+      this.annotations.remove(annotation.id)
+    }
   }
 
   /** Settle a send that ended without a Host outcome; the draft stays for correction. */

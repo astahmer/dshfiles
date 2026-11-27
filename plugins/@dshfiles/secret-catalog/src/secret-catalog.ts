@@ -150,8 +150,24 @@ export interface SecretListOptions {
   readonly fresh?: boolean
 }
 
+/** One vault item a read reaches by name (`global/<alias>`) although no global alias declares it. */
+const unaliasedSecretSchema = Schema.Struct({
+  alias: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)),
+  item: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+  field: Schema.String.check(Schema.isMaxLength(256)),
+})
+export type UnaliasedSecret = typeof unaliasedSecretSchema.Type
+
+/** Decode `secret unaliased --json`; the rows carry no value, only the alias, its item and the field read. */
+const decodeUnaliased = (jsonText: string) =>
+  Schema.decodeUnknownEffect(Schema.fromJsonString(Schema.Array(unaliasedSecretSchema).check(Schema.isMaxLength(5000))))(jsonText).pipe(
+    Effect.mapError(error => new SecretCatalogOperationError({ reason: 'invalid-cli-output', cause: error })),
+  )
+
 export interface SecretCatalogShape {
   readonly list: (cwd: string | null, options?: SecretListOptions) => Effect.Effect<readonly SecretMetadata[], SecretCatalogFailure>
+  /** Vault items under `global/` that no global alias declares; the CLI resolves those by name on a read. */
+  readonly unaliased: Effect.Effect<readonly UnaliasedSecret[], SecretCatalogFailure>
   readonly reveal: (input: SecretValueInput) => Effect.Effect<string, SecretCatalogFailure>
   readonly copy: (input: SecretValueInput) => Effect.Effect<{ readonly copied: true }, SecretCatalogFailure>
   readonly create: (input: SecretCreateInput) => Effect.Effect<{ readonly created: true }, SecretCatalogFailure>
@@ -249,6 +265,10 @@ export class SecretCatalog extends Context.Service<SecretCatalog, SecretCatalogS
 
       return SecretCatalog.of({
         list,
+        unaliased: Effect.gen(function* () {
+          const stdout = yield* cli.run({ args: ['unaliased', '--json'], cwd: null, captureStdout: true })
+          return yield* decodeUnaliased(stdout)
+        }).pipe(Effect.withSpan('secret catalog unaliased')),
         reveal: Effect.fn('secret catalog reveal')(function* (input) {
           const request = yield* getArguments(input)
           return withoutTerminalNewline(yield* cli.run({ ...request, captureStdout: true }))

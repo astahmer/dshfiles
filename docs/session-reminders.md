@@ -37,8 +37,12 @@ with an explicit IANA zone.
   crash.
 - Local times that do not exist in the zone are skipped; repeated local times
   fire once, at the earlier instant.
-- A reminder inherits its thread's account and model; archiving the thread
-  drops its reminders.
+- A reminder inherits its thread's account and model. A settled or archived
+  thread never drops one: the thread sidebar lifts that status just before the
+  reminder is due and delivers a missed occurrence, unless its
+  `remindersWakeEnabled` setting is off ([thread-sidebar](../plugins/@dshfiles/thread-sidebar/README.md)).
+  Stopping a thread's work from the archive confirmation still deletes the
+  reminders it names.
 
 ## Verify
 

@@ -2,7 +2,13 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { revalidateLogic, useAppForm } from '@dshfiles/plugin-ui/form'
 import * as Schema from 'effect/Schema'
 import { AccountConnectionMethodModel } from './account-connection-method.js'
-import { configureAccountConnectionInputSchema, type AccountConnectionMethod, type AccountProfile, type ConfigureAccountConnectionInput } from './api.js'
+import {
+  configureAccountConnectionInputSchema,
+  type AccountConnectionMethod,
+  type AccountKind,
+  type AccountProfile,
+  type ConfigureAccountConnectionInput,
+} from './api.js'
 
 const connectionHomesFormSchema = Schema.toStandardSchemaV1(
   Schema.Struct({
@@ -20,10 +26,16 @@ interface ConnectionOptionsProps {
   readonly configure: (change: ConnectionChange) => void
 }
 
+const CLI_METHOD_LABELS = new Map<AccountKind, string>([
+  ['codex', 'Existing login'],
+  ['mistral', 'Mistral Vibe login'],
+  ['antigravity', 'Antigravity CLI login'],
+])
+
 const methodLabel = (method: AccountConnectionMethod, account: AccountProfile): string => {
   if (method === 'subscription') return 'Claude account'
   if (method === 'device') return 'Browser sign-in'
-  if (method === 'cli') return account.kind === 'codex' ? 'Existing login' : account.kind === 'mistral' ? 'Mistral Vibe login' : 'CLI login'
+  if (method === 'cli') return CLI_METHOD_LABELS.get(account.kind) ?? 'CLI login'
   return account.kind === 'cursor' ? 'Access token' : 'API key'
 }
 
@@ -77,7 +89,7 @@ export const AccountConnectionOptions = (props: ConnectionOptionsProps): JSX.Ele
               Use default Claude Code login
             </Button>
           ) : null}
-          {props.account.kind === 'codex' || props.account.kind === 'claude' ? (
+          {props.account.kind === 'codex' || props.account.kind === 'claude' || props.account.kind === 'antigravity' ? (
             <ConnectionHomes key={`${props.account.instanceId}:${props.account.homePath}:${props.account.shadowHomePath}`} {...props} />
           ) : null}
         </div>
@@ -109,9 +121,15 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
           <form.AppField name="homePath">
             {field => (
               <field.TextField
-                label={codex ? 'Shared Codex home' : 'CLAUDE_CONFIG_DIR'}
+                label={codex ? 'Shared Codex home' : props.account.kind === 'antigravity' ? 'HOME for agy' : 'CLAUDE_CONFIG_DIR'}
                 monospace
-                description={codex ? 'Shared state; custom homes need a separate auth overlay.' : 'Directory containing your Claude Code login.'}
+                description={
+                  codex
+                    ? 'Shared state; custom homes need a separate auth overlay.'
+                    : props.account.kind === 'antigravity'
+                      ? 'Home whose .gemini folder holds this Google login. Empty uses your own; give each extra Google account its own folder.'
+                      : 'Directory containing your Claude Code login.'
+                }
               />
             )}
           </form.AppField>

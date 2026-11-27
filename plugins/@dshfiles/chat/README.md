@@ -20,6 +20,8 @@
 
 ![Open an unread thread at its final answer](docs/screenshots/unread-final-answer.png)
 
+![See a draft annotation beside the passage it quotes, comment it there, and read it in the right column](docs/screenshots/inline-annotations.png)
+
 Owned fork of DSH's native Chat client plugin. It keeps the native transcript, its Slots, renderers, settings and
 scroll behaviour, and mounts only the newest transcript rows plus the ones the reader scrolls up to (see Local delta):
 on the live profile a single thread used to mount up to 42k DOM nodes on open.
@@ -71,6 +73,7 @@ Every other vendored file is byte-identical to the pinned revision.
                                                                                                                                                                                                                  |
 
 | `src/client-entry.tsx` | new: dshx client entry calling the native `apply`; provides the dshx `Browser` contract over the Host browser page and adds an **Open web page…** action to the Workbench New tab chooser while that page type exists |
+| `src/link-embed-port.ts` | new: a chat link whose page refuses embedding (X-Frame-Options, `frame-ancestors`) opens in a browser tab instead of the blank Browser tab, and a link already open in that tab reports the refusal in a toast whose action opens the tab. Chat asks `@dshfiles/preview`'s Host probe by registered identity, like the find bar reaches session-search; without preview nothing changes |
 | `src/chat-focus.ts` | new: the published `@dshfiles/chat/chat-focus` contract — a Turn/Step/tool-call focus, its opaque view-request encoding, and the cross-thread pending request (below) |
 | `src/chat-focus-reveal.ts` | new: takes a focus from the native `viewRequest` or the pending request, jumps with the rail's `navigateToTurn`, opens folded groups with `beforematch` and highlights the row |
 | `src/native/chat/ChatView.tsx` (also) | reads the native `viewRequest`/`completeViewRequest`/`openView` Conversation View props, runs `useChatFocus`, and provides `openView` to the Turn-tail seats |

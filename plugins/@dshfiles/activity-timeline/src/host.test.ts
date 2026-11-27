@@ -54,7 +54,7 @@ describe('activity-timeline Host', () => {
       const { host, home, client } = yield* mountedTimeline
       host.ctx.emit('dshfiles/activity/event', {
         kind: 'communication-message',
-        value: { at: 10, messageId: 'message-1', senderId: 'session-a', recipientCount: 1, intent: 'request', topic: null, sessionId: 'session-a' },
+        value: { at: 10, messageId: 'message-1', senderId: 'session-a', recipientCount: 1, intent: 'request', sessionId: 'session-a' },
       })
       host.ctx.emit('dshfiles/activity/event', { kind: 'communication-message', value: { at: 10 } })
       const page = yield* Effect.promise(() => client.page({ detailed: true })).pipe(

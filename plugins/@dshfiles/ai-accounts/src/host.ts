@@ -86,7 +86,21 @@ import { QuotaAttention } from './quota-attention-promise.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
 import { DeclaredRetryAfter } from './provider-retry-after.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
-import { CLAUDE_KIND, COMMANDCODE_KIND, CODEX_KIND, MISTRAL_KIND, OPENCODE_KIND, ProviderRoutes, type KeyedRoute, type Route } from './provider-routes.js'
+import {
+  ANTIGRAVITY_KIND,
+  CLAUDE_KIND,
+  COMMANDCODE_KIND,
+  CODEX_KIND,
+  MISTRAL_KIND,
+  OPENCODE_KIND,
+  ProviderRoutes,
+  type DiscoveringRoute,
+  type Route,
+} from './provider-routes.js'
+import { AntigravityAcpSessions } from './antigravity-acp.js'
+import { ANTIGRAVITY_CLI_TOKEN, AntigravityAccountModel } from './antigravity-account.js'
+import { createAntigravityProvider } from './antigravity-provider.js'
+import { AntigravityProcesses, AntigravityProcessesPromiseModel, type AntigravityProcessesPromise } from './antigravity-processes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -126,6 +140,7 @@ const startAccountsHost = (input: {
   readonly usageHistory: { readonly collectNow: () => Promise<number> }
   readonly pricing: PricingCatalogPromise
   readonly modelCatalogs: ModelCatalogsPromise
+  readonly antigravity: AntigravityProcessesPromise
   readonly onRelease: (release: () => void) => void
 }): AccountsHostActivation => {
   const { ctx, readSettings, store, onRelease } = input
@@ -155,6 +170,7 @@ const startAccountsHost = (input: {
           [],
           resolveCredential,
           async id => (await copilotCredentialReader(id)) !== undefined,
+          runtime.antigravity?.describe,
         )
       ).accounts[0]
     },
@@ -163,6 +179,7 @@ const startAccountsHost = (input: {
       return verifyAccountConnection({
         ...request,
         readCopilotCredential: async id => runtime.copilotLogin?.readPending(id) ?? copilotCredentialReader(id),
+        describeAntigravity: runtime.antigravity?.describe,
         ...(pendingHome !== undefined && {
           readAccountUsage: async (probe: Parameters<typeof readAccountUsage>[0]) =>
             probe.account.kind === 'codex' ? readCodexUsage(pendingHome, probe.signal, probe.onAuthenticated) : readAccountUsage(probe),
@@ -321,14 +338,31 @@ const startAccountsHost = (input: {
       streamSimple: (model, context, options) => claudeCli.stream(model, context, options),
     },
   })
+  // Google AI plans serve only Google's own Antigravity CLI; requests run through one `agy acp` per conversation.
+  const describeAntigravity = (home: string) => AntigravityAccountModel.describe({ home, processes: input.antigravity })
+  const readAntigravityQuota = (home: string, signal?: AbortSignal) => AntigravityAccountModel.readQuota({ home, processes: input.antigravity, signal })
+  runtime.antigravity = { describe: describeAntigravity, readQuota: readAntigravityQuota }
+  onRelease(() => {
+    if (runtime.antigravity?.describe === describeAntigravity) delete runtime.antigravity
+  })
+  const antigravityCli = new AntigravityAcpSessions({
+    processes: input.antigravity,
+    home: provider => {
+      const route = routes.get(provider)
+      return route?.kind === ANTIGRAVITY_KIND ? route.home : AntigravityAccountModel.resolveHome('')
+    },
+  })
+  onRelease(() => void antigravityCli.dispose())
+  const antigravityUpstream = createAntigravityProvider(antigravityCli)
   const githubCopilotUpstream = githubCopilotProvider()
   const declaredRetryAfter = new DeclaredRetryAfter()
   /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
   const lunaReserveHolds = new Map<string, number>()
   const lunaReserveHeld = (id: string, now: number): boolean => (lunaReserveHolds.get(id) ?? 0) > now
   const catalogState = input.modelCatalogs
-  const sameKeyedRoute = (candidate: Route | undefined, expected: KeyedRoute): boolean => {
+  const sameDiscoveringRoute = (candidate: Route | undefined, expected: DiscoveringRoute): boolean => {
     if (candidate === undefined || !candidate.enabled) return false
+    if (expected.kind === ANTIGRAVITY_KIND) return candidate.kind === ANTIGRAVITY_KIND && candidate.home === expected.home
     if (expected.kind === COMMANDCODE_KIND) {
       return (
         candidate.kind === COMMANDCODE_KIND &&
@@ -347,7 +381,7 @@ const startAccountsHost = (input: {
   }
   // Each keyed provider is built with its own base and key variable, so two
   // Command Code accounts can point at different deployments.
-  const keyedUpstream = (route: KeyedRoute) =>
+  const keyedUpstream = (route: Exclude<DiscoveringRoute, { readonly kind: typeof ANTIGRAVITY_KIND }>) =>
     route.kind === COMMANDCODE_KIND
       ? createCommandCodeProvider({
           baseUrl: route.apiBaseUrl,
@@ -396,6 +430,7 @@ const startAccountsHost = (input: {
       }
       if (route.kind === CLAUDE_KIND) return ClaudeAccountModel.usesCliTransport(route) ? claudeCliUpstream : claudeUpstream
       if (route.kind === GITHUB_COPILOT_KIND) return githubCopilotUpstream
+      if (route.kind === ANTIGRAVITY_KIND) return antigravityUpstream
       return keyedUpstream(route)
     }
 
@@ -545,6 +580,7 @@ const startAccountsHost = (input: {
         if (route === undefined) return undefined
         if (route.kind === CODEX_KIND) return undefined
         if (route.kind === GITHUB_COPILOT_KIND) return undefined
+        if (route.kind === ANTIGRAVITY_KIND) return ANTIGRAVITY_CLI_TOKEN
         if (route.kind === CLAUDE_KIND) {
           if (ClaudeAccountModel.usesCliTransport(route)) return CLAUDE_CLI_TOKEN
           try {
@@ -656,13 +692,20 @@ const startAccountsHost = (input: {
     )
   }
 
-  const discoversModels = (route: Route): route is KeyedRoute => route.kind === COMMANDCODE_KIND || route.kind === OPENCODE_KIND || route.kind === MISTRAL_KIND
+  const discoversModels = (route: Route): route is DiscoveringRoute =>
+    route.kind === COMMANDCODE_KIND || route.kind === OPENCODE_KIND || route.kind === MISTRAL_KIND || route.kind === ANTIGRAVITY_KIND
   let adapterRegistration: AdapterRegistrationHandle | undefined
   let directoryRegistration: DirectoryRegistrationHandle | undefined
-  const modelDiscoveries = new Map<string, { readonly route: KeyedRoute; readonly dispose: () => void }>()
+  const modelDiscoveries = new Map<string, { readonly route: DiscoveringRoute; readonly dispose: () => void }>()
 
-  const registerKeyedDiscovery = (id: string, route: KeyedRoute): void => {
+  const registerKeyedDiscovery = (id: string, route: DiscoveringRoute): void => {
     const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
+      if (route.kind === ANTIGRAVITY_KIND) {
+        const description = await describeAntigravity(route.home)
+        if (!description.signedIn) throw new LlmError(description.detail, 'MISSING_CREDENTIAL')
+        antigravityUpstream.remember(description.models)
+        return description.models.map(entry => ({ id: entry.id, name: entry.name }))
+      }
       if (route.kind === COMMANDCODE_KIND) {
         const entries = await fetchCommandCodeCatalog({
           ...CredentialModel.discoveryCatalogOptions(
@@ -741,11 +784,11 @@ const startAccountsHost = (input: {
     }
 
     for (const [id, registration] of modelDiscoveries) {
-      if (sameKeyedRoute(nextRoutes.get(id), registration.route)) continue
+      if (sameDiscoveringRoute(nextRoutes.get(id), registration.route)) continue
       registration.dispose()
       modelDiscoveries.delete(id)
     }
-    catalogState.retain(({ instanceId, route }) => sameKeyedRoute(nextRoutes.get(instanceId), route))
+    catalogState.retain(({ instanceId, route }) => sameDiscoveringRoute(nextRoutes.get(instanceId), route))
     for (const [id, route] of enabled) {
       if (!discoversModels(route) || modelDiscoveries.has(id)) continue
       registerKeyedDiscovery(id, route)
@@ -781,7 +824,7 @@ const startAccountsHost = (input: {
     const discoveryRequest = route.kind === COMMANDCODE_KIND ? { provider: route.kind, baseURL: route.apiBaseUrl } : { provider: route.kind }
     const models = await catalogState.refresh(instanceId, signal => llm.discoverModels(settingsNs, discoveryRequest, signal))
     // A route that changed while the fetch ran cannot claim the models it found.
-    if (models === undefined || !sameKeyedRoute(routes.get(instanceId), route)) return
+    if (models === undefined || !sameDiscoveringRoute(routes.get(instanceId), route)) return
     catalogState.record({ instanceId, route, models })
     await refreshRoutes()
   }
@@ -841,6 +884,7 @@ const AccountsHostLive = Layer.effectDiscard(
     const usage = UsageSnapshotPromiseModel.facade(yield* UsageSnapshot, services)
     const usageHistory = UsageHistoryPromiseModel.facade(yield* UsageHistorySchedule, services)
     const modelCatalogs = ModelCatalogsPromiseModel.facade(yield* ModelCatalogs, services)
+    const antigravity = AntigravityProcessesPromiseModel.facade(yield* AntigravityProcesses, services)
     const pricingService = yield* PricingCatalog
     const pricing = PricingCatalogPromiseModel.facade(pricingService, services)
     // The imperative Host reads preferences synchronously; this mirror follows every committed change.
@@ -866,6 +910,7 @@ const AccountsHostLive = Layer.effectDiscard(
             usageHistory,
             pricing,
             modelCatalogs,
+            antigravity,
             onRelease: release => releases.push(release),
           }),
           releases,
@@ -907,6 +952,7 @@ export default DshxPlugin.make({
         UsageHistoryPromiseModel.layer,
         PricingCatalog.scheduled().pipe(Layer.provideMerge(PricingCatalog.layer({ path: DEFAULT_PRICING_PATH }))),
         ModelCatalogs.layer,
+        AntigravityProcesses.hostLayer,
       ).pipe(
         Layer.provideMerge(AccountPoolLive),
         Layer.provideMerge(

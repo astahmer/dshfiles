@@ -16,6 +16,11 @@ export interface ThreadRevision {
   readonly commitId: string
   readonly description: string
   readonly conflict: boolean
+  /**
+   * Author time, epoch ms, when the VCS reports it: when this work was written, not when it was last rebased. A
+   * pseudo-revision (a working tree, a land record) carries none.
+   */
+  readonly at?: number
 }
 
 export interface ThreadStatus {

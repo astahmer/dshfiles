@@ -10,6 +10,7 @@ import { CatalogPorts } from './catalog-ports-promise.js'
 import { DshCredentials } from './dsh-credentials-promise.js'
 import { SecretCatalog, SecretCatalogOperationError, type SecretCreateInput } from './secret-catalog.js'
 import { SecretCli } from './secret-cli.js'
+import { SecretMcp } from './secret-mcp-service.js'
 import { checkSecretReference } from './secret-reference-status.js'
 import { SecretRequests } from './secret-requests.js'
 import { secretTools } from './secret-tools.js'
@@ -22,6 +23,8 @@ const cwdForScope = (scope: SecretScope, requestedCwd: string | null) => {
 }
 
 const CatalogLive = SecretCatalog.layer.pipe(Layer.provide(SecretCli.layer), Layer.provide(DshChildProcessSpawner.layer))
+
+const SecretMcpLive = SecretMcp.layer.pipe(Layer.provide(DshChildProcessSpawner.layer))
 
 /** Tell browsers to read the pending secret requests again whenever one is added or settled. */
 const RequestEvents = Layer.effectDiscard(
@@ -41,7 +44,7 @@ const RequestEvents = Layer.effectDiscard(
 
 const SecretCatalogLive = Layer.mergeAll(CatalogPorts, RequestEvents).pipe(
   Layer.provideMerge(SecretRequests.layer),
-  Layer.provideMerge(Layer.mergeAll(CatalogLive, DshCredentials.layer)),
+  Layer.provideMerge(Layer.mergeAll(CatalogLive, SecretMcpLive, DshCredentials.layer)),
   Layer.provideMerge(NodeFileSystem.layer),
 )
 

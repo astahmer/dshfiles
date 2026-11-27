@@ -22,6 +22,7 @@ import type {
 } from '../contract/input.ts'
 import type { ComposerKeyboard } from '../contract/draft-editor.ts'
 import type { ComposerBlocks } from '../contract/composer-blocks.ts'
+import type { SentAnnotationHistory } from './sent-annotations.ts'
 import type { InputSubmitMode } from '../contract/composer-submission.ts'
 import type { PopupDismissFace } from './facade.ts'
 import { SessionInputShell } from './facade.ts'
@@ -71,6 +72,8 @@ export class InputHub implements SessionInputResolver {
   constructor(
     private readonly rootCtx: Context,
     private readonly t: TranslateNS<'conversation'>,
+    /** Resolve one Session's Host-backed annotation history; absent without a Host API. */
+    private readonly annotationHistory?: (sessionId: SessionId) => SentAnnotationHistory,
   ) {}
 
   /**
@@ -108,6 +111,7 @@ export class InputHub implements SessionInputResolver {
     const { session, ctx: actx } = binding
     const shell = new SessionInputShell({
       actx,
+      annotationHistory: this.annotationHistory?.(binding.sessionId),
       submissionState: () => {
         const state = session.getSnapshot()
         const model = session.projections.faceOf('modelSelection').getSnapshot() as ModelSelectionProjection | undefined

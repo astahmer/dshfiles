@@ -6,6 +6,7 @@ import type { OAuthCredential } from '@earendil-works/pi-ai'
 import { readCopilotUsage } from './copilot-quota.js'
 import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readCursorUsage } from './cursor-account.js'
+import { AntigravityAccountModel, type AntigravityAccountDescription, type AntigravityQuotaReading } from './antigravity-account.js'
 import { MistralAccountModel } from './mistral-account.js'
 import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.js'
 
@@ -53,6 +54,10 @@ export const readAccountUsage = async (input: {
   readonly resolveCredential?: CredentialValueResolver | undefined
   /** The Copilot account's stored OAuth grant. */
   readonly readCopilotCredential?: ((instanceId: string) => Promise<OAuthCredential | undefined>) | undefined
+  /** Reads an Antigravity login through the Host's `agy`. */
+  readonly describeAntigravity?: ((home: string) => Promise<AntigravityAccountDescription>) | undefined
+  /** Reads an Antigravity account's live quota buckets through `agy -p /usage --output-format json`. */
+  readonly readAntigravityQuota?: ((home: string, signal?: AbortSignal) => Promise<AntigravityQuotaReading>) | undefined
 }): Promise<UsageCard> => {
   const { account, signal } = input
   switch (account.kind) {
@@ -90,6 +95,18 @@ export const readAccountUsage = async (input: {
         onAuthenticated: input.onAuthenticated,
         signal,
       })
+    case 'antigravity': {
+      const describe = input.describeAntigravity
+      if (describe === undefined)
+        return ProviderUsageModel.emptyUsage('unsupported', 'Antigravity accounts are read by the AI Accounts Host, which is not running.')
+      const home = AntigravityAccountModel.resolveHome(account.homePath)
+      const readQuota = input.readAntigravityQuota
+      return AntigravityAccountModel.readUsage({
+        describe: () => describe(home),
+        readQuota: readQuota === undefined ? undefined : () => readQuota(home, signal),
+        onAuthenticated: input.onAuthenticated,
+      })
+    }
     case 'opencode-go': {
       const key = input.resolveCredential === undefined ? CredentialModel.readKeyFromEnv(account.apiKeyEnv) : await input.resolveCredential(account.apiKeyEnv)
       return readOpenCodeUsage(key, signal, input.onAuthenticated)

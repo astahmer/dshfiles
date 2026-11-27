@@ -187,7 +187,6 @@ describe('activity timeline', () => {
             senderId: 'session-a',
             recipientCount: 1,
             intent: 'request',
-            topic: null,
             sessionId: 'session-a',
           }),
           ActivityTimelineAdapters.integrationActivity({
@@ -392,9 +391,9 @@ describe('activity condensation primitives', () => {
         rootCallId: null,
       }).level,
     ).toBe('attention')
-    expect(
-      ActivityTimelineAdapters.communicationMessage({ at: now, messageId: 'm1', senderId: 's', recipientCount: 2, intent: 'request', topic: null }).level,
-    ).toBe('notable')
+    expect(ActivityTimelineAdapters.communicationMessage({ at: now, messageId: 'm1', senderId: 's', recipientCount: 2, intent: 'request' }).level).toBe(
+      'notable',
+    )
     expect(
       ActivityTimelineAdapters.integrationActivity({
         id: 'e',

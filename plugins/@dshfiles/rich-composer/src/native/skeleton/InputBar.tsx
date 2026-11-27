@@ -857,7 +857,7 @@ export const InputBar = memo(function InputBar({
               <ContextMeter
                 useProjection={useProjection}
                 t={t}
-                detail={input === undefined || sessionId === undefined ? null : renderSlot('conversation.composer.context', {})}
+                {...(input === undefined || sessionId === undefined ? {} : { renderDetail: () => renderSlot('conversation.composer.context', {}) })}
               />
             )}
             <div className={css.send}>

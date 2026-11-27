@@ -179,6 +179,29 @@ describe('SubagentPreviewDock', () => {
     expect(bindings.retainChild).toHaveBeenCalled()
   })
 
+  it('collapses one run card to its one-line row and back', async () => {
+    const bindings = preview({ retainChild: childInTool().retainChild })
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
+    await screen.findByRole('region', { name: /^Agent run: Review/ })
+    fireEvent.click(screen.getByRole('button', { name: 'subagentRunCollapse' }))
+    expect(screen.queryByRole('region', { name: /^Agent run:/ })).toBeNull()
+    const compact = screen.getByRole('button', { name: 'subagentRunExpand' })
+    expect(compact.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: 'subagentRunDetails' })).toBeNull()
+    fireEvent.click(compact)
+    expect(await screen.findByRole('region', { name: /^Agent run: Review/ })).not.toBeNull()
+  })
+
+  it('keeps every row a non-shrinking flex item so a tall dock scrolls instead of squashing cards', () => {
+    const count = (n: number): string => `${n} subagents`
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} count={count} />)
+    fireEvent.click(screen.getByRole('button', { name: '2 subagents subagentpreviewworking' }))
+    const dock = document.querySelector('[data-dshfiles-live-preview-dock]')
+    expect(dock?.className).toContain('dshx:overflow-y-auto')
+    expect(dock?.className).toContain('dshx:max-h-72')
+    for (const row of rows()) expect(row.className).toContain('dshx:shrink-0')
+  })
+
   it('never holds a child while the run card setting is off', () => {
     const bindings = preview({ retainChild: childInTool().retainChild })
     render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: false, childTiming: true })} />)

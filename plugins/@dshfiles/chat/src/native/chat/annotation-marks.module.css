@@ -1,0 +1,145 @@
+/* Inline draft annotations: fixed-position markers in the transcript gutter and, when the window leaves room, a
+   comments column beside it. Portalled to the body so the clipped transcript never cuts them. */
+.layer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.marker {
+  position: fixed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px 9px 9px 4px;
+  background: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary-foreground);
+  font: var(--dsw-font-xs-11);
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: var(--dshx-elevation-1);
+}
+
+.marker:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: 2px;
+}
+
+.popover {
+  width: 288px;
+  padding: 10px;
+}
+
+.comments {
+  position: fixed;
+  top: 0;
+  width: 248px;
+  pointer-events: none;
+}
+
+.commentCard {
+  position: fixed;
+  width: 248px;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-lg);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: var(--dshx-elevation-2);
+  pointer-events: auto;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.quote {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font: var(--dsw-font-xs-12);
+  color: var(--dsw-alias-label-secondary);
+  line-clamp: 2;
+}
+
+.comment {
+  margin: 0;
+  font: var(--dsw-font-sm-13);
+  color: var(--dsw-alias-label-primary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.empty {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.editor {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 52px;
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l3);
+  border-radius: var(--dsw-radius-sm);
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-sm-13);
+  resize: vertical;
+}
+
+.editor:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 1px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: var(--dsw-radius-sm);
+  background: transparent;
+  color: var(--dsw-alias-label-secondary);
+  font: var(--dsw-font-xs-11);
+  cursor: pointer;
+}
+
+.action:hover {
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+}
+
+.action:focus-visible {
+  outline: 2px solid var(--dsw-alias-border-l3);
+  outline-offset: 1px;
+}
+
+.icon {
+  width: 13px;
+  height: 13px;
+}
+
+/* Phones and narrow windows read the same cards as a sheet-like popover from their markers. */
+@media (max-width: 639.98px) {
+  .popover {
+    width: min(288px, calc(100vw - 16px));
+  }
+}

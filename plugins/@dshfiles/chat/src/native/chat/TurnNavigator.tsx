@@ -12,7 +12,7 @@ import type { ChatViewSlotProps } from '../contract/slots.ts'
 
 type ChatKey = Parameters<ChatViewSlotProps['t']>[0]
 import { TURN_MARK_FILTERS, type TurnMarkFilter } from '../../turn-marks.ts'
-import type { TurnRailItem } from './turn-rail-items.ts'
+import { seenBoundaryIndex, type TurnRailItem } from './turn-rail-items.ts'
 import css from './TurnNavigator.module.css'
 
 interface TurnNavigatorProps {
@@ -28,6 +28,8 @@ interface TurnNavigatorProps {
   readonly onFilterChange?: (filter: TurnMarkFilter) => void
   readonly inView?: { readonly first: number; readonly last: number } | null
   readonly onStep?: (direction: 'previous' | 'next') => void
+  /** The highest Turn the reader has reached; the track marks the unseen Turns below it. */
+  readonly seenTurn?: number | null
 }
 
 const KIND_CLASS: Record<TurnRailItem['kind'], string | undefined> = {
@@ -117,7 +119,7 @@ const TurnMark = memo(function TurnMark({
 })
 
 function TurnNavigatorRail(
-  { items, activeTurn, busyTurn, onNavigate, t, filter = 'all', filterCounts, onFilterChange, inView = null, onStep }: TurnNavigatorProps,
+  { items, activeTurn, busyTurn, onNavigate, t, filter = 'all', filterCounts, onFilterChange, inView = null, onStep, seenTurn = null }: TurnNavigatorProps,
   ref: ForwardedRef<TurnNavigatorHandle>,
 ) {
   const [previewTurn, setPreviewTurn] = useState<number | null>(null)
@@ -276,6 +278,7 @@ function TurnNavigatorRail(
     }
     if (first !== -1 && last >= first) band = { top: RAIL_INSET_PX + first * TURN_SPACING_PX - TURN_SPACING_PX / 2, height: (last - first + 1) * TURN_SPACING_PX }
   }
+  const boundary = seenBoundaryIndex(items, seenTurn)
   const fadeClasses = [css.scroller]
   if (scrollTop > 1) fadeClasses.push(css.fadeTop)
   if (scrollTop < virtualizer.getTotalSize() - viewHeight - 1) fadeClasses.push(css.fadeBottom)
@@ -333,6 +336,15 @@ function TurnNavigatorRail(
           <div ref={scrollerRef} className={fadeClasses.join(' ')}>
             <div ref={virtualizer.containerRef} className={css.marks}>
               {band !== null && <div className={css.band} aria-hidden="true" style={{ top: band.top, height: band.height }} />}
+              {boundary >= 0 && (
+                <div
+                  className={css.seenBoundary}
+                  role="separator"
+                  aria-label={t('chat.turnMap.unreadBoundary')}
+                  data-seen-boundary={boundary}
+                  style={{ top: boundary * TURN_SPACING_PX + RAIL_INSET_PX - TURN_SPACING_PX / 2 }}
+                />
+              )}
               {virtualItems.map(({ index, key }) => {
                 const item = items[index]
                 if (item === undefined) return null

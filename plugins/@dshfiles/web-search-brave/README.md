@@ -10,6 +10,13 @@ search, or uses `BRAVE_API_KEY` from the Host environment.
 1. Create a key in the [Brave dashboard](https://api-dashboard.search.brave.com/app/keys).
 2. Choose your own alias in the Secret Catalog and store the value in an
    appropriate local/global scope. No alias is preselected by the shared default.
+   Settings resolve global aliases only (`cwd: null`), so the alias must exist in
+   `secret print global`; on this machine that config is the git-synced nixfiles
+   `assets/secret/global.json`, so commit it after `secret set ALIAS --global`
+   ([where a global alias lives](../../../docs/secret-references.md#where-a-global-alias-lives)).
+   A unique vault item named `global/brave-api-key` resolves even without an alias
+   (`secret unaliased` lists it); declaring the alias adds `BRAVE_API_KEY` for
+   `secret run`, id pinning and doctor coverage.
 3. In **Settings → Plugins → Web search (Brave)**, select that alias in the
    **API key reference** field (`secret:ALIAS` or `secret:ALIAS@env`). Alternatively,
    leave the field empty and configure `BRAVE_API_KEY` in the Host environment.

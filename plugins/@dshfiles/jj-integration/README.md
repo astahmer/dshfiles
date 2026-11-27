@@ -200,17 +200,20 @@ integration control center: each ready workspace row has a bookmark combobox
 Integrate action. The banner's **Integrate all (n)** action uses the configured
 bookmark. The page also has a tab per integration state with live counts, a
 separate lifecycle filter, and compact rows grouped into
-**Conflicts**, **Ready to integrate**, **Blocked**, **Integrating** and
+**Conflicts**, **Ready to integrate**, **Stale**, **Blocked**, **Integrating** and
 **No changes or already integrated**. Empty groups are not rendered at all; their
 counts stay in the filter bar.
 
 Integration state and lifecycle are deliberately separate. Integration state is
 `ready` (described, conflict-free pending revisions and no writing session),
-`blocked` (pending revisions plus one specific unmet prerequisite), `conflicts`,
-`integrating`, `integrated`, `no changes` or `unverified` (the workspace
-directory is gone, or the Host could not verify its sessions). Lifecycle is
-active, waiting for input, idle, finished or missing, and the **Lifecycle**
-filter narrows rows by it without changing the integration classification.
+`stale` (the bookmark moved past that work and no revision was authored for
+`staleAfterDays`, so it is listed on its own tab and left out of Ready and the
+inbox, while its row still lands one workspace at a time), `blocked` (pending
+revisions plus one specific unmet prerequisite), `conflicts`, `integrating`,
+`integrated`, `no changes` or `unverified` (the workspace directory is gone, or
+the Host could not verify its sessions). Lifecycle is active, waiting for input,
+idle, finished or missing, and the **Lifecycle** filter narrows rows by it
+without changing the integration classification.
 
 A workspace that merely sits behind the bookmark has no work to offer: it is
 **No changes** with an advisory "base is N behind main" note, never a blocker.
@@ -417,9 +420,14 @@ The Jujutsu panel's repository menu (⋮) offers **Clean up thread workspaces…
 Pick how long a workspace must have been unused (1h, 6h or 24h) and which kinds
 to remove: **Empty** (never landed anything) and/or **Already integrated**
 (landed, nothing left above the bookmark, or all of its work is already on
-another bookmark). The dialog previews the list before
+another bookmark). **Stale work** is a separate opt-in group: pending work Land
+calls Stale, i.e. the bookmark moved past it and nobody changed it for
+`staleAfterDays` (7). Selecting it abandons those unlanded revisions, so it is
+never selected by default and the preview names each row before anything is
+removed. The dialog previews the list before
 anything is removed. One confirmation then discards every match exactly as the
-row's own Remove does (never forced) and abandons the empty, undescribed
+row's own Remove does: never forced, except the Stale rows you selected, whose
+unlanded revisions are abandoned. It also abandons the empty, undescribed
 revisions nothing builds on: no working copy, bookmark, tag or revision with
 content or a description descends from them, so no live workspace is rewritten.
 
@@ -506,12 +514,14 @@ the found, stopped, killed and failed counts.
 
 The Host also runs that same job on its own (setting `autoCleanup`, on by
 default): every `intervalMinutes` (60) it cleans the repositories used recently
-of the selected `kinds` (`empty` and `integrated`; `untracked` is opt-in) unused
-for `olderThanHours` (24). The first run waits five minutes after the Host
+of the selected `kinds` (`empty` and `integrated`; `untracked` and `stale` are
+opt-in) unused for `olderThanHours` (24). The first run waits five minutes after
+the Host
 starts, a run is skipped while any cleanup job is queued or running, and
 disposing the plugin cancels the next run. It uses the same qualifiers as the
-button, so a workspace with unlanded revisions, a working, waiting or unreadable
-Session, or a queued integration is always kept. Each run lands in the cleanup
+button, so a workspace with recent unlanded revisions, a working, waiting or
+unreadable Session, or a queued integration is always kept. Each run lands in
+the cleanup
 trail (`jj_thread_cleanup_jobs` marks it `automatic`) and in the activity
 timeline as `workspace.cleaned` — routine when nothing was removed, with the
 skip counts (`Skipped 41: 29 activity-unknown, 12 has-work.`) as its detail — or
@@ -723,6 +733,7 @@ the subagent is idle), or any rebase that keeps the revisions' ancestry — the 
 | `isolateByDefault`                    | `false`   | Initial state of the new-thread workspace toggle; `all` scope forces isolation on by default.                                                                                     |
 | `bookmark`                            | `main`    | Fallback main branch for a project without its own; see [Main branch per project](#main-branch-per-project).                                                                      |
 | `repositoryBookmarks`                 | empty     | `{ repository, bookmark }` per project, set in Settings › Projects; wins over `dsh.project.json` and origin's default branch.                                                     |
+| `staleAfterDays`                      | `7`       | Pending work the bookmark moved past and nobody changed for this many days is Stale: out of Ready and the inbox, still landable one row at a time. `0` disables.                  |
 | `threadsDirectory`                    | empty     | Parent for thread workspaces; empty uses `<repository>-threads`.                                                                                                                  |
 | `askAgentToFixLanding`                | `true`    | Hand Rebase problems back to the thread's agent.                                                                                                                                  |
 | `syncWorkspaceAfterLand`              | `default` | Workspace brought onto the bookmark after Rebase (`dshx checkout sync`); empty disables it.                                                                                       |

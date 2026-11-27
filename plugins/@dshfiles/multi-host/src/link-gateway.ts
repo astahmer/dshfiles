@@ -5,6 +5,7 @@ import { FetchHttpClient, HttpClient } from 'effect/http'
 import { DshxPlugin } from '@dshfiles/dshx/effect'
 import { LinkGatewayOff, LinkGatewayUnavailable, LinkPairRefused, type LinkStoreFailed } from './errors.js'
 import { RuntimeIdentity } from './identity.js'
+import { linkActivationContext } from './link-gateway-promise.js'
 import { LinkStore, type LinkSettings } from './link-store.js'
 import { createLinkServer, type RedeemAnswer } from './link-server.js'
 
@@ -69,6 +70,16 @@ interface State {
   readonly error: LinkGatewayUnavailable | undefined
 }
 
+/** The native session cookie last minted for this gateway, cached until shortly before it expires. */
+interface CachedNativeCookie {
+  value: NativeCookie | undefined
+}
+
+/** The cookie mint in flight, so concurrent requests share one launch exchange. */
+interface PendingMint {
+  current: Promise<string | undefined> | undefined
+}
+
 const redeemStatus = {
   invalid: 400,
   expired: 410,
@@ -105,9 +116,9 @@ export class LinkGateway extends Context.Service<
         const state = yield* Ref.make<State>({ listener: undefined, error: undefined })
         // A settings write applies from both the handler and the store's change stream; two opens at once would race for the port.
         const applying = yield* Semaphore.make(1)
-        const services = yield* Effect.context<R>()
+        const services = yield* linkActivationContext<R>()
         const run = Effect.runPromiseWith(services)
-        const cookie: { value: NativeCookie | undefined } = { value: undefined }
+        const cookie: CachedNativeCookie = { value: undefined }
 
         /** Exchange the native launch URL for its session cookie; the launch URL carries the token, so no span of its own. */
         const mintNativeCookie = Effect.gen(function* () {
@@ -131,7 +142,7 @@ export class LinkGateway extends Context.Service<
           Effect.orElseSucceed(() => undefined),
         )
 
-        const minting: { current: Promise<string | undefined> | undefined } = { current: undefined }
+        const minting: PendingMint = { current: undefined }
         const nativeCookie = (): Promise<string | undefined> => {
           if (cookie.value !== undefined && cookie.value.expiresAt - 60_000 > Date.now()) return Promise.resolve(cookie.value.value)
           minting.current ??= run(mintNativeCookie).then(next => {

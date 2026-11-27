@@ -95,6 +95,7 @@ const mutationSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('abandon'), commitIds: Schema.Array(commitIdSchema).check(Schema.isMinLength(1), Schema.isMaxLength(50)) }),
   Schema.Struct({ kind: Schema.Literal('revert'), commitId: commitIdSchema, destinationId: commitIdSchema }),
   Schema.Struct({ kind: Schema.Literal('restore'), commitId: commitIdSchema, paths: pathListSchema }),
+  Schema.Struct({ kind: Schema.Literal('operation-undo') }),
 ])
 
 export const previewSchema = Schema.Struct({
@@ -119,6 +120,7 @@ export const previewSchema = Schema.Struct({
     'abandon',
     'revert',
     'restore',
+    'operation-undo',
   ]),
   title: Schema.String.check(Schema.isMaxLength(200)),
   summary: Schema.String.check(Schema.isMaxLength(1000)),
@@ -443,7 +445,7 @@ export const jujutsuApi = defineApi({
       input: Schema.Struct({ repoId: repoIdSchema, action: mutationSchema }),
       output: previewSchema,
       description:
-        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore.',
+        'Prepare one jujutsu action and return its preview: title, summary, detail and the previewId that jj_confirm_action applies. Preparing changes nothing. Call only when the user asked for that action; show them the summary before confirming. Actions: describe, split, squash, rebase, bookmark-move, bookmark-set, bookmark-delete, fetch, push, workspace-add, workspace-forget, workspace-edit, edit, new, commit, duplicate, abandon, revert, restore, operation-undo.',
       tool: {
         name: 'jj_prepare_action',
         render: output => `${output.title} · ${output.summary}\n${output.detail}\npreviewId ${output.id} (expires ${new Date(output.expiresAt).toISOString()})`,

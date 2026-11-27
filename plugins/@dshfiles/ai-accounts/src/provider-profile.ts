@@ -12,6 +12,7 @@ import type { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropi
 import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
 import type { createCommandCodeProvider } from './commandcode-provider.js'
 import type { createMistralProvider } from './mistral-provider.js'
+import type { createAntigravityProvider } from './antigravity-provider.js'
 
 /** DeepSeek's documented default effort when thinking is on and the request names none. */
 const DEEPSEEK_DEFAULT_EFFORT = 'high'
@@ -89,7 +90,7 @@ const nativeModels = new WeakMap<ResolvedPiAiProviderProfile, ReadonlySet<string
 
 /** Match the installed adapter's supported-thinking-level rule before publishing or applying a pin. */
 const supportsEffort = (
-  model: { readonly reasoning: boolean; readonly thinkingLevelMap?: Readonly<Record<string, string | null>> | undefined },
+  model: { readonly reasoning: boolean; readonly thinkingLevelMap?: Readonly<Record<string, string | null | undefined>> | undefined },
   effort: string,
 ): boolean => {
   if (!model.reasoning) return false
@@ -119,6 +120,7 @@ export class ProviderProfileModel {
       | ReturnType<typeof githubCopilotProvider>
       | ReturnType<typeof createCommandCodeProvider>
       | ReturnType<typeof createMistralProvider>
+      | ReturnType<typeof createAntigravityProvider>
     readonly provider: string
     readonly displayName: string
     readonly additionalModelIds: readonly string[]
@@ -163,7 +165,10 @@ export class ProviderProfileModel {
         upstreamModels.find(model => model.api === api) ??
         upstreamModels[0]
       if (template === undefined) continue
-      models.push({ ...template, id, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
+      // Codex Spark reads text only. pi-ai 1.5 dropped the last Spark from its catalog, so a custom Spark id has no
+      // family template left and would otherwise copy a GPT model that reads images.
+      const input = familyTemplate === undefined && gptFamily?.endsWith('-codex-spark') === true ? ['text' as const] : template.input
+      models.push({ ...template, id, input, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
     }
     const offeredModels = models.filter(model => !hidden.has(model.id)).sort((left, right) => rank(left.id) - rank(right.id))
     // A pinned effort is offered as an override on the model it belongs to, which
@@ -179,7 +184,7 @@ export class ProviderProfileModel {
     const modelOverrides = Object.fromEntries(
       offeredModels.flatMap(model => {
         const effort = pins[model.id]
-        const levels: Readonly<Record<string, string | null>> | undefined = model.thinkingLevelMap
+        const levels: Readonly<Record<string, string | null | undefined>> | undefined = model.thinkingLevelMap
         return effort === undefined ? [] : [[model.id, { reasoningEfforts: { [effort]: levels?.[effort] ?? effort } }]]
       }),
     )

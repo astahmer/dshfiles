@@ -68,6 +68,10 @@
     "./thread-directories": {
       "types": "./src/thread-directories.ts",
       "default": "./dist/thread-directories.js"
+    },
+    "./project-colors": {
+      "types": "./src/project-colors.ts",
+      "default": "./dist/project-colors.js"
     }
   },
   "scripts": {
@@ -131,6 +135,7 @@
     "@deepseek-ai/dsh-cmdline": "0.2.2-rc.2",
     "@deepseek-ai/dsh-jobs": "catalog:",
     "@deepseek-ai/dsh-llm": "catalog:",
+    "@deepseek-ai/dsh-schedule": "0.2.2-rc.2",
     "@deepseek-ai/dsh-session": "catalog:",
     "@deepseek-ai/dsh-session-persistence": "catalog:",
     "@deepseek-ai/dsh-session-projection": "catalog:",

@@ -70,6 +70,44 @@ describe('thread integration assessment', () => {
     expect(pending.behindBookmark).toBe(4)
   })
 
+  it('keeps cold work the bookmark moved past out of Ready without blocking it', () => {
+    const stale = assess({ thread: { stale: true, behind: true, behindCount: 400 } })
+    expect(stale.category).toBe('stale')
+    expect(stale.stale).toBe(true)
+    expect(stale.blockers).toEqual([])
+    expect(stale.needsAttention).toBe(false)
+    expect(ThreadIntegrationModel.canSelectForIntegration(stale)).toBe(false)
+    // A real blocker still wins: staleness never hides a conflict, a missing description or a writing thread.
+    expect(assess({ thread: { stale: true }, integrationAllowed: false }).category).toBe('blocked')
+    expect(assess({ thread: { stale: true, unlanded: [revision({ description: 'wip' })] } }).category).toBe('blocked')
+    expect(assess({ thread: { stale: true, unlanded: [revision({ conflict: true })] } }).category).toBe('conflicts')
+  })
+
+  it('marks work stale only when the bookmark moved past it and nobody changed it inside the window', () => {
+    const now = Date.UTC(2026, 10, 25)
+    const days = (count: number) => now - count * 86_400_000
+    const base = { behindBookmark: 30, now, afterDays: 7 }
+    expect(ThreadIntegrationModel.isStale({ revisions: [{ at: days(8) }], ...base })).toBe(true)
+    expect(ThreadIntegrationModel.isStale({ revisions: [{ at: days(6) }], ...base })).toBe(false)
+    expect(ThreadIntegrationModel.isStale({ revisions: [{ at: days(8) }], ...base, behindBookmark: 0 })).toBe(false)
+    expect(ThreadIntegrationModel.isStale({ revisions: [{ at: days(8) }], ...base, afterDays: 0 })).toBe(false)
+    expect(ThreadIntegrationModel.isStale({ revisions: [{}], ...base })).toBe(false)
+    expect(ThreadIntegrationModel.isStale({ revisions: [], ...base })).toBe(false)
+  })
+
+  it('judges staleness on the newest revision, so a recently authored commit keeps older work ready', () => {
+    const now = Date.UTC(2026, 10, 25)
+    expect(
+      ThreadIntegrationModel.isStale({
+        revisions: [{ at: now - 40 * 86_400_000 }, { at: now - 2 * 86_400_000 }],
+        behindBookmark: 30,
+        now,
+        afterDays: 7,
+      }),
+    ).toBe(false)
+    expect(ThreadIntegrationModel.newestRevisionAt([{ at: 5 }, { at: 9 }, {}])).toBe(9)
+  })
+
   it('classifies already integrated work as integrated, not as pending or blocked', () => {
     const integrated = assess({ thread: { unlanded: [], rebasedAt: Date.now(), behind: true, behindCount: 2 } })
     expect(integrated.category).toBe('integrated')

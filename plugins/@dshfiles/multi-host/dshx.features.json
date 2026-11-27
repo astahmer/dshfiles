@@ -832,10 +832,11 @@
       "destination": "threads",
       "currentSurface": "thread-list: All remote threads",
       "configuration": [],
-      "states": ["empty", "listed", "host-started", "host-offline"],
+      "states": ["empty", "listed", "host-started", "host-offline", "archived-on-host"],
       "failureModes": [
         "A failed status keeps that host's started-here rows instead of dropping them.",
-        "A blank host session (never received a message) stays out of the list."
+        "A blank host session (never received a message) stays out of the list.",
+        "An archive the owning runtime refuses leaves the row where it was and names the reason."
       ],
       "externalDependencies": [],
       "reach": ["click button \"All remote threads, including ones started on a host\"", "expect heading \"Remote threads\""],

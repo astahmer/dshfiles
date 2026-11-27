@@ -67,7 +67,7 @@ export const isolatedWorkspaceSchema = Schema.Struct({
   created: Schema.Boolean,
 })
 
-export const cleanupKindSchema = Schema.Literals(['empty', 'integrated', 'merged', 'secondary', 'untracked'])
+export const cleanupKindSchema = Schema.Literals(['empty', 'integrated', 'merged', 'stale', 'secondary', 'untracked'])
 
 export const cleanupTargetSchema = Schema.Struct({
   repoRoot: nonEmptyString,

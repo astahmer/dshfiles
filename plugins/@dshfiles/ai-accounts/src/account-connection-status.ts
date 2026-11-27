@@ -45,6 +45,7 @@ export const accountConnectionStatus = (account: AccountProfile, usage: Accounts
 export const accountAuthenticationLabel = (account: Pick<AccountProfile, 'kind' | 'apiKeyEnv' | 'authSource'>): string => {
   if (account.kind === 'codex') return 'ChatGPT (OAuth)'
   if (account.kind === 'github-copilot') return 'GitHub (OAuth)'
+  if (account.kind === 'antigravity') return 'Antigravity CLI login'
   if (account.authSource === 'cli') return account.kind === 'claude' ? 'Claude Code subscription' : 'CLI login'
   if (account.apiKeyEnv !== '') return 'Credential reference'
   if (account.kind === 'claude') return 'Claude Code subscription'

@@ -968,7 +968,7 @@
     {
       "id": "thread-workspaces-panel",
       "title": "Thread integration control center",
-      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, blocked, conflicts, integrating, integrated, no changes, unverified) is kept separate from lifecycle (active, idle, finished, missing), so a workspace that merely sits behind the bookmark is 'no changes', never a blocker. Empty sections are not rendered while their counts stay in the filter bar. Rows prioritise the conversation title (falling back to the pending revision description, then the project name), the specific blocker, the pending-versus-behind distinction and a contextual action; workspace and thread ids stay secondary and copyable. Batch integration enqueues ready workspaces serially through the existing coordinator, and the queue line names what is active, queued or failed.",
+      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, stale, blocked, conflicts, integrating, integrated, no changes, unverified) is kept separate from lifecycle (active, idle, finished, missing), so a workspace that merely sits behind the bookmark is 'no changes', never a blocker. Work the bookmark moved past and nobody changed for the configured stale window leaves Ready and the inbox for its own Stale tab, while its row still lands one workspace at a time. Empty sections are not rendered while their counts stay in the filter bar. Rows prioritise the conversation title (falling back to the pending revision description, then the project name), the specific blocker, the pending-versus-behind distinction and a contextual action; workspace and thread ids stay secondary and copyable. Batch integration enqueues ready workspaces serially through the existing coordinator, and the queue line names what is active, queued or failed.",
       "reach": [
         "seed rebase-ready-thread",
         "click button \"Own workspace actions\"",
@@ -990,6 +990,12 @@
           "defaultValue": "empty",
           "constraints": "Absolute repository paths whose finished thread work is never integrated automatically; a manual Integrate on a row still works.",
           "coveredBy": ["jj-integration.auto-integration-repository-exclusion"]
+        },
+        {
+          "key": "staleAfterDays",
+          "defaultValue": "7",
+          "constraints": "Pending work the bookmark moved past and nobody changed for this many days is Stale: out of Ready and the inbox, still landable by its row. 0 disables the rule.",
+          "coveredBy": ["jj-integration.stale-after-days"]
         }
       ],
       "surfaces": ["client", "host", "integration"],
@@ -1004,6 +1010,7 @@
         "attention-filter",
         "lifecycle-filter",
         "ready-to-integrate",
+        "stale-workspace",
         "conflicts",
         "blocked-by-writer",
         "blocked-by-question",
@@ -1106,6 +1113,12 @@
           "id": "jj-integration.multiple-blockers",
           "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
           "testName": "shows every blocker while the failing one stays primary"
+        },
+        {
+          "kind": "unit-test",
+          "id": "jj-integration.stale-after-days",
+          "file": "plugins/@dshfiles/jj-integration/src/thread-integration-state.test.ts",
+          "testName": "marks work stale only when the bookmark moved past it and nobody changed it inside the window"
         }
       ],
       "telemetry": [
