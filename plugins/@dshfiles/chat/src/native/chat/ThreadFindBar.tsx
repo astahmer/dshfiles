@@ -11,8 +11,14 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEve
 import type { ChatViewSlotProps } from '../contract/slots.ts'
 import { ThreadFindPort, ThreadFindUnavailable } from '../../thread-find-port.ts'
 import { clearFindHighlight, findInLoadedRows, revealFindHit } from './find-reveal.ts'
-import { ThreadFindModel, type FindHit, type FindTurnAnchor } from './thread-find-model.ts'
+import { FIND_FILTERS, ThreadFindModel, type FindFilter, type FindHit, type FindTurnAnchor } from './thread-find-model.ts'
 import css from './ThreadFindBar.module.css'
+
+const FILTER_LABEL = {
+  assistant: 'chat.find.filter.assistant',
+  user: 'chat.find.filter.user',
+  tools: 'chat.find.filter.tools',
+} as const satisfies Readonly<Record<FindFilter, string>>
 
 export interface ThreadFindBarProps {
   readonly sessionId: string
@@ -42,40 +48,51 @@ const DEBOUNCE_MS = 160
 function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, revealTurn, readerSeq, t }: ThreadFindBarProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [text, setText] = useState('')
+  const [filters, setFilters] = useState<readonly FindFilter[]>([])
   const debounced = useDebouncedValue({ value: text, delayMs: DEBOUNCE_MS })
   const query = ThreadFindModel.indexQuery(debounced)
   const terms = useMemo(() => ThreadFindModel.terms(debounced), [debounced])
+  const eventTypes = useMemo(() => ThreadFindModel.eventTypesFor(filters), [filters])
+  const flowKinds = useMemo(() => ThreadFindModel.flowKindsFor(filters), [filters])
+  const filterKey = filters.join(',')
   const search = useQuery({
-    queryKey: ['chat', 'thread-find', sessionId, query],
+    queryKey: ['chat', 'thread-find', sessionId, query, filterKey],
     enabled: query !== null,
-    queryFn: ({ signal }) => ThreadFindPort.search({ sessionId, query: query ?? '' }, signal),
+    queryFn: ({ signal }) =>
+      ThreadFindPort.search(
+        eventTypes === undefined ? { sessionId, query: query ?? '' } : { sessionId, query: query ?? '', types: eventTypes },
+        signal,
+      ),
     retry: false,
     staleTime: 10_000,
     placeholderData: keepPreviousData,
   })
   // The loaded-window fallback reads the DOM, so it runs after commit for the query it answers.
-  const [loaded, setLoaded] = useState<{ readonly query: string; readonly hits: readonly FindHit[] } | null>(null)
+  const [loaded, setLoaded] = useState<{ readonly query: string; readonly filterKey: string; readonly hits: readonly FindHit[] } | null>(null)
   const unavailable = search.error instanceof ThreadFindUnavailable && search.error.missing
   const degraded = search.data !== undefined && search.data.state !== 'ready'
   const needsLoaded = query !== null && (unavailable || (degraded && !search.isPlaceholderData))
   useEffect(() => {
     if (!needsLoaded) return
     const root = list()
-    const hits = root === null ? [] : findInLoadedRows(root, terms).map(hit => ({ seq: null, nodeKey: hit.nodeKey, occurrence: hit.occurrence, snippet: hit.snippet }))
-    setLoaded({ query: debounced, hits })
-  }, [needsLoaded, debounced, terms, list])
+    const hits =
+      root === null
+        ? []
+        : findInLoadedRows(root, terms, flowKinds).map(hit => ({ seq: null, nodeKey: hit.nodeKey, occurrence: hit.occurrence, snippet: hit.snippet }))
+    setLoaded({ query: debounced, filterKey, hits })
+  }, [needsLoaded, debounced, terms, flowKinds, filterKey, list])
 
   const answer = useMemo<Answer>(() => {
     if (query === null) return { kind: 'idle' }
     if (needsLoaded) {
-      if (loaded === null || loaded.query !== debounced) return { kind: 'searching' }
+      if (loaded === null || loaded.query !== debounced || loaded.filterKey !== filterKey) return { kind: 'searching' }
       const note = unavailable ? t('chat.find.notInstalled') : t('chat.find.loadedOnly')
       return { kind: 'hits', source: 'loaded', hits: loaded.hits, total: loaded.hits.length, note }
     }
     if (search.isError) return { kind: 'error', message: search.error instanceof Error ? search.error.message : String(search.error) }
     if (search.data === undefined) return { kind: 'searching' }
     return { kind: 'hits', source: 'index', hits: search.data.hits, total: search.data.total, note: null }
-  }, [query, needsLoaded, loaded, debounced, unavailable, search.isError, search.error, search.data, t])
+  }, [query, needsLoaded, loaded, debounced, filterKey, unavailable, search.isError, search.error, search.data, t])
 
   const hits = answer.kind === 'hits' ? answer.hits : null
   const [current, setCurrent] = useState(-1)
@@ -122,6 +139,12 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
     if (hits === null || hits.length === 0) return
     setCurrent(index => ThreadFindModel.step(index, hits.length, direction))
   }
+  const onBarKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    if (event.key !== 'Escape') return
+    event.preventDefault()
+    event.stopPropagation()
+    onClose()
+  }
   const onKeyDown = (event: KeyboardEvent<HTMLInputElement>): void => {
     if (event.key === 'Escape') {
       event.preventDefault()
@@ -144,7 +167,7 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
           : ThreadFindModel.label(current, count, answer.total)
         : ''
   return (
-    <div className={css.bar} data-thread-find="" role="search" aria-label={t('chat.find.label')}>
+    <div className={css.bar} data-thread-find="" role="search" aria-label={t('chat.find.label')} onKeyDown={onBarKeyDown}>
       <div className={css.row}>
         <SearchIcon className={css.icon} size={14} strokeWidth={1.5} aria-hidden="true" />
         <input
@@ -173,6 +196,34 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
         <button type="button" className={css.button} aria-label={t('chat.find.close')} onClick={onClose}>
           <XIcon size={14} strokeWidth={1.5} aria-hidden="true" />
         </button>
+      </div>
+      <div className={css.filters} role="group" aria-label={t('chat.find.filters')} data-thread-find-filters="">
+        <button
+          type="button"
+          className={css.filter}
+          data-thread-find-filter="all"
+          data-active={filters.length === 0 ? '' : undefined}
+          aria-pressed={filters.length === 0}
+          onClick={() => setFilters([])}
+        >
+          {t('chat.find.filter.all')}
+        </button>
+        {FIND_FILTERS.map(option => {
+          const active = filters.includes(option)
+          return (
+            <button
+              key={option}
+              type="button"
+              className={css.filter}
+              data-thread-find-filter={option}
+              data-active={active ? '' : undefined}
+              aria-pressed={active}
+              onClick={() => setFilters(currentFilters => ThreadFindModel.toggleFilter(currentFilters, option))}
+            >
+              {t(FILTER_LABEL[option])}
+            </button>
+          )
+        })}
       </div>
       {answer.kind === 'error' && (
         <div className={css.status} role="alert" data-tone="danger">

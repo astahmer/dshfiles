@@ -23,6 +23,23 @@ export interface FindHit {
 /** Where the answer came from: the whole-thread index, or only the rows the transcript has loaded. */
 export type FindSource = 'index' | 'loaded'
 
+/** Narrowing categories offered in the find bar; an empty list searches everything. */
+export type FindFilter = 'assistant' | 'user' | 'tools'
+
+export const FIND_FILTERS: readonly FindFilter[] = ['assistant', 'user', 'tools']
+
+const EVENT_TYPES_BY_FILTER: Readonly<Record<FindFilter, readonly string[]>> = {
+  assistant: ['assistant/message'],
+  user: ['user/message'],
+  tools: ['tool/call', 'tool/result'],
+}
+
+const FLOW_KINDS_BY_FILTER: Readonly<Record<FindFilter, readonly string[]>> = {
+  assistant: ['assistant-step'],
+  user: ['user', 'steering', 'turn-trigger'],
+  tools: ['tool-call'],
+}
+
 export interface FindTurnAnchor {
   readonly turn: number
   readonly seq: number | null
@@ -109,6 +126,26 @@ export class ThreadFindModel {
     if (count <= 0) return -1
     if (index < 0) return count - 1
     return (index + (direction === 'older' ? -1 : 1) + count) % count
+  }
+
+  /** Toggle one filter category; selecting every category collapses back to `[]` (All). */
+  static readonly toggleFilter = (current: readonly FindFilter[], filter: FindFilter): readonly FindFilter[] => {
+    const next = current.includes(filter)
+      ? current.filter(candidate => candidate !== filter)
+      : FIND_FILTERS.filter(candidate => candidate === filter || current.includes(candidate))
+    return next.length === FIND_FILTERS.length ? [] : next
+  }
+
+  /** Session-search event types for the active filters, or undefined when unfiltered ("All"). */
+  static readonly eventTypesFor = (filters: readonly FindFilter[]): readonly string[] | undefined => {
+    if (filters.length === 0) return undefined
+    return filters.flatMap(filter => EVENT_TYPES_BY_FILTER[filter])
+  }
+
+  /** Rendered Chat row kinds (`data-chat-flow-kind`) for the loaded-window fallback, or undefined when unfiltered. */
+  static readonly flowKindsFor = (filters: readonly FindFilter[]): ReadonlySet<string> | undefined => {
+    if (filters.length === 0) return undefined
+    return new Set(filters.flatMap(filter => FLOW_KINDS_BY_FILTER[filter]))
   }
 
   /** The Chat row kind that renders an indexed event type, used to search an opened fold. */

@@ -269,11 +269,16 @@ export const revealFindHit = (target: FindRevealTarget, done: (outcome: FindReve
  * Loaded-window fallback: every mounted row whose text holds a term, oldest first, one entry per occurrence. Rows inside
  * folds are included (they are mounted with `hidden="until-found"`); rows a group never mounted are not.
  */
-export const findInLoadedRows = (list: HTMLElement, terms: readonly string[]): { readonly nodeKey: string; readonly occurrence: number; readonly snippet: string }[] => {
+export const findInLoadedRows = (
+  list: HTMLElement,
+  terms: readonly string[],
+  flowKinds?: ReadonlySet<string>,
+): { readonly nodeKey: string; readonly occurrence: number; readonly snippet: string }[] => {
   const hits: { nodeKey: string; occurrence: number; snippet: string }[] = []
   for (const row of list.querySelectorAll<HTMLElement>('[data-chat-node-key]')) {
     // A row inside another row (a group member) is counted once, by its innermost element.
     if (row.querySelector('[data-chat-node-key]') !== null) continue
+    if (flowKinds !== undefined && !flowKinds.has(row.dataset.chatFlowKind ?? '')) continue
     const key = row.dataset.chatNodeKey
     if (key === undefined) continue
     const ranges = findTextRanges(row, terms)

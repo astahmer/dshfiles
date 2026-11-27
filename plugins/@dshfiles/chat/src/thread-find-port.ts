@@ -44,7 +44,13 @@ const decodeReply = (raw: unknown): ThreadFindReply | undefined => Option.getOrU
 export const SESSION_SEARCH_FIND_API = { owner: '@dshfiles/session-search', id: 'session-search', version: 1, methods: ['findInThread'] } as const
 
 export type ThreadFindCall = (
-  input: { readonly sessionId: string; readonly text: string; readonly limit: number; readonly newest: boolean },
+  input: {
+    readonly sessionId: string
+    readonly text: string
+    readonly limit: number
+    readonly newest: boolean
+    readonly types?: readonly string[]
+  },
   signal: AbortSignal,
 ) => Promise<ThreadFindReply | undefined>
 
@@ -75,10 +81,18 @@ export class ThreadFindPort {
    * Ask the index.
    * @throws ThreadFindUnavailable with `missing` when no plugin serves find; any other failure is a real error.
    */
-  static readonly search = async (input: { readonly sessionId: string; readonly query: string }, signal: AbortSignal): Promise<ThreadFindAnswer> => {
+  static readonly search = async (
+    input: { readonly sessionId: string; readonly query: string; readonly types?: readonly string[] },
+    signal: AbortSignal,
+  ): Promise<ThreadFindAnswer> => {
     const call = globalThis.__dshfilesChatThreadFind
     if (call === null || call === undefined) throw new ThreadFindUnavailable(true, 'Thread search is not installed.')
-    const answer = await call({ sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true }, signal)
+    const types = input.types !== undefined && input.types.length > 0 ? input.types : undefined
+    const payload =
+      types === undefined
+        ? { sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true }
+        : { sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true, types }
+    const answer = await call(payload, signal)
     if (answer === undefined)
       throw new ThreadFindUnavailable(false, 'Thread search answered in a shape this view does not read. Update @dshfiles/session-search and restart DSH.')
     return {
