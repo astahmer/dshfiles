@@ -754,7 +754,7 @@ const SettingsColumnList = (props: {
   return (
     <nav ref={column} aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col" data-settings-column="">
       {OriginFilter === undefined ? null : (
-        <div className="dshx:pb-3" data-settings-column-filter="">
+        <div data-settings-column-filter="">
           <OriginFilter />
         </div>
       )}

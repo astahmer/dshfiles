@@ -40,6 +40,20 @@ describe('segmented filter (DESIGN.md: one segmented control)', () => {
     act(() => root.unmount())
   })
 
+  it('fills its row when asked, each item an equal share, so neighbouring labels never touch', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const root = createRoot(container)
+    act(() =>
+      root.render(
+        <SegmentedFilter fill label="Source" onChange={() => {}} optionAttribute="data-origin-option" options={[{ id: 'all', label: 'All' }, { id: 'dsh', label: 'DSH' }]} value="all" />,
+      ),
+    )
+    expect(container.querySelector('[role="group"]')?.className).toContain('dshx:w-full')
+    for (const item of container.querySelectorAll('button')) expect(item.className).toContain('dshx:flex-1')
+    act(() => root.unmount())
+  })
+
   it('keeps Plugins by category on the design tokens: sentence-case heads, 8px cards, a guarded spinner', () => {
     const page = read('dshfiles-plugins-page.tsx')
     expect(page).not.toContain('dshx:uppercase')

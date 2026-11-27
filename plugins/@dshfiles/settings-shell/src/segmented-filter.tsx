@@ -26,7 +26,7 @@ export const SegmentedFilter = <Id extends string>(props: {
     aria-label={props.label}
     className={cn(
       'dshx:h-(--dshx-control-h) dshx:items-center dshx:rounded-lg dshx:bg-muted dshx:p-[3px]',
-      props.fill === true ? 'dshx:flex' : 'dshx:inline-flex dshx:shrink-0',
+      props.fill === true ? 'dshx:flex dshx:w-full' : 'dshx:inline-flex dshx:shrink-0',
     )}
     role="group"
   >

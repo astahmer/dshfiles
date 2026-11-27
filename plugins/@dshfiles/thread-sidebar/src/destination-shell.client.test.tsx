@@ -315,6 +315,8 @@ describe('DestinationShell', () => {
     // First in the column, above the first group, so it reads as the list's own control.
     const first = column.querySelector('[data-settings-group]')
     expect(first === null ? 0 : filter.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    // The first group keeps its 20px step under the filter, as under any group: the filter adds no room of its own.
+    expect(column.querySelector('[data-settings-column-filter]')?.className ?? '').not.toMatch(/dshx:p[bty]?-/u)
   })
 
   it('brings the current Settings row into view at its nearest edge, its group label shown (council round 18 B2.4)', async () => {
