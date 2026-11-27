@@ -324,7 +324,7 @@ describe('Source and Group by (round 28, item 8)', () => {
 
   it('puts Group by in its own Display section under a hairline, Manual standing for Arrange manually', () => {
     render(<ListFilterPanel {...panel()} />)
-    const display = screen.getByRole('region', { name: 'threadSidebarFilterDisplay' })
+    const display = screen.getByRole('region', { name: 'threadSidebarGroupBy' })
     const group = within(display).getByRole('radiogroup', { name: 'threadSidebarGroupBy' })
     expect(group.hasAttribute('data-segmented')).toBe(true)
     const manual = within(group).getByRole('radio', { name: 'Arrange manually' })
@@ -693,5 +693,18 @@ describe('chip widths (round 29, item 9)', () => {
       expect(label?.className).toContain('dshx:segment-label')
       expect(label?.getAttribute('data-label')).toBe(label?.textContent)
     }
+  })
+})
+
+// Council round 28, item 11: one heading, "Group by", under the hairline; Reset says what it covers in its description.
+describe('one Group by label (round 29, item 11)', () => {
+  it('heads the grouping section "Group by" alone, and names Reset\'s scope in its description', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const section = screen.getByRole('region', { name: 'threadSidebarGroupBy' })
+    expect(within(section).getAllByRole('heading').map(heading => heading.textContent)).toEqual(['threadSidebarGroupBy'])
+    expect(screen.queryByText('threadSidebarFilterDisplay')).toBeNull()
+    expect(within(section).getByRole('radiogroup', { name: 'threadSidebarGroupBy' })).toBeTruthy()
+    const reset = screen.getByRole('button', { name: 'threadSidebarFilterResetLabel' })
+    expect(document.getElementById(reset.getAttribute('aria-describedby') ?? '')?.textContent).toBe('threadSidebarFilterResetScope')
   })
 })

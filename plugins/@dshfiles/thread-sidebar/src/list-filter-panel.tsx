@@ -250,8 +250,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           type="button"
           variant="ghost"
           size="sm"
-          // Reset covers the filters, not the Display section under its own hairline (round 28, item 8).
+          // Reset covers the presets, status and source, not Group by under its own hairline (round 28, items 8 and 11).
           aria-label={t('threadSidebarFilterResetLabel')}
+          aria-describedby={`${ids}-reset-scope`}
           disabled={props.reset.disabled}
           onClick={props.reset.onReset}
           data-thread-filter-reset=""
@@ -259,6 +260,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
         >
           {t('threadSidebarFilterReset')}
         </Button>
+        <span id={`${ids}-reset-scope`} className="dshx:sr-only">
+          {t('threadSidebarFilterResetScope')}
+        </span>
         <Button
           type="button"
           variant="ghost"
@@ -379,14 +383,12 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
         </div>
       )}
       {props.group === undefined ? null : (
-        // Display, under its own hairline: how the list is drawn, which Reset above does not cover.
-        <section className="dshx:grid dshx:gap-1.5 dshx:px-3 dshx:pt-2.5 dshx:pb-3" aria-labelledby={`${ids}-display`} data-thread-filter-display="">
-          <h3 id={`${ids}-display`} className={HEADING}>
-            {t('threadSidebarFilterDisplay')}
-          </h3>
-          <span id={`${ids}-group`} className="dshx:text-xs dshx:text-foreground">
+        // Group by, under its own hairline: how the list is drawn, which Reset above does not cover (its description
+        // says so). One heading (council round 28, item 11).
+        <section className="dshx:grid dshx:gap-1.5 dshx:px-3 dshx:pt-2.5 dshx:pb-3" aria-labelledby={`${ids}-group`} data-thread-filter-display="">
+          <h3 id={`${ids}-group`} className={HEADING}>
             {t('threadSidebarGroupBy')}
-          </span>
+          </h3>
           <Segmented
             labelledBy={`${ids}-group`}
             value={props.group.value}
