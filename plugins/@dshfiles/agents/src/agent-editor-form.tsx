@@ -146,7 +146,7 @@ const ProjectDefaultsSection = (props: {
                   <Checkbox id={id} checked={on} onCheckedChange={() => toggle(project.id)} />
                   <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                     <span className="dshx:truncate dshx:text-sm">{project.title}</span>
-                    <span className="dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{project.path}</span>
+                    <span className="dshx:truncate dshx:font-mono dshx:text-2xs dshx:text-muted-foreground">{project.path}</span>
                   </span>
                   <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:max-w-28 dshx:@max-pane-narrow:truncate">
                     {status}
@@ -694,7 +694,7 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
                 ? subagents.allowed !== 'any' && subagents.allowed.length === 0
                   ? 'No agent is listed, so its subagents can only run as the default above.'
                   : 'A subagent started without an agent runs as the default.'
-                : 'Subagents are off above; these choices apply once they are on.'
+                : 'Subagents are off above. These choices apply once they are on.'
             }
           />
         </div>

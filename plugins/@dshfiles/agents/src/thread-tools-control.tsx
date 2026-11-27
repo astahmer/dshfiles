@@ -1,3 +1,4 @@
+import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import {
   DropdownMenu,
@@ -82,7 +83,7 @@ export const ThreadToolsControl = (props: ThreadToolsControlProps): ReactNode =>
           <span className="dshx:min-w-0 dshx:truncate dshx:@max-pane-narrow:sr-only">
             {state.overridden && state.value === 'all' ? 'All tools' : `@${state.agent}`}
           </span>
-          {state.overridden ? <span aria-hidden className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-warning" /> : null}
+          {state.overridden ? <StatusDot size="sm" tone="warning" /> : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent side="top" align="start" className="dshx-root dshx:w-80 dshx:max-w-[calc(100vw-1rem)]">

@@ -81,7 +81,7 @@
     },
     {
       "id": "workspace-attribution",
-      "title": "Which project a Session belongs to",
+      "title": "Which project a thread belongs to",
       "summary": "Tells other plugins which project a thread belongs to, counting a thread workspace for the project it was cut from.",
       "details": "WorkspaceAttribution (subpath ./workspace-attribution) maps a Session to its DSH project from the workspace registry: a thread workspace (<repository>-threads/thread-…, or a provider-reported custom threads directory) belongs to the project it was cut from; a Session no workspace lists falls back to its recorded cwd. thread-sidebar groups by it and agents picks a project's default agent with it.",
       "surface": "infrastructure",

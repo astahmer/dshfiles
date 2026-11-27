@@ -60,7 +60,7 @@ export const createComposerAgentPorts = (ctx: Context): ComposerAgentPorts => {
       const local = drafts()
       if (local?.list.getSnapshot()[sessionId]?.local === true && local.stagePreset(id, preset)) return null
       const presets = ctx.get('remote.agentPresets')
-      if (presets === undefined) return 'this Host composes no Agent preset roster'
+      if (presets === undefined) return 'this DSH loads no Agent preset roster'
       const result = await presets.select(id, preset)
       return result.ok ? null : result.error.message
     },
