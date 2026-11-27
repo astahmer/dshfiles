@@ -489,7 +489,10 @@ const StatusChips = (props: {
   const chip = (filter: ThreadStatusFilter): JSX.Element => (
     <ToggleGroupItem key={filter} value={filter} className={CHIP}>
       <ChipSeat on={props.selected.includes(filter)} filter={filter} />
-      {props.t(threadStatusFilterLabelKeys[filter])}
+      {/* The label keeps its 550 width at rest, so selecting a chip never moves its neighbours (round 29, item 9). */}
+      <span data-slot="segment-label" data-label={props.t(threadStatusFilterLabelKeys[filter])} className="dshx:segment-label">
+        {props.t(threadStatusFilterLabelKeys[filter])}
+      </span>
     </ToggleGroupItem>
   )
   return (

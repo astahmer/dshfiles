@@ -678,3 +678,20 @@ describe('the closed trigger (round 29, item 8)', () => {
     expect(trigger).not.toContain('thread-view-attention-dot')
   })
 })
+
+// Council round 28, item 9: selecting a chip never shifts its neighbours: its label reserves its 550 width.
+describe('chip widths (round 29, item 9)', () => {
+  it('wraps every status chip label in a segment label that reserves the selected weight', () => {
+    render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    const chips = within(screen.getByRole('toolbar', { name: 'threadSidebarFilterStatus' }))
+      .getAllByRole('button')
+      .filter(chip => !chip.hasAttribute('data-thread-status-more'))
+    expect(chips.length).toBeGreaterThan(10)
+    for (const chip of chips) {
+      const label = chip.querySelector('[data-slot="segment-label"]')
+      expect(label?.className).toContain('dshx:segment-label')
+      expect(label?.getAttribute('data-label')).toBe(label?.textContent)
+    }
+  })
+})
