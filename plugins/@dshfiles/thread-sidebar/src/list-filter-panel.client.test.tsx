@@ -7,6 +7,7 @@ import { act, cleanup, fireEvent, render as renderUi, screen, within } from '@te
 import type { ReactElement } from 'react'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { threadSidebarDictionaries } from './locales.js'
 import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, type ListFilterPanelProps } from './list-filter-panel.js'
 
 afterEach(cleanup)
@@ -555,7 +556,7 @@ describe('the More statuses disclosure, placed (round 29, item 3)', () => {
     const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
     expect(more.hasAttribute('disabled')).toBe(false)
     expect(more.getAttribute('aria-disabled')).toBe('true')
-    expect(document.getElementById(more.getAttribute('aria-describedby') ?? '')?.textContent).toBe('threadSidebarFilterFoldHint')
+    expect(document.getElementById(more.getAttribute('aria-describedby') ?? '')?.textContent).toBe('threadSidebarFilterFoldHintOne')
     fireEvent.click(more)
     expect(more.getAttribute('aria-expanded')).toBe('true')
   })
@@ -870,7 +871,8 @@ describe('the forced-open disclosure (round 30, item 3)', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
     const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
     const hint = element(document.getElementById(more.getAttribute('aria-describedby') ?? ''))
-    expect(hint.textContent).toBe('threadSidebarFilterFoldHint')
+    // Names its cause since round 33 (item 7).
+    expect(hint.textContent).toBe('threadSidebarFilterFoldHintOne')
     expect(hint.className).not.toContain('sr-only')
     // On screen; its style is round 31's group-label line (item 5).
     expect(hint.getClientRects).toBeDefined()
@@ -1569,5 +1571,21 @@ describe('desktop Save stands out (round 33, item 6)', () => {
     expect(save).not.toContain('dshx:text-muted-foreground')
     expect(discard).toContain('dshx:text-muted-foreground')
     expect(discard).not.toContain('dshx:text-foreground')
+  })
+})
+
+// Council round 32, item 7: the forced hint names what holds the region open: "Archived is on. Turn it off to fold."
+describe('the fold hint names its cause (round 33, item 7)', () => {
+  const words: Readonly<Record<string, string>> = threadSidebarDictionaries.en
+  const translate: ListFilterPanelProps['t'] = (key, params) => (words[key] ?? key).replace(/\{(\w+)\}/gu, (_, name: string) => String(params?.[name] ?? ''))
+  const hint = (): string => element(document.querySelector('[data-thread-status-fold-hint]')).textContent ?? ''
+  it('says which revealed status is on, singular or plural, and sits at the label x', () => {
+    const { rerender } = render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} t={translate} />)
+    expect(hint()).toBe('Archived is on. Turn it off to fold.')
+    expect(element(document.querySelector('[data-thread-status-fold-hint]')).className).toContain('dshx:pl-6')
+    rerender(<ListFilterPanel {...panel({ status: { selected: ['muted', 'archived'], onChange: vi.fn() } })} t={translate} />)
+    expect(hint()).toBe('Muted and Archived are on. Turn them off to fold.')
+    rerender(<ListFilterPanel {...panel({ status: { selected: ['working', 'interrupted', 'muted', 'archived'], onChange: vi.fn() } })} t={translate} />)
+    expect(hint()).toBe('Interrupted, Muted and Archived are on. Turn them off to fold.')
   })
 })

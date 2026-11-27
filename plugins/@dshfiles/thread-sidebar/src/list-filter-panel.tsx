@@ -649,6 +649,17 @@ const StatusChips = (props: {
   const expanded = opened || forced
   const leading = props.selected.filter(isLeadingStatus)
   const revealed = props.selected.filter(filter => !isLeadingStatus(filter))
+  // What holds the region open, named (council round 32, item 7): "Archived is on. Turn it off to fold."
+  const holding = THREAD_STATUS_FILTER_GROUPS.slice(1)
+    .flatMap(group => group.filters)
+    .filter(filter => revealed.includes(filter))
+    .map(filter => props.t(threadStatusFilterLabelKeys[filter]))
+  const foldHint =
+    holding.length === 1
+      ? props.t('threadSidebarFilterFoldHintOne', { name: holding[0] ?? '' })
+      : props.t('threadSidebarFilterFoldHintMany', {
+          names: `${holding.slice(0, -1).join(props.t('threadSidebarListComma'))}${props.t('threadSidebarListAnd')}${holding.at(-1) ?? ''}`,
+        })
   /** Apply a group's next value, naming the chip it turned on or off. */
   const toggle = (next: readonly ThreadStatusFilter[], others: readonly ThreadStatusFilter[]): void => {
     const combined = nextStatusFilters([...next, ...others])
@@ -734,7 +745,7 @@ const StatusChips = (props: {
           // Why it will not fold (council round 29, item 3): its own line under it, at its label's x (36px), in the group
           // label style (council round 30, item 5); also its description for a screen reader.
           <p id={`${moreId}-hint`} className="dshx:-mt-1 dshx:pl-6 dshx:text-2xs dshx:text-(--dsw-alias-label-tertiary)" data-thread-status-fold-hint="">
-            {props.t('threadSidebarFilterFoldHint')}
+            {foldHint}
           </p>
         ) : null}
         {/* The disclosure's region stays mounted (its aria-controls target); it holds the other groups while open. */}
