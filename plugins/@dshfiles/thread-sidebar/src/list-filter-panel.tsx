@@ -277,6 +277,20 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
     for (const target of [section, ...seats]) observer.observe(target)
     return () => observer.disconnect()
   })
+  // Whether more content waits below the fold: the foot fades 16px while it does (council round 30, item 7).
+  const [moreBelow, setMoreBelow] = useState(false)
+  const measureMoreBelow = (): void => {
+    const root = panelRef.current
+    if (root !== null) setMoreBelow(root.scrollTop + root.clientHeight < root.scrollHeight - 1)
+  }
+  useLayoutEffect(() => {
+    measureMoreBelow()
+    const root = panelRef.current
+    if (root === null || globalThis.ResizeObserver === undefined) return
+    const observer = new ResizeObserver(measureMoreBelow)
+    for (const target of [root, ...Array.from(root.children)]) observer.observe(target)
+    return () => observer.disconnect()
+  })
   /** The last action, named for the live region; a new seq says it again even when its words repeat. */
   const [note, setNote] = useState<{ readonly text: string; readonly seq: number } | undefined>(undefined)
   const setChange = (text: string | undefined): void => {
@@ -296,7 +310,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
       ref={panelRef}
       // One shrinkable column (an `auto` one grows to a row's min-content: council round 29, item 4) and a clipped x axis
       // as the guard, so the phone sheet never scrolls sideways.
-      className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:grid-cols-[minmax(0,1fr)] dshx:divide-y dshx:divide-border dshx:overflow-x-clip dshx:overflow-y-auto dshx:overscroll-contain"
+      className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:grid-cols-[minmax(0,1fr)] dshx:divide-y dshx:divide-border dshx:overflow-x-clip dshx:overflow-y-auto dshx:overscroll-contain dshx:data-[more-below]:[mask-image:linear-gradient(to_bottom,currentcolor_calc(100%-16px),transparent)]"
+      onScroll={measureMoreBelow}
+      data-more-below={moreBelow ? '' : undefined}
       data-thread-list-filter-panel=""
     >
       {/* The change and the count it leaves (council rounds 29 and 30): "Unread on, 5 threads shown", once. */}

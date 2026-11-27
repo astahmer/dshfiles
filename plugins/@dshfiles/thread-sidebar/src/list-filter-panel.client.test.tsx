@@ -651,7 +651,7 @@ describe('the panel scrolls under its header (round 29, item 7)', () => {
     expect(header.className).toContain('dshx:top-0')
     // The phone sheet's grabber padding now sits outside the scroller, so the header needs no offset there.
     expect(header.className).not.toContain('dshx:phone:-top-5')
-    expect(filterControl).toMatch(/className="dshx-root dshx:flex dshx:w-80 dshx:max-w-\[calc\(100vw-1rem\)\] dshx:flex-col dshx:overflow-hidden dshx:p-0/u)
+    expect(filterControl).toMatch(/className="dshx-root dshx:flex [^"]*dshx:w-80 dshx:max-w-\[calc\(100vw-1rem\)\] dshx:flex-col dshx:overflow-hidden dshx:p-0/u)
   })
 })
 
@@ -1253,5 +1253,30 @@ describe('fresh announcements (round 31, item 6)', () => {
     act(() => vi.advanceTimersByTime(1200))
     rerender(<ListFilterPanel {...base} shown="3 threads shown" />)
     expect(status()).toBe('3 threads shown')
+  })
+})
+
+// Council round 30, item 7: measured at 1440 × 700, opening More grew the panel past the room below its trigger and
+// Radix shifted it from top 88 to top 8. Its height is capped at the room below the trigger, so its top holds and only
+// its content scrolls, with a 16px fade at the foot while more content remains.
+describe('the desktop panel holds its top (round 31, item 7)', () => {
+  it('caps the popover at the room below the trigger as well as the available height', () => {
+    expect(filterControl).toContain('dshx:max-h-[min(var(--radix-popover-content-available-height),var(--filter-panel-room,100dvh))]')
+    expect(client).toMatch(/'--filter-panel-room': `\$\{String\(filterPanelRoom\)\}px`/u)
+    expect(filterControl).toContain('style={filterPanelStyle}')
+    expect(client).toContain('window.innerHeight - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING')
+  })
+
+  it('fades its foot while more content remains below, and drops the fade at the end', () => {
+    const { container } = render(<ListFilterPanel {...panel()} />)
+    const root = element(container.querySelector('[data-thread-list-filter-panel]'))
+    expect(root.className).toContain('dshx:data-[more-below]:[mask-image:linear-gradient(to_bottom,currentcolor_calc(100%-16px),transparent)]')
+    Object.defineProperties(root, { scrollHeight: { value: 800, configurable: true }, clientHeight: { value: 600, configurable: true } })
+    root.scrollTop = 0
+    fireEvent.scroll(root)
+    expect(root.hasAttribute('data-more-below')).toBe(true)
+    root.scrollTop = 200
+    fireEvent.scroll(root)
+    expect(root.hasAttribute('data-more-below')).toBe(false)
   })
 })

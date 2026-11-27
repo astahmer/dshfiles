@@ -159,6 +159,7 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
   type ReactNode,
+  type CSSProperties,
 } from 'react'
 import { createPortal } from 'react-dom'
 import * as Result from 'effect/Result'
@@ -770,6 +771,11 @@ const finishedSubagentsLabels = {
   collapse: 'threadSidebarFinishedSubagentsCollapse',
   hide: 'threadSidebarFinishedSubagentsHide',
 } as const
+
+/** The Filter panel's distance from the window's edges, and the least height it keeps when its trigger sits low. */
+const FILTER_PANEL_COLLISION_PADDING = 8
+const FILTER_PANEL_MIN_ROOM = 240
+type FilterPanelRoomStyle = CSSProperties & { readonly '--filter-panel-room': string }
 
 const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
   <Tooltip>
@@ -2526,6 +2532,20 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const [viewsManagerOpen, setViewsManagerOpen] = useState(false)
   // The thread list's Filter panel; closed by the footer's places and by the prompts it opens.
   const [filterOpen, setFilterOpen] = useState(false)
+  // The room below the Filter trigger (council round 30, item 7): the desktop panel is capped at it, so a taller state
+  // (More open) scrolls inside instead of Radix shifting the panel up off its trigger; measured on open and on resize.
+  const filterTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const [filterPanelRoom, setFilterPanelRoom] = useState<number | null>(null)
+  useLayoutEffect(() => {
+    if (!filterOpen) return
+    const measure = (): void => {
+      const trigger = filterTriggerRef.current
+      if (trigger !== null) setFilterPanelRoom(Math.max(FILTER_PANEL_MIN_ROOM, window.innerHeight - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [filterOpen])
   const [presetPrompt, setPresetPrompt] = useState<PresetNamePrompt | null>(null)
   const [presetToDelete, setPresetToDelete] = useState<{ readonly id: string; readonly label: string } | null>(null)
   const [threadToScrollTo, setThreadToScrollTo] = useState<string | null>(null)
@@ -6723,6 +6743,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       </DropdownMenuContent>
     </DropdownMenu>
   )
+  const filterPanelStyle: FilterPanelRoomStyle | undefined = filterPanelRoom === null ? undefined : { '--filter-panel-room': `${String(filterPanelRoom)}px` }
   const filterMenu = (
     <Popover open={filterOpen} onOpenChange={setFilterOpen}>
       <PopoverTrigger asChild>
@@ -6730,6 +6751,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           type="button"
           // The kit quiet secondary (council round 18 B1.4): the one look for an action beside a search field, the trigger
           // fill and hairline with its label in secondary ink, ink while the menu is open, whether or not a filter is on.
+          ref={filterTriggerRef}
           variant="quiet"
           size="field"
           data-thread-list-filter=""
@@ -6786,7 +6808,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         side="right"
         align="start"
         sideOffset={8}
-        collisionPadding={8}
+        collisionPadding={FILTER_PANEL_COLLISION_PADDING}
+        style={filterPanelStyle}
         // Open on the preset in force, not on the first focusable control, the presets' ⋯ (round 28, item 14).
         onOpenAutoFocus={event => {
           const target = event.currentTarget instanceof HTMLElement ? filterPanelInitialFocus(event.currentTarget) : null
@@ -6797,7 +6820,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         aria-label={props.tSidebar('threadSidebarFilters')}
         // The phone sheet opens taller than the kit's 72dvh, so both Status rows show with three presets (round 28, item 10).
         // A column that holds still: the panel inside scrolls under its sticky header (round 29, item 7).
-        className="dshx-root dshx:flex dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:overflow-hidden dshx:p-0 dshx:phone:max-h-[85dvh]! dshx:phone:overflow-hidden!"
+        // Its top holds on a desktop: no taller than the room below the trigger (round 31, item 7).
+        className="dshx-root dshx:flex dshx:max-h-[min(var(--radix-popover-content-available-height),var(--filter-panel-room,100dvh))] dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:overflow-hidden dshx:p-0 dshx:phone:max-h-[85dvh]! dshx:phone:overflow-hidden!"
       >
         <ListFilterPanel
           t={props.tSidebar}
