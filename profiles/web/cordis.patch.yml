@@ -240,6 +240,13 @@
               toolName: subagent
               modelSelection: true
               modelDiscovery: true
+              # Resume a delegated child whose completed turn hands the task back instead of implementing it.
+              # `enabled: false` is the off switch; a turn with minToolCalls calls is work.
+              # See plugins/@dshfiles/tool-subagent/README.md#the-child-turn-guard.
+              childTurnGuard:
+                enabled: true
+                minToolCalls: 3
+                maxResumes: 2
           - id: tool-subagent-fork
             name: '@dshfiles/tool-subagent'
             config:

@@ -34,6 +34,8 @@ import { SubagentPresetSelection, type PresetSelectionConfig, type PresetSelecti
 import type {} from './model-selection-settings.ts'
 import type {} from '../agent-resolver.ts'
 import { AGENT_PARAMETER_DESCRIPTION, agentPrompt, agentRouteOptions, selectSubagentAgent } from './agent-selection.ts'
+import { ChildTurnGuard, type ChildTurnGuardRow } from '../child-turn-guard.ts'
+import { installChildTurnGuard } from '../child-turn-guard-host.ts'
 import {
   followedSubagentModelSelectionProjectionDefinition,
   followingSubagentModelSelection,
@@ -83,6 +85,14 @@ export interface Config extends PresetSelectionConfig {
    * the current Host subagent depth setting (default `1`) at each delegation.
    */
   maxDepth?: number | 'provider-managed'
+  /**
+   * Keep a delegated child working when its completed turn hands the task back
+   * ("no implementation yet, please reassign") instead of implementing it.
+   * A child turn that made `minToolCalls` calls is ordinary work whatever it
+   * says; at most `maxResumes` continuing messages are steered, then the parent
+   * is told. `enabled: false` is the off switch.
+   */
+  childTurnGuard?: ChildTurnGuardRow
 }
 
 export const Config: z<Config> = z.object({
@@ -105,6 +115,15 @@ export const Config: z<Config> = z.object({
   agentPreset: z.string().min(1),
   allowedAgentPresets: (z.array(z.string().min(1)).min(1) as z<string[] | undefined>).default(undefined),
   maxDepth: z.union([z.natural().max(Number.MAX_SAFE_INTEGER), z.const('provider-managed' as const)]),
+  // Omitted fields keep the guard's own defaults; Schemastery would otherwise
+  // materialize an omitted pattern list as `[]`, which reads as "match nothing".
+  childTurnGuard: z.object({
+    enabled: z.boolean().default(ChildTurnGuard.DEFAULT.enabled),
+    minToolCalls: z.natural().max(Number.MAX_SAFE_INTEGER).default(ChildTurnGuard.DEFAULT.minToolCalls),
+    maxResumes: z.natural().max(Number.MAX_SAFE_INTEGER).default(ChildTurnGuard.DEFAULT.maxResumes),
+    handBackPatterns: z.array(z.string()).default(undefined as unknown as string[]),
+    resumeMessage: z.string().min(1).default(ChildTurnGuard.DEFAULT.resumeMessage),
+  }).default(undefined as unknown as ChildTurnGuardRow),
 })
 
 /**
@@ -434,4 +453,7 @@ export async function apply(ctx: Context, config: Config): Promise<void> {
         + ` Do not call \`${toolName}\` at this depth; carry out the work directly.`
     },
   })
+  // The guard is one Host policy, not a per-tool option: the canonical `subagent` row owns
+  // it, so a sibling row's defaults can never contradict the switch the user set here.
+  if ((config.toolName ?? 'subagent') === 'subagent') installChildTurnGuard(ctx, config.childTurnGuard)
 }
