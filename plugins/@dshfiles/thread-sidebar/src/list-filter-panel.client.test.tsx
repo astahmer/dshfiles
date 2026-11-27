@@ -120,7 +120,6 @@ describe('the Filter panel', () => {
     unmount()
     render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
     expect(screen.getByRole('button', { name: 'threadSidebarArchived', pressed: true })).toBeTruthy()
-    expect(screen.queryByRole('button', { name: 'threadSidebarFilterMoreStatuses' })).toBeNull()
   })
 
   it('gives every control a 44pt touch target and a 36pt chip on a coarse pointer', () => {
@@ -171,5 +170,38 @@ describe('preset marks (round 28, item 1)', () => {
     expect(done.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('ready')
     expect(done.querySelector('[data-slot="status-dot"]')).toBeNull()
     expect(screen.getByRole('radio', { name: 'Working (2)' }).querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
+  })
+})
+
+// Council round 27, item 2: More statuses is a real disclosure that stays mounted, says whether it is open and folds again.
+describe('the More statuses disclosure (round 28, item 2)', () => {
+  it('stays mounted with a truthful aria-expanded and aria-controls, turns its chevron and folds again', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })
+    expect(more.getAttribute('aria-expanded')).toBe('false')
+    const controls = more.getAttribute('aria-controls')
+    expect(controls).toBeTruthy()
+    const region = document.getElementById(controls ?? '')
+    expect(region).not.toBeNull()
+    expect(region?.querySelector('button')).toBeNull()
+    more.focus()
+    fireEvent.click(more)
+    // Same element, still focused, now open; the region it names holds the hidden statuses.
+    expect(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })).toBe(more)
+    expect(document.activeElement).toBe(more)
+    expect(more.getAttribute('aria-expanded')).toBe('true')
+    expect(more.querySelector('svg')?.getAttribute('class')).toContain('dshx:rotate-180')
+    expect(within(region as HTMLElement).getByRole('button', { name: 'threadSidebarArchived' })).toBeTruthy()
+    fireEvent.click(more)
+    expect(more.getAttribute('aria-expanded')).toBe('false')
+    expect(screen.queryByRole('button', { name: 'threadSidebarArchived' })).toBeNull()
+  })
+
+  it('cannot fold while one of the statuses it holds is on', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })
+    expect(more.getAttribute('aria-expanded')).toBe('true')
+    expect(more.hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'threadSidebarArchived', pressed: true })).toBeTruthy()
   })
 })

@@ -291,7 +291,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
 const LEADING_STATUS_GROUP = THREAD_STATUS_FILTER_GROUPS[0]
 const isLeadingStatus = (filter: ThreadStatusFilter): boolean => LEADING_STATUS_GROUP.filters.some(candidate => candidate === filter)
 
-/** Status: "Any" and the activity chips; More opens why a thread waits and where it is stored, each on its own line. */
+/**
+ * Status: "Any" and the activity chips; More statuses (a disclosure, round 28 item 2) opens why a thread waits and
+ * where it is stored, each on its own line. It stays mounted, says whether it is open, folds again, and cannot fold
+ * while one of the statuses it holds is on.
+ */
 const StatusChips = (props: {
   readonly t: ThreadSidebarTranslate
   readonly headingId: string
@@ -299,8 +303,9 @@ const StatusChips = (props: {
   readonly onChange: (filters: readonly ThreadStatusFilter[]) => void
 }): JSX.Element => {
   const [opened, setOpened] = useState(false)
-  // A status in force never hides: More stays open while one of its chips is on.
-  const expanded = opened || props.selected.some(filter => !isLeadingStatus(filter))
+  const moreId = useId()
+  const forced = props.selected.some(filter => !isLeadingStatus(filter))
+  const expanded = opened || forced
   return (
     <section className="dshx:grid dshx:gap-1.5" aria-labelledby={props.headingId}>
       <h3 id={props.headingId} className={HEADING}>
@@ -318,38 +323,48 @@ const StatusChips = (props: {
         <ToggleGroupItem value={ALL_STATUSES} className={CHIP}>
           {props.t('threadSidebarFilterNone')}
         </ToggleGroupItem>
-        {THREAD_STATUS_FILTER_GROUPS.map((group, index) =>
-          index > 0 && !expanded ? null : (
-            <Fragment key={group.id}>
-              {/* A later group starts its own line under a small label: the line break is the label's full width. */}
-              {index === 0 ? null : (
-                <span className="dshx:w-full dshx:pt-1 dshx:text-xs dshx:text-muted-foreground" aria-hidden="true">
-                  {props.t(threadStatusFilterGroupLabelKeys[group.id])}
-                </span>
-              )}
-              {group.filters.map(filter => (
-                <ToggleGroupItem key={filter} value={filter} className={CHIP}>
-                  {props.t(threadStatusFilterLabelKeys[filter])}
-                </ToggleGroupItem>
-              ))}
-            </Fragment>
-          ),
-        )}
+        {LEADING_STATUS_GROUP.filters.map(filter => (
+          <ToggleGroupItem key={filter} value={filter} className={CHIP}>
+            {props.t(threadStatusFilterLabelKeys[filter])}
+          </ToggleGroupItem>
+        ))}
+        {/* The disclosure's region stays mounted (its aria-controls target); it holds the other groups while open. */}
+        <div id={moreId} className="dshx:contents" data-thread-status-more-region="">
+          {expanded
+            ? THREAD_STATUS_FILTER_GROUPS.slice(1).map(group => (
+                <Fragment key={group.id}>
+                  {/* A later group starts its own line under a small label: the line break is the label's full width. */}
+                  <span className="dshx:w-full dshx:pt-1 dshx:text-xs dshx:text-muted-foreground" aria-hidden="true">
+                    {props.t(threadStatusFilterGroupLabelKeys[group.id])}
+                  </span>
+                  {group.filters.map(filter => (
+                    <ToggleGroupItem key={filter} value={filter} className={CHIP}>
+                      {props.t(threadStatusFilterLabelKeys[filter])}
+                    </ToggleGroupItem>
+                  ))}
+                </Fragment>
+              ))
+            : null}
+        </div>
       </ToggleGroup>
-      {expanded ? null : (
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          aria-expanded={false}
-          className="dshx:-mx-1.5 dshx:justify-start dshx:justify-self-start dshx:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:pointer-coarse:h-11"
-          onClick={() => setOpened(true)}
-          data-thread-status-more=""
-        >
-          <ChevronDownIcon aria-hidden="true" />
-          {props.t('threadSidebarFilterMoreStatuses')}
-        </Button>
-      )}
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        aria-expanded={expanded}
+        aria-controls={moreId}
+        // A status in force never hides: while one of these is on, More stays open and cannot fold.
+        disabled={forced}
+        className="dshx:-mx-1.5 dshx:justify-start dshx:justify-self-start dshx:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:pointer-coarse:h-11"
+        onClick={() => setOpened(current => !current)}
+        data-thread-status-more=""
+      >
+        <ChevronDownIcon
+          aria-hidden="true"
+          className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-hover)', expanded && 'dshx:rotate-180')}
+        />
+        {props.t('threadSidebarFilterMoreStatuses')}
+      </Button>
     </section>
   )
 }
