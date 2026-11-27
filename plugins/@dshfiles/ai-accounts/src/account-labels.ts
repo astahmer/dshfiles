@@ -12,6 +12,9 @@ export const KIND_LABEL = {
   vibe: 'Vibe CLI',
 } satisfies Record<AccountProfile['kind'], string>
 
+/** Vibe is Mistral's own CLI, so it keeps the Mistral brand orange (white glyphs stay legible on it). */
+const MISTRAL_ACCENT = '#FA520F'
+
 export const KIND_ACCENT = {
   codex: '#10A37F',
   claude: '#D97757',
@@ -19,9 +22,9 @@ export const KIND_ACCENT = {
   commandcode: '#0E7490',
   'github-copilot': '#24292F',
   cursor: '#6B7280',
-  mistral: '#FA520F',
+  mistral: MISTRAL_ACCENT,
   antigravity: '#4285F4',
-  vibe: '#FF7000',
+  vibe: MISTRAL_ACCENT,
 } satisfies Record<AccountProfile['kind'], string>
 
 /** Rail group headings, in the order the groups are listed. */
