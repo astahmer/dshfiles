@@ -7,6 +7,7 @@ export default defineConfig({
     'thread-views': 'src/thread-views.ts',
     'composer-more': 'src/composer-more.ts',
     'composer-send': 'src/composer-send.ts',
+    'agent-mention-tones': 'src/agent-mention-tones.ts',
     'phone-thread-menu': 'src/phone-thread-menu.tsx',
     'rich-text-editor': 'src/editor/index.ts',
   },

@@ -32,6 +32,10 @@
       "types": "./src/composer-send.ts",
       "default": "./dist/composer-send.js"
     },
+    "./agent-mention-tones": {
+      "types": "./src/agent-mention-tones.ts",
+      "default": "./dist/agent-mention-tones.js"
+    },
     "./composer-more": {
       "types": "./src/composer-more.ts",
       "default": "./dist/composer-more.js"
@@ -51,7 +55,6 @@
     "test:e2e": "node ../../../tooling/dshx/scripts/run-e2e.mjs"
   },
   "dependencies": {
-    "@dshfiles/agents": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/multi-host": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",

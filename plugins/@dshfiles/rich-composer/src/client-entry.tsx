@@ -1,9 +1,9 @@
-import { agentsApi } from '@dshfiles/agents/contract'
 import { Command, Composer, createApiClient, defineClient } from '@dshfiles/dshx/client'
 import type { SettingsValue } from '@dshfiles/dshx/settings'
 import { ConversationScope } from '@dshfiles/workbench/conversation-header'
 import { PhoneMenuScope } from './phone-menu-scope.tsx'
 import { AgentChipTone } from './agent-chip-tone.ts'
+import { AgentMentionTones } from './agent-mention-tones.ts'
 import { agentWarmupApi } from './agent-warmup-api.ts'
 import type {} from './agent-warmup.ts'
 import { AgentPresetVisibility } from './agent-preset-visibility.ts'
@@ -42,17 +42,11 @@ export default defineClient({
     const preparers = metadata?.plugin?.list(ComposerSendPreparers)
     if (preparers !== undefined) ctx.effect(() => ComposerSendPipeline.bind(() => preparers.get()), 'rich-composer: new-thread send preparers')
     metadata?.plugin?.provide(Composer, createComposerService(ctx))
-    // Agent mentions in a draft wear the colour the agent chose; one shared registry read, the hashed slot without it.
-    const agents = createApiClient(ctx, agentsApi)
-    ctx.effect(
-      () =>
-        AgentChipTone.install(async () => {
-          const listed = await agents.safe.list()
-          if (!listed.ok) return null
-          return new Map(listed.value.agents.flatMap(agent => (agent.tone === undefined ? [] : [[agent.handle, agent.tone] as const])))
-        }),
-      'rich-composer: agent mention colours',
-    )
+    // Agent mentions in a draft wear the colour the agent chose: one shared read from the first source an agent
+    // registry adds (agent-mention-tones.ts), the hashed slot without one.
+    const toneSources = metadata?.plugin?.list(AgentMentionTones)
+    if (toneSources !== undefined)
+      ctx.effect(() => AgentChipTone.install(async () => (await toneSources.get()[0]?.load()) ?? null), 'rich-composer: agent mention colours')
     // The header's More actions as plain rows, for the thread menu that lists them (thread-views.ts): one `⋯` per header.
     ctx.effect(
       () =>

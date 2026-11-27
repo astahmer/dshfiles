@@ -153,6 +153,13 @@ instructions ahead of the request). The draft stays as typed; only the sent text
 takes longer than 8 s is skipped and the message goes out as typed, so a missing or failing provider never blocks a
 send. Messages of a started thread never pass through it.
 
+## Agent mention colours
+
+`@dshfiles/rich-composer/agent-mention-tones` publishes the `AgentMentionTones` registry. An `@{handle}` chip in the
+draft paints the identity slot the first source answers for that handle (`src/agent-chip-tone.ts`: one shared read,
+refreshed at most every 30 s when a chip mounts), else the slot its handle hashes to. `@dshfiles/agents` adds the source
+from its registry, so the composer never imports agents and renders the same without it.
+
 ## The composer bar
 
 One calm card (composer redesign b:v9yh): a 44px text
