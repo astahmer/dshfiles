@@ -3,9 +3,12 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { bundleCategoryOf } from './bundle-categories.js'
 import { bundleDisplayTitle, DshfilesPluginsView, settingsEntryIdForBundle } from './dshfiles-plugins-page.js'
-import type { ShellTranslate } from './native/locales.js'
+import { shellMessages, type ShellTranslate } from './native/locales.js'
 import { SettingsGroups } from './settings-groups.js'
 import type { PluginBundle, PluginBundleChange } from './shell-api.js'
+
+/** A manifest's display text in English: literal, or the English entry of its translations. */
+const resolveText = (value: NonNullable<PluginBundle['title']>): string => (typeof value === 'string' ? value : value.en)
 
 const t: ShellTranslate = (key, values) => (values === undefined ? key : `${key} ${JSON.stringify(values)}`)
 
@@ -111,7 +114,7 @@ describe('dshfiles plugins page', () => {
     expect(bundleCategoryOf({ name: '@dshfiles/main-tabs', origin: 'dshfiles' })).toBe('workspace')
     expect(bundleCategoryOf({ name: '@dshfiles/backlog', origin: 'dshfiles' })).toBe('projects')
     expect(bundleCategoryOf({ name: '@deepseek-ai/dsh-base', origin: 'dsh' })).toBe('core')
-    expect(bundleDisplayTitle(sampleBundles[1]!, value => (typeof value === 'string' ? value : value.en))).toBe('Backlog')
+    expect(bundleDisplayTitle(sampleBundles[1]!, resolveText)).toBe('Backlog')
     expect(settingsEntryIdForBundle(groups, sampleBundles[0]!)).toBe('plugin:dshfiles-main-tabs')
     expect(settingsEntryIdForBundle(groups, sampleBundles[3]!)).toBe('market')
   })
@@ -134,7 +137,7 @@ describe('dshfiles plugins page', () => {
           onRefresh={() => {}}
           onToggle={onToggle}
           refreshing={false}
-          resolveLocaleText={value => (typeof value === 'string' ? value : value.en)}
+          resolveLocaleText={resolveText}
           t={t}
         />,
       )
@@ -198,7 +201,7 @@ describe('dshfiles plugins page', () => {
           onRefresh={() => {}}
           onToggle={onToggle}
           refreshing={false}
-          resolveLocaleText={value => (typeof value === 'string' ? value : value.en)}
+          resolveLocaleText={resolveText}
           t={t}
         />,
       )
@@ -227,11 +230,52 @@ describe('dshfiles plugins page', () => {
             throw new Error('unused')
           }}
           refreshing={false}
-          resolveLocaleText={value => (typeof value === 'string' ? value : value.en)}
+          resolveLocaleText={resolveText}
           t={t}
         />,
       )
     })
     expect(container.querySelector('[role="alert"]')?.textContent).toBe('Host unreachable')
+  })
+})
+
+/** The English strings, with their placeholders filled. */
+const english: ShellTranslate = (key, values) =>
+  Object.entries(values ?? {}).reduce(
+    (text, [name, value]) => text.replaceAll(`{${name}}`, String(value)),
+    Object.entries(shellMessages.en).find(([candidate]) => candidate === key)?.[1] ?? key,
+  )
+
+describe('Plugins by category copy (DESIGN.md copy rules)', () => {
+  it('shows a manifest description only, still finds a plugin by its package description, and says the page in one line', async () => {
+    await act(async () => {
+      root.render(
+        <DshfilesPluginsView
+          bundles={sampleBundles}
+          error={undefined}
+          groups={groups}
+          loading={false}
+          onOpenSettings={() => {}}
+          onRefresh={() => {}}
+          onToggle={async name => ({ name, changed: false, enabled: true, application: 'applied', restartReason: null, error: null, warnings: [] })}
+          refreshing={false}
+          resolveLocaleText={resolveText}
+          t={english}
+        />,
+      )
+    })
+    // A package.json description is a note between developers: never a row's text (README "Section text").
+    const mainTabs = container.querySelector('[data-dshfiles-bundle="@dshfiles/main-tabs"]')
+    expect(mainTabs?.textContent).not.toContain('Browser-like tabs')
+    const search = container.querySelector<HTMLInputElement>('input[type="text"]')
+    await act(async () => {
+      if (search === null) return
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(search, 'browser-like')
+      search.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    expect([...container.querySelectorAll('[data-dshfiles-bundle]')].map(row => row.getAttribute('data-dshfiles-bundle'))).toEqual(['@dshfiles/main-tabs'])
+    expect(english('pluginsPage.subtitle')).toBe('Turn plugins on or off by area. Install and update them in Plugins.')
+    expect(english('pluginsPage.openManager')).toBe('Open Plugins')
+    expect(english('pluginsPage.launcherSummary')).toBe('The same plugins by area, each with its switch.')
   })
 })

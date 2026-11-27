@@ -34,10 +34,11 @@ export const bundleDisplayTitle = (
   return SettingsGroups.humanizeId(bundle.name)
 }
 
+/** The manifest's description for people; a package.json description is a note between developers and never shows. */
 export const bundleDisplayDescription = (
-  bundle: Pick<PluginBundle, 'description' | 'packageDescription'>,
+  bundle: Pick<PluginBundle, 'description'>,
   resolveLocaleText: (text: NonNullable<PluginBundle['description']>) => string,
-): string => resolveBundleText(bundle.description, resolveLocaleText).trim() || (bundle.packageDescription ?? '').trim()
+): string => resolveBundleText(bundle.description, resolveLocaleText).trim()
 
 /** The Settings entry a bundle's Settings button opens: its section's or its page's, else the one named for it. */
 export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bundle: Pick<PluginBundle, 'name' | 'rowIds'>): string | undefined => {
@@ -113,7 +114,8 @@ export const DshfilesPluginsView = (props: DshfilesPluginsViewProps): JSX.Elemen
       if (status === 'disabled' && bundle.enabled) return false
       if (needle === '') return true
       const title = bundleDisplayTitle(bundle, props.resolveLocaleText).toLowerCase()
-      const description = bundleDisplayDescription(bundle, props.resolveLocaleText).toLowerCase()
+      // The package description is not shown, but it still finds the plugin.
+      const description = `${bundleDisplayDescription(bundle, props.resolveLocaleText)} ${bundle.packageDescription ?? ''}`.toLowerCase()
       return `${title} ${bundle.name.toLowerCase()} ${description}`.includes(needle)
     })
   }, [scopedBundles, status, query, props.resolveLocaleText])
