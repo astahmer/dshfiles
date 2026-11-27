@@ -63,6 +63,11 @@ function providedModuleGuardPlugin(options: {
   /** Module specifier the page provides, with the reason it does. */
   readonly provided: ReadonlyMap<string, string>
   readonly bundleDependencies: readonly string[]
+  /**
+   * Workspace source files the shared runtime provides, file → specifier (filled when the build starts). Their package
+   * is provided file by file: only a bundled copy of one of these files is a second instance; its other files are not.
+   */
+  readonly providedFiles?: ReadonlyMap<string, string>
 }): Plugin {
   const bundled = new Set(options.bundleDependencies.map(packageNameOf))
   const provided = new Map<string, string>()
@@ -102,10 +107,13 @@ function providedModuleGuardPlugin(options: {
       const chunk = Object.values(bundle).find(item => item.type === 'chunk' && item.isEntry)
       if (chunk === undefined || chunk.type !== 'chunk' || provided.size === 0) return
       const offenders: Array<{ readonly id: string; readonly name: string }> = []
+      const byFile = new Set([...(options.providedFiles?.values() ?? [])].map(packageNameOf))
       for (const [id, module] of Object.entries(chunk.modules)) {
         if (module.renderedLength === 0 || !isAbsolute(id)) continue
         const name = await owningPackage(dirname(id))
-        if (name !== undefined && provided.has(name)) offenders.push({ id, name })
+        if (name === undefined || !provided.has(name)) continue
+        if (byFile.has(name) && options.providedFiles?.has(id) !== true) continue
+        offenders.push({ id, name })
       }
       const first = offenders[0]
       if (first === undefined) return

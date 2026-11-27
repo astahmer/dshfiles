@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { basename, isAbsolute, relative } from 'node:path'
 import type { Plugin, Rollup } from 'vite'
 import { DshxError } from '../../diagnostics.js'
+import { exportNames } from './export-names.js'
 import { SharedRuntime } from './shared-runtime.js'
 
 /**
@@ -74,32 +75,6 @@ const isNodeModule = (id: string): boolean => id.includes('/node_modules/')
 const isBundlerHelper = (id: string): boolean => id.startsWith('\0rolldown/') || id.startsWith('\0vite/')
 /** Modules a chunk may hold beside its entry: facades that read one shared instance, and stateless helpers. */
 const isFacade = (id: string): boolean => SharedRuntime.isFacade(id) || id.startsWith(CHUNK_SHARED_PREFIX) || isBundlerHelper(id)
-
-const STAR_REEXPORT = /export\s*\*\s*from\s*(['"])([^'"]+)\1/gu
-
-/**
- * Every name a module exports. Rolldown's `ModuleInfo.exports` can leave out names an `export * from` brings in (a
- * star over a virtual module, such as plugin-ui/query over the shared runtime's react-query facade), so the star
- * sources are followed. `undefined` when a star source is external: its names exist only at runtime.
- */
-const exportNames = async (context: Rollup.PluginContext, id: string, seen: Set<string> = new Set()): Promise<readonly string[] | undefined> => {
-  if (seen.has(id)) return []
-  seen.add(id)
-  const info = context.getModuleInfo(id)
-  if (info === null) return undefined
-  if (info.inputFormat === 'cjs') return info.exports
-  const names = new Set(info.exports)
-  for (const match of (info.code ?? '').matchAll(STAR_REEXPORT)) {
-    const source = match[2]
-    if (source === undefined) continue
-    const target = await context.resolve(source, id)
-    if (target === null || target.external !== false) return undefined
-    const starred = await exportNames(context, target.id, seen)
-    if (starred === undefined) return undefined
-    for (const name of starred) if (name !== 'default') names.add(name)
-  }
-  return [...names]
-}
 
 /** The chunk an import() target loads from (recorded in `state.fileNames`), or undefined when it stays inlined. */
 const lazyTarget = async (

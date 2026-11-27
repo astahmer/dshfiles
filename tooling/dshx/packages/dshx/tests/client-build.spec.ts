@@ -1310,6 +1310,78 @@ describe('client compiler', () => {
     expect(consumerCode).not.toContain(manifest.cssHash)
   })
 
+  it('serves a TypeScript-source kit module once to two consumers, also through a relative import inside the kit', async () => {
+    // A workspace kit like @dshfiles/plugin-ui: TSX sources Node cannot import, linked into each package.
+    const kit = await mkdtemp(resolve(tmpdir(), 'dshx-kit-'))
+    temporaryDirectories.push(kit)
+    await mkdir(resolve(kit, 'src'), { recursive: true })
+    await writeFile(resolve(kit, 'package.json'), JSON.stringify({ name: 'kit', type: 'module', exports: { './button': './src/button.tsx', './extra': './src/extra.tsx' } }))
+    await writeFile(
+      resolve(kit, 'src/button.tsx'),
+      "export const registry = new Set<string>()\nexport const Button = (label: string): number => registry.add(`${label}-kitbuttonmarker`).size\n",
+    )
+    await writeFile(resolve(kit, 'src/extra.tsx'), "import { Button } from './button.js'\nexport const Extra = (): number => Button('extra')\n")
+    const project = async (name: string, client: string, external: readonly string[]): Promise<string> => {
+      const root = await mkdtemp(resolve(tmpdir(), 'dshx-shared-'))
+      temporaryDirectories.push(root)
+      await mkdir(resolve(root, 'src'), { recursive: true })
+      await mkdir(resolve(root, 'node_modules'), { recursive: true })
+      await symlink(kit, resolve(root, 'node_modules/kit'), 'dir')
+      await writeFile(
+        resolve(root, 'package.json'),
+        JSON.stringify({ name, version: '0.0.0', type: 'module', dsh: { client: { platform: 'web', inject: [], external } } }),
+      )
+      await writeFile(resolve(root, 'src/client.ts'), client)
+      return root
+    }
+    const supplierRoot = await project('@dshx/shared-runtime', "import { defineClient } from '@dshfiles/dshx/client'\nexport default defineClient({ setup() {} })\n", [])
+    await buildClient({ packageId: '@dshx/shared-runtime', root: supplierRoot, entry: 'src/client.ts', outDir: 'dist', sharedRuntime: ['kit/button'] })
+    const manifest = decodeJson(Schema.Struct({ modules: Schema.Record(Schema.String, Schema.Array(Schema.String)) }), await readFile(resolve(supplierRoot, 'dist/shared-runtime.json'), 'utf8'))
+    expect(manifest.modules['kit/button']).toEqual(['Button', 'registry'])
+    const consumer = async (name: string, client: string): Promise<string> => {
+      const root = await project(name, client, ['@dshx/shared-runtime'])
+      await mkdir(resolve(root, 'node_modules/@dshx'), { recursive: true })
+      await symlink(supplierRoot, resolve(root, 'node_modules/@dshx/shared-runtime'), 'dir')
+      await buildClient({ packageId: name, root, entry: 'src/client.ts', outDir: 'dist', shared: '@dshx/shared-runtime', external: ['@dshx/shared-runtime'] })
+      return readFile(resolve(root, 'dist/client.js'), 'utf8')
+    }
+    const first = await consumer(
+      '@dshx/first',
+      "import { defineClient } from '@dshfiles/dshx/client'\nimport { Button, registry } from 'kit/button'\nglobalThis.first = () => [Button('first'), [...registry]]\nexport default defineClient({ setup() {} })\n",
+    )
+    const second = await consumer(
+      '@dshx/second',
+      "import { defineClient } from '@dshfiles/dshx/client'\nimport { Extra } from 'kit/extra'\nglobalThis.second = Extra\nexport default defineClient({ setup() {} })\n",
+    )
+    for (const code of [first, second]) expect(code).not.toContain('kitbuttonmarker')
+    const factories = new Map<string, ModuleFactory>()
+    const materialized = new Map<string, ModuleExports | undefined>()
+    const requireModule: ModuleRequire = id => {
+      if (!materialized.has(id)) materialized.set(id, factories.get(id)?.(requireModule))
+      return materialized.get(id)
+    }
+    const sandbox: Record<string, unknown> = {
+      document: { querySelector: () => null, createElement: () => ({ dataset: {}, textContent: '' }), head: { appendChild: () => undefined } },
+      window: {
+        __ModuleLoader__: {
+          load: <Registration>(value: Registration) => {
+            const registration = Schema.decodeUnknownSync(identifiedRegistrationShape)(value)
+            factories.set(registration.id, registration.factory)
+          },
+        },
+      },
+    }
+    sandbox.globalThis = sandbox
+    for (const code of [await readFile(resolve(supplierRoot, 'dist/client.js'), 'utf8'), first, second]) vm.runInNewContext(code, sandbox)
+    requireModule('@dshx/first')
+    requireModule('@dshx/second')
+    const probe = Schema.decodeUnknownSync(Schema.Struct({ first: FunctionSchema, second: FunctionSchema }))(sandbox)
+    expect(probe.second()).toBe(1)
+    const [size, registry] = Schema.decodeUnknownSync(Schema.Tuple([Schema.Number, Schema.Array(Schema.String)]))(probe.first())
+    expect(size).toBe(2)
+    expect(registry).toEqual(['extra-kitbuttonmarker', 'first-kitbuttonmarker'])
+  })
+
   it('keeps its own sheet when the supplier sheet differs', async () => {
     const supplierRoot = await mkdtemp(resolve(tmpdir(), 'dshx-shared-'))
     temporaryDirectories.push(supplierRoot)

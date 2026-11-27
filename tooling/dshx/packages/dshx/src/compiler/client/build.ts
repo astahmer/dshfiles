@@ -715,7 +715,9 @@ async function clientConfig(
     output,
     cssCodeSplit: false,
   })
-  const providedModuleGuard = ClientCompilerGuards.providedModuleGuardPlugin({ root: paths.root, packageId: options.packageId, provided, bundleDependencies })
+  /** Workspace source files the shared runtime provides (file → specifier), filled by its consumer plugin at build start. */
+  const providedFiles = new Map<string, string>()
+  const providedModuleGuard = ClientCompilerGuards.providedModuleGuardPlugin({ root: paths.root, packageId: options.packageId, provided, bundleDependencies, providedFiles })
   const consumer =
     supplier === undefined || options.shared === undefined
       ? []
@@ -723,7 +725,7 @@ async function clientConfig(
           ...(runtime?.snapshot === undefined
             ? []
             : [ClientRuntimeStore.consumerPlugin({ snapshot: runtime.snapshot, runtimeRoot: RUNTIME_ROOT, facade: SharedRuntime.facadeId })]),
-          SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies }),
+          SharedRuntime.consumerPlugin({ supplier: options.shared, modules: supplier.modules, bundleDependencies, root: paths.root, byFile: providedFiles }),
         ]
   const dshxRuntimeStore = options.sharedRuntime !== undefined && options.sharedDshxRuntime === true ? await realpath(resolve(RUNTIME_ROOT, '..')) : undefined
   // A lazy chunk keeps only module transforms and guards: the entry owns CSS, capabilities, declarations and manifests.
