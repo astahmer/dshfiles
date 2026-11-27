@@ -23,7 +23,7 @@ import { ChangesKeysModel, type HunkCursor } from './changes-keys.js'
 import { ChangesScopeModel, changesScopeSchema, type ChangesRequest, type ChangesScope } from './changes-scope.js'
 import { ChangedImages } from './changed-images.js'
 import { CombinedReview } from './combined-review.js'
-import { orderReviewFiles } from './file-importance.js'
+import { isNoiseFile, orderReviewFiles } from './file-importance.js'
 import { LandCard } from './land-card.js'
 import { PackageJsonTables, usePackageJsonTables } from './package-json-table.js'
 import { ReviewImageModel, WORKING_COPY } from './review-image-query.js'
@@ -44,6 +44,16 @@ export interface ChangesFacetProps {
 }
 
 const HINT = 'dshx:text-xs dshx:text-muted-foreground'
+
+/** The frame's phone rule: below it a diff shows one file at a time, chosen from the changed-file list above. */
+const PHONE_QUERY = '(max-width: 639.98px)'
+const subscribePhone = (listener: () => void): (() => void) => {
+  if (typeof window.matchMedia !== 'function') return () => undefined
+  const query = window.matchMedia(PHONE_QUERY)
+  query.addEventListener('change', listener)
+  return () => query.removeEventListener('change', listener)
+}
+const readPhone = (): boolean => typeof window.matchMedia === 'function' && window.matchMedia(PHONE_QUERY).matches
 const noValue = (): undefined => undefined
 
 interface UserQuestionsProjection {
@@ -129,6 +139,8 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
   const diffsRoot = useRef<HTMLDivElement | null>(null)
   /** Bumped by ⇧L: the Land card opens its preview (never lands from a key). */
   const [landRequest, setLandRequest] = useState(0)
+  // Generated output, vendored code and lockfiles start folded so the real changes lead the list.
+  const [showNoise, setShowNoise] = useState(false)
   const patchFacet = useCallback(
     (patch: FacetSessionPatch): void => setStored(current => FacetSessionStateModel.update(current, { sessionId, patch })),
     [sessionId],
@@ -226,7 +238,20 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
       .sort((left, right) => (order.get(left.name) ?? Infinity) - (order.get(right.name) ?? Infinity))
   }, [diff])
   const packageJson = usePackageJsonTables(diff?.patch ?? '', parsedFiles)
+  const phone = useSyncExternalStore(subscribePhone, readPhone, () => false)
+  // One file at a time on a phone: the changed-file list above is the file picker; focusPath follows its tap.
+  const diffFiles = ((): typeof packageJson.textFiles => {
+    if (!phone) return packageJson.textFiles
+    const focused =
+      focusPath === null
+        ? undefined
+        : (packageJson.textFiles.find(file => file.name === focusPath) ?? packageJson.textFiles.find(file => file.name.endsWith(`/${focusPath}`)))
+    const first = packageJson.textFiles[0]
+    return focused === undefined ? (first === undefined ? [] : [first]) : [focused]
+  })()
   const paths = useMemo(() => (diff?.files ?? []).map(file => file.path), [diff])
+  const reviewFiles = useMemo(() => (diff?.files ?? []).filter(file => !isNoiseFile(file.path)), [diff])
+  const noiseFiles = useMemo(() => (diff?.files ?? []).filter(file => isNoiseFile(file.path)), [diff])
   const viewedCount = paths.filter(path => marks.viewed.has(path)).length
   const additions = (diff?.files ?? []).reduce((total, file) => total + file.added, 0)
   const deletions = (diff?.files ?? []).reduce((total, file) => total + file.deleted, 0)
@@ -451,6 +476,43 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
       </p>
     )
 
+  /** One changed-file row, shared by the review list and the folded generated/lock list. */
+  const changeRow = (file: FacetDiff['files'][number]): ReactNode => {
+    const viewed = marks.viewed.has(file.path)
+    const current = focusPath === file.path
+    return (
+      <li
+        aria-current={current ? 'true' : undefined}
+        className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-1', current && 'dshx:bg-accent')}
+        data-changes-file={file.path}
+        key={file.path}
+      >
+        <Checkbox
+          aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.display}`}
+          checked={viewed}
+          className="dshx:size-3.5 dshx:data-[state=checked]:border-success dshx:data-[state=checked]:bg-success"
+          disabled={!marks.ready}
+          onCheckedChange={next => marks.set([file.path], next === true)}
+        />
+        <button
+          className={cn(
+            'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
+            viewed && 'dshx:text-muted-foreground',
+          )}
+          onClick={() => {
+            if (packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
+            patchFacet({ focusPath: file.path, hunk: null })
+          }}
+          type="button"
+        >
+          {file.display}
+        </button>
+        <Stat tone="add">+{file.added}</Stat>
+        <Stat tone="del">−{file.deleted}</Stat>
+      </li>
+    )
+  }
+
   return (
     <div
       className="dshx-root dshx:@container dshx:flex dshx:size-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-3 dshx:outline-none"
@@ -578,42 +640,31 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
             </p>
           )}
           <ul aria-label="Changed files" className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border">
-            {diff.files.map(file => {
-              const viewed = marks.viewed.has(file.path)
-              const current = focusPath === file.path
-              return (
-                <li
-                  aria-current={current ? 'true' : undefined}
-                  className={cn('dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:py-1', current && 'dshx:bg-accent')}
-                  data-changes-file={file.path}
-                  key={file.path}
-                >
-                  <Checkbox
-                    aria-label={`${viewed ? 'Mark not viewed' : 'Mark viewed'}: ${file.display}`}
-                    checked={viewed}
-                    className="dshx:size-3.5 dshx:data-[state=checked]:border-success dshx:data-[state=checked]:bg-success"
-                    disabled={!marks.ready}
-                    onCheckedChange={next => marks.set([file.path], next === true)}
-                  />
-                  <button
-                    className={cn(
-                      'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left dshx:font-mono dshx:text-xs dshx:hover:underline',
-                      viewed && 'dshx:text-muted-foreground',
-                    )}
-                    onClick={() => {
-                      if (packageJson.isTextHidden(file.path)) packageJson.showText(file.path)
-                      patchFacet({ focusPath: file.path, hunk: null })
-                    }}
-                    type="button"
-                  >
-                    {file.display}
-                  </button>
-                  <Stat tone="add">+{file.added}</Stat>
-                  <Stat tone="del">−{file.deleted}</Stat>
-                </li>
-              )
-            })}
+            {reviewFiles.map(file => changeRow(file))}
           </ul>
+          {noiseFiles.length === 0 ? null : (
+            <div className="dshx:flex dshx:flex-col dshx:gap-1">
+              <button
+                aria-expanded={showNoise}
+                className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:border dshx:border-border dshx:px-2 dshx:py-1 dshx:text-left dshx:text-xs dshx:text-muted-foreground dshx:hover:text-foreground"
+                onClick={() => setShowNoise(current => !current)}
+                type="button"
+              >
+                <span>
+                  {showNoise ? 'Hide' : 'Show'} {noiseFiles.length} generated or lock file{noiseFiles.length === 1 ? '' : 's'}
+                </span>
+                <span aria-hidden="true">{showNoise ? '▾' : '▸'}</span>
+              </button>
+              {showNoise ? (
+                <ul
+                  aria-label="Generated and lock files"
+                  className="dshx:flex dshx:flex-col dshx:divide-y dshx:divide-border dshx:rounded-md dshx:border dshx:border-border"
+                >
+                  {noiseFiles.map(file => changeRow(file))}
+                </ul>
+              ) : null}
+            </div>
+          )}
           <PackageJsonTables onShowText={path => patchFacet({ focusPath: path })} view={packageJson} />
           <ChangedImages
             images={diff.images}
@@ -644,7 +695,7 @@ export const ChangesFacet = (props: ChangesFacetProps): JSX.Element => {
               <PatchView
                 className="dshx:flex-1"
                 empty={<p className={cn(HINT, 'dshx:p-3')}>No diff lines to display (binary or oversized files).</p>}
-                files={packageJson.textFiles}
+                files={diffFiles}
                 focusPath={focusPath}
                 onLineSelection={next => {
                   patchFacet({ selection: next, commentNotice: null })

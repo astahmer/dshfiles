@@ -69,6 +69,7 @@ import {
   type Ref,
 } from 'react'
 import { PendingPick, SETTINGS_PANEL_ID } from './phone-shell.js'
+import { pageLoadThreadRoute } from './thread-url.js'
 import { StageCover } from './stage-cover.js'
 import { SidebarOrganization, type OrderedSidebarEntry, type SidebarPreferences, type ThreadRowAction } from './organization.js'
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
@@ -291,10 +292,14 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // The stage Session follows a tap only once the thread opens; until then the bar names the pick from the list.
   const [pickSeen, setPickSeen] = useState({ pick: pickedThread, stage: stageSession })
   if (pickSeen.pick !== pickedThread) setPickSeen({ pick: pickedThread, stage: stageSession })
-  const pendingThread = PendingPick.threadId({ pickedId: pickedThread?.id, stageAtPick: pickSeen.stage, stageSession })
+  const linkedThread = typeof window === 'undefined' ? null : pageLoadThreadRoute.pending(window.location.href)
+  const pendingThread = PendingPick.threadId({ pickedId: pickedThread?.id, stageAtPick: pickSeen.stage, stageSession, linkedId: linkedThread ?? undefined })
   const pendingTitle = props.useSessions(state => {
-    const picked = pendingThread === undefined ? undefined : Object.values(state.byId).find(session => session.id === pendingThread)
-    return picked === undefined || picked.blank ? undefined : picked.displayTitle
+    if (pendingThread === undefined) return undefined
+    const picked = Object.values(state.byId).find(session => session.id === pendingThread)
+    // A linked thread the list has not loaded yet: name it a thread, never the stage's new-thread draft.
+    if (picked === undefined) return 'Thread'
+    return picked.blank ? undefined : picked.displayTitle
   })
   // One sidebar layout (b:952m): the Workbench's left docking region is always mounted behind the rail; its default is
   // the old Fixed column as one Sidebar pane. The merge from the two former layouts runs once (sidebar-dock-host.ts).

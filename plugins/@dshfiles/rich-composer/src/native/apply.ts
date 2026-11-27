@@ -36,6 +36,7 @@ import type { IConversation } from './service.ts'
 import { ComposerBlockRegistry } from './input/blocks.ts'
 import type { ComposerBlock } from './contract/composer-blocks.ts'
 import { InputHub } from './input/hub.ts'
+import { createHostAnnotationHistory } from './input/sent-annotations.ts'
 import { transferComposerDraft } from '../composer-draft-handoff.ts'
 import { createComposerFileIntake } from './input/file-intake.ts'
 import { ComposerSubmissionPolicy } from './input/submission-policy.ts'
@@ -391,7 +392,7 @@ export function apply(ctx: Context, config: Config = Config({})): void {
     }, 'ui-conversation: fixed stop reference')
   })
 
-  const inputHub = new InputHub(ctx, t)
+  const inputHub = new InputHub(ctx, t, sessionId => createHostAnnotationHistory(ctx, String(sessionId)))
   const composerBlocks = new ComposerBlockRegistry()
 
   ctx.inject(['commandUi'], (scope) => {

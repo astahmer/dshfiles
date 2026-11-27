@@ -20,11 +20,13 @@ const cliFailure = (code: SecretCliFailureCode) => Effect.fail(new SecretCliErro
 const catalogWith = (input: {
   readonly rows?: readonly Record<string, string>[]
   readonly rowsByFolder?: Readonly<Record<string, readonly Record<string, string>[]>>
+  readonly unaliased?: readonly { readonly alias: string; readonly item: string; readonly field?: string }[]
   readonly listFailure?: SecretCliFailureCode
   readonly revealFailure?: SecretCliFailureCode
   readonly value?: string
 }) =>
   catalogWithCli((request: SecretCliRequest) => {
+    if (request.args[0] === 'unaliased') return Effect.succeed(JSON.stringify(input.unaliased ?? []))
     if (request.args[0] === 'get') return input.revealFailure === undefined ? Effect.succeed(input.value ?? 'synthetic-value') : cliFailure(input.revealFailure)
     if (input.listFailure !== undefined) return cliFailure(input.listFailure)
     if (request.cwd !== null) return Effect.succeed(JSON.stringify(input.rowsByFolder?.[request.cwd] ?? []))
@@ -51,6 +53,18 @@ describe('secret reference status', () => {
     }),
   )
 
+  it.effect('reports a vault item named global/<alias> as resolved without any config alias', () =>
+    Effect.gen(function* () {
+      const fixture = catalogWith({
+        rows: [],
+        unaliased: [{ alias: 'DSH_JEV_BACKLOG', item: 'global/dsh-jev-backlog', field: 'password' }],
+        value: 'vault-item-value',
+      })
+      expect(yield* check(fixture, 'secret:DSH_JEV_BACKLOG')).toMatchObject({ state: 'resolved', scope: 'global', scopes: ['global'] })
+      expect(fixture.requests.map(request => request.args[0])).toContain('unaliased')
+    }),
+  )
+
   it.effect('interrupts primary and elsewhere list reads with the check', () =>
     Effect.gen(function* () {
       const probing = yield* Deferred.make<void>()
@@ -70,7 +84,9 @@ describe('secret reference status', () => {
       yield* Deferred.await(probing)
       yield* Fiber.interrupt(fiber)
       expect(Exit.hasInterrupts(yield* Fiber.await(fiber))).toBe(true)
-      expect(fixture.requests.map(request => request.cwd)).toEqual([null, '/work/one'])
+      // The global alias list, the vault fallback probe, then the probing folder's list.
+      expect(fixture.requests.filter(request => request.args[0] === 'print').map(request => request.cwd)).toEqual([null, '/work/one'])
+      expect(fixture.requests.map(request => request.args[0])).toContain('unaliased')
       expect(interrupted).toEqual(['/work/one'])
     }),
   )

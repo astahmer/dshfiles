@@ -41,6 +41,10 @@ test('mutation strings remain single argv values and never become shell commands
   ])
 })
 
+test('operation-undo builds the jj op undo argv', () => {
+  assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv({ kind: 'operation-undo' })), ['op', 'undo'])
+})
+
 test('split argv quotes each listed path as one exact JJ root-file fileset', () => {
   const action: Mutation = { kind: 'split', commitId: id, paths: ['src/a.ts', 'dir with space/café [1]*?.txt'], message: 'split selected files' }
   assert.deepEqual(Result.getOrThrow(JujutsuMutationModel.buildMutationArgv(action)), [

@@ -20,3 +20,6 @@ export const orderReviewFiles = <File extends ReviewFile>(input: { readonly file
       right.additions + right.deletions - (left.additions + left.deletions) ||
       (left.path < right.path ? -1 : left.path > right.path ? 1 : 0),
   )
+
+/** A file a reviewer skims last: generated output, vendored code or a lockfile (never a test or source file). */
+export const isNoiseFile = (path: string): boolean => category(path) >= 3

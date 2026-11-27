@@ -3,6 +3,7 @@ import { Browser, Command, createRegisteredApiClient, defineClient, type Browser
 import { ChatViewRegistry } from './native/chat/chat-view-registry.ts'
 import { registerWebPageLauncher } from './web-page-launcher.ts'
 import { apply, inject } from './native/index.ts'
+import { LinkEmbedPort, PREVIEW_PROBE_API } from './link-embed-port.ts'
 import { SESSION_SEARCH_FIND_API, ThreadFindPort } from './thread-find-port.ts'
 import { PinnedToolCalls } from './pinned-tool-calls.ts'
 import { PinnedToolNames } from './pinned-tool-names.ts'
@@ -63,6 +64,24 @@ export default defineClient({
       },
     }
     plugin.provide(Browser, browser)
+    // dshfiles: a link the Browser tab cannot show falls back to a browser tab, with the reason in a toast, because an
+    // iframe cannot report a framing refusal. preview's Host half answers; without it Chat keeps today's behavior.
+    const embedProbe = createRegisteredApiClient(ctx, PREVIEW_PROBE_API)
+    LinkEmbedPort.set(
+      LinkEmbedPort.create({
+        probe: url => {
+          const probeEmbed = embedProbe.probeEmbed
+          if (probeEmbed === undefined) return Promise.resolve(undefined)
+          return Promise.resolve(probeEmbed({ url })).then(LinkEmbedPort.check, () => undefined)
+        },
+        toast: input => {
+          plugin.toast.show(input)
+        },
+        openInNewTab: url => {
+          window.open(url, '_blank', 'noopener,noreferrer')
+        },
+      }),
+    )
     // dshfiles (productivity pass Q4): find in thread asks session-search by registered identity (see thread-find-port).
     const finder = createRegisteredApiClient(ctx, SESSION_SEARCH_FIND_API)
     ThreadFindPort.set((input, signal) => {

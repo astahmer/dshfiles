@@ -121,18 +121,18 @@
 
 @layer base {
   :root {
-    --dshx-project-balanced-0: #075985;
-    --dshx-project-balanced-1: #166534;
-    --dshx-project-balanced-2: #854d0e;
-    --dshx-project-balanced-3: #6b21a8;
-    --dshx-project-balanced-4: #0f766e;
-    --dshx-project-balanced-5: #1d4ed8;
-    --dshx-project-cool-0: #075985;
-    --dshx-project-cool-1: #6b21a8;
-    --dshx-project-cool-2: #0f766e;
-    --dshx-project-cool-3: #166534;
-    --dshx-project-cool-4: #1d4ed8;
-    --dshx-project-cool-5: #854d0e;
+    --dshx-project-balanced-0: #0369a1;
+    --dshx-project-balanced-1: #15803d;
+    --dshx-project-balanced-2: #b45309;
+    --dshx-project-balanced-3: #7e22ce;
+    --dshx-project-balanced-4: #be123c;
+    --dshx-project-balanced-5: #4338ca;
+    --dshx-project-cool-0: #0369a1;
+    --dshx-project-cool-1: #4338ca;
+    --dshx-project-cool-2: #7e22ce;
+    --dshx-project-cool-3: #be123c;
+    --dshx-project-cool-4: #0f766e;
+    --dshx-project-cool-5: #15803d;
     --dshx-kit-teal: oklch(0.58 0.1 185);
     --dshx-kit-violet: oklch(0.55 0.19 295);
     --dshx-kit-graph-1: oklch(0.6 0.11 185);
@@ -226,14 +226,14 @@
     --dshx-project-balanced-1: #86efac;
     --dshx-project-balanced-2: #fcd34d;
     --dshx-project-balanced-3: #d8b4fe;
-    --dshx-project-balanced-4: #5eead4;
-    --dshx-project-balanced-5: #93c5fd;
-    --dshx-project-cool-0: #93c5fd;
-    --dshx-project-cool-1: #c4b5fd;
-    --dshx-project-cool-2: #5eead4;
-    --dshx-project-cool-3: #86efac;
-    --dshx-project-cool-4: #7dd3fc;
-    --dshx-project-cool-5: #fcd34d;
+    --dshx-project-balanced-4: #fda4af;
+    --dshx-project-balanced-5: #a5b4fc;
+    --dshx-project-cool-0: #7dd3fc;
+    --dshx-project-cool-1: #a5b4fc;
+    --dshx-project-cool-2: #d8b4fe;
+    --dshx-project-cool-3: #fda4af;
+    --dshx-project-cool-4: #5eead4;
+    --dshx-project-cool-5: #86efac;
     --dshx-kit-teal: oklch(0.76 0.11 182);
     --dshx-kit-violet: oklch(0.72 0.15 300);
     --dshx-kit-graph-1: oklch(0.76 0.11 182);
@@ -792,7 +792,8 @@ svg [class*='_spinnerArc_'] {
       > [data-slot='select-content'],
       > [data-slot='popover-content']
     ),
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'],
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu] {
     position: fixed !important;
     top: auto !important;
     right: 0 !important;
@@ -816,7 +817,8 @@ svg [class*='_spinnerArc_'] {
       [data-slot='select-content'],
       [data-slot='popover-content']
     ),
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'],
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu] {
     position: relative;
     box-sizing: border-box;
     width: 100% !important;
@@ -864,7 +866,8 @@ svg [class*='_spinnerArc_'] {
       [data-slot='select-content'],
       [data-slot='popover-content']
     )::before,
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu']::before {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu']::before,
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu]::before {
     content: '';
     position: absolute;
     top: 8px;
@@ -1039,4 +1042,16 @@ html[data-phone-stack-motion='pop']::view-transition-new(root) {
  */
 :where([data-slot^='conversation.']) :is(ol, ul) {
   list-style: revert;
+}
+
+/*
+ * Phone: no keycaps. The shell has no hardware keyboard (plan phone rules), so a
+ * shortcut hint costs a row of width and names keys that cannot be pressed; the
+ * phone sheet keeps the labels and actions.
+ */
+@media (max-width: 639.98px) {
+  html[data-shell-phone-nav]
+    :is([data-slot='key-hint'], [data-slot='dropdown-menu-shortcut'], [data-slot='context-menu-shortcut'], [data-slot='command-shortcut']) {
+    display: none;
+  }
 }

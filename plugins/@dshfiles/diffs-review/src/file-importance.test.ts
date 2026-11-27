@@ -1,5 +1,20 @@
 import { describe, expect, it } from 'vitest'
-import { orderReviewFiles } from './file-importance.js'
+import { isNoiseFile, orderReviewFiles } from './file-importance.js'
+
+describe('isNoiseFile', () => {
+  it('marks generated output, vendored code and lockfiles', () => {
+    expect(isNoiseFile('pnpm-lock.yaml')).toBe(true)
+    expect(isNoiseFile('src/generated/api.ts')).toBe(true)
+    expect(isNoiseFile('vendor/lib.js')).toBe(true)
+    expect(isNoiseFile('dist/client.js')).toBe(true)
+  })
+
+  it('leaves source, entry points and tests to review', () => {
+    expect(isNoiseFile('src/feature.ts')).toBe(false)
+    expect(isNoiseFile('src/index.ts')).toBe(false)
+    expect(isNoiseFile('src/main.test.ts')).toBe(false)
+  })
+})
 
 describe('orderReviewFiles', () => {
   it('puts entry points and substantial source changes before tests, lockfiles and generated files', () => {

@@ -6,6 +6,9 @@ import { SidebarHost, type HostSession } from './sidebar-host-promise.js'
 export interface FakeHost {
   readonly running: Ref.Ref<ReadonlyArray<string>>
   readonly jobs: Ref.Ref<number>
+  /** Archived Session ids; `unarchiveSession` removes one and records it. */
+  readonly archived: Ref.Ref<ReadonlyArray<string>>
+  readonly unarchived: Ref.Ref<ReadonlyArray<string>>
   readonly sessions: Ref.Ref<ReadonlyArray<HostSession>>
   /** The exit codes DSH was asked to exit with; the exit hook is a plain callback, so it records synchronously. */
   readonly exits: Effect.Effect<ReadonlyArray<number>>
@@ -17,6 +20,8 @@ export interface FakeHost {
 export const makeFakeHost = Effect.all({
   running: Ref.make<ReadonlyArray<string>>([]),
   jobs: Ref.make(0),
+  archived: Ref.make<ReadonlyArray<string>>([]),
+  unarchived: Ref.make<ReadonlyArray<string>>([]),
   sessions: Ref.make<ReadonlyArray<HostSession>>([]),
   prompts: Ref.make<ReadonlyArray<{ readonly sessionId: string; readonly requestId: string; readonly text: string }>>([]),
   persistenceFails: Ref.make(false),
@@ -40,10 +45,12 @@ export const fakeSidebarHost = (fake: FakeHost, options: { readonly exitHook?: b
     SidebarHost.of({
       runningSessionIds: Ref.get(fake.running),
       runningJobCount: Ref.get(fake.jobs),
+      workingJobSessionIds: Effect.succeed([]),
+      reminders: Effect.succeed([]),
       sessions: Ref.get(fake.sessions),
       workspaces: Effect.succeed([]),
       threadDirectories: Effect.succeed(new Map()),
-      archivedSessionIds: Effect.succeed([]),
+      archivedSessionIds: Ref.get(fake.archived),
       pinnedSessionIds: Effect.succeed([]),
       sessionHeader: () => Effect.succeedNone,
       sessionTitles: Effect.succeed(new Map()),
@@ -58,5 +65,8 @@ export const fakeSidebarHost = (fake: FakeHost, options: { readonly exitHook?: b
       rebasedThreads: Effect.succeedNone,
       appExit: options.exitHook === false ? Option.none() : Option.some(fake.recordExit),
       stopJobs: () => Effect.succeed([]),
+      unarchiveSession: sessionId =>
+        Ref.update(fake.unarchived, ids => [...ids, sessionId]).pipe(Effect.andThen(Ref.update(fake.archived, ids => ids.filter(id => id !== sessionId)))),
+      runReminder: () => Effect.void,
     }),
   )

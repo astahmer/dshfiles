@@ -5,6 +5,7 @@ import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-code
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
+import { decodeJson, jsonObjectSchema, type JsonObject } from '@dshfiles/dshx/json'
 import { FastModeService } from './codex-fast-mode.js'
 import { createCommandCodeProvider } from './commandcode-provider.js'
 import { createMistralProvider } from './mistral-provider.js'
@@ -468,7 +469,7 @@ describe('OpenCode Go DeepSeek thinking', () => {
     reasoningEffort?: string,
     upstream = opencodeGoProvider(),
     settings: Partial<AccountModelSettings> = {},
-  ): Promise<Record<string, unknown>> => {
+  ): Promise<JsonObject> => {
     const account = { ...AccountDraftModel.newAccountDraft({ kind: 'opencode-go', existing: [] }), ...settings }
     const profile = ProviderProfileModel.buildProfile({
       upstream,
@@ -488,9 +489,9 @@ describe('OpenCode Go DeepSeek thinking', () => {
       { reasoningDefaults: new Map([['opencode-go-test', ProviderProfileModel.reasoningDefaultsForProfile(profile)]]), fastMode: disabledFastMode },
     )
     const originalFetch = globalThis.fetch
-    let body: Record<string, unknown> = {}
+    let body: JsonObject = {}
     globalThis.fetch = async (_input, init) => {
-      body = JSON.parse(String(init?.body))
+      body = decodeJson(jsonObjectSchema, String(init?.body))
       return new Response('{"error":{"message":"stop here"}}', { status: 400 })
     }
     try {

@@ -13,7 +13,9 @@ export const mainTabsSettings = defineSettings({
     fixedTabWidth: Schema.boolean()
       .default(false)
       .description('Give every tab in the strip the same width, so titles line up instead of sizing to their text.'),
-    showProjectName: Schema.boolean().default(false).description("Show the thread's project name before its title in thread tabs."),
+    showProjectName: Schema.boolean()
+      .default(true)
+      .description("Show the thread's project folder as a chip before its title, in the native strip and in Workbench tabs."),
     maxTabs: Schema.natural()
       .max(50)
       .default(10)

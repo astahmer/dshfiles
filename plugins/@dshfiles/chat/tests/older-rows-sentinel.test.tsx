@@ -134,4 +134,13 @@ describe('older rows inside a shared conversation scrollport', () => {
     sentinel.scrollport.dispatchEvent(new Event('scroll'))
     expect(sentinel.calls()).toBe(1)
   })
+
+  it('stays at the tail when a shrinking layout clamps the scrollport to its new floor', async () => {
+    const sentinel = renderInScrollport(0)
+    await act(async () => {})
+    sentinel.scrollport.dispatchEvent(new Event('scroll'))
+    layOut(sentinel.scrollport, { scrollHeight: 6962, clientHeight: 700, scrollTop: 6262 })
+    sentinel.scrollport.dispatchEvent(new Event('scroll'))
+    expect(sentinel.calls()).toBe(0)
+  })
 })

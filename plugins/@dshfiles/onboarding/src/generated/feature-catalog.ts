@@ -132,7 +132,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "chat",
       "description": "Owned fork of DSH's native Chat plugin that mounts only the transcript rows near the viewport.",
       "ui": true,
-      "features": 15
+      "features": 16
     },
     {
       "name": "command-palette",
@@ -462,7 +462,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "rich-composer",
       "description": "Owned fork of DSH's native Conversation plugin with structured session-reference paste.",
       "ui": true,
-      "features": 12
+      "features": 13
     },
     {
       "name": "schedule",
@@ -606,7 +606,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 56
+      "features": 57
     },
     {
       "name": "thread-transfer",
@@ -1040,8 +1040,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#agent-directory",
       "plugin": "agent-communication",
       "id": "agent-directory",
-      "title": "Discover Agents and workspace channels",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first, and keep same-directory Agents on one hashed workspace topic.",
+      "title": "Discover Agents and peers",
+      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: peer mail is direct and needs no registration.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
@@ -1052,15 +1052,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#passive-messaging",
       "plugin": "agent-communication",
       "id": "passive-messaging",
-      "title": "Store and browse passive messages",
-      "summary": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging or starting execution.",
+      "title": "Durable direct peer mail with a bounded request wake",
+      "summary": "Direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request wakes an idle recipient through a plugin-source pointer message under a cooldown and an hourly cap, while notices stay passive.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Agents › Messages and post a message to a topic.",
-        "doneWhen": "Your message shows in the topic's history.",
+        "firstAction": "Open Agents › Messages and send a direct message to a live Agent.",
+        "doneWhen": "Your message shows in that Agent’s conversation.",
         "open": {
           "panel": "agent-communication"
         }
@@ -1070,8 +1070,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#human-browser",
       "plugin": "agent-communication",
       "id": "human-browser",
-      "title": "Post messages from the communication browser",
-      "summary": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
+      "title": "Send direct messages from the Messages panel",
+      "summary": "A human picks a live or dormant Agent thread and sends a direct message; the panel returns a storage receipt. A request wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages › post",
       "reach": [
@@ -11053,6 +11053,21 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "chat#inline-annotations",
+      "plugin": "chat",
+      "id": "inline-annotations",
+      "title": "See annotations beside the passage they quote, sent or draft",
+      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Sending moves the annotations into the…",
+      "destination": "transcript",
+      "currentSurface": "transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Select a passage in an assistant reply and press Annotate.",
+        "doneWhen": "A numbered marker sits beside the passage and its comment can be written right there."
+      }
+    },
+    {
       "key": "command-palette#palette-search",
       "plugin": "command-palette",
       "id": "palette-search",
@@ -14082,7 +14097,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "thread-workspaces-panel",
       "title": "Thread integration control center",
-      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, blocked, conflicts, integrating, integrated, no change…",
+      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, stale, blocked, conflicts, integrating, integrated, no…",
       "destination": "land",
       "currentSurface": "left-nav: Land",
       "reach": [
@@ -20803,6 +20818,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "rich-composer#sent-annotations",
+      "plugin": "rich-composer",
+      "id": "sent-annotations",
+      "title": "Keep sent annotations across browsers",
+      "summary": "An accepted message's annotations move into a Host-stored per-session review history, so markers and comments stay on the passage after sending and come back in any browser. Edits and removals follow the same record, and the Composer contract exposes draft and sent annotations t…",
+      "destination": "none",
+      "currentSurface": "host: plugin storage per Session · client: Composer annotations",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "schedule#catalog-read-reuse",
       "plugin": "schedule",
       "id": "catalog-read-reuse",
@@ -21228,10 +21255,32 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with co…",
+      "summary": "List aliases as metadata only, run a command with the workspace's aliases injected through `secret mcp` (output scrubbed by the Host), and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve…",
       "destination": "none",
-      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias",
-      "reach": [],
+      "currentSurface": "agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias",
+      "reach": [
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "expect text \"GITHUB_TOKEN\"",
+          "action": "expect",
+          "by": "text",
+          "name": "GITHUB_TOKEN",
+          "value": null
+        }
+      ],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -24418,11 +24467,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "thread-sidebar#reminder-wake",
+      "plugin": "thread-sidebar",
+      "id": "reminder-wake",
+      "title": "Wake a settled or archived thread for its reminder",
+      "summary": "A reminder is a prompt that comes back to its thread, but a settled thread rejects the step it proposes and the Schedule service refuses an archived target outright, so the reminder would be dropped. The Host never settles a thread holding an active reminder, however far out its…",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › Reminder wake",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "thread-sidebar#section-order",
       "plugin": "thread-sidebar",
       "id": "section-order",
       "title": "Group remote threads with each view",
-      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
+      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default, and their rows archive or restore on the runtime that owns them. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloa…",
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "reach": [

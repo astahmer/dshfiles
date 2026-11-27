@@ -11,31 +11,24 @@ import type { JsonObject, JsonValue } from '../json.js'
 import { CommunicationError, CommunicationService } from './service.js'
 import {
   communicationAgentSchema,
-  communicationDeliverySchema,
   communicationDiagnosticsSchema,
   communicationInboxSchema,
   communicationMessageIntentSchema,
   communicationMessageSchema,
   communicationPrincipalSchema,
-  communicationSubscriptionSchema,
-  communicationTopicSchema,
-  legacyCommunicationDeliverySchema,
   type CommunicationAgent,
-  type CommunicationDelivery,
   type CommunicationDiagnostics,
   type CommunicationInbox,
   type CommunicationMessage,
   type CommunicationMessageIntent,
   type CommunicationPrincipal,
-  type CommunicationSubscription,
-  type CommunicationTopic,
 } from './types.js'
 
 const PROTOCOL_VERSION = 1
 const MAX_REQUEST_BYTES = 64 * 1024
 const MAX_RESPONSE_BYTES = 1024 * 1024
 const REQUEST_TIMEOUT_MS = 5_000
-const operationSchema = Schema.Literals(['agents', 'topics', 'report', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack'])
+const operationSchema = Schema.Literals(['agents', 'report', 'send', 'inbox', 'ack'])
 
 const strictStruct = <const Fields extends Schema.Struct.Fields>(fields: Fields) => {
   const struct = Schema.Struct(fields)
@@ -78,22 +71,7 @@ export interface HostCommunicationBridgeHandle {
 export interface CommunicationClient {
   readonly principal: CommunicationPrincipal
   listAgents(): Promise<readonly CommunicationAgent[]>
-  listTopics(): Promise<readonly CommunicationTopic[]>
   diagnostics(input?: { readonly limit?: number }): Promise<CommunicationDiagnostics>
-  subscribe(input: {
-    readonly topic: string
-    readonly delivery?: CommunicationDelivery
-    readonly allowSteerFrom?: readonly string[]
-  }): Promise<CommunicationSubscription>
-  unsubscribe(topic: string): Promise<{ readonly removed: boolean }>
-  publish(input: {
-    readonly topic: string
-    readonly text: string
-    readonly intent?: CommunicationMessageIntent
-    readonly priority?: 'normal' | 'urgent'
-    readonly correlationId?: string
-    readonly dedupeKey?: string
-  }): Promise<CommunicationMessage>
   send(input: {
     readonly toAgentId: string
     readonly text: string
@@ -102,7 +80,7 @@ export interface CommunicationClient {
     readonly correlationId?: string
     readonly dedupeKey?: string
   }): Promise<CommunicationMessage>
-  inbox(input?: { readonly topic?: string; readonly limit?: number; readonly includeSeen?: boolean }): Promise<CommunicationInbox>
+  inbox(input?: { readonly limit?: number; readonly includeSeen?: boolean }): Promise<CommunicationInbox>
   acknowledge(messageId: string): Promise<{ readonly acknowledged: boolean }>
 }
 
@@ -162,9 +140,7 @@ const readMetadata = async (stateHome?: string): Promise<Schema.Schema.Type<type
 /** One communication operation's result, as the JSON response envelope carries it. */
 type CommunicationOperationResult =
   | readonly CommunicationAgent[]
-  | readonly CommunicationTopic[]
   | CommunicationDiagnostics
-  | CommunicationSubscription
   | { readonly removed: boolean }
   | CommunicationMessage
   | readonly CommunicationMessage[]
@@ -180,56 +156,11 @@ const dispatch = async (
     if (request.input !== undefined) throw new CommunicationError('invalid-request', 'This communication operation takes no input.')
     return (await listAgents()).map(item => decode(communicationAgentSchema, item))
   }
-  if (request.operation === 'topics') {
-    if (request.input !== undefined) throw new CommunicationError('invalid-request', 'This communication operation takes no input.')
-    return service.listTopics()
-  }
   if (request.operation === 'report') {
     const input = decode(strictStruct({ limit: Schema.optional(boundedInteger(1, 100)) }), request.input ?? {})
     return service.diagnostics({ agents: await listAgents(), limit: input.limit ?? 20 })
   }
   if (!isRecord(request.input)) throw new CommunicationError('invalid-request', 'Communication operation input must be an object.')
-  if (request.operation === 'subscribe') {
-    const input = decode(
-      strictStruct({
-        topic: boundedString(1, 128),
-        delivery: Schema.optional(Schema.Union([communicationDeliverySchema, legacyCommunicationDeliverySchema])),
-        allowSteerFrom: Schema.optional(Schema.Array(boundedString(1, 256)).check(Schema.isMaxLength(64))),
-      }),
-      request.input,
-    )
-    return service.subscribe(request.principal, {
-      topic: input.topic,
-      ...(input.delivery !== undefined && { delivery: input.delivery }),
-      ...(input.allowSteerFrom !== undefined && { allowSteerFrom: input.allowSteerFrom }),
-    })
-  }
-  if (request.operation === 'unsubscribe') {
-    const input = decode(strictStruct({ topic: boundedString(1, 128) }), request.input)
-    return service.unsubscribe(request.principal, input.topic)
-  }
-  if (request.operation === 'publish') {
-    const input = decode(
-      strictStruct({
-        topic: boundedString(1, 128),
-        text: boundedString(1, 12_000),
-        intent: Schema.optional(communicationMessageIntentSchema),
-        priority: Schema.optional(Schema.Literals(['normal', 'urgent'])),
-        correlationId: Schema.optional(boundedString(1, 128)),
-        dedupeKey: Schema.optional(boundedString(1, 128)),
-      }),
-      request.input,
-    )
-    return service.publish({
-      sender: request.principal,
-      topic: input.topic,
-      text: input.text,
-      ...(input.intent !== undefined && { intent: input.intent }),
-      ...(input.priority !== undefined && { priority: input.priority }),
-      ...(input.correlationId !== undefined && { correlationId: input.correlationId }),
-      ...(input.dedupeKey !== undefined && { dedupeKey: input.dedupeKey }),
-    })
-  }
   if (request.operation === 'send') {
     const input = decode(
       strictStruct({
@@ -255,7 +186,6 @@ const dispatch = async (
   if (request.operation === 'inbox') {
     const input = decode(
       strictStruct({
-        topic: Schema.optional(boundedString(1, 128)),
         limit: Schema.optional(boundedInteger(1, 500)),
         includeSeen: Schema.optional(Schema.Boolean),
       }),
@@ -264,7 +194,6 @@ const dispatch = async (
     return {
       items: await service.inbox({
         principal: request.principal,
-        ...(input.topic !== undefined && { topic: input.topic }),
         ...(input.limit !== undefined && { limit: input.limit }),
         ...(input.includeSeen !== undefined && { includeSeen: input.includeSeen }),
       }),
@@ -432,11 +361,7 @@ export const connectCommunicationClient = async (options: ConnectCommunicationCl
   return {
     principal,
     listAgents: async () => decode(Schema.Array(communicationAgentSchema), await request('agents')),
-    listTopics: async () => decode(Schema.Array(communicationTopicSchema), await request('topics')),
     diagnostics: async input => decode(communicationDiagnosticsSchema, await request('report', input ?? {})),
-    subscribe: async input => decode(communicationSubscriptionSchema, await request('subscribe', input)),
-    unsubscribe: async topic => decode(strictStruct({ removed: Schema.Boolean }), await request('unsubscribe', { topic })),
-    publish: async input => decode(communicationMessageSchema, await request('publish', input)),
     send: async input => decode(communicationMessageSchema, await request('send', input)),
     inbox: async input => decode(communicationInboxSchema, await request('inbox', input ?? {})),
     acknowledge: async messageId => decode(strictStruct({ acknowledged: Schema.Boolean }), await request('ack', { messageId })),

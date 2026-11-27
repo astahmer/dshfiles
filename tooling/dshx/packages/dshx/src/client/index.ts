@@ -121,6 +121,7 @@ export type {
   CommandTrigger,
   CommandsService,
   ComposerAttachment,
+  ComposerAnnotation,
   ComposerModelSelection,
   ComposerService,
   ComposerTarget,

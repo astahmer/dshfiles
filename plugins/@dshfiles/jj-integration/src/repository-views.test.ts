@@ -9,10 +9,11 @@ import { TestClock } from 'effect/testing'
 import { NotARepository } from './errors.js'
 import { SessionReads, WorkspaceRegistry } from './host-edges-promise.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
+import { jjSettingsTest } from './jj-settings.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
 import { RepositoryViews } from './repository-views.js'
 import { SessionActivity } from './session-activity.js'
-import { ThreadWorkspaces } from './thread-workspaces.js'
+import { ThreadWorkspaces, type ThreadStatus } from './thread-workspaces.js'
 
 const fixture = Effect.gen(function* () {
   const scans = yield* Ref.make(0)
@@ -31,6 +32,7 @@ const fixture = Effect.gen(function* () {
         Layer.mock(SessionActivity, { display: Ref.update(scans, count => count + 1).pipe(Effect.andThen(Deferred.await(release)), Effect.as(undefined)) }),
         Layer.mock(IntegrationRequests, {}),
         Layer.mock(IsolatedSessions, {}),
+        jjSettingsTest(),
         NodeServices.layer,
       ),
     ),
@@ -95,6 +97,7 @@ describe('RepositoryViews thread statuses', () => {
             Layer.mock(SessionActivity, { display: Effect.succeed(undefined) }),
             Layer.mock(IntegrationRequests, {}),
             Layer.mock(IsolatedSessions, {}),
+            jjSettingsTest(),
             NodeServices.layer,
           ),
         ),
@@ -107,6 +110,65 @@ describe('RepositoryViews thread statuses', () => {
         yield* Effect.promise(() => rename(join(heads, 'aaaa'), join(heads, 'bbbb')))
         yield* views.list
         expect(yield* Ref.get(lists)).toBe(2)
+      }).pipe(Effect.provide(layer), Effect.ensuring(Effect.promise(() => rm(repoRoot, { recursive: true, force: true }))))
+    }),
+  )
+})
+
+describe('RepositoryViews stale classification', () => {
+  it.live('marks pending work the bookmark moved past as stale, and leaves recently authored work ready', () =>
+    Effect.gen(function* () {
+      const repoRoot = yield* Effect.promise(() => mkdtemp(join(tmpdir(), 'jj-views-stale-')))
+      yield* Effect.promise(() => mkdir(join(repoRoot, '.jj', 'repo', 'op_heads', 'heads', 'aaaa'), { recursive: true }))
+      const now = Date.now()
+      const threadAt = (name: string, at: number): ThreadStatus => ({
+        name,
+        path: join(repoRoot, name),
+        repoRoot,
+        missing: false,
+        unlanded: [{ changeId: `${name}-change`, commitId: 'a'.repeat(40), description: 'feat: pending work', conflict: false, at }],
+        behind: true,
+        behindCount: 3,
+      })
+      const workspace: Workspace = {
+        id: WorkspaceId('workspace-1'),
+        path: repoRoot,
+        title: 'repo',
+        createdAt: '2026-11-09T00:00:00.000Z',
+        updatedAt: '2026-11-09T00:00:00.000Z',
+        sessionIds: [],
+        setTitle: () => Promise.resolve(),
+        attachSession: () => Promise.resolve(),
+        insertSessionBefore: () => Promise.resolve(),
+        detachSession: () => Promise.resolve(),
+        status: () => Promise.resolve('ok'),
+      }
+      const layer = RepositoryViews.layer.pipe(
+        Layer.provide(
+          Layer.mergeAll(
+            Layer.mock(WorkspaceRegistry, { list: Effect.succeed([workspace]), archivedSessionIds: Effect.succeed(new Set<string>()) }),
+            Layer.mock(ThreadWorkspaces, {
+              locate: () => Effect.succeed({ repoRoot, workspaceRoot: repoRoot, threadName: undefined }),
+              list: () => Effect.succeed([threadAt('thread-stale', now - 30 * 86_400_000), threadAt('thread-fresh', now - 60 * 60_000)]),
+              bookmarks: () => Effect.succeed({ current: null, names: [] }),
+            }),
+            Layer.mock(ProjectBookmarks, { bookmarkFor: () => Effect.succeed('main') }),
+            Layer.mock(SessionReads, {}),
+            Layer.mock(SessionActivity, { display: Effect.succeed(undefined) }),
+            Layer.mock(IntegrationRequests, { history: () => Effect.succeed([]), get: () => Effect.succeed(undefined) }),
+            IsolatedSessions.layer,
+            jjSettingsTest(),
+            NodeServices.layer,
+          ),
+        ),
+      )
+      yield* Effect.gen(function* () {
+        const views = yield* RepositoryViews
+        const [repository] = yield* views.list
+        expect(repository?.threads.map(thread => [thread.name, thread.stale])).toEqual([
+          ['thread-stale', true],
+          ['thread-fresh', undefined],
+        ])
       }).pipe(Effect.provide(layer), Effect.ensuring(Effect.promise(() => rm(repoRoot, { recursive: true, force: true }))))
     }),
   )
@@ -144,6 +206,7 @@ describe('RepositoryViews folder locations', () => {
             Layer.mock(SessionActivity, { display: Effect.succeed(undefined) }),
             Layer.mock(IntegrationRequests, {}),
             Layer.mock(IsolatedSessions, {}),
+            jjSettingsTest(),
             NodeServices.layer,
           ),
         ),

@@ -1,27 +1,16 @@
 import { Alert, AlertDescription } from '@dshfiles/plugin-ui/components/ui/alert'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { AgentRoster, type RosterAgent } from '@dshfiles/plugin-ui/components/motion/agent-roster'
 import { Badge } from '@dshfiles/plugin-ui/components/ui/badge'
 import { EmptyState, Page } from '@dshfiles/plugin-ui/components/page'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dshfiles/plugin-ui/components/ui/card'
-import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { Separator } from '@dshfiles/plugin-ui/components/ui/separator'
 import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { HashIcon, MessageSquareIcon, RefreshCwIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
+import { MessageSquareIcon, RefreshCwIcon, SendIcon } from '@dshfiles/plugin-ui/icons'
 import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { useLoadMore } from '@dshfiles/plugin-ui/hooks/use-load-more'
@@ -44,18 +33,10 @@ const messageRecipientsKey = ['agent-communication', 'message-recipients'] as co
 const REPORT_LIMIT = 100
 const PAGE_SIZE = 50
 
-type ConversationSelection =
-  | { readonly kind: 'all' }
-  | { readonly kind: 'topic'; readonly topic: string }
-  | { readonly kind: 'direct'; readonly agentId: string }
-
-type ManagementAction =
-  | { readonly kind: 'unsubscribe'; readonly agentId: string; readonly topic: string }
-  | { readonly kind: 'rejoin'; readonly agentId: string; readonly topic: string }
+type ConversationSelection = { readonly kind: 'all' } | { readonly kind: 'direct'; readonly agentId: string }
 
 interface SendVariables {
   readonly input: AgentCommunicationPostInput
-  readonly selection: ConversationSelection
   readonly queryKey: readonly string[]
 }
 
@@ -65,10 +46,8 @@ interface AgentCommunicationPanelProps {
   readonly t: AgentCommunicationTranslate
 }
 
-/** Agents are Sessions and workspace channels are hashed folders: both render as thread titles and project names. */
 interface Labels {
   readonly agent: (agentId: string) => string
-  readonly topic: (topic: string) => string
 }
 
 const formatTime = (timestamp: number): string => new Date(timestamp).toLocaleString()
@@ -79,11 +58,8 @@ const principalLabel = (principal: CommunicationMessage['sender'], labels: Label
       ? t('browserUser')
       : t('externalPrincipal', { id: principal.id })
 
-const selectionKey = (selection: ConversationSelection): readonly string[] => {
-  if (selection.kind === 'topic') return [...browseKey, 'topic', selection.topic]
-  if (selection.kind === 'direct') return [...browseKey, 'direct', selection.agentId]
-  return [...browseKey, 'all']
-}
+const selectionKey = (selection: ConversationSelection): readonly string[] =>
+  selection.kind === 'direct' ? [...browseKey, 'direct', selection.agentId] : [...browseKey, 'all']
 
 const ActivityList = (props: {
   readonly events: readonly {
@@ -190,30 +166,18 @@ const AgentStatus = (props: { readonly agent: CommunicationDiagnosticAgent; read
   <Badge variant={props.agent.status === 'running' ? 'default' : 'secondary'}>{props.agent.status === 'running' ? props.t('running') : props.t('idle')}</Badge>
 )
 
-/** One live agent as a roster row: the status pill and its workspace channel subscription, with the matching action. */
+/** One live agent as a roster row: the status pill only; peer mail is direct now. */
 const rosterAgent = (props: {
   readonly agent: CommunicationDiagnosticAgent
   readonly labels: Labels
   readonly t: AgentCommunicationTranslate
-  readonly busy: boolean
-  readonly onAction: (action: ManagementAction) => void
 }): RosterAgent => {
   const { agent, t } = props
-  const topic = agent.workspaceTopic
-  const canRejoin = topic !== null && (agent.workspaceOptedOut || agent.workspaceSubscribed === false)
-  const canUnsubscribe = topic !== null && !agent.workspaceOptedOut && agent.workspaceSubscribed === true
-  const actionKind = canRejoin ? 'rejoin' : canUnsubscribe ? 'unsubscribe' : undefined
-  const action =
-    topic === null || actionKind === undefined ? undefined : (
-      <Button size="sm" variant="outline" disabled={props.busy} onClick={() => props.onAction({ kind: actionKind, agentId: agent.id, topic })}>
-        {t(actionKind)}
-      </Button>
-    )
   return {
     id: agent.id,
     status: agent.status === 'running' ? 'running' : 'idle',
     statusLabel: agent.status === 'running' ? t('running') : t('idle'),
-    activityKey: `${agent.status}:${String(agent.workspaceSubscribed)}:${String(agent.workspaceOptedOut)}`,
+    activityKey: agent.status ?? 'idle',
     title: (
       <Tooltip>
         <TooltipTrigger asChild>
@@ -225,43 +189,19 @@ const rosterAgent = (props: {
     activity: (
       <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:pt-1">
         <AgentStatus agent={agent} t={t} />
-        {topic === null ? null : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="dshx:text-xs dshx:text-muted-foreground">{props.labels.topic(topic)}</span>
-            </TooltipTrigger>
-            <TooltipContent>{topic}</TooltipContent>
-          </Tooltip>
-        )}
-        {agent.workspaceOptedOut ? <Badge variant="outline">{t('optedOut')}</Badge> : null}
-        {agent.workspaceSubscribed === true ? <Badge variant="secondary">{t('subscribed')}</Badge> : null}
-        {topic !== null && agent.workspaceSubscribed === undefined && !agent.workspaceOptedOut ? (
-          <Badge variant="outline">{t('unknownSubscription')}</Badge>
-        ) : null}
       </span>
     ),
-    ...(action !== undefined && { action }),
   }
 }
 
-const DiagnosticPanel = (props: {
-  readonly data: CommunicationDiagnostics
-  readonly labels: Labels
-  readonly t: AgentCommunicationTranslate
-  readonly onAction: (action: ManagementAction) => void
-  readonly busy: boolean
-}): JSX.Element => {
+const DiagnosticPanel = (props: { readonly data: CommunicationDiagnostics; readonly labels: Labels; readonly t: AgentCommunicationTranslate }): JSX.Element => {
   const t = props.t
   const diagnostics = props.data
-  const missingWorkspace = diagnostics.agents.filter(agent => agent.workspaceTopic !== null && agent.workspaceSubscribed === false && !agent.workspaceOptedOut)
-  const topicMap = new Map(diagnostics.topics.map(topic => [topic.topic, topic.subscribers]))
   return (
     <div className="dshx:flex dshx:flex-col dshx:gap-4">
-      <div className="dshx:grid dshx:grid-cols-4 dshx:gap-3 dshx:@max-pane-compact:grid-cols-2">
+      <div className="dshx:grid dshx:grid-cols-2 dshx:gap-3">
         {[
           { label: t('agents'), value: diagnostics.agentCount },
-          { label: t('channels'), value: diagnostics.topicCount },
-          { label: t('subscriptions'), value: diagnostics.subscriptionCount },
           { label: t('pending'), value: diagnostics.pendingRecipientCount },
         ].map(metric => (
           <Card key={metric.label}>
@@ -272,52 +212,19 @@ const DiagnosticPanel = (props: {
           </Card>
         ))}
       </div>
-      {missingWorkspace.length === 0 ? null : (
-        <Alert variant="destructive">
-          <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspace.length })}</AlertDescription>
-        </Alert>
-      )}
-      <div className="dshx:grid dshx:gap-4 dshx:@min-[56rem]:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('channels')}</CardTitle>
-            <CardDescription>{t('topicSubscribers', { count: diagnostics.topics.reduce((sum, topic) => sum + topic.subscribers, 0) })}</CardDescription>
-          </CardHeader>
-          <CardContent className="dshx:p-0">
-            {diagnostics.topics.length === 0 ? <EmptyState>{t('noTopics')}</EmptyState> : null}
-            {diagnostics.topics.map(topic => (
-              <div
-                key={topic.topic}
-                className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:py-3"
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="dshx:min-w-0 dshx:truncate dshx:text-sm">{props.labels.topic(topic.topic)}</span>
-                  </TooltipTrigger>
-                  <TooltipContent>{topic.topic}</TooltipContent>
-                </Tooltip>
-                <Badge variant="secondary">{topicMap.get(topic.topic) ?? 0}</Badge>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('agents')}</CardTitle>
-            <CardDescription>{t('offlineUnknown')}</CardDescription>
-          </CardHeader>
-          <CardContent className="dshx:border-t dshx:border-border dshx:p-4">
-            {diagnostics.agents.length === 0 ? (
-              <EmptyState>{t('noLiveAgents')}</EmptyState>
-            ) : (
-              <AgentRoster
-                aria-label={t('agents')}
-                agents={diagnostics.agents.map(agent => rosterAgent({ agent, labels: props.labels, t, busy: props.busy, onAction: props.onAction }))}
-              />
-            )}
-          </CardContent>
-        </Card>
-      </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('agents')}</CardTitle>
+          <CardDescription>{t('offlineUnknown')}</CardDescription>
+        </CardHeader>
+        <CardContent className="dshx:border-t dshx:border-border dshx:p-4">
+          {diagnostics.agents.length === 0 ? (
+            <EmptyState>{t('noLiveAgents')}</EmptyState>
+          ) : (
+            <AgentRoster aria-label={t('agents')} agents={diagnostics.agents.map(agent => rosterAgent({ agent, labels: props.labels, t }))} />
+          )}
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader>
           <CardTitle>{t('recentActivity')}</CardTitle>
@@ -343,9 +250,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const [search, setSearch] = useState('')
   const [draft, setDraft] = useState('')
   const [draftIntent, setDraftIntent] = useState<'notice' | 'request'>('notice')
-  const [newTopic, setNewTopic] = useState('')
   const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null)
-  const [action, setAction] = useState<ManagementAction | null>(null)
   const [receiptCount, setReceiptCount] = useState<number | null>(null)
   const debouncedSearch = useDebouncedValue({ value: search.trim(), delayMs: 200 })
   const diagnosticsQuery = useQuery({
@@ -355,21 +260,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   })
   const diagnostics = diagnosticsQuery.data
   const sessionLabel = EntityLabels.useSessionLabel(props.sessions)
-  const sessionCwd = EntityLabels.useSessionCwd(props.sessions)
-  const projectLabel = EntityLabels.useWorkspaceLabel(props.workspaces)
-  const labels: Labels = {
-    agent: sessionLabel,
-    // A workspace topic hashes its folder on the Host; any agent subscribed to it knows the folder through its Session.
-    topic: topic => {
-      if (!topic.startsWith('workspace/')) return topic
-      const member = diagnostics?.agents.find(agent => agent.workspaceTopic === topic)
-      const cwd = member === undefined ? null : sessionCwd(member.id)
-      if (cwd === null) return `${props.t('workspace')} · ${topic.slice('workspace/'.length, 'workspace/'.length + 8)}`
-      const project = projectLabel({ path: cwd })
-      // A thread workspace is named by its thread, never its folder (b:212a).
-      return EntityLabels.isThreadWorkspace(cwd) ? `${project} · ${sessionLabel(member?.id ?? '')}` : project
-    },
-  }
+  const labels: Labels = { agent: sessionLabel }
   const navigationQuery = useQuery({
     queryKey: [...browseKey, 'navigation'],
     enabled: diagnostics !== undefined,
@@ -380,7 +271,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   const threadAgents = new Map<string, CommunicationDiagnosticAgent | undefined>()
   for (const agent of diagnostics?.agents ?? []) threadAgents.set(agent.id, agent)
   for (const message of navigationQuery.data?.items ?? []) {
-    if (message.topic !== null) continue
     if (message.sender.kind === 'agent')
       threadAgents.set(
         message.sender.id,
@@ -396,19 +286,8 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
   }
   const directThreads = [...threadAgents.entries()].sort(([left], [right]) => sessionLabel(left).localeCompare(sessionLabel(right)))
   const pickableAgents = [...(diagnostics?.agents ?? [])].sort((left, right) => sessionLabel(left.id).localeCompare(sessionLabel(right.id)))
-  const topics = new Map<string, number>((diagnostics?.topics ?? []).map(topic => [topic.topic, topic.subscribers]))
-  for (const agent of diagnostics?.agents ?? []) {
-    if (agent.workspaceTopic !== null && agent.workspaceTopic !== undefined && !topics.has(agent.workspaceTopic)) topics.set(agent.workspaceTopic, 0)
-  }
-  for (const message of diagnostics?.recentMessages ?? []) {
-    if (message.topic !== null && !topics.has(message.topic)) topics.set(message.topic, 0)
-  }
-  if (selection.kind === 'topic' && !topics.has(selection.topic)) topics.set(selection.topic, 0)
-  // Sorted by label so a project's channel sits next to its thread workspaces' channels.
-  const topicEntries = [...topics.entries()].sort(([left], [right]) => labels.topic(left).localeCompare(labels.topic(right)))
   const conversationKey = selectionKey(selection)
   const browseInputFor = (beforeId: string | null): AgentCommunicationBrowseInput => ({
-    ...(selection.kind === 'topic' && { topic: selection.topic }),
     ...(selection.kind === 'direct' && { agentId: selection.agentId }),
     ...(debouncedSearch.length !== 0 && { search: debouncedSearch }),
     ...(beforeId !== null && { beforeId }),
@@ -461,71 +340,28 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
     mutationFn: (variables: SendVariables) => runHostRequest({ request: signal => api.postMessage(variables.input, { signal }) }),
     onSuccess: async (receipt, variables) => {
       setDraft('')
-      setNewTopic('')
       setReceiptCount(receipt.recipientCount)
-      if (receipt.topic !== null && variables.selection.kind === 'all' && selection.kind === 'all') {
-        setSelection({ kind: 'topic', topic: receipt.topic })
-      }
       await queryClient.invalidateQueries({ queryKey: variables.queryKey })
       await queryClient.invalidateQueries({ queryKey: [...browseKey, 'navigation'] })
-      await queryClient.invalidateQueries({ queryKey: diagnosticsKey })
-    },
-  })
-  const managementMutation = useMutation({
-    mutationFn: (request: ManagementAction) =>
-      runHostRequest({
-        request: async signal => {
-          if (request.kind === 'unsubscribe') {
-            await api.unsubscribe({ agentId: request.agentId, topic: request.topic }, { signal })
-            return
-          }
-          await api.setSubscription({ agentId: request.agentId, topic: request.topic }, { signal })
-        },
-      }),
-    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: diagnosticsKey })
     },
   })
   const t = props.t
   const [tab, setTab] = useState<'messages' | 'diagnostics'>('messages')
   const connected = diagnostics !== undefined && diagnosticsQuery.error === null
-  const currentTopic = selection.kind === 'topic' ? selection.topic : null
   const currentDirectAgent = selection.kind === 'direct' ? selection.agentId : null
-  const currentTitle =
-    currentTopic === null
-      ? currentDirectAgent === null
-        ? t('allConversations')
-        : t('directThread', { agent: sessionLabel(currentDirectAgent) })
-      : labels.topic(currentTopic)
-  const legacyHost =
-    diagnostics?.unnotifiedRecipientCount !== undefined || diagnostics?.subscriptions.some(subscription => subscription.delivery !== 'passive') === true
-  const missingWorkspaceCount =
-    diagnostics?.agents.filter(agent => agent.workspaceTopic !== null && agent.workspaceSubscribed === false && !agent.workspaceOptedOut).length ?? 0
-  const actionDescription =
-    action === null
-      ? ''
-      : action.kind === 'rejoin'
-        ? t('confirmRejoin', { agent: sessionLabel(action.agentId), topic: labels.topic(action.topic) })
-        : t('confirmUnsubscribe', { agent: sessionLabel(action.agentId), topic: labels.topic(action.topic) })
+  const currentTitle = currentDirectAgent === null ? t('allConversations') : t('directThread', { agent: sessionLabel(currentDirectAgent) })
+  const legacyHost = diagnostics?.unnotifiedRecipientCount !== undefined
   const submitMessage = (): void => {
-    if (draft.trim().length === 0 || sendMutation.isPending) return
-    let input: AgentCommunicationPostInput
-    if (selection.kind === 'topic') input = { topic: selection.topic, text: draft, intent: draftIntent }
-    else if (selection.kind === 'direct') input = { agentId: selection.agentId, text: draft, intent: draftIntent }
-    else {
-      const topic = newTopic.trim()
-      if (topic.length === 0) return
-      input = { topic, text: draft, intent: draftIntent }
-    }
+    if (draft.trim().length === 0 || sendMutation.isPending || selection.kind !== 'direct') return
     setReceiptCount(null)
-    sendMutation.mutate({ input, selection, queryKey: conversationKey })
+    sendMutation.mutate({ input: { agentId: selection.agentId, text: draft, intent: draftIntent }, queryKey: conversationKey })
   }
   const changeSelection = (next: ConversationSelection): void => {
     setSelection(next)
     setSelectedMessageId(null)
     setDraft('')
     setDraftIntent('notice')
-    setNewTopic('')
     setReceiptCount(null)
     sendMutation.reset()
   }
@@ -589,7 +425,7 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                 <Card className="dshx:min-w-0">
                   <CardHeader className="dshx:pb-3">
                     <CardTitle className="dshx:flex dshx:items-center dshx:gap-2">
-                      <HashIcon aria-hidden /> {t('channels')}
+                      <MessageSquareIcon aria-hidden /> {t('directMessages')}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="dshx:flex dshx:max-h-[60vh] dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:p-3 dshx:pt-0">
@@ -601,29 +437,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                     >
                       <MessageSquareIcon aria-hidden /> {t('allConversations')}
                     </Button>
-                    <div className="dshx:flex dshx:flex-col dshx:gap-1">
-                      <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{t('channels')}</p>
-                      {topicEntries.length === 0 ? <EmptyState className="dshx:py-3">{t('noTopics')}</EmptyState> : null}
-                      {topicEntries.map(([topic, subscribers]) => (
-                        <Button
-                          key={topic}
-                          variant={selection.kind === 'topic' && selection.topic === topic ? 'secondary' : 'ghost'}
-                          disabled={sendMutation.isPending}
-                          className="dshx:min-w-0 dshx:justify-start"
-                          onClick={() => changeSelection({ kind: 'topic', topic })}
-                        >
-                          <HashIcon aria-hidden />
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{labels.topic(topic)}</span>
-                            </TooltipTrigger>
-                            <TooltipContent>{topic}</TooltipContent>
-                          </Tooltip>
-                          <span className="dshx:text-xs dshx:text-muted-foreground">{subscribers}</span>
-                        </Button>
-                      ))}
-                    </div>
-                    <Separator />
                     <div className="dshx:flex dshx:flex-col dshx:gap-1">
                       <p className="dshx:px-2 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{t('directMessages')}</p>
                       <Select
@@ -722,16 +535,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         submitMessage()
                       }}
                     >
-                      {selection.kind === 'all' ? (
-                        <Input
-                          aria-label={t('topicName')}
-                          placeholder={t('newChannel')}
-                          value={newTopic}
-                          maxLength={128}
-                          disabled={sendMutation.isPending}
-                          onChange={event => setNewTopic(event.currentTarget.value)}
-                        />
-                      ) : null}
                       <Textarea
                         aria-label={t('composePlaceholder')}
                         placeholder={t('composePlaceholder')}
@@ -770,17 +573,9 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                       <p className="dshx:text-xs dshx:text-muted-foreground">{t('intentHint')}</p>
                       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:justify-between dshx:gap-2">
                         <p className="dshx:text-xs dshx:text-muted-foreground">
-                          {selection.kind === 'topic'
-                            ? t('sendToTopic', { topic: labels.topic(selection.topic) })
-                            : selection.kind === 'direct'
-                              ? t('sendToAgent', { agent: sessionLabel(selection.agentId) })
-                              : t('newChannel')}
+                          {selection.kind === 'direct' ? t('sendToAgent', { agent: sessionLabel(selection.agentId) }) : t('chooseAgent')}
                         </p>
-                        <Button
-                          type="submit"
-                          size="sm"
-                          disabled={draft.trim().length === 0 || sendMutation.isPending || (selection.kind === 'all' && newTopic.trim().length === 0)}
-                        >
+                        <Button type="submit" size="sm" disabled={draft.trim().length === 0 || sendMutation.isPending || selection.kind !== 'direct'}>
                           <SendIcon aria-hidden /> {sendMutation.isPending ? t('sending') : t('send')}
                         </Button>
                       </div>
@@ -811,10 +606,6 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('sender')}</p>
                           <p className="dshx:break-all dshx:text-sm dshx:font-medium">{principalLabel(selectedMessage.sender, labels, t)}</p>
-                        </div>
-                        <div>
-                          <p className="dshx:text-xs dshx:text-muted-foreground">{t('topic')}</p>
-                          <p className="dshx:break-all dshx:text-sm">{selectedMessage.topic ?? t('directMessages')}</p>
                         </div>
                         <div>
                           <p className="dshx:text-xs dshx:text-muted-foreground">{t('intent')}</p>
@@ -871,62 +662,10 @@ export const AgentCommunicationPanel = (props: AgentCommunicationPanelProps): JS
                 </Card>
               </div>
             ) : (
-              <div className="dshx:flex dshx:flex-col dshx:gap-3">
-                {missingWorkspaceCount > 0 ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{t('missingWorkspaceSubscriptions', { count: missingWorkspaceCount })}</AlertDescription>
-                  </Alert>
-                ) : null}
-                <DiagnosticPanel
-                  data={diagnostics}
-                  labels={labels}
-                  t={t}
-                  busy={managementMutation.isPending}
-                  onAction={nextAction => {
-                    managementMutation.reset()
-                    setAction(nextAction)
-                  }}
-                />
-                {managementMutation.error !== null ? (
-                  <Alert variant="destructive">
-                    <AlertDescription>{errorMessage(managementMutation.error, t('loadFailed'))}</AlertDescription>
-                  </Alert>
-                ) : null}
-              </div>
+              <DiagnosticPanel data={diagnostics} labels={labels} t={t} />
             )}
           </>
         )}
-
-        <AlertDialog
-          open={action !== null}
-          onOpenChange={open => {
-            if (!open && !managementMutation.isPending) setAction(null)
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('confirm')}</AlertDialogTitle>
-              <AlertDialogDescription>{actionDescription}</AlertDialogDescription>
-            </AlertDialogHeader>
-            <Separator />
-            <AlertDialogFooter>
-              <AlertDialogCancel disabled={managementMutation.isPending} onClick={() => setAction(null)}>
-                {t('cancel')}
-              </AlertDialogCancel>
-              <AlertDialogAction
-                disabled={managementMutation.isPending}
-                variant={action?.kind === 'unsubscribe' ? 'destructive' : 'default'}
-                onClick={event => {
-                  event.preventDefault()
-                  if (action === null) return
-                  managementMutation.mutate(action, { onSuccess: () => setAction(null) })
-                }}
-              >
-                {t('confirm')}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </Page>
     </TooltipProvider>
   )

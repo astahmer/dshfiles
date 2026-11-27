@@ -27,6 +27,7 @@ describe('Chat external link opening', () => {
       currentOrigin: 'http://127.0.0.1:3080',
       linkOpening: 'sidebar',
       browserAvailable: true,
+      paneRefused: () => false,
       openInSidebar: openers.openInSidebar,
       openInNewTab: openers.openInNewTab,
     })
@@ -44,6 +45,7 @@ describe('Chat external link opening', () => {
       currentOrigin: 'http://127.0.0.1:3080',
       linkOpening: 'sidebar',
       browserAvailable: true,
+      paneRefused: () => false,
       openInSidebar: openers.openInSidebar,
       openInNewTab: openers.openInNewTab,
     })
@@ -61,12 +63,32 @@ describe('Chat external link opening', () => {
       currentOrigin: 'http://127.0.0.1:3080',
       linkOpening: 'sidebar',
       browserAvailable: true,
+      paneRefused: () => false,
       openInSidebar: openers.openInSidebar,
       openInNewTab: openers.openInNewTab,
     })
 
     expect(openers.openedInSidebar).toEqual([url.href])
     expect(openers.openedInNewTab).toEqual([])
+  })
+
+  it('sends a link the Host knows refuses embedding to a browser tab, not the blank pane', () => {
+    const openers = createOpeners()
+    const url = new URL('https://github.com/')
+
+    openChatExternalLink({
+      url,
+      currentOrigin: 'http://127.0.0.1:3080',
+      linkOpening: 'sidebar',
+      browserAvailable: true,
+      // Chrome's frame refusal is invisible to the pane, so the Host's answer decides instead.
+      paneRefused: href => href === url.href,
+      openInSidebar: openers.openInSidebar,
+      openInNewTab: openers.openInNewTab,
+    })
+
+    expect(openers.openedInSidebar).toEqual([])
+    expect(openers.openedInNewTab).toEqual([url.href])
   })
 
   it('preserves new-tab and browser-unavailable choices for other URLs', () => {
@@ -78,6 +100,7 @@ describe('Chat external link opening', () => {
       currentOrigin: 'http://127.0.0.1:3080',
       linkOpening: 'new-tab',
       browserAvailable: true,
+      paneRefused: () => false,
       openInSidebar: openers.openInSidebar,
       openInNewTab: openers.openInNewTab,
     })
@@ -86,6 +109,7 @@ describe('Chat external link opening', () => {
       currentOrigin: 'http://127.0.0.1:3080',
       linkOpening: 'sidebar',
       browserAvailable: false,
+      paneRefused: () => false,
       openInSidebar: openers.openInSidebar,
       openInNewTab: openers.openInNewTab,
     })

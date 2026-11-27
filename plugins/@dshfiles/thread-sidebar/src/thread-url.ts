@@ -44,18 +44,25 @@ export class ThreadUrlModel {
  * The `?thread=` route the page was loaded with, offered until one thread list resolves it. The thread list unmounts
  * while the rail shows another destination and the URL then keeps the thread it last wrote, so a remount must not read
  * that stale URL as a request to navigate: it would pull the stage away from a thread opened meanwhile (New thread on
- * the Settings destination). Back and Forward still route through `popstate`.
+ * the Settings destination). Back and Forward still route through `popstate`. The first read is the page-load route: a
+ * phone history layer rewrites the URL (its `history.back()` onto the base entry drops the thread) before the list mounts.
  */
 export class PageLoadThreadRoute {
   private settled = false
+  private loaded: string | null | undefined
+
+  /** @param loadedUrl - the address the page loaded with; without it, the first read stands for it. */
+  constructor(loadedUrl?: string) {
+    if (loadedUrl !== undefined) this.loaded = ThreadUrlModel.readThreadUrl(loadedUrl)?.sessionId ?? null
+  }
 
   /** The page-load route while unresolved; null once a list resolved it or the page had none. */
   readonly pending = (currentUrl: string): string | null => {
     if (this.settled) return null
-    const sessionId = ThreadUrlModel.readThreadUrl(currentUrl)?.sessionId ?? null
+    this.loaded ??= ThreadUrlModel.readThreadUrl(currentUrl)?.sessionId ?? null
     // A page loaded without a route has nothing to resolve: a URL written later by the list is never a request.
-    if (sessionId === null) this.settled = true
-    return sessionId
+    if (this.loaded === null) this.settled = true
+    return this.loaded
   }
 
   /** Called once the route was opened, found already selected, reported missing or overtaken by a user selection. */
@@ -65,7 +72,7 @@ export class PageLoadThreadRoute {
 }
 
 /** One per page: each plugin bundle loads this module once. */
-export const pageLoadThreadRoute = new PageLoadThreadRoute()
+export const pageLoadThreadRoute = new PageLoadThreadRoute(typeof window === 'undefined' ? undefined : window.location.href)
 
 export const buildThreadUrl = ThreadUrlModel.buildThreadUrl
 export const clearThreadUrl = ThreadUrlModel.clearThreadUrl

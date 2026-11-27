@@ -3,6 +3,7 @@ import { secretAliasSchemaEffect, secretEnvironmentSchemaEffect, secretScopeSche
 import { Tool } from '@dshfiles/dshx/effect'
 import { Effect, Schema } from 'effect'
 import { SecretCatalog } from './secret-catalog.js'
+import { SecretMcp, SecretMcpError } from './secret-mcp-service.js'
 import { resolveSecretValue } from './secret-reference-resolver.js'
 import { DEFAULT_SECRET_REQUEST_TIMEOUT_MS, SecretRequests, type SecretRequestOutcome } from './secret-requests.js'
 
@@ -70,6 +71,55 @@ const secretGet = Tool.make({
     const environment = input.environment ?? 'prod'
     const value = yield* resolveSecretValue({ reference: { alias: input.alias, environment }, cwd: sessionCwd(call) })
     return { alias: input.alias, environment, value }
+  }),
+})
+
+const runOutput = Schema.Struct({
+  exitCode: Schema.Int,
+  timedOut: Schema.Boolean,
+  stdout: Schema.String,
+  stderr: Schema.String,
+  injectedAliases: Schema.Array(Schema.String),
+  error: Schema.optionalKey(Schema.String),
+})
+
+const renderRun = (value: typeof runOutput.Type): string => {
+  if (value.error !== undefined) return value.error
+  const heading = `exit ${value.exitCode}${value.timedOut ? ' (timed out)' : ''} · ${value.injectedAliases.join(', ') || 'no aliases injected'}`
+  const output = [value.stdout, value.stderr].filter(part => part.length > 0).join('\n')
+  const trimmed = output.length > 8_000 ? `${output.slice(0, 8_000)}\n… truncated` : output
+  return trimmed.length === 0 ? heading : `${heading}\n${trimmed}`
+}
+
+const secretRun = Tool.make({
+  name: 'secret_run',
+  description:
+    "Run a command with this workspace's secret aliases injected as environment variables. Values are never returned: exact value bytes in the child output are replaced with [scrubbed] by the Host. Use this instead of secret_get whenever a command needs a credential.",
+  input: Schema.Struct({
+    command: Schema.Array(Schema.String).check(Schema.isMinLength(1), Schema.isMaxLength(64)).annotate({
+      description: 'Command and arguments, e.g. ["npm", "test"].',
+    }),
+    environment: Schema.optionalKey(secretEnvironmentSchemaEffect.annotate({ description: 'Secret environment; defaults to prod.' })),
+    timeoutSeconds: Schema.optionalKey(
+      Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 300 })).annotate({ description: 'Maximum run time in seconds; defaults to 60.' }),
+    ),
+  }),
+  output: runOutput,
+  render: renderRun,
+  execute: Effect.fn('secret tool run')(function* (input, call) {
+    const cwd = sessionCwd(call)
+    if (cwd === null)
+      return { exitCode: 1, timedOut: false, stdout: '', stderr: '', injectedAliases: [], error: 'secret_run needs a Session workspace folder.' }
+    const environment = input.environment ?? DEFAULT_SECRET_ENVIRONMENT
+    const timeoutSeconds = input.timeoutSeconds
+    return yield* SecretMcp.use(mcp =>
+      mcp.run(timeoutSeconds === undefined ? { command: input.command, cwd, environment } : { command: input.command, cwd, environment, timeoutSeconds }),
+    ).pipe(
+      Effect.map(result => ({ ...result, injectedAliases: [...result.injectedAliases] })),
+      Effect.catchTag('SecretMcpError', (error: SecretMcpError) =>
+        Effect.succeed({ exitCode: 1, timedOut: false, stdout: '', stderr: '', injectedAliases: [], error: error.message }),
+      ),
+    )
   }),
 })
 
@@ -142,4 +192,4 @@ const secretRemoveAlias = Tool.make({
   }),
 })
 
-export const secretTools = [secretList, secretGet, requestSecret, secretRemoveAlias]
+export const secretTools = [secretList, secretGet, secretRun, requestSecret, secretRemoveAlias]

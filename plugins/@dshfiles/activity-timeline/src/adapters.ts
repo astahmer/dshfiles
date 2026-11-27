@@ -102,7 +102,6 @@ export class ActivityTimelineAdapters {
     readonly senderId: string
     readonly recipientCount: number
     readonly intent: 'notice' | 'request'
-    readonly topic: string | null
     readonly correlationId?: string | undefined
     readonly sessionId?: string | null | undefined
   }): ActivityIngest => ({
@@ -113,12 +112,9 @@ export class ActivityTimelineAdapters {
     level: input.intent === 'request' ? 'notable' : 'routine',
     sessionId: identifier(input.sessionId ?? null),
     correlationId: input.correlationId ?? null,
-    summary:
-      input.topic === null
-        ? `Direct message from ${input.senderId} to ${String(input.recipientCount)} agent(s)`
-        : `Message from ${input.senderId} on ${input.topic}`,
-    metadata: { intent: input.intent, topic: input.topic, recipientCount: input.recipientCount, senderId: input.senderId },
-    references: referencesOf([{ kind: 'message', id: input.messageId, label: input.topic }]),
+    summary: `Direct message from ${input.senderId} to ${String(input.recipientCount)} agent(s)`,
+    metadata: { intent: input.intent, recipientCount: input.recipientCount, senderId: input.senderId },
+    references: referencesOf([{ kind: 'message', id: input.messageId, label: null }]),
     provenance: 'observed',
   })
 

@@ -64,9 +64,10 @@ their live running state, while date, project, and flat views group them
 alongside local threads. Enable **Show remote threads in a separate group** in
 **Thread list settings** to restore a standalone Remote section; in status views its
 header joins the saved `sectionOrder` and can be reordered like local sections.
-Remote runtime status does not include pinned, parked, settled, archived, or
-attention state, so integrated remote sessions only participate in
-Active/Inactive status grouping.
+Remote runtime status carries pinned, archived, and attention state for the runtime's own threads: an
+integrated remote session joins Active/Inactive from its live running state, and once its runtime reports it
+archived, its row moves to the Archived section. The row's menu and hover strip archive and restore it through
+multi-host on the runtime that owns it; pin, rename, and the rest stay local to that runtime.
 A local status section with no rows folds away and keeps its saved slot while the
 shown ones reorder around it. The project picker scopes rows to one workspace or
 unassigned sessions.
@@ -329,8 +330,10 @@ threshold, so a drop there records `idleSectionOverrides` (with its instant) and
 keeps the row in that section until the thread's next turn; Archived keeps the
 thread's other statuses, so restoring brings it back where it was. Pin, settle
 and archive keep their usual refusals (a running thread cannot be parked, settled
-or archived), and every move honors Apply actions to child threads. The row
-context menu's Move to group submenu performs the same moves from the keyboard.
+or archived), and every move honors Apply actions to child threads. A remote row
+follows the same plan, except that its archive and restore run on the runtime
+owning it (its Host-only pin is the one verb it never applies). The row context
+menu's Move to group submenu performs the same moves from the keyboard.
 
 **The thread board page.** The sidebar only ever shows the list; the board is a
 full-width page opened from the thread board row in the sidebar's panel list (or
@@ -397,10 +400,11 @@ when enabled, the Host checks the same idle threshold on the configured scan
 interval (`src/auto-settle-host.ts`, first scan 30 s after boot, again at once
 when the policy settings change) and writes `settledSessionIds`, so threads
 settle with no browser open. It skips running, blank, archived, pinned, parked,
-already-settled, excluded-session, excluded-project, waiting-for-an-answer and
-still-running-descendant entries. The same scan settles rebased threads once
-`rebasedThreadSettleDelay` passes, reading jj-integration's thread workspaces
-through its Host API.
+already-settled, excluded-session, excluded-project, waiting-for-an-answer, a
+thread waiting for its resume after a restart or a crash, and any entry whose
+subagent tree still works (a running turn, a pending answer or a running
+background job below it), plus every thread holding an active reminder. The same scan settles rebased threads once `rebasedThreadSettleDelay`
+passes, reading jj-integration's thread workspaces through its Host API.
 
 **Finished subagents settle on their own.** Independently of the idle switch, the
 same Host scan settles a subagent thread (one with a parent) that stayed idle for
@@ -434,6 +438,20 @@ reported per id), writes the settled status once, and lists the settle with its
 source and reason in `thread_auto_settle_status`. Callers that run without the
 sidebar treat `isApiOwnerMissing(error)` as "nothing settles".
 
+**Reminders always wake their thread.** A settled or archived thread would
+drop the reminder aimed at it: the settle gate rejects the step, and the Schedule
+service refuses an archived target. So a thread with any active reminder is never
+settled — however far out its next occurrence is, the same effect as the
+per-thread auto-settle override a right-click menu sets — and the Host's separate
+wake pass (`src/reminder-wake-host.ts`, once a
+minute after boot) lifts the status one interval before the reminder is due:
+settled becomes unsettled, archived is restored, and a missed occurrence is
+delivered at once through the service's run-now, which does not consume a
+recurring rule: a Host restart can deliver that same missed occurrence once
+more. The settle gate is the second line: a schedule-sourced step that still
+finds a settled owner lifts it and runs, instead of the loop ending blocked.
+`remindersWakeEnabled` (default on) switches the whole behavior off.
+
 Settled exists because auto-archive used to push idle threads into the native
 archived state, and native navigation drops an archived Session from the main
 view right after it opens, so clicking an idle thread fought that cleanup.
@@ -442,7 +460,8 @@ The Host no-wake gate (`src/settled-gate.ts`) walks the subagent lineage through
 live agents' headers plus the child's recorded `parentSession`, so a settled
 grandparent whose intermediate subagent is no longer live is not detected; the
 client refuses to settle a thread with a running descendant, which covers the
-case that matters. Every preference decoder field needs the same default as the
+case that matters. A reminder's own step is the one wake a settled status does
+not refuse. Every preference decoder field needs the same default as the
 Host schema: Schemastery drops a null-valued union field from its resolved
 output, and one field without a default once made the strict decoder reject
 every Host document, silently falling back to browser storage.
@@ -845,8 +864,11 @@ offers **Resume all** (up to three requests at once). The status-grouped **Needs
 group offer the same verb, so every list of blocked threads can resume them together. Resume sends a new
 continuation prompt that directs the agent to inspect its transcript and
 workspace before continuing; it does not replay the interrupted model/tool call.
-A row leaves its group as soon as that thread runs again, and dismissing drops it
-by hand.
+Resuming also lifts the statuses that would silently reject that prompt: a settled
+thread is unsettled and an archived one is restored before the request is queued,
+whether the resume comes from **Resume**, **Resume all**, or the opt-in automatic
+resume. A row leaves its group as soon as that thread runs again, and dismissing
+drops it by hand.
 
 **Automatic resume after a restart** is opt-in (`resumeAfterRestart`, off by default: each resume is one turn nobody
 asked for). When on, after a managed restart the new Host waits `resumeAfterRestartDelaySeconds` (default 10) and for
@@ -1300,4 +1322,4 @@ The row of a `subagent` or `subagent_fork` call reports the child rather than th
 
 A parent commonly ends its turn to wait for its children, which folds these rows, so working subagents also list above the composer (`conversation.input.dock`) with the same preview, and leave as they go idle. Two or more fold into one row, **N subagents working**, closed by default like the background-jobs dock's; opening it lists each child, and the choice holds while children start and finish. A child that failed or needs you is not working, so it never hides in the fold.
 
-With `subagentRunCards` on (the default), a working child whose open turn, route and current tool are known renders as the kit's compact `AgentRunStatus` card instead of the one-line row: current tool, route, elapsed time from the turn's own start, the tool-call count as “Step n”, Stop behind the same confirmation and **Open thread**. There is no Pause: DSH has no Host verb that pauses a session. Pause, Stop and Open render only when the caller passes their handler, so the card never shows a disabled stand-in. A child missing any of those parts (no open turn yet, no route projection, no tool in flight) keeps the one-line row, and turning the setting off is that row for every child. The card fits a 390 px pane and every action is a kit button, so the coarse-pointer rules give it a 44 px hit area and it stays keyboard-operable.
+With `subagentRunCards` on (the default), a working child whose open turn, route and current tool are known renders as the kit's compact `AgentRunStatus` card instead of the one-line row: current tool, route, elapsed time from the turn's own start, the tool-call count as “Step n”, Stop behind the same confirmation and **Open thread**. There is no Pause: DSH has no Host verb that pauses a session. Pause, Stop and Open render only when the caller passes their handler, so the card never shows a disabled stand-in. A child missing any of those parts (no open turn yet, no route projection, no tool in flight) keeps the one-line row, and turning the setting off is that row for every child. The card fits a 390 px pane and every action is a kit button, so the coarse-pointer rules give it a 44 px hit area and it stays keyboard-operable. A chevron in the card's header folds that one child back to its one-line row — label, live clock and state — and the row expands it again, so a reader watching several children keeps one open and the rest compact. The dock itself is a scroll region whose rows keep their full height as children join; it scrolls instead of compressing the cards.

@@ -208,7 +208,10 @@ follows its routed account.
 
 Agents change the same setting with the `ai_accounts_set_extra_usage` tool,
 which runs only when the user asks. It is stored in the accounts file as
-`useExtraUsage` next to the other per-account settings.
+`useExtraUsage` next to the other per-account settings. A quota card carries
+that gate as `useExtraUsage` beside the provider's own reading
+(`usage.extraUsage.enabled`): they are independent, so a provider that keeps
+reporting its extra usage on is not the DSH switch turning itself back on.
 
 Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
@@ -263,6 +266,9 @@ run at once. `src/claude-cli.ts` holds the transport; a setup-token or API key k
 ## Google AI plans through the Antigravity CLI
 
 ![Connect an Antigravity account with the official agy sign-in](docs/screenshots/antigravity-accounts.png)
+
+> **Use at your own risk.** Google does not support driving `agy` from another client, so this route depends on the
+> CLI as it ships today and may stop working at any time.
 
 Google serves its individual plans (free, Google AI Pro, Google AI Ultra) to coding agents only through its own
 [Antigravity CLI](https://antigravity.google/docs/cli/acp/), `agy`: Gemini CLI

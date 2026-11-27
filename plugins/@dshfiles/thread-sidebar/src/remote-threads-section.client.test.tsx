@@ -10,18 +10,21 @@ const labels: RemoteThreadRowLabels = {
   unsettle: 'Unsettle',
   park: 'Park',
   unpark: 'Unpark',
+  archive: 'Archive',
+  restore: 'Restore',
   moveToSection: 'Move to section',
   copyId: 'Copy ID',
   contextMenu: 'Thread actions',
   sectionLabels: { pinned: 'Pinned', active: 'Active', parked: 'Parked', settled: 'Settled', inactive: 'Inactive', archived: 'Archived' },
 }
 
-const dropSections: readonly SidebarSection[] = ['active', 'parked', 'inactive', 'settled']
+const dropSections: readonly SidebarSection[] = ['active', 'parked', 'inactive', 'settled', 'archived']
 
 const mount = (
   options: {
     settled?: boolean
     parked?: boolean
+    archived?: boolean
     running?: boolean
     selected?: boolean
     section?: SidebarSection
@@ -31,6 +34,7 @@ const mount = (
   const onOpen = vi.fn()
   const onToggleSettled = vi.fn()
   const onToggleParked = vi.fn()
+  const onSetArchived = vi.fn()
   const onMoveToSection = vi.fn()
   const onCopyId = vi.fn()
   const view = render(
@@ -46,6 +50,7 @@ const mount = (
         running={options.running ?? false}
         settled={options.settled ?? false}
         parked={options.parked ?? false}
+        archived={options.archived ?? false}
         selected={options.selected ?? false}
         compact={false}
         age="2h"
@@ -56,12 +61,13 @@ const mount = (
         onOpen={onOpen}
         onToggleSettled={onToggleSettled}
         onToggleParked={onToggleParked}
+        onSetArchived={onSetArchived}
         onMoveToSection={onMoveToSection}
         onCopyId={onCopyId}
       />
     </TooltipProvider>,
   )
-  return { ...view, onOpen, onToggleSettled, onToggleParked, onMoveToSection, onCopyId }
+  return { ...view, onOpen, onToggleSettled, onToggleParked, onSetArchived, onMoveToSection, onCopyId }
 }
 
 const openMenu = (): void => {
@@ -80,12 +86,15 @@ describe('RemoteThreadItem', () => {
     expect(row.textContent).toContain('dshfiles')
   })
 
-  it('offers the settle and park verbs the sidebar owns for a remote id', () => {
-    const { onToggleSettled, onToggleParked } = mount()
+  it('offers the settle, park and archive verbs for a remote id', () => {
+    const { onToggleSettled, onToggleParked, onSetArchived } = mount()
     fireEvent.click(screen.getByRole('button', { name: 'Settle' }))
     fireEvent.click(screen.getByRole('button', { name: 'Park' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Archive' }))
     expect(onToggleSettled).toHaveBeenCalledTimes(1)
     expect(onToggleParked).toHaveBeenCalledTimes(1)
+    expect(onSetArchived).toHaveBeenCalledTimes(1)
+    expect(onSetArchived).toHaveBeenCalledWith(true)
   })
 
   it('reads a settled row as Unsettle and mutes its title', () => {
@@ -96,10 +105,20 @@ describe('RemoteThreadItem', () => {
     expect(container.querySelector('.dshx\\:text-muted-foreground')).not.toBeNull()
   })
 
+  it('trades the state verbs for Restore on an archived row, and mutes its title', () => {
+    const { container, onSetArchived } = mount({ archived: true })
+    expect(screen.queryByRole('button', { name: 'Settle' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Park' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }))
+    expect(onSetArchived).toHaveBeenCalledWith(false)
+    expect(container.querySelector('.dshx\\:text-muted-foreground')).not.toBeNull()
+  })
+
   it('withholds the state verbs while the remote thread runs', () => {
     mount({ running: true })
     expect(screen.queryByRole('button', { name: 'Settle' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Park' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Archive' })).toBeNull()
   })
 
   it('opens the thread from the row body', () => {
@@ -124,21 +143,39 @@ describe('RemoteThreadItem', () => {
     expect(container.querySelector('.dshx\\:opacity-50')).not.toBeNull()
   })
 
-  it('offers the same preference verbs in its context menu and no Host verb', () => {
-    const { onToggleSettled, onCopyId } = mount({ section: 'active' })
+  it('offers the state verbs and Archive in its context menu, and no Host-only verb', () => {
+    const { onToggleSettled, onSetArchived, onCopyId } = mount({ section: 'active' })
     openMenu()
     const menu = screen.getByRole('menu', { name: 'Thread actions' })
     expect(menu.textContent).toContain('Settle')
     expect(menu.textContent).toContain('Park')
-    // Archive, pin and rename stay on the runtime that owns the Session.
-    expect(menu.textContent).not.toContain('Archive')
+    expect(menu.textContent).toContain('Archive')
+    // Pin and rename stay on the runtime that owns the Session.
     expect(menu.textContent).not.toContain('Pin')
     expect(menu.textContent).not.toContain('Rename')
     fireEvent.click(screen.getByRole('menuitem', { name: 'Copy ID' }))
     openMenu()
     fireEvent.click(screen.getByRole('menuitem', { name: 'Settle' }))
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }))
     expect(onToggleSettled).toHaveBeenCalledTimes(1)
+    expect(onSetArchived).toHaveBeenCalledWith(true)
     expect(onCopyId).toHaveBeenCalledTimes(1)
+  })
+
+  it('offers Restore alone on an archived row, and keeps its section moves', () => {
+    const { onSetArchived, onMoveToSection } = mount({ archived: true, section: 'archived' })
+    openMenu()
+    const menu = screen.getByRole('menu', { name: 'Thread actions' })
+    expect(menu.textContent).toContain('Restore')
+    expect(menu.textContent).not.toContain('Settle')
+    expect(menu.textContent).not.toContain('Park')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Restore' }))
+    expect(onSetArchived).toHaveBeenCalledWith(false)
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to section' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Active' }))
+    expect(onMoveToSection).toHaveBeenCalledWith('active')
   })
 
   it('moves the row into another offered section and disables the one it is already in', () => {
@@ -149,7 +186,10 @@ describe('RemoteThreadItem', () => {
     fireEvent.click(screen.getByRole('menuitem', { name: 'Settled' }))
     expect(onMoveToSection).toHaveBeenCalledWith('settled')
     expect(screen.queryByRole('menuitem', { name: 'Pinned' })).toBeNull()
-    expect(screen.queryByRole('menuitem', { name: 'Archived' })).toBeNull()
+    openMenu()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to section' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Archived' }))
+    expect(onMoveToSection).toHaveBeenCalledWith('archived')
   })
 
   it('disables the state verbs in the menu while the thread runs', () => {
@@ -157,5 +197,6 @@ describe('RemoteThreadItem', () => {
     openMenu()
     expect(screen.getByRole('menuitem', { name: 'Settle' }).getAttribute('aria-disabled')).toBe('true')
     expect(screen.getByRole('menuitem', { name: 'Park' }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('menuitem', { name: 'Archive' }).getAttribute('aria-disabled')).toBe('true')
   })
 })

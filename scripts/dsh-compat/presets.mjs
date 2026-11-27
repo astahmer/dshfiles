@@ -51,6 +51,10 @@ const readJson = path => {
   }
 }
 
+const asString = value => (typeof value === 'string' ? value : undefined)
+
+const asNonEmptyString = value => (typeof value === 'string' && value.length > 0 ? value : undefined)
+
 const isInside = (parent, child) => {
   const path = relative(parent, child)
   return path === '' || (!path.startsWith('..') && !path.startsWith('/'))
@@ -140,8 +144,8 @@ const presetRowsOf = doc => {
 }
 
 const presetIdOf = row => {
-  const declared = row.getIn(['config', 'id'])
-  if (typeof declared === 'string' && declared.length > 0) return declared
+  const declared = asNonEmptyString(row.getIn(['config', 'id']))
+  if (declared !== undefined) return declared
   const rowId = String(row.get('id') ?? '')
   return rowId.startsWith('preset-') ? rowId.slice('preset-'.length) : rowId
 }
@@ -157,15 +161,17 @@ const presetSources = profileDir => {
   const profile = realpathSync(profileDir)
   const sources = [{ owner: 'profile', file: join(profile, 'cordis.patch.yml'), base: profile, writable: true }]
   const manifest = readJson(join(profile, 'package.json'))
-  for (const name of manifest?.dsh?.profile?.bundles ?? []) {
-    if (typeof name !== 'string' || name.startsWith('@deepseek-ai/')) continue
+  for (const bundle of manifest?.dsh?.profile?.bundles ?? []) {
+    const name = asString(bundle)
+    if (name === undefined || name.startsWith('@deepseek-ai/')) continue
     const directory = join(profile, 'node_modules', name)
     if (!existsSync(join(directory, 'package.json'))) continue
     const real = realpathSync(directory)
     const patches = readJson(join(real, 'package.json'))?.dsh?.bundle?.patch
     for (const patch of [patches ?? []].flat()) {
-      if (typeof patch !== 'string') continue
-      sources.push({ owner: `bundle ${name}`, file: resolve(real, patch), base: real, writable: isInside(profile, real) })
+      const patchPath = asString(patch)
+      if (patchPath === undefined) continue
+      sources.push({ owner: `bundle ${name}`, file: resolve(real, patchPath), base: real, writable: isInside(profile, real) })
     }
   }
   return sources.filter(source => existsSync(source.file))
@@ -175,8 +181,9 @@ const presetSources = profileDir => {
 const selectedPresets = ({ docs, home }) => {
   const selected = new Map()
   const add = (id, reason) => {
-    if (typeof id !== 'string' || id.length === 0) return
-    selected.set(id, [...(selected.get(id) ?? []), reason])
+    const presetId = asNonEmptyString(id)
+    if (presetId === undefined) return
+    selected.set(presetId, [...(selected.get(presetId) ?? []), reason])
   }
   for (const doc of docs) {
     if (!YAML.isSeq(doc.contents)) continue
@@ -353,13 +360,13 @@ const incompatibility = (manifest, specifier, core) => {
   if (name.startsWith('@deepseek-ai/dsh') && manifest.version !== core.version) {
     return `${specifier} resolves to ${name}@${manifest.version}, but the core is ${core.version}; official modules must match the core version`
   }
-  const engine = manifest.engines?.dsh
-  if (typeof engine === 'string' && !semver.satisfies(core.version, engine, { includePrerelease: true })) {
+  const engine = asString(manifest.engines?.dsh)
+  if (engine !== undefined && !semver.satisfies(core.version, engine, { includePrerelease: true })) {
     return `${name}@${manifest.version} declares engines.dsh ${engine}, which excludes ${core.version}`
   }
-  const cordis = manifest.peerDependencies?.['@deepseek-ai/cordis']
-  if (core.cordis !== undefined && typeof cordis === 'string' && !semver.satisfies(core.cordis, cordis, { includePrerelease: true })) {
-    return `${name}@${manifest.version} needs @deepseek-ai/cordis ${cordis}, but the core runs ${core.cordis}`
+  const cordisVersion = asString(manifest.peerDependencies?.['@deepseek-ai/cordis'])
+  if (core.cordis !== undefined && cordisVersion !== undefined && !semver.satisfies(core.cordis, cordisVersion, { includePrerelease: true })) {
+    return `${name}@${manifest.version} needs @deepseek-ai/cordis ${cordisVersion}, but the core runs ${core.cordis}`
   }
   return undefined
 }
@@ -468,8 +475,8 @@ const planPresetMigration = ({ profileDir, coreRoot, from, to, home, node }) => 
   for (const source of sources) {
     for (const preset of source.presets) {
       for (const { row, path } of preset.rows) {
-        const specifier = row.get('name')
-        if (typeof specifier !== 'string' || specifier.startsWith('cordis:')) continue
+        const specifier = asString(row.get('name'))
+        if (specifier === undefined || specifier.startsWith('cordis:')) continue
         const disabled = row.get('disabled') === true
         references.push({ source, preset: preset.id, where: `${preset.where}.config.${path}`, row, specifier, disabled })
       }

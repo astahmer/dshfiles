@@ -184,6 +184,16 @@ Feature: Secret Catalog
     Then the tool result "contains" "No secret alias MISSING_ALIAS is configured for environment prod."
     And the secret tools journey is complete
 
+
+  @scenario:secret-catalog.agent-run @fake-secret-cli
+  Scenario: Agents run a command with injected secrets and never see a value
+    Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread in the seeded project asks the fake model to "[[call secret_run {\"command\":[\"/bin/sh\",\"-lc\",\"printenv DB_PASSWORD\"]}]]"
+    Then the tool result "contains" "[scrubbed]"
+    And the tool result "omits" "db-e2e-prod-value"
+    And the secret tools journey is complete
+
   @scenario:secret-catalog.request-secret
   Scenario: An agent asks for a secret, the user stores it in the Catalog form, and the agent receives only its reference
     Given the isolated plugin composition of "@dshfiles/secret-catalog, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker, @dshfiles/chat, @dshfiles/session-controller" is booted
@@ -197,6 +207,7 @@ Feature: Secret Catalog
     When a thread in the seeded project asks the fake model to "[[call secret_remove_alias {\"alias\":\"SYNTHETIC_REQUESTED_TOKEN\",\"scope\":\"global\",\"confirm\":true}]]"
     Then the tool result "contains" "Removed alias SYNTHETIC_REQUESTED_TOKEN"
     And the secret request journey is complete
+
 
   @scenario:secret-catalog.request-secret-decline
   Scenario: Declining a secret request tells the agent nothing was stored

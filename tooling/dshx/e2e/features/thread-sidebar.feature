@@ -333,3 +333,11 @@ Feature: Thread sidebar journeys
     Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell, @dshfiles/main-tabs" is booted
     When Settings is opened from the destination rail
     Then clicking All settings keeps the Settings tab open without switching back to a conversation tab
+
+  @scenario:thread-sidebar.subagent-run-cards
+  Scenario: Several working subagents keep their cards legible and fold one at a time
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread delegates a long command to three subagents
+    Then the dock lists three working subagent cards without squashing one into another
+    And one working subagent folds to its own row and back without collapsing the others

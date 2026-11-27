@@ -229,4 +229,12 @@ describe('JobPreviewDock', () => {
     for (const total of [10, 20, 30]) act(() => fake.publish({ rows: { [SESSION]: [row({ output: { total, earliest: 0 } })] } }))
     expect(commits).toBe(0)
   })
+
+  it('fills the composer card width, like the subagents dock, instead of the whole chat column', () => {
+    renderDock()
+    const dock = document.querySelector('[data-dshfiles-live-preview-dock="jobs"]')
+    expect(dock?.className).toContain('dshx:max-w-(--dsh-composer-card-max-width)')
+    expect(dock?.className).toContain('dshx:w-[calc(100%-var(--dsh-composer-side-clearance,0px)*2)]')
+    expect(dock?.className).not.toContain('dshx:w-full')
+  })
 })

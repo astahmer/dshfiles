@@ -6,6 +6,9 @@ import { errorMessage, useMutation } from '@dshfiles/plugin-ui/query'
 import * as Schema from 'effect/Schema'
 import { useState } from 'react'
 import { projectFolderNameSchema, type ProjectLifecycleClient } from './project-lifecycle-api.js'
+import { initialProjectParent } from './project-defaults.js'
+import { ProjectTone, type ProjectColorChoice } from './project-tone.js'
+import { ProjectTonePicker } from './project-tone-picker.js'
 import { WorkspaceFolderPickerSchema, type FormFieldErrors } from './schema.js'
 import { TextInput } from './text-input.js'
 
@@ -24,20 +27,32 @@ export const ProjectCreateDialog = (props: {
   readonly api: ProjectLifecycleClient
   readonly home: string | undefined
   readonly gitHubAvailable: boolean
-  readonly onCreated: (path: string) => void
+  /** Remembered parent folder from the picker settings; absent means the Host home. */
+  readonly defaultParent?: string | undefined
+  /** Remember the parent field as the default for the next project. */
+  readonly onRememberParent?: ((parent: string) => void) | undefined
+  readonly onCreated: (path: string, choice: ProjectColorChoice) => void
   readonly onClose: () => void
 }): JSX.Element => {
-  const [form, setForm] = useState<CreateForm>({ parentPath: props.home ?? '~/', name: '', createGitHubRepository: false })
+  const [form, setForm] = useState<CreateForm>({
+    parentPath: initialProjectParent({ defaultParent: props.defaultParent, home: props.home }),
+    name: '',
+    createGitHubRepository: false,
+  })
+  const [chosenColor, setChosenColor] = useState<ProjectColorChoice | null>(null)
+  const [remembered, setRemembered] = useState(false)
   const [errors, setErrors] = useState<FormFieldErrors>({})
+  const color = chosenColor ?? ProjectTone.defaultColor(form.name)
   const create = useMutation({
     mutationFn: (input: CreateForm) => props.api.createProject(input),
     onSuccess: created => {
-      if (created.warning === null) props.onCreated(created.path)
+      if (created.warning === null) props.onCreated(created.path, color)
     },
   })
   const change = (patch: Partial<CreateForm>): void => {
     setForm(current => ({ ...current, ...patch }))
     setErrors({})
+    setRemembered(false)
     create.reset()
   }
   const submit = (): void => {
@@ -59,7 +74,7 @@ export const ProjectCreateDialog = (props: {
           }}
         >
           <DialogHeader>
-            <DialogTitle>New project</DialogTitle>
+            <DialogTitle>Create project</DialogTitle>
             <DialogDescription className="dshx:sr-only">
               Create a folder with a jj repository, a README and a first commit, and add it as a project.
             </DialogDescription>
@@ -81,6 +96,23 @@ export const ProjectCreateDialog = (props: {
               value={form.name}
             />
           </div>
+          {props.onRememberParent === undefined ? null : (
+            <div className="dshx:flex dshx:items-center dshx:gap-2">
+              <Button
+                className="dshx:text-xs"
+                disabled={remembered || form.parentPath.trim().length === 0}
+                onClick={() => {
+                  props.onRememberParent?.(form.parentPath)
+                  setRemembered(true)
+                }}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                {remembered ? 'Default parent folder saved' : 'Use this parent folder by default'}
+              </Button>
+            </div>
+          )}
           {props.gitHubAvailable && (
             <label className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-sm">
               <Checkbox
@@ -100,12 +132,13 @@ export const ProjectCreateDialog = (props: {
               <AlertDescription>{created.warning}</AlertDescription>
             </Alert>
           )}
+          <ProjectTonePicker choice={color} name={form.name === '' ? 'Create project' : form.name} onChange={setChosenColor} />
           <DialogFooter>
             <Button onClick={props.onClose} type="button" variant="outline">
               Close
             </Button>
             {created !== undefined && created.warning !== null ? (
-              <Button onClick={() => props.onCreated(created.path)} type="button">
+              <Button onClick={() => props.onCreated(created.path, color)} type="button">
                 Open project
               </Button>
             ) : (

@@ -4,6 +4,8 @@ import { Api, DshxPlugin, hostService } from '@dshfiles/dshx/effect'
 import { Context, Effect, Layer, Option, Schema } from 'effect'
 import { agentWarmupApi } from './agent-warmup-api.ts'
 import { composerControlsSettings } from './composer-controls-settings.ts'
+import { sentAnnotationHandlers } from './sent-annotations-host.ts'
+import { sentAnnotationsApi } from './sent-annotations-api.ts'
 
 class AgentWarmupFailure extends Schema.TaggedError<AgentWarmupFailure>()(
   'AgentWarmupFailure',
@@ -42,5 +44,8 @@ export default DshxPlugin.make({
   name: 'dshfiles-rich-composer',
   settings: [composerControlsSettings],
   layer: AgentWarmups.layer,
-  apis: [Api.bind(agentWarmupApi, { warm: input => AgentWarmups.use(warmups => warmups.warm(SessionId(input.sessionId))) })],
+  apis: [
+    Api.bind(agentWarmupApi, { warm: input => AgentWarmups.use(warmups => warmups.warm(SessionId(input.sessionId))) }),
+    Api.bind(sentAnnotationsApi, sentAnnotationHandlers),
+  ],
 })

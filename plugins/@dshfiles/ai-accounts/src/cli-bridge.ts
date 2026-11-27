@@ -52,15 +52,8 @@ export const bridgeCallSchema = Schema.Struct({
 
 export class CliBridge {
   /** One line the CLI or the bridge wrote, decoded; a non-JSON line (a warning, a stray log) fails like a malformed one. */
-  static readonly decodeJsonLine = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, line: string) => {
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(line)
-    } catch {
-      parsed = undefined
-    }
-    return AiAccountsSchema.decodeResult(schema, parsed)
-  }
+  static readonly decodeJsonLine = <S extends Schema.ConstraintDecoder<unknown>>(schema: S, line: string) =>
+    AiAccountsSchema.decodeResult(Schema.fromJsonString(schema), line)
 
   static readonly fingerprint = (json: string): string => createHash('sha256').update(json).digest('hex').slice(0, 16)
 
