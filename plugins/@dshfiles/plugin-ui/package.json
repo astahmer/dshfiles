@@ -142,6 +142,10 @@
       "types": "./testing/host-primitives.tsx",
       "default": "./testing/host-primitives.tsx"
     },
+    "./testing/boot-imports": {
+      "types": "./testing/boot-imports.ts",
+      "default": "./testing/boot-imports.ts"
+    },
     "./package.json": "./package.json"
   },
   "scripts": {
