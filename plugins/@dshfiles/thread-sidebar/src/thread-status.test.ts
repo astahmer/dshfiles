@@ -283,3 +283,32 @@ describe('group settler', () => {
     expect(settler.groupOf('new', 'needs-you')).toBe('needs-you')
   })
 })
+
+// Council round 34, B5 (Fable): a thread under "Working" wore the Idle ring (its background job ran, no turn). Not
+// reproduced on round 34's scratch: stopping the held subagent moved its parent to Idle with the Idle glyph within 500 ms
+// and both agreed at every sample to 10 s. This pins why: the row's glyph and its group come from one status, a job never
+// makes a thread Working, and the group change a stop causes lands once the settle window ends, with a wake for it.
+describe('a parent whose held subagent stops (council round 34, B5)', () => {
+  it('reads Idle in its glyph and its group once the child stops, a running job or not', () => {
+    const working = ThreadStatusModel.statusOf(input(), [ThreadStatusModel.childStatusOf(input({ running: true })).rollup], COPY)
+    expect([working.status, working.group]).toEqual(['working', 'working'])
+    // Stopped: its turn ended unread and stopped (an aborted finish), which is not Ready.
+    const stopped = ThreadStatusModel.childStatusOf(input({ unread: true, stoppedTurn: 'aborted' })).rollup
+    const after = ThreadStatusModel.statusOf(input(), [stopped], COPY)
+    expect(after.group).toBe(after.status)
+    expect(after.status).not.toBe('working')
+  })
+
+  it('moves the row to the glyph\'s group when the settle window ends, and asks to look again then', () => {
+    let now = 1_000
+    const settler = ThreadStatusModel.createGroupSettler(600, () => now)
+    expect(settler.groupOf('parent', 'working')).toBe('working')
+    now = 2_000
+    // The stop arrives: the glyph reads Idle at once, the row holds its place for the settle window only.
+    expect(settler.groupOf('parent', 'idle')).toBe('working')
+    expect(settler.wakeAt()).toBe(2_600)
+    now = 2_600
+    expect(settler.groupOf('parent', 'idle')).toBe('idle')
+    expect(settler.wakeAt()).toBeUndefined()
+  })
+})
