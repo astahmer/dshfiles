@@ -20,10 +20,14 @@ import { AgentMentions } from './agent-mentions.js'
 import { AgentReference } from './agent-reference.js'
 import { agentUserTextRule } from './agent-user-text.js'
 import { AgentReferenceDecorations, AgentReferencePreview } from './agent-reference-preview.jsx'
-import { AgentsPanel, type AgentsPanelProps } from './agents-panel.js'
+import type { AgentsPanelProps } from './agents-panel.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { registerComposerAgent } from './composer-wiring.js'
 import { agentsApi } from './api.js'
 import { AgentDispatch, type AgentDispatchRequest, type AgentModelSelection, type AgentThreadCreation } from './dispatch.js'
+
+/** The Agents page and its editor load when the page first opens, not at page boot. */
+const AgentsPanel = lazyView(() => import('./agents-panel.js').then(module => module.AgentsPanel), { label: 'Agents' })
 
 const PANEL_ID = 'dshfiles-agents'
 
