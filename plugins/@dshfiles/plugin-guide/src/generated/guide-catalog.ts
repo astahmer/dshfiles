@@ -2543,7 +2543,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "SettingsNavigation",
       "importFrom": "@dshfiles/settings-shell/settings-navigation",
       "owner": "@dshfiles/settings-shell",
-      "source": "plugins/@dshfiles/settings-shell/src/settings-navigation.ts:51",
+      "source": "plugins/@dshfiles/settings-shell/src/settings-navigation.ts:57",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "contract:@dshfiles/settings-shell.navigation",

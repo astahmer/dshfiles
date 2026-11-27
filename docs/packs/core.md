@@ -112,7 +112,7 @@ From the onboarding feature catalog: 213 features, the 103 curated ones first.
 62. **List and switch plugin entries, from Settings or an Agent** (`settings-shell`, settings) — Turn a plugin on or off from its settings page, and the agent can do the same when you ask.
 63. **Open the configuration file elsewhere** (`settings-shell`, settings) — Open a configuration file in your default app or the editor, or copy or reveal its path.
 64. **Set the Jev key once** (`settings-shell`, settings) — Set one Jev key in Settings for Backlog and Memory to share.
-65. **Tell DSH defaults from plugin categories** (`settings-shell`, settings) — An All / DSH / Plugins filter beside the Settings search narrows the categories, the side column and the search results by who ships them.
+65. **Tell DSH defaults from plugin categories** (`settings-shell`, settings) — An All / DSH / Plugins filter at the head of the Settings category list narrows the categories and the search results by who ships them.
 66. **Plugins by category** (`settings-shell`, settings) — Turn installed plugins on or off grouped by area, with search, source and status filters and a Settings link for each plugin.
 67. **See what this setup can do and what it still needs on one page** (`onboarding`, knowledge) — A setup checklist shows what this setup can do and what it still needs, with a fix for each missing step.
 68. **Enable or disable a plugin pack after an exact preview** (`onboarding`, knowledge) — Turn a plugin pack on or off after a preview of exactly what changes.

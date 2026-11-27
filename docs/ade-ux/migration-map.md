@@ -400,7 +400,7 @@ rail destination (bottom); 71 features.
 | settings-shell/plugin-enablement-tools: List and switch plugin entries, from Settings or an Agent | settingsSection | settings: plugin page › entry card; agent tools: plugin_inventory, plugin_set_enabled |
 | settings-shell/plugin-settings-controls: Plugin settings with real controls | settingsSection | settings: plugin pages |
 | settings-shell/settings-json-editor: Edit plugin settings as JSON | settingsSection | settings: plugin page › JSON |
-| settings-shell/settings-origin-distinction: Tell DSH defaults from plugin categories | settingsSection | settings: source filter beside the search, origin badge in the page header |
+| settings-shell/settings-origin-distinction: Tell DSH defaults from plugin categories | settingsSection | settings: source filter heading the category list, origin badge in the page header |
 | settings-shell/settings-search: Search Settings inline | settingsSection | settings: Search settings |
 | settings-shell/settings-search-entries: Search section controls and open them at the control | settingsSection | settings: Search settings › section controls |
 | settings-shell/settings-shell-port: Settings shell | settingsSection | rail: Settings; palette: Settings: General |

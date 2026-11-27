@@ -23934,9 +23934,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "settings-shell",
       "id": "settings-origin-distinction",
       "title": "Tell DSH defaults from plugin categories",
-      "summary": "An All / DSH / Plugins filter beside the Settings search narrows the categories, the side column and the search results by who ships them.",
+      "summary": "An All / DSH / Plugins filter at the head of the Settings category list narrows the categories and the search results by who ships them.",
       "destination": "settings",
-      "currentSurface": "settings: source filter beside the search, origin badge in the page header",
+      "currentSurface": "settings: source filter heading the category list, origin badge in the page header",
       "reach": [
         {
           "text": "click button \"Open command palette\"",
