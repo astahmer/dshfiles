@@ -641,6 +641,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-bridged-tool-guidance",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "tells Vibe to use the bridged DSH tools for shell and file work instead of its own builtins"
+        },
+        {
+          "kind": "unit-test",
           "id": "ai-accounts.vibe-acp-strict-tools",
           "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
           "testName": "strictTools denies every Vibe builtin request and cleans up when the account is removed"

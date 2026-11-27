@@ -313,7 +313,10 @@ moved `vibe_budget` from 0 % to 0.00336 %.
   its parent's) treats a native tool: reads run; under `danger-full-access` everything runs without asking; under
   `workspace-write` a `write_file`/`edit` whose file (symlinks resolved) lies inside the session's writable roots runs;
   any other write or command (which DSH cannot sandbox) asks the session, and a session with approvals off denies it.
-  Vibe's own resolver may still run a command it deems read-only (such as `uname`) without asking.
+  Vibe's own resolver may still run a command it deems read-only (such as `uname`) without asking. Vibe offers its
+  builtins up front and DSH's tools only through `search_tool_functions`, and its builtins run in an empty private
+  folder, so the managed profile appends a short "Tools on this route" section to DSH's instructions telling the model
+  to use `mcp_dsh.bash`, `mcp_dsh.write`, `mcp_dsh.edit` and the other bridged tools DSH offers for project work.
 - **Vibe ACP preferences.** Under Settings → AI Accounts → Mistral Vibe ACP, **Vibe builtin approvals**
   (`vibe.acpApprovalPolicy`) follows the calling session (`session`, default) or asks the session before every Vibe
   builtin, reads included (`ask`). **Only use DSH tools** (`vibe.strictTools`, off by default) denies every Vibe

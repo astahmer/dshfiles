@@ -112,6 +112,20 @@ describe('the Vibe ACP route', () => {
     expect(fake.events()).toContain('set_config_option agent=dsh')
   })
 
+  it('tells Vibe to use the bridged DSH tools for shell and file work instead of its own builtins', async () => {
+    const { cli, fake, model } = setup()
+    const dshTool = (name: string) => ({ name, description: name, parameters: { type: 'object', properties: {} } })
+    const tools = [dshTool('bash'), dshTool('write'), dshTool('read'), dshTool('todo_write')]
+    const messages: Message[] = [{ role: 'user', content: 'plain answer', timestamp: 1 }]
+    await finished(cli.stream(model(), normalizeContext({ systemPrompt: 'You are inside DSH.', tools: tools as never, messages }), { sessionId: 'guided' }))
+    // The profile holds the instructions as one JSON string, so the guidance follows DSH's prompt inside it.
+    const instructions = /^instructions = (.*)$/mu.exec(managedProfile(fake).toml)?.[1] ?? ''
+    expect(instructions.startsWith(JSON.stringify('You are inside DSH.\n\n# Tools on this route\n').slice(0, -1))).toBe(true)
+    expect(instructions).toContain('use them (`mcp_dsh.bash`, `mcp_dsh.read`, `mcp_dsh.write`)')
+    expect(instructions).toContain("Do not use Vibe's own bash, write_file, edit, read_file or grep for project work")
+    expect(instructions).not.toContain('todo_write')
+  })
+
   it('refuses to run a step when Vibe did not load the managed profile instead of leaving its own tools enabled', async () => {
     vi.stubEnv('FAKE_VIBE_ACP_NO_AGENTS', '1')
     const { cli, fake, model } = setup()

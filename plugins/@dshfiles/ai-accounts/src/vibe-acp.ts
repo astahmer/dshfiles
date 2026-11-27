@@ -324,14 +324,34 @@ const declaredArguments = (tool: Tool | undefined, input: ToolArguments): ToolAr
  * every root in `session/new`'s `additionalDirectories`, so this profile lives in the process's own folder and never
  * touches the account's `VIBE_HOME`.
  */
-const agentFile = (system: string, strictTools: boolean): string =>
+const agentFile = (input: { readonly system: string; readonly strictTools: boolean; readonly tools: readonly Tool[] }): string =>
   [
     'display_name = "DeepSeek Harness"',
     'description = "DSH owns this conversation: DSH\'s bridged tools plus the Vibe builtins DSH gates."',
-    `instructions = ${JSON.stringify(system)}`,
-    `enabled_tools = ${JSON.stringify([`${MCP_EFFECT_PREFIX}*`, `${MCP_TOOL_PREFIX}*`, ...(strictTools ? [] : [...READ_ONLY_BUILTINS, ...GATED_BUILTINS])])}`,
+    `instructions = ${JSON.stringify(`${input.system}${bridgedToolGuidance(input.tools)}`)}`,
+    `enabled_tools = ${JSON.stringify([`${MCP_EFFECT_PREFIX}*`, `${MCP_TOOL_PREFIX}*`, ...(input.strictTools ? [] : [...READ_ONLY_BUILTINS, ...GATED_BUILTINS])])}`,
     '',
   ].join('\n')
+
+/** DSH tools that stand in for a Vibe builtin, in the order the guidance names them. */
+const PREFERRED_BRIDGED_TOOLS = ['bash', 'read', 'write', 'edit', 'apply_patch', 'grep', 'glob'] as const
+
+/**
+ * Vibe offers its own builtins up front and DSH's only through `search_tool_functions`, so a model reaches for its
+ * `bash` or `write_file` first. Those run in an empty private folder, outside the thread's working directory and
+ * DSH's transcript, so the profile tells it to use the bridged tools.
+ */
+const bridgedToolGuidance = (tools: readonly Tool[]): string => {
+  const offered = PREFERRED_BRIDGED_TOOLS.filter(name => tools.some(tool => tool.name === name)).map(name => `\`${MCP_EFFECT_PREFIX}${name}\``)
+  if (offered.length === 0) return ''
+  return [
+    '',
+    '',
+    '# Tools on this route',
+    `DSH's tools are available as \`${MCP_EFFECT_PREFIX}<name>\` (load their schemas with search_tool_functions). For shell commands and file reads, searches and edits, use them (${offered.join(', ')}): they run in the conversation's working directory under its permissions.`,
+    "Do not use Vibe's own bash, write_file, edit, read_file or grep for project work: they run in a private empty folder outside the conversation's working directory, and DSH does not record their effects.",
+  ].join('\n')
+}
 
 const zeroTotals = (): UsageTotals => ({ prompt: 0, completion: 0, cached: 0, cost: 0 })
 
@@ -736,7 +756,11 @@ export class VibeAcpSessions {
     try {
       mkdirSync(workspace)
       mkdirSync(join(agentRoot, '.vibe', 'agents'), { recursive: true })
-      writeFileSync(join(agentRoot, '.vibe', 'agents', `${AGENT_NAME}.toml`), agentFile(input.system, input.settings.strictTools), { mode: 0o600 })
+      writeFileSync(
+        join(agentRoot, '.vibe', 'agents', `${AGENT_NAME}.toml`),
+        agentFile({ system: input.system, strictTools: input.settings.strictTools, tools: input.tools }),
+        { mode: 0o600 },
+      )
     } catch (cause) {
       void fsPromises.rm(directory, { recursive: true, force: true }).catch(() => undefined)
       throw new Error(
