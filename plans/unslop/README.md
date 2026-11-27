@@ -501,6 +501,15 @@ Integrated tip captures (`round-27/`) match round 26 apart from clocks and the n
 Restart when landing live: Host halves of thread-sidebar, settings-shell, activity-timeline; refresh pages after the
 shared-runtime change.
 
+Round nine, continued. Upstream moved twice more (`e9d2deb7` Mistral Vibe route and ACP bridge, `de40250d` its picker
+label); both merged. Upstream's Vibe code broke ai-accounts' build and six checks (paragraph summaries, raw colour and
+shadow, a missing span, direct `JSON.parse`, nested ternaries, a spike that never ended, a wrong reach step): fixed on
+the branch; the usage card keeps our separate "left" word plus upstream's credit caption. Filters panel council:
+round 29 Astra 9.5 / Fable 9 / Opus 8.5, round 30 the same (first round with no increase); round-30 fixes in
+`.cache/unslop-audit/r5/council/round-30-filter-fixes.md` are the last under the stop rule. Next surface (Opus, Fable):
+the Manual grouping draws a second status vocabulary (blue dot, grey dot, black dot for failed, "(1)" counts).
+Captures `round-29/` match `round-28/` apart from subagent timers.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
