@@ -44,7 +44,7 @@ Pack id `core`, always on: every other pack builds on it. Back to [all packs](RE
 
 ## Features
 
-From the onboarding feature catalog: 208 features, the 100 curated ones first.
+From the onboarding feature catalog: 211 features, the 101 curated ones first.
 
 ### Curated
 
@@ -58,96 +58,97 @@ From the onboarding feature catalog: 208 features, the 100 curated ones first.
 8. **Configure saved thread views** (`thread-sidebar`, threads) — Save thread list views that group and filter by status, source or attention.
 9. **Save and switch thread list filter presets** (`thread-sidebar`, threads) — Save the thread list's filters as a preset and switch presets in one click.
 10. **Mark idle threads done** (`thread-sidebar`, settings) — Off by default: idle threads are marked done after a while, except pinned or excluded ones.
-11. **Group remote threads with each view** (`thread-sidebar`, threads) — Threads from other hosts join your current groups, or sit in their own Remote group.
-12. **Archive a done thread once its delay passes** (`thread-sidebar`, settings) — A done thread is archived once the delay you set has passed.
-13. **Mute or snooze a thread** (`thread-sidebar`, threads) — Mute a thread for a while or until you unmute it, so it stops alerting you.
-14. **Keep selected threads manually unread** (`thread-sidebar`, threads) — Mark a thread unread, and opening it in any browser clears the mark.
-15. **See finished turns until you open them** (`thread-sidebar`, inbox) — A finished turn stays marked until you open its thread, in every browser.
-16. **Configure per-category thread notifications** (`thread-sidebar`, settings) — Choose in-app, system or both notifications for each kind of thread event, with sounds.
-17. **Customize sidebar navigation and sections** (`thread-sidebar`, settings) — Customize the sidebar's sections from the gear in the Threads panel.
-18. **Browse subagent threads and share thread links** (`thread-sidebar`, threads) — A thread lists its subagents while they work, and its link can be copied and shared.
-19. **Manage a thread from its header** (`thread-sidebar`, threads) — The thread header's More menu holds find, pin, done, mute, archive, copy and export actions.
-20. **See threads a crash interrupted** (`thread-sidebar`, inbox) — Threads whose turn a crash or restart cut off are listed so you can resume them.
-21. **Resume threads a managed restart cut off** (`thread-sidebar`, inbox) — Off by default: after a restart you asked for, cut-off threads resume on their own.
-22. **Mention another thread from its row, its tab, or a drag into the composer** (`thread-sidebar`, threads) — Mention a thread in the composer from its row or tab menu, or by dragging it in.
-23. **Find human-invocable skills from @ autocomplete** (`thread-sidebar`, composer) — Find skills you can run in the @ menu.
-24. **Group provider-blocked threads under Usage limit** (`thread-sidebar`, inbox) — Threads stopped by a usage limit are grouped with their reset time and a Resume button.
-25. **Open a thread in the right side panel** (`thread-sidebar`, threads) — Open a thread in the right side panel instead of the main view.
-26. **See which threads reference one thread** (`thread-sidebar`, threads) — A thread's menu lists the threads that point back to it.
-27. **Navigate and multi-select threads from the keyboard** (`thread-sidebar`, threads) — Move through threads with the arrow keys and select several with Shift.
-28. **Edit a thread title from its row menu** (`thread-sidebar`, threads) — Rename a thread from its row menu with Edit title.
-29. **Continue a thread in another project** (`thread-sidebar`, threads) — Move a thread to another project when it started in the wrong one.
-30. **Finished turns in the Inbox** (`thread-sidebar`, inbox) — Each finished turn you have not seen becomes an Inbox item, cleared when you open the thread.
-31. **Switch destinations from the rail** (`thread-sidebar`, threads) — The left rail switches between Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings.
-32. **Navigate the phone as a stack** (`thread-sidebar`, threads) — On a phone, screens stack and Back returns to the list you came from.
-33. **Open the thread list as a drawer on a phone** (`thread-sidebar`, threads) — On a phone, the thread list can open as a drawer over the open thread.
-34. **Open a thread's actions by touch** (`thread-sidebar`, threads) — On a touch screen each thread row has a ⋯ button with its actions.
-35. **One sidebar layout: the rail and list as a movable pane** (`thread-sidebar`, settings) — The rail and its list form one sidebar pane you can move, split or float.
-36. **Navigate from a bottom tab bar on a phone** (`thread-sidebar`, threads) — On a phone, a bottom tab bar holds Threads, Inbox, New and More.
-37. **See the threads waiting on you in one page** (`thread-sidebar`, inbox) — One page lists every thread waiting on you, with Open, its action and Done.
-38. **Live subagent preview in the transcript and above the composer** (`thread-sidebar`, transcript) — A subagent's row shows its current step and latest answer, and opens its thread or stops it.
-39. **Opt-in completion notices between threads** (`thread-sidebar`, threads) — A thread can follow another thread and get one short notice each time its turn ends.
-40. **Resume, Review and Inbox cards on the new-thread screen** (`thread-sidebar`, composer) — The new-thread screen offers cards to resume a quiet thread, review ready work or open the Inbox.
-41. **Thread menu on a phone** (`rich-composer`, composer) — On a phone, the top bar's menu holds this thread's views, header controls and composer tools.
-42. **Paste thread mentions as chips** (`rich-composer`, composer) — A thread mention you paste into the composer becomes a reference chip.
-43. **Add inline references for image attachments** (`rich-composer`, composer) — Each image you attach gets a numbered reference in the draft, so you can point to it.
-44. **Reuse image references and open the selected image** (`rich-composer`, composer) — Mention an attached image again with @, and click its chip to open that image.
-45. **Rename a thread from its header title** (`rich-composer`, threads) — Click the thread title in the header to rename it.
-46. **Recall earlier prompts with ArrowUp** (`rich-composer`, composer) — Press the Up arrow in an empty composer to bring back this thread's earlier prompts.
-47. **Attach a large paste as a text file** (`rich-composer`, composer) — Pasting a lot of text attaches it as a file, with an option to paste it as text instead.
-48. **Send once the attachments finish uploading** (`rich-composer`, composer) — Press Send while a file still uploads and the message goes out by itself once every upload is ready.
-49. **Run row, send states and meter line** (`rich-composer`, composer) — A new thread's project, host, workspace, agent and model sit as quiet pickers in the composer.
-50. **Restore draft reference chips from plain text** (`rich-composer`, composer) — A queued message brought back into the composer gets its reference chips back.
-51. **Settings shell** (`settings-shell`, settings) — The Settings button, its sections, the General page and the Cmd+, shortcut.
-52. **Dock Settings as one panel** (`settings-shell`, settings) — Open all of Settings as one dockable panel with its sections, search and forms.
-53. **DSH release notice and summary** (`settings-shell`, settings) — Settings marks a new DSH release and sums up what changed since your version.
-54. **One Settings page in the stage** (`settings-shell`, settings) — Settings opens as one page in the main view, from the rail, the gear, the palette or Cmd+,.
-55. **Settings grouped by task, with deep links** (`settings-shell`, settings) — Settings are grouped by task, such as Models and accounts or Projects and workspaces, with direct links.
-56. **Search Settings inline** (`settings-shell`, settings) — Search all settings from one field and change matches in place.
-57. **Search section controls and open them at the control** (`settings-shell`, settings) — Search finds controls inside Settings sections and opens the section at that control.
-58. **Plugin settings with real controls** (`settings-shell`, settings) — Each plugin's settings show real controls such as switches, menus and number fields.
-59. **Modified settings and reset to default** (`settings-shell`, settings) — Settings you changed are marked, and Reset to default puts them back.
-60. **Edit plugin settings as JSON** (`settings-shell`, settings) — Edit a plugin's settings as JSON with completion and checks before you save.
-61. **List and switch plugin entries, from Settings or an Agent** (`settings-shell`, settings) — Turn a plugin on or off from its settings page, and the agent can do the same when you ask.
-62. **Open the configuration file elsewhere** (`settings-shell`, settings) — Open a configuration file in your default app or the editor, or copy or reveal its path.
-63. **Set the Jev key once** (`settings-shell`, settings) — Set one Jev key in Settings for Backlog and Memory to share.
-64. **See what this setup can do and what it still needs on one page** (`onboarding`, knowledge) — A setup checklist shows what this setup can do and what it still needs, with a fix for each missing step.
-65. **Enable or disable a plugin pack after an exact preview** (`onboarding`, knowledge) — Turn a plugin pack on or off after a preview of exactly what changes.
-66. **Get set up in three steps: account, project, first task** (`onboarding`, threads) — Three steps get you set up: add an account, add a project, start a first task.
-67. **First tasks for your project on the new-thread screen** (`onboarding`, composer) — The new-thread screen offers three tasks for the project that put a prompt in the composer without sending it.
-68. **Show me where a feature lives, one step at a time** (`onboarding`, knowledge) — Show me where highlights each control on the way to a feature, one step at a time.
-69. **See what changed in your plugins since your last visit** (`onboarding`, knowledge) — What's new lists the latest changes to your plugins, newest first.
-70. **Get features suggested from what you already do** (`onboarding`, knowledge) — Off by default: suggests features you have not tried, based on what you did in the last 30 days.
-71. **Try a feature with the agent in a new thread** (`onboarding`, knowledge) — Off by default: Try it starts a new thread where the agent demonstrates a feature, using tokens.
-72. **Use another account for this thread** (`ai-accounts`, composer) — Right-click an account in the sidebar to use it for this thread only, keeping the model when it can.
-73. **Connect an account without leaving the chat** (`ai-accounts`, settings) — Sign in to a provider from a short dialog without leaving the thread.
-74. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
-75. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
-76. **Use a Google AI plan through the Antigravity CLI** (`ai-accounts`, settings) — Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.
-77. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
-78. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
-79. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
-80. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
-81. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
-82. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
-83. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
-84. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
-85. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
-86. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
-87. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
-88. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
-89. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
-90. **Add projects from the folder browser** (`workspace-folder-picker`, composer) — Add a project by browsing folders, or open your system's folder dialog.
-91. **Add a project by cloning a repository** (`workspace-folder-picker`, composer) — Add a project by cloning a repository, with progress and Cancel.
-92. **Remove a project** (`workspace-folder-picker`, composer) — Remove a project from the picker without deleting its folder or files.
-93. **Create a new project** (`workspace-folder-picker`, composer) — Create a new project folder with a Jujutsu repository and a first commit.
-94. **Search projects and browse folder paths** (`workspace-folder-picker`, composer) — Search your projects and browse folder paths, including ones under your home folder.
-95. **Select project folders with keyboard navigation** (`workspace-folder-picker`, composer) — Move through folders with the arrow keys.
-96. **Offer recent folders not yet registered as projects** (`workspace-folder-picker`, composer) — Recent folders that are not projects yet are offered first.
-97. **Start in the folder browser** (`workspace-folder-picker`, composer) — Some pickers open straight on the folder browser, without your projects.
-98. **Inspect a folder before adding it** (`workspace-folder-picker`, composer) — Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.
-99. **Read a project's declared settings** (`workspace-folder-picker`, settings) — Settings › Projects lists your projects and the settings other features add for each one.
-100. **Choose an agent preset before typing** (`agent-preset`, composer) — Pick a preset for a new thread before you type its first message.
+11. **Wake a done or archived thread for its reminder** (`thread-sidebar`, settings) — A done or archived thread with an active reminder wakes before the reminder is due, so the reminder is never dropped.
+12. **Group remote threads with each view** (`thread-sidebar`, threads) — Threads from other hosts join your current groups, or sit in their own Remote group.
+13. **Archive a done thread once its delay passes** (`thread-sidebar`, settings) — A done thread is archived once the delay you set has passed.
+14. **Mute or snooze a thread** (`thread-sidebar`, threads) — Mute a thread for a while or until you unmute it, so it stops alerting you.
+15. **Keep selected threads manually unread** (`thread-sidebar`, threads) — Mark a thread unread, and opening it in any browser clears the mark.
+16. **See finished turns until you open them** (`thread-sidebar`, inbox) — A finished turn stays marked until you open its thread, in every browser.
+17. **Configure per-category thread notifications** (`thread-sidebar`, settings) — Choose in-app, system or both notifications for each kind of thread event, with sounds.
+18. **Customize sidebar navigation and sections** (`thread-sidebar`, settings) — Customize the sidebar's sections from the gear in the Threads panel.
+19. **Browse subagent threads and share thread links** (`thread-sidebar`, threads) — A thread lists its subagents while they work, and its link can be copied and shared.
+20. **Manage a thread from its header** (`thread-sidebar`, threads) — The thread header's More menu holds find, pin, done, mute, archive, copy and export actions.
+21. **See threads a crash interrupted** (`thread-sidebar`, inbox) — Threads whose turn a crash or restart cut off are listed so you can resume them.
+22. **Resume threads a managed restart cut off** (`thread-sidebar`, inbox) — Off by default: after a restart you asked for, cut-off threads resume on their own.
+23. **Mention another thread from its row, its tab, or a drag into the composer** (`thread-sidebar`, threads) — Mention a thread in the composer from its row or tab menu, or by dragging it in.
+24. **Find human-invocable skills from @ autocomplete** (`thread-sidebar`, composer) — Find skills you can run in the @ menu.
+25. **Group provider-blocked threads under Usage limit** (`thread-sidebar`, inbox) — Threads stopped by a usage limit are grouped with their reset time and a Resume button.
+26. **Open a thread in the right side panel** (`thread-sidebar`, threads) — Open a thread in the right side panel instead of the main view.
+27. **See which threads reference one thread** (`thread-sidebar`, threads) — A thread's menu lists the threads that point back to it.
+28. **Navigate and multi-select threads from the keyboard** (`thread-sidebar`, threads) — Move through threads with the arrow keys and select several with Shift.
+29. **Edit a thread title from its row menu** (`thread-sidebar`, threads) — Rename a thread from its row menu with Edit title.
+30. **Continue a thread in another project** (`thread-sidebar`, threads) — Move a thread to another project when it started in the wrong one.
+31. **Finished turns in the Inbox** (`thread-sidebar`, inbox) — Each finished turn you have not seen becomes an Inbox item, cleared when you open the thread.
+32. **Switch destinations from the rail** (`thread-sidebar`, threads) — The left rail switches between Threads, Inbox, Land, Work, Agents, Observe, Knowledge and Settings.
+33. **Navigate the phone as a stack** (`thread-sidebar`, threads) — On a phone, screens stack and Back returns to the list you came from.
+34. **Open the thread list as a drawer on a phone** (`thread-sidebar`, threads) — On a phone, the thread list can open as a drawer over the open thread.
+35. **Open a thread's actions by touch** (`thread-sidebar`, threads) — On a touch screen each thread row has a ⋯ button with its actions.
+36. **One sidebar layout: the rail and list as a movable pane** (`thread-sidebar`, settings) — The rail and its list form one sidebar pane you can move, split or float.
+37. **Navigate from a bottom tab bar on a phone** (`thread-sidebar`, threads) — On a phone, a bottom tab bar holds Threads, Inbox, New and More.
+38. **See the threads waiting on you in one page** (`thread-sidebar`, inbox) — One page lists every thread waiting on you, with Open, its action and Done.
+39. **Live subagent preview in the transcript and above the composer** (`thread-sidebar`, transcript) — A subagent's row shows its current step and latest answer, and opens its thread or stops it.
+40. **Opt-in completion notices between threads** (`thread-sidebar`, threads) — A thread can follow another thread and get one short notice each time its turn ends.
+41. **Resume, Review and Inbox cards on the new-thread screen** (`thread-sidebar`, composer) — The new-thread screen offers cards to resume a quiet thread, review ready work or open the Inbox.
+42. **Thread menu on a phone** (`rich-composer`, composer) — On a phone, the top bar's menu holds this thread's views, header controls and composer tools.
+43. **Paste thread mentions as chips** (`rich-composer`, composer) — A thread mention you paste into the composer becomes a reference chip.
+44. **Add inline references for image attachments** (`rich-composer`, composer) — Each image you attach gets a numbered reference in the draft, so you can point to it.
+45. **Reuse image references and open the selected image** (`rich-composer`, composer) — Mention an attached image again with @, and click its chip to open that image.
+46. **Rename a thread from its header title** (`rich-composer`, threads) — Click the thread title in the header to rename it.
+47. **Recall earlier prompts with ArrowUp** (`rich-composer`, composer) — Press the Up arrow in an empty composer to bring back this thread's earlier prompts.
+48. **Attach a large paste as a text file** (`rich-composer`, composer) — Pasting a lot of text attaches it as a file, with an option to paste it as text instead.
+49. **Send once the attachments finish uploading** (`rich-composer`, composer) — Press Send while a file still uploads and the message goes out by itself once every upload is ready.
+50. **Run row, send states and meter line** (`rich-composer`, composer) — A new thread's project, host, workspace, agent and model sit as quiet pickers in the composer.
+51. **Restore draft reference chips from plain text** (`rich-composer`, composer) — A queued message brought back into the composer gets its reference chips back.
+52. **Settings shell** (`settings-shell`, settings) — The Settings button, its sections, the General page and the Cmd+, shortcut.
+53. **Dock Settings as one panel** (`settings-shell`, settings) — Open all of Settings as one dockable panel with its sections, search and forms.
+54. **DSH release notice and summary** (`settings-shell`, settings) — Settings marks a new DSH release and sums up what changed since your version.
+55. **One Settings page in the stage** (`settings-shell`, settings) — Settings opens as one page in the main view, from the rail, the gear, the palette or Cmd+,.
+56. **Settings grouped by task, with deep links** (`settings-shell`, settings) — Settings are grouped by task, such as Models and accounts or Projects and workspaces, with direct links.
+57. **Search Settings inline** (`settings-shell`, settings) — Search all settings from one field and change matches in place.
+58. **Search section controls and open them at the control** (`settings-shell`, settings) — Search finds controls inside Settings sections and opens the section at that control.
+59. **Plugin settings with real controls** (`settings-shell`, settings) — Each plugin's settings show real controls such as switches, menus and number fields.
+60. **Modified settings and reset to default** (`settings-shell`, settings) — Settings you changed are marked, and Reset to default puts them back.
+61. **Edit plugin settings as JSON** (`settings-shell`, settings) — Edit a plugin's settings as JSON with completion and checks before you save.
+62. **List and switch plugin entries, from Settings or an Agent** (`settings-shell`, settings) — Turn a plugin on or off from its settings page, and the agent can do the same when you ask.
+63. **Open the configuration file elsewhere** (`settings-shell`, settings) — Open a configuration file in your default app or the editor, or copy or reveal its path.
+64. **Set the Jev key once** (`settings-shell`, settings) — Set one Jev key in Settings for Backlog and Memory to share.
+65. **See what this setup can do and what it still needs on one page** (`onboarding`, knowledge) — A setup checklist shows what this setup can do and what it still needs, with a fix for each missing step.
+66. **Enable or disable a plugin pack after an exact preview** (`onboarding`, knowledge) — Turn a plugin pack on or off after a preview of exactly what changes.
+67. **Get set up in three steps: account, project, first task** (`onboarding`, threads) — Three steps get you set up: add an account, add a project, start a first task.
+68. **First tasks for your project on the new-thread screen** (`onboarding`, composer) — The new-thread screen offers three tasks for the project that put a prompt in the composer without sending it.
+69. **Show me where a feature lives, one step at a time** (`onboarding`, knowledge) — Show me where highlights each control on the way to a feature, one step at a time.
+70. **See what changed in your plugins since your last visit** (`onboarding`, knowledge) — What's new lists the latest changes to your plugins, newest first.
+71. **Get features suggested from what you already do** (`onboarding`, knowledge) — Off by default: suggests features you have not tried, based on what you did in the last 30 days.
+72. **Try a feature with the agent in a new thread** (`onboarding`, knowledge) — Off by default: Try it starts a new thread where the agent demonstrates a feature, using tokens.
+73. **Use another account for this thread** (`ai-accounts`, composer) — Right-click an account in the sidebar to use it for this thread only, keeping the model when it can.
+74. **Connect an account without leaving the chat** (`ai-accounts`, settings) — Sign in to a provider from a short dialog without leaving the thread.
+75. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
+76. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
+77. **Use a Google AI plan through the Antigravity CLI** (`ai-accounts`, settings) — Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.
+78. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
+79. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
+80. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
+81. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
+82. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
+83. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
+84. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
+85. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
+86. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
+87. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
+88. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
+89. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
+90. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
+91. **Add projects from the folder browser** (`workspace-folder-picker`, composer) — Add a project by browsing folders, or open your system's folder dialog.
+92. **Add a project by cloning a repository** (`workspace-folder-picker`, composer) — Add a project by cloning a repository, with progress and Cancel.
+93. **Remove a project** (`workspace-folder-picker`, composer) — Remove a project from the picker without deleting its folder or files.
+94. **Create a new project** (`workspace-folder-picker`, composer) — Create a new project folder with a Jujutsu repository and a first commit.
+95. **Search projects and browse folder paths** (`workspace-folder-picker`, composer) — Search your projects and browse folder paths, including ones under your home folder.
+96. **Select project folders with keyboard navigation** (`workspace-folder-picker`, composer) — Move through folders with the arrow keys.
+97. **Offer recent folders not yet registered as projects** (`workspace-folder-picker`, composer) — Recent folders that are not projects yet are offered first.
+98. **Start in the folder browser** (`workspace-folder-picker`, composer) — Some pickers open straight on the folder browser, without your projects.
+99. **Inspect a folder before adding it** (`workspace-folder-picker`, composer) — Choosing a folder first says what it is, such as a git or Jujutsu repository, before you add it.
+100. **Read a project's declared settings** (`workspace-folder-picker`, settings) — Settings › Projects lists your projects and the settings other features add for each one.
+101. **Choose an agent preset before typing** (`agent-preset`, composer) — Pick a preset for a new thread before you type its first message.
 
 ### More
 
@@ -183,82 +184,84 @@ From the onboarding feature catalog: 208 features, the 100 curated ones first.
 30. **A finished turn folds its work under one Worked for row** (`chat`, transcript) — A finished turn folds its tool calls under one Worked for row, and failures stay visible.
 31. **Choose Summary, Normal or Verbose for tool work** (`chat`, settings) — Choose in Settings whether tool work is folded always, only once a turn ends, or never.
 32. **Find text anywhere in a long thread** (`chat`, transcript) — Press Cmd+F in a thread to find text anywhere in it, even in turns not loaded yet.
-33. **Typed turn map with filters and Turn keys** (`chat`, transcript) — The turn rail marks questions, failures and edits, and steps between them with filters or keys.
+33. **Typed turn map with filters and Turn keys** (`chat`, transcript) — The turn rail marks questions, failures, edits and where you stopped reading, and steps between them with filters or keys.
 34. **Since you left: divider and recap above the first unseen Turn** (`chat`, transcript) — A card above the first turn you missed says what happened while you were away.
 35. **Runs of background jobs and subagents fold into one summary row** (`chat`, transcript) — Several background jobs or subagents in a row fold into one summary row that expands.
 36. **Mark where the model or effort changed** (`chat`, transcript) — A quiet row marks where the model, account or effort changed during a thread.
 37. **Open an unread thread at its final answer** (`chat`, transcript) — An unread thread opens at its final answer instead of the end, and Settings can change this.
-38. **Dock a thread view** (`rich-composer`) — Saved layouts restore their docked thread views without an extra composer.
-39. **Composer contract for other plugins** (`rich-composer`) — Other features can read and change the draft, add chips and pick the next message's model.
-40. **The model picker follows connected account changes** (`session-controller`) — The model picker updates as soon as you connect or change an account.
-41. **Guarded thread-local model selection** (`session-controller`) — Change the model for this thread only, without changing your defaults.
-42. **Send the browser only what a thread renders** (`session-controller`) — Opening a thread sends the browser only what it shows, so threads open faster.
-43. **Drive threads from another plugin** (`session-controller`) — Other features can list, start, prompt, stop and wait for threads.
-44. **Limit how many threads run at once** (`session-controller`, composer) — Limit how many threads run at once in Settings, and the rest wait for a free slot.
-45. **Inspect a setting's default, override and source** (`settings-shell`) — The agent can read a setting's default, your change and where its value comes from.
-46. **Ask how to get to a feature** (`onboarding`) — The agent can ask how to get to a feature, step by step.
-47. **Turn an account on or off from the usage popover** (`ai-accounts`) — Turned-off accounts stay visible in the usage strip, and the usage popover turns each one back on.
-48. **See which account serves this thread** (`ai-accounts`) — The usage strip highlights the account the open thread is using right now.
-49. **Stop at the plan limits instead of drawing paid extra usage** (`ai-accounts`) — Off by default: an account stops at its plan limit instead of paying for extra usage.
-50. **Main area and side panels** (`frame-layout`) — The main area holds the open tabs, and the right panel spans the full height.
-51. **Persist the frame's dragged panel widths** (`frame-layout`) — The sidebar and right panel keep the widths you dragged them to after a reload.
-52. **Persist the collapsed sidebar** (`frame-layout`) — A closed sidebar stays closed after a reload and reopens at its last width.
-53. **Give the stage the full width on a phone** (`frame-layout`) — On a phone, the thread takes the full width and the bottom tab bar never covers the composer.
-54. **One status strip at the bottom of the frame** (`frame-layout`) — One thin status bar along the bottom holds short items, with this thread's on the right.
-55. **Show, hide and reorder status bar items** (`frame-layout`, settings) — Show, hide and reorder status bar items in Settings or from an item's right-click menu.
-56. **Bring back hidden status items in place** (`frame-layout`) — When every status item is hidden, one small control brings them back.
-57. **Click a status item to open its page** (`frame-layout`) — Click a status item to open its full page.
-58. **Zen mode: only the thread and its composer** (`frame-layout`) — Zen mode hides everything but the thread and its composer, and Escape brings it all back.
-59. **Keep the thread header inside each thread** (`workbench`) — Each thread tab keeps its own header with title, workspace controls and the ⋯ menu.
-60. **Close the right pane when its final tab closes** (`workbench`) — Closing the last tab of the right pane closes the pane.
-61. **Hide a single tab row without hiding its view** (`workbench`) — Hide the tab row of a pane with one tab, and bring it back from a control or command.
-62. **Account preview is a movable tab** (`workbench`) — The account preview is a tab you can move like any other.
-63. **Root-pane windows float across the application** (`workbench`) — Float any pane as a window over the app, and dock it back.
-64. **Workbench as the main thread view** (`workbench`) — The main view is a thread tab, and clicking a thread opens it in a preview tab or its own tab.
-65. **Choose plugin views and one Settings hub** (`workbench`) — Each pane's + opens a chooser of plugin views and one Settings panel.
-66. **Drag panels across centre right and bottom** (`workbench`) — Drag tabs between the centre, right and bottom panes.
-67. **Keep preview pin unread and close semantics in Dockview tabs** (`workbench`) — Tabs keep preview, pin, unread and close behaviour in the Workbench.
-68. **Open native terminals from any pane's view chooser** (`workbench`, thread-panel) — Open a terminal in any pane from its view chooser.
-69. **Open thread facets from any pane's view chooser** (`workbench`, thread-panel) — Open a thread panel such as Changes, Cost or Jobs in any pane from its view chooser.
-70. **Open the thread panel as a bottom sheet on a phone** (`workbench`, thread-panel) — On a phone, the thread panel rises as a bottom sheet.
-71. **Previews, diffs and terminals as panels** (`workbench`) — Previews, diffs and terminals open as panels tied to their thread.
-72. **Split panes into Dockview groups and restore legacy layouts** (`workbench`) — Split a pane right or down, and older layouts still restore.
-73. **Arrange plugin panels in independent layouts** (`workbench`, settings) — Arrange panels in layouts with splits, and switch or reset them from Pane options.
-74. **Keep one docking surface in the right column and a bottom panel** (`workbench`) — One right pane and one bottom panel hold the docked views.
-75. **Recover all panes and semantic tabs** (`workbench`) — Reset layout always brings back the thread list and the current thread.
-76. **Queue panel-open requests before mount** (`workbench`) — A panel asked to open before it is ready opens as soon as it is.
-77. **One shared plugin stylesheet** (`ui-styles`) — All plugins share one stylesheet loaded once per page.
-78. **Appearance theme: presets, palette and fonts** (`ui-styles`, settings) — Pick a colour preset, adjust hue, accent and contrast, and choose fonts in Settings.
-79. **Saved and gallery themes** (`ui-styles`, settings) — Save any theme you ask the agent for, or pick one from the gallery such as Dracula.
-80. **Touch platform baseline** (`ui-styles`) — On touch screens, controls skip the tap flash and fields never zoom the page.
-81. **Search threads and workspace files** (`command-palette`) — Search threads by title, project or id, and files in the workspace.
-82. **Register and invoke typed palette actions** (`command-palette`) — Features register actions that the command palette lists and runs.
-83. **List commands from every plugin** (`command-palette`) — The palette lists every command plugins add, with disabled ones greyed out.
-84. **Rank recently used actions and files** (`command-palette`) — Actions and files you use often rank higher in this browser.
-85. **Route prefixed searches to the right content** (`command-palette`) — Type a prefix in the palette to search commands, content, a line number or capture to Backlog.
-86. **Ask DSH from an empty palette** (`command-palette`) — Press Tab in an empty palette to ask DSH a question in a new thread.
-87. **Keep palette ranking within the interaction budget** (`command-palette`) — The palette stays fast to open and to type in, even with many threads and files.
-88. **Commands show the keys they answer to** (`command-palette`) — Each command shows the keys it answers to, including the ones you changed.
-89. **Toggle the sidebar with the platform primary chord** (`shortcuts`) — Press Cmd+B on a Mac, or Ctrl+B elsewhere, to show or hide the sidebar.
-90. **Shortcuts that leave text fields and the terminal alone** (`shortcuts`) — Shortcuts never take keys from a text field or the terminal unless they are meant to.
-91. **Rebindable command keys** (`shortcuts`, settings) — Change the keys of any command in Keyboard shortcuts, and the new keys work at once.
-92. **Single keys, sequences and scoped keys** (`shortcuts`) — Single keys and two-key sequences such as G then I work where they apply, never while you type.
-93. **Keyboard shortcut sheet** (`shortcuts`) — Press ? or Cmd+/ to see every shortcut, grouped by where it works.
-94. **Open a new thread's composer at once** (`workspace-nav`, composer) — Every New thread button opens the composer at once, so you can type right away.
-95. **Choose a model before typing in a new thread** (`model-selection`, composer) — Pick a model from the composer or with /model before you send a thread's first message.
-96. **Pick what an @ mention targets** (`input-trigger`, composer) — Type @ in the composer to mention a file or thread, as in Codex, with quotes for names with spaces.
-97. **Restore a persisted command chip** (`input-trigger`, composer) — A draft that starts with a command keeps its command chip after a reload.
-98. **Slash entries for commands** (`input-trigger`, composer) — Commands with a slash name appear in the composer's / menu and run when picked.
-99. **One mention and reference-preview registry** (`input-trigger`) — Files, threads, skills, backlog items, agents and more share one @ menu and one preview card.
-100. **An answered question form stays closed while its reply waits for admission** (`user-questions`, transcript) — A question you answered stays closed while your reply waits to reach the agent.
-101. **Markdown questions with sandboxed HTML previews** (`user-questions`, transcript) — Questions show Markdown, and their HTML previews run safely sandboxed.
-102. **Answer a question by keyboard** (`user-questions`, transcript) — A question can be answered with a digit and Enter, and focus goes back to the composer.
-103. **Changed-files card and review tab** (`deliverables`, transcript) — Each turn lists the files it changed, with a comparison on hover and a review tab.
-104. **Changed images preview instead of the binary placeholder** (`deliverables`, transcript) — A changed image shows as the image itself instead of a binary file note.
-105. **Plugin panel loads its list once** (`cordis-cards`, threads) — The dynamic plugin panel and its tool cards load the plugin list once per connection.
-106. **Models settings and provider onboarding** (`settings-models`, settings) — The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.
-107. **Subagent settings** (`settings-subagent`, settings) — Set how deep subagents can nest, how many run at once and which model they use.
-108. **Web search settings** (`settings-web-search`, settings) — Choose the web search provider, its limits and its key.
+38. **See annotations beside the passage they quote, sent or draft** (`chat`, transcript) — Annotations show beside the passage they quote, as a numbered marker and a comment card, before and after the message is sent.
+39. **Dock a thread view** (`rich-composer`) — Saved layouts restore their docked thread views without an extra composer.
+40. **Composer contract for other plugins** (`rich-composer`) — Other features can read and change the draft, add chips and pick the next message's model.
+41. **Keep sent annotations across browsers** (`rich-composer`) — DSH keeps sent annotations in a review history per thread, so their markers and comments come back in any browser.
+42. **The model picker follows connected account changes** (`session-controller`) — The model picker updates as soon as you connect or change an account.
+43. **Guarded thread-local model selection** (`session-controller`) — Change the model for this thread only, without changing your defaults.
+44. **Send the browser only what a thread renders** (`session-controller`) — Opening a thread sends the browser only what it shows, so threads open faster.
+45. **Drive threads from another plugin** (`session-controller`) — Other features can list, start, prompt, stop and wait for threads.
+46. **Limit how many threads run at once** (`session-controller`, composer) — Limit how many threads run at once in Settings, and the rest wait for a free slot.
+47. **Inspect a setting's default, override and source** (`settings-shell`) — The agent can read a setting's default, your change and where its value comes from.
+48. **Ask how to get to a feature** (`onboarding`) — The agent can ask how to get to a feature, step by step.
+49. **Turn an account on or off from the usage popover** (`ai-accounts`) — Turned-off accounts stay visible in the usage strip, and the usage popover turns each one back on.
+50. **See which account serves this thread** (`ai-accounts`) — The usage strip highlights the account the open thread is using right now.
+51. **Stop at the plan limits instead of drawing paid extra usage** (`ai-accounts`) — Off by default: an account stops at its plan limit instead of paying for extra usage.
+52. **Main area and side panels** (`frame-layout`) — The main area holds the open tabs, and the right panel spans the full height.
+53. **Persist the frame's dragged panel widths** (`frame-layout`) — The sidebar and right panel keep the widths you dragged them to after a reload.
+54. **Persist the collapsed sidebar** (`frame-layout`) — A closed sidebar stays closed after a reload and reopens at its last width.
+55. **Give the stage the full width on a phone** (`frame-layout`) — On a phone, the thread takes the full width and the bottom tab bar never covers the composer.
+56. **One status strip at the bottom of the frame** (`frame-layout`) — One thin status bar along the bottom holds short items, with this thread's on the right.
+57. **Show, hide and reorder status bar items** (`frame-layout`, settings) — Show, hide and reorder status bar items in Settings or from an item's right-click menu.
+58. **Bring back hidden status items in place** (`frame-layout`) — When every status item is hidden, one small control brings them back.
+59. **Click a status item to open its page** (`frame-layout`) — Click a status item to open its full page.
+60. **Zen mode: only the thread and its composer** (`frame-layout`) — Zen mode hides everything but the thread and its composer, and Escape brings it all back.
+61. **Keep the thread header inside each thread** (`workbench`) — Each thread tab keeps its own header with title, workspace controls and the ⋯ menu.
+62. **Close the right pane when its final tab closes** (`workbench`) — Closing the last tab of the right pane closes the pane.
+63. **Hide a single tab row without hiding its view** (`workbench`) — Hide the tab row of a pane with one tab, and bring it back from a control or command.
+64. **Account preview is a movable tab** (`workbench`) — The account preview is a tab you can move like any other.
+65. **Root-pane windows float across the application** (`workbench`) — Float any pane as a window over the app, and dock it back.
+66. **Workbench as the main thread view** (`workbench`) — The main view is a thread tab, and clicking a thread opens it in a preview tab or its own tab.
+67. **Choose plugin views and one Settings hub** (`workbench`) — Each pane's + opens a chooser of plugin views and one Settings panel.
+68. **Drag panels across centre right and bottom** (`workbench`) — Drag tabs between the centre, right and bottom panes.
+69. **Keep preview pin unread and close semantics in Dockview tabs** (`workbench`) — Tabs keep preview, pin, unread and close behaviour in the Workbench.
+70. **Open native terminals from any pane's view chooser** (`workbench`, thread-panel) — Open a terminal in any pane from its view chooser.
+71. **Open thread facets from any pane's view chooser** (`workbench`, thread-panel) — Open a thread panel such as Changes, Cost or Jobs in any pane from its view chooser.
+72. **Open the thread panel as a bottom sheet on a phone** (`workbench`, thread-panel) — On a phone, the thread panel rises as a bottom sheet.
+73. **Previews, diffs and terminals as panels** (`workbench`) — Previews, diffs and terminals open as panels tied to their thread.
+74. **Split panes into Dockview groups and restore legacy layouts** (`workbench`) — Split a pane right or down, and older layouts still restore.
+75. **Arrange plugin panels in independent layouts** (`workbench`, settings) — Arrange panels in layouts with splits, and switch or reset them from Pane options.
+76. **Keep one docking surface in the right column and a bottom panel** (`workbench`) — One right pane and one bottom panel hold the docked views.
+77. **Recover all panes and semantic tabs** (`workbench`) — Reset layout always brings back the thread list and the current thread.
+78. **Queue panel-open requests before mount** (`workbench`) — A panel asked to open before it is ready opens as soon as it is.
+79. **One shared plugin stylesheet** (`ui-styles`) — All plugins share one stylesheet loaded once per page.
+80. **Appearance theme: presets, palette and fonts** (`ui-styles`, settings) — Pick a colour preset, adjust hue, accent and contrast, and choose fonts in Settings.
+81. **Saved and gallery themes** (`ui-styles`, settings) — Save any theme you ask the agent for, or pick one from the gallery such as Dracula.
+82. **Touch platform baseline** (`ui-styles`) — On touch screens, controls skip the tap flash and fields never zoom the page.
+83. **Search threads and workspace files** (`command-palette`) — Search threads by title, project or id, and files in the workspace.
+84. **Register and invoke typed palette actions** (`command-palette`) — Features register actions that the command palette lists and runs.
+85. **List commands from every plugin** (`command-palette`) — The palette lists every command plugins add, with disabled ones greyed out.
+86. **Rank recently used actions and files** (`command-palette`) — Actions and files you use often rank higher in this browser.
+87. **Route prefixed searches to the right content** (`command-palette`) — Type a prefix in the palette to search commands, content, a line number or capture to Backlog.
+88. **Ask DSH from an empty palette** (`command-palette`) — Press Tab in an empty palette to ask DSH a question in a new thread.
+89. **Keep palette ranking within the interaction budget** (`command-palette`) — The palette stays fast to open and to type in, even with many threads and files.
+90. **Commands show the keys they answer to** (`command-palette`) — Each command shows the keys it answers to, including the ones you changed.
+91. **Toggle the sidebar with the platform primary chord** (`shortcuts`) — Press Cmd+B on a Mac, or Ctrl+B elsewhere, to show or hide the sidebar.
+92. **Shortcuts that leave text fields and the terminal alone** (`shortcuts`) — Shortcuts never take keys from a text field or the terminal unless they are meant to.
+93. **Rebindable command keys** (`shortcuts`, settings) — Change the keys of any command in Keyboard shortcuts, and the new keys work at once.
+94. **Single keys, sequences and scoped keys** (`shortcuts`) — Single keys and two-key sequences such as G then I work where they apply, never while you type.
+95. **Keyboard shortcut sheet** (`shortcuts`) — Press ? or Cmd+/ to see every shortcut, grouped by where it works.
+96. **Open a new thread's composer at once** (`workspace-nav`, composer) — Every New thread button opens the composer at once, so you can type right away.
+97. **Choose a model before typing in a new thread** (`model-selection`, composer) — Pick a model from the composer or with /model before you send a thread's first message.
+98. **Pick what an @ mention targets** (`input-trigger`, composer) — Type @ in the composer to mention a file or thread, as in Codex, with quotes for names with spaces.
+99. **Restore a persisted command chip** (`input-trigger`, composer) — A draft that starts with a command keeps its command chip after a reload.
+100. **Slash entries for commands** (`input-trigger`, composer) — Commands with a slash name appear in the composer's / menu and run when picked.
+101. **One mention and reference-preview registry** (`input-trigger`) — Files, threads, skills, backlog items, agents and more share one @ menu and one preview card.
+102. **An answered question form stays closed while its reply waits for admission** (`user-questions`, transcript) — A question you answered stays closed while your reply waits to reach the agent.
+103. **Markdown questions with sandboxed HTML previews** (`user-questions`, transcript) — Questions show Markdown, and their HTML previews run safely sandboxed.
+104. **Answer a question by keyboard** (`user-questions`, transcript) — A question can be answered with a digit and Enter, and focus goes back to the composer.
+105. **Changed-files card and review tab** (`deliverables`, transcript) — Each turn lists the files it changed, with a comparison on hover and a review tab.
+106. **Changed images preview instead of the binary placeholder** (`deliverables`, transcript) — A changed image shows as the image itself instead of a binary file note.
+107. **Plugin panel loads its list once** (`cordis-cards`, threads) — The dynamic plugin panel and its tool cards load the plugin list once per connection.
+108. **Models settings and provider onboarding** (`settings-models`, settings) — The Models settings page and the DeepSeek sign-in step, refreshed only while you look at them.
+109. **Subagent settings** (`settings-subagent`, settings) — Set how deep subagents can nest, how many run at once and which model they use.
+110. **Web search settings** (`settings-web-search`, settings) — Choose the web search provider, its limits and its key.
 
 ## Enable it
 

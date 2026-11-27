@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-572 features from 121 plugins.
+575 features from 121 plugins.
 
 ## Counts
 
@@ -19,11 +19,11 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Agents |  |  |  |  | 5 |  | 1 |  |  |  |  |  |  |  | 6 |
 | Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
 | Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
-| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 64 |  |  |  | 68 |
+| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 65 |  |  |  | 69 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
 | Composer |  |  |  | 70 |  |  |  |  |  |  |  |  |  |  | 70 |
-| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 43 | 43 |
-| No place of its own | 28 |  | 22 |  |  |  | 1 | 133 |  |  |  | 10 |  |  | 194 |
+| Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 44 | 44 |
+| No place of its own | 28 |  | 22 |  |  |  | 1 | 134 |  |  |  | 10 |  |  | 195 |
 
 ## By current left-nav entry
 
@@ -91,7 +91,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | conversation.chat.assistant-actions | 1 | Work 1 |
 | dialog | 4 | Settings 2, No place of its own 1, Thread panel 1 |
 | empty thread view (first run); palette | 1 | Threads 1 |
-| host | 71 | No place of its own 71 |
+| host | 72 | No place of its own 72 |
 | host and client | 1 | No place of its own 1 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
@@ -110,7 +110,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | rail | 13 | Knowledge 6, Settings 4, No place of its own 1, Threads 1, Work 1 |
 | right sidebar | 1 | Threads 1 |
 | right-pane | 10 | Thread panel 8, No place of its own 2 |
-| settings | 37 | Settings 34, No place of its own 3 |
+| settings | 38 | Settings 35, No place of its own 3 |
 | Settings | 1 | Settings 1 |
 | Settings › General › Appearance; agent tools theme_get / theme_set | 1 | Settings 1 |
 | Settings › General › Status bar | 1 | Settings 1 |
@@ -129,7 +129,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | thread-panel | 1 | Thread panel 1 |
 | threads | 1 | Threads 1 |
 | toast | 1 | No place of its own 1 |
-| transcript | 41 | Transcript 38, Inbox 1, Land 1, Thread panel 1 |
+| transcript | 42 | Transcript 39, Inbox 1, Land 1, Thread panel 1 |
 | url | 1 | No place of its own 1 |
 | workbench | 17 | No place of its own 12, Thread panel 4, Settings 1 |
 
@@ -286,7 +286,7 @@ rail destination; 6 features.
 | Feature | Surface | Today |
 | --- | --- | --- |
 | agent-communication/agent-directory: Find running agents | destinationSection | left-nav: Messages |
-| agent-communication/human-browser: Post messages from the communication browser | destinationSection | left-nav: Messages › post |
+| agent-communication/human-browser: Send direct messages from the Messages panel | destinationSection | left-nav: Messages › post |
 | agent-communication/passive-messaging: Store and browse agent messages | destinationSection | left-nav: Messages |
 | agents/agent-colour: Colour an agent | destinationSection | left-nav: Agents |
 | agents/agent-registry: Manage agents | destinationSection | left-nav: Agents |
@@ -351,7 +351,7 @@ rail destination; 14 features.
 
 ### Settings
 
-rail destination (bottom); 68 features.
+rail destination (bottom); 69 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -416,6 +416,7 @@ rail destination (bottom); 68 features.
 | thread-sidebar/layout-mode: One sidebar layout: the rail and list as a movable pane | settingsSection | sidebar: the rail and list (Workbench Sidebar pane) |
 | thread-sidebar/navigation-layout: Customize sidebar navigation and sections | settingsSection | thread-list: Sidebar settings › Customize sidebar |
 | thread-sidebar/notification-delivery: Configure per-category thread notifications | settingsSection | settings: Notifications › Thread notifications |
+| thread-sidebar/reminder-wake: Wake a done or archived thread for its reminder | settingsSection | settings: Thread sidebar › Reminder wake |
 | thread-sidebar/settled-auto-archive: Archive a done thread once its delay passes | settingsSection | settings: Thread sidebar › settled archive delay |
 | ui-styles/appearance-theme: Appearance theme: presets, palette and fonts | settingsSection | Settings › General › Appearance; agent tools theme_get / theme_set |
 | ui-styles/saved-themes: Saved and gallery themes | settingsSection | Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) |
@@ -542,7 +543,7 @@ run row, chips, `/` and `@` sources; 70 features.
 
 ### Transcript
 
-cards inline in the active thread; 43 features.
+cards inline in the active thread; 44 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -559,6 +560,7 @@ cards inline in the active thread; 43 features.
 | chat/find-in-thread: Find text anywhere in a long thread | transcriptCard | transcript: find bar over the thread |
 | chat/folded-work: A finished turn folds its work under one Worked for row | transcriptCard | transcript: turn process row |
 | chat/image-links: Open image links in the gallery | transcriptCard | transcript: image links |
+| chat/inline-annotations: See annotations beside the passage they quote, sent or draft | transcriptCard | transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window |
 | chat/resume-interrupted: Resume the latest stopped turn | transcriptCard | transcript: Resume beside a stopped task |
 | chat/retry-failed-turn: Retry a turn that failed before any reply | transcriptCard | transcript: Retry beside a failed turn |
 | chat/route-change-markers: Mark where the model or effort changed | transcriptCard | transcript: route-change row |
@@ -592,7 +594,7 @@ cards inline in the active thread; 43 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 194 features.
+palette commands, status items, agent tools, infrastructure; 195 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -611,7 +613,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | multi-host/remote-delegation: Delegate a task to another host | agentToolOnly | agent tool: multi_host_delegate |
 | onboarding/feature-reach: Ask how to get to a feature | agentToolOnly | agent tool: onboarding_reach; read by Show me where on Knowledge › Getting started |
 | pull-requests/github-pull-request-links: Link and watch GitHub pull requests from DSH threads | agentToolOnly | agent tools: pull_request_link, pull_request_watch, pull_request_list |
-| secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias |
+| secret-catalog/metadata-only-agent-tools: Expose safe secret catalog tools to agents | agentToolOnly | agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias |
 | session-controller/thread-local-model: Guarded thread-local model selection | agentToolOnly | agent tool: thread_local_model_state / thread_select_local_model |
 | settings-shell/settings-inspect-tool: Inspect a setting's default, override and source | agentToolOnly | agent tool: settings_inspect |
 | thread-sidebar/agent-user-notification: Agent sends the user a notification | agentToolOnly | agent tool notify_user; in-app toast and system notification |
@@ -731,6 +733,7 @@ palette commands, status items, agent tools, infrastructure; 194 features.
 | pwa/installable-app: Install the Web UI as an app on the phone | infrastructure | host: served manifest, icon routes and index head |
 | request-messages/dispatch-request-messages: Let plugins adjust each model request | infrastructure | host: no UI |
 | rich-composer/composer-contract: Composer contract for other plugins | infrastructure | client: Composer contract |
+| rich-composer/sent-annotations: Keep sent annotations across browsers | infrastructure | host: plugin storage per Session · client: Composer annotations |
 | rich-composer/workbench-conversation-views: Dock a thread view | infrastructure | workbench: docked Conversation views |
 | session-controller/drive-threads: Drive threads from another plugin | infrastructure | host: sessions API |
 | session-controller/lean-session-follow: Send the browser only what a thread renders | infrastructure | host: session event stream |

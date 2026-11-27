@@ -2628,7 +2628,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAutoSettleApi",
       "importFrom": "@dshfiles/thread-sidebar/auto-settle-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:91",
+      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:102",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-auto-settle",
@@ -2964,6 +2964,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [
         "Registry id: @dshfiles/tool-meta.tool-call-section"
       ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/tool-search/tool-visibility",
+      "kind": "module",
+      "title": "@dshfiles/tool-search/tool-visibility",
+      "summary": "One plugin's claim that some of its tools must be declared to every Session instead of hidden behind `tool_search`. Keep the set small and the tools cheap: the declared list is sent with every request, so a large schema costs cached tokens on each turn.",
+      "publicSymbol": "ToolVisibilityDeclaration, ToolSearchVisibility, declareVisibleTools, makeToolSearchVisibility",
+      "importFrom": "@dshfiles/tool-search/tool-visibility",
+      "owner": "@dshfiles/tool-search",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/tool-search/src/tool-visibility.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -3806,7 +3826,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › root-timed-questions"
       ],
       "details": [
-        "Used by 43 catalog feature(s)",
+        "Used by 44 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3890,7 +3910,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › antigravity-accounts"
       ],
       "details": [
-        "Used by 64 catalog feature(s)",
+        "Used by 65 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -4002,7 +4022,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 133 catalog feature(s)",
+        "Used by 134 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

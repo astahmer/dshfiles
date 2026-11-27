@@ -132,7 +132,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "chat",
       "description": "Owned fork of DSH's native Chat plugin that mounts only the transcript rows near the viewport.",
       "ui": true,
-      "features": 15
+      "features": 16
     },
     {
       "name": "command-palette",
@@ -462,7 +462,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "rich-composer",
       "description": "Owned fork of DSH's native Conversation plugin with structured session-reference paste.",
       "ui": true,
-      "features": 12
+      "features": 13
     },
     {
       "name": "schedule",
@@ -606,7 +606,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 56
+      "features": 57
     },
     {
       "name": "thread-transfer",
@@ -1101,14 +1101,14 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "agent-communication",
       "id": "passive-messaging",
       "title": "Store and browse agent messages",
-      "summary": "Messages between agents are kept, and reading one never starts any work.",
+      "summary": "Messages between agents are kept. A request wakes an idle agent, and a notice or a read never starts any work.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Agents › Messages and post a message to a topic.",
-        "doneWhen": "Your message shows in the topic's history.",
+        "firstAction": "Open Agents › Messages and send a direct message to a live Agent.",
+        "doneWhen": "Your message shows in that Agent’s thread.",
         "open": {
           "panel": "agent-communication"
         }
@@ -1118,8 +1118,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#human-browser",
       "plugin": "agent-communication",
       "id": "human-browser",
-      "title": "Post messages from the communication browser",
-      "summary": "Post to a topic or message an agent directly without starting its work.",
+      "title": "Send direct messages from the Messages panel",
+      "summary": "Message an agent's thread directly. A request wakes it when idle, and a notice never starts its work.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages › post",
       "reach": [
@@ -11817,7 +11817,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "chat",
       "id": "turn-map",
       "title": "Typed turn map with filters and Turn keys",
-      "summary": "The turn rail marks questions, failures and edits, and steps between them with filters or keys.",
+      "summary": "The turn rail marks questions, failures, edits and where you stopped reading, and steps between them with filters or keys.",
       "destination": "transcript",
       "currentSurface": "transcript: turn rail and Turns sheet",
       "reach": [
@@ -11972,6 +11972,21 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": null,
       "onboarding": null
+    },
+    {
+      "key": "chat#inline-annotations",
+      "plugin": "chat",
+      "id": "inline-annotations",
+      "title": "See annotations beside the passage they quote, sent or draft",
+      "summary": "Annotations show beside the passage they quote, as a numbered marker and a comment card, before and after the message is sent.",
+      "destination": "transcript",
+      "currentSurface": "transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Select a passage in an assistant reply and press Annotate.",
+        "doneWhen": "A numbered marker sits beside the passage and its comment can be written right there."
+      }
     },
     {
       "key": "command-palette#palette-search",
@@ -16654,7 +16669,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jujutsu",
       "id": "workspace-cleanup",
       "title": "Clean up idle workspaces",
-      "summary": "Clean up workspaces idle for an hour, a day or a week, with a preview that protects unlanded work.",
+      "summary": "Clean up workspaces idle for an hour, a day or a week, with a preview that protects unlanded work unless you pick Stale work.",
       "destination": "land",
       "currentSurface": "left-nav: Revision graph › Clean up workspaces",
       "reach": [
@@ -21843,6 +21858,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "rich-composer#sent-annotations",
+      "plugin": "rich-composer",
+      "id": "sent-annotations",
+      "title": "Keep sent annotations across browsers",
+      "summary": "DSH keeps sent annotations in a review history per thread, so their markers and comments come back in any browser.",
+      "destination": "none",
+      "currentSurface": "host: plugin storage per Session · client: Composer annotations",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "schedule#catalog-read-reuse",
       "plugin": "schedule",
       "id": "catalog-read-reuse",
@@ -22268,10 +22295,32 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "Agents list your secrets without their values and read one value only when asked by name.",
+      "summary": "Agents list your secrets without their values, run commands with them injected, and read one value only when asked by name.",
       "destination": "none",
-      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias",
-      "reach": [],
+      "currentSurface": "agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias",
+      "reach": [
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "expect text \"GITHUB_TOKEN\"",
+          "action": "expect",
+          "by": "text",
+          "name": "GITHUB_TOKEN",
+          "value": null
+        }
+      ],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -25377,6 +25426,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "thread-sidebar#reminder-wake",
+      "plugin": "thread-sidebar",
+      "id": "reminder-wake",
+      "title": "Wake a done or archived thread for its reminder",
+      "summary": "A done or archived thread with an active reminder wakes before the reminder is due, so the reminder is never dropped.",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › Reminder wake",
+      "reach": [],
       "reachNarrow": null,
       "onboarding": null
     },

@@ -37,8 +37,8 @@ From the onboarding feature catalog: 53 features, the 43 curated ones first.
 3. **Mention an agent where a thread starts** (`agents`, composer) — Start a thread on an agent by typing its @handle at the start of your message.
 4. **Preview an agent from its mention** (`agents`, agents) — Click an agent's @handle anywhere to see its card with its model, tools, instructions and recent threads.
 5. **Find running agents** (`agent-communication`, agents) — Agents can find the other running agents, with the ones in the same project listed first.
-6. **Store and browse agent messages** (`agent-communication`, agents) — Messages between agents are kept, and reading one never starts any work.
-7. **Post messages from the communication browser** (`agent-communication`, agents) — Post to a topic or message an agent directly without starting its work.
+6. **Store and browse agent messages** (`agent-communication`, agents) — Messages between agents are kept. A request wakes an idle agent, and a notice or a read never starts any work.
+7. **Send direct messages from the Messages panel** (`agent-communication`, agents) — Message an agent's thread directly. A request wakes it when idle, and a notice never starts its work.
 8. **Ask and answer a subagent's question** (`agent-questions`, inbox) — A subagent can ask its parent thread a question, and only the parent can answer it.
 9. **Timed questions keep the agent working** (`agent-questions`, transcript) — A timed question counts down while the agent keeps working, and a later answer still reaches it.
 10. **Steady countdown on question cards** (`agent-questions`, transcript) — The question card keeps a steady countdown and folds long questions to three lines.

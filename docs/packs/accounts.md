@@ -67,7 +67,7 @@ From the onboarding feature catalog: 46 features, the 33 curated ones first.
 1. **Turn an account on or off from the usage popover** (`ai-accounts`) — Turned-off accounts stay visible in the usage strip, and the usage popover turns each one back on.
 2. **See which account serves this thread** (`ai-accounts`) — The usage strip highlights the account the open thread is using right now.
 3. **Stop at the plan limits instead of drawing paid extra usage** (`ai-accounts`) — Off by default: an account stops at its plan limit instead of paying for extra usage.
-4. **Expose safe secret catalog tools to agents** (`secret-catalog`) — Agents list your secrets without their values and read one value only when asked by name.
+4. **Expose safe secret catalog tools to agents** (`secret-catalog`) — Agents list your secrets without their values, run commands with them injected, and read one value only when asked by name.
 5. **Usage index from thread logs** (`usage`) — Every model request and tool call in your threads is counted for the Usage page.
 6. **Export usage as metrics** (`usage`) — The agent can export your usage as OpenTelemetry metrics.
 7. **Bounded compaction summaries** (`context-compaction`) — Long histories are summarized in pieces small enough for the model to accept.

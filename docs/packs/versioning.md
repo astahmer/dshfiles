@@ -55,7 +55,7 @@ From the onboarding feature catalog: 38 features, the 29 curated ones first.
 23. **Move a workspace from a shared revision** (`jujutsu`, land) — When several workspaces share a revision, open the overflow chip to see and move them.
 24. **Create a workspace at a revision** (`jujutsu`, land) — Right-click a revision and choose New workspace here to create a workspace there.
 25. **Open Jujutsu references from a chat message** (`jujutsu`, land) — Revision ids and bookmarks in a message become links that preview a small graph around them.
-26. **Clean up idle workspaces** (`jujutsu`, land) — Clean up workspaces idle for an hour, a day or a week, with a preview that protects unlanded work.
+26. **Clean up idle workspaces** (`jujutsu`, land) — Clean up workspaces idle for an hour, a day or a week, with a preview that protects unlanded work unless you pick Stale work.
 27. **Remove a workspace from the graph** (`jujutsu`, land) — Right-click a workspace to remove it, and a thread workspace first names its unlanded revisions.
 28. **Describe and review the working copy in Source Control** (`jujutsu`, land) — Describe the working copy and see its changed files and the revisions below it in Source control.
 29. **Mark review files as viewed** (`diff-viewed`, thread-panel) — Mark a file as viewed in a review and see how many are left.
