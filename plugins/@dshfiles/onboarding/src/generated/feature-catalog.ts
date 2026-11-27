@@ -25893,10 +25893,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Save current filters as preset…\"",
+          "text": "click menuitem \"Save as new preset…\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Save current filters as preset…",
+          "name": "Save as new preset…",
           "value": null
         },
         {
@@ -25944,10 +25944,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Save current filters as preset…\"",
+          "text": "click menuitem \"Save as new preset…\"",
           "action": "click",
           "by": "menuitem",
-          "name": "Save current filters as preset…",
+          "name": "Save as new preset…",
           "value": null
         },
         {
@@ -25959,7 +25959,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "onboarding": {
-        "firstAction": "Set the thread list's filters, then choose Filters › ⋯ › Save current filters as preset… and name it.",
+        "firstAction": "Set the thread list's filters, then choose Filters › ⋯ › Save as new preset… and name it.",
         "doneWhen": "The Filter button shows your preset's name and one click in its Presets section brings the filters back."
       }
     },
