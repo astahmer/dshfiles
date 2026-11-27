@@ -70,9 +70,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "ai-accounts",
-      "description": "Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
+      "description": "Per-account Codex, Claude, Antigravity, Mistral Vibe CLI, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 21
+      "features": 23
     },
     {
       "name": "annotations",
@@ -3381,6 +3381,74 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Copy Antigravity sign-in command",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#vibe-cli-route",
+      "plugin": "ai-accounts",
+      "id": "vibe-cli-route",
+      "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
+      "summary": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key req…",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Vibe CLI",
+      "reach": [
+        {
+          "text": "click text \"AI Accounts: Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts: Accounts",
+          "value": null
+        },
+        {
+          "text": "click button \"Add account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add account",
+          "value": null
+        },
+        {
+          "text": "click button \"Vibe CLI account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Vibe CLI account",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy Vibe sign-in command\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy Vibe sign-in command",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#vibe-acp-bridge",
+      "plugin": "ai-accounts",
+      "id": "vibe-acp-bridge",
+      "title": "Run Vibe with DSH's tools through its ACP server",
+      "summary": "A Vibe account switched to the ACP bridge holds one `vibe-acp` process per thread: DSH's tools reach it as one stdio MCP server, Vibe publishes an ACP tool update before invoking MCP; only the held MCP request becomes a native DSH call. The native executor applies the calling se…",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › Mistral Vibe ACP; accounts editor › Runtime paths › Bridge",
+      "reach": [
+        {
+          "text": "click button \"AI accounts\"",
+          "action": "click",
+          "by": "button",
+          "name": "AI accounts",
+          "value": null
+        },
+        {
+          "text": "expect text \"Mistral Vibe ACP\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Mistral Vibe ACP",
           "value": null
         }
       ],

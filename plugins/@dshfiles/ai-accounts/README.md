@@ -148,7 +148,7 @@ Automated verification uses fake CLI/device responses and a loopback provider. I
 | Codex          | **Continue with Codex** in quick setup (official CLI device approval); existing CLI login remains supported                                              | yes         | 5-hour and weekly windows, banked resets                                                                                    |
 | Claude         | `claude auth login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet, extra usage spend vs monthly cap (`/api/oauth/usage`)                                   |
 | Mistral        | Mistral Vibe login (`~/.vibe/.env`, macOS Keychain), or a key in DSH credentials or the Host environment                                                 | yes         | monthly API credit and Vibe & Studio allowance from `/v1/billing/budget` (best effort)                                      |
-| Vibe CLI       | the `vibe` CLI's own `vibe --setup` login in the account's VIBE_HOME; requests run the CLI, never HTTP                                                   | yes         | the plan's API credit and Vibe & Studio allowance from `/v1/billing/budget`, read with the CLI login's key                  |
+| Vibe CLI       | the `vibe` CLI's own `vibe --setup` login in the account's VIBE_HOME; requests run the CLI, never HTTP                                                   | yes         | Vibe & Studio allowance from `/v1/billing/budget`, read with the CLI login's key                                            |
 | OpenCode Go    | key in DSH credentials or the Host environment                                                                                                           | yes         | rolling, weekly and monthly windows                                                                                         |
 | Command Code   | key in DSH credentials or the Host environment, or `cmd login`                                                                                           | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)                                                                  |
 | GitHub Copilot | GitHub device-code OAuth; grant and refresh token stay in DSH credentials                                                                                | yes         | premium requests and chat, from GitHub's internal `copilot_internal/user` (what GitHub's Copilot clients read; best effort) |
@@ -295,26 +295,39 @@ moved `vibe_budget` from 0 % to 0.00336 %.
 - **Install and sign in.** Install the CLI on the Host (`vibe --setup` → **Launch browser**). The login lives in the
   account's **VIBE_HOME** (empty means `~/.vibe`), which is also where the CLI keeps its config, catalog cache and logs.
   DSH never reads, copies or prints that credential; the CLI process uses it in place.
-- **Requests.** Each DSH step spawns one
+- **Headless CLI (default).** Each DSH step spawns one
   `vibe --prompt-file <transcript> --output streaming --output-dir <tmp> --model <id> --system-prompt-file <DSH prompt>`
   process in a private temporary workdir, with `--approval-policy ask` (a headless turn has nobody to approve a tool, so
   an unapproved call is denied) and `--max-turns 4`. The next step replays the transcript as text, so a step always sees
   the conversation DSH holds. An inherited `MISTRAL_API_KEY` is removed from the child environment, because Vibe reads
   the variable before its own login and that would bill the API credit instead.
-- **CLI-agent route, no tool bridge.** `vibe` owns its agent loop and its own tools; this route neither exposes DSH's
-  tools to it nor turns its tool calls into DSH tool calls. It is a text route: the answer and its reasoning stream into
-  the transcript, and a tool call the CLI makes (or has denied) stays inside that run. Use a Codex, Claude, Antigravity or
-  API route when the work needs DSH's tools.
+- **ACP host tools (opt in).** In the Vibe account's **Runtime paths → Bridge**, choose **ACP host tools**. Agents can
+  make the same change through `ai_accounts_save_account` with `draft.bridge: 'acp'`. One `vibe-acp` process per thread
+  receives DSH tools over MCP (Vibe names them `mcp_dsh.<tool>`). Vibe's permission request only admits the MCP
+  call; DSH's normal executor then applies the calling session's exact sandbox and approval policy and returns the
+  result to Vibe. Disabling prompts does not deny otherwise permitted calls.
+- **Vibe's own tools.** Vibe 3.1.5 ignores an agent profile's `enabled_tools`, so its `write_file`, `edit`, `bash` and
+  `run_typescript` stay listed. DSH runs Vibe in its `ask` mode and answers each request the way the calling session
+  treats a native tool: reads run; under `danger-full-access` everything runs without asking; under a confining file
+  policy a write or command (which DSH cannot sandbox) asks the session, and a session with approvals off denies it.
+- **Vibe ACP preferences.** Under Settings → AI Accounts → Mistral Vibe ACP, **Vibe builtin approvals**
+  (`vibe.acpApprovalPolicy`) follows the calling session (`session`, default) or asks the session before every Vibe
+  builtin, reads included (`ask`). **Only use DSH tools** (`vibe.strictTools`, off by default) denies every Vibe
+  builtin. Changes apply on the next model step. Neither setting changes DSH tool permissions. Vibe keeps its private
+  working directory; use DSH tools for paths relative to the thread workspace.
+- **Reset/recovery.** The generated `agent/.vibe/agents/dsh.toml` lives under the Host temporary directory in
+  `dsh-vibe-acp-*`, not in VIBE_HOME. It is reused while the settings and prompt are unchanged and removed when the
+  process stops. Switch the account away from ACP to reset it. If Vibe cannot write its own home, make VIBE_HOME
+  writable or choose **Headless CLI** explicitly; DSH will not silently fall back to a route that does not use DSH tools.
 - **Models.** The CLI's own catalog (read from `$VIBE_HOME/model_catalog_cache.json`, Vibe 3.1.5): **Mistral Large 4**
   (`mistral-large-4`, `mistral-large-4-0-3`), **Mistral Medium 3.5** (`mistral-medium`, `mistral-medium-3.5`,
   `mistral-vibe-cli-latest`), **GLM 5.3** (`glm-5-3`, `zai-glm-5`, `zai-glm-latest`), **GLM 5.3 Flash**, and **DeepSeek
   V4.1 Flash 1017** (`deepseek-v4-1-flash-1017`). Each keeps the context window, image input and thinking levels the
   CLI lists for it (`--thinking`), so an effort the model does not offer is not sent. Aliases resolve to the model id the
   CLI accepts.
-- **Usage.** Tokens and cost come from the `export.json` the CLI writes on exit, and a failed run reports the CLI's own
-  stderr (for example a rejected `--model` alias) instead of a generic error. A process that writes nothing for ten
-  minutes is stopped, naming the CLI log under VIBE_HOME. The account card reads the plan's two buckets through
-  `/v1/billing/budget` with the CLI login, so the allowance the route spends is the one it reports.
+- **Usage.** Headless reads tokens and cost from `export.json`; ACP reads them from `usage_update`. The Vibe CLI
+  card tracks only the Vibe & Studio allowance from `/v1/billing/budget`. A spent API credit does not affect it.
+  ACP also records `vibe describe` and `vibe prompt` spans without home paths, prompt text or model IDs.
 
 ## Claude through the Claude Code CLI
 

@@ -2501,7 +2501,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadActionsApi",
       "importFrom": "@dshfiles/thread-sidebar/thread-actions-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:66",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:75",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-actions",
@@ -3740,7 +3740,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › antigravity-accounts"
       ],
       "details": [
-        "Used by 67 catalog feature(s)",
+        "Used by 69 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

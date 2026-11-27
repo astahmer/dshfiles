@@ -15,7 +15,7 @@ export const VibeBridgeSwitch = (props: {
       <span className="dshx:text-sm dshx:font-medium">Bridge</span>
       <small className="dshx:text-xs dshx:text-muted-foreground">
         ACP keeps one <code>vibe-acp</code> process per thread and runs Vibe's file edits and commands through DSH's tools, approvals and diffs. Headless runs{' '}
-        <code>vibe</code> once per step without DSH's tools.
+        <code>vibe</code> once per step without DSH's tools. Set builtin approvals or disable Vibe's builtins in AI Accounts preferences.
       </small>
     </span>
     <div aria-label="Vibe bridge" className="dshx:flex dshx:gap-1 dshx:rounded-lg dshx:bg-muted dshx:p-1" role="group">
