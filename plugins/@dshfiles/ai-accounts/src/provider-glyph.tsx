@@ -64,5 +64,13 @@ export const ProviderGlyph = (props: { readonly kind: AccountKind; readonly clas
       )
     case 'cursor':
       return <MousePointer2Icon aria-label={label} className={className} role="img" style={style} />
+    case 'vibe':
+      // A terminal prompt, matching the CLI route it names.
+      return (
+        <svg aria-label={label} className={className} role="img" style={style} viewBox="0 0 24 24">
+          <path d="M3 5h18v14H3z" fill="none" stroke="currentColor" strokeWidth="1.8" />
+          <path d="m7 10 2.5 2L7 14M12.5 14H17" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="1.8" />
+        </svg>
+      )
   }
 }

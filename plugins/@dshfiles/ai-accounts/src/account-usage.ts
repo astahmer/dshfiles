@@ -8,6 +8,7 @@ import { CredentialModel, type CredentialValueResolver } from './credentials.js'
 import { readCursorUsage } from './cursor-account.js'
 import { AntigravityAccountModel, type AntigravityAccountDescription, type AntigravityQuotaReading } from './antigravity-account.js'
 import { MistralAccountModel } from './mistral-account.js'
+import { VibeAccountModel } from './vibe-account.js'
 import { ProviderUsageModel, readCodexUsage, readOpenCodeUsage } from './usage.js'
 
 /** The stored half of a profile this read needs; the observed fields a card shows are never read here. */
@@ -91,6 +92,13 @@ export const readAccountUsage = async (input: {
       return MistralAccountModel.readUsage({
         keyEnv: account.apiKeyEnv,
         authSource: account.authSource,
+        resolveCredential: input.resolveCredential,
+        onAuthenticated: input.onAuthenticated,
+        signal,
+      })
+    case 'vibe':
+      return VibeAccountModel.readUsage({
+        homePath: account.homePath,
         resolveCredential: input.resolveCredential,
         onAuthenticated: input.onAuthenticated,
         signal,

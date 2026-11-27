@@ -9,6 +9,7 @@ export const KIND_LABEL = {
   cursor: 'Cursor',
   mistral: 'Mistral',
   antigravity: 'Antigravity',
+  vibe: 'Vibe CLI',
 } satisfies Record<AccountProfile['kind'], string>
 
 export const KIND_ACCENT = {
@@ -20,6 +21,7 @@ export const KIND_ACCENT = {
   cursor: '#6B7280',
   mistral: '#FA520F',
   antigravity: '#4285F4',
+  vibe: '#FF7000',
 } satisfies Record<AccountProfile['kind'], string>
 
 /** Rail group headings, in the order the groups are listed. */
@@ -29,6 +31,7 @@ export const KIND_GROUPS: readonly AccountProfile['kind'][] = [
   'antigravity',
   'github-copilot',
   'mistral',
+  'vibe',
   'opencode-go',
   'commandcode',
   'cursor',
@@ -71,5 +74,7 @@ export const connectHintFor = (kind: AccountProfile['kind']): string => {
   if (kind === 'antigravity')
     return 'Run `agy acp --login` with your Google account; the picker lists the models its plan offers (Gemini 4 needs Google AI Pro or Ultra).'
   if (kind === 'mistral') return 'Run `vibe --setup` (Launch browser) with your Le Chat plan, or store MISTRAL_API_KEY, and the picker publishes the route.'
+  if (kind === 'vibe')
+    return 'Run `vibe --setup` (Launch browser) on the Host; this route drives that signed-in CLI, so its steps draw the Vibe & Studio allowance.'
   return 'Set OPENCODE_API_KEY (or a shared key on the ai-accounts entry) and the route serves.'
 }

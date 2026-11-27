@@ -34,6 +34,7 @@ export class AccountDraftModel {
     cursor: '',
     mistral: '',
     antigravity: '',
+    vibe: '~/.vibe',
   } satisfies Record<AccountKind, string>
 
   /** The authored half of a profile; identity and health are observed, never sent back. */
@@ -159,7 +160,9 @@ export class AccountDraftModel {
       homePath: AccountDraftModel.defaultHome[input.kind],
       shadowHomePath: '',
       apiKeyEnv:
-        input.kind === 'codex' || input.kind === 'github-copilot' || input.kind === 'antigravity' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
+        input.kind === 'codex' || input.kind === 'github-copilot' || input.kind === 'antigravity' || input.kind === 'vibe'
+          ? ''
+          : AccountDraftModel.suggestedApiKeyRef(instanceId),
       apiBaseUrl: '',
       badge: AccountDraftModel.badgeFromName(displayName),
       accentColor: KIND_ACCENT[input.kind],

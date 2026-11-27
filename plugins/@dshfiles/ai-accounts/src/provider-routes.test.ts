@@ -1,5 +1,6 @@
 import { mkdtempSync } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_COMMANDCODE_KEY_ENV } from './commandcode-provider.js'
@@ -44,6 +45,21 @@ describe('Mistral subscription routes', () => {
     const mistral = built.routes.get(vibe.instanceId)
     expect(mistral).toMatchObject({ kind: 'mistral', authSource: 'cli', apiKeyEnv: '' })
     expect(mistral?.kind === 'mistral' && ProviderRoutes.keyEnvFor(mistral)).toBe('MISTRAL_API_KEY')
+  })
+})
+
+describe('Vibe CLI routes', () => {
+  it('builds a route whose home is the VIBE_HOME the CLI signed in to', async () => {
+    const { AccountDraftModel } = await import('./account-draft.js')
+    const { configFromAccountsFile } = await import('./account-config.js')
+    const generated = AccountDraftModel.newAccountDraft({ kind: 'vibe', existing: [] })
+    const custom = { ...generated, instanceId: 'vibe_alt', homePath: '/synthetic/vibe-alt' }
+    const config = configFromAccountsFile({ distribution: 'priority', cooldownMs: 0, shadowRoot: '/synthetic/shadows', accounts: [generated, custom] })
+    expect(config.vibeAccounts.map(account => account.home)).toEqual(['~/.vibe', '/synthetic/vibe-alt'])
+    const built = ProviderRoutes.buildRoutes(config)
+    expect(built.rejected).toEqual([])
+    expect(built.routes.get(generated.instanceId)).toMatchObject({ kind: 'vibe', home: join(homedir(), '.vibe') })
+    expect(built.routes.get('vibe_alt')).toMatchObject({ kind: 'vibe', home: '/synthetic/vibe-alt' })
   })
 })
 
@@ -126,6 +142,7 @@ describe('provider ids another plugin serves', () => {
     claudeAccounts: [],
     githubCopilotAccounts: [{ instanceId: 'copilot-work', displayName: 'Copilot Work', enabled }],
     antigravityAccounts: [],
+    vibeAccounts: [],
     opencodeApiKey: '',
     distribution: 'sticky',
     cooldownMs: 0,
