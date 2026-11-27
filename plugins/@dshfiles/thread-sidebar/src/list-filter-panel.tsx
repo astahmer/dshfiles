@@ -603,6 +603,15 @@ const StatusChips = (props: {
 }): JSX.Element => {
   const [opened, setOpened] = useState(false)
   const moreId = useId()
+  // Opened by the user: bring what it revealed into view (council round 30, item 8: below the fold on a phone).
+  const revealRequested = useRef(false)
+  useEffect(() => {
+    if (!opened || !revealRequested.current) return
+    revealRequested.current = false
+    const region = document.getElementById(moreId)
+    // jsdom (the unit tests) draws no layout and has no scrollIntoView.
+    if (region !== null && 'scrollIntoView' in region) region.scrollIntoView({ block: 'nearest' })
+  }, [moreId, opened])
   const forced = props.selected.some(filter => !isLeadingStatus(filter))
   // Latched open once forced (council round 29, item 3): turning the last revealed status off never folds the region
   // under the pointer or drops the focus that sits in it.
@@ -678,7 +687,11 @@ const StatusChips = (props: {
           aria-disabled={forced ? true : undefined}
           aria-describedby={forced ? `${moreId}-hint` : undefined}
           className={cn(QUIET_ROW, 'dshx:justify-self-start')}
-          onClick={() => (forced ? undefined : setOpened(current => !current))}
+          onClick={() => {
+            if (forced) return
+            revealRequested.current = !opened
+            setOpened(current => !current)
+          }}
           data-thread-status-more=""
         >
           <ChevronDownIcon

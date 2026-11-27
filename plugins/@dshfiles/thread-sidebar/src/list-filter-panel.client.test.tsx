@@ -1280,3 +1280,27 @@ describe('the desktop panel holds its top (round 31, item 7)', () => {
     expect(root.hasAttribute('data-more-below')).toBe(false)
   })
 })
+
+// Council round 30, item 8: on a phone the revealed statuses opened below the fold; they scroll into view.
+describe('More statuses reveals into view (round 31, item 8)', () => {
+  it('scrolls the revealed region to the nearest edge when More opens it, and not when it folds', () => {
+    const calls: { readonly target: Element; readonly options: ScrollIntoViewOptions | boolean | undefined }[] = []
+    const original = Element.prototype.scrollIntoView
+    Element.prototype.scrollIntoView = function (this: Element, options?: ScrollIntoViewOptions | boolean) {
+      calls.push({ target: this, options })
+    }
+    try {
+      render(<ListFilterPanel {...panel()} />)
+      const more = screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })
+      fireEvent.click(more)
+      const region = document.getElementById(more.getAttribute('aria-controls') ?? '')
+      expect(calls).toEqual([{ target: region, options: { block: 'nearest' } }])
+      fireEvent.click(more)
+      expect(calls).toHaveLength(1)
+    } finally {
+      // jsdom has no scrollIntoView: put the prototype back as it was, not with an own `undefined` property.
+      if (original === undefined) Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
+      else Element.prototype.scrollIntoView = original
+    }
+  })
+})
