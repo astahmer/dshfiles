@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { cleanup, fireEvent, render as renderUi, screen, within } from '@testing-library/react'
+import { act, cleanup, fireEvent, render as renderUi, screen, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -996,13 +996,21 @@ describe('roles and announcements (round 30, item 13)', () => {
   })
 
   it('names the change in the live region, so a change that leaves the count alone is still heard', () => {
-    const base = panel({ shown: '5 threads shown' })
-    render(<ListFilterPanel {...base} />)
-    expect(screen.getByRole('status').textContent).toBe('')
-    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarUnread' }))
-    expect(screen.getByRole('status').textContent).toBe('threadSidebarFilterChangeOn, 5 threads shown')
-    fireEvent.click(screen.getByRole('radio', { name: 'Main threads' }))
-    expect(screen.getByRole('status').textContent).toBe('Main threads, 5 threads shown')
+    // Said once the list has answered (round 31, item 6).
+    vi.useFakeTimers()
+    try {
+      const base = panel({ shown: '5 threads shown' })
+      render(<ListFilterPanel {...base} />)
+      expect(screen.getByRole('status').textContent).toBe('')
+      fireEvent.click(screen.getByRole('button', { name: 'threadSidebarUnread' }))
+      act(() => vi.advanceTimersByTime(200))
+      expect(screen.getByRole('status').textContent).toBe('threadSidebarFilterChangeOn, 5 threads shown')
+      fireEvent.click(screen.getByRole('radio', { name: 'Main threads' }))
+      act(() => vi.advanceTimersByTime(200))
+      expect(screen.getByRole('status').textContent).toBe('Main threads, 5 threads shown')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -1212,5 +1220,38 @@ describe('the forced-open hint line (round 31, item 5)', () => {
     expect(hint.tagName).toBe('P')
     for (const token of ['dshx:pl-6', 'dshx:text-2xs', 'dshx:text-(--dsw-alias-label-tertiary)']) expect(hint.className).toContain(token)
     expect(more.className).not.toContain('opacity-60')
+  })
+})
+
+// Council round 30, item 6: an action and the count it leads to are one announcement; the action is cleared once spoken,
+// so a later count change alone is said without a verb.
+describe('fresh announcements (round 31, item 6)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+  const status = (): string => screen.getByRole('status').textContent ?? ''
+
+  it('says the action with the count it leads to, once, and then clears it', () => {
+    vi.useFakeTimers()
+    const base = panel({ shown: '5 threads shown' })
+    const { rerender } = render(<ListFilterPanel {...base} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarUnread' }))
+    // The list answers a moment later with its new count; the announcement waits for it.
+    rerender(<ListFilterPanel {...base} shown="4 threads shown" />)
+    act(() => vi.advanceTimersByTime(200))
+    expect(status()).toBe('threadSidebarFilterChangeOn, 4 threads shown')
+    act(() => vi.advanceTimersByTime(1200))
+    expect(status()).toBe('')
+  })
+
+  it('says a count change that no action made without a verb', () => {
+    vi.useFakeTimers()
+    const base = panel({ shown: '5 threads shown' })
+    const { rerender } = render(<ListFilterPanel {...base} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarUnread' }))
+    act(() => vi.advanceTimersByTime(200))
+    act(() => vi.advanceTimersByTime(1200))
+    rerender(<ListFilterPanel {...base} shown="3 threads shown" />)
+    expect(status()).toBe('3 threads shown')
   })
 })

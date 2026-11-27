@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { ArchiveIcon, BellOffIcon, BookmarkPlusIcon, CheckIcon, CircleCheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { plural } from '@dshfiles/dshx/client'
-import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, type ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
   THREAD_SOURCE_FILTER_OPTIONS,
@@ -84,17 +84,46 @@ export interface ListFilterPanelProps {
   readonly shown?: string | undefined
 }
 
+/** How long an action waits for the count it leads to, and how long its announcement stays before it clears. */
+const ANNOUNCE_SETTLE_MS = 150
+const ANNOUNCE_HOLD_MS = 1000
+
 /**
- * A polite live region for the list's count (council round 27, item 15): a filter applies at once to rows a screen
- * reader user is not looking at, so the count is said after a change. Empty on opening, so opening says nothing extra.
+ * A polite live region for the list (council rounds 27 and 30): a filter applies at once to rows a screen reader user is
+ * not looking at. An action and the count it leads to are one announcement ("Unread on, 4 threads shown"), said once the
+ * list has answered, then cleared, so the action is never repeated; a count change no action made is said alone. Opening
+ * says nothing.
  */
-const ShownAnnouncer = (props: { readonly shown: string | undefined }): JSX.Element => {
-  const [opening] = useState(props.shown)
-  const [changed, setChanged] = useState(false)
-  if (!changed && props.shown !== opening) setChanged(true)
+const ShownAnnouncer = (props: { readonly note: { readonly text: string; readonly seq: number } | undefined; readonly shown: string | undefined }): JSX.Element => {
+  const [message, setMessage] = useState('')
+  const spoken = useRef(props.shown)
+  const latest = useRef(props.shown)
+  latest.current = props.shown
+  const pending = useRef(false)
+  const note = props.note
+  useEffect(() => {
+    if (note === undefined) return
+    pending.current = true
+    const settle = setTimeout(() => {
+      pending.current = false
+      spoken.current = latest.current
+      setMessage(latest.current === undefined ? note.text : `${note.text}, ${latest.current}`)
+    }, ANNOUNCE_SETTLE_MS)
+    return () => clearTimeout(settle)
+  }, [note])
+  useEffect(() => {
+    if (pending.current || props.shown === spoken.current) return
+    spoken.current = props.shown
+    setMessage(props.shown ?? '')
+  }, [props.shown])
+  useEffect(() => {
+    if (message === '') return
+    const hold = setTimeout(() => setMessage(''), ANNOUNCE_HOLD_MS)
+    return () => clearTimeout(hold)
+  }, [message])
   return (
     <p role="status" aria-live="polite" className="dshx:sr-only" data-thread-filter-shown="">
-      {changed || props.shown !== opening ? props.shown : ''}
+      {message}
     </p>
   )
 }
@@ -248,8 +277,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
     for (const target of [section, ...seats]) observer.observe(target)
     return () => observer.disconnect()
   })
-  /** The last change, named for the live region. */
-  const [change, setChange] = useState<string | undefined>(undefined)
+  /** The last action, named for the live region; a new seq says it again even when its words repeat. */
+  const [note, setNote] = useState<{ readonly text: string; readonly seq: number } | undefined>(undefined)
+  const setChange = (text: string | undefined): void => {
+    if (text !== undefined) setNote(current => ({ text, seq: (current?.seq ?? 0) + 1 }))
+  }
   /** Save and Discard vanish as they act: focus moves to the preset row first, never to the page (round 28, item 18). */
   const focusPresetThen =
     (action: () => void): (() => void) =>
@@ -267,9 +299,8 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
       className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:grid-cols-[minmax(0,1fr)] dshx:divide-y dshx:divide-border dshx:overflow-x-clip dshx:overflow-y-auto dshx:overscroll-contain"
       data-thread-list-filter-panel=""
     >
-      {/* The change and the count it leaves (council round 29, item 13): "Unread on, 5 threads shown" is heard even when the
-          count does not move. */}
-      <ShownAnnouncer shown={change === undefined || props.shown === undefined ? props.shown : `${change}, ${props.shown}`} />
+      {/* The change and the count it leaves (council rounds 29 and 30): "Unread on, 5 threads shown", once. */}
+      <ShownAnnouncer note={note} shown={props.shown} />
       {/* Sticky, so Reset and Done stay in reach while the sheet scrolls (round 28, item 10). A desktop reads "Filters …
           Reset"; a phone reads "Reset · Filters · Done", the sheet's own close. One word for the button and the title.
           The panel scrolls, not the sheet, so the grabber's 20px stays above the header. */}
