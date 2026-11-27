@@ -8,7 +8,7 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { AlarmClockIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
+import { PluginQueryProvider, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
 import { useState, type ReactNode } from 'react'
 import { goalAutoRetryApi, type ArmingView, type RetryStatusView } from './api.js'
 
@@ -45,6 +45,7 @@ const GoalAutoRetryChip = (props: PropsRuntime<'conversation.input.right'>): Rea
     void queryClient.invalidateQueries({ queryKey: ['goal-auto-retry', props.sessionId] })
   })
   const [delayDraft, setDelayDraft] = useState<string | undefined>(undefined)
+  const [open, setOpen] = useState(false)
   const status = query.data
   if (status === undefined) return null
   const arming = status.arming
@@ -56,7 +57,6 @@ const GoalAutoRetryChip = (props: PropsRuntime<'conversation.input.right'>): Rea
     )
   }
   const delayValue = delayDraft ?? (arming.delayMinutes > 0 ? String(arming.delayMinutes) : '')
-  const [open, setOpen] = useState(false)
   return (
     <Popover
       open={open}
@@ -131,12 +131,19 @@ const GoalAutoRetryChip = (props: PropsRuntime<'conversation.input.right'>): Rea
   )
 }
 
+/** The composer seat has no query client of its own, so the chip brings the plugin's. */
+const GoalAutoRetrySeat = (props: PropsRuntime<'conversation.input.right'>): ReactNode => (
+  <PluginQueryProvider>
+    <GoalAutoRetryChip {...props} />
+  </PluginQueryProvider>
+)
+
 export default defineClient({
   name: '@dshfiles/goal-auto-retry',
   inject: ['slots', 'sessions'],
   setup(ctx, decorate) {
     ctx.slots.inject('conversation.input.right', () =>
-      ctx.slots.register({ name: 'conversation.input.right', id: 'goal-auto-retry', order: 88 }, decorate(GoalAutoRetryChip)),
+      ctx.slots.register({ name: 'conversation.input.right', id: 'goal-auto-retry', order: 88 }, decorate(GoalAutoRetrySeat)),
     )
   },
 })
