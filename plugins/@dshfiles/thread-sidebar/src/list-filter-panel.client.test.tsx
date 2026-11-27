@@ -108,7 +108,7 @@ describe('the Filter panel', () => {
     fireEvent.click(screen.getByRole('button', { name: /threadSidebarPresetSaveChanges/u }))
     expect(presets.onSaveChanges).toHaveBeenCalledOnce()
     // Picking the edited preset again drops its edits.
-    fireEvent.click(screen.getByRole('radio', { name: 'Working (2)' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' }))
     expect(presets.onApply).toHaveBeenCalledWith('working')
   })
 
@@ -203,5 +203,24 @@ describe('the More statuses disclosure (round 28, item 2)', () => {
     expect(more.getAttribute('aria-expanded')).toBe('true')
     expect(more.hasAttribute('disabled')).toBe(true)
     expect(screen.getByRole('button', { name: 'threadSidebarArchived', pressed: true })).toBeTruthy()
+  })
+})
+
+// Council round 27, item 3: an edited preset is announced, not only drawn.
+describe('an edited preset (round 28, item 3)', () => {
+  it('names its row ", edited" and marks it current, while nothing is checked', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const row = screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' })
+    expect(row.getAttribute('aria-current')).toBe('true')
+    expect(row.getAttribute('aria-checked')).toBe('false')
+    expect(screen.getByRole('radio', { name: 'All threads' }).hasAttribute('aria-current')).toBe(false)
+  })
+
+  it('keeps the plain name while the preset is as saved', () => {
+    render(<ListFilterPanel {...panel()} />)
+    expect(screen.getByRole('radio', { name: 'All threads' }).getAttribute('aria-current')).toBe('true')
   })
 })

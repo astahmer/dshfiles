@@ -167,7 +167,10 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                 <ToggleGroupItem
                   key={preset.id}
                   value={preset.id}
-                  aria-label={preset.accessibleName}
+                  // An edited preset is announced, not only drawn (round 28, item 3): its name says so, and it stays the
+                  // current one although nothing is checked.
+                  aria-label={active && presets.edited ? `${preset.accessibleName}, ${t('threadSidebarPresetEditedShort')}` : preset.accessibleName}
+                  aria-current={active ? 'true' : undefined}
                   data-preset-active={active ? '' : undefined}
                   className="dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11"
                 >
