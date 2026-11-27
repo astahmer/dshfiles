@@ -4,7 +4,7 @@ import { homedir, tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import * as Schema from 'effect/Schema'
 import { AcpRequestFailed, AcpRpc } from './acp-rpc.js'
-import type { AgyLaunch, AntigravityProcessesPromise } from './antigravity-processes.js'
+import type { CliLaunch, CliProcessesPromise } from './cli-processes.js'
 import type { UsageCard } from './api.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
 import { AiAccountsSchema } from './effect-schema.js'
@@ -183,7 +183,7 @@ export class AntigravityAccountModel {
   static loginHint = (home: string): string => AntigravityAccountModel.command(home, 'acp --login')
 
   /** `agy` finds its login under `$HOME/.gemini`, so a separate account is a separate HOME. */
-  static cliEnvironment = (input: { readonly environment: NodeJS.ProcessEnv; readonly home: string }): AgyLaunch['env'] => {
+  static cliEnvironment = (input: { readonly environment: NodeJS.ProcessEnv; readonly home: string }): CliLaunch['env'] => {
     const environment: Record<string, string> = {}
     for (const [name, value] of Object.entries(input.environment)) {
       // An API key in the environment would make `agy` bill the Gemini API instead of the plan the login carries.
@@ -203,7 +203,7 @@ export class AntigravityAccountModel {
   /** Sign-in state, plan and models of the login under `home`, cached for a while per home. */
   static describe = (input: {
     readonly home: string
-    readonly processes: AntigravityProcessesPromise
+    readonly processes: CliProcessesPromise
     readonly executable?: string
     readonly now?: number
   }): Promise<AntigravityAccountDescription> => {
@@ -300,7 +300,7 @@ export class AntigravityAccountModel {
    */
   static probeUsage = (input: {
     readonly home: string
-    readonly processes: AntigravityProcessesPromise
+    readonly processes: CliProcessesPromise
     readonly executable?: string | undefined
   }): Promise<AntigravityQuotaReading> =>
     withSpan('antigravity usage', { kind: 'client', attributes: { 'process.executable.name': ANTIGRAVITY_EXECUTABLE } }, async span => {
@@ -394,7 +394,7 @@ export class AntigravityAccountModel {
    */
   static readQuota = (input: {
     readonly home: string
-    readonly processes: AntigravityProcessesPromise
+    readonly processes: CliProcessesPromise
     readonly executable?: string
     readonly signal?: AbortSignal | undefined
     readonly now?: number
@@ -427,7 +427,7 @@ export class AntigravityAccountModel {
    */
   static probe = (input: {
     readonly home: string
-    readonly processes: AntigravityProcessesPromise
+    readonly processes: CliProcessesPromise
     readonly executable?: string
   }): Promise<AntigravityAccountDescription> =>
     withSpan('antigravity describe', { kind: 'client', attributes: { 'process.executable.name': ANTIGRAVITY_EXECUTABLE } }, async span => {

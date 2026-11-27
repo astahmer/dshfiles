@@ -26,7 +26,7 @@ import {
   type AcpConfigOptions,
   type AntigravityLevel,
 } from './antigravity-account.js'
-import type { AgyRunning, AntigravityProcessesPromise } from './antigravity-processes.js'
+import type { CliRunning, CliProcessesPromise } from './cli-processes.js'
 import { neutralSystemPrompt } from './antigravity-system-prompt.js'
 import { MCP_BRIDGE_SOURCE, bridgeCallSchema, CliBridge } from './cli-bridge.js'
 import { AiAccountsSchema } from './effect-schema.js'
@@ -132,7 +132,7 @@ type AcpEvent =
 interface Session {
   readonly key: string
   readonly signature: string
-  readonly running: AgyRunning
+  readonly running: CliRunning
   readonly rpc: AcpRpc
   readonly server: Server
   /** Bridge connections the server accepted; `server.close()` leaves these open, which keeps the bridge alive. */
@@ -237,7 +237,7 @@ export class AntigravityAcpSessions {
 
   constructor(
     private readonly options: {
-      readonly processes: AntigravityProcessesPromise
+      readonly processes: CliProcessesPromise
       readonly home: (provider: string) => string
       readonly executable?: string
     },

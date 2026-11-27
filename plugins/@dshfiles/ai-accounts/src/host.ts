@@ -105,7 +105,7 @@ import { ANTIGRAVITY_CLI_TOKEN, AntigravityAccountModel } from './antigravity-ac
 import { createAntigravityProvider } from './antigravity-provider.js'
 import { VIBE_CLI_TOKEN, VibeCliSessions } from './vibe-cli.js'
 import { createVibeProvider } from './vibe-provider.js'
-import { AntigravityProcesses, AntigravityProcessesPromiseModel, type AntigravityProcessesPromise } from './antigravity-processes.js'
+import { CliProcesses, CliProcessesPromiseModel, type CliProcessesPromise } from './cli-processes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -145,7 +145,7 @@ const startAccountsHost = (input: {
   readonly usageHistory: { readonly collectNow: () => Promise<number> }
   readonly pricing: PricingCatalogPromise
   readonly modelCatalogs: ModelCatalogsPromise
-  readonly antigravity: AntigravityProcessesPromise
+  readonly antigravity: CliProcessesPromise
   readonly onRelease: (release: () => void) => void
 }): AccountsHostActivation => {
   const { ctx, readSettings, store, onRelease } = input
@@ -956,7 +956,7 @@ const AccountsHostLive = Layer.effectDiscard(
     const usage = UsageSnapshotPromiseModel.facade(yield* UsageSnapshot, services)
     const usageHistory = UsageHistoryPromiseModel.facade(yield* UsageHistorySchedule, services)
     const modelCatalogs = ModelCatalogsPromiseModel.facade(yield* ModelCatalogs, services)
-    const antigravity = AntigravityProcessesPromiseModel.facade(yield* AntigravityProcesses, services)
+    const antigravity = CliProcessesPromiseModel.facade(yield* CliProcesses, services)
     const pricingService = yield* PricingCatalog
     const pricing = PricingCatalogPromiseModel.facade(pricingService, services)
     // The imperative Host reads preferences synchronously; this mirror follows every committed change.
@@ -1024,7 +1024,7 @@ export default DshxPlugin.make({
         UsageHistoryPromiseModel.layer,
         PricingCatalog.scheduled().pipe(Layer.provideMerge(PricingCatalog.layer({ path: DEFAULT_PRICING_PATH }))),
         ModelCatalogs.layer,
-        AntigravityProcesses.hostLayer,
+        CliProcesses.hostLayer,
       ).pipe(
         Layer.provideMerge(AccountPoolLive),
         Layer.provideMerge(

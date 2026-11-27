@@ -8,7 +8,7 @@ import { layer as nodeChildProcessSpawnerLayer } from '@effect/platform-node/Nod
 import { Context, Effect, Layer, Scope } from 'effect'
 import * as Schema from 'effect/Schema'
 import { afterEach, expect, it, vi } from 'vitest'
-import { AntigravityProcesses, AntigravityProcessesPromiseModel } from './antigravity-processes.js'
+import { CliProcesses, CliProcessesPromiseModel } from './cli-processes.js'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { AntigravityAccountModel } from './antigravity-account.js'
@@ -159,9 +159,9 @@ createInterface({ input: process.stdin }).on('line', async line => {
 /** The production service on Effect's Node spawner, as the transport drives it through its Promise facade. */
 const processesScope = Scope.makeUnsafe()
 const processesContext = Effect.runSync(
-  Layer.buildWithScope(AntigravityProcesses.layer.pipe(Layer.provide(nodeChildProcessSpawnerLayer), Layer.provide(AccountsPlatformLive)), processesScope),
+  Layer.buildWithScope(CliProcesses.layer.pipe(Layer.provide(nodeChildProcessSpawnerLayer), Layer.provide(AccountsPlatformLive)), processesScope),
 )
-const processes = AntigravityProcessesPromiseModel.facade(Context.get(processesContext, AntigravityProcesses), processesContext)
+const processes = CliProcessesPromiseModel.facade(Context.get(processesContext, CliProcesses), processesContext)
 
 const directories: string[] = []
 const sessions: AntigravityAcpSessions[] = []
