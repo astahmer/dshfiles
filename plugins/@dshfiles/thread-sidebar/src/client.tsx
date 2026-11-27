@@ -6662,8 +6662,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           type="button"
           variant="ghost"
           size="icon-xs"
-          // Its 16px glyph ends on the panel's 12px inset, the edge Reset's label ends on (round 28, item 16).
-          className="dshx:-mr-1 dshx:text-muted-foreground"
+          // Its 16px glyph ends on the panel's 12px inset, the edge Reset's label ends on (round 28, item 16). On a coarse
+          // pointer its 44px touch area reaches left (20px) instead of 10px each way, which put 2px past the sheet's edge
+          // and scrolled it sideways (council round 29, item 4).
+          className="dshx:-mr-1 dshx:text-muted-foreground dshx:pointer-coarse:after:right-0 dshx:pointer-coarse:after:-left-5"
           aria-label={`${props.tSidebar('threadSidebarPresetOptions')}: ${activeViewTab?.label ?? ''}`}
         >
           <OverflowGlyph />

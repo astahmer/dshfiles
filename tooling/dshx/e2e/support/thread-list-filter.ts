@@ -39,7 +39,19 @@ const settled = async (page: Page): Promise<void> => {
   await expect(page.locator('[data-aria-hidden="true"]')).toHaveCount(0)
 }
 
+/**
+ * The panel never scrolls sideways (council round 29, item 4: a 390 px phone sheet did, by 2 px at rest and 49 px with an
+ * edited preset). Checked every time a journey closes it, in whatever state it reached.
+ */
+const expectNoSidewaysScroll = async (page: Page): Promise<void> => {
+  const body = panel(page).locator('[data-thread-list-filter-panel]').first()
+  if (!(await body.isVisible().catch(() => false))) return
+  const width = await body.evaluate(element => ({ scroll: element.scrollWidth, client: element.clientWidth }))
+  expect(width.scroll, 'the Filters panel scrolls sideways').toBe(width.client)
+}
+
 const close = async (page: Page): Promise<void> => {
+  await expectNoSidewaysScroll(page)
   for (let index = 0; index < 3; index += 1) {
     if ((await panel(page).count()) === 0 && (await page.getByRole('menu').count()) === 0) break
     await page.keyboard.press('Escape')

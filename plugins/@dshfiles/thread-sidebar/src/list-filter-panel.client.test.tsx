@@ -1004,3 +1004,25 @@ describe('roles and announcements (round 30, item 13)', () => {
     expect(screen.getByRole('status').textContent).toBe('Main threads, 5 threads shown')
   })
 })
+
+// Council round 29, item 4 (a round-28 regression): the phone sheet scrolled sideways. Measured at 390 px on iPhone
+// WebKit: the edited preset row drew 404 px in a 369 px panel (scrollWidth 418), because the panel, the presets section and
+// the radiogroup are grids whose one `auto` column grows to the row's min-content (its label never shrinks there); and
+// at rest the presets ⋯'s 44 px touch area (a 24 px button 8 px from the edge) reached 2 px past it (scrollWidth 371).
+describe('the phone sheet never scrolls sideways (round 30, item 4)', () => {
+  it("gives every grid between the panel and the preset row one shrinkable column, and clips the panel's x axis", () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const { container } = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const root = element(container.querySelector('[data-thread-list-filter-panel]'))
+    expect(root.className).toContain('dshx:overflow-x-clip')
+    for (const grid of [root, element(container.querySelector('[data-thread-presets]')), screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })])
+      expect(grid.className).toContain('dshx:grid-cols-[minmax(0,1fr)]')
+  })
+
+  it("keeps the presets ⋯'s 44 px touch area inside the sheet: it reaches left, not past the edge", () => {
+    const trigger = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('</DropdownMenuTrigger>', client.indexOf('const presetOptionsMenu = (')))
+    expect(trigger).toContain('dshx:pointer-coarse:after:right-0 dshx:pointer-coarse:after:-left-5')
+  })
+})

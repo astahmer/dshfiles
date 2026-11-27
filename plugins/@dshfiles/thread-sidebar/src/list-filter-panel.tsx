@@ -254,7 +254,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
     // popover (and, on a phone, the sheet with its grabber) holds still around it.
     <div
       ref={panelRef}
-      className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:divide-y dshx:divide-border dshx:overflow-y-auto dshx:overscroll-contain"
+      // One shrinkable column (an `auto` one grows to a row's min-content: council round 29, item 4) and a clipped x axis
+      // as the guard, so the phone sheet never scrolls sideways.
+      className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:grid-cols-[minmax(0,1fr)] dshx:divide-y dshx:divide-border dshx:overflow-x-clip dshx:overflow-y-auto dshx:overscroll-contain"
       data-thread-list-filter-panel=""
     >
       {/* The change and the count it leaves (council round 29, item 13): "Unread on, 5 threads shown" is heard even when the
@@ -304,7 +306,7 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
         <div className="dshx:px-3 dshx:py-0.5">{props.project}</div>
       )}
       {presets === undefined ? null : (
-        <section ref={presetsRef} className={cn(SECTION, 'dshx:relative dshx:pb-2')} aria-labelledby={`${ids}-presets`} data-thread-presets="">
+        <section ref={presetsRef} className={cn(SECTION, 'dshx:relative dshx:grid-cols-[minmax(0,1fr)] dshx:pb-2')} aria-labelledby={`${ids}-presets`} data-thread-presets="">
           {/* A 44px row on a coarse pointer, so the ⋯'s 44px hit area stays in it (round 28, item 12). */}
           <div className="dshx:-my-1 dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:pointer-coarse:my-0 dshx:pointer-coarse:h-11">
             <h3 id={`${ids}-presets`} className={HEADING}>
@@ -326,7 +328,8 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
             }}
             // Rows that stand apart: with spacing the kit keeps each row's own rounded corners (round 28, item 13).
             spacing={0.5}
-            className="dshx:-mx-1.5 dshx:grid dshx:w-auto dshx:gap-0.5"
+            // One shrinkable column, so an edited row's label truncates instead of widening the sheet (round 30, item 4).
+            className="dshx:-mx-1.5 dshx:grid dshx:w-auto dshx:grid-cols-[minmax(0,1fr)] dshx:gap-0.5"
           >
             {presets.items.map(preset => {
               const active = preset.id === presets.activeId
