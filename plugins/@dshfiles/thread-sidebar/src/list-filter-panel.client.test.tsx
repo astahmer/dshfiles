@@ -781,3 +781,13 @@ describe('status subgroup labels (round 29, item 15)', () => {
     expect(PaletteMath.contrastRatio(tertiary, popover)).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+// Council round 28, item 16: the footer's places read in the secondary ink, ink on hover, below the filters.
+describe('footer rows (round 29, item 16)', () => {
+  it('draws Board and the settings rows in the secondary ink, the ink on hover', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const row = screen.getByRole('button', { name: 'Thread list settings' })
+    expect(row.className).toContain('dshx:text-muted-foreground')
+    expect(row.className).toContain('dshx:hover:text-foreground')
+  })
+})

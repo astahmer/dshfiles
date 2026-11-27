@@ -422,10 +422,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
               disabled={action.disabled === true}
               data-section={action.id}
               // The footer's 6px plus the row's 6px: the same glyph column and label x as every quiet row (round 28, item 16).
-              className="dshx:justify-start dshx:gap-2 dshx:px-1.5 dshx:has-[>svg]:px-1.5 dshx:font-normal dshx:[&_svg]:size-4 dshx:pointer-coarse:h-11"
+              // Places, not filters: the secondary ink, the ink on hover (council round 28, item 16).
+              className="dshx:justify-start dshx:gap-2 dshx:px-1.5 dshx:has-[>svg]:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground dshx:[&_svg]:size-4 dshx:pointer-coarse:h-11"
               onClick={action.onSelect}
             >
-              <span className="dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
+              <span className="dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center" aria-hidden="true">
                 {action.icon}
               </span>
               {action.label}
