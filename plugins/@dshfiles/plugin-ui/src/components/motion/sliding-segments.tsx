@@ -74,7 +74,7 @@ export function SlidingSegments<V extends string>({ options, value, onValueChang
     <div
       ref={rootRef}
       role="radiogroup"
-      className={cn('dshx:relative dshx:inline-flex dshx:w-fit dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:bg-muted dshx:p-0.75', className)}
+      className={cn('dshx:relative dshx:inline-flex dshx:w-fit dshx:items-center dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.75', className)}
       onKeyDown={event => {
         if (event.key === 'ArrowRight' || event.key === 'ArrowDown') {
           event.preventDefault()

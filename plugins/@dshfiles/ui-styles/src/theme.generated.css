@@ -46,6 +46,7 @@ html body {
   --dshx-trigger-fill: oklch(0.22 0.0025 65 / 0.05);
   --dshx-segment-thumb: oklch(0.992 0.0035 65);
   --dshx-segment-edge: oklch(0.22 0.0025 65 / 0.1);
+  --dshx-segment-track: oklch(0.935 0.0035 65);
   --dshx-prompt-fill: oklch(0.965 0.012 230);
   --dshx-tone-nav: oklch(0.962 0.0035 65);
   --dshx-ready-mark: oklch(0.55 0.13 150);
@@ -208,7 +209,8 @@ body[data-ds-dark-theme][data-ds-dark-theme] {
   --dshx-field-border: oklch(0.545 0.01 65);
   --dshx-trigger-fill: oklch(0.93 0.005 65 / 0.052);
   --dshx-segment-thumb: oklch(0.296 0.009 65);
-  --dshx-segment-edge: oklch(1 0 0 / 0.07);
+  --dshx-segment-edge: oklch(0.4049 0.0107 67.5);
+  --dshx-segment-track: oklch(0.2074 0.0061 56);
   --dshx-prompt-fill: oklch(0.255 0.018 230);
   --dshx-tone-nav: oklch(0.225 0.006 60);
   --dshx-ready-mark: oklch(0.75 0.14 150);

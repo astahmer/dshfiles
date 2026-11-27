@@ -126,11 +126,11 @@ const ShownAnnouncer = (props: { readonly shown: string | undefined }): JSX.Elem
 
 /**
  * A chip (council round 27, item 6): the quiet trigger fill and the secondary ink at rest (no hairline: sixteen edged
- * chips read as a form); selected, the kit segment thumb (paper, #302C28 in dark) under the 3:1 field edge, its label
- * the ink at 550, so the choices in force read at a glance on the popover and on the phone sheet alike.
+ * chips read as a form); selected, the segments' own look (council round 28, item 14): the segment thumb under the
+ * segment edge, lifted by shadow-xs, its label the ink at 550, with the check in its seat.
  */
 const CHIP =
-  'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:text-foreground dshx:data-[state=on]:border-field-border dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
+  'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:text-foreground dshx:data-[state=on]:border-(--dshx-segment-edge) dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:shadow-xs dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
 
 /** What a status chip's seat draws at rest: the glyph the list draws for that state (council round 27, item 9). */
 type ChipMark = WorkStatus | 'unread' | 'muted' | 'archived'
@@ -458,8 +458,8 @@ const Segmented = (props: {
     spacing={1}
     data-segmented=""
     data-thread-group-by={props['data-thread-group-by']}
-    // The raised track; in dark the popover is that same step, so the track takes the trigger fill to stay one step off it.
-    className="dshx:h-(--dshx-control-h) dshx:w-full dshx:gap-0 dshx:rounded-lg dshx:bg-muted dshx:p-[3px] dshx:dark:bg-trigger-fill"
+    // The kit segment track (#1A1715 in dark, below the popover fill: council round 28, item 14).
+    className="dshx:h-(--dshx-control-h) dshx:w-full dshx:gap-0 dshx:rounded-lg dshx:bg-segment-track dshx:p-[3px]"
   >
     {props.options.map(option => (
       <ToggleGroupItem

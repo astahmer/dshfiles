@@ -232,11 +232,11 @@ const paint = (under: Oklch, over: Oklch): Oklch => {
 
 // Council round 27, item 6: a selected chip reads at a glance, in both schemes and on the phone sheet.
 describe('the selected state (round 28, item 6)', () => {
-  it('draws a selected chip as the segment thumb with the field edge and the 550 ink; a resting one in secondary ink', () => {
+  it('draws a selected chip as the segment thumb with the segment edge and the 550 ink; a resting one in secondary ink', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
     const on = screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })
     const off = screen.getByRole('button', { name: 'threadSidebarUnread', pressed: false })
-    for (const token of ['dshx:data-[state=on]:bg-(--dshx-segment-thumb)', 'dshx:data-[state=on]:border-field-border', 'dshx:data-[state=on]:font-selected', 'dshx:data-[state=on]:text-foreground'])
+    for (const token of ['dshx:data-[state=on]:bg-(--dshx-segment-thumb)', 'dshx:data-[state=on]:border-(--dshx-segment-edge)', 'dshx:data-[state=on]:font-selected', 'dshx:data-[state=on]:text-foreground'])
       expect(on.className).toContain(token)
     // Not the selected wash, which sat one step off the light phone sheet and darker than its neighbours in dark.
     expect(on.className).not.toContain('bg-selected-wash')
@@ -314,9 +314,7 @@ describe('Source and Group by (round 28, item 8)', () => {
     render(<ListFilterPanel {...panel()} />)
     const source = screen.getByRole('radiogroup', { name: 'threadSidebarFilterSource' })
     expect(source.hasAttribute('data-segmented')).toBe(true)
-    expect(source.className).toContain('dshx:bg-muted')
-    // The dark popover is the raised step itself: the track takes the trigger fill there, one step off it.
-    expect(source.className).toContain('dshx:dark:bg-trigger-fill')
+    expect(source.className).toContain('dshx:bg-segment-track')
     const all = within(source).getByRole('radio', { name: 'All sources' })
     expect(all.className).toContain('dshx:data-[state=on]:bg-(--dshx-segment-thumb)')
     expect(all.querySelector('[data-slot="segment-label"]')?.getAttribute('data-label')).toBe('All')
@@ -741,5 +739,19 @@ describe('the built-in All threads (round 29, item 13)', () => {
     const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
     expect(optionsMenu.match(/disabled=\{[^}]*activeIsBuiltIn/gu)?.length).toBe(3)
     expect(client).toContain('const activeIsBuiltIn = listThreadView.id === ALL_THREADS_VIEW_ID')
+  })
+})
+
+// Council round 28, item 14: one selected look across chips and segments.
+describe('one selected look (round 29, item 14)', () => {
+  it('draws the segmented track with the kit track token and a chip\'s on state with the segment edge and shadow-xs', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
+    const track = screen.getByRole('radiogroup', { name: 'threadSidebarFilterSource' })
+    expect(track.className).toContain('dshx:bg-segment-track')
+    expect(track.className).not.toContain('dshx:dark:bg-trigger-fill')
+    const chip = screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })
+    expect(chip.className).toContain('dshx:data-[state=on]:border-(--dshx-segment-edge)')
+    expect(chip.className).toContain('dshx:data-[state=on]:shadow-xs')
+    expect(chip.className).not.toContain('dshx:data-[state=on]:border-field-border')
   })
 })

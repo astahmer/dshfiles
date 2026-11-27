@@ -73,7 +73,7 @@ describe('one selected segment (council round 10 A3)', () => {
     const label = tab.querySelector('[data-slot="segment-label"]')!
     expect(label.getAttribute('data-label')).toBe('Needs you')
     expect(classes(label)).toContain('dshx:segment-label')
-    expect(classes(view.getByRole('tablist'))).toEqual(expect.arrayContaining(['dshx:bg-muted', 'dshx:p-[3px]']))
+    expect(classes(view.getByRole('tablist'))).toEqual(expect.arrayContaining(['dshx:bg-segment-track', 'dshx:p-[3px]']))
   })
 
   it('springs the page tab indicator in the same thumb', () => {
@@ -92,7 +92,7 @@ describe('one selected segment (council round 10 A3)', () => {
   it('draws SlidingSegments in it, inset 3px in the raised track at the same 32px height', () => {
     const view = render(<SlidingSegments aria-label="Metric" value="cost" onValueChange={() => undefined} options={[{ value: 'cost', label: 'Cost' }, { value: 'tokens', label: 'Tokens' }]} />)
     const root = view.getByRole('radiogroup')
-    expect(classes(root)).toEqual(expect.arrayContaining(['dshx:bg-muted', 'dshx:p-0.75', 'dshx:rounded-lg']))
+    expect(classes(root)).toEqual(expect.arrayContaining(['dshx:bg-segment-track', 'dshx:p-0.75', 'dshx:rounded-lg']))
     const pill = root.querySelector('span[aria-hidden]')!
     expect(classes(pill)).toEqual(expect.arrayContaining(['dshx:border', 'dshx:segment-thumb', 'dshx:inset-y-0.75']))
     expect(pill.className).not.toMatch(/shadow-xs|ring-1|bg-background/u)
@@ -100,5 +100,26 @@ describe('one selected segment (council round 10 A3)', () => {
     // 26px items + 2 x 3px inset = the 32px it was (28 + 2 x 2).
     expect(classes(cost)).toEqual(expect.arrayContaining(['dshx:h-6.5', 'dshx:aria-checked:font-selected', 'dshx:aria-checked:text-foreground']))
     expect(cost.querySelector('[data-label="Cost"]')).not.toBeNull()
+  })
+})
+
+// Council round 28, item 14: the dark thumb was a hair off its track (1.10:1 against a popover of the same step). The dark
+// track drops to #1A1715 and the thumb's edge to an opaque #4D4843, so the chosen segment reads at a glance; light keeps
+// the raised #EBE9E7 track.
+describe('the segment track (council round 28, item 14)', () => {
+  it.each(schemes)('is its own token, #EBE9E7 in light and #1A1715 in dark, with the dark edge at #4D4843 (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    expect(PaletteMath.toHex(p.segmentTrack)).toBe(scheme === 'light' ? '#ebe9e7' : '#1a1715')
+    if (scheme === 'dark') expect(PaletteMath.toHex(p.segmentEdge)).toBe('#4d4843')
+    // Secondary labels stay AA on the track; the thumb and its edge stand off it.
+    expect(PaletteMath.contrastRatio(p.neutral[9]!, p.segmentTrack)).toBeGreaterThanOrEqual(4.5)
+    expect(ThemeCss.themeCss()).toContain(`--dshx-segment-track: ${PaletteMath.toCss(p.segmentTrack)};`)
+  })
+
+  it('paints the kit segmented Tabs and SlidingSegments tracks with it', () => {
+    const tabs = readFileSync(join(process.cwd(), 'src/components/ui/tabs.tsx'), 'utf8')
+    const sliding = readFileSync(join(process.cwd(), 'src/components/motion/sliding-segments.tsx'), 'utf8')
+    expect(tabs).toContain("default: 'dshx:bg-segment-track dshx:group-data-[orientation=horizontal]/tabs:h-(--dshx-control-h)'")
+    expect(sliding).toContain('dshx:bg-segment-track')
   })
 })

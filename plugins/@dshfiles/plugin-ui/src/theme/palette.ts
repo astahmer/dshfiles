@@ -94,8 +94,17 @@ export interface Palette {
    * in dark, inset 3px at a 6px radius under a 550 ink label.
    */
   readonly segmentThumb: Oklch
-  /** The selected segment's quiet 1px edge: the ink at 10% in light, white at 7% in dark. */
+  /**
+   * The selected segment's quiet 1px edge: the ink at 10% in light; in dark an opaque #4D4843 (council round 28, item
+   * 14), so the thumb reads on its darker track.
+   */
   readonly segmentEdge: Oklch
+  /**
+   * A segmented control's track (council round 28, item 14): the raised step in light (#EBE9E7); in dark #1A1715, below
+   * the popover and dialog fills it sits on, where the raised step (#23201D) was the popover itself and the #302C28
+   * thumb barely stood off it.
+   */
+  readonly segmentTrack: Oklch
   /**
    * The user prompt bubble (council round 6 A5): a faint cool tint at hue 230, 40° from the default attention indigo,
    * so your own words read apart from the agent's without saying attention. Ink, secondary and faint text and links hold
@@ -238,7 +247,8 @@ function palette(input: PaletteInput): Palette {
     fieldBorder,
     triggerFill,
     segmentThumb: dark ? { l: 0.296, c: round((chroma * 9) / 7, 4), h: hue } : bg,
-    segmentEdge: dark ? { l: 1, c: 0, h: 0, alpha: 0.07 } : withAlpha(neutral[10] ?? { l: 0.22, c: 0, h: hue }, 0.1),
+    segmentEdge: dark ? { l: 0.4049, c: round((chroma * 23) / 15, 4), h: hue + 2.5 } : withAlpha(neutral[10] ?? { l: 0.22, c: 0, h: hue }, 0.1),
+    segmentTrack: dark ? { l: 0.2074, c: round((chroma * 13) / 15, 4), h: hue - 9 } : raised,
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
     primaryHover: dark ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue } : { l: 0.24, c: primaryChroma, h: hue },
   }
