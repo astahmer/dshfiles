@@ -151,20 +151,27 @@
     {
       "id": "message-search",
       "title": "Search user and assistant messages across threads",
-      "summary": "Search current-surface user/message and assistant/message documents across top-level threads, optionally narrowed by role (all, user, assistant), routing through conversation_documents once backfilled and returning each hit's sessionId, event seq, role, time and snippet for the command palette Messages tab.",
+      "summary": "Search current-surface user/message and assistant/message documents across top-level threads, optionally narrowed by role (all, user, assistant), leaving out user messages a plugin or agent sent, routing through conversation_documents once backfilled and returning each hit's sessionId, event seq, role, time and snippet for the command palette Messages tab and the session_search_messages agent tool.",
       "surfaces": ["host", "storage", "api"],
       "surface": "infrastructure",
       "destination": "none",
-      "currentSurface": "host: session-search searchMessages API (read by @dshfiles/command-palette)",
+      "currentSurface": "host: session-search searchMessages API (read by @dshfiles/command-palette) and session_search_messages tool",
       "configuration": [],
       "states": ["matches", "no-match", "not-owner"],
       "failureModes": [
         "Tool calls, tool results, shadowed events and subagent threads are excluded from results.",
+        "User messages a plugin or agent sent are excluded; user messages indexed before the human flag existed stay in until their thread is reindexed.",
         "Text without a letter or digit returns no matches instead of an FTS5 syntax error.",
         "When another plugin owns sessionQuery, ownsService is false and the palette reports message search unavailable."
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "session-search.message-search-human-only",
+          "file": "plugins/@dshfiles/session-search/tests/search-messages.spec.ts",
+          "testName": "leaves out user messages a plugin or agent sent, keeping typed prompts and legacy rows"
+        },
         {
           "kind": "unit-test",
           "id": "session-search.message-search-roles",
@@ -193,6 +200,10 @@
         {
           "kind": "automatic",
           "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
         }
       ]
     }

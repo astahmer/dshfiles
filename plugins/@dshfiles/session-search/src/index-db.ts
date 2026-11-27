@@ -322,6 +322,13 @@ const RANK_CAP = 2_000
 /** Most matching messages kept from one thread in a cross-thread search, so one busy thread cannot hide the rest. */
 const MAX_MESSAGES_PER_SESSION = 3
 
+/**
+ * Leaves out user messages a plugin or agent sent (`user_prompts.human = 0`): on a real index they outnumber the
+ * prompts people typed about ten to one. An assistant message has no `user_prompts` row, and a row indexed before the
+ * flag existed (NULL) stays in, as it does in the prompt history.
+ */
+const HUMAN_MESSAGES_ONLY = 'NOT EXISTS (SELECT 1 FROM user_prompts AS p WHERE p.document_rowid = d.rowid AND p.human = 0)'
+
 const typesForMessageRole = (role: MessageRoleFilter): readonly string[] => {
   if (role === 'user') return ['user/message']
   if (role === 'assistant') return ['assistant/message']
@@ -724,7 +731,7 @@ export class SearchIndex {
       const rows = yield* this.rankedRows({
         table: route.table,
         query: request.query,
-        filters: ['s.parent_session IS NULL', 'coalesce(s.delegation_depth, 0) = 0', ...events.clauses],
+        filters: ['s.parent_session IS NULL', 'coalesce(s.delegation_depth, 0) = 0', HUMAN_MESSAGES_ONLY, ...events.clauses],
         bindings: events.bindings,
         limit: request.limit + 1,
         offset: 0,

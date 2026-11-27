@@ -25,6 +25,23 @@ const renderFind = (output: { readonly ownsService: boolean; readonly matches: r
   return [...lines, ...(output.hasMore ? ['More matches exist: raise `limit` or narrow `text`.'] : [])].join('\n')
 }
 
+/** What `searchMessages` answers; Clients decode it with this schema instead of restating it. */
+export const searchMessagesOutputSchema = Schema.Struct({
+  ownsService: Schema.Boolean,
+  matches: Schema.Array(messageSearchMatchSchema),
+  hasMore: Schema.Boolean,
+})
+export type SearchMessagesOutput = typeof searchMessagesOutputSchema.Type
+/** The sender filter `searchMessages` takes in `role`. */
+export type SearchMessagesRole = typeof messageRoleFilterSchema.Type
+
+const renderMessages = (output: SearchMessagesOutput): string => {
+  if (!output.ownsService) return 'The owned session-search index does not serve this profile, so messages cannot be searched.'
+  if (output.matches.length === 0) return 'No user or assistant message matches.'
+  const lines = output.matches.map(match => `${match.sessionId} · seq ${String(match.seq)} · ${match.role} · ${match.snippet}`)
+  return [...lines, ...(output.hasMore ? ['More matches exist: raise `limit`, narrow `text` or set `role`.'] : [])].join('\n')
+}
+
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
   options: Omit<ApiMethodOptions<Input, Output>, 'tool'> & {
     readonly input: Input
@@ -86,10 +103,10 @@ export const sessionSearchApi = defineApi({
         role: Schema.optional(messageRoleFilterSchema),
         limit: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(MESSAGE_SEARCH_LIMIT_MAX))),
       }),
-      output: Schema.Struct({ ownsService: Schema.Boolean, matches: Schema.Array(messageSearchMatchSchema), hasMore: Schema.Boolean }),
+      output: searchMessagesOutputSchema,
       description:
-        'Search user and assistant messages across every top-level thread whose indexed text contains all words of `text` (the last word may be a prefix). Tool calls, tool results, thinking and subagent threads are left out; `role` narrows to `user`, `assistant`, or `all` (default). Read-only.',
-      readOnly: true,
+        'Search user and assistant messages across every top-level DSH thread (Session) whose indexed text contains all words of `text` (the last word may be a prefix), at most 3 per thread, best match first. Each match has its sessionId, event seq, role, time, snippet and cwd. Tool calls, tool results, thinking, subagent threads and user messages a plugin or agent sent are left out; `role` narrows to `user`, `assistant`, or `all` (default); `limit` defaults to 25. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.',
+      tool: { name: 'session_search_messages', readOnly: true, render: renderMessages },
     }),
   },
 })

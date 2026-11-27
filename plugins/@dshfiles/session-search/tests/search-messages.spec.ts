@@ -56,6 +56,28 @@ const commit = (
 }
 
 describe('SearchIndex.searchMessages', () => {
+  it('leaves out user messages a plugin or agent sent, keeping typed prompts and legacy rows', async () => {
+    const query = findExpression('basalt') ?? ''
+    const found = await runWithIndex(await openIndex(), function* (index) {
+      yield* commit(index, {
+        sessionId: 'thread-typed',
+        documents: [
+          { type: 'user/message', text: 'Why is basalt slow?', time: 1, humanPrompt: true },
+          { type: 'user/message', text: 'Scheduled basalt check from a plugin', time: 2, humanPrompt: false },
+          { type: 'user/message', text: 'Legacy basalt prompt', time: 3 },
+          { type: 'assistant/message', text: 'basalt answer', time: 4 },
+        ],
+      })
+      return {
+        user: yield* index.searchMessages({ query, role: 'user', limit: 20 }),
+        all: yield* index.searchMessages({ query, role: 'all', limit: 20 }),
+      }
+    })
+
+    expect(found.user.matches.map(match => match.seq).sort()).toEqual([0, 2])
+    expect(found.all.matches.map(match => match.seq).sort()).toEqual([0, 2, 3])
+  })
+
   it('searches only current user and assistant messages across top-level threads and filters by role', async () => {
     const query = findExpression('quartz') ?? ''
     const found = await runWithIndex(await openIndex(), function* (index) {
