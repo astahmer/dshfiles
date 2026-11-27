@@ -94,7 +94,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ListHeaderExtras } from './list-header-extras.js'
-import { ListFilterPanel, type ListFilterAction } from './list-filter-panel.js'
+import { ListFilterPanel, presetMark, type ListFilterAction } from './list-filter-panel.js'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ThreadListScope } from './list-scope.js'
 import { PresetChips, PresetDeleteDialog, PresetNameDialog, type PresetNamePrompt } from './filter-presets.js'
@@ -6599,6 +6599,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     filters: props.tSidebar('threadSidebarFilters'),
   }
   const scopeCount = ThreadListScope.count(scopeInput)
+  const activeViewMark =
+    activeViewTab === undefined
+      ? undefined
+      : presetMark({ attentionLabel: activeViewTab.attentionLabel, count: activeViewTab.visibleCount, countsWorking: activeViewTab.view.statusFilters.includes('working') })
   // The Filter panel (round nine, owner annotation): one level instead of five submenus, every value shown where it
   // sits, a change applied at once beside the list; a footer for the list's other places; a phone sheet (the kit's).
   const closeFilterThen =
@@ -6743,19 +6747,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
               className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full dshx:bg-primary"
             />
           ) : null}
-          {scopeSlot !== null || activeViewTab?.attentionLabel === undefined ? null : (
-            <StatusDot
-              size="sm"
-              data-testid="thread-view-attention-dot"
-              className={cn(
-                ThreadAttentionPresentationModel.attentionDotClass({
-                  attentionLabel: activeViewTab.attentionLabel,
-                  attentionColors: preferences.attentionColors,
-                  unread: false,
-                  running: false,
-                }),
-              )}
-            />
+          {scopeSlot !== null || activeViewMark === undefined ? null : (
+            // The active preset's mark, the same glyph its row in the panel draws (round 28, item 1).
+            <StatusGlyph status={activeViewMark} decorative data-testid="thread-view-attention-dot" />
           )}
           {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
           {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
@@ -6798,24 +6792,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           presets={
             presetsOn
               ? {
-                  items: viewTabs.map(({ view, label, attentionLabel, visibleCount }) => ({
-                    id: view.id,
-                    label,
-                    accessibleName:
-                      attentionLabel === undefined && visibleCount === null
-                        ? label
-                        : `${label}${visibleCount === null ? '' : ` (${visibleCount})`}${attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`,
-                    count: visibleCount,
-                    dotClass:
-                      attentionLabel === undefined
-                        ? undefined
-                        : ThreadAttentionPresentationModel.attentionDotClass({
-                            attentionLabel,
-                            attentionColors: preferences.attentionColors,
-                            unread: false,
-                            running: false,
-                          }),
-                  })),
+                  items: viewTabs.map(({ view, label, attentionLabel, visibleCount }) => {
+                    // A count of 0 draws nothing, so it is not spoken either; the mark is the list's own glyph.
+                    const count = visibleCount === 0 ? null : visibleCount
+                    const mark = presetMark({ attentionLabel, count: visibleCount, countsWorking: view.statusFilters.includes('working') })
+                    return {
+                      id: view.id,
+                      label,
+                      accessibleName:
+                        mark === undefined && count === null
+                          ? label
+                          : `${label}${count === null ? '' : ` (${count})`}${mark === undefined || attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`,
+                      count,
+                      mark,
+                    }
+                  }),
                   activeId: listThreadView.id,
                   edited: presetEdited,
                   onApply: selectThreadViewPreset,

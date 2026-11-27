@@ -1593,8 +1593,8 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     const tabs = await ThreadListFilter.openViews(page, threadSidebar(page))
     const doneTab = tabs.getByRole('radio', { name: 'Done (1), Turn finished', exact: true })
     await expect(doneTab).toBeVisible()
-    // A finished turn's default colour is ink since the visual refresh (P1: only waiting on you is coloured).
-    await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveClass(/bg-muted-foreground/)
+    // The preset draws the list's own glyph for a finished turn: the Ready dot (round 28, item 1).
+    await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveAttribute('data-status', 'ready')
     await expect(tabs.getByRole('radio', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
     await ThreadListFilter.close(page)
   })

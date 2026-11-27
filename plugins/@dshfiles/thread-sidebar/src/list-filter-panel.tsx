@@ -6,11 +6,12 @@
  * popovers"). The list (client.tsx) owns every value and write; this file only draws them.
  */
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { BookmarkPlusIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { Fragment, useId, useState, type ReactNode } from 'react'
+import type { ThreadAttentionLabel } from './attention-presentation.js'
 import { threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, type ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
   THREAD_SOURCE_FILTER_OPTIONS,
@@ -27,8 +28,34 @@ export interface ListFilterPreset {
   /** The former view tab's name: "Done (1), Turn finished". */
   readonly accessibleName: string
   readonly count: number | null
-  /** The attention dot's colour class, when a thread in the preset waits on the user. */
-  readonly dotClass: string | undefined
+  /** The list's own glyph for what the preset counts (`presetMark`); none at a count of 0. */
+  readonly mark: WorkStatus | undefined
+}
+
+/** Which status a preset's attention label stands for: the glyph its rows already draw for it. */
+const ATTENTION_MARK = {
+  threadSidebarApprovalNeeded: 'needs-you',
+  threadSidebarInputNeeded: 'needs-you',
+  threadSidebarTurnFinished: 'ready',
+  threadSidebarNeedsResume: 'failed',
+  threadSidebarInterrupted: 'failed',
+} as const satisfies Record<ThreadAttentionLabel, WorkStatus>
+
+/**
+ * A preset's mark (council round 27, item 1): the list's glyph for the state its number counts (the indigo diamond for Needs
+ * you, the green dot for Ready, the red cross for Failed, the ink ring for Working), never a generic dot, and nothing
+ * while its count is 0.
+ */
+export const presetMark = (input: {
+  readonly attentionLabel: ThreadAttentionLabel | undefined
+  readonly count: number | null
+  readonly countsWorking: boolean
+}): WorkStatus | undefined => {
+  if (input.count === 0) return undefined
+  // The mark names what the number beside it counts: a view that lists working threads counts them, so it draws the
+  // Working ring even when one of them also waits on the user.
+  if (input.countsWorking && input.count !== null) return 'working'
+  return input.attentionLabel === undefined ? undefined : ATTENTION_MARK[input.attentionLabel]
 }
 
 export interface ListFilterAction {
@@ -154,8 +181,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                       {t('threadSidebarPresetEditedShort')}
                     </span>
                   ) : null}
-                  {preset.dotClass === undefined ? null : <StatusDot size="sm" data-testid="thread-view-attention-dot" className={preset.dotClass} />}
-                  {preset.count === null ? null : <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{preset.count}</span>}
+                  {preset.mark === undefined ? null : <StatusGlyph status={preset.mark} decorative data-testid="thread-view-attention-dot" />}
+                  {/* A zero draws nothing (DESIGN.md › Layout › Counts). */}
+                  {preset.count === null || preset.count === 0 ? null : (
+                    <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{preset.count}</span>
+                  )}
                 </ToggleGroupItem>
               )
             })}

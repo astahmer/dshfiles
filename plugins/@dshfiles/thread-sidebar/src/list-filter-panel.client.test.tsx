@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ListFilterPanel, nextStatusFilters, type ListFilterPanelProps } from './list-filter-panel.js'
+import { ListFilterPanel, nextStatusFilters, presetMark, type ListFilterPanelProps } from './list-filter-panel.js'
 
 afterEach(cleanup)
 
@@ -34,9 +34,9 @@ const panel = (overrides: Partial<ListFilterPanelProps> = {}): ListFilterPanelPr
   t: key => key,
   presets: {
     items: [
-      { id: 'all', label: 'All threads', accessibleName: 'All threads', count: null, dotClass: undefined },
-      { id: 'working', label: 'Working', accessibleName: 'Working (2)', count: 2, dotClass: undefined },
-      { id: 'done', label: 'Done', accessibleName: 'Done (1), threadSidebarTurnFinished', count: 1, dotClass: 'dshx:bg-info' },
+      { id: 'all', label: 'All threads', accessibleName: 'All threads', count: null, mark: undefined },
+      { id: 'working', label: 'Working', accessibleName: 'Working (2)', count: 2, mark: 'working' },
+      { id: 'done', label: 'Done', accessibleName: 'Done (1), threadSidebarTurnFinished', count: 1, mark: 'ready' },
     ],
     activeId: 'all',
     edited: false,
@@ -136,5 +136,40 @@ describe('nextStatusFilters', () => {
     expect(nextStatusFilters([], ['all', 'unread', 'working'])).toEqual(['working', 'unread'])
     expect(nextStatusFilters(['working'], ['working', 'all'])).toEqual([])
     expect(nextStatusFilters(['working'], [])).toEqual([])
+  })
+})
+
+// Council round 27, item 1: a preset's mark is the list's own glyph for what it counts, and nothing at a count of 0.
+describe('preset marks (round 28, item 1)', () => {
+  it('maps what a preset counts to the status glyph its rows draw', () => {
+    // A Working view counts working threads: its mark is the ring, even when one of them waits on an approval.
+    expect(presetMark({ attentionLabel: 'threadSidebarApprovalNeeded', count: 2, countsWorking: true })).toBe('working')
+    expect(presetMark({ attentionLabel: 'threadSidebarApprovalNeeded', count: 1, countsWorking: false })).toBe('needs-you')
+    expect(presetMark({ attentionLabel: 'threadSidebarInputNeeded', count: null, countsWorking: false })).toBe('needs-you')
+    expect(presetMark({ attentionLabel: 'threadSidebarTurnFinished', count: 1, countsWorking: false })).toBe('ready')
+    expect(presetMark({ attentionLabel: 'threadSidebarNeedsResume', count: 1, countsWorking: false })).toBe('failed')
+    expect(presetMark({ attentionLabel: 'threadSidebarInterrupted', count: 1, countsWorking: false })).toBe('failed')
+    expect(presetMark({ attentionLabel: undefined, count: 3, countsWorking: true })).toBe('working')
+    expect(presetMark({ attentionLabel: undefined, count: null, countsWorking: false })).toBeUndefined()
+  })
+
+  it('draws no mark and no number at a count of 0', () => {
+    expect(presetMark({ attentionLabel: 'threadSidebarApprovalNeeded', count: 0, countsWorking: true })).toBeUndefined()
+    expect(presetMark({ attentionLabel: undefined, count: 0, countsWorking: true })).toBeUndefined()
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, items: [{ id: 'working', label: 'Working', accessibleName: 'Working', count: 0, mark: undefined }] }} />)
+    const row = screen.getByRole('radio', { name: 'Working' })
+    expect(row.querySelector('[data-slot="status-glyph"]')).toBeNull()
+    expect(row.textContent).toBe('Working')
+  })
+
+  it("draws the row glyph (diamond, dot, cross, ring) in the preset row, not a generic dot", () => {
+    render(<ListFilterPanel {...panel()} />)
+    const done = screen.getByRole('radio', { name: 'Done (1), threadSidebarTurnFinished' })
+    expect(done.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('ready')
+    expect(done.querySelector('[data-slot="status-dot"]')).toBeNull()
+    expect(screen.getByRole('radio', { name: 'Working (2)' }).querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
   })
 })
