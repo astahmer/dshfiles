@@ -1,3 +1,4 @@
+import { decodeJson, jsonValueSchema } from '@dshfiles/dshx/json'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
 import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import assert from 'node:assert/strict'
@@ -205,14 +206,24 @@ test('dropping a row into a section plans exactly the statuses that section mean
   }
 })
 
-test('a remote row reaches the sections whose drop plan writes no Host verb', () => {
-  // Pinned and Archived are Host verbs on the runtime owning the Session, and a remote row never unpins.
-  assert.deepEqual(SidebarOrganization.remoteDropSections, ['active', 'parked', 'inactive', 'settled'])
+test('a remote row reaches the sections whose drop plan writes no pin', () => {
+  // Pinned is a Host verb on the runtime owning the Session, and a remote row never unpins; archive runs there too.
+  assert.deepEqual(SidebarOrganization.remoteDropSections, ['active', 'parked', 'inactive', 'settled', 'archived'])
   assert.equal(SidebarOrganization.remoteSectionDropPlan('pinned'), null)
-  assert.equal(SidebarOrganization.remoteSectionDropPlan('archived'), null)
+  assert.deepEqual(SidebarOrganization.remoteSectionDropPlan('archived'), {
+    archive: true,
+    unarchive: false,
+    pin: false,
+    unpin: false,
+    park: false,
+    unpark: false,
+    settle: false,
+    unsettle: false,
+    idleOverride: null,
+  })
   assert.deepEqual(SidebarOrganization.remoteSectionDropPlan('settled'), {
     archive: false,
-    unarchive: false,
+    unarchive: true,
     pin: false,
     unpin: false,
     park: false,
@@ -223,7 +234,7 @@ test('a remote row reaches the sections whose drop plan writes no Host verb', ()
   })
   assert.deepEqual(SidebarOrganization.remoteSectionDropPlan('active'), {
     archive: false,
-    unarchive: false,
+    unarchive: true,
     pin: false,
     unpin: false,
     park: false,
@@ -451,7 +462,7 @@ test('a deep link names the thread workspace the session lives in, not its ownin
 
 test('invalid stored preference data is rejected without exposing the raw value', () => {
   const raw = '{"session":"private-session-id","newerVersion":true}'
-  assert.equal(SidebarPreferencesModel.decode(JSON.parse(raw)), null)
+  assert.equal(SidebarPreferencesModel.decode(decodeJson(jsonValueSchema, raw)), null)
 })
 
 test('navigation preferences preserve independent order, visibility, and header mode', () => {

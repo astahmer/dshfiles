@@ -242,3 +242,67 @@ Then('the preview opens {string} in the Agents panel', async ({ page }: { page: 
   })
   await finishJourneyAssertions(page)
 })
+
+const toolsTree = (page: Page) => page.getByRole('tree', { name: 'Tools', exact: true })
+/** A tree row: its accessible name starts with the tool or group name, then its state. */
+const toolItem = (page: Page, name: string) =>
+  toolsTree(page)
+    .getByRole('treeitem', { name: new RegExp(`^${name}(,|$)`, 'u') })
+    .first()
+const openToolGroup = async (page: Page, group: string): Promise<void> => {
+  const row = toolItem(page, group)
+  if ((await row.getAttribute('aria-expanded')) !== 'true') await row.click()
+  await expect(row).toHaveAttribute('aria-expanded', 'true')
+}
+const firstProject = (page: Page) => page.getByRole('group', { name: 'Projects', exact: true }).locator('label').first()
+
+When(
+  'the tool {string} is turned off and {string} is pinned in the {string} tool group with the keyboard',
+  async ({ page }: { page: Page }, off: string, pinned: string, group: string) => {
+    await openToolGroup(page, group)
+    await toolItem(page, off).focus()
+    await page.keyboard.press('Space')
+    await toolItem(page, pinned).focus()
+    await page.keyboard.press('p')
+    await expect(toolItem(page, off)).toHaveAttribute('aria-checked', 'false')
+    await expect(toolItem(page, pinned)).toHaveAttribute('aria-label', new RegExp(`^${pinned}, pinned, set here, unsaved$`, 'u'))
+    await expect(toolItem(page, group)).toHaveAttribute('aria-checked', 'mixed')
+  },
+)
+
+When("the first project is made the agent's default and the agent is saved", async ({ page }: { page: Page }) => {
+  await firstProject(page).getByRole('checkbox').click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Saved. Threads started from now on get these tools.', { exact: true })).toBeVisible()
+})
+
+Then(
+  'the agent {string} keeps {string} off, {string} pinned and its default project',
+  async ({ page }: { page: Page }, handle: string, off: string, pinned: string) => {
+    await recordAssertion(page, 'agents-tool-access-tree-persists', async () => {
+      await agentRow(page, handle).click()
+      await openToolGroup(page, 'DSH')
+      await expect(toolItem(page, off)).toHaveAttribute('aria-label', new RegExp(`^${off}, set here$`, 'u'))
+      await expect(toolItem(page, off)).toHaveAttribute('aria-checked', 'false')
+      await expect(toolItem(page, pinned)).toHaveAttribute('aria-label', new RegExp(`^${pinned}, pinned, set here$`, 'u'))
+      await expect(firstProject(page)).toContainText(`uses @${handle}`)
+      await expect(page.getByRole('region', { name: 'Save changes' })).toHaveCount(0)
+    })
+  },
+)
+
+When('the tool {string} is reset to inherited and the agent is saved', async ({ page }: { page: Page }, name: string) => {
+  await toolItem(page, name).focus()
+  await page.keyboard.press('Delete')
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await expect(page.getByText('Saved. Threads started from now on get these tools.', { exact: true })).toBeVisible()
+})
+
+Then('the agent {string} has {string} on again, following its group', async ({ page }: { page: Page }, _handle: string, name: string) => {
+  await recordAssertion(page, 'agents-tool-access-tree-reset', async () => {
+    await openToolGroup(page, 'DSH')
+    await expect(toolItem(page, name)).toHaveAttribute('aria-checked', 'true')
+    await expect(toolItem(page, name)).toHaveAttribute('aria-label', new RegExp(`^${name}, default$`, 'u'))
+  })
+  await finishJourneyAssertions(page)
+})

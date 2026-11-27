@@ -74,6 +74,8 @@ describe('jj-integration inbox drafts', () => {
     expect(LandAttention.readyFateOf(thread({ unlanded: [] }))).toBe('resolve')
     expect(LandAttention.readyFateOf(thread({ missing: true }))).toBe('resolve')
     expect(LandAttention.readyFateOf(thread({ unlanded: [revision({ conflict: true })] }))).toBe('resolve')
+    // Work main moved past long ago leaves the inbox instead of asking for a land it does not need.
+    expect(LandAttention.readyFateOf(thread({ stale: true }))).toBe('resolve')
   })
 
   it('states conflicts as Failed with Retry even while the thread works, and nothing for busy, queued or undescribed work', () => {

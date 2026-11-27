@@ -128,7 +128,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "occupancy": "unavailable",
       "occupants": [],
       "details": [],
-      "source": "tooling/dshx/packages/dshx/src/host/index.ts:15",
+      "source": "tooling/dshx/packages/dshx/src/host/index.ts:19",
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
     },
@@ -2132,6 +2132,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "ComposerSendPreparers",
+      "importFrom": "@dshfiles/rich-composer/composer-send",
+      "owner": "@dshfiles/rich-composer",
+      "source": "plugins/@dshfiles/rich-composer/src/composer-send.ts:32",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/rich-composer.composer-send-preparer",
+      "kind": "registry",
+      "title": "ComposerSendPreparers",
+      "summary": "Contribution registry owned by @dshfiles/rich-composer.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(ComposerSendPreparers, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/rich-composer renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/rich-composer.composer-send-preparer"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "PhoneThreadMenu",
       "importFrom": "@dshfiles/rich-composer/phone-thread-menu",
       "owner": "@dshfiles/rich-composer",
@@ -2456,7 +2478,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadSidebarAutoSettleApi",
       "importFrom": "@dshfiles/thread-sidebar/auto-settle-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:89",
+      "source": "plugins/@dshfiles/thread-sidebar/src/auto-settle-api.ts:100",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-sidebar-auto-settle",
@@ -2479,7 +2501,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadActionsApi",
       "importFrom": "@dshfiles/thread-sidebar/thread-actions-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:66",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:75",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-actions",
@@ -2712,6 +2734,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/thread-sidebar/project-colors",
+      "kind": "module",
+      "title": "@dshfiles/thread-sidebar/project-colors",
+      "summary": "What a chip or a project label paints: a palette class, or a custom `#rrggbb` the operator picked.",
+      "publicSymbol": "ProjectChip, useProjectChip, useSavedProjectChip, useProjectDisplayName",
+      "importFrom": "@dshfiles/thread-sidebar/project-colors",
+      "owner": "@dshfiles/thread-sidebar",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/thread-sidebar/src/project-colors.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "ToolCallSections",
       "importFrom": "@dshfiles/tool-meta/tool-call-sections",
       "owner": "@dshfiles/tool-meta",
@@ -2730,6 +2772,70 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "details": [
         "Registry id: @dshfiles/tool-meta.tool-call-section"
       ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/tool-search/access",
+      "kind": "module",
+      "title": "@dshfiles/tool-search/access",
+      "summary": "The per-agent tool access contract. `@dshfiles/tool-search` owns tool visibility and declares it here; `@dshfiles/agents` provides it on the Host as the `dshfilesToolAccess` Cordis service. Without a provider every tool is on, as before. Every tool is ON by default, tools that appear later included. Two controls, per…",
+      "publicSymbol": "TOOL_ACCESS_RESERVED, NATIVE_GROUP_KEY, toolNameSchema, toolGroupKeySchema, toolAccessEntrySchema, toolAccessSchema",
+      "importFrom": "@dshfiles/tool-search/access",
+      "owner": "@dshfiles/tool-search",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [
+        "Also exports: ToolAccessEntry, ToolAccessConfig, TOOL_ACCESS_ALL, toolGroupKindSchema, ToolGroupKind, ToolGroup, ToolOrigin, ToolAccessDecision, ToolAccess, toolAccessSourceSchema, ToolAccessSource, toolAccessPolicySchema, ToolAccessPolicy, ToolAccessSubject, ToolAccessProvider, TOOL_ACCESS_SERVICE"
+      ],
+      "source": "plugins/@dshfiles/tool-search/src/access.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/tool-search/tool-visibility",
+      "kind": "module",
+      "title": "@dshfiles/tool-search/tool-visibility",
+      "summary": "One plugin's claim that some of its tools must be declared to every Session instead of hidden behind `tool_search`. Keep the set small and the tools cheap: the declared list is sent with every request, so a large schema costs cached tokens on each turn.",
+      "publicSymbol": "ToolVisibilityDeclaration, ToolSearchVisibility, declareVisibleTools, makeToolSearchVisibility",
+      "importFrom": "@dshfiles/tool-search/tool-visibility",
+      "owner": "@dshfiles/tool-search",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/tool-search/src/tool-visibility.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/tool-subagent/agent-resolver",
+      "kind": "module",
+      "title": "@dshfiles/tool-subagent/agent-resolver",
+      "summary": "The `@dshfiles/tool-subagent/agent-resolver` contract: which configured agent a fresh subagent starts as. The `subagent` tool owns the `agent` argument and the child start; an agent registry (`@dshfiles/agents`) provides this resolver on the Host as the `dshfilesSubagentAgents` Cordis service. The registry depends on…",
+      "publicSymbol": "SubagentAgentSubject, SubagentAgentRoute, MAX_SUBAGENT_AGENT_PREAMBLE_CHARS, SubagentAgentChoice, SubagentAgentResolution, SubagentAgentOption",
+      "importFrom": "@dshfiles/tool-subagent/agent-resolver",
+      "owner": "@dshfiles/tool-subagent",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [
+        "Also exports: SubagentAgentListing, SubagentAgentResolver, SUBAGENT_AGENT_RESOLVER_SERVICE"
+      ],
+      "source": "plugins/@dshfiles/tool-subagent/src/agent-resolver.ts",
       "docs": "docs/plugin-boundaries.md",
       "command": null
     },
@@ -3264,6 +3370,106 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/workspace-folder-picker/project-tone",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-tone",
+      "summary": "A project's colour: one of the six palette tones, or any `#rrggbb` the operator picked.",
+      "publicSymbol": "ProjectColorChoice, ProjectColorEntry, ProjectToneName, ProjectTone",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-tone",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-tone.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-name",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-name",
+      "summary": "One project's chip label, stored in the plugin's settings keyed by absolute project folder.",
+      "publicSymbol": "ProjectNameEntry, ProjectName",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-name",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-name.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/settings",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/settings",
+      "summary": "Public module of @dshfiles/workspace-folder-picker.",
+      "publicSymbol": "workspaceFolderPickerSettings",
+      "importFrom": "@dshfiles/workspace-folder-picker/settings",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client or host",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/settings.ts",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-create-dialog",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-create-dialog",
+      "summary": "Public module of @dshfiles/workspace-folder-picker.",
+      "publicSymbol": "ProjectCreateDialog",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-create-dialog",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-create-dialog.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
+      "key": "module:@dshfiles/workspace-folder-picker/project-clone-dialog",
+      "kind": "module",
+      "title": "@dshfiles/workspace-folder-picker/project-clone-dialog",
+      "summary": "Public module of @dshfiles/workspace-folder-picker.",
+      "publicSymbol": "ProjectCloneDialog",
+      "importFrom": "@dshfiles/workspace-folder-picker/project-clone-dialog",
+      "owner": "@dshfiles/workspace-folder-picker",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/workspace-folder-picker/src/project-clone-dialog.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "key": "surface:command",
       "kind": "surface",
       "title": "command",
@@ -3312,7 +3518,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/activity-timeline › inbox-push"
       ],
       "details": [
-        "Used by 86 catalog feature(s)",
+        "Used by 87 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3450,7 +3656,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › question-card-layout"
       ],
       "details": [
-        "Used by 41 catalog feature(s)",
+        "Used by 42 catalog feature(s)",
         "Destinations in use: transcript"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3478,7 +3684,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-preset › draft-preset-selection"
       ],
       "details": [
-        "Used by 70 catalog feature(s)",
+        "Used by 72 catalog feature(s)",
         "Destinations in use: composer"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3534,7 +3740,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › antigravity-accounts"
       ],
       "details": [
-        "Used by 64 catalog feature(s)",
+        "Used by 68 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3618,7 +3824,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-questions › bounded-batch-resolution"
       ],
       "details": [
-        "Used by 28 catalog feature(s)",
+        "Used by 29 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3646,7 +3852,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 133 catalog feature(s)",
+        "Used by 138 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",

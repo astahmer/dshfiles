@@ -48,6 +48,15 @@ const devServerSchema = Schema.Struct({
   jobId: Schema.NullOr(Schema.String),
 })
 
+const embedCheckSchema = Schema.Struct({
+  url: Schema.String,
+  reachable: Schema.Boolean,
+  status: Schema.NullOr(Schema.Number),
+  framing: Schema.Literals(['allowed', 'denied']),
+  verdict: Schema.Literals(['open', 'refused', 'unreachable']),
+  detail: Schema.NullOr(Schema.String),
+})
+
 const targetCheck = Schema.makeFilter<{ readonly ref?: string | undefined; readonly selector?: string | undefined }>(input =>
   (input.ref === undefined) !== (input.selector === undefined) ? true : 'Pass exactly one of ref or selector.',
 )
@@ -209,6 +218,16 @@ export const previewApi = defineApi({
       description:
         'Listening TCP ports started by a thread: processes from its background jobs or bash calls, and processes running inside its workspace. Each lists its pid, command, ports with a URL, and whether a live job owns it. Read-only.',
       tool: { name: 'thread_dev_servers', readOnly: true, render: compactJson },
+    }),
+    probeEmbed: method({
+      input: Schema.Struct({
+        url: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(2_048)).annotate({
+          description: 'http(s) address to check before the Browser tab loads it.',
+        }),
+      }),
+      output: embedCheckSchema,
+      description:
+        'Whether the Browser tab can show this address: the Host requests it once, reads X-Frame-Options and Content-Security-Policy frame-ancestors, and reports open, refused (the site forbids framing) or unreachable (nothing answered). Clients only; the pane cannot see this itself.',
     }),
     stopDevServer: method({
       input: Schema.Struct({

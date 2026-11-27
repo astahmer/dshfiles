@@ -309,23 +309,7 @@ const workspaceHelp = actionHelpGroup('workspace', {
 
 const communicationHelp = actionHelpGroup('comm', {
   agents: { description: 'List live DSH Agents and their Session ids.' },
-  topics: { description: 'List topics and subscriber counts.' },
   report: { description: 'Read a bounded, metadata-only communication activity and delivery report.' },
-  subscribe: {
-    description: 'Subscribe this external CLI principal.',
-    positionals: { topic: positional('Topic name.') },
-  },
-  unsubscribe: {
-    description: 'Remove this external CLI principal from a topic.',
-    positionals: { topic: positional('Topic name.') },
-  },
-  publish: {
-    description: 'Publish a durable peer message.',
-    positionals: {
-      topic: positional('Topic name.'),
-      'message...': positional('Message text.'),
-    },
-  },
   send: {
     description: 'Send a direct message to a DSH Agent inbox.',
     positionals: {

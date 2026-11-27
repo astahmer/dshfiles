@@ -1,3 +1,4 @@
+import type {} from '@deepseek-ai/dsh-schedule'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-session-query'
 import type {} from '@deepseek-ai/dsh-subprocess'
@@ -17,6 +18,7 @@ import { threadSidebarAttentionApi } from './attention-api.js'
 import { ThreadAttention } from './attention-store.js'
 import { threadSidebarAutoSettleApi } from './auto-settle-api.js'
 import { AutoSettle, AutoSettleSources } from './auto-settle-host.js'
+import { ReminderWake, ReminderWakeSources } from './reminder-wake-host.js'
 import { ClientModules } from './client-modules-promise.js'
 import { FinishedTurnAttention } from './inbox-provider.js'
 import { InflightTurns } from './inflight-turns.js'
@@ -50,7 +52,7 @@ import { SessionEvents, attentionRecorder, inflightTracker } from './session-eve
 import { SessionLineage } from './session-lineage.js'
 import { threadSidebarSessionArchiveApi } from './session-archive-api.js'
 import { threadSidebarSettings } from './settings.js'
-import { underSettledSession } from './settled-gate.js'
+import { SettledGateModel, type SettledSessionHeader } from './settled-gate.js'
 import { ThreadSubscriptionActions } from './subscription-actions.js'
 import { subscriptionChangeEvents, subscriptionNoticeHostLayer, subscriptionNoticer } from './subscription-notices-host.js'
 import { threadSubscriptionsApi } from './subscriptions-api.js'
@@ -70,20 +72,33 @@ import { UserNotifications } from './user-notification-host.js'
  * A settled Session runs no model step until it is unsettled: a late wake (subagent settlement, queued follow-up,
  * reminder) proposes a step this rejects, which the loop ends as `blocked` without a request. The gate answers
  * synchronously from the settled ids of the last committed settings revision, before the rest of the chain runs.
+ *
+ * A reminder is the exception: it always reaches its thread, so the settled status it finds is lifted and the step
+ * it proposes runs. The claim already carried the message into this step, so refusing it would drop the reminder.
  */
 const settledGate = Layer.effectDiscard(
   Effect.gen(function* () {
     const { ctx } = yield* HostContext
     const settings = yield* SidebarSettings
-    yield* HostEvents.interceptAsync('agent/pre-step', ({ args: [payload], next }) => {
-      const settled = underSettledSession({
-        header: payload.agent.session.header,
+    const ownersOf = (header: SettledSessionHeader) =>
+      SettledGateModel.lineage({
+        header,
         settledSessionIds: settings.settledSessionIdsNow(),
         // Live agents carry the durable headers of a chain the walk can still read; a settled parent
         // that is not live answers from the child's own recorded parentSession instead.
         parentHeader: sessionId => ctx.agents.list().find(candidate => String(candidate.id) === sessionId)?.session.header,
       })
-      return settled ? Effect.succeed({ kind: 'reject' as const }) : next
+    yield* HostEvents.interceptAsync('agent/pre-step', ({ args: [payload], next }) => {
+      const owners = ownersOf(payload.agent.session.header)
+      if (SettledGateModel.stepFor({ settledOwners: owners, messages: payload.messages }) === 'run') {
+        if (owners.length === 0) return next
+        return settings.unsettle(owners).pipe(
+          Effect.andThen(next),
+          // A refused write keeps the old rule: no step without a settled status that no longer holds.
+          Effect.catch(() => Effect.succeed({ kind: 'reject' as const })),
+        )
+      }
+      return Effect.succeed({ kind: 'reject' as const })
     })
   }),
 )
@@ -99,7 +114,7 @@ const hostEdge = Layer.mergeAll(
   SidebarSettings.layer.pipe(Layer.provideMerge(Settings.layer(threadSidebarSettings))),
 ).pipe(Layer.provideMerge(platform))
 
-const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer, OpenToolCalls.layer).pipe(
+const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer, OpenToolCalls.layer, ThreadSubscriptions.layer).pipe(
   Layer.provideMerge(RecoveryStore.layer),
   Layer.provideMerge(StateFiles.layer),
 )
@@ -127,6 +142,8 @@ const autoRestart = Layer.unwrap(
 
 const autoSettle = AutoSettle.schedule().pipe(Layer.provideMerge(AutoSettle.layer), Layer.provideMerge(AutoSettleSources.layer))
 
+const reminderWake = ReminderWake.schedule().pipe(Layer.provideMerge(ReminderWake.layer), Layer.provideMerge(ReminderWakeSources.layer))
+
 const threads = threadCommandsLayer.pipe(Layer.provideMerge(Layer.mergeAll(ThreadActions.layer, ThreadViews.layer, SidebarTrees.layer)))
 
 const restartWithUpdates = autoRestart.pipe(
@@ -138,9 +155,10 @@ const services = Layer.mergeAll(
   ThreadAttention.layer,
   NotificationHistory.layer,
   subscriptionNoticeHostLayer,
-  ThreadSubscriptionActions.layer.pipe(Layer.provideMerge(ThreadSubscriptions.layer)),
+  ThreadSubscriptionActions.layer,
   restartWithUpdates,
   autoSettle,
+  reminderWake,
   threads,
   MachineName.layer,
   LiveTurns.layer,

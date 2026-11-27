@@ -71,13 +71,27 @@ const make = Effect.fnUntraced(function* <Status extends { readonly ok: boolean 
       }),
     )
 
-  return { read, refresh, invalidate }
+  /**
+   * Patch one cached snapshot in place after a mutation the snapshot partly depends on, keeping its freshness: the
+   * merged value never waits for a refresh, and the refresh that runs later replaces it from the runtime anyway.
+   */
+  const update = (runtimeId: string, patch: (status: Status) => Status) =>
+    Ref.update(entries, current => {
+      const entry = current.get(runtimeId)
+      if (entry === undefined) return current
+      const next = new Map(current)
+      next.set(runtimeId, { ...entry, status: patch(entry.status) })
+      return next
+    })
+
+  return { read, refresh, invalidate, update }
 })
 
 export interface StatusSnapshots<Status> {
   readonly read: (runtimeId: string) => Effect.Effect<StatusSnapshot<Status>>
   readonly refresh: (runtimeId: string, load: Effect.Effect<Status>) => Effect.Effect<void>
   readonly invalidate: (runtimeId: string) => Effect.Effect<void>
+  readonly update: (runtimeId: string, patch: (status: Status) => Status) => Effect.Effect<void>
 }
 
 export class StatusSnapshotsModel {

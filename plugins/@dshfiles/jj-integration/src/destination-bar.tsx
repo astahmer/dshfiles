@@ -448,6 +448,9 @@ export const DestinationBar = (props: {
                   <Button variant="ghost" className={chip} disabled={toggle.busy} aria-label={segmentName} data-run-segment="workspace">
                     {isolated ? <GitBranchIcon className="dshx:size-3.5" /> : <FolderIcon className="dshx:size-3.5" />}
                     <span className="dshx:min-w-0 dshx:truncate">{segmentLabel}</span>
+                    {/* The two spans are one flex row, so a real space only reaches textContent: rich-composer joins
+                        segment text ("Own workspacefrom main" otherwise). */}
+                    {segmentDetail === undefined ? null : ' '}
                     {segmentDetail === undefined ? null : (
                       <span className="dshx:min-w-0 dshx:truncate dshx:font-normal dshx:text-muted-foreground">
                         from <span className="dshx:font-mono! dshx:text-xs">{segmentDetail}</span>

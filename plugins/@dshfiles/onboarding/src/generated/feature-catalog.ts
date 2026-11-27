@@ -60,7 +60,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "agents",
       "description": "Persistent, mentionable agents: identity, instructions, model route and tool preset, dispatched into an ordinary thread.",
       "ui": true,
-      "features": 3
+      "features": 8
     },
     {
       "name": "agentsview",
@@ -70,9 +70,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "ai-accounts",
-      "description": "Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
+      "description": "Per-account Codex, Claude, Antigravity, Mistral Vibe CLI, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 21
+      "features": 22
     },
     {
       "name": "annotations",
@@ -138,7 +138,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "chat",
       "description": "Owned fork of DSH's native Chat plugin that mounts only the transcript rows near the viewport.",
       "ui": true,
-      "features": 15
+      "features": 16
     },
     {
       "name": "command-palette",
@@ -468,7 +468,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "rich-composer",
       "description": "Owned fork of DSH's native Conversation plugin with structured session-reference paste.",
       "ui": true,
-      "features": 12
+      "features": 13
     },
     {
       "name": "schedule",
@@ -528,7 +528,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "settings-shell",
       "description": "VS Code-style DSH Settings shell with plugin settings, search, and notices for new DSH releases.",
       "ui": true,
-      "features": 14
+      "features": 16
     },
     {
       "name": "settings-subagent",
@@ -612,7 +612,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "thread-sidebar",
       "description": "Replace the DSH sidebar with project-scoped thread groups and customizable navigation.",
       "ui": true,
-      "features": 56
+      "features": 57
     },
     {
       "name": "thread-transfer",
@@ -648,13 +648,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "tool-search",
       "description": "Opt-in per-agent progressive discovery of native tools",
       "ui": false,
-      "features": 1
+      "features": 2
     },
     {
       "name": "tool-subagent",
       "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
       "ui": false,
-      "features": 1
+      "features": 2
     },
     {
       "name": "traces",
@@ -695,8 +695,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     {
       "name": "vcs-provider-port",
       "description": "The Host port through which version-control plugins (jj, git worktrees) provide workspace isolation and file snapshots, shared so callers never depend on one provider.",
-      "ui": false,
-      "features": 2
+      "ui": true,
+      "features": 3
     },
     {
       "name": "web-fetch-readable",
@@ -1046,8 +1046,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#agent-directory",
       "plugin": "agent-communication",
       "id": "agent-directory",
-      "title": "Discover Agents and workspace channels",
-      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first, and keep same-directory Agents on one hashed workspace topic.",
+      "title": "Discover Agents and peers",
+      "summary": "List live Agents with their title, parent and relation to the caller, related and same-workspace peers first. Nothing subscribes an Agent automatically: peer mail is direct and needs no registration.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
@@ -1058,15 +1058,15 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#passive-messaging",
       "plugin": "agent-communication",
       "id": "passive-messaging",
-      "title": "Store and browse passive messages",
-      "summary": "Topic and direct messages remain durable records; explicit Agent reads record read time without acknowledging or starting execution.",
+      "title": "Durable direct peer mail with a bounded request wake",
+      "summary": "Direct messages remain durable records; explicit Agent reads record read time without acknowledging. A direct request wakes an idle recipient through a plugin-source pointer message under a cooldown and an hourly cap, while notices stay passive.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages",
       "reach": [],
       "reachNarrow": null,
       "onboarding": {
-        "firstAction": "Open Agents › Messages and post a message to a topic.",
-        "doneWhen": "Your message shows in the topic's history.",
+        "firstAction": "Open Agents › Messages and send a direct message to a live Agent.",
+        "doneWhen": "Your message shows in that Agent’s conversation.",
         "open": {
           "panel": "agent-communication"
         }
@@ -1076,8 +1076,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "agent-communication#human-browser",
       "plugin": "agent-communication",
       "id": "human-browser",
-      "title": "Post messages from the communication browser",
-      "summary": "A human can seed a topic or send a direct message; the UI receives a storage receipt and does not inject work into an Agent.",
+      "title": "Send direct messages from the Messages panel",
+      "summary": "A human picks a live or dormant Agent thread and sends a direct message; the panel returns a storage receipt. A request wakes an idle recipient with a pointer to its inbox; a notice stays passive.",
       "destination": "agents",
       "currentSurface": "left-nav: Messages › post",
       "reach": [
@@ -2601,6 +2601,472 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "agents#agent-tool-access",
+      "plugin": "agents",
+      "id": "agent-tool-access",
+      "title": "An agent decides its threads' tools",
+      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched…",
+      "destination": "none",
+      "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; editor UI in agent-tools-tree",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "agents#subagent-agents",
+      "plugin": "agents",
+      "id": "subagent-agents",
+      "title": "A subagent starts as a configured agent",
+      "summary": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own age…",
+      "destination": "none",
+      "currentSurface": "host: the dshfilesSubagentAgents Cordis service, read by @dshfiles/tool-subagent's subagent and list_subagent_models tools",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "agents#agent-tools-tree",
+      "plugin": "agents",
+      "id": "agent-tools-tree",
+      "title": "Choose an agent's tools, subagents and projects",
+      "summary": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through too…",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents › agent editor › Tools, Delegation, Default for projects",
+      "reach": [
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"New agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New agent",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Name\" \"Reviewer\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Name",
+          "value": "Reviewer"
+        },
+        {
+          "text": "click treeitem \"DSH, DSH*\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "DSH, DSH*",
+          "value": null
+        },
+        {
+          "text": "click treeitem \"read, default\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "read, default",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"read, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "read, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "expect text \"unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "unsaved*",
+          "value": null
+        },
+        {
+          "text": "click button \"Pin present\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pin present",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"present, pinned, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "present, pinned, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Filter tools\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Filter tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 unsaved*",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents*",
+          "value": null
+        },
+        {
+          "text": "click button \"New agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New agent",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Name\" \"Reviewer\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Name",
+          "value": "Reviewer"
+        },
+        {
+          "text": "click treeitem \"DSH, DSH*\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "DSH, DSH*",
+          "value": null
+        },
+        {
+          "text": "click treeitem \"read, default\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "read, default",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"read, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "read, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "expect text \"unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "unsaved*",
+          "value": null
+        },
+        {
+          "text": "click button \"Pin present\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pin present",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"present, pinned, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "present, pinned, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Filter tools\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Filter tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 unsaved*",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "agents#composer-agent",
+      "plugin": "agents",
+      "id": "composer-agent",
+      "title": "Start a new thread as the project's default agent",
+      "summary": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the pers…",
+      "destination": "composer",
+      "currentSurface": "composer: new-thread agent chip",
+      "reach": [
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "expect text \"Start from a template\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Start from a template",
+          "value": null
+        },
+        {
+          "text": "click button \"Reviews diffs and pull requests*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reviews diffs and pull requests*",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Instructions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Instructions",
+          "value": null
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved.",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @dsh (default). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @dsh (default). Change agent",
+          "value": null
+        },
+        {
+          "text": "click text \"@reviewer\"",
+          "action": "click",
+          "by": "text",
+          "name": "@reviewer",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @reviewer (for this thread). Change agent",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Make @reviewer this project’s default\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Make @reviewer this project’s default",
+          "value": null
+        },
+        {
+          "text": "expect button \"New thread runs as @reviewer (project default). Change agent\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New thread runs as @reviewer (project default). Change agent",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @reviewer (project default). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @reviewer (project default). Change agent",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Stop using @reviewer as this project’s default\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Stop using @reviewer as this project’s default",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "In a new thread, open the \"as @agent\" chip beside the composer's tools and make an agent this project's default.",
+        "doneWhen": "New threads in that project start as that agent without picking it."
+      }
+    },
+    {
+      "key": "agents#thread-tools",
+      "plugin": "agents",
+      "id": "thread-tools",
+      "title": "See and switch a running thread's tools",
+      "summary": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread…",
+      "destination": "composer",
+      "currentSurface": "composer: Tools control",
+      "reach": [
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "expect text \"Start from a template\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Start from a template",
+          "value": null
+        },
+        {
+          "text": "click button \"Reviews diffs and pull requests*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reviews diffs and pull requests*",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Instructions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Instructions",
+          "value": null
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved.",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @dsh (default). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @dsh (default). Change agent",
+          "value": null
+        },
+        {
+          "text": "click text \"@reviewer\"",
+          "action": "click",
+          "by": "text",
+          "name": "@reviewer",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @reviewer (for this thread). Change agent",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Make @reviewer this project’s default\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Make @reviewer this project’s default",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Review the open diff\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or threads",
+          "value": "Review the open diff"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Review the change for correctness first*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Review the change for correctness first*",
+          "value": null
+        },
+        {
+          "text": "click button \"Tools: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Tools: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All tools\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All tools",
+          "value": null
+        },
+        {
+          "text": "expect button \"Tools: All tools*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Tools: All tools*",
+          "value": null
+        },
+        {
+          "text": "click button \"Tools: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Tools: *",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Reset to @reviewer’s tools\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Reset to @reviewer’s tools",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "agentsview#agent-sessions-panel",
       "plugin": "agentsview",
       "id": "agent-sessions-panel",
@@ -2921,6 +3387,47 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Copy Antigravity sign-in command",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#vibe-cli-route",
+      "plugin": "ai-accounts",
+      "id": "vibe-cli-route",
+      "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
+      "summary": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key req…",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Vibe CLI",
+      "reach": [
+        {
+          "text": "click text \"AI Accounts: Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts: Accounts",
+          "value": null
+        },
+        {
+          "text": "click button \"Add account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add account",
+          "value": null
+        },
+        {
+          "text": "click button \"Vibe CLI account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Vibe CLI account",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy Vibe sign-in command\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy Vibe sign-in command",
           "value": null
         }
       ],
@@ -11217,6 +11724,21 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "chat#inline-annotations",
+      "plugin": "chat",
+      "id": "inline-annotations",
+      "title": "See annotations beside the passage they quote, sent or draft",
+      "summary": "Selecting assistant text and pressing Annotate attaches that passage to the draft; the passage then shows a numbered marker, and on a wide window a comment card in a right column, so the reader writes and edits the comment where they read. Sending moves the annotations into the…",
+      "destination": "transcript",
+      "currentSurface": "transcript: numbered markers beside annotated assistant passages, draft and sent, with a comments column on a wide window",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "Select a passage in an assistant reply and press Annotate.",
+        "doneWhen": "A numbered marker sits beside the passage and its comment can be written right there."
+      }
+    },
+    {
       "key": "command-palette#palette-search",
       "plugin": "command-palette",
       "id": "palette-search",
@@ -14246,7 +14768,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "jj-integration",
       "id": "thread-workspaces-panel",
       "title": "Thread integration control center",
-      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, blocked, conflicts, integrating, integrated, no change…",
+      "summary": "A full-page control center, also in the conversation side panel: state tabs with live counts, a separate lifecycle filter, and a banner whose primary action integrates every ready workspace at once. Integration state (ready, stale, blocked, conflicts, integrating, integrated, no…",
       "destination": "land",
       "currentSurface": "left-nav: Land",
       "reach": [
@@ -20967,6 +21489,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "rich-composer#sent-annotations",
+      "plugin": "rich-composer",
+      "id": "sent-annotations",
+      "title": "Keep sent annotations across browsers",
+      "summary": "An accepted message's annotations move into a Host-stored per-session review history, so markers and comments stay on the passage after sending and come back in any browser. Edits and removals follow the same record, and the Composer contract exposes draft and sent annotations t…",
+      "destination": "none",
+      "currentSurface": "host: plugin storage per Session · client: Composer annotations",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "schedule#catalog-read-reuse",
       "plugin": "schedule",
       "id": "catalog-read-reuse",
@@ -21392,10 +21926,32 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with co…",
+      "summary": "List aliases as metadata only, run a command with the workspace's aliases injected through `secret mcp` (output scrubbed by the Host), and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve…",
       "destination": "none",
-      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias",
-      "reach": [],
+      "currentSurface": "agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias",
+      "reach": [
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "expect text \"GITHUB_TOKEN\"",
+          "action": "expect",
+          "by": "text",
+          "name": "GITHUB_TOKEN",
+          "value": null
+        }
+      ],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -22970,6 +23526,139 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "settings-shell#settings-origin-distinction",
+      "plugin": "settings-shell",
+      "id": "settings-origin-distinction",
+      "title": "Distinguish default DSH categories from plugin categories",
+      "summary": "Every Settings category is classified as stock DSH or a DSH plugin from bundle metadata (with core namespace fallback). The sidebar offers an All / DSH / Plugins scope filter with counts, subtle per-row origin cues (DSH pill vs plugin icon), category icons, and origin badges in…",
+      "destination": "settings",
+      "currentSurface": "settings: sidebar source filter and entry header badge",
+      "reach": [
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "expect group \"Filter categories by source\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Filter categories by source",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "expect group \"Filter categories by source\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Filter categories by source",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "settings-shell#dshfiles-plugins-page",
+      "plugin": "settings-shell",
+      "id": "dshfiles-plugins-page",
+      "title": "Plugins by category: a second plugin view in Settings and as a panel",
+      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin; DSH core's Plugins manager lists a first card (its plugins.item seat) that opens it. It lists global @dshfiles/* bu…",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins › Plugins by category",
+      "reach": [
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugins by category\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugins by category",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Enable *\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Enable *",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Plugins by category\"",
+          "action": "click",
+          "by": "option",
+          "name": "Plugins by category",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Enable *\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Enable *",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
       "key": "settings-subagent#subagent-settings",
       "plugin": "settings-subagent",
       "id": "subagent-settings",
@@ -24449,11 +25138,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "thread-sidebar#reminder-wake",
+      "plugin": "thread-sidebar",
+      "id": "reminder-wake",
+      "title": "Wake a settled or archived thread for its reminder",
+      "summary": "A reminder is a prompt that comes back to its thread, but a settled thread rejects the step it proposes and the Schedule service refuses an archived target outright, so the reminder would be dropped. The Host never settles a thread holding an active reminder, however far out its…",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › Reminder wake",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "thread-sidebar#section-order",
       "plugin": "thread-sidebar",
       "id": "section-order",
       "title": "Group remote threads with each view",
-      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
+      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default, and their rows archive or restore on the runtime that owns them. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloa…",
       "destination": "threads",
       "currentSurface": "thread-list: Thread list settings › Remote group",
       "reach": [
@@ -26785,6 +27486,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "tool-search#agent-tool-access",
+      "plugin": "tool-search",
+      "id": "agent-tool-access",
+      "title": "Tools per agent: enabled and pinned",
+      "summary": "The thread's agent decides which tools reach it. tool-search declares the @dshfiles/tool-search/access contract (the dshfilesToolAccess Cordis service, provided by @dshfiles/agents): every tool is on by default, a disabled tool or group is never declared, searched, proxied or ca…",
+      "destination": "none",
+      "currentSurface": "host: agent tool tool_search_access; contract module @dshfiles/tool-search/access",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "tool-subagent#live-model-selection-policy",
       "plugin": "tool-subagent",
       "id": "live-model-selection-policy",
@@ -26792,6 +27505,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/m…",
       "destination": "none",
       "currentSurface": "agent tools: subagent, subagent_fork, list_subagent_models",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#subagent-agent-argument",
+      "plugin": "tool-subagent",
+      "id": "subagent-agent-argument",
+      "title": "subagent starts a child as a configured agent",
+      "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's…",
+      "destination": "none",
+      "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -28498,6 +29223,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "id": "vcs-detection",
       "title": "Which VCS owns a path",
       "summary": "VcsDetector (subpath ./detect) names jj or git for a path from the nearest .jj or .git above it, jj first when both exist, reading only the filesystem; jj-integration and diffs-review pick their jj or git adapter with it.",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "vcs-provider-port#workspace-attribution",
+      "plugin": "vcs-provider-port",
+      "id": "workspace-attribution",
+      "title": "Which project a Session belongs to",
+      "summary": "WorkspaceAttribution (subpath ./workspace-attribution) maps a Session to its DSH project from the workspace registry: a thread workspace (<repository>-threads/thread-…, or a provider-reported custom threads directory) belongs to the project it was cut from; a Session no workspac…",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],

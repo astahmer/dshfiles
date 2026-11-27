@@ -17,8 +17,11 @@ import { Context, Effect, Layer, Option } from 'effect'
 import type { RebasedThread } from './rebased-threads.js'
 import { HostCallFailed, HostCapabilityMissing } from './sidebar-errors.js'
 import { threadSidebarModelRouteProjection } from './subagent-provenance/projection.js'
+import type {} from '@deepseek-ai/dsh-schedule'
+import type { ScheduleRecord } from '@deepseek-ai/dsh-schedule'
 import { loadThreadDirectories } from './thread-directories-promise.js'
-import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
+import type { ScannedReminder } from './reminder-wake.js'
+import { type ThreadDirectories, WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 type SessionListItem = Awaited<ReturnType<CordisContext['sessionController']['list']>>['items'][number]
 
@@ -72,6 +75,10 @@ export class SidebarHost extends Context.Service<
     readonly runningSessionIds: Effect.Effect<ReadonlyArray<string>>
     /** Background jobs still running or stopping, owned by a live Agent or by nobody. */
     readonly runningJobCount: Effect.Effect<number>
+    /** Sessions whose own background jobs still run or stop: an idle Agent with a job out is still working. */
+    readonly workingJobSessionIds: Effect.Effect<ReadonlyArray<string>>
+    /** Active reminders per target Session, read from the Schedule service; empty when it is not installed. */
+    readonly reminders: Effect.Effect<ReadonlyArray<ScannedReminder>, HostCallFailed>
     readonly sessions: Effect.Effect<ReadonlyArray<HostSession>, HostCallFailed>
     readonly workspaces: Effect.Effect<ReadonlyArray<HostWorkspace>>
     /** Where the VCS providers put the registered projects' thread workspaces; empty without a provider. */
@@ -99,6 +106,10 @@ export class SidebarHost extends Context.Service<
     readonly sessionTitles: Effect.Effect<ReadonlyMap<string, string>, HostCapabilityMissing | HostCallFailed>
     /** Stop every running job these Sessions own, through the job registry's owner fence; answers the ids stopped. */
     readonly stopJobs: (input: { readonly sessionIds: ReadonlyArray<string>; readonly reason: string }) => Effect.Effect<ReadonlyArray<string>>
+    /** Restore one archived Session through the Workspace controller: the only owner of the archived set. */
+    readonly unarchiveSession: (sessionId: string) => Effect.Effect<void, HostCallFailed>
+    /** Deliver one reminder now through the Schedule service; nothing to do where it is not installed. */
+    readonly runReminder: (id: ScheduleRecord['id']) => Effect.Effect<void, HostCallFailed>
   }
 >()('@dshfiles/thread-sidebar/SidebarHost') {
   static readonly layer = Layer.effect(
@@ -130,6 +141,33 @@ export class SidebarHost extends Context.Service<
             callers.flatMap(caller => jobs.list(caller).flatMap(job => (job.status === 'running' || job.status === 'stopping' ? [String(job.id)] : []))),
           )
           return running.size
+        }),
+        workingJobSessionIds: Effect.sync(() => {
+          const jobs = ctx.get('jobs')
+          if (jobs === undefined || jobs === null) return []
+          return [
+            ...new Set(
+              ctx.agents.list().flatMap(agent => {
+                const sessionId = String(agent.id)
+                const working = jobs.list(SessionId(sessionId)).some(job => job.owner === sessionId && (job.status === 'running' || job.status === 'stopping'))
+                return working ? [sessionId] : []
+              }),
+            ),
+          ]
+        }),
+        reminders: Effect.suspend((): Effect.Effect<ReadonlyArray<ScannedReminder>, HostCallFailed> => {
+          const schedule = ctx.get('schedule')
+          if (schedule === undefined) return Effect.succeed<ReadonlyArray<ScannedReminder>>([])
+          return Effect.tryPromise({
+            try: async () =>
+              (await schedule.catalog()).flatMap((entry): ReadonlyArray<ScannedReminder> => {
+                if (entry.target.kind !== 'session') return []
+                const scheduledAt = Date.parse(entry.scheduledAt)
+                if (!Number.isFinite(scheduledAt)) return []
+                return [{ id: entry.id, sessionId: String(entry.target.sessionId), scheduledAt, active: entry.status === 'active' }]
+              }),
+            catch: cause => new HostCallFailed({ operation: 'list schedule tasks', cause }),
+          }).pipe(Effect.withSpan('host reminders list'))
         }),
         sessions: call('list sessions', signal => ctx.sessionController.list({}, signal)).pipe(
           Effect.map(listed => listed.items.map(hostSession)),
@@ -228,6 +266,14 @@ export class SidebarHost extends Context.Service<
             ),
           )
           return stopped.flat()
+        }),
+        unarchiveSession: Effect.fn('host session unarchive')(function* (sessionId) {
+          yield* call('unarchive session', () => ctx.workspaceController.unarchiveSession({ sessionId: SessionId(sessionId) }))
+        }),
+        runReminder: Effect.fn('host reminder run')(function* (id) {
+          const schedule = ctx.get('schedule')
+          if (schedule === undefined) return
+          yield* call('run reminder', () => schedule.run({ id }))
         }),
       })
     }),

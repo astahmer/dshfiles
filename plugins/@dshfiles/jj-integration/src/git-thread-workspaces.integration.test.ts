@@ -68,6 +68,8 @@ describe.skipIf(!gitAvailable)('thread workspaces in a git-only repository', () 
 
     const before = await threads.status(repo, thread.name)
     expect(before.unlanded.map(revision => revision.description)).toEqual(['feat: add feature'])
+    // The author time travels with each revision, so Land can tell abandoned work from work touched today.
+    expect(before.unlanded[0]?.at).toBeGreaterThan(Date.now() - 86_400_000)
     expect(before.behindCount).toBe(1)
 
     const outcome = await threads.land(thread.path, { sessionId: 'session-1' })

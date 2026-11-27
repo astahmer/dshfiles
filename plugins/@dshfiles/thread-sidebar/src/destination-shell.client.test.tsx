@@ -105,10 +105,12 @@ describe('DestinationShell', () => {
 
   it('lists the Settings pages without a layout switch: one sidebar layout (b:952m)', () => {
     setPhone(false)
-    const shell = renderShell()
+    const shell = renderShell({ activePanelId: 'dshfiles-settings' })
     fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
     expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'All settings' }))
+    const allSettings = screen.getByRole('button', { name: 'All settings' })
+    expect(allSettings.getAttribute('aria-current')).toBe('page')
+    fireEvent.click(allSettings)
     expect(shell.openSettings).toHaveBeenCalled()
     expect(screen.queryByRole('radio', { name: 'Free docking' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Layout' })).toBeNull()
@@ -144,6 +146,19 @@ describe('DestinationShell', () => {
     expect(shell.record).toHaveBeenCalledWith(expect.objectContaining({ destination: 'land', surface: 'tab-bar' }))
     cleanup()
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(false)
+  })
+
+  it('on a phone, drops the page description and row descriptions in a destination list', () => {
+    setPhone(true)
+    renderShell({
+      collapsed: false,
+      panels: [...panels, { id: 'jj-integration', label: 'Workspaces', order: 1 }, { id: 'diffs-review', label: 'Review', order: 2 }],
+    })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'Land' }))
+    // The top bar already names the destination; the two lines of copy only truncated at 390px.
+    expect(screen.queryByText('Workspaces ready to land, and repository history.')).toBeNull()
+    expect(screen.queryByText('Thread workspaces ready, blocked or behind.')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Workspaces' })).toBeTruthy()
   })
 
   it('on a phone, starts a thread from the + in the Threads list header and lists Land outside More', () => {
@@ -311,6 +326,19 @@ describe('phone navigation: drawer', () => {
     view.rerender(shell({ ...closed, collapsed: false, selectedThreadId: 'session-2', stageThreadId: 'session-2', stageSessionId: 'session-2' }))
     expect(drawerState()).toBe('open')
     expect(closed.toggleSidebar).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks the app root inert while the drawer is open and restores it on close', () => {
+    setPhone(true)
+    const appRoot = document.createElement('div')
+    appRoot.id = 'root'
+    document.body.append(appRoot)
+    render(shell({ ...threadProps(), phoneNavigation: 'drawer' }))
+    showThreads()
+    expect(appRoot.hasAttribute('inert')).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(appRoot.hasAttribute('inert')).toBe(false)
+    appRoot.remove()
   })
 
   it('returns a thread opened from the Inbox page to the Inbox, keeping the sidebar button', () => {

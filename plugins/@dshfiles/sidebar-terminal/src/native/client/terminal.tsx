@@ -14,6 +14,7 @@ import type { TerminalExcerpt, TerminalSelectionSource } from './excerpt.ts'
 import type { TerminalExcerptTarget } from './excerpt-targets.ts'
 import { useTerminalExcerptTarget } from './use-terminal-excerpt-target.ts'
 import { TerminalTheme } from './terminal-theme.ts'
+import { TerminalKeyRow } from './terminal-key-row.tsx'
 import { observeTerminalCursor } from './terminal-cursor.ts'
 
 /** Standard sidebar owner share plus terminal model and localized copy. */
@@ -199,6 +200,16 @@ function TerminalScreen({ state, model, visible, label, theme, css, addExcerpt, 
   useEffect(() => { if (visible && state.writable) terminal.current!.focus() }, [visible, state.writable])
   return (
     <div className={css.viewport}>
+      <TerminalKeyRow
+        css={css}
+        disabled={!visible || !state.writable}
+        onKey={sequence => {
+          const xterm = terminal.current
+          if (xterm === undefined) return
+          xterm.input(sequence)
+          xterm.focus()
+        }}
+      />
       <TerminalExcerptAction excerpt={selection} attach={attach} failed={failed} label={addLabel} failedLabel={failedLabel} styles={css} />
       <div className={css.screen} ref={element} />
     </div>

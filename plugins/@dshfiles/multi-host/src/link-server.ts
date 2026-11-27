@@ -114,18 +114,20 @@ export const createLinkServer = (options: LinkServerOptions) => {
 
     if (url.pathname === '/link/redeem') {
       if (request.method !== 'POST') return json(response, 405, { reason: 'invalid', message: 'Use POST.' })
-      void readBody(request)
-        .then(async body => {
+      const serveRedeem = async (): Promise<void> => {
+        try {
+          const body = await readBody(request)
           const decoded = decodeRedeemBody(body)
           if (Option.isNone(decoded)) return json(response, 400, { reason: 'invalid', message: 'The pairing request was malformed.' })
           const { code, name, runtimeId } = decoded.value
           const answer = await options.redeem({ code, name, ...(runtimeId !== undefined && { runtimeId }) })
           if (!answer.ok) return json(response, answer.status, { reason: answer.reason, message: answer.message })
           json(response, 200, { credential: answer.credential, runtimeId: answer.runtimeId, name: answer.name })
-        })
-        .catch(() => {
+        } catch {
           if (!response.headersSent) json(response, 400, { reason: 'invalid', message: 'The pairing request was malformed.' })
-        })
+        }
+      }
+      void serveRedeem()
       return
     }
 
@@ -150,7 +152,8 @@ export const createLinkServer = (options: LinkServerOptions) => {
       return
     }
 
-    void options.nativeCookie().then(cookie => {
+    const proxyRequest = async (): Promise<void> => {
+      const cookie = await options.nativeCookie()
       if (cookie === undefined) return json(response, 503, { reason: 'no-runtime', message: 'DSH on this machine is not serving yet.' })
       const outgoing = http.request(
         { hostname: '127.0.0.1', port: options.upstreamPort, method: request.method, path: request.url, headers: rewrite(request.headers, cookie) },
@@ -169,7 +172,8 @@ export const createLinkServer = (options: LinkServerOptions) => {
         response.end('upstream unavailable')
       })
       request.pipe(outgoing)
-    })
+    }
+    void proxyRequest()
   })
 
   server.on('upgrade', (request, socket: Duplex, head: Buffer) => {
@@ -190,7 +194,8 @@ export const createLinkServer = (options: LinkServerOptions) => {
     }
     socket.once('close', teardown)
     socket.on('error', teardown)
-    void options.nativeCookie().then(cookie => {
+    const proxyUpgrade = async (): Promise<void> => {
+      const cookie = await options.nativeCookie()
       if (cookie === undefined || closed) return teardown()
       const outgoing = http.request({
         hostname: '127.0.0.1',
@@ -220,7 +225,8 @@ export const createLinkServer = (options: LinkServerOptions) => {
       })
       outgoing.on('error', teardown)
       outgoing.end()
-    })
+    }
+    void proxyUpgrade()
   })
 
   return {

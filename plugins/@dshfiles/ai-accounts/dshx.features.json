@@ -458,9 +458,75 @@
       ]
     },
     {
+      "id": "vibe-cli-route",
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ],
+      "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
+      "summary": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key request spends. The CLI's own catalog decides the models (Mistral Large 4, Mistral Medium 3.5, GLM 5.3, GLM 5.3 Flash, DeepSeek V4.1 Flash 1017), their thinking levels and their context windows. Each DSH step replays the transcript, streams the answer and its reasoning, and reports the run's tokens and cost from `export.json`. This is a CLI-agent route: Vibe owns its agent loop and tools, and DSH's tools are not bridged.",
+      "reach": [
+        "click text \"AI Accounts: Accounts\"",
+        "click button \"Add account\"",
+        "click button \"Vibe CLI account\"",
+        "expect button \"Copy Vibe sign-in command\""
+      ],
+      "surfaces": ["client", "host", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Vibe CLI",
+      "configuration": [],
+      "states": ["cli-missing", "signed-out", "signed-in", "streaming", "expired-key"],
+      "failureModes": [
+        "A Host without `vibe` reports the install and `vibe --setup` recovery instead of a spawn error.",
+        "A rejected model alias reports the CLI's own stderr so the alias can be corrected rather than retried silently.",
+        "A process that writes nothing for ten minutes is stopped and names the CLI log under VIBE_HOME.",
+        "The route disables an inherited MISTRAL_API_KEY so the CLI's signed-in session is what pays, not the API credit.",
+        "No quota is guessed: a signed-out profile reports unauthenticated, and the card reads Mistral's own two buckets when the CLI login exists."
+      ],
+      "externalDependencies": [
+        {
+          "id": "vibe-cli",
+          "boundary": "Mistral Vibe 3.1.5 headless mode (`--prompt-file`, `--output streaming`, `--output-dir`, `--model`, `--thinking`) and its `vibe --setup` login; DSH never copies or prints that credential.",
+          "deterministicFake": "vibe-cli.test.ts runs a fake `vibe` that reads the arguments, writes one completed history entry per JSON line and the export.json Vibe writes on exit."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-cli-stream",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-cli.test.ts",
+          "testName": "streams the answer and its reasoning, never a tool call, and reads tokens and cost from export.json"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-catalog",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-provider.test.ts",
+          "testName": "publishes the CLI catalog as one route over the cli transport"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-route",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-routes.test.ts",
+          "testName": "builds a route whose home is the VIBE_HOME the CLI signed in to"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "ai-accounts.vibe-cli-route-browser",
+          "reason": "Host-only transport: adding the account reuses the AI Accounts add-account dialog walked by the existing dashboard scenario, and the route's own catalogue and stream are proven by the fake-vibe unit tests. A browser scenario would only re-render that dialog, since no client surface renders the route itself."
+        }
+      ]
+    },
+    {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
+      "summary": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover. Codex accounts list the models their plan exposes from the ChatGPT backend (visible ones only) with its context windows, and each account can raise a model's context window up to the backend maximum.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Settings\"",
@@ -517,7 +583,9 @@
         "A stream that sends no data until its idle timeout names its route, model and silence in the retry rows; a turn it stops tells the user to Resume or pick another model, and how to turn on stalled-stream fallback.",
         "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned.",
         "A Mistral model offers only the reasoning efforts Mistral accepts for it, never an Off that would send a rejected `none`.",
-        "A Mistral model that Mistral documents as reading images offers image input even when its catalog entry leaves vision out."
+        "A Mistral model that Mistral documents as reading images offers image input even when its catalog entry leaves vision out.",
+        "A failed Codex model discovery keeps the previous (or static pi-ai) model list and logs a warning naming the account and how to retry or sign in again.",
+        "A context window override above the provider's disclosed maximum is saved and applied as that maximum."
       ],
       "externalDependencies": [
         {
@@ -620,6 +688,30 @@
           "id": "ai-accounts.discovered-model-capabilities",
           "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
           "testName": "keeps the context window and image input a provider catalog reports"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.codex-model-discovery",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "offers a listed model absent from the static catalog as a complete Codex model with the backend window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.codex-discovery-fallback",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "keeps the previous model list when a refresh fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.context-window-override",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "applies a window override clamped to the backend maximum, and DSH resolves the clamped window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.context-window-editor",
+          "file": "plugins/@dshfiles/ai-accounts/src/model-curation.test.tsx",
+          "testName": "offers context windows up to the provider maximum and keeps the account inheriting"
         }
       ],
       "telemetry": [
@@ -636,6 +728,12 @@
           "span": "ai-accounts provider request",
           "file": "plugins/@dshfiles/ai-accounts/src/provider-request.test.ts",
           "testName": "records an ai-accounts provider request span with host and status, never the path or credentials"
+        },
+        {
+          "kind": "custom",
+          "span": "ai-accounts provider request",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "sends the Codex CLI headers and records a catalog provider request span without the token"
         }
       ]
     },
@@ -1671,6 +1769,10 @@
     {
       "file": "src/claude-cli.ts",
       "reason": "Claude Code CLI transport of a model stream: each stream runs under agent-telemetry chat <model> span, and the CLI child lives as long as that stream."
+    },
+    {
+      "file": "src/vibe-cli.ts",
+      "reason": "Vibe CLI transport of a model stream: each stream runs under the agent-telemetry chat <model> span, and the `vibe` child lives only as long as that stream."
     },
     {
       "file": "src/antigravity-acp.ts",

@@ -2,6 +2,7 @@ import { mkdtempSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import type { JsonObject } from '@dshfiles/dshx/json'
 import { SessionPayload } from '@dshfiles/session-source-port'
 import { describe, expect, it } from '@effect/vitest'
 import { Cause, Effect, Exit, Fiber, Layer, Stream } from 'effect'
@@ -21,7 +22,7 @@ import { dataLayer } from './fixtures/data-runtime.js'
 
 const runtimeId = '10000000-0000-4000-8000-000000000001' as const
 
-const row = (sessionId: string, extra: Record<string, unknown> = {}) => ({
+const row = (sessionId: string, extra: JsonObject = {}) => ({
   sessionId,
   updatedAt: 100,
   running: false,
@@ -196,8 +197,8 @@ describe('RemoteSessions', () => {
       const owner = yield* sessions.source.runtimeIdForSession?.('session-remote') ?? Effect.succeed({ _tag: 'None' })
       expect(owner).toMatchObject({ _tag: 'Some', value: runtimeId })
       expect(test.calls).toEqual([{ method: 'list', args: { _request: { projections: ['title'] } } }])
-      expect(yield* sessions.source.owns('session-remote' as SessionId)).toBe(true)
-      expect(yield* sessions.source.owns('session-unknown' as SessionId)).toBe(false)
+      expect(yield* sessions.source.owns(SessionId('session-remote'))).toBe(true)
+      expect(yield* sessions.source.owns(SessionId('session-unknown'))).toBe(false)
     }).pipe(Effect.provide(services(test)))
   })
 
@@ -249,7 +250,7 @@ describe('RemoteSessions', () => {
       const sessions = yield* RemoteSessions
       yield* sessions.source.list({})
       const frames = yield* Stream.runCollect(
-        sessions.source.follow?.({ address: { kind: 'session', sessionId: 'session-remote' as SessionId } }) ?? Stream.empty,
+        sessions.source.follow?.({ address: { kind: 'session', sessionId: SessionId('session-remote') } }) ?? Stream.empty,
       )
       expect([...frames]).toHaveLength(1)
     }).pipe(Effect.provide(services(test)))
@@ -278,7 +279,7 @@ describe('RemoteSessions', () => {
       const sessions = yield* RemoteSessions
       const interactions = yield* RemoteInteractions
       yield* sessions.source.list({})
-      const follow = sessions.source.follow?.({ address: { kind: 'session', sessionId: 'session-remote' as SessionId } } as never)
+      const follow = sessions.source.follow?.({ address: { kind: 'session', sessionId: SessionId('session-remote') } } as never)
       if (follow === undefined) throw new Error('The source follows Sessions.')
       // The directory and the connection are real I/O, which a virtual clock does not advance.
       const settle = TestClock.withLive(Effect.sleep('200 millis'))
@@ -304,7 +305,7 @@ describe('RemoteSessions', () => {
       const threads = yield* RemoteThreads
       const fork = sessions.source.fork
       if (fork === undefined) throw new Error('The source forks Sessions.')
-      const created = yield* fork({ sessionId: 'session-remote' as SessionId })
+      const created = yield* fork({ sessionId: SessionId('session-remote') })
       expect(created.sessionId).toBe('session-forked')
       expect(test.calls.map(call => call.method)).toContain('fork')
       expect((yield* threads.list).find(thread => thread.sessionId === 'session-forked')).toMatchObject({ runtimeId, cwd: '/remote/repo' })
@@ -318,7 +319,7 @@ describe('RemoteSessions', () => {
       yield* sessions.source.list({})
       const request = {
         requestId: 'request-1',
-        sessionId: 'session-remote' as SessionId,
+        sessionId: SessionId('session-remote'),
         mode: 'queue' as const,
         content: [{ type: 'text' as const, text: 'hello' }],
       }
@@ -481,7 +482,7 @@ describe('RemoteSessions', () => {
     return Effect.gen(function* () {
       const sessions = yield* RemoteSessions
       const exit = yield* Effect.exit(
-        sessions.source.page?.({ address: { kind: 'session', sessionId: 'session-unknown' as SessionId }, throughSeq: 0 }) ?? Effect.void,
+        sessions.source.page?.({ address: { kind: 'session', sessionId: SessionId('session-unknown') }, throughSeq: 0 }) ?? Effect.void,
       )
       expect(exit._tag).toBe('Failure')
       expect(test.calls.some(call => call.method === 'page')).toBe(false)
@@ -494,7 +495,7 @@ describe('RemoteSessions', () => {
       const sessions = yield* RemoteSessions
       yield* sessions.source.list({})
       const selected = yield* (
-        sessions.source.selectModel?.({ sessionId: 'session-remote' as SessionId, provider: 'deepseek', model: 'chat', reasoningEffort: 'high' }) ??
+        sessions.source.selectModel?.({ sessionId: SessionId('session-remote'), provider: 'deepseek', model: 'chat', reasoningEffort: 'high' }) ??
           Effect.succeed(undefined)
       )
       expect(selected).toEqual({ selected: { provider: 'deepseek', model: 'chat', reasoningEffort: 'high' } })

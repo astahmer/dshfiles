@@ -1,9 +1,50 @@
 import { describe, expect, test } from 'vitest'
-import { aiAccountsApi, removeCustomModelInputSchema, type CopilotLoginState } from './api.js'
+import { aiAccountsApi, removeCustomModelInputSchema, type AccountsUsage, type CopilotLoginState } from './api.js'
 import { AccountsHostApiModel } from './accounts-host-api.js'
 import { AiAccountsSchema } from './effect-schema.js'
 
 describe('ai-accounts tool exposure', () => {
+  test('the quota reading names DSH’s gate and the provider’s own extra-usage setting as independent', () => {
+    const usage: AccountsUsage = {
+      readAt: 1,
+      hostName: 'mac',
+      cards: [
+        {
+          instanceId: 'claude_work',
+          displayName: 'ClaudeWork',
+          kind: 'claude',
+          enabled: true,
+          useExtraUsage: false,
+          usage: {
+            status: 'ok',
+            message: null,
+            identity: null,
+            plan: 'team',
+            windows: [],
+            bankedResets: 0,
+            bankedResetExpiries: [],
+            extraUsage: { enabled: true, used: 169.91, monthlyLimit: 200, currency: 'EUR', percentUsed: 84.955, resetsAt: null },
+          },
+        },
+      ],
+    }
+    const rendered = aiAccountsApi.methods.usage.tool?.render?.(usage)
+    expect(rendered).toContain('useExtraUsage is DSH’s gate')
+    expect(rendered).toContain('"useExtraUsage":false')
+    expect(rendered).toContain('"enabled":true')
+    expect(aiAccountsApi.methods.refreshUsage.tool?.render?.(usage)).toBe(rendered)
+  })
+
+  test('changing DSH’s extra-usage gate says the provider’s own setting is unchanged', () => {
+    const rendered = aiAccountsApi.methods.setExtraUsage.tool?.render?.({
+      distribution: 'priority',
+      cooldownMs: 0,
+      shadowRoot: '',
+      accounts: [],
+    })
+    expect(rendered).toContain('off on every account in DSH')
+    expect(rendered).toContain('provider’s own extra-usage setting is unchanged')
+  })
   test('every account and quota action a human can take is a named tool', () => {
     const tools = Object.values(aiAccountsApi.methods).flatMap(method => (method.tool === undefined ? [] : [method.tool]))
     expect(tools.map(tool => tool.name).sort()).toEqual([
@@ -35,6 +76,7 @@ describe('ai-accounts tool exposure', () => {
       'ai_accounts_resume_continuation',
       'ai_accounts_save_account',
       'ai_accounts_set_auto_retry',
+      'ai_accounts_set_context_window',
       'ai_accounts_set_distribution',
       'ai_accounts_set_extra_usage',
       'ai_accounts_set_native_provider',

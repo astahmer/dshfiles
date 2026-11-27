@@ -22,6 +22,7 @@ import type { ChatSnapshot } from '../contract/snapshot.ts'
 import { markdownLabels } from '../markdown-labels.ts'
 import { TurnNavigator } from './TurnNavigator.tsx'
 import { AnnotateSelection } from './AnnotateSelection.tsx'
+import { AnnotationMarks } from './annotation-marks.tsx'
 import { TranscriptWindow, useTranscriptWindow } from '../../transcript-window.ts'
 import { chatRenderKey } from './render-entry.ts'
 import { ConversationViewOpenerContext, useChatFocus } from '../../chat-focus-reveal.ts'
@@ -83,10 +84,14 @@ type PendingInput = PendingSubmission | InboxState['next-step'][number]
 export function ChatView({
   useSession, useChat, useConversation, useSessions, renderSlot, useImageGalleryScope, useUnreadLanding,
   sessionId, openFile, openExternalLink, resolveFilePath, useContextMenu,
-  loadOlder, consumeOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, forkAt,
+  loadOlder, consumeOlder, loadThrough, loadImage, inspectCall, chatScroll, seenAnswer, seenTurns, forkAt,
   usePresentation, useProjection, useInteractionIds, dispatchInteraction, t, fileDrag, viewRequest, completeViewRequest, openView,
+  useAnnotationMarks, useAnnotationQuickComment,
 }: ChatViewSlotProps) {
+  const annotationMarks = useAnnotationMarks(value => value)
+  const annotationQuickComment = useAnnotationQuickComment(value => value)
   const { getTriggerProps } = useContextMenu()
+
   const getMarkdownTriggerProps = useCallback((target: MarkdownMenuTarget) => getTriggerProps(() => {
     switch (target.kind) {
       case 'file': return { kind: 'file', value: { sessionId, path: resolveFilePath(target.path),
@@ -387,6 +392,13 @@ export function ChatView({
   const frameRef = useRef<HTMLDivElement>(null)
   const listElement = useCallback(() => scroll.listRef.current, [scroll.listRef])
   const navigateToTurn = scroll.navigateToTurn
+  const [seenTurn, setSeenTurn] = useState<number | null>(null)
+  const seenTurnRef = useRef<number | null>(null)
+  useLayoutEffect(() => {
+    const stored = seenTurns.read()
+    seenTurnRef.current = stored
+    setSeenTurn(stored)
+  }, [seenTurns, sessionId])
   const activeTurn = scroll.activeTurn
   const [turnFilter, setTurnFilter] = useState<TurnMarkFilter>('all')
   useEffect(() => { setTurnFilter('all') }, [sessionId])
@@ -539,6 +551,26 @@ export function ChatView({
   }, [sessionId])
   const recap = useMemo(() => (sinceNote === null ? null : SinceYouLeftRecapModel.recap(railItems, sinceNote)), [sinceNote, railItems])
   const dismissSince = useCallback(() => { setSinceNote(null) }, [])
+  // The rail's read boundary (the place Chat's "New" divider marks): the Host unread record seeds it while the recap is
+  // shown, then the Turn at the top of the viewport advances it as the reader scrolls through newer content.
+  const unreadBoundary = useMemo(
+    () => (recap === null ? null : railItems.findLast(item => item.turn < recap.firstTurn)?.turn ?? null),
+    [recap, railItems],
+  )
+  useLayoutEffect(() => {
+    if (recap === null) return
+    seenTurns.reset(unreadBoundary)
+    seenTurnRef.current = unreadBoundary
+    setSeenTurn(unreadBoundary)
+  }, [recap, unreadBoundary, seenTurns])
+  useEffect(() => {
+    if (recap !== null || activeTurn === null) return
+    const current = seenTurnRef.current
+    if (current !== null && activeTurn <= current) return
+    seenTurnRef.current = activeTurn
+    seenTurns.markSeen(activeTurn)
+    setSeenTurn(activeTurn)
+  }, [activeTurn, recap, seenTurns])
   const entryTurn = useCallback((entry: RenderEntry): number | undefined => {
     const key = entry.kind === 'node' ? entry.key : groupMembers(entry.key)[0]
     const location = key === undefined ? undefined : nodeStore.get(key as NodeKey)?.location
@@ -560,9 +592,11 @@ export function ChatView({
   }, [recap, transcript.entries, entryTurn, jumpToTurn, dismissSince, t, railItems, unreadLanding, running])
 
   return (
-    <div ref={frameRef} className={css.frame}>
+    <div ref={frameRef} className={css.frame} data-chat-frame="">
       <AnnotateSelection sessionId={sessionId} containerRef={scroll.listRef} t={t}
+        quickComment={annotationQuickComment}
         actionRow={textInteraction.active?.trigger === 'selection' ? interactionSurface : null} />
+      <AnnotationMarks sessionId={sessionId} containerRef={scroll.columnRef} mode={annotationMarks} t={t} />
       {scroll.initialized && (
         <TurnNavigator
           items={shownRailItems}
@@ -575,6 +609,7 @@ export function ChatView({
           onFilterChange={setTurnFilter}
           inView={inView}
           onStep={stepTurn}
+          seenTurn={seenTurn}
         />
       )}
       {find.open && (
@@ -599,6 +634,7 @@ export function ChatView({
         counts={filterCounts}
         onFilterChange={setTurnFilter}
         onNavigate={item => { jumpToTurn(item.turn) }}
+        seenTurn={seenTurn}
         t={t}
       />}
       <div className={css.root} data-chat-following-tail={scroll.followingTail ? '' : undefined}>

@@ -36,7 +36,7 @@ if (mode === 'huge') { process.stdout.write('x'.repeat(1_100_000)); return }
 if (mode === 'hang') { fs.writeFileSync(process.env.SECRET_SESSION_FILE, String(process.pid)); setInterval(() => {}, 1000); return }
 let stdin = ''
 process.stdin.on('data', chunk => { stdin += chunk })
-process.stdin.on('end', () => process.stdout.write(JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), stdin, bwSession: process.env.BW_SESSION ?? null, sessionFile: process.env.SECRET_SESSION_FILE ?? null, home: process.env.HOME ?? null, foreign: process.env.SYNTHETIC_FOREIGN_SECRET ?? null }) + '\\n'))
+process.stdin.on('end', () => process.stdout.write(JSON.stringify({ args: process.argv.slice(2), cwd: process.cwd(), stdin, bwSession: process.env.BW_SESSION ?? null, onePasswordToken: process.env.OP_SERVICE_ACCOUNT_TOKEN ?? null, sessionFile: process.env.SECRET_SESSION_FILE ?? null, home: process.env.HOME ?? null, foreign: process.env.SYNTHETIC_FOREIGN_SECRET ?? null }) + '\\n'))
 `
 
 const Report = Schema.fromJsonString(
@@ -45,6 +45,7 @@ const Report = Schema.fromJsonString(
     cwd: Schema.String,
     stdin: Schema.String,
     bwSession: Schema.NullOr(Schema.String),
+    onePasswordToken: Schema.NullOr(Schema.String),
     sessionFile: Schema.NullOr(Schema.String),
     home: Schema.NullOr(Schema.String),
     foreign: Schema.NullOr(Schema.String),
@@ -92,6 +93,7 @@ describe.skipIf(process.platform === 'win32')('managed secret CLI', () => {
           cwd: report.cwd,
           stdin: 'synthetic-secret-value',
           bwSession: 'synthetic-session-token',
+          onePasswordToken: 'synthetic-service-account-token',
           sessionFile: '/private/tmp/synthetic-secret-session',
           home: '/private/tmp/synthetic-home',
           foreign: null,
@@ -104,6 +106,7 @@ describe.skipIf(process.platform === 'win32')('managed secret CLI', () => {
           ConfigProvider.fromUnknown({
             HOME: '/private/tmp/synthetic-home',
             BW_SESSION: 'synthetic-session-token',
+            OP_SERVICE_ACCOUNT_TOKEN: 'synthetic-service-account-token',
             SECRET_SESSION_FILE: '/private/tmp/synthetic-secret-session',
             SYNTHETIC_FOREIGN_SECRET: 'must-not-be-forwarded',
           }),

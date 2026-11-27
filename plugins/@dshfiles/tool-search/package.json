@@ -16,7 +16,15 @@
   "exports": {
     ".": "./dist/index.js",
     "./package.json": "./package.json",
-    "./cordis.patch.yml": "./cordis.patch.yml"
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./tool-visibility": {
+      "types": "./src/tool-visibility.ts",
+      "default": "./dist/tool-visibility.js"
+    },
+    "./access": {
+      "types": "./src/access.ts",
+      "default": "./dist/access.js"
+    }
   },
   "scripts": {
     "build": "node ../../../tooling/dshx/packages/dshx/dist/cli/bin.js build",

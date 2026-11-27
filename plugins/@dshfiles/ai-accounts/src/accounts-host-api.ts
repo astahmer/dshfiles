@@ -30,9 +30,11 @@ import {
 } from './api.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { AccountProfilesModel } from './account-store.js'
+import { accountUsageCard } from './account-usage-card.js'
 import type { AccountStorePromise } from './account-store-promise.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
+import { AccountModelSettingsModel } from './account-model-settings.js'
 import { boundedUsageRead, readAccountUsage } from './account-usage.js'
 import { ExtraUsageGuardModel } from './extra-usage-guard.js'
 import { ProviderUsageModel } from './usage.js'
@@ -311,6 +313,37 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
       return accountsFile(ctx, store)
     },
   ),
+  setModelContextWindow: lockedHandler(
+    aiAccountsApi,
+    'setModelContextWindow',
+    ({ input }) => [input.instanceId],
+    async ({ input, ctx, store }) => {
+      const account = (await store.readAccountFile()).accounts.find(profile => profile.instanceId === input.instanceId)
+      if (account === undefined) throw new AccountNotFound({ instanceId: input.instanceId })
+      const max = accountRuntime(ctx)?.maxContextWindows?.(input.instanceId).get(input.modelId)
+      const write = AccountModelSettingsModel.contextWindowWrite({
+        current: account.contextWindowOverrides,
+        modelId: input.modelId,
+        requested: input.contextWindow,
+        max,
+      })
+      await store.upsertAccount({ ...account, contextWindowOverrides: write.overrides }, undefined, true)
+      await refreshRoutes(ctx, store)
+      const effective = await ctx
+        .get('llm')
+        ?.resolveModelInfo(input.instanceId, input.modelId)
+        .then(info => info.context?.contextWindow ?? null)
+        .catch(() => null)
+      return {
+        instanceId: input.instanceId,
+        modelId: input.modelId,
+        contextWindowOverride: write.saved,
+        maxContextWindow: max ?? null,
+        clamped: write.clamped,
+        effectiveContextWindow: effective ?? null,
+      }
+    },
+  ),
   identity: effectHandler(aiAccountsApi, 'identity', async ({ input, store }) =>
     AccountProfilesModel.readAccountIdentity(await store.readAccountFile(), input.instanceId),
   ),
@@ -365,13 +398,21 @@ export const accountsHostApi = Api.bind(aiAccountsApi, {
       editingCatalog === undefined
         ? await Promise.all((await llm.listModels(input.instanceId)).map(model => llm.resolveModelInfo(input.instanceId, model.id)))
         : await editingCatalog(input.instanceId)
-    const resolved = models.map(model => ({
-      id: model.id,
-      name: baseModelName(input.instanceId, model.name),
-      efforts: (model.reasoning?.efforts ?? []).map(effort => ({ id: effort.id, name: effort.name })),
-      defaultEffort: model.reasoning?.defaultEffort ?? null,
-      ...('accountAdditional' in model && typeof model.accountAdditional === 'boolean' && { accountAdditional: model.accountAdditional }),
-    }))
+    const overrides = (await store.readAccountFile()).accounts.find(account => account.instanceId === input.instanceId)?.contextWindowOverrides ?? {}
+    const resolved = models.map(model => {
+      const contextWindow =
+        'defaultContextWindow' in model && typeof model.defaultContextWindow === 'number' ? model.defaultContextWindow : model.context?.contextWindow
+      const maxContextWindow = 'maxContextWindow' in model && typeof model.maxContextWindow === 'number' ? model.maxContextWindow : undefined
+      const override = overrides[model.id]
+      return {
+        id: model.id,
+        name: baseModelName(input.instanceId, model.name),
+        efforts: (model.reasoning?.efforts ?? []).map(effort => ({ id: effort.id, name: effort.name })),
+        defaultEffort: model.reasoning?.defaultEffort ?? null,
+        ...('accountAdditional' in model && typeof model.accountAdditional === 'boolean' && { accountAdditional: model.accountAdditional }),
+        ...AccountModelSettingsModel.contextWindowFields({ contextWindow, maxContextWindow, override }),
+      }
+    })
     const catalog = { instanceId: input.instanceId, models: resolved }
     if (warning === undefined) return catalog
     return { ...catalog, warning }
@@ -490,29 +531,27 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
   const cards = await mapRolling({
     items: file.accounts,
     concurrency: ACCOUNT_USAGE_READ_CONCURRENCY,
-    map: async account => ({
-      instanceId: account.instanceId,
-      displayName: AccountProfilesModel.displayNameOf(account),
-      kind: account.kind,
-      enabled: account.enabled,
-      usage: ProviderUsageModel.stamped(
-        await boundedUsageRead({
-          read: readSignal =>
-            readAccountUsage({
-              account,
-              shadowRoot: file.shadowRoot,
-              resolveCredential,
-              readCopilotCredential,
-              describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
-              readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
-              signal: readSignal,
-            }),
-          timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
-          signal,
-        }),
-        Date.now(),
-      ),
-    }),
+    map: async account =>
+      accountUsageCard({
+        account,
+        usage: ProviderUsageModel.stamped(
+          await boundedUsageRead({
+            read: readSignal =>
+              readAccountUsage({
+                account,
+                shadowRoot: file.shadowRoot,
+                resolveCredential,
+                readCopilotCredential,
+                describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+                readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
+                signal: readSignal,
+              }),
+            timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
+            signal,
+          }),
+          Date.now(),
+        ),
+      }),
   })
   const usage = { readAt: Date.now(), hostName: hostname(), cards }
   // Every surface polls this sweep, so it is where a spent plan starts keeping requests off an account that may not draw

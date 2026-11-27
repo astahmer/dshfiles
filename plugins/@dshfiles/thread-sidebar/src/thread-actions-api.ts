@@ -62,6 +62,15 @@ const fanOutModelSchema = Schema.Struct({
 
 const ONLY_WHEN_ASKED = 'Call only when the user asked for this.'
 
+/** Whether the calling thread now gets the target's turn-end notices; absent when nothing was asked or no thread called. */
+const notifyOutcomeSchema = Schema.optional(Schema.Literals(['subscribed', 'failed']))
+
+const renderNotify = (output: { readonly notify?: 'subscribed' | 'failed' | undefined; readonly notifyError?: string | undefined }): string => {
+  if (output.notify === 'subscribed') return ' It reports back to this thread when each turn ends.'
+  if (output.notify === 'failed') return ` It will not report back (${output.notifyError ?? 'subscription failed'}); call thread_subscribe to retry.`
+  return ''
+}
+
 /** Thread and project lifecycle actions the sidebar exposes, served to the Agent as native tools. */
 export const threadActionsApi = defineApi({
   id: 'thread-actions',
@@ -225,6 +234,7 @@ export const threadActionsApi = defineApi({
         title: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(200))),
         agentPreset: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128))),
         text: Schema.optional(Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(20_000))),
+        notifyCreator: Schema.optional(Schema.Boolean),
       }),
       output: Schema.Struct({
         sessionId: Schema.String,
@@ -232,12 +242,14 @@ export const threadActionsApi = defineApi({
         agentPreset: Schema.optional(Schema.String),
         prompt: Schema.optional(Schema.Literals(['accepted', 'refused'])),
         promptError: Schema.optional(Schema.String),
+        notify: notifyOutcomeSchema,
+        notifyError: Schema.optional(Schema.String),
       }),
-      description: `Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and optionally hand it its first message (text) in the same call: the thread's turn starts with that text instead of sitting idle, so no separate prompt call is needed. title applies when given; with only text the Host's automatic title stands, derived from that first message. Omitted text creates a blank thread, as before. A refused first message still returns the new thread id with prompt: 'refused' and the reason, so the created thread is never hidden. ${ONLY_WHEN_ASKED}`,
+      description: `Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and optionally hand it its first message (text) in the same call: the thread's turn starts with that text instead of sitting idle, so no separate prompt call is needed. title applies when given; with only text the Host's automatic title stands, derived from that first message. Omitted text creates a blank thread, as before. Started by an Agent, the new thread reports back: each of its turn ends (finished, failed, or stopped on a question) sends the calling thread one compact notice with the status and an answer preview, waking it when idle; pass notifyCreator: false to opt out, thread_unsubscribe to stop later. A refused first message still returns the new thread id with prompt: 'refused' and the reason, so the created thread is never hidden. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_create',
         render: output => {
-          const head = `Started thread ${output.sessionId}${output.title === undefined ? '' : ` named “${output.title}”`}${output.agentPreset === undefined ? '' : ` with preset ${output.agentPreset}`}.`
+          const head = `Started thread ${output.sessionId}${output.title === undefined ? '' : ` named “${output.title}”`}${output.agentPreset === undefined ? '' : ` with preset ${output.agentPreset}`}.${renderNotify(output)}`
           if (output.prompt === 'accepted') return `${head} Its first message was accepted.`
           if (output.prompt === 'refused') {
             return `${head} Its first message was refused: ${output.promptError ?? 'no reason given'}. The thread exists and is idle; send the text with thread_prompt.`
@@ -251,12 +263,19 @@ export const threadActionsApi = defineApi({
         sessionId: Schema.optional(sessionIdSchema),
         text: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(20_000)),
         mode: Schema.optional(Schema.Literals(['queue', 'steer'])),
+        watch: Schema.optional(Schema.Boolean),
       }),
-      output: Schema.Struct({ sessionId: Schema.String, mode: Schema.Literals(['queue', 'steer']), accepted: Schema.Literal(true) }),
-      description: `Hand a message to one thread: queue (the default) adds it as the thread's next turn and starts that turn when the thread is idle, so it is how an Agent follows up on a thread it started; steer folds it into the turn already running, which the Host refuses when no turn is live. Defaults to the calling thread. ${ONLY_WHEN_ASKED}`,
+      output: Schema.Struct({
+        sessionId: Schema.String,
+        mode: Schema.Literals(['queue', 'steer']),
+        accepted: Schema.Literal(true),
+        notify: notifyOutcomeSchema,
+        notifyError: Schema.optional(Schema.String),
+      }),
+      description: `Hand a message to one thread: queue (the default) adds it as the thread's next turn and starts that turn when the thread is idle, so it is how an Agent follows up on a thread it started; steer folds it into the turn already running, which the Host refuses when no turn is live. Defaults to the calling thread. watch: true also subscribes the calling thread to that thread's turn ends (as thread_subscribe does), for a thread it did not create; a thread created with thread_create already reports back. ${ONLY_WHEN_ASKED}`,
       tool: {
         name: 'thread_prompt',
-        render: output => `${output.mode === 'steer' ? 'Steered' : 'Queued a message for'} thread ${output.sessionId}.`,
+        render: output => `${output.mode === 'steer' ? 'Steered' : 'Queued a message for'} thread ${output.sessionId}.${renderNotify(output)}`,
       },
     }),
     stop: method({

@@ -58,12 +58,18 @@ const KEY_FIELD = {
     placeholder: 'MISTRAL_WORK_API_KEY',
   },
   antigravity: null,
+  vibe: {
+    label: 'VIBE_HOME',
+    hint: 'The folder `vibe --setup` signed in to. Empty uses ~/.vibe; this route runs the Vibe CLI, so it needs no key reference.',
+    placeholder: '~/.vibe',
+  },
 } satisfies Record<AccountDraft['kind'], { readonly label: string; readonly hint: string; readonly placeholder: string } | null>
 
 const launchCommandFor = (draft: AccountDraft): string | null => {
   if (draft.kind === 'codex' && draft.shadowHomePath.trim() !== '') return ShellCommand.withEnvironment('CODEX_HOME', draft.shadowHomePath, 'codex')
   if (draft.kind === 'claude') return claudeLaunchCommand(draft.homePath.trim())
   if (draft.kind === 'antigravity') return antigravityLaunchCommand(draft.homePath.trim())
+  if (draft.kind === 'vibe') return vibeLaunchCommand(draft.homePath.trim())
   return null
 }
 
@@ -83,6 +89,13 @@ const antigravityLaunchCommand = (homePath: string): string => {
   if (homePath === '' || /^~\/?$/u.test(homePath)) return 'agy'
   if (homePath.startsWith('~/')) return `HOME="$HOME"/${ShellCommand.posixQuote(homePath.slice(2))} agy`
   return ShellCommand.withEnvironment('HOME', homePath, 'agy')
+}
+
+/** `vibe` reads its login from VIBE_HOME; an empty home is the user's own default profile. */
+const vibeLaunchCommand = (homePath: string): string => {
+  if (homePath === '' || /^~\/\.vibe\/?$/u.test(homePath)) return 'vibe --setup'
+  if (homePath.startsWith('~/')) return `VIBE_HOME="$HOME"/${ShellCommand.posixQuote(homePath.slice(2))} vibe --setup`
+  return ShellCommand.withEnvironment('VIBE_HOME', homePath, 'vibe --setup')
 }
 
 export const RuntimePathsSection = (props: {

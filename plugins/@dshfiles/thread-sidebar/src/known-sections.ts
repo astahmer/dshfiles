@@ -233,4 +233,11 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['Secret Catalog: Secrets', 'Secrets'],
   },
   { panelId: 'plugins', destination: 'settings', label: 'Plugins', description: 'Installed plugins and the marketplace.', order: 4, formerLabels: ['Plugins'] },
+  {
+    panelId: 'dshfiles-plugin-list',
+    destination: 'settings',
+    label: 'Plugins by category',
+    description: 'A second view of your plugins: by area, with filters and Settings shortcuts.',
+    order: 5,
+  },
 ]

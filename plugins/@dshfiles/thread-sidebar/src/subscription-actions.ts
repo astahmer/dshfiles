@@ -43,6 +43,21 @@ const threadListUnavailable = (cause: unknown): PluginApiError =>
 
 export type SubscriptionActionError = PluginApiError | SubscriptionStorageFailed
 
+/**
+ * Store one edge for a thread the caller just started or prompted, keeping an existing pair's level. Unlike `subscribe`
+ * it skips the sidebar listing, which may not show a thread created a moment ago.
+ */
+export const watchThread = Effect.fn('thread subscriptions watch')(function* (input: {
+  readonly subscriberSessionId: string
+  readonly targetSessionId: string
+}) {
+  const store = yield* ThreadSubscriptions
+  const current = yield* store.snapshot
+  const refusal = ThreadSubscriptionsModel.refusalOf({ ...input, subscriptions: current.subscriptions })
+  if (refusal !== undefined) return yield* Effect.fail(new PluginApiError(refusal, { code: 'subscription-refused' }))
+  yield* store.subscribe(input)
+})
+
 export interface ThreadSubscriptionActionSet {
   readonly state: (
     input: { readonly subscriberSessionId?: string | undefined; readonly targetSessionId?: string | undefined },

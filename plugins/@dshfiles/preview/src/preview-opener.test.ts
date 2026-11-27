@@ -29,6 +29,32 @@ describe('PreviewOpener.hostOnly', () => {
   })
 })
 
+describe('PreviewOpener.embedNotice', () => {
+  it('explains a refusal with the header that made it, and a dead port as a stopped server', () => {
+    const refused = PreviewOpener.embedNotice({ url: 'https://github.com/', reachable: true, status: 200, framing: 'denied', detail: 'X-Frame-Options: deny' })
+    expect(refused?.verdict).toBe('refused')
+    expect(refused?.message).toContain('github.com')
+    expect(refused?.message).toContain('X-Frame-Options: deny')
+    // The pane may already hold the URL, and then only the notice can offer the way out.
+    expect(refused?.action?.label).toBe('Open in browser tab')
+
+    const afterOpening = PreviewOpener.embedNotice(
+      { url: 'https://github.com/', reachable: true, status: 200, framing: 'denied', detail: 'X-Frame-Options: deny' },
+      { tabOpened: true },
+    )
+    expect(afterOpening?.message).toContain('opened in a browser tab instead')
+    expect(afterOpening?.action).toBeUndefined()
+
+    const stopped = PreviewOpener.embedNotice({ url: 'http://127.0.0.1:53411/', reachable: false, status: null, framing: 'allowed', detail: null })
+    expect(stopped?.verdict).toBe('unreachable')
+    expect(stopped?.message).toContain('127.0.0.1:53411')
+  })
+
+  it('keeps a page that answers and allows framing in the pane', () => {
+    expect(PreviewOpener.embedNotice({ url: 'https://example.com/', reachable: true, status: 200, framing: 'allowed', detail: null })).toBeNull()
+  })
+})
+
 describe('PreviewOpener.open', () => {
   it('opens in the pane when it accepts the URL', () => {
     const tabs: string[] = []

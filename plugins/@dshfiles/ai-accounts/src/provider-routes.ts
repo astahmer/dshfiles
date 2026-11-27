@@ -4,6 +4,7 @@ import { ClaudeAccountModel } from './claude-account.js'
 import { CodexHomeError, type CodexHomeLayout } from './codex-home.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { DEFAULT_MISTRAL_KEY_ENV, MISTRAL_KIND as M_KIND } from './mistral-account.js'
+import { VIBE_KIND as V_KIND, VibeAccountModel } from './vibe-account.js'
 import { ANTIGRAVITY_KIND as AG_KIND, AntigravityAccountModel } from './antigravity-account.js'
 
 export const CODEX_KIND = 'codex'
@@ -12,6 +13,7 @@ export const COMMANDCODE_KIND = CC_KIND
 export const CLAUDE_KIND = 'claude'
 export const GITHUB_COPILOT_KIND = 'github-copilot'
 export const MISTRAL_KIND = M_KIND
+export const VIBE_KIND = V_KIND
 export const ANTIGRAVITY_KIND = AG_KIND
 
 const SLUG_PATTERN = /^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/
@@ -71,10 +73,20 @@ export interface AntigravityRoute {
   readonly enabled: boolean
 }
 
-export type Route = CodexRoute | KeyedRoute | ClaudeRoute | GitHubCopilotRoute | AntigravityRoute
+/** A route driven by the Vibe CLI: it runs `vibe` with this VIBE_HOME's signed-in session. */
+export interface VibeRoute {
+  readonly kind: typeof VIBE_KIND
+  readonly instanceId: string
+  readonly displayName: string
+  /** The account's VIBE_HOME, where `vibe --setup` stored the login. */
+  readonly home: string
+  readonly enabled: boolean
+}
+
+export type Route = CodexRoute | KeyedRoute | ClaudeRoute | GitHubCopilotRoute | AntigravityRoute | VibeRoute
 
 /** Routes whose model list is discovered from the account rather than read from a static catalog. */
-export type DiscoveringRoute = KeyedRoute | AntigravityRoute
+export type DiscoveringRoute = KeyedRoute | AntigravityRoute | CodexRoute
 
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()
@@ -175,6 +187,16 @@ export class ProviderRoutes {
         instanceId,
         displayName: displayNameFor(account.displayName, ANTIGRAVITY_KIND, instanceId),
         home: AntigravityAccountModel.resolveHome(account.home),
+        enabled: account.enabled,
+      })
+    }
+    for (const account of config.vibeAccounts) {
+      const instanceId = ProviderRoutes.normalizeInstanceId(account.instanceId, VIBE_KIND)
+      routes.set(instanceId, {
+        kind: VIBE_KIND,
+        instanceId,
+        displayName: displayNameFor(account.displayName, VIBE_KIND, instanceId),
+        home: VibeAccountModel.resolveHome(account.home),
         enabled: account.enabled,
       })
     }

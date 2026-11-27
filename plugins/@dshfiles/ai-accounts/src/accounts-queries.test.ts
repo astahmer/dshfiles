@@ -1,19 +1,28 @@
 import { createApiClient } from '@dshfiles/dshx/client'
-import { QueryClient, QueryObserver, type QueryKey } from '@dshfiles/plugin-ui/query'
+import { decodeJson, type JsonValue } from '@dshfiles/dshx/json'
+import { QueryClient, QueryObserver, type QueryKey, type QueryObserverOptions } from '@dshfiles/plugin-ui/query'
+import * as Schema from 'effect/Schema'
 import { describe, expect, it } from 'vitest'
 import { acceptAccountOrder, aiAccountsKeys, aiAccountsQueries } from './accounts-queries.js'
-import { aiAccountsApi, type AccountsFile, type NativeProviders } from './api.js'
+import { aiAccountsApi, type AccountsFile, type AccountsUsage, type NativeProviders } from './api.js'
 import { AccountDraftModel } from './account-draft.js'
 
 /** What an older Host actually sends: JSON that the current schema types do not describe. */
-const toWire = (value: unknown) => JSON.parse(JSON.stringify(value))
+const toWire = (value: unknown): AccountsUsage => {
+  // SAFETY: the fixture deliberately builds the wire JSON an older Host sends; keepLastGoodUsage is what tolerates that shape.
+  return decodeJson(Schema.Unknown, JSON.stringify(value)) as AccountsUsage
+}
 
 const usageCard = { status: 'ok', message: null, identity: null, plan: null, windows: [], bankedResets: 0, bankedResetExpiries: [] }
 
-const nextPollAfterFetch = (client: QueryClient, options: { readonly queryKey: QueryKey; readonly refetchInterval?: unknown }): unknown => {
-  const query = client.getQueryCache().find({ queryKey: options.queryKey })
-  if (query === undefined || typeof options.refetchInterval !== 'function') return options.refetchInterval
-  return options.refetchInterval(query)
+const nextPollAfterFetch = <TQueryFnData, TQueryKey extends QueryKey>(
+  client: QueryClient,
+  options: QueryObserverOptions<TQueryFnData, Error, TQueryFnData, TQueryFnData, TQueryKey>,
+): number | false | undefined => {
+  const observer = new QueryObserver(client, options)
+  const refetchInterval = observer.options.refetchInterval
+  if (typeof refetchInterval !== 'function') return refetchInterval
+  return refetchInterval(observer.getCurrentQuery())
 }
 
 const nativeProviders = (provider: { readonly enabled: boolean; readonly running: boolean }, liveReload = true): NativeProviders => ({
@@ -88,6 +97,32 @@ describe('ai-accounts queries', () => {
     )
     const usage = await new QueryClient().fetchQuery(options)
     expect(usage?.cards[0]?.displayName).toBe('work')
+    expect(usage?.cards[0]?.useExtraUsage).toBeUndefined()
+  })
+
+  it('keeps the Host’s extra-usage gate beside the provider’s own extra-usage reading', async () => {
+    const options = aiAccountsQueries.usage(
+      {
+        usage: async () =>
+          toWire({
+            readAt: 1,
+            hostName: 'mac',
+            cards: [
+              {
+                instanceId: 'work',
+                kind: 'claude',
+                enabled: true,
+                useExtraUsage: false,
+                usage: { ...usageCard, extraUsage: { enabled: true, used: 12, monthlyLimit: 50, currency: 'EUR', percentUsed: 24, resetsAt: null } },
+              },
+            ],
+          }),
+      },
+      60_000,
+    )
+    const usage = await new QueryClient().fetchQuery(options)
+    expect(usage?.cards[0]?.useExtraUsage).toBe(false)
+    expect(usage?.cards[0]?.usage.extraUsage?.enabled).toBe(true)
   })
 
   it('reports an unreadable usage answer as null rather than failing the surface', async () => {
@@ -97,7 +132,7 @@ describe('ai-accounts queries', () => {
 
   it('dates a kept reading by when it was read, not by the sweep that failed to replace it', () => {
     const goodCard = { ...usageCard, status: 'ok' as const, windows: [{ label: 'Weekly limit', percentRemaining: 40, resetsAt: 9 }] }
-    const sweep = (readAt: number, usage: unknown) =>
+    const sweep = (readAt: number, usage: JsonValue) =>
       aiAccountsQueries.keepLastGoodUsage(
         null,
         toWire({ readAt, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'claude', enabled: true, usage }] }),
@@ -132,7 +167,7 @@ describe('ai-accounts queries', () => {
   })
 
   it('shows a throttled card that carries its own windows instead of the older reading', () => {
-    const sweep = (usage: unknown) =>
+    const sweep = (usage: JsonValue) =>
       aiAccountsQueries.keepLastGoodUsage(
         null,
         toWire({ readAt: 1, hostName: 'mac', cards: [{ instanceId: 'work', displayName: 'Work', kind: 'mistral', enabled: true, usage }] }),

@@ -7,6 +7,10 @@ export const definePromptSection = HostDefinitionModel.definePromptSection
 export { defineTool } from '@deepseek-ai/dsh-tools'
 export { pluginToolCatalog } from '../api/tool-catalog.js'
 export type { PluginToolCatalogEntry } from '../api/tool-catalog.js'
+import { ToolSourcesModel } from '../api/tool-sources.js'
+/** A synchronous `name → { source, owner }` classifier over the current registry, the listing's own rule. */
+export const toolSources = ToolSourcesModel.of
+export type { ToolSourceView } from '../api/tool-sources.js'
 import { HostApiClientModel } from '../api/host-client.js'
 import { HostApiEventsModel } from '../api/host-events.js'
 import { PluginStorageModel } from './plugin-storage.js'

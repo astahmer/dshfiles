@@ -1,17 +1,36 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { underSettledSession, type SettledSessionHeader } from './settled-gate.js'
+import { SettledGateModel, type SettledSessionHeader } from './settled-gate.js'
 
 const walk = (input: {
   readonly header: SettledSessionHeader
   readonly settled?: readonly string[]
   readonly parents?: Readonly<Record<string, SettledSessionHeader>>
 }): boolean =>
-  underSettledSession({
+  SettledGateModel.under({
     header: input.header,
     settledSessionIds: input.settled ?? [],
     parentHeader: sessionId => input.parents?.[sessionId],
   })
+
+test('names every settled owner up the lineage, nearest first, so a reminder can lift each one', () => {
+  const header: SettledSessionHeader = { id: 'child', origin: 'subagent', parentSession: 'parent' }
+  const parents = {
+    parent: { id: 'parent', origin: 'subagent', parentSession: 'grandparent' },
+    grandparent: { id: 'grandparent' },
+  } satisfies Record<string, SettledSessionHeader>
+  const parentHeader = (sessionId: string) => (sessionId === 'parent' ? parents.parent : sessionId === 'grandparent' ? parents.grandparent : undefined)
+  assert.deepEqual(SettledGateModel.lineage({ header, settledSessionIds: ['parent', 'grandparent'], parentHeader }), ['parent', 'grandparent'])
+  assert.deepEqual(
+    SettledGateModel.lineage({
+      header: { id: 'child', origin: 'subagent', parentSession: 'gone' },
+      settledSessionIds: ['gone'],
+      parentHeader: () => undefined,
+    }),
+    ['gone'],
+  )
+  assert.deepEqual(SettledGateModel.lineage({ header: { id: 'free' }, settledSessionIds: ['elsewhere'], parentHeader: () => undefined }), [])
+})
 
 test('a settled session owns its own step', () => {
   assert.equal(walk({ header: { id: 'a' }, settled: ['a'] }), true)
@@ -45,4 +64,12 @@ test('a corrupt cycle still terminates', () => {
     }),
     false,
   )
+})
+
+test('a reminder step runs and lifts the settled owners, every other wake waits for an unsettle', () => {
+  const reminder = { source: { kind: 'schedule' } }
+  const answer = { source: { kind: 'user' } }
+  assert.equal(SettledGateModel.stepFor({ settledOwners: [], messages: [answer] }), 'run')
+  assert.equal(SettledGateModel.stepFor({ settledOwners: ['parent'], messages: [answer] }), 'reject')
+  assert.equal(SettledGateModel.stepFor({ settledOwners: ['parent'], messages: [answer, reminder] }), 'run')
 })

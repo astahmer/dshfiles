@@ -8,7 +8,7 @@ import type { ThreadMutes } from './thread-mute.js'
 import { DEFAULT_THREAD_NOTIFICATION_CATEGORIES, type ThreadNotificationCategories, type ThreadNotificationPlacement } from './thread-notifications.js'
 import { DEFAULT_THREAD_VIEW_SETTINGS, type ThreadViewSettings } from './thread-view-preferences.js'
 import type { ThreadBoardViewSettings } from './thread-board-view.js'
-import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspaceAttribution, WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 import { SchemaHelpers } from './schema-helpers.js'
 
 /** Render order: settled sits right before archived, since both are storage rather than places to work. */
@@ -81,6 +81,8 @@ export interface SidebarPreferences {
   idleMinutes: number
   /** Settle a finished subagent thread after this many idle hours and stop its jobs; 0 leaves subagents to the idle rule. */
   subagentSettleHours: number
+  /** Lift a thread's settled or archived status before one of its reminders is due, so the reminder always runs. */
+  remindersWakeEnabled: boolean
   scanIntervalMinutes: number
   excludedWorkspaceIds: string[]
   excludedSessionIds: string[]
@@ -214,6 +216,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   settledArchiveDelay: 'disabled',
   idleMinutes: 120,
   subagentSettleHours: 24,
+  remindersWakeEnabled: true,
   scanIntervalMinutes: 10,
   excludedWorkspaceIds: [],
   excludedSessionIds: [],
@@ -388,58 +391,8 @@ const sessionLineage = (session: Pick<SessionSummary, 'id' | 'parentId'>, byId: 
   }
 }
 
-/** The workspace fields session attribution reads; the Host registry and the client stream both carry them. */
-export type AttributedWorkspace = Pick<WorkspaceView, 'workspaceId' | 'path' | 'sessionIds'>
-
-interface PathIndex<Workspace extends AttributedWorkspace> {
-  readonly byPath: ReadonlyMap<string, Workspace>
-  readonly threadDirectories: ThreadDirectories | undefined
-}
-
-const projectOfThreadWorkspace = <Workspace extends AttributedWorkspace>(workspace: Workspace, index: PathIndex<Workspace>): Workspace | undefined => {
-  const projectPath = WorkspacePaths.projectPathOf({ path: workspace.path, threadDirectories: index.threadDirectories })
-  return projectPath === workspace.path ? undefined : index.byPath.get(projectPath)
-}
-
-/**
- * The owning project of a filesystem path. A registered thread workspace resolves to the repository it builds in; a
- * path under a `<repository>-threads` directory resolves even without a registration, which is all a session keeps
- * after its thread workspace is forgotten.
- */
-const projectIdForPath = (path: string, index: PathIndex<AttributedWorkspace>): string | undefined => {
-  const registered = index.byPath.get(path)
-  if (registered !== undefined) return (projectOfThreadWorkspace(registered, index) ?? registered).workspaceId
-  const projectPath = WorkspacePaths.projectPathOf({ path, threadDirectories: index.threadDirectories })
-  if (projectPath === path) return undefined
-  const owner = index.byPath.get(projectPath)
-  return owner === undefined ? undefined : (projectOfThreadWorkspace(owner, index) ?? owner).workspaceId
-}
-
-/**
- * Thread workspaces are attributed to their owning project workspace; unaccounted sessions fall back to their recorded
- * cwd. `threadDirectories` carries the VCS providers' custom thread folders; without it the default layout applies.
- */
-const workspaceForSessions = (input: {
-  readonly workspaces: readonly AttributedWorkspace[]
-  readonly sessions: readonly { readonly id: string; readonly cwd?: string | undefined }[]
-  readonly threadDirectories?: ThreadDirectories | undefined
-}): Map<string, string> => {
-  const index: PathIndex<AttributedWorkspace> = {
-    byPath: new Map(input.workspaces.map(workspace => [workspace.path, workspace])),
-    threadDirectories: input.threadDirectories,
-  }
-  const map = new Map<string, string>()
-  for (const workspace of input.workspaces) {
-    const owner = projectOfThreadWorkspace(workspace, index) ?? workspace
-    for (const sessionId of workspace.sessionIds) map.set(sessionId, owner.workspaceId)
-  }
-  for (const session of input.sessions) {
-    if (map.has(session.id) || session.cwd === undefined) continue
-    const projectId = projectIdForPath(session.cwd, index)
-    if (projectId !== undefined) map.set(session.id, projectId)
-  }
-  return map
-}
+/** Session → project attribution lives in `@dshfiles/vcs-provider-port/workspace-attribution`, shared with agents. */
+const workspaceForSessions = WorkspaceAttribution.workspaceForSessions
 
 /**
  * The workspace each Session is accounted to, without attributing a thread workspace to its project. A deep link has
@@ -780,13 +733,13 @@ const sectionDropPlan = (section: SidebarSection): SectionDropPlan => {
 
 /**
  * The part of a section drop a remote row can honour. Parked, settled and the idle override are this sidebar's own
- * sets, keyed by Session id; pin, unpin and archive are Host verbs on the runtime that owns the Session, so a
- * remote row never unpins and never enters Pinned or Archived.
+ * sets, keyed by Session id; archive and unarchive run on the runtime owning the Session through multi-host; pin stays
+ * a Host verb this sidebar only mirrors, so a remote row never enters Pinned and never unpins.
  * @returns the plan to apply, or null for a section a mirrored Session cannot move into.
  */
 const remoteSectionDropPlan = (section: SidebarSection): SectionDropPlan | null => {
   const plan = sectionDropPlan(section)
-  return plan.archive || plan.pin ? null : { ...plan, unarchive: false, unpin: false }
+  return plan.pin ? null : { ...plan, unpin: false }
 }
 
 /** The sections a remote row offers, in render order. */

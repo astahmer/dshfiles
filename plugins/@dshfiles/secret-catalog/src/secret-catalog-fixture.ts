@@ -23,10 +23,16 @@ export const catalogWithCli = (
   return { requests, layer }
 }
 
-/** A stand-in CLI that prints `rows` for every `print` and answers `get` with `value`. */
-export const catalogWithRows = (input: { readonly rows: readonly Record<string, string>[]; readonly value?: string }) =>
+/** A stand-in CLI that prints `rows` for every `print`, `unaliased` rows for `unaliased`, and answers `get` with `value`. */
+export const catalogWithRows = (input: {
+  readonly rows: readonly Record<string, string>[]
+  readonly value?: string
+  /** Vault items the CLI resolves by name (`secret unaliased --json`): no config alias declares them. */
+  readonly unaliased?: readonly { readonly alias: string; readonly item: string; readonly field?: string }[]
+}) =>
   catalogWithCli(request => {
     if (request.args[0] === 'print') return Effect.succeed(JSON.stringify(input.rows))
+    if (request.args[0] === 'unaliased') return Effect.succeed(JSON.stringify(input.unaliased ?? []))
     if (request.args[0] === 'get') return Effect.succeed(input.value ?? 'synthetic-secret-value\n')
     return Effect.succeed('')
   })

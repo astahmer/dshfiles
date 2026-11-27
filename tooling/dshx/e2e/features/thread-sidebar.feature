@@ -327,3 +327,17 @@ Feature: Thread sidebar journeys
     Then the composer dock reports the working subagent and what it runs
     And stopping the subagent from the dock takes a confirmation
     And the transcript row opens the subagent's thread
+
+  @scenario:thread-sidebar.all-settings-keeps-tab
+  Scenario: Clicking All settings in the Settings sidebar keeps the Settings tab open
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When Settings is opened from the destination rail
+    Then clicking All settings keeps the Settings tab open without switching back to a conversation tab
+
+  @scenario:thread-sidebar.subagent-run-cards
+  Scenario: Several working subagents keep their cards legible and fold one at a time
+    Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted
+    When a Command Code account backed by a local fake provider is added
+    And a thread delegates a long command to three subagents
+    Then the dock lists three working subagent cards without squashing one into another
+    And one working subagent folds to its own row and back without collapsing the others

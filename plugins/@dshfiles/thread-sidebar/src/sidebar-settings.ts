@@ -59,8 +59,12 @@ export class SidebarSettings extends Context.Service<
     readonly autoRestart: Effect.Effect<AutoRestartPolicy>
     readonly subscriptionNoticeLevel: Effect.Effect<SubscriptionNoticeLevel>
     readonly subscriptionDelivery: Effect.Effect<SubscriptionDeliveryMode>
+    /** Whether a settled or archived thread is lifted before one of its reminders is due. */
+    readonly remindersWake: Effect.Effect<boolean>
     /** Settle several threads in one write, keeping the first settle instant of each and dropping their parked mark. */
     readonly settle: (sessionIds: ReadonlyArray<string>) => Effect.Effect<void, SidebarSettingsWriteFailed>
+    /** Drop the settled status of several threads in one write, for a reminder that needs its thread awake. */
+    readonly unsettle: (sessionIds: ReadonlyArray<string>) => Effect.Effect<void, SidebarSettingsWriteFailed>
     /** Add or drop one settled id, returning the ids the namespace now holds. */
     readonly setSettled: (input: { readonly sessionId: string; readonly settled: boolean }) => Effect.Effect<ReadonlyArray<string>, SidebarSettingsWriteFailed>
   }
@@ -110,8 +114,15 @@ export class SidebarSettings extends Context.Service<
         autoRestart: Effect.map(settings.get, value => ({ enabled: value.autoRestartWhenIdle, quietSeconds: value.autoRestartQuietSeconds })),
         subscriptionNoticeLevel: Effect.map(settings.get, value => value.subscriptionNoticeLevel),
         subscriptionDelivery: Effect.map(settings.get, value => value.subscriptionDelivery),
+        remindersWake: Effect.map(settings.get, value => value.remindersWakeEnabled),
         settle: Effect.fn('settled threads settle')(function* (sessionIds) {
           yield* write((value, now) => settleAndUnpark(value, sessionIds, now))
+        }),
+        unsettle: Effect.fn('settled threads unsettle')(function* (sessionIds) {
+          yield* write(value => {
+            const unsettled = SettledThreadsModel.unsettle(statusOf(value), sessionIds)
+            return { settledSessionIds: unsettled.settledSessionIds, settledAt: unsettled.settledAt }
+          })
         }),
         setSettled: Effect.fn('settled thread set')(function* (input) {
           const next = yield* write((value, now) => {

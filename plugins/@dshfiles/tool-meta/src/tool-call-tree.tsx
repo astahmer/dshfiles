@@ -103,12 +103,7 @@ const useHeaderRowReservation = (frameRef: { readonly current: HTMLElement | nul
   }, [frameRef, labelRef])
 }
 
-const ToolCallFrame = (props: {
-  readonly card: ReactNode
-  readonly meta: ReactNode
-  readonly inFlow: boolean
-  readonly sections: ReactNode
-}): ReactElement => {
+const ToolCallFrame = (props: { readonly card: ReactNode; readonly meta: ReactNode; readonly inFlow: boolean; readonly sections: ReactNode }): ReactElement => {
   const frameRef = useRef<HTMLDivElement>(null)
   const labelRef = useRef<HTMLSpanElement>(null)
   useHeaderRowReservation(frameRef, labelRef)

@@ -20,6 +20,8 @@ const draft = (fields: Partial<AgentDraft> = {}): AgentDraft => ({
   memoryScope: null,
   routine: '',
   delegation: { messaging: 'any', handles: [], subagents: true },
+  tools: { tools: {}, groups: {} },
+  subagents: { allowed: 'any', default: null },
   enabled: true,
   ...fields,
 })

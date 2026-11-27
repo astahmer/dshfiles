@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { WorkspacePaths, workspaceName } from './workspace-paths.js'
+import { WorkspaceAttribution, WorkspacePaths, workspaceName } from './workspace-attribution.js'
 
 describe('WorkspacePaths.projectPathOf', () => {
   const customLayout = WorkspacePaths.threadDirectoriesOf([{ repoRoot: '/dev/dshfiles', threadsDirectory: '/elsewhere/threads/dshfiles/' }])
@@ -36,5 +36,73 @@ describe('workspaceName', () => {
   it('returns undefined for an empty path', () => {
     expect(workspaceName('')).toBeUndefined()
     expect(workspaceName('/')).toBeUndefined()
+  })
+})
+
+describe('WorkspaceAttribution', () => {
+  const project = {
+    workspaceId: 'project',
+    path: '/dev/dshfiles',
+    sessionIds: ['in-project'],
+  }
+  const thread = {
+    workspaceId: 'thread',
+    path: '/dev/dshfiles-threads/thread-a',
+    sessionIds: ['in-thread'],
+  }
+  const workspaces = [project, thread]
+
+  it('attributes a registered thread workspace session, and one whose thread workspace was forgotten, to the project', () => {
+    expect(
+      WorkspaceAttribution.projectOfSession({
+        workspaces,
+        sessionId: 'in-thread',
+      }),
+    ).toBe('project')
+    expect(
+      WorkspaceAttribution.projectOfSession({
+        workspaces,
+        sessionId: 'in-project',
+      }),
+    ).toBe('project')
+    expect(
+      WorkspaceAttribution.projectOfSession({
+        workspaces,
+        sessionId: 'forgotten',
+        cwd: '/dev/dshfiles-threads/thread-b',
+      }),
+    ).toBe('project')
+    expect(
+      WorkspaceAttribution.projectOfSession({
+        workspaces,
+        sessionId: 'elsewhere',
+        cwd: '/tmp/other',
+      }),
+    ).toBeUndefined()
+  })
+
+  it('uses a reported custom threads directory', () => {
+    const custom = [
+      project,
+      {
+        workspaceId: 'custom',
+        path: '/elsewhere/dshfiles/thread-c',
+        sessionIds: ['in-custom'],
+      },
+    ]
+    const threadDirectories = new Map([['/elsewhere/dshfiles', '/dev/dshfiles']])
+    expect(
+      WorkspaceAttribution.projectOfSession({
+        workspaces: custom,
+        sessionId: 'in-custom',
+        threadDirectories,
+      }),
+    ).toBe('project')
+    expect(
+      WorkspaceAttribution.projectOfSession({
+        workspaces: custom,
+        sessionId: 'in-custom',
+      }),
+    ).toBe('custom')
   })
 })

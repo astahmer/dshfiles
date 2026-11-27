@@ -5,6 +5,8 @@ export const openChatExternalLink = (input: {
   readonly currentOrigin: string
   readonly linkOpening: LinkOpening
   readonly browserAvailable: boolean
+  /** True when the Host already knows this address refuses embedding: the pane would only show a blank page. */
+  readonly paneRefused: (href: string) => boolean
   readonly openInSidebar: (href: string) => void
   readonly openInNewTab: (href: string) => void
 }): void => {
@@ -14,7 +16,7 @@ export const openChatExternalLink = (input: {
     return
   }
 
-  if (input.linkOpening === 'sidebar' && input.browserAvailable) {
+  if (input.linkOpening === 'sidebar' && input.browserAvailable && !input.paneRefused(input.url.href)) {
     input.openInSidebar(input.url.href)
     return
   }

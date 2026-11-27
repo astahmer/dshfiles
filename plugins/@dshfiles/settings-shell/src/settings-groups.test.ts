@@ -181,4 +181,43 @@ describe('settings groups', () => {
     expect(SettingsGroups.entryFor(grouped, 'plugin:ui-theme')?.id).toBe('general')
     expect(SettingsGroups.searchablePages(grouped).some(current => current.ns === 'ui-theme')).toBe(true)
   })
+
+  it('classifies stock DSH defaults separately from DSH plugin categories and filters by origin', () => {
+    expect(all.find(entry => entry.id === 'general')?.origin).toBe('dsh')
+    expect(all.find(entry => entry.id === 'models')?.origin).toBe('dsh')
+    expect(all.find(entry => entry.id === 'plugins')?.origin).toBe('dsh')
+    expect(all.find(entry => entry.id === 'plugin:agent-loop')?.origin).toBe('dsh')
+    expect(all.find(entry => entry.id === 'plugin:bash-sandbox')?.origin).toBe('dsh')
+    expect(all.find(entry => entry.id === 'link:plugins')?.origin).toBe('dsh')
+
+    expect(all.find(entry => entry.id === 'ai-accounts')?.origin).toBe('plugin')
+    expect(all.find(entry => entry.id === 'thread-sidebar')?.origin).toBe('plugin')
+    expect(all.find(entry => entry.id === 'plugin:dshfiles-backlog')?.origin).toBe('plugin')
+    expect(all.find(entry => entry.id === 'link:mcp-servers')?.origin).toBe('plugin')
+    expect(all.find(entry => entry.id === JEV_ENTRY_ID)?.origin).toBe('plugin')
+
+    const counts = SettingsGroups.originCounts(grouped)
+    expect(counts.all).toBe(counts.dsh + counts.plugin)
+    const dshOnly = SettingsGroups.filterByOrigin(grouped, 'dsh')
+    const pluginOnly = SettingsGroups.filterByOrigin(grouped, 'plugin')
+    expect(dshOnly.flatMap(group => group.entries).every(entry => entry.origin === 'dsh')).toBe(true)
+    expect(pluginOnly.flatMap(group => group.entries).every(entry => entry.origin === 'plugin')).toBe(true)
+    expect(dshOnly.flatMap(group => group.entries)).toHaveLength(counts.dsh)
+    expect(pluginOnly.flatMap(group => group.entries)).toHaveLength(counts.plugin)
+  })
+
+  it('keeps a stock DSH category DSH when a dshfiles fork serves it, and trusts bundle labels over the core prefix guess', () => {
+    const labelled = SettingsGroups.group({
+      sections: [],
+      pages: [
+        { ...page('agent-loop', 'Agent loop', ['maxSteps']), origin: 'plugin', bundleName: '@dshfiles/agent-loop' },
+        { ...page('tool-community-thing', 'Community thing', ['enabled']), origin: 'plugin', bundleName: 'community-thing' },
+        page('tool-unlabelled', 'Unlabelled', ['enabled']),
+      ],
+      panels: new Set(),
+    }).flatMap(group => group.entries)
+    expect(labelled.find(entry => entry.id === 'plugin:agent-loop')).toMatchObject({ origin: 'dsh', bundleName: undefined })
+    expect(labelled.find(entry => entry.id === 'plugin:tool-community-thing')).toMatchObject({ origin: 'plugin', bundleName: 'community-thing' })
+    expect(labelled.find(entry => entry.id === 'plugin:tool-unlabelled')?.origin).toBe('dsh')
+  })
 })

@@ -187,8 +187,14 @@ const failed = (error: unknown) =>
       ? { code: failureCodeOf(error), message: error.message }
       : { code: 'runtime-unavailable', message: 'The runtime request failed. Check the host status and reconnect if needed.' }
 
+interface UnavailableFailure {
+  readonly ok: false
+  readonly code: string
+  readonly message: string
+}
+
 /** The failure a Host service reports, as a value a client shows: its wire code and message. */
-const unavailable = (): { readonly ok: false; readonly code: string; readonly message: string } => ({
+const unavailable = (): UnavailableFailure => ({
   ok: false,
   code: 'runtime-unavailable',
   message: 'The runtime request failed. Check the host status and reconnect if needed.',
@@ -262,7 +268,7 @@ const withRuntime = <A, E>(
   Effect.gen(function* () {
     const pool = yield* RuntimePool
     const marker = new GatewayUnreachable()
-    const last = { value: undefined as A | undefined }
+    let last: A | undefined
     return yield* pool
       .use(
         runtimeId,
@@ -270,7 +276,7 @@ const withRuntime = <A, E>(
           request(gateway).pipe(
             Effect.flatMap(value => {
               if (options.broken?.(value) !== true) return Effect.succeed(value)
-              last.value = value
+              last = value
               return Effect.fail(marker)
             }),
           ),
@@ -279,7 +285,7 @@ const withRuntime = <A, E>(
       .pipe(
         Effect.catchIf(
           error => error === marker,
-          () => (last.value === undefined ? Effect.fail(marker) : Effect.succeed(last.value)),
+          () => (last === undefined ? Effect.fail(marker) : Effect.succeed(last)),
         ),
       )
   })
@@ -513,6 +519,9 @@ type ThreadStartInput = {
   readonly model?: ModelSelection | undefined
 }
 
+/** The Session a start reports to its failure path once the runtime created it. */
+type StartedSession = { sessionId: string | undefined }
+
 /** A failed fetch never blocks the thread: the thread starts on what the host has and the result says why. */
 const fetchBeforeThread = Effect.fn('multi-host fetch before thread')(function* (input: { readonly sshTarget: string; readonly cwd: string }) {
   return yield* RemoteExec.run({ sshTarget: input.sshTarget, command: RemoteCheckout.fetchBeforeThreadCommand(input.cwd), timeoutMs: 60_000 }).pipe(
@@ -621,7 +630,7 @@ const startRemoteThread = Effect.fn('multi-host thread start')(function* (input:
     host?.fetchBeforeThread === true && host.connector.kind === 'ssh'
       ? yield* fetchBeforeThread({ sshTarget: host.connector.sshTarget, cwd: input.cwd })
       : undefined
-  const state: { sessionId: string | undefined } = { sessionId: undefined }
+  const state: StartedSession = { sessionId: undefined }
   return yield* withRuntime(
     runtime.id,
     gateway =>
@@ -704,6 +713,50 @@ const stopRemoteThread = Effect.fn('multi-host thread stop')(function* (input: {
     { mutation: true, broken: brokenRpc },
   ).pipe(
     Effect.map(() => ({ ok: true as const })),
+    Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
+  )
+})
+
+/** The archived set an archive reply carries, narrowed from the wire value the native RPC already validated. */
+const decodeArchivedSessionIds = Schema.decodeUnknownOption(Schema.Struct({ archivedSessionIds: Schema.Array(Schema.String) }))
+
+/**
+ * Archive or restore one remote thread on the runtime that owns it, then drop the cached status so the next read
+ * carries the new set. The reply is that set too, so a sidebar can move the row without waiting for a refresh.
+ */
+const setRemoteThreadArchived = Effect.fn('multi-host thread archive')(function* (input: {
+  readonly runtimeId: string
+  readonly sessionId: string
+  readonly archived: boolean
+}) {
+  return yield* withRuntime(
+    input.runtimeId,
+    gateway =>
+      NativeRpc.call(gateway, {
+        namespace: 'workspace',
+        method: input.archived ? 'archiveSession' : 'unarchiveSession',
+        args: { request: { sessionId: input.sessionId } },
+      }),
+    { mutation: true, broken: brokenRpc },
+  ).pipe(
+    Effect.flatMap(result =>
+      Effect.gen(function* () {
+        const status = yield* RuntimeStatus
+        if (!result.ok) {
+          yield* status.invalidate(input.runtimeId)
+          return { ok: false as const, code: result.code, message: result.message }
+        }
+        const parsed = decodeArchivedSessionIds(result.value)
+        if (Option.isNone(parsed))
+          return {
+            ok: false as const,
+            code: 'invalid-response',
+            message: 'The runtime changed the archive set but did not report it; reopen the host list to see the thread.',
+          }
+        yield* status.recordArchived(input.runtimeId, parsed.value.archivedSessionIds)
+        return { ok: true as const, archivedSessionIds: parsed.value.archivedSessionIds }
+      }),
+    ),
     Effect.catch(error => Effect.succeed({ ok: false as const, ...failed(error) })),
   )
 })
@@ -1199,7 +1252,7 @@ const handlers = Api.handlers(multiHostApi, {
     const threads = yield* RemoteThreads
     const runtime = yield* directory.findRuntime(input.runtimeId)
     if (runtime === undefined) return threadRefused({ code: 'runtime-not-found', message: 'This host is no longer recorded.' })
-    const state: { sessionId: string | undefined } = { sessionId: undefined }
+    const state: StartedSession = { sessionId: undefined }
     return yield* withRuntime(
       runtime.id,
       gateway =>
@@ -1578,6 +1631,8 @@ const handlers = Api.handlers(multiHostApi, {
     )
   }),
   threadStop: stopRemoteThread,
+  threadArchive: input => setRemoteThreadArchived({ runtimeId: input.runtimeId, sessionId: input.sessionId, archived: true }),
+  threadUnarchive: input => setRemoteThreadArchived({ runtimeId: input.runtimeId, sessionId: input.sessionId, archived: false }),
   runtimeCall: Effect.fn('multi-host runtime call')(function* (input) {
     const mutation = NativeRpc.isMutation(input.request)
     return yield* withRuntime(input.runtimeId, gateway => NativeRpc.call(gateway, input.request), { mutation, broken: brokenRpc }).pipe(
@@ -1637,7 +1692,7 @@ const launchUrlOf = Effect.gen(function* () {
   const connection = host.ctx.get('connection')
   if (webServer === undefined) return undefined
   const launchUrl = connection?.authenticatedUrl?.(`http://127.0.0.1:${webServer.port}`)
-  return typeof launchUrl === 'string' ? launchUrl : undefined
+  return launchUrl
 })
 
 /** Publish this runtime's launch URL whenever the Host provides a web server, and withdraw it on unload. */

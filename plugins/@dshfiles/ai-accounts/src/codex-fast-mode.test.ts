@@ -1,6 +1,7 @@
 import type { StreamChunk } from '@deepseek-ai/dsh-llm'
 import { zstdDecompressSync } from 'node:zlib'
 import { normalizeContext } from '@earendil-works/pi-ai'
+import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
 import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-codex'
 import { describe, expect, it } from 'vitest'
 import { FastModeService, isCodexFastModeModel, withCodexFastMode } from './codex-fast-mode.js'
@@ -39,7 +40,7 @@ const runRequest = async (input: { enabled?: boolean; defaultEnabled?: boolean }
     const request = requestInfo instanceof Request ? requestInfo : new Request(requestInfo, init)
     const bytes = new Uint8Array(await request.clone().arrayBuffer())
     const body = request.headers.get('content-encoding') === 'zstd' ? zstdDecompressSync(bytes) : bytes
-    requestBodies.push(JSON.parse(new TextDecoder().decode(body)))
+    requestBodies.push(decodeJson(jsonObjectSchema, new TextDecoder().decode(body)))
     return new Response(JSON.stringify({ error: { message: 'Fast mode request capture complete.' } }), {
       headers: { 'content-type': 'application/json' },
       status: 500,
@@ -79,7 +80,17 @@ describe('Codex Fast mode', () => {
       .map(model => model.id)
       .sort()
 
-    expect(supportedModelIds).toEqual(['gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-6-astra', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol'])
+    expect(supportedModelIds).toEqual([
+      'gpt-5.6-luna',
+      'gpt-5.6-sol',
+      'gpt-5.6-terra',
+      'gpt-6-astra',
+      'gpt-6-luna',
+      'gpt-6-sol',
+      'gpt-6.1-sol',
+      'gpt-6.2-astra',
+      'gpt-6.2-sol',
+    ])
     expect(isCodexFastModeModel({ api: 'openai-codex-responses', id: 'gpt-5.4' })).toBe(false)
     expect(isCodexFastModeModel({ api: 'openai-responses', id: modelId })).toBe(false)
     expect(fastMode.status({ sessionId, provider: providerId, model: modelId })).toEqual({ available: true, enabled: false })

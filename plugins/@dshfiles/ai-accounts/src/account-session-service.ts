@@ -306,6 +306,11 @@ export const createAccountSessionService = (input: {
         reason:
           'Mistral uses a Mistral Vibe login (~/.vibe/.env) or a named key reference that DSH does not own. Revoke the key in console.mistral.ai or remove it from ~/.vibe/.env.',
       }
+    if (account.kind === 'vibe')
+      return {
+        reason:
+          "This route runs the Vibe CLI, which owns its own login. Sign out inside Vibe, or remove MISTRAL_API_KEY from the profile's .env; DSH never reads or removes that login itself.",
+      }
     return { reason: EXTERNAL }
   }
   const capability = async (instanceId: string): Promise<AccountSessionCapability> => {

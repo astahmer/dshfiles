@@ -3,14 +3,19 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message, type Model } from '@earendil-works/pi-ai'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { layer as nodeChildProcessSpawnerLayer } from '@effect/platform-node/NodeChildProcessSpawner'
 import { Context, Effect, Layer, Scope } from 'effect'
+import * as Schema from 'effect/Schema'
 import { afterEach, expect, it, vi } from 'vitest'
 import { AntigravityProcesses, AntigravityProcessesPromiseModel } from './antigravity-processes.js'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
+import { ProviderProfileModel } from './provider-profile.js'
+
+const launchReportSchema = Schema.Struct({ argv: Schema.Array(Schema.String), home: Schema.String, key: Schema.NullOr(Schema.String) })
 
 /**
  * Stands in for `agy acp`: an ACP server over stdio that starts the MCP server `session/new` names, offers two models
@@ -292,7 +297,7 @@ it("runs agy with DSH's agent in a private Gemini folder, the account HOME and n
       }),
     )
     expect(textOf(reply)).toMatch(/: hi$/)
-    const launch = JSON.parse(readFileSync(report, 'utf8'))
+    const launch = decodeJson(launchReportSchema, readFileSync(report, 'utf8'))
     const geminiDir = String(launch.argv[2])
     expect(launch).toEqual({
       argv: ['acp', '--gemini-dir', geminiDir, '--agent', 'dsh', '--process-per-session', '--dangerously-skip-permissions', '--disable-telemetry'],
@@ -405,6 +410,19 @@ it('fails a step whose plan is spent as a quota failure instead of waiting on ag
     ),
   ).rejects.toThrow(/^Antigravity quota exhausted: Google answers 429 RESOURCE_EXHAUSTED for this account's plan\./u)
   expect(cli.processCount).toBe(0)
+})
+
+it('names each account model with the name agy gives it, not its id', () => {
+  const { cli } = setup()
+  const profile = ProviderProfileModel.buildProfile({
+    upstream: createAntigravityProvider(cli),
+    provider: 'antigravity-work',
+    displayName: 'Antigravity Work',
+    additionalModelIds: ['gemini-unnamed'],
+    discoveredModels: [{ id: 'gemini-fast', name: 'Gemini Fast' }],
+  })
+  const names = Object.fromEntries((profile.piProvider?.getModels() ?? []).map(model => [model.id, model.name]))
+  expect(names).toEqual({ 'gemini-fast': 'antigravity-work/Gemini Fast', 'gemini-unnamed': 'antigravity-work/gemini-unnamed' })
 })
 
 it('reports per-step usage_update instead of cumulative prompt usage across tool-call steps', async () => {

@@ -75,3 +75,14 @@ Feature: Persistent agents
     And the mention "@{luna}" is clicked in the open item
     Then the agent preview shows "Luna" with instructions "Prefer small findings."
     And the preview opens "Luna" in the Agents panel
+
+  @scenario:agents.tool-access-tree
+  Scenario: Choose an agent's tools and default project, and keep them after a reload
+    Given the isolated plugin profile "@dshfiles/agents" is booted
+    Then the agent "Reviewer" is saved with instructions "Prefer small findings."
+    When the tool "glob" is turned off and "read" is pinned in the "DSH" tool group with the keyboard
+    And the first project is made the agent's default and the agent is saved
+    And the browser page is reloaded with the Agents panel open
+    Then the agent "reviewer" keeps "glob" off, "read" pinned and its default project
+    When the tool "glob" is reset to inherited and the agent is saved
+    Then the agent "reviewer" has "glob" on again, following its group

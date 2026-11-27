@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientReleaseChange } from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
@@ -29,6 +30,7 @@ import { workbenchPanels } from '@dshfiles/workbench/registry'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState } from 'react'
+import { LayoutListIcon } from '@dshfiles/plugin-ui/icons'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type * as Types from 'effect/Types'
@@ -56,15 +58,16 @@ import { bundleLabelsOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
+import { DshfilesPluginsPage, PluginListLauncher } from './dshfiles-plugins-page.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
-import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries } from './settings-groups.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type SectionRow, type SettingsViewProps } from './settings-view.js'
-import { shellMachine, type FieldTarget } from './shell-machine.js'
+import { shellMachine, type FieldTarget, type ShellEvent } from './shell-machine.js'
 import { PORTED_FROM } from './upstream.js'
 import {
   createSettingsHubRouter,
@@ -76,6 +79,8 @@ import {
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
+/** Plugins by category as a stage panel the sidebar can pin. */
+const PLUGIN_LIST_PANEL_ID = 'dshfiles-plugin-list'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
 const MAIN_TABS_OVERLAY_ID = 'dshfiles-main-tabs'
 const PUBLISH_SETTLE_MS = 250
@@ -230,6 +235,8 @@ export default defineClient({
         next.set(row.rowId, {
           title: resolvedTitle === row.bundleName || resolvedTitle === row.moduleName ? '' : resolvedTitle,
           description: row.description === undefined ? (row.bundleDescription ?? '') : ctx.locale.resolveText(row.description),
+          bundleName: row.bundleName,
+          official: row.official,
         })
       }
       labels.set(next)
@@ -238,11 +245,12 @@ export default defineClient({
     ctx.inject(['remote.pluginManager'], scoped => {
       // The Host caches these labels: core's listBundles reads every plugin's files on each call. A Host started before
       // that method existed is asked the old way.
-      void labelsApi.safe.bundleLabels().then(async cached => {
+      void (async () => {
+        const cached = await labelsApi.safe.bundleLabels()
         if (cached.ok) return installLabels(cached.value)
         const result = await scoped.remote.pluginManager.listBundles()
         if (result.ok) installLabels(bundleLabelsOf(result.value))
-      })
+      })()
     })
 
     const describe = ctx.configForms.describe()
@@ -373,7 +381,14 @@ export default defineClient({
     // Search rows: sections under their entry's name and group, so "Models & accounts" or "AI accounts" find them.
     const searchRows = (grouped: readonly GroupedEntries[]): readonly SectionRow[] =>
       grouped.flatMap(({ group, entries }) =>
-        entries.map(entry => ({ id: entry.id, order: entry.order, label: entry.label, keywords: `${group.label} ${entry.keywords}` })),
+        entries.map(entry => ({
+          id: entry.id,
+          order: entry.order,
+          label: entry.label,
+          origin: entry.origin,
+          bundleName: entry.bundleName,
+          keywords: `${group.label} ${entry.keywords}`,
+        })),
       )
     let shortcutSource: readonly ShortcutCatalogEntry[] | undefined
     let shortcutRows: readonly ShortcutRow[] = []
@@ -498,12 +513,15 @@ export default defineClient({
       shortcuts: input.shortcuts,
       renderSlot: input.renderSlot,
       pluginPages: SettingsGroups.searchablePages(input.groups),
-      renderPluginPage: (page: PluginSettingsPage, nested: boolean) => (
+      renderPluginPage: (page: PluginSettingsPage, nested: boolean, meta) => (
         <PluginSettingsPageView
+          bundleName={meta?.bundleName}
           entry={<PluginEntryCard namespace={page.ns} t={input.t} />}
           form={formFor(page.ns)}
+          groupLabel={meta?.groupLabel}
           key={page.pageId}
           nested={nested}
+          origin={meta?.origin}
           page={page}
           t={input.t}
           {...(input.field?.sectionId === page.pageId ? { focusPath: input.field.fieldPath } : {})}
@@ -697,10 +715,12 @@ export default defineClient({
     // A request that still names the retired dialog surface opens the page: there is no other place left.
     const openRequest = (request: OpenSettingsRequest): void => {
       if (request.setting !== undefined && openSettingsTarget(request.setting)) return
-      const openEvent: { type: 'open'; sectionId?: string; target?: string; query?: string } = { type: 'open' }
-      if (request.section !== undefined) openEvent.sectionId = request.section
-      if (request.target !== undefined) openEvent.target = request.target
-      if (request.query !== undefined) openEvent.query = request.query
+      const openEvent: Extract<ShellEvent, { type: 'open' }> = {
+        type: 'open',
+        ...(request.section !== undefined && { sectionId: request.section }),
+        ...(request.target !== undefined && { target: request.target }),
+        ...(request.query !== undefined && { query: request.query }),
+      }
       if (hubRouter.open(openEvent)) return
       actor.send(openEvent)
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })
@@ -808,13 +828,14 @@ export default defineClient({
     const probeNow = (): void => {
       if (reachability.getSnapshot().probing) return
       reachability.set(ReachabilityModel.started(reachability.getSnapshot()))
-      void probeHost().then((reachable) => {
+      void (async () => {
+        const reachable = await probeHost()
         const next = ReachabilityModel.settled(reachability.getSnapshot(), reachable)
         reachability.set(next.state)
         if (next.recovered) connection.reconnect()
         // One miss is not an outage yet (a phone just woke); confirm it soon instead of a full interval later.
         if (!reachable && next.state.probe !== 'unreachable') setTimeout(probeNow, REACHABILITY_CONFIRM_MS)
-      })
+      })()
     }
     ctx.effect(() => {
       const visible = (): boolean => document.visibilityState === 'visible'
@@ -951,6 +972,60 @@ export default defineClient({
         (props: PropsRenderSlots<'settings.general.item'> & SettingsSectionSearchProps) => (
           <GeneralSection banner={<ReleaseBanner t={t} />} renderSlot={props.renderSlot} target={props.target} />
         ),
+      ),
+    )
+    // A second view of the installed plugins, beside DSH core's Plugins manager: a Settings section and a stage panel.
+    const PluginsByCategory = (props: { readonly onOpenSettings?: ((sectionId: string) => void) | undefined }): JSX.Element => {
+      const grouped = useObservable(groups)
+      return (
+        <DshfilesPluginsPage
+          groups={grouped}
+          onOpenPluginManager={() => openPanel('plugins')}
+          onOpenSettings={props.onOpenSettings ?? openSettings}
+          resolveLocaleText={text => ctx.locale.resolveText(text)}
+          t={t}
+        />
+      )
+    }
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.section',
+          id: DSHFILES_PLUGINS_SECTION_ID,
+          order: 2,
+          label: () => t('pluginsPage.nav'),
+          locale: SHELL_LOCALE_NAMESPACE,
+        },
+        decorate((props: { readonly openSection?: (sectionId: string) => void }) => <PluginsByCategory onOpenSettings={props.openSection} />),
+      ),
+    )
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: PLUGIN_LIST_PANEL_ID, order: 90, label: () => t('pluginsPage.nav') },
+        (props: { readonly size?: number }) => <LayoutListIcon aria-hidden size={props.size ?? 18} strokeWidth={1.6} />,
+      ),
+    )
+    ctx.slots.inject('main', () =>
+      ctx.slots.register(
+        { name: 'main', key: PLUGIN_LIST_PANEL_ID },
+        decorate(() => (
+          <section
+            aria-label={t('pluginsPage.nav')}
+            className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-4"
+          >
+            <h2 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{t('pluginsPage.nav')}</h2>
+            <PluginsByCategory />
+          </section>
+        )),
+      ),
+    )
+    // DSH core's Plugins manager has no banner seat; its first card group (plugins.item) points to this view instead.
+    ctx.slots.inject('plugins.item', () =>
+      ctx.slots.register(
+        { name: 'plugins.item', id: PLUGIN_LIST_PANEL_ID, order: 0, label: () => t('pluginsPage.nav') },
+        decorate((props: { readonly view: 'summary' | 'page' }) => (
+          <PluginListLauncher onOpen={() => openPanel(PLUGIN_LIST_PANEL_ID)} t={t} view={props.view} />
+        )),
       ),
     )
     ctx.slots.inject('settings.general.item', () =>

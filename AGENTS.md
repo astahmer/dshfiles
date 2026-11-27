@@ -192,6 +192,15 @@ stop the renderer.
    the dispatch mention, not a link.
 5. Other URLs and repository files: Markdown links.
 
+## Visual answers
+
+A comparison, a flow, a state machine or a design is a picture, not a paragraph.
+Publish it with `html_render` (find it with `tool_search`, then `tool_call`) so it
+renders as an inline, expandable card; use `html_preview` for a generated `.html`
+file. When the answer is a choice, prefer `ask_user_question` with a fenced
+````html preview. Prose stays for what the picture cannot say. The
+`render-visuals` skill owns the page rules.
+
 ## Version control
 
 Detect the checkout's VCS metadata first. Upstream uses
@@ -486,10 +495,12 @@ Pick the channel by what you wait for:
    (queue, or steer a live turn). It is a root thread, not your child:
    `send_message` refuses it with `subagent "…" belongs to another parent session`.
    Mid-turn this is not a wait: end your turn or do other work.
-4. That thread's completion after your turn ends: call
-   `thread_subscribe { sessionId }` first. It queues one compact notice (status
-   plus answer preview) into your thread and wakes you when idle. Without it,
-   nothing wakes you: a created thread is silent. `thread_unsubscribe` stops it.
+4. That thread's completion after your turn ends: a thread you start with
+   `thread_create` reports back automatically: each turn end queues one compact
+   notice (status plus answer preview) into your thread and wakes you when idle.
+   Opt out with `notifyCreator: false`; stop later with `thread_unsubscribe`.
+   For a thread you did not create, call `thread_subscribe { sessionId }` (or
+   `thread_prompt { watch: true }`) first; otherwise nothing wakes you.
 5. Any other top-level thread: `thread_prompt` to start or queue its turn, or
    `dshx_comm_send` for a passive note it reads at its next prompt.
 6. The user: async `ask_user_question`, or a `schedule_*` reminder. A pending

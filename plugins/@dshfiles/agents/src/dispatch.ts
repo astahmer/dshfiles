@@ -2,7 +2,7 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import * as Schema from 'effect/Schema'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
-import { Agents, type Agent } from './agent.js'
+import { Agents, type Agent, type AgentRoute } from './agent.js'
 
 const effortSchema = Schema.Struct({ id: Schema.String, name: Schema.String })
 const modelSchema = Schema.Struct({
@@ -124,6 +124,22 @@ export class AgentDispatch {
       text: request.prompt,
       fallback: `Work as @${request.agent.handle}. Inspect the current workspace and wait for the next instruction if the task is unclear.`,
     })
+  }
+
+  /**
+   * A thread the composer started as this agent: the same opening as a dispatch (identity, instructions, routine), then
+   * the person's message exactly as typed.
+   */
+  static composerMessage(agent: Agent, text: string): string {
+    return Agents.introducedMessage({ agent, text })
+  }
+
+  /** The `selectModel` arguments for an agent's pinned route, or null when it follows the harness default. */
+  static modelSelection(sessionId: SessionId, route: AgentRoute | null): AgentModelSelection | null {
+    if (route === null) return null
+    return route.reasoningEffort === undefined
+      ? { sessionId, provider: route.provider, model: route.model }
+      : { sessionId, provider: route.provider, model: route.model, reasoningEffort: route.reasoningEffort }
   }
 
   /** The schedules catalog, narrowed to tasks that deliver to or were managed from one agent's threads; decoded once at the client boundary. */

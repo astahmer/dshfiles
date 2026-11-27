@@ -104,5 +104,7 @@ const baseOf = (handle: string): AgentDraft => ({
   memoryScope: null,
   routine: '',
   delegation: { messaging: 'any', handles: [], subagents: true },
+  tools: { tools: {}, groups: {} },
+  subagents: { allowed: 'any', default: null },
   enabled: true,
 })

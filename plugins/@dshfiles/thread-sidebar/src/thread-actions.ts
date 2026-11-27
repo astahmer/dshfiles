@@ -5,7 +5,7 @@ import type { FolderInspection } from '@dshfiles/workspace-folder-picker/project
 import { Effect, Option, Schedule, Schema } from 'effect'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
-import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 /** One Host verb as the actions read it; its failure carries the Host's own error as `cause`. */
 export type HostEffect<A> = Effect.Effect<A, ThreadHostCallFailed>
@@ -64,6 +64,8 @@ export interface ThreadActionDeps {
   }) => HostEffect<{ readonly sessionId: string; readonly agentPreset?: string }>
   /** Hand one message to a thread: queue starts its next turn, steer folds it into the running one. */
   readonly prompt: (input: { readonly sessionId: string; readonly text: string; readonly mode: 'queue' | 'steer' }) => HostEffect<void>
+  /** Subscribe one thread to another's turn ends, keeping an existing pair's level; fails for a refused pair. */
+  readonly watch: (input: { readonly subscriberSessionId: string; readonly targetSessionId: string }) => HostEffect<void>
   /** The workspace a new thread may start in: never a jj thread workspace another thread already uses. */
   readonly ownWorkspaceFor: (projectId: string) => HostEffect<string>
   readonly stop: (sessionId: string) => HostEffect<void>
@@ -129,11 +131,13 @@ export interface ThreadCreateInput {
   readonly title?: string | undefined
   readonly agentPreset?: string | undefined
   readonly text?: string | undefined
+  readonly notifyCreator?: boolean | undefined
 }
 export interface ThreadPromptInput {
   readonly sessionId?: string | undefined
   readonly text: string
   readonly mode?: 'queue' | 'steer' | undefined
+  readonly watch?: boolean | undefined
 }
 export interface ThreadFanOutModel {
   readonly provider: string
@@ -321,6 +325,26 @@ const NO_THREAD_DIRECTORIES: ThreadDirectories = new Map()
 const reportedThreadDirectories = (deps: ThreadActionDeps, projectPaths: readonly string[]) =>
   deps.threadDirectories(projectPaths).pipe(Effect.orElseSucceed(() => NO_THREAD_DIRECTORIES))
 
+/** Whether the caller now hears the target's turn ends; empty when nothing was asked or no thread called. */
+interface WatchOutcome {
+  readonly notify?: 'subscribed' | 'failed'
+  readonly notifyError?: string
+}
+
+/**
+ * Subscribe the calling Agent's thread to `targetSessionId` before that thread starts a turn, so its first turn end
+ * cannot slip past the edge. A human caller has no thread to wake: none. A refused or failed subscription never hides
+ * the thread the caller just started or prompted; it is reported instead.
+ */
+const watchFor = (deps: ThreadActionDeps, caller: ApiCaller, targetSessionId: string): Effect.Effect<WatchOutcome> => {
+  const subscriberSessionId = callerSessionId(caller)
+  if (subscriberSessionId === undefined || subscriberSessionId === targetSessionId) return Effect.succeed({})
+  return deps.watch({ subscriberSessionId, targetSessionId }).pipe(
+    Effect.as<WatchOutcome>({ notify: 'subscribed' }),
+    Effect.catch(error => Effect.succeed<WatchOutcome>({ notify: 'failed', notifyError: failure(error, 'Could not subscribe to the thread.').message })),
+  )
+}
+
 /** Run one Host verb, reporting its failure the way the actions API always has. */
 const attempt = <A>(effect: HostEffect<A>, message: string) => Effect.mapError(effect, error => failure(error, message))
 
@@ -502,7 +526,7 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
     )
   }),
 
-  create: Effect.fn('thread actions create')(function* ({ input }: ThreadActionContext<ThreadCreateInput>) {
+  create: Effect.fn('thread actions create')(function* ({ input, caller }: ThreadActionContext<ThreadCreateInput>) {
     // The Host accounts a Session to a workspace or to a bare cwd, never both, and a bare cwd leaves it ungrouped:
     // when the directory is a registered project, create the thread in that project instead.
     const requestedProjectId = input.projectId ?? projectIdForPath(deps, input.cwd)
@@ -527,7 +551,8 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
             Effect.map(renamed => renamed.title),
             Effect.catch(() => Effect.succeed(undefined)),
           )
-    const withTitle = { ...started, ...(title === undefined ? undefined : { title }) }
+    const watched = input.notifyCreator === false ? {} : yield* watchFor(deps, caller, created.sessionId)
+    const withTitle = { ...started, ...(title === undefined ? undefined : { title }), ...watched }
     if (input.text === undefined) return withTitle
     return yield* deps.prompt({ sessionId: created.sessionId, text: input.text, mode: 'queue' }).pipe(
       Effect.as({ ...withTitle, prompt: 'accepted' as const }),
@@ -540,8 +565,9 @@ export const createThreadActions = (deps: ThreadActionDeps) => ({
   prompt: Effect.fn('thread actions prompt')(function* ({ input, caller }: ThreadActionContext<ThreadPromptInput>) {
     const sessionId = yield* targetSessionId(input.sessionId, caller)
     const mode = input.mode ?? 'queue'
+    const watched = input.watch === true ? yield* watchFor(deps, caller, sessionId) : {}
     yield* attempt(deps.prompt({ sessionId, text: input.text, mode }), `Could not send a message to thread ${sessionId}.`)
-    return { sessionId, mode, accepted: true as const }
+    return { sessionId, mode, accepted: true as const, ...watched }
   }),
 
   stop: Effect.fn('thread actions stop')(function* ({ input }: ThreadActionContext<ThreadTargetInput>) {

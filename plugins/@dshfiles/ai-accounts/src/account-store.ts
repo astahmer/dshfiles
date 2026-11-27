@@ -13,6 +13,7 @@ import { readCommandCodeKey } from './commandcode-usage.js'
 import { CURSOR_LOGIN_HINT, readCursorToken } from './cursor-account.js'
 import { MISTRAL_LOGIN_HINT, MistralAccountModel } from './mistral-account.js'
 import { AntigravityAccountModel, type AntigravityAccountDescription } from './antigravity-account.js'
+import { VibeAccountModel } from './vibe-account.js'
 import { AccountOrderModel } from './account-order-model.js'
 import { type AccountReorder, type CreateSetupAccountInput } from './api.js'
 import { AccountConflict, AccountOrderRejected, AccountStoreFileUnreadable, AccountStoreWriteFailed } from './errors.js'
@@ -154,6 +155,18 @@ const observe = async (
       plan: description.signedIn ? (description.plan ?? null) : null,
       loginHint: AntigravityAccountModel.loginHint(home),
       detail: description.signedIn ? null : description.detail,
+    })
+  }
+  if (draft.kind === 'vibe') {
+    const home = VibeAccountModel.resolveHome(draft.homePath)
+    const signedIn = await VibeAccountModel.signedIn(home)
+    return observed(draft, {
+      pool,
+      signedIn,
+      identity: null,
+      plan: null,
+      loginHint: VibeAccountModel.loginHint,
+      detail: null,
     })
   }
   if (draft.kind === 'claude') {

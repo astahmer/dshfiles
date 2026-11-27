@@ -19,6 +19,7 @@
     "check:zod-imports": "node scripts/check-zod-imports.mjs",
     "check:native-forks": "node scripts/native-fork-diff.mjs",
     "check:repo": "node tooling/dshx/packages/dshx/dist/cli/bin.js check repo",
+    "check:secret-refs": "node scripts/check-secret-refs.mjs",
     "check:diff": "node scripts/check-diff.mjs",
     "jj:state": "node scripts/jj-state.mjs",
     "ade:migration-map": "node scripts/ade-migration-map.mjs",

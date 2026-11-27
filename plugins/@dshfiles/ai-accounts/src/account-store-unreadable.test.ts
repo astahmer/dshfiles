@@ -2,6 +2,7 @@ import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { decodeJson, jsonObjectSchema } from '@dshfiles/dshx/json'
 import { openAccountStore } from './fixtures/account-store.js'
 
 const account = {
@@ -68,7 +69,10 @@ describe('account store with an unreadable file', () => {
     expect(saved.accounts.map(entry => entry.instanceId)).toEqual(['copilot-new'])
     expect(saved.distribution).toBe('sticky')
     expect(saved.cooldownMs).toBe(300_000)
-    expect(JSON.parse(readFileSync(scratch.filePath, 'utf8'))).toMatchObject({ cooldownMs: 300_000, accounts: [{ instanceId: 'copilot-new' }] })
+    expect(decodeJson(jsonObjectSchema, readFileSync(scratch.filePath, 'utf8'))).toMatchObject({
+      cooldownMs: 300_000,
+      accounts: [{ instanceId: 'copilot-new' }],
+    })
     expect(readdirSync(scratch.dir).filter(name => name.startsWith('accounts.json.unreadable-'))).toEqual([])
   })
 

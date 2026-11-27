@@ -2,7 +2,7 @@ import { Context, Duration, Effect, Layer, Option, Schedule, Schema, Stream } fr
 import { connectCommunicationClient, type CommunicationClient, type ConnectCommunicationClientOptions } from '../communication/bridge.js'
 import type { CommunicationMessage } from '../communication/types.js'
 
-const communicationOperations = ['listAgents', 'listTopics', 'diagnostics', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'acknowledge'] as const
+const communicationOperations = ['listAgents', 'diagnostics', 'send', 'inbox', 'acknowledge'] as const
 
 type CommunicationOperation = (typeof communicationOperations)[number]
 
@@ -48,7 +48,6 @@ export const liftPromiseClient = <Client, const Keys extends ReadonlyArray<keyof
 }
 
 export interface CommunicationInboxOptions {
-  readonly topic?: string
   /** How often the bridge is asked for new messages; it has no push channel. */
   readonly every: Duration.Input
 }
@@ -84,10 +83,7 @@ const makeCommunication = (client: CommunicationClient) => {
     ...lifted,
     principal: client.principal,
     messages: options =>
-      Stream.fromEffectSchedule(
-        lifted.inbox(options.topic === undefined ? {} : { topic: options.topic }),
-        Schedule.spaced(Duration.fromInputUnsafe(options.every)),
-      ).pipe(
+      Stream.fromEffectSchedule(lifted.inbox({}), Schedule.spaced(Duration.fromInputUnsafe(options.every))).pipe(
         Stream.mapAccum(
           (): ReadonlySet<string> => new Set(),
           (seen, inbox) => {

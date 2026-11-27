@@ -508,8 +508,8 @@ const SettingRow = (props: {
   return (
     <div
       className={cn(
-        'dshx:group dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:border-b-[0.5px] dshx:border-border dshx:py-3.5 dshx:last:border-b-0',
-        flashing && 'dshx:rounded-md dshx:bg-accent/70 dshx:px-2 dshx:transition-colors',
+        'dshx:group dshx:relative dshx:flex dshx:flex-col dshx:gap-2 dshx:rounded-lg dshx:border-b-[0.5px] dshx:border-border/70 dshx:px-2.5 dshx:py-3.5 dshx:transition-colors dshx:duration-100 dshx:last:border-b-0 dshx:hover:bg-accent/30',
+        flashing && 'dshx:bg-accent/70',
       )}
       data-modified={props.modified ? '' : undefined}
       data-setting-path={field.path.join('.')}
@@ -518,7 +518,7 @@ const SettingRow = (props: {
       {props.modified && (
         <span
           aria-hidden="true"
-          className="dshx:absolute dshx:inset-y-3 dshx:-left-3 dshx:w-0.5 dshx:rounded-full dshx:bg-info"
+          className="dshx:absolute dshx:inset-y-3 dshx:left-0 dshx:w-0.5 dshx:rounded-full dshx:bg-info"
           title={props.t('form.modified')}
         />
       )}
@@ -548,8 +548,8 @@ const SettingRow = (props: {
               <Highlight query={props.highlight} text={field.description} />
             </span>
           )}
-          <span className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-2 dshx:text-2xs dshx:text-muted-foreground/80">
-            <code className="dshx:font-mono">
+          <span className="dshx:mt-0.5 dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2 dshx:gap-y-1 dshx:text-2xs dshx:text-muted-foreground/80">
+            <code className="dshx:rounded dshx:bg-muted/80 dshx:px-1.5 dshx:py-px dshx:font-mono">
               <Highlight query={props.highlight} text={field.path.join('.')} />
             </code>
             <span data-setting-source={props.provenance.source}>{sourceText(props.provenance, props.t)}</span>

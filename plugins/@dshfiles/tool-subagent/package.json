@@ -16,6 +16,10 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": "./dist/index.js",
+    "./agent-resolver": {
+      "types": "./src/agent-resolver.ts",
+      "default": "./dist/agent-resolver.js"
+    },
     "./cordis.patch.yml": "./cordis.patch.yml",
     "./package.json": "./package.json"
   },

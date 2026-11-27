@@ -23,8 +23,8 @@ makes the strip a filter (`usageStripPinned`): only pinned accounts are segments
 ("CC1 10% · CC2 12% · CC3 limit 2h 40m +3"; a reset only at the limit); its sheet lists every account with its reset.
 
 AI Accounts runs several subscription accounts side by side. Codex, Claude,
-Antigravity (Google AI plans), Mistral, OpenCode Go and Command Code accounts each become their own route in the
-model picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
+Antigravity (Google AI plans), Mistral, Mistral Vibe CLI, OpenCode Go and Command Code accounts each become their own
+route in the model picker. GitHub Copilot connects through GitHub's device-code OAuth flow. Cursor
 accounts only track identity and quota: DSH has no Cursor agent runtime, so
 Cursor sessions run outside DSH.
 
@@ -147,7 +147,8 @@ Automated verification uses fake CLI/device responses and a loopback provider. I
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Codex          | **Continue with Codex** in quick setup (official CLI device approval); existing CLI login remains supported                                              | yes         | 5-hour and weekly windows, banked resets                                                                                    |
 | Claude         | `claude auth login` under the account's `CLAUDE_CONFIG_DIR`; an optional `claude setup-token` in DSH credentials or the Host environment serves requests | yes         | 5-hour, weekly, weekly Opus/Sonnet, extra usage spend vs monthly cap (`/api/oauth/usage`)                                   |
-| Mistral        | Mistral Vibe login (`~/.vibe/.env`, macOS Keychain), or a key in DSH credentials or the Host environment                                                 | yes         | monthly Vibe allowance from `/v1/billing/budget` (what Mistral Vibe's footer reads; best effort)                            |
+| Mistral        | Mistral Vibe login (`~/.vibe/.env`, macOS Keychain), or a key in DSH credentials or the Host environment                                                 | yes         | monthly API credit and Vibe & Studio allowance from `/v1/billing/budget` (best effort)                                      |
+| Vibe CLI       | the `vibe` CLI's own `vibe --setup` login in the account's VIBE_HOME; requests run the CLI, never HTTP                                                   | yes         | the plan's API credit and Vibe & Studio allowance from `/v1/billing/budget`, read with the CLI login's key                  |
 | OpenCode Go    | key in DSH credentials or the Host environment                                                                                                           | yes         | rolling, weekly and monthly windows                                                                                         |
 | Command Code   | key in DSH credentials or the Host environment, or `cmd login`                                                                                           | yes         | 5-hour and weekly window limits (`/alpha/billing/credits`)                                                                  |
 | GitHub Copilot | GitHub device-code OAuth; grant and refresh token stay in DSH credentials                                                                                | yes         | premium requests and chat, from GitHub's internal `copilot_internal/user` (what GitHub's Copilot clients read; best effort) |
@@ -157,6 +158,35 @@ GitHub Copilot sign-in opens GitHub's device authorization page and shows a
 short code in AI Accounts. Each account's OAuth grant is stored as a DSH
 credential record, separate from `accounts.json`; the plugin refreshes tokens
 through pi-ai and offers the Copilot models returned for that subscription.
+
+### Codex models and context windows
+
+A Codex account lists the models its plan exposes. The Host reads
+`GET https://chatgpt.com/backend-api/codex/models` with the account's own
+ChatGPT login, the same endpoint Codex CLI reads. A stale login is refreshed
+through the same path requests use. This happens at Host start and each time
+the account's **Models** tab opens (`ai_accounts_catalog`). Only models the
+backend marks `visibility: "list"` appear; hidden ones (`gpt-reserve`, review
+helpers) never do. pi-ai's static Codex models stay listed. The backend's
+`context_window` replaces the static window, and a model pi-ai does not know
+yet becomes a full `openai-codex-responses` model (128k output, the reasoning
+levels of its family). If discovery fails, the account keeps its previous or
+static list. The Host log says why, with the next step: reopen **Models** to
+retry, or sign in again if the login expired.
+
+Each model's **Context window** column in **Models** raises or lowers the
+window DSH uses for that model on this account. The choices go up to the
+backend's `max_context_window` (for example, `gpt-6.2-astra`: default 272k, max
+872k). The window changes when DSH compacts and how much a request may carry. A
+larger window uses more of the plan per turn; pi-ai prices input above 272k at
+a higher tier. **Default** removes the override. Overrides are stored per account as
+`contextWindowOverrides` in the accounts file. They apply even while the
+account inherits the provider's model settings. A value above the backend
+maximum is saved as that maximum. Agents read the windows with
+`ai_accounts_catalog` (`context 272k (max 872k)`) and change them with
+`ai_accounts_set_context_window` (`contextWindow: null` restores the default)
+only when the user asks. Accounts in one fail-over pool must use the same
+window for a model, or they stop counting as compatible for it.
 
 The plugin reads Claude Code's login but never refreshes it. When that token
 expires, run Claude Code once on the account. Quota needs the interactive
@@ -208,7 +238,10 @@ follows its routed account.
 
 Agents change the same setting with the `ai_accounts_set_extra_usage` tool,
 which runs only when the user asks. It is stored in the accounts file as
-`useExtraUsage` next to the other per-account settings.
+`useExtraUsage` next to the other per-account settings. A quota card carries
+that gate as `useExtraUsage` beside the provider's own reading
+(`usage.extraUsage.enabled`): they are independent, so a provider that keeps
+reporting its extra usage on is not the DSH switch turning itself back on.
 
 Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
@@ -227,7 +260,11 @@ other Mistral subscription path (t3code and Zed run Vibe over ACP instead).
   Windows keyrings are not read; use `.env` or a key reference there. A named key reference never falls back to the
   Vibe login. DSH does not implement Vibe's undocumented browser sign-in or its OIDC client.
 - **Requests.** pi-ai's Mistral transport: `https://api.mistral.ai/v1/chat/completions` with the account's bearer key and
-  `x-affinity` set to the conversation for prompt caching.
+  `x-affinity` set to the conversation for prompt caching. Every request made this way draws the plan's included **API
+  usage** (the API credit), never the Vibe & Studio allowance: Mistral bills attribution to the client, not the model,
+  so a plain API-key call to `mistral-vibe-cli-latest` still spends the API credit (verified 2026-11-27 against
+  `/v1/billing/budget`). A **Vibe CLI** account is the way to reach the Vibe & Studio allowance: it runs the official
+  CLI itself (see [Mistral Vibe through the Vibe CLI](#mistral-vibe-through-the-vibe-cli)).
 - **Models.** pi-ai's Mistral catalog, including DeepSeek V4.1 Flash 1017 (`deepseek-v4-1-flash-1017`), which pi-ai
   lists since 1.5; an older pi-ai gets it from our own entry, with the limits and price its model page documents. Then the Vibe plan catalog
   (`/v1/model-catalog?surface=vibe-code`, e.g. `mistral-vibe-cli-latest`), falling back to the documented `/v1/models`;
@@ -239,10 +276,45 @@ other Mistral subscription path (t3code and Zed run Vibe over ACP instead).
   GLM 5.3 Flash and `zai-glm-latest` low/high/max; DeepSeek V4.1 Flash low/high/max (undocumented, as a live account
   serves it). None of them accepts `none`, so they offer no Off and a request without an effort omits `reasoning_effort`.
   Other models keep pi-ai's catalog levels.
-- **Quota.** The monthly Vibe allowance and plan name from `/v1/billing/budget` and `/v1/billing/subscription`, the reads
-  Mistral Vibe's footer uses. They are not in Mistral's public API reference: a key without a plan allowance, or a member
-  without the usage permission, shows **Quota unavailable**, never a guessed percentage.
+- **Quota.** Two included buckets, both from `/v1/billing/budget`: the **API credit** (`api_budget`) and the **Vibe &
+  Studio allowance** (`vibe_budget`), each as its own window with the percent left, its money when the bucket reports
+  `initial_budget`/`currency`, and the reset. The plan name comes from `/v1/billing/subscription`. The reads are the
+  ones Mistral Vibe's footer uses and are not in Mistral's public API reference: a key without a plan allowance, or a
+  member without the usage permission, shows **Quota unavailable**, never a guessed percentage. The tightest bucket
+  decides the card's status, so a spent API credit reads rate-limited even while the Vibe allowance is untouched.
 - **Sign out.** Not offered: the key belongs to Mistral Vibe or your credential store. Revoke it in console.mistral.ai.
+
+## Mistral Vibe through the Vibe CLI
+
+A **Vibe CLI** account publishes a second Mistral route that runs the official `vibe` CLI instead of sending HTTP. It
+exists for one reason: a Mistral plan bills two included buckets, and a plain API-key request always draws the **API
+credit**, while only the Vibe CLI itself draws the **Vibe & Studio allowance**. With the API credit spent, this route
+keeps work moving on the same plan. Verified on 2026-11-27: one headless `vibe` turn left `api_budget` at 100 % and
+moved `vibe_budget` from 0 % to 0.00336 %.
+
+- **Install and sign in.** Install the CLI on the Host (`vibe --setup` → **Launch browser**). The login lives in the
+  account's **VIBE_HOME** (empty means `~/.vibe`), which is also where the CLI keeps its config, catalog cache and logs.
+  DSH never reads, copies or prints that credential; the CLI process uses it in place.
+- **Requests.** Each DSH step spawns one
+  `vibe --prompt-file <transcript> --output streaming --output-dir <tmp> --model <id> --system-prompt-file <DSH prompt>`
+  process in a private temporary workdir, with `--approval-policy ask` (a headless turn has nobody to approve a tool, so
+  an unapproved call is denied) and `--max-turns 4`. The next step replays the transcript as text, so a step always sees
+  the conversation DSH holds. An inherited `MISTRAL_API_KEY` is removed from the child environment, because Vibe reads
+  the variable before its own login and that would bill the API credit instead.
+- **CLI-agent route, no tool bridge.** `vibe` owns its agent loop and its own tools; this route neither exposes DSH's
+  tools to it nor turns its tool calls into DSH tool calls. It is a text route: the answer and its reasoning stream into
+  the transcript, and a tool call the CLI makes (or has denied) stays inside that run. Use a Codex, Claude, Antigravity or
+  API route when the work needs DSH's tools.
+- **Models.** The CLI's own catalog (read from `$VIBE_HOME/model_catalog_cache.json`, Vibe 3.1.5): **Mistral Large 4**
+  (`mistral-large-4`, `mistral-large-4-0-3`), **Mistral Medium 3.5** (`mistral-medium`, `mistral-medium-3.5`,
+  `mistral-vibe-cli-latest`), **GLM 5.3** (`glm-5-3`, `zai-glm-5`, `zai-glm-latest`), **GLM 5.3 Flash**, and **DeepSeek
+  V4.1 Flash 1017** (`deepseek-v4-1-flash-1017`). Each keeps the context window, image input and thinking levels the
+  CLI lists for it (`--thinking`), so an effort the model does not offer is not sent. Aliases resolve to the model id the
+  CLI accepts.
+- **Usage.** Tokens and cost come from the `export.json` the CLI writes on exit, and a failed run reports the CLI's own
+  stderr (for example a rejected `--model` alias) instead of a generic error. A process that writes nothing for ten
+  minutes is stopped, naming the CLI log under VIBE_HOME. The account card reads the plan's two buckets through
+  `/v1/billing/budget` with the CLI login, so the allowance the route spends is the one it reports.
 
 ## Claude through the Claude Code CLI
 

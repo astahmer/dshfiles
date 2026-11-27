@@ -42,7 +42,57 @@ DSH_TOOL_SEARCH_EVAL=1 DSH_TOOL_SEARCH_EVAL_CATALOG=/path/to/capture.json DSH_TO
 
 When the global tool set changes after an agent attached (an MCP server connects, reconnects with a new list, or a plugin unloads), the agent's next step gets one `<system-reminder>` user message naming only the change: each added tool with the first sentence of its description (at most 100 characters, cut on a code point), and the removed names. At most 20 names per side are listed; the rest are counted and stay findable through `tool_search`. Nothing is sent while the set is unchanged, and the catalog is never re-sent. The reminder is a logged message appended after the step's own messages, so the cached prompt prefix (tools, system prompt, earlier messages) is untouched. Several changes before the next step collapse into one net difference; a tool added and removed in between is not mentioned. The told state is in memory: after a Host restart the baseline is the catalog at re-attachment. Set `announceToolChanges: false` to send nothing.
 
-In `cache-safe` mode the declared list is fixed at attachment: a tool that appears later is never declared, even when it matches `alwaysVisible`; it is searchable with `tool_search` and callable with `tool_call`. Removing a declared tool still removes it from the list, since a request cannot declare a tool that no longer exists.
+In `cache-safe` mode the declared list is fixed at attachment (until the thread's [tool access](#per-agent-tool-access) changes): a tool that appears later is never declared, even when it matches `alwaysVisible`; it is searchable with `tool_search` and callable with `tool_call`. Removing a declared tool still removes it from the list, since a request cannot declare a tool that no longer exists.
+
+## Per-agent tool access
+
+Which tools reach a thread is decided by the thread's agent. tool-search owns tool visibility and declares the contract
+in its `@dshfiles/tool-search/access` dshx module; [`@dshfiles/agents`](../agents/README.md#tool-access) provides it as
+the `dshfilesToolAccess` Cordis service. Without a provider every tool is on, exactly as before.
+
+- **Every tool is on by default**, tools that appear later included (a new MCP server or plugin). An agent stores sparse
+  entries per tool name and per group: one MCP server (`mcp:<server>`, from `mcp__<server>__<tool>`), one owning plugin
+  (`plugin:<package>`, the dshx registry's owner of an API or plugin tool) or `native` (DSH's own tools and plugins built
+  without dshx). The group of a name comes from dshx `toolSources(ctx)`, the registry listing's own rule.
+- **Two controls.** `enabled: false` means no access: the tool is not declared, `tool_search` never returns it (it names it
+  as a disabled match with the way to change it, never its description or schema), `tool_call` refuses it and a call by
+  its real name is denied before dispatch; each refusal names the agent and how to change it. `pinned: true` declares the
+  tool from the first request; an enabled, unpinned tool stays deferred behind `tool_search` unless `alwaysVisible`
+  declares it. A core tool in `alwaysVisible` stays declared unless the agent disables it.
+- **Precedence**, field by field: a tool entry beats its group entry beats the default (enabled, not pinned). A tool that
+  appears later in a disabled group is disabled; a tool of a group never configured is enabled. `tool_search` and
+  `tool_call` are never disabled.
+- **Resolution.** When an agent attaches, tool-search asks the provider once with the Session id, cwd and (for a
+  subagent) its parent Session. The provider decides and records the thread's agent, so a thread keeps its tool set
+  when its agent or the project default changes; those changes reach threads started afterwards.
+- **Per-thread override.** The provider reports a Session whose override was set or cleared; tool-search resolves it again
+  and applies the new set from that thread's next model request: the declared list, the restriction and the cache-safe
+  `tool_search` description are rebuilt once, which costs that one request its prompt-cache prefix, and the tool-set
+  reminder names what was added or removed. Clearing the override restores the previous declarations byte for byte.
+- `tool_search_access` (read-only, found through `tool_search`) shows the calling thread's agent, why it applies (its own
+  agent, an override, the project default or the built-in default), its pinned and disabled tools, and how to change
+  them. It replaces the former path-based `rules` setting, which is gone: configure access per agent instead.
+
+## Owner-declared visibility
+
+A tool's owner can put it in the declared list without a profile edit. The Host provides a
+`toolSearchVisibility` service; the owning plugin calls it once while it loads:
+
+```ts
+import { declareVisibleTools } from '@dshfiles/tool-search/tool-visibility'
+
+declareVisibleTools(ctx, {
+  owner: '@dshfiles/html-render',
+  tools: ['html_render', 'html_preview', 'html_screenshot'],
+  reason: 'a rendered answer is cheaper than prose',
+})
+```
+
+Declarations are additive with `alwaysVisible`, take exact names (no wildcards), and the first owner of a name
+keeps it. A declaration must happen before the Session attaches, which holds when both plugins load before the
+agents they serve; a late declaration applies to the next Session. A Host without this plugin provides no service,
+so `declareVisibleTools` returns `false` and the tools stay searchable. Today `@dshfiles/html-render` declares its
+three tools.
 
 ## Behavior and safety
 

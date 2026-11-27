@@ -95,23 +95,23 @@ export const sessionProjectionsSchema = Schema.Union([
  */
 const decoder = <Wire, S extends Schema.ConstraintDecoder<unknown>>(payload: SessionPayloadError['payload'], shape: S) => {
   const decode = Schema.decodeUnknownResult(shape)
-  const result = (value: unknown): Result.Result<Wire, SessionPayloadError> =>
+  const decodePayload = (value: unknown): Result.Result<Wire, SessionPayloadError> =>
     decode(value).pipe(
       // SAFETY: the shape validated every field the Session wire type names that this Host reads, and passthrough kept the rest.
       Result.map(decoded => decoded as Wire),
       Result.mapError(cause => new SessionPayloadError({ payload, cause })),
     )
-  return Object.assign((value: unknown): Effect.Effect<Wire, SessionPayloadError> => Effect.fromResult(result(value)), {
-    sync: (value: unknown): Wire => Result.getOrThrowWith(result(value), error => error),
-  })
+  const decodeEffect = (value: unknown): Effect.Effect<Wire, SessionPayloadError> => Effect.fromResult(decodePayload(value))
+  const decodeSync = (value: unknown): Wire => Result.getOrThrowWith(decodePayload(value), error => error)
+  return Object.assign(decodeEffect, { sync: decodeSync })
 }
 
 const listDecoder = decoder<{ readonly items: readonly SessionSummary[] }, typeof sessionListSchema>('summaries', sessionListSchema)
 
 /** Rows of one runtime's `session/list` answer. */
-export const summaries = Object.assign((value: unknown) => Effect.map(listDecoder(value), list => list.items), {
-  sync: (value: unknown): readonly SessionSummary[] => listDecoder.sync(value).items,
-})
+const decodeSummaries = (value: unknown) => Effect.map(listDecoder(value), list => list.items)
+const decodeSummariesSync = (value: unknown): readonly SessionSummary[] => listDecoder.sync(value).items
+export const summaries = Object.assign(decodeSummaries, { sync: decodeSummariesSync })
 /** One frame of a runtime's `session/follow` stream; only its discriminant is checked, the browser validates events. */
 export const followFrame = decoder<SessionFollowFrame, typeof sessionFollowFrameSchema>('follow-frame', sessionFollowFrameSchema)
 /** One history page of a runtime's `session/page` answer. */

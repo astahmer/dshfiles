@@ -48,8 +48,10 @@ describe('theme definitions', () => {
   })
 
   it('keeps a backdrop self-contained: no url(), @import or a brace that escapes its layer', () => {
-    const withLayer = (layer: string, keyframes?: string) =>
-      ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, backdrop: { layers: [layer], ...(keyframes === undefined ? {} : { keyframes }) } } }).errors
+    const withLayer = (layer: string, keyframes?: string) => {
+      const backdrop = keyframes === undefined ? { layers: [layer] } : { layers: [layer], keyframes }
+      return ThemeDefinitionModel.parse({ ...NORD, dark: { ...NORD.dark, backdrop } }).errors
+    }
     expect(withLayer('background: url(https://evil.test/x.png)')).toHaveLength(1)
     expect(withLayer('color: red } body { display: none')).toHaveLength(1)
     expect(withLayer('opacity: 1', '@import "x.css";')).not.toHaveLength(0)

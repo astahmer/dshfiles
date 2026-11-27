@@ -3,10 +3,19 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { PassThrough } from 'node:stream'
+import * as Schema from 'effect/Schema'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { CheckoutRebuild } from '../src/checkout/rebuild.js'
 import { planCheckout, syncCheckout } from '../src/checkout/sync.js'
 import { runCli } from '../src/cli/run.js'
+import { decodeJson, jsonValueSchema } from '../src/json.js'
+
+const cliEnvelopeSchema = Schema.Struct({
+  command: Schema.optionalKey(Schema.String),
+  ok: Schema.Boolean,
+  data: Schema.optionalKey(jsonValueSchema),
+  error: Schema.optionalKey(jsonValueSchema),
+})
 
 const jjAvailable = spawnSync('jj', ['--version']).status === 0
 
@@ -324,7 +333,7 @@ describe.skipIf(!jjAvailable)('dshx checkout sync against real jj', () => {
       let out = ''
       stdout.on('data', (chunk: Buffer) => (out += chunk.toString('utf8')))
       const code = await runCli(argv, { io: { stdin: new PassThrough(), stdout, stderr: new PassThrough() } })
-      return { code, envelope: JSON.parse(out) }
+      return { code, envelope: decodeJson(cliEnvelopeSchema, out) }
     }
     expect(await run(['checkout', 'sync', '--cwd', lander, '--dry-run', '--json'])).toMatchObject({
       code: 0,

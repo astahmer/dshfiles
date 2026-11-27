@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { ToolSchema } from '@deepseek-ai/dsh-llm'
 import type * as Types from 'effect/Types'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import type { ToolSearchVisibility } from './tool-visibility.js'
 
 type ToolSearchStatus = 'loaded' | 'already_loaded' | 'unavailable'
 
@@ -49,7 +50,7 @@ interface AgentContext {
 
 interface TestAgent {
   readonly id: string
-  readonly session: { readonly requestHeader: () => { readonly tools?: ToolSchema[] } | undefined }
+  readonly session: { readonly requestHeader: () => { readonly tools?: ToolSchema[] } | undefined; readonly header: Record<never, never> }
   readonly ctx: AgentContext
 }
 
@@ -137,6 +138,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
             ...(restored.length === 0 ? [] : [schema('tool_search', 'Search global tools')]),
           ],
         }),
+        header: {},
       },
       ctx: context,
     }
@@ -146,8 +148,11 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     for (const listener of listeners.get(name) ?? []) listener(payload)
   }
   const agents = [makeAgent('one', options.restored), makeAgent('two')]
+  const providers = new Map<string, ToolSearchVisibility>()
   const root = {
     tools: {
+      /** The plugin's own global tool (tool_search_access) stays out of the fixture catalog. */
+      register: () => () => undefined,
       schemas: (scope?: TestAgent) => (scope === undefined ? [...schemas.values()] : visibleGlobals(scope)),
       get: (name: string, scope?: TestAgent) => {
         const tool = globalTools.get(name)
@@ -156,7 +161,12 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
       },
     },
     agents: { list: () => agents },
-    get: () => undefined,
+    provide: (name: string, value: ToolSearchVisibility) => {
+      providers.set(name, value)
+    },
+    get: (name: string) => providers.get(name),
+    /** No tool access provider is ever provided here: the watcher waits on nothing. */
+    inject: () => ({ dispose: async () => undefined }),
     once: () => () => undefined,
     emit: () => undefined,
     parallel: () => undefined,
@@ -171,6 +181,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
     },
   }
   const dispose = await plugin.apply(root, { mode: 'progressive', maxResults: 3, ...(options.config ?? {}) })
+  const visibility = providers.get('toolSearchVisibility')
   const searchTool = (agent: TestAgent): RegisteredTool => {
     const tool = scopedTools.get(agent)?.get('tool_search')
     if (tool === undefined) throw new Error('tool_search was not registered')
@@ -191,6 +202,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
       ...[...(scopedTools.get(agent)?.values() ?? [])].map(tool => ({ name: tool.name, description: tool.description, parameters: tool.parameters })),
     ],
     restrictions,
+    visibility,
     searchTool,
     restrictAgent: (agent: TestAgent, allow: readonly string[]) => {
       const filters = restrictions.get(agent) ?? []
@@ -227,6 +239,15 @@ describe('tool-search host integration', () => {
     )}\n`
 
     expect(current).toBe(snapshot)
+    await runtime.dispose()
+  })
+
+  it('publishes the visibility registry an owning plugin declares into', async () => {
+    const runtime = await harness(await loadPlugin(), { config: { mode: 'progressive', alwaysVisible: [] } })
+    expect(runtime.visibility).toBeDefined()
+    runtime.visibility?.declare({ owner: '@dshfiles/html-render', tools: ['html_render'], reason: 'a rendered answer is cheaper than prose' })
+    expect([...(runtime.visibility?.names() ?? [])]).toEqual(['html_render'])
+    expect(runtime.visibility?.reasons?.().get('html_render')).toContain('@dshfiles/html-render')
     await runtime.dispose()
   })
 

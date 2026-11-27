@@ -9,6 +9,7 @@ const methods = {
   cursor: ['key', 'cli', 'reference'],
   mistral: ['cli', 'key', 'reference'],
   antigravity: ['cli'],
+  vibe: ['cli'],
 } as const satisfies Record<AccountKind, readonly AccountConnectionMethod[]>
 const labels = {
   device: 'Sign in in the browser',
@@ -29,6 +30,8 @@ export class AccountConnectionMethodModel {
     if (kind === 'codex' || kind === 'github-copilot') return 'device'
     // Google serves its plans only to its own Antigravity CLI, so its login is the only connection.
     if (kind === 'antigravity') return 'cli'
+    // The Vibe route exists to spend the allowance the CLI's own sign-in reaches.
+    if (kind === 'vibe') return 'cli'
     if (existing !== undefined && existing.apiKeyEnv.trim() !== '') return 'reference'
     if (kind === 'claude') return 'subscription'
     if (existing !== undefined && (kind === 'commandcode' || kind === 'cursor')) return 'cli'

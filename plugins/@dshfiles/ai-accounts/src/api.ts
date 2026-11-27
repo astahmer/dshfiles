@@ -22,13 +22,32 @@ import { ShellCommand } from './shell-command.js'
  * whether it holds a login, the identity it presents, and the command that creates one.
  */
 
-export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor', 'mistral', 'antigravity'])
+export const accountKindSchema = Schema.Literals([
+  'codex',
+  'claude',
+  'opencode-go',
+  'commandcode',
+  'github-copilot',
+  'cursor',
+  'mistral',
+  'antigravity',
+  'vibe',
+])
 
 export const createSetupAccountInputSchema = Schema.Struct({ kind: accountKindSchema, requestId: Schema.String.check(Schema.isUUID()) })
 export type CreateSetupAccountInput = typeof createSetupAccountInputSchema.Type
 
 /** Model-facing text for a structured result the tools below return. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
+
+/**
+ * Model-facing legend for the two independent extra-usage settings every quota card carries. Providers keep reporting
+ * their own setting as on, so an agent that reads only the provider reading mistakes it for DSH's switch turning back on.
+ */
+const QUOTA_READING_LEGEND =
+  'useExtraUsage is DSH’s gate (ai_accounts_set_extra_usage); usage.extraUsage.enabled is the provider’s own setting. They are independent: a provider that keeps reporting its extra usage on does not mean the DSH gate turned back on.\n'
+
+const renderQuotaReading = (output: { readonly cards: readonly unknown[] }): string => `${QUOTA_READING_LEGEND}${compactJson(output)}`
 
 export const accountOrderDirectionSchema = Schema.Literals(['earlier', 'later'])
 
@@ -69,7 +88,44 @@ export class AccountsRules {
     if (isLoopbackHost(url.hostname)) return url.protocol === 'https:' || url.protocol === 'http:'
     return url.protocol === 'https:' && (url.hostname === 'commandcode.ai' || url.hostname.endsWith('.commandcode.ai'))
   }
+
+  /** `272000` → `272k`, `1048576` → `1049k`: a window as people read it. */
+  static formatTokens = (tokens: number): string => (tokens >= 1_000 ? `${String(Math.round(tokens / 1_000))}k` : String(tokens))
+
+  /** The catalog tool's window note: the effective window, and the default, override and maximum it came from. */
+  static contextWindowSummary = (model: {
+    readonly contextWindow?: number | undefined
+    readonly maxContextWindow?: number | undefined
+    readonly contextWindowOverride?: number | undefined
+    readonly effectiveContextWindow?: number | undefined
+  }): string => {
+    const effective = model.effectiveContextWindow ?? model.contextWindow
+    if (effective === undefined) return ''
+    const details = [
+      ...(model.contextWindowOverride !== undefined && model.contextWindow !== undefined ? [`default ${AccountsRules.formatTokens(model.contextWindow)}`] : []),
+      ...(model.contextWindowOverride !== undefined ? [`override ${AccountsRules.formatTokens(model.contextWindowOverride)}`] : []),
+      ...(model.maxContextWindow !== undefined ? [`max ${AccountsRules.formatTokens(model.maxContextWindow)}`] : []),
+    ]
+    return ` · context ${AccountsRules.formatTokens(effective)}${details.length === 0 ? '' : ` (${details.join(', ')})`}`
+  }
 }
+
+/** A context window in tokens: a positive integer, bounded so a typo cannot ask for an absurd window. */
+const contextWindowTokensSchema = Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(1_000), Schema.isLessThanOrEqualTo(10_000_000))
+
+export const modelContextWindowResultSchema = Schema.Struct({
+  instanceId: AiAccountsSchema.id(64),
+  modelId: AiAccountsSchema.id(160),
+  /** The saved override after clamping; null when the model uses the provider default. */
+  contextWindowOverride: Schema.NullOr(contextWindowTokensSchema),
+  /** The provider maximum the value was clamped to, when known. */
+  maxContextWindow: Schema.NullOr(contextWindowTokensSchema),
+  /** True when the requested window exceeded the maximum and was lowered to it. */
+  clamped: Schema.Boolean,
+  /** The window the model now runs with, when the account offers the model. */
+  effectiveContextWindow: Schema.NullOr(contextWindowTokensSchema),
+})
+export type ModelContextWindowResult = typeof modelContextWindowResultSchema.Type
 
 // A Windows Host's homes are drive-absolute (`C:\Users\…`) and split on either separator; this schema also runs in the
 // browser, so no node:path. A POSIX path keeps its `/`-only rules.
@@ -197,6 +253,11 @@ export const accountProfileSchema = Schema.Struct({
    * order after the listed ones, so adding a model never reshuffles the rest.
    */
   modelOrder: AiAccountsSchema.list(Schema.String.check(Schema.isMaxLength(160)), 500).pipe(Schema.withDecodingDefaultKey(Effect.succeed([]))),
+  /**
+   * Context window per model id, in tokens, instead of the provider's default. Clamped to the provider's disclosed
+   * maximum (Codex `max_context_window`) when known. Applies whether or not the account inherits its model curation.
+   */
+  contextWindowOverrides: Schema.optional(Schema.Record(Schema.String.check(Schema.isMaxLength(160)), contextWindowTokensSchema)),
 })
 
 /** What the page may write: identity and health are observed, never authored. */
@@ -232,6 +293,7 @@ export const accountDraftSchema = Schema.Struct({
   hiddenModelIds: accountProfileSchema.fields.hiddenModelIds,
   favoriteModelIds: accountProfileSchema.fields.favoriteModelIds,
   modelOrder: accountProfileSchema.fields.modelOrder,
+  contextWindowOverrides: accountProfileSchema.fields.contextWindowOverrides,
   useExtraUsage: accountProfileSchema.fields.useExtraUsage,
 })
 
@@ -277,6 +339,18 @@ export const accountsFileSchema = Schema.Struct({
   accounts: AiAccountsSchema.list(accountProfileSchema, 64),
 })
 
+/**
+ * The provider's own money for one window, beside the percentage. Billing windows are separate per bucket (an API
+ * credit and a plan's app allowance), so a percent alone can read "100% left" while the credit that pays for the
+ * requests is nearly spent. `limit` is the window's allowance, `used` what it reports spent; both in `currency`.
+ */
+export const usageWindowAmountSchema = Schema.Struct({
+  used: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+  limit: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+  currency: Schema.String.check(Schema.isMaxLength(8)),
+})
+export type UsageWindowAmount = typeof usageWindowAmountSchema.Type
+
 export const usageCardSchema = Schema.Struct({
   status: Schema.Literals(['ok', 'unauthenticated', 'unsupported', 'rate-limited', 'error']),
   message: Schema.NullOr(Schema.String.check(Schema.isMaxLength(300))),
@@ -289,6 +363,8 @@ export const usageCardSchema = Schema.Struct({
       resetsAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
       /** Luna Reserve: drawn on only after an ordinary window is spent. */
       reserve: Schema.optional(Schema.Boolean),
+      /** Absent when the provider reports only a percent. */
+      amount: Schema.optional(usageWindowAmountSchema),
     }),
     6,
   ),
@@ -324,6 +400,12 @@ export const accountsUsageSchema = Schema.Struct({
       displayName: Schema.String.check(Schema.isMaxLength(120)),
       kind: accountKindSchema,
       enabled: Schema.Boolean,
+      /**
+       * Whether DSH may draw this account's provider-reported extra usage, the `ai_accounts_set_extra_usage` switch.
+       * `usage.extraUsage.enabled` is the provider's own setting, which stays on independently: a card reporting
+       * the provider's extra usage on does not mean this gate turned back on. Absent from older Hosts.
+       */
+      useExtraUsage: Schema.optional(Schema.Boolean),
       usage: usageCardSchema,
     }),
   ),
@@ -339,6 +421,14 @@ export const accountsCatalogSchema = Schema.Struct({
       defaultEffort: Schema.NullOr(Schema.String.check(Schema.isMaxLength(32))),
       /** True only for an account-added ID absent from native and discovered provider catalogs. */
       accountAdditional: Schema.optional(Schema.Boolean),
+      /** The provider's default context window for this model (the discovered one when the provider lists it). */
+      contextWindow: Schema.optional(contextWindowTokensSchema),
+      /** The largest context window the provider accepts for this model, when it disclosed one. */
+      maxContextWindow: Schema.optional(contextWindowTokensSchema),
+      /** This account's saved window for the model, before clamping. */
+      contextWindowOverride: Schema.optional(contextWindowTokensSchema),
+      /** The window requests and compaction use: the override clamped to the maximum, else the default. */
+      effectiveContextWindow: Schema.optional(contextWindowTokensSchema),
     }),
   ),
   warning: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
@@ -610,7 +700,7 @@ export const aiAccountsApi = defineApi({
       tool: {
         name: 'ai_accounts_set_extra_usage',
         render: output =>
-          `Extra usage is now ${output.accounts.some(account => account.useExtraUsage === true) ? 'allowed on at least one account' : 'off on every account'} (${String(output.accounts.length)} account(s)).`,
+          `Extra usage is now ${output.accounts.some(account => account.useExtraUsage === true) ? 'allowed on at least one account' : 'off on every account'} in DSH (${String(output.accounts.length)} account(s)). The provider’s own extra-usage setting is unchanged; a quota card keeps reporting it as usage.extraUsage.enabled.`,
       },
     }),
     /**
@@ -672,8 +762,30 @@ export const aiAccountsApi = defineApi({
         readOnly: true,
         render: output =>
           output.models
-            .map(model => `${model.id} · ${model.name}${model.efforts.length === 0 ? '' : ` · effort ${model.efforts.map(effort => effort.id).join('/')}`}`)
+            .map(
+              model =>
+                `${model.id} · ${model.name}${model.efforts.length === 0 ? '' : ` · effort ${model.efforts.map(effort => effort.id).join('/')}`}${AccountsRules.contextWindowSummary(model)}`,
+            )
             .join('\n') || `${output.instanceId} exposes no models.`,
+      },
+    }),
+    /** Set or clear one model's context window override on one account. */
+    setModelContextWindow: method({
+      input: Schema.Struct({
+        instanceId: AiAccountsSchema.id(64),
+        modelId: AiAccountsSchema.id(160),
+        /** Tokens; null restores the provider's default window. */
+        contextWindow: Schema.NullOr(contextWindowTokensSchema),
+      }),
+      output: modelContextWindowResultSchema,
+      description:
+        'Set the context window (tokens) one account uses for one model, or null to restore the provider default. The value is clamped to the provider maximum shown by ai_accounts_catalog (maxContextWindow). A larger window changes when DSH compacts and how many tokens a request may carry. Call only when the user asked to change that window.',
+      tool: {
+        name: 'ai_accounts_set_context_window',
+        render: output =>
+          output.contextWindowOverride === null
+            ? `${output.modelId} on ${output.instanceId} now uses the provider default window${output.effectiveContextWindow === null ? '' : ` (${String(output.effectiveContextWindow)} tokens)`}.`
+            : `${output.modelId} on ${output.instanceId} now uses a ${String(output.contextWindowOverride)}-token window${output.clamped ? ` (clamped to the provider maximum ${String(output.maxContextWindow)})` : ''}.`,
       },
     }),
     /**
@@ -761,7 +873,7 @@ export const aiAccountsApi = defineApi({
       output: accountsUsageSchema,
       description:
         'Live subscription quota of every configured AI account (Codex, Copilot, Mistral, OpenCode Go…): used and remaining windows and when each resets. Read-only; cached for a short while.',
-      tool: { name: 'ai_accounts_quota', readOnly: true },
+      tool: { name: 'ai_accounts_quota', readOnly: true, render: renderQuotaReading },
     }),
     /** Native DSH provider rows (DeepSeek, Command Code, …) and whether each is switched on. */
     nativeProviders: method({
@@ -790,7 +902,7 @@ export const aiAccountsApi = defineApi({
       output: accountsUsageSchema,
       description:
         'Read live subscription quota now, bypassing the shared short-lived cache. A card’s own `readAt` says when its provider answered, and `nextReadAt` when reads are held back (Claude shares one reading and backs off after a 429), so check them rather than assuming the reading is new. Call only when the user asked for a fresh reading.',
-      tool: { name: 'ai_accounts_refresh_quota', render: compactJson },
+      tool: { name: 'ai_accounts_refresh_quota', render: renderQuotaReading },
     }),
 
     /** Read now and record, so a fresh chart does not wait for the next poll. */

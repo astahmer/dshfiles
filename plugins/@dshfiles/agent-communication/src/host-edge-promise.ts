@@ -21,7 +21,6 @@ export interface CommunicationMessageActivityPayload {
     readonly senderId: string
     readonly recipientCount: number
     readonly intent: 'notice' | 'request'
-    readonly topic: string | null
     readonly correlationId?: string | undefined
     readonly sessionId: string | null
   }

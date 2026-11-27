@@ -1,3 +1,4 @@
+import type * as Schema from 'effect/Schema'
 import { ReviewImageModel, type ChangedImageEntry } from './review-image-query.js'
 import { TurnChangesModel, TurnChangesReadError } from './turn-changes.js'
 
@@ -20,7 +21,7 @@ export interface FacetDiff {
   readonly label: string
 }
 
-type FetchJson = (url: string, signal: AbortSignal) => Promise<unknown>
+type FetchJson = (url: string, signal: AbortSignal) => Promise<Schema.Json>
 
 /** Fetch one document-relative Host route as JSON; a non-2xx or empty (204) answer is an error the facet can show. */
 const fetchJson: FetchJson = async (url, signal) => {

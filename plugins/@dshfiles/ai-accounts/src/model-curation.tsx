@@ -14,7 +14,7 @@ import { ActionHint } from './panel-primitives.js'
 import { ChevronDownIcon, ChevronRightIcon, ChevronUpIcon, MoreHorizontalIcon, PlusIcon, SearchIcon, StarIcon, Trash2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState } from 'react'
-import type { AccountDraft, AccountsCatalog } from './api.js'
+import { AccountsRules, type AccountDraft, type AccountsCatalog } from './api.js'
 import { ModelCurationModel } from './model-curation-model.js'
 import { AccountModelSettingsModel } from './account-model-settings.js'
 import { KIND_LABEL } from './account-labels.js'
@@ -23,10 +23,51 @@ type CatalogModel = AccountsCatalog['models'][number]
 export type CurationPatch = Partial<
   Pick<
     AccountDraft,
-    'additionalModelIds' | 'hiddenModelIds' | 'favoriteModelIds' | 'modelOrder' | 'reasoningDefaults' | 'inheritModelSettings' | 'defaultReasoningEffort'
+    | 'additionalModelIds'
+    | 'hiddenModelIds'
+    | 'favoriteModelIds'
+    | 'modelOrder'
+    | 'reasoningDefaults'
+    | 'inheritModelSettings'
+    | 'defaultReasoningEffort'
+    | 'contextWindowOverrides'
   >
 >
 const PROVIDER_DEFAULT = '__provider-default__'
+const WINDOW_DEFAULT = '__window-default__'
+
+/** The model's window: a picker up to the provider maximum when it disclosed one, else the window as text. */
+const ContextWindowCell = (props: {
+  readonly model: CatalogModel
+  readonly override: number | undefined
+  readonly onChange: (value: string) => void
+}): JSX.Element => {
+  const { model } = props
+  const choices = AccountModelSettingsModel.contextWindowChoices(model)
+  if (choices.length === 0 && props.override === undefined) {
+    return (
+      <span className="dshx:text-xs dshx:text-muted-foreground">
+        {model.contextWindow === undefined ? '—' : AccountsRules.formatTokens(model.contextWindow)}
+      </span>
+    )
+  }
+  const values = [...new Set([...choices, ...(props.override === undefined ? [] : [props.override])])]
+    .filter(value => value !== model.contextWindow)
+    .sort((left, right) => left - right)
+  const label = (value: number): string => `${AccountsRules.formatTokens(value)}${value === model.maxContextWindow ? ' (max)' : ''}`
+  return (
+    <Combobox
+      label={`Context window for ${model.name}`}
+      value={props.override === undefined || props.override === model.contextWindow ? WINDOW_DEFAULT : String(props.override)}
+      options={[
+        { value: WINDOW_DEFAULT, label: model.contextWindow === undefined ? 'Default' : `Default (${AccountsRules.formatTokens(model.contextWindow)})` },
+        ...values.map(value => ({ value: String(value), label: label(value) })),
+      ]}
+      onValueChange={props.onChange}
+      triggerClassName="dshx:h-8 dshx:w-full dshx:text-xs"
+    />
+  )
+}
 
 /** Provider inheritance suspends saved overrides; editing a row explicitly resumes account customization. */
 export const ModelCuration = (props: {
@@ -83,6 +124,17 @@ export const ModelCuration = (props: {
       }),
     )
   }
+  // A window is not curation: it applies while the account inherits, so it never switches the account to Customize.
+  const setContextWindow = (model: CatalogModel, value: string): void => {
+    const next = { ...account.contextWindowOverrides }
+    if (value === WINDOW_DEFAULT) delete next[model.id]
+    else {
+      const tokens = Number(value)
+      if (!Number.isInteger(tokens) || tokens <= 0) return
+      next[model.id] = model.maxContextWindow === undefined ? tokens : Math.min(tokens, model.maxContextWindow)
+    }
+    props.onChange({ contextWindowOverrides: next })
+  }
   const setEffort = (model: CatalogModel, value: string): void => {
     if (value !== PROVIDER_DEFAULT && !model.efforts.some(effort => effort.id === value)) return
     const next = { ...account.reasoningDefaults }
@@ -127,11 +179,12 @@ export const ModelCuration = (props: {
         </div>
       </div>
       <div className="dshx:overflow-x-auto dshx:rounded-md dshx:border">
-        <table className="dshx:w-full dshx:min-w-[600px] dshx:border-collapse dshx:text-sm">
+        <table className="dshx:w-full dshx:min-w-[740px] dshx:border-collapse dshx:text-sm">
           <thead className="dshx:border-b dshx:bg-muted/20 dshx:text-left dshx:text-xs dshx:font-normal dshx:text-muted-foreground">
             <tr>
               <th className="dshx:px-3 dshx:py-2 dshx:font-normal">Model</th>
               <th className="dshx:w-48 dshx:px-3 dshx:py-2 dshx:font-normal">Reasoning effort</th>
+              <th className="dshx:w-36 dshx:px-3 dshx:py-2 dshx:font-normal">Context window</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Show in picker</th>
               <th className="dshx:w-28 dshx:px-3 dshx:py-2 dshx:font-normal">Source</th>
               <th className="dshx:w-10">
@@ -195,6 +248,9 @@ export const ModelCuration = (props: {
                       onValueChange={value => setEffort(model, value)}
                       triggerClassName="dshx:h-8 dshx:w-full dshx:text-xs"
                     />
+                  </td>
+                  <td className="dshx:px-3 dshx:py-1.5">
+                    <ContextWindowCell model={model} override={account.contextWindowOverrides?.[model.id]} onChange={value => setContextWindow(model, value)} />
                   </td>
                   <td className="dshx:px-3 dshx:py-2">
                     <Switch

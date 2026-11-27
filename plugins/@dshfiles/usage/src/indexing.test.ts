@@ -1,5 +1,6 @@
 import { describe, expect, it } from '@effect/vitest'
 import { Deferred, Effect, Fiber, FileSystem, Layer, Option, Path, Ref } from 'effect'
+import { TestClock } from 'effect/testing'
 import { SessionLogFiles, SessionLogIndex } from './indexer.js'
 import { Indexer, ToolRegistry } from './indexing.js'
 import { Pricing } from './pricing.js'
@@ -38,6 +39,22 @@ describe('Indexer demand', () => {
           expect(yield* indexer.demanded).toBe(false)
           yield* indexer.touch
           expect(yield* indexer.demanded).toBe(true)
+        }).pipe(Effect.provide(indexerTest({ sessionsRoot, registry: registryTest({ reads }) })))
+      }),
+    )
+
+    // Regression: `touch` once stamped the activation time, so no read after the first five minutes made demand.
+    it.effect('dates each read by when it happens, long after activation', () =>
+      Effect.gen(function* () {
+        const reads = yield* Ref.make(0)
+        const sessionsRoot = yield* scratchRoot
+        yield* Effect.gen(function* () {
+          const indexer = yield* Indexer
+          yield* TestClock.adjust('1 hour')
+          yield* indexer.touch
+          expect(yield* indexer.demanded).toBe(true)
+          yield* TestClock.adjust('6 minutes')
+          expect(yield* indexer.demanded).toBe(false)
         }).pipe(Effect.provide(indexerTest({ sessionsRoot, registry: registryTest({ reads }) })))
       }),
     )

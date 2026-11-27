@@ -55,15 +55,16 @@ export interface CliArgs {
   readonly max?: number
   readonly atSeq?: number
   readonly principal?: string
-  readonly delivery?: 'quiet' | 'queue'
   readonly priority?: 'normal' | 'urgent'
-  readonly topic?: string
   readonly limit?: number
   readonly sinceSeq?: number
   readonly tail?: number
   readonly types?: readonly string[]
   readonly follow?: boolean
 }
+
+/** One parsed CLI option value, as the shared scope check reads it. */
+type CliOptionValue = string | number | boolean | readonly string[] | undefined
 
 export class CliUsageError extends Error {
   constructor(message: string) {
@@ -238,20 +239,10 @@ const sharedArgs = {
     description: 'Stable external DSHX communication identity.',
     valueHint: 'name',
   },
-  delivery: {
-    type: 'string',
-    description: 'External topic delivery: quiet or queue.',
-    valueHint: 'quiet|queue',
-  },
   priority: {
     type: 'string',
     description: 'Communication message priority.',
     valueHint: 'normal|urgent',
-  },
-  topic: {
-    type: 'string',
-    description: 'Filter communication inbox by topic.',
-    valueHint: 'topic',
   },
   limit: {
     type: 'string',
@@ -485,9 +476,7 @@ const optionScopes: ReadonlyMap<string, OptionScope> = new Map([
   ['max', { allows: platformAction('sessions', 'history'), usage: '--max is only valid with sessions history.' }],
   ['atSeq', { allows: platformAction('sessions', 'fork'), usage: '--at-seq is only valid with sessions fork.' }],
   ['principal', { allows: ({ command }) => command === 'comm', usage: '--principal is only valid with comm commands.' }],
-  ['delivery', { allows: platformAction('comm', 'subscribe'), usage: '--delivery is only valid with comm subscribe.' }],
   ['priority', { allows: platformAction('comm', 'publish', 'send'), usage: '--priority is only valid with comm publish or send.' }],
-  ['topic', { allows: platformAction('comm', 'inbox'), usage: '--topic is only valid with comm inbox.' }],
   [
     'limit',
     {
@@ -511,9 +500,9 @@ const optionScopes: ReadonlyMap<string, OptionScope> = new Map([
   ['explain', { allows: inspectSlots, usage: '--explain is only valid with inspect slots.' }],
 ])
 
-const isSet = (value: unknown): boolean => value !== undefined && value !== false
+const isSet = (value: CliOptionValue): boolean => value !== undefined && value !== false
 
-const validateOptionScopes = (options: Readonly<Record<string, unknown>>, context: CliOptionContext): void => {
+const validateOptionScopes = (options: Readonly<Record<string, CliOptionValue>>, context: CliOptionContext): void => {
   for (const [option, value] of Object.entries(options)) {
     const scope = optionScopes.get(option)
     if (scope !== undefined && isSet(value) && !scope.allows(context)) throw new CliUsageError(scope.usage)
@@ -665,13 +654,8 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     if (!Number.isSafeInteger(atSeq) || atSeq < 0) throw new CliUsageError('--at-seq requires a non-negative safe integer.')
   }
   const principal = parsed.principal
-  const delivery = parsed.delivery
   const priority = parsed.priority
-  const topic = parsed.topic
   let limit: number | undefined
-  if (delivery !== undefined && delivery !== 'quiet' && delivery !== 'queue') {
-    throw new CliUsageError('--delivery requires quiet or queue for external communication clients.')
-  }
   if (priority !== undefined && priority !== 'normal' && priority !== 'urgent') throw new CliUsageError('--priority requires normal or urgent.')
   if (principal !== undefined && !/^[a-zA-Z0-9._-]{1,64}$/.test(principal)) {
     throw new CliUsageError('--principal requires 1 to 64 letters, digits, dot, underscore, or hyphen.')
@@ -746,9 +730,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       max,
       atSeq,
       principal,
-      delivery,
       priority,
-      topic,
       limit,
       sinceSeq,
       tail,
@@ -770,17 +752,16 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
   )
   if (command === 'comm' && !help) {
     const [action, first, ...extra] = platformArgs
-    const actions = ['agents', 'topics', 'report', 'subscribe', 'unsubscribe', 'publish', 'send', 'inbox', 'ack', 'mcp']
+    const actions = ['agents', 'report', 'send', 'inbox', 'ack', 'mcp']
     if (!actions.includes(action ?? '')) throw new CliUsageError(`comm requires ${actions.join(', ')}.`)
-    if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && first === undefined) throw new CliUsageError(`comm ${action} requires an id.`)
-    if (['publish', 'send'].includes(action ?? '') && (first === undefined || extra.join(' ').trim().length === 0)) {
+    if (action === 'ack' && first === undefined) throw new CliUsageError('comm ack requires an id.')
+    if (action === 'send' && (first === undefined || extra.join(' ').trim().length === 0)) {
       throw new CliUsageError(`comm ${action} requires a target and message text.`)
     }
-    if (['agents', 'topics', 'report', 'inbox', 'mcp'].includes(action ?? '') && first !== undefined)
+    if (['agents', 'report', 'inbox', 'mcp'].includes(action ?? '') && first !== undefined)
       throw new CliUsageError(`comm ${action} accepts no positional arguments.`)
-    if (['subscribe', 'unsubscribe', 'ack'].includes(action ?? '') && extra.length > 0)
-      throw new CliUsageError(`comm ${action} accepts one positional argument.`)
-    if (action === 'mcp' && (json || delivery !== undefined || priority !== undefined || topic !== undefined || limit !== undefined)) {
+    if (action === 'ack' && extra.length > 0) throw new CliUsageError('comm ack accepts one positional argument.')
+    if (action === 'mcp' && (json || priority !== undefined || limit !== undefined)) {
       throw new CliUsageError('comm mcp does not accept --json or inbox/message options.')
     }
   }
@@ -956,9 +937,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
       ...(max !== undefined && { max }),
       ...(atSeq !== undefined && { atSeq }),
       ...(principal !== undefined && { principal }),
-      ...(delivery !== undefined && { delivery }),
       ...(priority !== undefined && { priority }),
-      ...(topic !== undefined && { topic }),
       ...(limit !== undefined && { limit }),
     }
   if (command === undefined && !help && !version) {
@@ -1011,9 +990,7 @@ export function parseCliArgs(argv: readonly string[]): CliArgs {
     ...(max !== undefined && { max }),
     ...(atSeq !== undefined && { atSeq }),
     ...(principal !== undefined && { principal }),
-    ...(delivery !== undefined && { delivery }),
     ...(priority !== undefined && { priority }),
-    ...(topic !== undefined && { topic }),
     ...(limit !== undefined && { limit }),
     ...(sinceSeq !== undefined && { sinceSeq }),
     ...(tail !== undefined && { tail }),

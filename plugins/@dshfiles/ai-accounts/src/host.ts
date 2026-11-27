@@ -81,6 +81,7 @@ import { ExtraUsageGuardModel } from './extra-usage-guard.js'
 import { RequestAccountRouting } from './request-account-routing.js'
 import { randomUUID } from 'node:crypto'
 import { CodexCredentialStore } from './codex-credential.js'
+import { CodexModelCatalog } from './codex-model-catalog.js'
 import { createQuotaContinuationService } from './quota-continuation.js'
 import { QuotaAttention } from './quota-attention-promise.js'
 import { ProviderProfileModel, EffortPinnedAdapter } from './provider-profile.js'
@@ -93,13 +94,17 @@ import {
   CODEX_KIND,
   MISTRAL_KIND,
   OPENCODE_KIND,
+  VIBE_KIND,
   ProviderRoutes,
+  type CodexRoute,
   type DiscoveringRoute,
   type Route,
 } from './provider-routes.js'
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { ANTIGRAVITY_CLI_TOKEN, AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
+import { VIBE_CLI_TOKEN, VibeCliSessions } from './vibe-cli.js'
+import { createVibeProvider } from './vibe-provider.js'
 import { AntigravityProcesses, AntigravityProcessesPromiseModel, type AntigravityProcessesPromise } from './antigravity-processes.js'
 
 /**
@@ -354,15 +359,33 @@ const startAccountsHost = (input: {
   })
   onRelease(() => void antigravityCli.dispose())
   const antigravityUpstream = createAntigravityProvider(antigravityCli)
+  // Mistral's Vibe allowance is reachable only by the CLI itself, so this route spawns `vibe` per step with the
+  // account's signed-in VIBE_HOME instead of sending HTTP (see vibe-cli.ts).
+  const vibeCli = new VibeCliSessions({
+    home: provider => {
+      const route = routes.get(provider)
+      return route?.kind === VIBE_KIND ? route.home : ''
+    },
+  })
+  onRelease(() => vibeCli.dispose())
+  const vibeUpstream = createVibeProvider({ upstream: mistralUpstream, sessions: vibeCli })
   const githubCopilotUpstream = githubCopilotProvider()
   const declaredRetryAfter = new DeclaredRetryAfter()
   /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
   const lunaReserveHolds = new Map<string, number>()
   const lunaReserveHeld = (id: string, now: number): boolean => (lunaReserveHolds.get(id) ?? 0) > now
   const catalogState = input.modelCatalogs
+  /** The largest window per model each Codex account's backend disclosed at its last successful discovery. */
+  const maxContextWindows = new Map<string, ReadonlyMap<string, number>>()
+  const maxContextWindowsFor = (instanceId: string): ReadonlyMap<string, number> => maxContextWindows.get(instanceId) ?? new Map()
+  runtime.maxContextWindows = maxContextWindowsFor
+  onRelease(() => {
+    if (runtime.maxContextWindows === maxContextWindowsFor) delete runtime.maxContextWindows
+  })
   const sameDiscoveringRoute = (candidate: Route | undefined, expected: DiscoveringRoute): boolean => {
     if (candidate === undefined || !candidate.enabled) return false
     if (expected.kind === ANTIGRAVITY_KIND) return candidate.kind === ANTIGRAVITY_KIND && candidate.home === expected.home
+    if (expected.kind === CODEX_KIND) return candidate.kind === CODEX_KIND && candidate.layout.effectiveHomePath === expected.layout.effectiveHomePath
     if (expected.kind === COMMANDCODE_KIND) {
       return (
         candidate.kind === COMMANDCODE_KIND &&
@@ -381,7 +404,7 @@ const startAccountsHost = (input: {
   }
   // Each keyed provider is built with its own base and key variable, so two
   // Command Code accounts can point at different deployments.
-  const keyedUpstream = (route: Exclude<DiscoveringRoute, { readonly kind: typeof ANTIGRAVITY_KIND }>) =>
+  const keyedUpstream = (route: Exclude<DiscoveringRoute, { readonly kind: typeof ANTIGRAVITY_KIND | typeof CODEX_KIND }>) =>
     route.kind === COMMANDCODE_KIND
       ? createCommandCodeProvider({
           baseUrl: route.apiBaseUrl,
@@ -418,6 +441,11 @@ const startAccountsHost = (input: {
       ]),
     )
 
+    const overrides = new Map(
+      sourceFile.accounts.map(account => [ProviderRoutes.normalizeInstanceId(account.instanceId, account.kind), account.contextWindowOverrides] as const),
+    )
+    const overridesFor = (id: string) => overrides.get(id)
+
     const upstreamFor = (id: string, route: Route) => {
       if (route.kind === CODEX_KIND) {
         return withLunaReserve({
@@ -429,6 +457,7 @@ const startAccountsHost = (input: {
         })
       }
       if (route.kind === CLAUDE_KIND) return ClaudeAccountModel.usesCliTransport(route) ? claudeCliUpstream : claudeUpstream
+      if (route.kind === VIBE_KIND) return vibeUpstream
       if (route.kind === GITHUB_COPILOT_KIND) return githubCopilotUpstream
       if (route.kind === ANTIGRAVITY_KIND) return antigravityUpstream
       return keyedUpstream(route)
@@ -446,6 +475,12 @@ const startAccountsHost = (input: {
           ...settings.get(id),
           additionalModelIds: settings.get(id)?.additionalModelIds ?? [],
           discoveredModels: catalogState.discovered(id) ?? [],
+          // The Codex backend is the authority over pi-ai's static windows.
+          discoveryRefinesCatalog: route.kind === CODEX_KIND,
+          // Window overrides are not curation: they apply while the account inherits its provider's model settings.
+          // The editor reads the provider default, so it builds without them.
+          contextWindowOverrides: forEditing ? undefined : overridesFor(id),
+          maxContextWindows: maxContextWindowsFor(id),
         }),
       ]),
     )
@@ -457,7 +492,7 @@ const startAccountsHost = (input: {
   profiles = buildProfiles(routes, initialFile)
   runtime.longCacheMinutes = (provider, model) => {
     const route = routes.get(provider)
-    if (route === undefined || (route.kind === CLAUDE_KIND && ClaudeAccountModel.usesCliTransport(route))) return null
+    if (route === undefined || route.kind === VIBE_KIND || (route.kind === CLAUDE_KIND && ClaudeAccountModel.usesCliTransport(route))) return null
     const candidate = profiles
       .get(provider)
       ?.piProvider?.getModels()
@@ -581,6 +616,7 @@ const startAccountsHost = (input: {
         if (route.kind === CODEX_KIND) return undefined
         if (route.kind === GITHUB_COPILOT_KIND) return undefined
         if (route.kind === ANTIGRAVITY_KIND) return ANTIGRAVITY_CLI_TOKEN
+        if (route.kind === VIBE_KIND) return VIBE_CLI_TOKEN
         if (route.kind === CLAUDE_KIND) {
           if (ClaudeAccountModel.usesCliTransport(route)) return CLAUDE_CLI_TOKEN
           try {
@@ -684,22 +720,57 @@ const startAccountsHost = (input: {
     const models = profile?.piProvider?.getModels() ?? []
     const nativeIds = profile === undefined ? new Set<string>() : ProviderProfileModel.nativeModelIdsForProfile(profile)
     const discoveredIds = new Set((catalogState.discovered(instanceId) ?? []).map(discovered => discovered.id))
+    const maxima = maxContextWindowsFor(instanceId)
     return Promise.all(
-      models.map(async model => ({
-        ...(await catalogAdapter.resolveModel(instanceId, model.id)),
-        accountAdditional: !nativeIds.has(model.id) && !discoveredIds.has(model.id),
-      })),
+      models.map(async model => {
+        const max = maxima.get(model.id)
+        return {
+          ...(await catalogAdapter.resolveModel(instanceId, model.id)),
+          accountAdditional: !nativeIds.has(model.id) && !discoveredIds.has(model.id),
+          defaultContextWindow: model.contextWindow,
+          ...(max !== undefined && { maxContextWindow: max }),
+        }
+      }),
     )
   }
 
   const discoversModels = (route: Route): route is DiscoveringRoute =>
-    route.kind === COMMANDCODE_KIND || route.kind === OPENCODE_KIND || route.kind === MISTRAL_KIND || route.kind === ANTIGRAVITY_KIND
+    route.kind === COMMANDCODE_KIND ||
+    route.kind === OPENCODE_KIND ||
+    route.kind === MISTRAL_KIND ||
+    route.kind === ANTIGRAVITY_KIND ||
+    route.kind === CODEX_KIND
+  /** The plan's listed models from the Codex backend, with the login a request would use (refreshed when stale). */
+  const discoverCodexModels = async (id: string, route: CodexRoute, signal: AbortSignal) => {
+    try {
+      const credential = await CodexModelCatalog.credential({
+        store: CodexCredentialStore.forLayout(route.layout),
+        refresh: (current, refreshSignal) => {
+          const oauth = codexUpstream.auth.oauth
+          if (oauth === undefined) throw new LlmError('This pi-ai build cannot refresh a Codex login. Sign in again from AI Accounts.', 'MISSING_CREDENTIAL')
+          return oauth.refresh(current, refreshSignal)
+        },
+        signal,
+      })
+      const entries = await CodexModelCatalog.fetch({ ...credential, signal })
+      maxContextWindows.set(id, new Map(entries.flatMap(entry => (entry.maxContextWindow === undefined ? [] : [[entry.id, entry.maxContextWindow] as const]))))
+      return entries.map(CodexModelCatalog.toDiscovered)
+    } catch (cause) {
+      if (!signal.aborted) {
+        ctx.logger.warn(
+          `ai-accounts: Codex model discovery failed for ${id}; keeping the previous model list. ${cause instanceof Error ? cause.message : ''} Open AI Accounts › Models to retry, or sign in again if the login expired.`,
+        )
+      }
+      throw cause
+    }
+  }
   let adapterRegistration: AdapterRegistrationHandle | undefined
   let directoryRegistration: DirectoryRegistrationHandle | undefined
   const modelDiscoveries = new Map<string, { readonly route: DiscoveringRoute; readonly dispose: () => void }>()
 
   const registerKeyedDiscovery = (id: string, route: DiscoveringRoute): void => {
     const dispose = llm.registerModelDiscovery(`ai-accounts.${route.kind}.${id}`, async (request, signal) => {
+      if (route.kind === CODEX_KIND) return discoverCodexModels(id, route, signal ?? new AbortController().signal)
       if (route.kind === ANTIGRAVITY_KIND) {
         const description = await describeAntigravity(route.home)
         if (!description.signedIn) throw new LlmError(description.detail, 'MISSING_CREDENTIAL')
@@ -789,6 +860,7 @@ const startAccountsHost = (input: {
       modelDiscoveries.delete(id)
     }
     catalogState.retain(({ instanceId, route }) => sameDiscoveringRoute(nextRoutes.get(instanceId), route))
+    for (const instanceId of maxContextWindows.keys()) if (nextRoutes.get(instanceId)?.kind !== CODEX_KIND) maxContextWindows.delete(instanceId)
     for (const [id, route] of enabled) {
       if (!discoversModels(route) || modelDiscoveries.has(id)) continue
       registerKeyedDiscovery(id, route)

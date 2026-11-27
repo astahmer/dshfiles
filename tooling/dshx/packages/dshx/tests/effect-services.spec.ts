@@ -10,7 +10,7 @@ import LocalSubprocessRuntime from '@deepseek-ai/dsh-subprocess-local'
 import { describe, expect, it } from '@effect/vitest'
 import { Context, Effect, Exit, Fiber, Layer, Option, Schema, Stream } from 'effect'
 import { defineApi, method } from '../src/api/index.js'
-import { connectCommunicationClient, startHostCommunicationBridge } from '../src/communication/bridge.js'
+import { startHostCommunicationBridge } from '../src/communication/bridge.js'
 import { createCommunicationService } from '../src/communication/service.js'
 import { Communication, CommunicationFailed } from '../src/effect/communication.js'
 import { DshxEffect } from '../src/effect/index.js'
@@ -35,7 +35,7 @@ const temporaryDirectory = (prefix: string) =>
     directory => Effect.promise(() => rm(directory, { recursive: true, force: true })),
   )
 
-const cordisHost = (packageId: string, setup: (ctx: CordisContext) => PromiseLike<unknown>) =>
+const cordisHost = (packageId: string, setup: (ctx: CordisContext) => PromiseLike<void>) =>
   Layer.effect(
     HostContext,
     Effect.acquireRelease(
@@ -372,7 +372,7 @@ describe('HostApis', () => {
 })
 
 describe('Communication', () => {
-  it.live('lifts every bridge method and streams new inbox messages once', () =>
+  it.live('lifts the bridge methods it still serves', () =>
     Effect.gen(function* () {
       const directory = yield* temporaryDirectory('dshx-effect-communication-')
       const service = createCommunicationService({ statePath: join(directory, 'messages.json') })
@@ -380,19 +380,10 @@ describe('Communication', () => {
         Effect.promise(() => startHostCommunicationBridge(service, { stateHome: directory, listAgents: () => [] })),
         bridge => Effect.promise(() => bridge.close()),
       )
-      const sender = yield* Effect.promise(() => connectCommunicationClient({ stateHome: directory, principalId: 'sender' }))
 
       const communication = yield* Effect.provide(Communication, Communication.layer({ stateHome: directory, principalId: 'reader' }))
       expect(communication.principal).toEqual({ kind: 'external', id: 'reader' })
       expect(yield* communication.listAgents()).toEqual([])
-      yield* communication.subscribe({ topic: 'builds.ready' })
-      expect(yield* communication.listTopics()).toMatchObject([{ topic: 'builds.ready', subscribers: 1 }])
-
-      const inbox = yield* Stream.runCollect(Stream.take(communication.messages({ every: '20 millis' }), 2)).pipe(Effect.forkChild)
-      yield* Effect.promise(() => sender.publish({ topic: 'builds.ready', text: 'first' }))
-      yield* Effect.promise(() => sender.publish({ topic: 'builds.ready', text: 'second' }))
-      const received = yield* Fiber.join(inbox).pipe(Effect.timeout('5 seconds'))
-      expect(received.map(message => message.text).sort()).toEqual(['first', 'second'])
 
       const failure = yield* communication.acknowledge('not-a-uuid').pipe(Effect.flip)
       expect(failure).toBeInstanceOf(CommunicationFailed)
@@ -414,7 +405,9 @@ describe('Communication', () => {
 })
 
 describe.skipIf(process.platform === 'win32')('HostTerminal', () => {
-  const terminalHost = cordisHost('@test/terminal', ctx => ctx.plugin(LocalSubprocessRuntime))
+  const terminalHost = cordisHost('@test/terminal', async ctx => {
+    await ctx.plugin(LocalSubprocessRuntime)
+  })
   it.layer(HostTerminal.layer.pipe(Layer.provide(terminalHost)))(layer => {
     layer.effect('resolves executables and reports the terminal environment of the real provider', () =>
       Effect.gen(function* () {

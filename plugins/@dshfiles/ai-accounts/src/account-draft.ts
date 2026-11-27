@@ -34,6 +34,7 @@ export class AccountDraftModel {
     cursor: '',
     mistral: '',
     antigravity: '',
+    vibe: '~/.vibe',
   } satisfies Record<AccountKind, string>
 
   /** The authored half of a profile; identity and health are observed, never sent back. */
@@ -57,13 +58,14 @@ export class AccountDraftModel {
     hiddenModelIds: profile.hiddenModelIds,
     favoriteModelIds: profile.favoriteModelIds,
     modelOrder: profile.modelOrder,
+    ...(profile.contextWindowOverrides !== undefined && { contextWindowOverrides: profile.contextWindowOverrides }),
     ...(profile.useExtraUsage !== undefined && { useExtraUsage: profile.useExtraUsage }),
   })
 
   private static sameList = (left: readonly string[], right: readonly string[]): boolean =>
     left.length === right.length && left.every((value, index) => value === right[index])
 
-  private static sameRecord = (left: Readonly<Record<string, string>>, right: Readonly<Record<string, string>>): boolean => {
+  private static sameRecord = <Value extends string | number>(left: Readonly<Record<string, Value>>, right: Readonly<Record<string, Value>>): boolean => {
     const keys = Object.keys(left)
     return keys.length === Object.keys(right).length && keys.every(key => left[key] === right[key])
   }
@@ -88,7 +90,8 @@ export class AccountDraftModel {
     AccountDraftModel.sameList(left.hiddenModelIds, right.hiddenModelIds) &&
     AccountDraftModel.sameList(left.favoriteModelIds, right.favoriteModelIds) &&
     AccountDraftModel.sameList(left.modelOrder, right.modelOrder) &&
-    AccountDraftModel.sameRecord(left.reasoningDefaults, right.reasoningDefaults)
+    AccountDraftModel.sameRecord(left.reasoningDefaults, right.reasoningDefaults) &&
+    AccountDraftModel.sameRecord(left.contextWindowOverrides ?? {}, right.contextWindowOverrides ?? {})
 
   /**
    * The draft the editor shows after the selection or the store changes; `followedId` is the stored account it last
@@ -157,7 +160,9 @@ export class AccountDraftModel {
       homePath: AccountDraftModel.defaultHome[input.kind],
       shadowHomePath: '',
       apiKeyEnv:
-        input.kind === 'codex' || input.kind === 'github-copilot' || input.kind === 'antigravity' ? '' : AccountDraftModel.suggestedApiKeyRef(instanceId),
+        input.kind === 'codex' || input.kind === 'github-copilot' || input.kind === 'antigravity' || input.kind === 'vibe'
+          ? ''
+          : AccountDraftModel.suggestedApiKeyRef(instanceId),
       apiBaseUrl: '',
       badge: AccountDraftModel.badgeFromName(displayName),
       accentColor: KIND_ACCENT[input.kind],

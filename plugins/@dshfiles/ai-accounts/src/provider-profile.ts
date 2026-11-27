@@ -13,6 +13,7 @@ import type { githubCopilotProvider } from '@earendil-works/pi-ai/providers/gith
 import type { createCommandCodeProvider } from './commandcode-provider.js'
 import type { createMistralProvider } from './mistral-provider.js'
 import type { createAntigravityProvider } from './antigravity-provider.js'
+import type { createVibeProvider } from './vibe-provider.js'
 
 /** DeepSeek's documented default effort when thinking is on and the request names none. */
 const DEEPSEEK_DEFAULT_EFFORT = 'high'
@@ -103,6 +104,12 @@ export class ProviderProfileModel {
   static nativeModelIdsForProfile = (profile: ResolvedPiAiProviderProfile): ReadonlySet<string> => nativeModels.get(profile) ?? new Set()
   static reasoningDefaultsForProfile = (profile: ResolvedPiAiProviderProfile): Readonly<Record<string, string>> => profilePins.get(profile) ?? {}
 
+  /** The window a model runs with: the account's override when set, never above the provider's disclosed maximum. */
+  static effectiveContextWindow = (input: { readonly base: number; readonly override?: number | undefined; readonly max?: number | undefined }): number => {
+    if (input.override === undefined || !Number.isInteger(input.override) || input.override <= 0) return input.base
+    return input.max === undefined ? input.override : Math.min(input.override, input.max)
+  }
+
   static buildProfile = (params: {
     readonly defaultReasoningEffort?: string | null | undefined
     /** Per-model default effort ids this account pins. */
@@ -121,11 +128,21 @@ export class ProviderProfileModel {
       | ReturnType<typeof createCommandCodeProvider>
       | ReturnType<typeof createMistralProvider>
       | ReturnType<typeof createAntigravityProvider>
+      | ReturnType<typeof createVibeProvider>
     readonly provider: string
     readonly displayName: string
     readonly additionalModelIds: readonly string[]
     /** Models the provider catalog reported for this account, with the context window and input it disclosed. */
     readonly discoveredModels?: readonly LlmDiscoveredModel[]
+    /**
+     * The discovered context window replaces the static catalog's for a model both list. Set for Codex, whose backend
+     * is the authority over pi-ai's catalog; other providers keep their static limits.
+     */
+    readonly discoveryRefinesCatalog?: boolean
+    /** Per-model context windows this account asks for, clamped to `maxContextWindows` when the provider disclosed one. */
+    readonly contextWindowOverrides?: Readonly<Record<string, number>> | undefined
+    /** The largest window the provider accepts per model id, when it said so. */
+    readonly maxContextWindows?: ReadonlyMap<string, number>
     /** Sees every HTTP response this account's provider receives, e.g. to read a declared Retry-After. */
     readonly onResponse?: (response: { readonly status: number; readonly headers: Readonly<Record<string, string>> }) => void
     readonly cacheRetention?: () => Readonly<Record<string, CacheRetention>>
@@ -152,7 +169,7 @@ export class ProviderProfileModel {
       // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
       const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id, discovered.get(id)) : undefined
       if (described !== undefined) {
-        models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
+        models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, described.name) })
         continue
       }
       const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
@@ -167,10 +184,35 @@ export class ProviderProfileModel {
       if (template === undefined) continue
       // Codex Spark reads text only. pi-ai 1.5 dropped the last Spark from its catalog, so a custom Spark id has no
       // family template left and would otherwise copy a GPT model that reads images.
-      const input = familyTemplate === undefined && gptFamily?.endsWith('-codex-spark') === true ? ['text' as const] : template.input
-      models.push({ ...template, id, input, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
+      const found = discovered.get(id)
+      const reported = found?.inputModalities?.filter(modality => modality === 'text' || modality === 'image')
+      const input =
+        reported !== undefined && reported.includes('text')
+          ? reported
+          : familyTemplate === undefined && gptFamily?.endsWith('-codex-spark') === true
+            ? ['text' as const]
+            : template.input
+      models.push({
+        ...template,
+        id,
+        input,
+        // A discovered model keeps the limits its provider reported, not its template's.
+        ...(found?.contextWindow !== undefined && found.contextWindow > 0 && { contextWindow: found.contextWindow }),
+        ...(found?.maxTokens !== undefined && found.maxTokens > 0 && { maxTokens: found.maxTokens }),
+        provider: params.provider,
+        name: AccountsRules.accountModelName(params.provider, id),
+      })
     }
-    const offeredModels = models.filter(model => !hidden.has(model.id)).sort((left, right) => rank(left.id) - rank(right.id))
+    const sized = models.map(model => {
+      const reported = params.discoveryRefinesCatalog === true ? discovered.get(model.id)?.contextWindow : undefined
+      const contextWindow = ProviderProfileModel.effectiveContextWindow({
+        base: reported !== undefined && reported > 0 ? reported : model.contextWindow,
+        override: params.contextWindowOverrides?.[model.id],
+        max: params.maxContextWindows?.get(model.id),
+      })
+      return contextWindow === model.contextWindow ? model : { ...model, contextWindow }
+    })
+    const offeredModels = sized.filter(model => !hidden.has(model.id)).sort((left, right) => rank(left.id) - rank(right.id))
     // A pinned effort is offered as an override on the model it belongs to, which
     // is the seam the adapter materializes a default through: an explicit caller
     // choice still wins, and an unpinned model keeps the provider's own default.

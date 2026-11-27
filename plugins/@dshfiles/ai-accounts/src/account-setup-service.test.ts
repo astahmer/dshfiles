@@ -34,7 +34,7 @@ const deferred = () => {
   return { promise, resolve }
 }
 const harness = async (
-  verify: (request: SetupVerificationInput) => Promise<unknown> = async () => undefined,
+  verify: (request: SetupVerificationInput) => Promise<void> = async () => undefined,
   ttlMs = 60_000,
   settleLogin?: (id: string) => Promise<void>,
 ) => {

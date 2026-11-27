@@ -190,6 +190,18 @@
   transition: top 120ms ease, height 120ms ease;
 }
 
+/* The read boundary: the first Turn the reader has not scrolled through, drawn as the quiet hairline Chat's "New"
+   divider uses between the seen ticks and the unseen ones. */
+.seenBoundary {
+  position: absolute;
+  right: var(--dshx-backdrop-rail-inset, 0px);
+  width: 20px;
+  height: 1px;
+  border-radius: 1px;
+  background: var(--dsw-alias-border-l2);
+  pointer-events: none;
+}
+
 /* Previous / next and the filter: shown while the rail is in use or filtered, so a quiet rail stays quiet. */
 .controls {
   display: flex;
@@ -359,6 +371,7 @@
   .mark::before,
   .markBusy::before,
   .band,
+  .seenBoundary,
   .controls,
   .preview {
     transition: none;

@@ -3,6 +3,7 @@ import { test } from 'node:test'
 import { VcsProviders } from '@dshfiles/vcs-provider-port'
 import { VcsProviderService } from '@dshfiles/vcs-provider-port/effect'
 import { VcsDetector } from '@dshfiles/vcs-provider-port/detect'
+import { WorkspaceAttribution } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 test('the public port loads built Promise and Effect entrypoints', () => {
   assert.ok(import.meta.resolve('@dshfiles/vcs-provider-port').endsWith('/dist/index.js'))
@@ -11,4 +12,6 @@ test('the public port loads built Promise and Effect entrypoints', () => {
   assert.equal(VcsProviderService.key, '@dshfiles/vcs-provider-port/VcsProvider')
   assert.ok(import.meta.resolve('@dshfiles/vcs-provider-port/detect').endsWith('/dist/detect.js'))
   assert.equal(VcsDetector.key, '@dshfiles/vcs-provider-port/VcsDetector')
+  assert.ok(import.meta.resolve('@dshfiles/vcs-provider-port/workspace-attribution').endsWith('/dist/workspace-attribution.js'))
+  assert.equal(typeof WorkspaceAttribution.projectOfSession, 'function')
 })
