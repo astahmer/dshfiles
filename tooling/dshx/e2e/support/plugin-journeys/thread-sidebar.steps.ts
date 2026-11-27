@@ -3100,7 +3100,6 @@ const threeSubagentCalls = [240, 241, 242]
   .join('')
 
 const dockRows = (page: Page): Locator => page.locator('[data-dshfiles-live-preview="agent"][data-dshfiles-live-preview-seat="dock"]')
-const dockRunCards = (page: Page): Locator => dockRows(page).locator('section[aria-label^="Agent run:"]')
 const rowBoxes = (rows: Locator): Promise<readonly { readonly top: number; readonly bottom: number; readonly height: number }[]> =>
   rows.evaluateAll(elements =>
     elements.map(element => {
@@ -3125,31 +3124,24 @@ When('a thread delegates a long command to three subagents', async ({ page }: { 
   await composer.press('Enter')
 })
 
-Then('the dock lists three working subagent cards without squashing one into another', async ({ page }: { page: Page }) => {
+// The dock draws one compact row per working child (unslop round seven); with four or more it folds behind one row.
+Then('the dock lists three working subagent rows without squashing one into another', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-subagent-run-cards-layout', async () => {
-    const fold = page.getByRole('button', { name: '3 subagents working', exact: true })
-    await expect(fold).toBeVisible({ timeout: 60_000 })
-    await fold.click()
-    await expect(dockRows(page)).toHaveCount(3, { timeout: 30_000 })
-    await expect(dockRunCards(page)).toHaveCount(3, { timeout: 45_000 })
+    const fold = page.locator('[data-dshfiles-live-preview-fold="subagents"]')
+    if ((await fold.count()) > 0 && (await fold.first().getAttribute('aria-expanded')) === 'false') await fold.first().click()
+    await expect(dockRows(page)).toHaveCount(3, { timeout: 60_000 })
     const boxes = await rowBoxes(dockRows(page))
-    for (const box of boxes) expect(box.height).toBeGreaterThanOrEqual(120)
+    for (const box of boxes) expect(box.height).toBeGreaterThanOrEqual(28)
     for (const [index, box] of boxes.entries()) if (index > 0) expect(box.top).toBeGreaterThanOrEqual(boxes[index - 1]!.bottom - 1)
   })
 })
 
-Then('one working subagent folds to its own row and back without collapsing the others', async ({ page }: { page: Page }) => {
+Then('each working subagent row opens its own thread', async ({ page }: { page: Page }) => {
   await recordAssertion(page, 'thread-sidebar-subagent-run-card-collapse', async () => {
-    await dockRunCards(page)
-      .first()
-      .getByRole('button', { name: /^Collapse / })
-      .click()
-    await expect(dockRunCards(page)).toHaveCount(2)
-    // The folded child keeps its own one-line row, live clock included, and expands in place without touching its siblings.
-    const compact = dockRows(page).first()
-    expect(await compact.evaluate(row => row.getBoundingClientRect().height)).toBeLessThan(48)
-    await compact.getByRole('button', { name: /^Expand / }).click()
-    await expect(dockRunCards(page)).toHaveCount(3)
+    for (const row of await dockRows(page).all()) await expect(row.locator('[data-live-work-action]')).toHaveCount(1)
+    await dockRows(page).first().locator('[data-live-work-action]').click()
+    // Only a child thread's header draws its live state beside the parent breadcrumb.
+    await expect(page.locator('[data-subagent-live-state]').first()).toBeVisible({ timeout: 30_000 })
   })
   await finishJourneyAssertions(page)
 })

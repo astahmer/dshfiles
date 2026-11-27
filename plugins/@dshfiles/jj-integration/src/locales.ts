@@ -17,9 +17,9 @@ const en = {
   readyToIntegrate: 'Ready to land',
   staleStatus: 'Stale',
   staleHeading: 'Stale',
-  staleAdvisory: 'Main moved past this older work; land it only if it still matters.',
+  staleAdvisory: 'Main moved past this older work. Land it only if it still matters.',
   staleDescription:
-    'No revision changed in {days} days while {bookmark} moved on. Landing would rebase old work, so these stay out of Ready and the inbox; each row still lands one workspace at a time.',
+    'No revision changed in {days} days while {bookmark} moved on. Landing would rebase old work, so these stay out of Ready and the inbox. Each row still lands one workspace at a time.',
   landAnyway: 'Land anyway',
   waitingHeading: 'Waiting',
   searchThreads: 'Search threads, revisions…',
