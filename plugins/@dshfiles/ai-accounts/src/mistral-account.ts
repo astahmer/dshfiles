@@ -228,11 +228,15 @@ const tightestBudget = (budgets: readonly { readonly label: string; readonly det
   [...budgets].sort((left, right) => right.detail.usage_percentage - left.detail.usage_percentage)[0]
 
 /** Turn Vibe's billing reads into a card; `null` reads are the 403/404 Vibe also treats as "no data". */
-const mistralUsageCard = (subscription: MistralSubscription | null, budget: MistralBudget | null): UsageCard => {
+const mistralUsageCard = (subscription: MistralSubscription | null, budget: MistralBudget | null, kind: 'mistral' | 'vibe' = 'mistral'): UsageCard => {
   const planName = subscription === null ? null : subscription.plan_name.trim().slice(0, 64) || null
   const vibe = budget?.vibe_budget ?? null
-  const api = budget?.api_budget ?? null
-  if (vibe === null && api === null) return { ...ProviderUsageModel.emptyUsage('unsupported', MISTRAL_NO_BUDGET_MESSAGE), plan: planName }
+  const api = kind === 'vibe' ? null : (budget?.api_budget ?? null)
+  if (vibe === null && api === null) {
+    const message =
+      kind === 'vibe' ? 'Mistral reported no Vibe & Studio allowance for this login. Check usage in console.mistral.ai.' : MISTRAL_NO_BUDGET_MESSAGE
+    return { ...ProviderUsageModel.emptyUsage('unsupported', message), plan: planName }
+  }
   const budgets = [
     ...(api === null ? [] : [{ label: WINDOW_LABELS.api, detail: api }]),
     ...(vibe === null ? [] : [{ label: WINDOW_LABELS.vibe, detail: vibe }]),
@@ -261,6 +265,7 @@ const mistralUsageCard = (subscription: MistralSubscription | null, budget: Mist
  * and a missing allowance reads `unsupported` rather than a guessed percentage.
  */
 const readMistralUsage = async (input: {
+  readonly kind?: 'mistral' | 'vibe'
   readonly keyEnv: string
   readonly authSource?: 'cli' | 'reference' | undefined
   readonly resolveCredential?: CredentialValueResolver | undefined
@@ -304,7 +309,7 @@ const readMistralUsage = async (input: {
     if (models.status === 429) return ProviderUsageModel.emptyUsage('rate-limited', 'Mistral is rate limiting this key; wait a minute and refresh.')
     if (!models.ok) return ProviderUsageModel.emptyUsage('error', `Mistral returned ${String(models.status)} for the model list; refresh later.`)
     if (AiAccountsSchema.decodeResult(modelListSchema, await models.json())._tag === 'Success' && input.signal?.aborted !== true) input.onAuthenticated?.()
-    return mistralUsageCard(subscription, budget)
+    return mistralUsageCard(subscription, budget, input.kind)
   } catch (cause) {
     return ProviderUsageModel.emptyUsage('error', cause instanceof Error ? cause.message : 'Mistral could not be reached; refresh later.')
   }

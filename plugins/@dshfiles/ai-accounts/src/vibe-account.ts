@@ -146,8 +146,8 @@ export class VibeAccountModel {
     (readCliKey === undefined ? await readLogin(resolveHome(homePath)) : await readCliKey()).length > 0
 
   /**
-   * The plan's two included buckets, read with the CLI's own key: the API credit and the Vibe & Studio allowance this
-   * route spends. Vibe's billing reads are undocumented, so a missing one is `unsupported`, never a guessed percentage.
+   * Only the Vibe & Studio allowance governs the CLI route. A missing allowance is `unsupported`, never an API-credit
+   * fallback or a guessed percentage.
    */
   static readonly readUsage = async (input: {
     readonly homePath: string
@@ -158,6 +158,7 @@ export class VibeAccountModel {
   }): Promise<UsageCard> => {
     const home = resolveHome(input.homePath)
     return MistralAccountModel.readUsage({
+      kind: 'vibe',
       keyEnv: '',
       authSource: 'cli',
       resolveCredential: input.resolveCredential,

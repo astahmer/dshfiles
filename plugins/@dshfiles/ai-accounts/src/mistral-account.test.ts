@@ -151,6 +151,20 @@ describe('Mistral plan quota', () => {
     expect(card.windows[0]).toMatchObject({ label: 'API credit', percentRemaining: 0, amount: { used: 25.81, limit: 25.5, currency: 'EUR' } })
   })
 
+  it('uses only the Vibe allowance as quota for a Vibe route', () => {
+    const apiSpent = { ...bothBudgets.api_budget, usage_percentage: 101.2 }
+    expect(mistralUsageCard(null, { ...bothBudgets, api_budget: apiSpent }, 'vibe')).toMatchObject({
+      status: 'ok',
+      message: null,
+      windows: [{ label: 'Vibe & Studio allowance', percentRemaining: 100 }],
+    })
+    expect(mistralUsageCard(null, { ...bothBudgets, vibe_budget: { ...bothBudgets.vibe_budget, usage_percentage: 100 } }, 'vibe')).toMatchObject({
+      status: 'rate-limited',
+      message: 'The Vibe & Studio allowance is spent and pay-as-you-go is off: requests fail until it resets.',
+    })
+    expect(mistralUsageCard(null, { api_budget: apiSpent }, 'vibe')).toMatchObject({ status: 'unsupported', windows: [] })
+  })
+
   it("keeps one window when a key only reports the Vibe allowance, as Vibe's own reader expects", () => {
     const card = mistralUsageCard({ plan_name: 'Pro' }, { vibe_budget: { usage_percentage: 42.5, reset_at: '2026-12-01T00:00:00Z' } })
     expect(card).toMatchObject({ status: 'ok', windows: [{ label: 'Vibe & Studio allowance', percentRemaining: 57.5 }] })
