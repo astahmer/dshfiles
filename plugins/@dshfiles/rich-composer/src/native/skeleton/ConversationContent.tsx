@@ -23,6 +23,37 @@ function NoConversationWidthControls() {
   return null
 }
 
+/** How many parents a child thread's project is looked up through. */
+const LINEAGE_DEPTH = 8
+
+/**
+ * A thread's ancestors, nearest first: its parent, the parent's parent, and so on, up to eight, stopping at a cycle.
+ * @param sessionId - The thread whose ancestors are read.
+ * @param byId - The session list's summaries.
+ * @returns The ancestor ids, nearest first.
+ */
+export function ancestorsOf<Id extends string>(sessionId: Id, byId: Partial<Readonly<Record<Id, { readonly parentId?: Id | undefined }>>>): Id[] {
+  const ids: Id[] = []
+  const seen = new Set<Id>([sessionId])
+  let parent = byId[sessionId]?.parentId
+  while (parent !== undefined && ids.length < LINEAGE_DEPTH && !seen.has(parent)) {
+    ids.push(parent)
+    seen.add(parent)
+    parent = byId[parent]?.parentId
+  }
+  return ids
+}
+
+/** The workspace of the nearest ancestor in `lineage` (ids joined by newlines) that has one. */
+function workspaceOfLineage<Workspace extends { readonly sessionIds: readonly string[] }>(lineage: string, items: readonly Workspace[]): Workspace | undefined {
+  if (lineage === '') return undefined
+  for (const id of lineage.split('\n')) {
+    const found = items.find(workspace => workspace.sessionIds.includes(id))
+    if (found !== undefined) return found
+  }
+  return undefined
+}
+
 interface ComposerInputDockProps {
   readonly session: SessionSnapshot
   readonly useInput: ConversationContentProps['useInput']
@@ -58,6 +89,9 @@ export function ConversationContent(props: ConversationContentProps) {
   const pendingInteraction = useSessionStatus(snapshot =>
     sessionId === undefined ? undefined : snapshot.get(sessionId)?.pendingInteraction)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
+  // Council round 34 B7: a subagent's thread is in no workspace's sessionIds, so it takes its nearest ancestor's project,
+  // as the thread list does (thread-sidebar's workspaceForLineage). Joined ids, so the subscription keeps its identity.
+  const lineage = useSessions(s => sessionId === undefined ? '' : ancestorsOf(sessionId, s.byId).join('\n'))
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
@@ -136,6 +170,7 @@ export function ConversationContent(props: ConversationContentProps) {
   const sessionWorkspace = sessionId === undefined
     ? undefined
     : workspaces.items.find(workspace => workspace.sessionIds.includes(sessionId))
+      ?? workspaceOfLineage(lineage, workspaces.items)
       ?? workspaces.items.find(workspace => workspace.workspaceId === draftWorkspaceId)
   const pendingWorkspace = workspaces.items.find(
     workspace => workspace.workspaceId === pendingWorkspaceId,

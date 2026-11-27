@@ -13,6 +13,7 @@ import { createEditor } from 'lexical'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SessionSnapshot } from '@deepseek-ai/dsh-api-session-controller/client'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
+import { WorkspaceId } from '@deepseek-ai/dsh-workspace'
 import { createSnapshotStore, type SnapshotSelectorHook, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { ComposerBarProps, ConversationContentProps, ConversationSessionHeaderSlotProps, ConversationSessionSlotProps } from './native/contract/slots.ts'
 import { ConversationSessionHeader } from './native/skeleton/ConversationSession.tsx'
@@ -766,5 +767,49 @@ describe('fixed Conversation content factory composition', () => {
     // The composer publishes on every content change; a draft keystroke must not
     // reach the Conversation body, whose View re-render costs the transcript.
     expect(viewRenders.count).toBe(mountedViewRenders)
+  })
+
+  // Council round 34 B7: a subagent's thread is in no workspace's sessionIds, so its footer named no project ("In the
+  // project · 1 ahead of main") while its parent's read "BA billing-api · …". It takes its nearest ancestor's project.
+  it("names a child thread's project through its parent, with the project's mark", () => {
+    vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} })
+    Object.defineProperty(document, 'fonts', { configurable: true, value: new EventTarget() })
+    const parent = SessionId('parent-thread')
+    const middle = SessionId('middle-child')
+    const child = SessionId('child-thread')
+    const summary = (id: SessionId) => ({ id, displayTitle: String(id), running: false, retainedBy: {}, blank: false, updatedAt: 0 })
+    const childOf = (id: SessionId, parentId: SessionId) => ({ ...summary(id), parentId, origin: 'subagent' as const })
+    const { props } = fixture('child-thread')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    act(() =>
+      root.render(
+        <ConversationContent
+          {...props}
+          useSessions={selected({
+            ids: [parent, middle, child],
+            byId: { [parent]: summary(parent), [middle]: childOf(middle, parent), [child]: childOf(child, middle) },
+            phase: 'ready' as const,
+            projectionsBySession: {},
+          })}
+          useWorkspaces={selected({
+            phase: 'ready' as const,
+            items: [{ workspaceId: WorkspaceId('w-billing'), path: '/srv/billing-api', title: 'billing-api', sessionIds: [parent], createdAt: '', updatedAt: '' }],
+            archivedSessionIds: [],
+            pinnedSessionIds: [],
+            state: 'idle' as const,
+            error: null,
+          })}
+          renderSlot={(name: string, owner: Partial<InputZone> & { readonly runSummary?: ReactNode }, options?: { readonly children?: ReactNode }) =>
+            name === 'conversation.composer.bar' ? <output data-bar="">{owner.runSummary}</output> : (options?.children ?? null)
+          }
+        />,
+      ),
+    )
+    const chip = element.querySelector('[data-run-summary]')
+    expect(chip?.textContent).toContain('billing-api')
+    expect(chip?.querySelector('[data-slot="project-mark"]')).not.toBeNull()
   })
 })
