@@ -590,4 +590,12 @@
     content-visibility: auto;
     contain-intrinsic-size: auto 96px;
   }
+
+  /* dshfiles: containment clips paint to the item's padding box, and the phone fills (AssistantMarkdown's code cards,
+     MessageItem's prompt bubble) bleed 12px out of the text column. The item reaches the fill edge; its padding keeps
+     the content box where it was. */
+  :global(html[data-shell-phone-nav]) .flowItem {
+    margin-inline: -12px;
+    padding-inline: 12px;
+  }
 }
