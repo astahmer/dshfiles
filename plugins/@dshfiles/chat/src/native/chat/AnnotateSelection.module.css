@@ -120,10 +120,18 @@
   color: var(--dsw-alias-label-secondary);
 }
 
+/* dshfiles: the box's one primary takes the kit's primary fill and hover (DESIGN.md, Primary button), not the raw ink. */
 .commentSave {
   border: 0;
-  background: var(--dsw-alias-label-primary);
-  color: var(--dsw-alias-bg-base);
+  background: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary-foreground);
+  font-weight: 500;
+}
+
+@media (hover: hover) {
+  .commentSave:hover {
+    background: var(--dshx-primary-hover);
+  }
 }
 
 @keyframes fade-in {
