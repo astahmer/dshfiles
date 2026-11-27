@@ -1,5 +1,6 @@
 import { CreditsUsage, type CreditCategory, type CreditTone } from '@dshfiles/plugin-ui/components/motion/credits-usage'
-import type { UsageCard, UsageHistoryPoint } from './api.js'
+import type { UsageCard, UsageHistoryPoint, UsageWindowAmount } from './api.js'
+import { ExtraUsageModel } from './extra-usage-model.js'
 import { ExtraUsageMeter } from './extra-usage-view.js'
 import { quotaTone, type QuotaTone } from './quota-tone.js'
 import { QuotaHistoryAnalysis } from './usage-history-analysis.js'
@@ -11,6 +12,15 @@ const SPARKLINE_POINTS = 12
 const creditTone = { ok: 'success', low: 'warning', critical: 'destructive' } as const satisfies Record<QuotaTone, CreditTone>
 
 const formatLeft = (percent: number): string => `${String(Math.round(percent))}% left`
+
+/** The window's own money when the provider reports it, so a spent credit is never hidden behind a full allowance. */
+const formatAmount = (amount: UsageWindowAmount): string =>
+  `${ExtraUsageModel.formatMoney(amount.used, amount.currency)} of ${ExtraUsageModel.formatMoney(amount.limit, amount.currency)}`
+
+const windowCaption = (window: UsageCard['windows'][number], now: number): string => {
+  const reset = UsageOverviewModel.formatResetIn(window.resetsAt, now)
+  return window.amount === undefined ? reset : `${formatAmount(window.amount)} · ${reset}`
+}
 
 /** The current reset cycle of one window, newest points last; empty under two points, which draw no line. */
 const recentPercents = (history: readonly UsageHistoryPoint[], label: string): readonly number[] => {
@@ -35,7 +45,7 @@ export const quotaWindowCategories = (input: {
     total: window.percentRemaining,
     unit: '',
     formatTotal: formatLeft,
-    caption: UsageOverviewModel.formatResetIn(window.resetsAt, input.now),
+    caption: windowCaption(window, input.now),
     chart: 'area',
     series: recentPercents(input.history, window.label),
     meter: { percent: window.percentRemaining, label: `${window.label} remaining` },

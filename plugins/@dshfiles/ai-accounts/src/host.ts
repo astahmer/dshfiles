@@ -94,6 +94,7 @@ import {
   CODEX_KIND,
   MISTRAL_KIND,
   OPENCODE_KIND,
+  VIBE_KIND,
   ProviderRoutes,
   type CodexRoute,
   type DiscoveringRoute,
@@ -102,6 +103,8 @@ import {
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { ANTIGRAVITY_CLI_TOKEN, AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
+import { VIBE_CLI_TOKEN, VibeCliSessions } from './vibe-cli.js'
+import { createVibeProvider } from './vibe-provider.js'
 import { AntigravityProcesses, AntigravityProcessesPromiseModel, type AntigravityProcessesPromise } from './antigravity-processes.js'
 
 /**
@@ -356,6 +359,16 @@ const startAccountsHost = (input: {
   })
   onRelease(() => void antigravityCli.dispose())
   const antigravityUpstream = createAntigravityProvider(antigravityCli)
+  // Mistral's Vibe allowance is reachable only by the CLI itself, so this route spawns `vibe` per step with the
+  // account's signed-in VIBE_HOME instead of sending HTTP (see vibe-cli.ts).
+  const vibeCli = new VibeCliSessions({
+    home: provider => {
+      const route = routes.get(provider)
+      return route?.kind === VIBE_KIND ? route.home : ''
+    },
+  })
+  onRelease(() => vibeCli.dispose())
+  const vibeUpstream = createVibeProvider({ upstream: mistralUpstream, sessions: vibeCli })
   const githubCopilotUpstream = githubCopilotProvider()
   const declaredRetryAfter = new DeclaredRetryAfter()
   /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
@@ -444,6 +457,7 @@ const startAccountsHost = (input: {
         })
       }
       if (route.kind === CLAUDE_KIND) return ClaudeAccountModel.usesCliTransport(route) ? claudeCliUpstream : claudeUpstream
+      if (route.kind === VIBE_KIND) return vibeUpstream
       if (route.kind === GITHUB_COPILOT_KIND) return githubCopilotUpstream
       if (route.kind === ANTIGRAVITY_KIND) return antigravityUpstream
       return keyedUpstream(route)
@@ -478,7 +492,7 @@ const startAccountsHost = (input: {
   profiles = buildProfiles(routes, initialFile)
   runtime.longCacheMinutes = (provider, model) => {
     const route = routes.get(provider)
-    if (route === undefined || (route.kind === CLAUDE_KIND && ClaudeAccountModel.usesCliTransport(route))) return null
+    if (route === undefined || route.kind === VIBE_KIND || (route.kind === CLAUDE_KIND && ClaudeAccountModel.usesCliTransport(route))) return null
     const candidate = profiles
       .get(provider)
       ?.piProvider?.getModels()
@@ -602,6 +616,7 @@ const startAccountsHost = (input: {
         if (route.kind === CODEX_KIND) return undefined
         if (route.kind === GITHUB_COPILOT_KIND) return undefined
         if (route.kind === ANTIGRAVITY_KIND) return ANTIGRAVITY_CLI_TOKEN
+        if (route.kind === VIBE_KIND) return VIBE_CLI_TOKEN
         if (route.kind === CLAUDE_KIND) {
           if (ClaudeAccountModel.usesCliTransport(route)) return CLAUDE_CLI_TOKEN
           try {

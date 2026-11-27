@@ -22,7 +22,17 @@ import { ShellCommand } from './shell-command.js'
  * whether it holds a login, the identity it presents, and the command that creates one.
  */
 
-export const accountKindSchema = Schema.Literals(['codex', 'claude', 'opencode-go', 'commandcode', 'github-copilot', 'cursor', 'mistral', 'antigravity'])
+export const accountKindSchema = Schema.Literals([
+  'codex',
+  'claude',
+  'opencode-go',
+  'commandcode',
+  'github-copilot',
+  'cursor',
+  'mistral',
+  'antigravity',
+  'vibe',
+])
 
 export const createSetupAccountInputSchema = Schema.Struct({ kind: accountKindSchema, requestId: Schema.String.check(Schema.isUUID()) })
 export type CreateSetupAccountInput = typeof createSetupAccountInputSchema.Type
@@ -329,6 +339,18 @@ export const accountsFileSchema = Schema.Struct({
   accounts: AiAccountsSchema.list(accountProfileSchema, 64),
 })
 
+/**
+ * The provider's own money for one window, beside the percentage. Billing windows are separate per bucket (an API
+ * credit and a plan's app allowance), so a percent alone can read "100% left" while the credit that pays for the
+ * requests is nearly spent. `limit` is the window's allowance, `used` what it reports spent; both in `currency`.
+ */
+export const usageWindowAmountSchema = Schema.Struct({
+  used: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+  limit: Schema.Number.check(Schema.isFinite(), Schema.isGreaterThanOrEqualTo(0)),
+  currency: Schema.String.check(Schema.isMaxLength(8)),
+})
+export type UsageWindowAmount = typeof usageWindowAmountSchema.Type
+
 export const usageCardSchema = Schema.Struct({
   status: Schema.Literals(['ok', 'unauthenticated', 'unsupported', 'rate-limited', 'error']),
   message: Schema.NullOr(Schema.String.check(Schema.isMaxLength(300))),
@@ -341,6 +363,8 @@ export const usageCardSchema = Schema.Struct({
       resetsAt: Schema.NullOr(Schema.Number.check(Schema.isFinite())),
       /** Luna Reserve: drawn on only after an ordinary window is spent. */
       reserve: Schema.optional(Schema.Boolean),
+      /** Absent when the provider reports only a percent. */
+      amount: Schema.optional(usageWindowAmountSchema),
     }),
     6,
   ),

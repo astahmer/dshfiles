@@ -89,7 +89,7 @@ export const AccountConnectionOptions = (props: ConnectionOptionsProps): JSX.Ele
               Use default Claude Code login
             </Button>
           ) : null}
-          {props.account.kind === 'codex' || props.account.kind === 'claude' || props.account.kind === 'antigravity' ? (
+          {props.account.kind === 'codex' || props.account.kind === 'claude' || props.account.kind === 'antigravity' || props.account.kind === 'vibe' ? (
             <ConnectionHomes key={`${props.account.instanceId}:${props.account.homePath}:${props.account.shadowHomePath}`} {...props} />
           ) : null}
         </div>
@@ -121,14 +121,24 @@ const ConnectionHomes = (props: ConnectionOptionsProps): JSX.Element => {
           <form.AppField name="homePath">
             {field => (
               <field.TextField
-                label={codex ? 'Shared Codex home' : props.account.kind === 'antigravity' ? 'HOME for agy' : 'CLAUDE_CONFIG_DIR'}
+                label={
+                  codex
+                    ? 'Shared Codex home'
+                    : props.account.kind === 'antigravity'
+                      ? 'HOME for agy'
+                      : props.account.kind === 'vibe'
+                        ? 'VIBE_HOME'
+                        : 'CLAUDE_CONFIG_DIR'
+                }
                 monospace
                 description={
                   codex
                     ? 'Shared state; custom homes need a separate auth overlay.'
                     : props.account.kind === 'antigravity'
                       ? 'Home whose .gemini folder holds this Google login. Empty uses your own; give each extra Google account its own folder.'
-                      : 'Directory containing your Claude Code login.'
+                      : props.account.kind === 'vibe'
+                        ? 'Vibe profile folder holding the `vibe --setup` login. Empty uses ~/.vibe.'
+                        : 'Directory containing your Claude Code login.'
                 }
               />
             )}
