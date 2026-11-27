@@ -1730,14 +1730,20 @@ button.crumbEditable {
     border-width: 1px 0 0 !important;
     border-radius: var(--dsw-radius-panel, 16px) var(--dsw-radius-panel, 16px) 0 0 !important;
     /* A solid raised fill (no translucent menu material over the composer) and a dim scrim drawn as a spread shadow;
-       a tap outside still closes the picker through its owner. */
+       a tap outside still closes the picker through its owner. The kit scrim (council round 31, item 2): a mix of the
+       text ink brightened the page in dark, where the ink is near-white. */
     background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2)) !important;
     backdrop-filter: none !important;
     box-shadow:
       var(--dshx-elevation-3),
-      0 0 0 100vmax color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent) !important;
+      0 0 0 100vmax var(--dshx-scrim) !important;
     overflow-y: auto;
     animation: composer-picker-sheet-in var(--dshx-duration-sheet, 280ms) var(--dshx-motion-ease-enter, ease) both;
+  }
+
+  /* A dialog sheet already dims the page with its own overlay: one dimming layer, so it keeps only its elevation. */
+  :global(html[data-shell-phone-nav]:has([data-composer-card] [aria-expanded='true'])) :global([role='dialog'][data-slot='dialog-content']) {
+    box-shadow: var(--dshx-elevation-3) !important;
   }
 
   /* The grabber says it is a sheet. */
