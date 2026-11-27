@@ -140,8 +140,9 @@ export default DshxPlugin.make({
           const query = findExpression(input.text)
           if (query === null) return { ownsService: true, matches: [], hasMore: false }
           const limit = input.limit ?? FIND_DEFAULT_LIMIT
-          const request = { sessionId: input.sessionId, query, limit }
-          const found = yield* (yield* SearchWorker).findInSession(input.newest === true ? { ...request, newest: true } : request)
+          const withNewest = input.newest === true ? { sessionId: input.sessionId, query, limit, newest: true } : { sessionId: input.sessionId, query, limit }
+          const request = input.types === undefined ? withNewest : { ...withNewest, types: input.types }
+          const found = yield* (yield* SearchWorker).findInSession(request)
           yield* Effect.annotateCurrentSpan({ 'dshx.find.matches': found.matches.length, 'dshx.find.has_more': found.hasMore })
           return { ownsService: true, matches: found.matches, hasMore: found.hasMore }
         }).pipe(Effect.withSpan('session search find', { attributes: { 'dsh.session.id': input.sessionId } })),

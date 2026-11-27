@@ -702,25 +702,36 @@ export class SearchIndex {
     })
 
   readonly findInSession = (request: FindInSessionRequest) =>
-    Effect.map(
-      this.sql.unsafe(
-        `SELECT d.seq AS seq, d.type AS type, d.time AS time, snippet(session_documents, 0, ?, ?, '…', 24) AS marked_text
-      FROM session_documents AS d WHERE session_documents MATCH ? AND d.session_id = ? AND d.surface = 'current'
-      ORDER BY d.seq ${request.newest === true ? 'DESC' : 'ASC'}, d.rowid ${request.newest === true ? 'DESC' : 'ASC'} LIMIT ?`,
-        [MARKER_START, MARKER_END, request.query, request.sessionId, request.limit + 1],
-      ),
-      values => {
-        const decoded = values.map(value => Schema.decodeUnknownSync(findRowSchema)(value))
-        // `newest` reads from the tail; the page it keeps is still handed back oldest first.
-        const rows = request.newest === true ? [...decoded.slice(0, request.limit).reverse(), ...decoded.slice(request.limit)] : decoded
-        return {
-          matches: rows
-            .slice(0, request.limit)
-            .map(row => ({ seq: row.seq, type: row.type, time: row.time, snippet: DocumentText.snippet(row.marked_text, FIND_SNIPPET_CHARS) })),
-          hasMore: rows.length > request.limit,
-        }
-      },
-    )
+    Effect.gen({ self: this }, function* () {
+      const types = request.types === undefined || request.types.length === 0 ? undefined : [...new Set(request.types)]
+      const useConversation = types !== undefined && types.every(value => CONVERSATION_TYPES.has(value)) && (yield* this.conversationReady())
+      const table: DocumentTable = useConversation ? 'conversation_documents' : 'session_documents'
+      const coversEveryConversationType = useConversation && [...CONVERSATION_TYPES].every(value => types.includes(value))
+      const clauses = [`${table} MATCH ?`, 'd.session_id = ?']
+      const bindings: (string | number)[] = [MARKER_START, MARKER_END, request.query, request.sessionId]
+      if (!useConversation) clauses.push("d.surface = 'current'")
+      if (types !== undefined && !coversEveryConversationType) {
+        clauses.push(`d.type IN (${types.map(() => '?').join(', ')})`)
+        bindings.push(...types)
+      }
+      bindings.push(request.limit + 1)
+      const order = request.newest === true ? 'DESC' : 'ASC'
+      const values = yield* this.sql.unsafe(
+        `SELECT d.seq AS seq, d.type AS type, d.time AS time, snippet(${table}, 0, ?, ?, '…', 24) AS marked_text
+      FROM ${table} AS d WHERE ${clauses.join(' AND ')}
+      ORDER BY d.seq ${order}, d.rowid ${order} LIMIT ?`,
+        bindings,
+      )
+      const decoded = values.map(value => Schema.decodeUnknownSync(findRowSchema)(value))
+      // `newest` reads from the tail; the page it keeps is still handed back oldest first.
+      const rows = request.newest === true ? [...decoded.slice(0, request.limit).reverse(), ...decoded.slice(request.limit)] : decoded
+      return {
+        matches: rows
+          .slice(0, request.limit)
+          .map(row => ({ seq: row.seq, type: row.type, time: row.time, snippet: DocumentText.snippet(row.marked_text, FIND_SNIPPET_CHARS) })),
+        hasMore: rows.length > request.limit,
+      }
+    })
 
   /**
    * The newest prompts people sent across top-level threads, newest first, each text once. Only the newest `window`

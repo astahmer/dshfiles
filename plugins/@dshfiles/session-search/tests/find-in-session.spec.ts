@@ -80,4 +80,51 @@ describe('SearchIndex.findInSession', () => {
     expect(outcome.page.hasMore).toBe(true)
     expect(outcome.unrelated.matches).toEqual([])
   })
+
+  it('filters matches by event type without tool calls crowding out assistant replies', async () => {
+    const path = await openIndex()
+    const outcome = await runWithIndex(path, function* (index) {
+      yield* commit(index, 'session-a', [
+        { type: 'user/message', surface: 'current', text: 'check quartz config' },
+        { type: 'assistant/message', surface: 'current', text: 'quartz first reply' },
+        { type: 'tool/call', surface: 'current', text: 'grep quartz src/' },
+        { type: 'tool/result', surface: 'current', text: 'quartz match in tool output' },
+        { type: 'assistant/message', surface: 'current', text: 'quartz final reply' },
+        { type: 'tool/result', surface: 'current', text: 'trailing quartz tool result' },
+      ])
+      const assistantOnly = yield* index.findInSession({
+        sessionId: 'session-a',
+        query: findExpression('quartz') ?? '',
+        limit: 1,
+        newest: true,
+        types: ['assistant/message'],
+      })
+      const toolsOnly = yield* index.findInSession({
+        sessionId: 'session-a',
+        query: findExpression('quartz') ?? '',
+        limit: 10,
+        types: ['tool/call', 'tool/result'],
+      })
+      const conversation = yield* index.findInSession({
+        sessionId: 'session-a',
+        query: findExpression('quartz') ?? '',
+        limit: 10,
+        types: ['user/message', 'assistant/message'],
+      })
+      return { assistantOnly, toolsOnly, conversation }
+    })
+
+    expect(outcome.assistantOnly.matches.map(match => [match.seq, match.type])).toEqual([[4, 'assistant/message']])
+    expect(outcome.assistantOnly.hasMore).toBe(true)
+    expect(outcome.toolsOnly.matches.map(match => [match.seq, match.type])).toEqual([
+      [2, 'tool/call'],
+      [3, 'tool/result'],
+      [5, 'tool/result'],
+    ])
+    expect(outcome.conversation.matches.map(match => [match.seq, match.type])).toEqual([
+      [0, 'user/message'],
+      [1, 'assistant/message'],
+      [4, 'assistant/message'],
+    ])
+  })
 })
