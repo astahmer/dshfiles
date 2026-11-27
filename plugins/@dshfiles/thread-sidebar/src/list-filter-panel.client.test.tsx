@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, presetMark, type ListFilterPanelProps } from './list-filter-panel.js'
+import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, presetAttentionOf, type ListFilterPanelProps } from './list-filter-panel.js'
 
 afterEach(cleanup)
 
@@ -41,9 +41,9 @@ const panel = (overrides: Partial<ListFilterPanelProps> = {}): ListFilterPanelPr
   t: key => key,
   presets: {
     items: [
-      { id: 'all', label: 'All threads', accessibleName: 'All threads', count: null, mark: undefined },
-      { id: 'working', label: 'Working', accessibleName: 'Working (2)', count: 2, mark: 'working' },
-      { id: 'done', label: 'Done', accessibleName: 'Done (1), threadSidebarTurnFinished', count: 1, mark: 'ready' },
+      { id: 'all', label: 'All threads', count: null, needsYou: 0, failed: 0 },
+      { id: 'working', label: 'Working', count: 2, needsYou: 0, failed: 0 },
+      { id: 'done', label: 'Done', count: 3, needsYou: 1, failed: 0 },
     ],
     activeId: 'all',
     edited: false,
@@ -79,7 +79,7 @@ describe('the Filter panel', () => {
     expect(screen.queryAllByRole('menuitem')).toHaveLength(0)
     const presets = screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })
     expect(within(presets).getByRole('radio', { name: 'All threads' }).getAttribute('aria-checked')).toBe('true')
-    expect(within(presets).getByRole('radio', { name: 'Done (1), threadSidebarTurnFinished' }).getAttribute('aria-checked')).toBe('false')
+    expect(within(presets).getByRole('radio', { name: 'Done, threadSidebarPresetThreads_other, threadSidebarPresetNeedsYou_other' }).getAttribute('aria-checked')).toBe('false')
     expect(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: false })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'All sources' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('radio', { name: 'Status' }).getAttribute('aria-checked')).toBe('true')
@@ -89,7 +89,7 @@ describe('the Filter panel', () => {
   it('applies a change at once: a preset, a status, a source, a grouping', () => {
     const props = panel()
     render(<ListFilterPanel {...props} />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Working (2)' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other' }))
     expect(props.presets?.onApply).toHaveBeenCalledWith('working')
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarWorking' }))
     expect(props.status?.onChange).toHaveBeenCalledWith(['working'])
@@ -119,7 +119,7 @@ describe('the Filter panel', () => {
     fireEvent.click(screen.getByRole('button', { name: /threadSidebarPresetSaveChanges/u }))
     expect(presets.onSaveChanges).toHaveBeenCalledOnce()
     // Picking the edited preset again drops its edits.
-    fireEvent.click(screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' }))
+    fireEvent.click(screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' }))
     expect(presets.onApply).toHaveBeenCalledWith('working')
   })
 
@@ -145,41 +145,6 @@ describe('nextStatusFilters', () => {
   it('keeps the menu order and drops anything that is not a status', () => {
     expect(nextStatusFilters(['all', 'unread', 'working'])).toEqual(['working', 'unread'])
     expect(nextStatusFilters([])).toEqual([])
-  })
-})
-
-// Council round 27, item 1: a preset's mark is the list's own glyph for what it counts, and nothing at a count of 0.
-describe('preset marks (round 28, item 1)', () => {
-  it('maps what a preset counts to the status glyph its rows draw', () => {
-    // A Working view counts working threads: its mark is the ring, even when one of them waits on an approval.
-    expect(presetMark({ attentionLabel: 'threadSidebarApprovalNeeded', count: 2, countsWorking: true })).toBe('working')
-    expect(presetMark({ attentionLabel: 'threadSidebarApprovalNeeded', count: 1, countsWorking: false })).toBe('needs-you')
-    expect(presetMark({ attentionLabel: 'threadSidebarInputNeeded', count: null, countsWorking: false })).toBe('needs-you')
-    expect(presetMark({ attentionLabel: 'threadSidebarTurnFinished', count: 1, countsWorking: false })).toBe('ready')
-    expect(presetMark({ attentionLabel: 'threadSidebarNeedsResume', count: 1, countsWorking: false })).toBe('failed')
-    expect(presetMark({ attentionLabel: 'threadSidebarInterrupted', count: 1, countsWorking: false })).toBe('failed')
-    expect(presetMark({ attentionLabel: undefined, count: 3, countsWorking: true })).toBe('working')
-    expect(presetMark({ attentionLabel: undefined, count: null, countsWorking: false })).toBeUndefined()
-  })
-
-  it('draws no mark and no number at a count of 0', () => {
-    expect(presetMark({ attentionLabel: 'threadSidebarApprovalNeeded', count: 0, countsWorking: true })).toBeUndefined()
-    expect(presetMark({ attentionLabel: undefined, count: 0, countsWorking: true })).toBeUndefined()
-    const base = panel()
-    const presets = base.presets
-    if (presets === undefined) throw new Error('The fixture has presets.')
-    render(<ListFilterPanel {...base} presets={{ ...presets, items: [{ id: 'working', label: 'Working', accessibleName: 'Working', count: 0, mark: undefined }] }} />)
-    const row = screen.getByRole('radio', { name: 'Working' })
-    expect(row.querySelector('[data-slot="status-glyph"]')).toBeNull()
-    expect(row.textContent).toBe('Working')
-  })
-
-  it("draws the row glyph (diamond, dot, cross, ring) in the preset row, not a generic dot", () => {
-    render(<ListFilterPanel {...panel()} />)
-    const done = screen.getByRole('radio', { name: 'Done (1), threadSidebarTurnFinished' })
-    expect(done.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('ready')
-    expect(done.querySelector('[data-slot="status-dot"]')).toBeNull()
-    expect(screen.getByRole('radio', { name: 'Working (2)' }).querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('working')
   })
 })
 
@@ -223,7 +188,7 @@ describe('an edited preset (round 28, item 3)', () => {
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
-    const row = screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' })
+    const row = screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' })
     expect(row.getAttribute('aria-current')).toBe('true')
     expect(row.getAttribute('aria-checked')).toBe('false')
     expect(screen.getByRole('radio', { name: 'All threads' }).hasAttribute('aria-current')).toBe(false)
@@ -435,7 +400,7 @@ describe('initial focus (round 28, item 14)', () => {
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     const edited = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
-    expect(filterPanelInitialFocus(edited.container)).toBe(screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' }))
+    expect(filterPanelInitialFocus(edited.container)).toBe(screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' }))
     edited.unmount()
     // Without presets, the first status chip.
     const plain = render(<ListFilterPanel {...panel({ presets: undefined })} />)
@@ -516,5 +481,57 @@ describe('hit areas (round 28, item 12)', () => {
     expect(presetsHeading?.className).toContain('dshx:pointer-coarse:my-0')
     const statusHeading = screen.getByRole('button', { name: 'threadSidebarFilterClear' }).closest('[data-thread-status-heading]')
     expect(statusHeading?.className).toContain('dshx:pointer-coarse:h-11')
+  })
+})
+
+// Council round 28, item 2: a preset's number and mark say one thing to eyes and ears.
+describe('preset tallies (round 29, item 2)', () => {
+  const counting = (key: string, params?: Record<string, unknown>): string =>
+    ({
+      threadSidebarPresetThreads_one: '1 thread',
+      threadSidebarPresetThreads_other: `${String(params?.['count'])} threads`,
+      threadSidebarPresetNeedsYou_one: `${String(params?.['count'])} needs you`,
+      threadSidebarPresetNeedsYou_other: `${String(params?.['count'])} need you`,
+      threadSidebarPresetFailedCount_one: `${String(params?.['count'])} failed`,
+      threadSidebarPresetFailedCount_other: `${String(params?.['count'])} failed`,
+    })[key] ?? key
+
+  it('counts the rows a preset shows, in secondary ink, and names it from what is drawn', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(
+      <ListFilterPanel
+        {...base}
+        t={counting as ListFilterPanelProps['t']}
+        presets={{
+          ...presets,
+          items: [
+            { id: 'working', label: 'Working', count: 2, needsYou: 0, failed: 0 },
+            { id: 'done', label: 'Done', count: 3, needsYou: 1, failed: 2 },
+            { id: 'empty', label: 'Empty', count: 0, needsYou: 0, failed: 0 },
+          ],
+        }}
+      />,
+    )
+    const working = screen.getByRole('radio', { name: 'Working, 2 threads' })
+    expect(working.querySelector('[data-preset-count]')?.textContent).toBe('2')
+    expect(working.querySelector('[data-preset-count]')?.className).toContain('dshx:text-muted-foreground')
+    expect(working.querySelector('[data-slot="status-glyph"]')).toBeNull()
+    const done = screen.getByRole('radio', { name: 'Done, 3 threads, 1 needs you, 2 failed' })
+    // The diamond before the cross, both only because a row in the preset needs you or failed.
+    expect(Array.from(done.querySelectorAll('[data-slot="status-glyph"]')).map(glyph => glyph.getAttribute('data-status'))).toEqual(['needs-you', 'failed'])
+    const empty = screen.getByRole('radio', { name: 'Empty' })
+    expect(empty.querySelector('[data-preset-count]')).toBeNull()
+    expect(empty.querySelector('[data-slot="status-glyph"]')).toBeNull()
+  })
+
+  it('reads a row as needing you or failed from its status, else from its attention label; never from an unread finish', () => {
+    expect(presetAttentionOf('needs-you', undefined)).toBe('needs-you')
+    expect(presetAttentionOf('failed', undefined)).toBe('failed')
+    expect(presetAttentionOf('ready', 'threadSidebarTurnFinished')).toBeUndefined()
+    expect(presetAttentionOf(undefined, 'threadSidebarApprovalNeeded')).toBe('needs-you')
+    expect(presetAttentionOf(undefined, 'threadSidebarInterrupted')).toBe('failed')
+    expect(presetAttentionOf(undefined, 'threadSidebarTurnFinished')).toBeUndefined()
   })
 })

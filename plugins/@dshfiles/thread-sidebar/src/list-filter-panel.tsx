@@ -10,6 +10,7 @@ import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/wor
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { ArchiveIcon, BellOffIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import { plural } from '@dshfiles/dshx/client'
 import { useId, useState, type ReactNode } from 'react'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 import { threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, type ThreadSidebarTranslate } from './thread-view-manager.js'
@@ -25,38 +26,41 @@ import {
 export interface ListFilterPreset {
   readonly id: string
   readonly label: string
-  /** The former view tab's name: "Done (1), Turn finished". */
-  readonly accessibleName: string
+  /** How many rows the preset shows; null when its count is turned off. A zero draws nothing. */
   readonly count: number | null
-  /** The list's own glyph for what the preset counts (`presetMark`); none at a count of 0. */
-  readonly mark: WorkStatus | undefined
+  /** Of those rows, how many need you and how many failed: the only states a preset marks. */
+  readonly needsYou: number
+  readonly failed: number
 }
 
-/** Which status a preset's attention label stands for: the glyph its rows already draw for it. */
-const ATTENTION_MARK = {
+/** The attention labels that mean a row needs you or failed when it has no status glyph. */
+const LABEL_ATTENTION = {
   threadSidebarApprovalNeeded: 'needs-you',
   threadSidebarInputNeeded: 'needs-you',
-  threadSidebarTurnFinished: 'ready',
+  threadSidebarTurnFinished: undefined,
   threadSidebarNeedsResume: 'failed',
   threadSidebarInterrupted: 'failed',
-} as const satisfies Record<ThreadAttentionLabel, WorkStatus>
+} as const satisfies Record<ThreadAttentionLabel, 'needs-you' | 'failed' | undefined>
 
 /**
- * A preset's mark (council round 27, item 1): the list's glyph for the state its number counts (the indigo diamond for Needs
- * you, the green dot for Ready, the red cross for Failed, the ink ring for Working), never a generic dot, and nothing
- * while its count is 0.
+ * What a row adds to its preset's mark (council round 28, item 2): needs you or failed, from its status glyph, else
+ * from its attention label. A finished turn or an unread mark is not something the preset marks.
  */
-export const presetMark = (input: {
-  readonly attentionLabel: ThreadAttentionLabel | undefined
-  readonly count: number | null
-  readonly countsWorking: boolean
-}): WorkStatus | undefined => {
-  if (input.count === 0) return undefined
-  // The mark names what the number beside it counts: a view that lists working threads counts them, so it draws the
-  // Working ring even when one of them also waits on the user.
-  if (input.countsWorking && input.count !== null) return 'working'
-  return input.attentionLabel === undefined ? undefined : ATTENTION_MARK[input.attentionLabel]
+export const presetAttentionOf = (status: WorkStatus | undefined, attentionLabel: ThreadAttentionLabel | undefined): 'needs-you' | 'failed' | undefined => {
+  if (status !== undefined) return status === 'needs-you' || status === 'failed' ? status : undefined
+  return attentionLabel === undefined ? undefined : LABEL_ATTENTION[attentionLabel]
 }
+
+/** The preset row's accessible name, built from what it draws: "Done, 3 threads, 1 needs you". */
+const presetName = (t: ThreadSidebarTranslate, preset: ListFilterPreset): string =>
+  [
+    preset.label,
+    preset.count === null || preset.count === 0 ? undefined : plural(t, 'threadSidebarPresetThreads', preset.count),
+    preset.needsYou === 0 ? undefined : plural(t, 'threadSidebarPresetNeedsYou', preset.needsYou),
+    preset.failed === 0 ? undefined : plural(t, 'threadSidebarPresetFailedCount', preset.failed),
+  ]
+    .filter((part): part is string => part !== undefined)
+    .join(', ')
 
 export interface ListFilterAction {
   readonly id: string
@@ -271,7 +275,7 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                   value={preset.id}
                   // An edited preset is announced, not only drawn (round 28, item 3): its name says so, and it stays the
                   // current one although nothing is checked.
-                  aria-label={active && presets.edited ? `${preset.accessibleName}, ${t('threadSidebarPresetEditedShort')}` : preset.accessibleName}
+                  aria-label={active && presets.edited ? `${presetName(t, preset)}, ${t('threadSidebarPresetEditedShort')}` : presetName(t, preset)}
                   aria-current={active ? 'true' : undefined}
                   data-preset-active={active ? '' : undefined}
                   className="dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11"
@@ -286,10 +290,14 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                       {t('threadSidebarPresetEditedShort')}
                     </span>
                   ) : null}
-                  {preset.mark === undefined ? null : <StatusGlyph status={preset.mark} decorative data-testid="thread-view-attention-dot" />}
-                  {/* A zero draws nothing (DESIGN.md › Layout › Counts). */}
+                  {/* Marked only for rows that need you or failed (the diamond before the cross), never for an unread count. */}
+                  {preset.needsYou === 0 ? null : <StatusGlyph status="needs-you" decorative data-testid="thread-view-attention-dot" />}
+                  {preset.failed === 0 ? null : <StatusGlyph status="failed" decorative />}
+                  {/* A plain row count in the secondary ink; a zero draws nothing (DESIGN.md › Layout › Counts). */}
                   {preset.count === null || preset.count === 0 ? null : (
-                    <span className="dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">{preset.count}</span>
+                    <span className="dshx:min-w-4 dshx:shrink-0 dshx:text-right dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-preset-count="">
+                      {preset.count}
+                    </span>
                   )}
                 </ToggleGroupItem>
               )

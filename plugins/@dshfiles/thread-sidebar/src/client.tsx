@@ -95,7 +95,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ListHeaderExtras } from './list-header-extras.js'
 import { HoverStripFit } from './hover-strip-fit.js'
-import { filterPanelInitialFocus, ListFilterPanel, presetMark, type ListFilterAction } from './list-filter-panel.js'
+import { filterPanelInitialFocus, ListFilterPanel, presetAttentionOf, type ListFilterAction } from './list-filter-panel.js'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ThreadListScope } from './list-scope.js'
 import { PresetChips, PresetDeleteDialog, PresetNameDialog, type PresetNamePrompt } from './filter-presets.js'
@@ -4563,6 +4563,27 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         visibleCount: view.showCount === false ? null : (workingCount ?? (unreadCount > 0 ? unreadCount : null)),
       }
     })
+  // Each preset's rows, and how many of them need you or failed (round 29, item 2): counted only while the Filter panel is
+  // open, since matching every row per preset on each render was the sidebar's hottest loop while a turn streams.
+  const presetTallies = useMemo(() => {
+    const tallies = new Map<string, { readonly count: number; readonly needsYou: number; readonly failed: number }>()
+    if (!filterOpen) return tallies
+    for (const view of threadViewSettings.views) {
+      if (!view.enabled) continue
+      let count = 0
+      let needsYou = 0
+      let failed = 0
+      for (const entry of threadViewAttentionEntries) {
+        if (!ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter })) continue
+        count += 1
+        const attention = presetAttentionOf((threadStatusById.get(entry.thread.id) ?? childStatusById.get(entry.thread.id))?.status, entry.attentionLabel)
+        if (attention === 'needs-you') needsYou += 1
+        else if (attention === 'failed') failed += 1
+      }
+      tallies.set(view.id, { count, needsYou, failed })
+    }
+    return tallies
+  }, [childStatusById, filterOpen, threadStatusById, threadViewAttentionEntries, threadViewSettings.views])
   const visibleThreadEntries = useMemo(
     () =>
       sourceFilteredThreadEntries.filter(entry =>
@@ -6575,10 +6596,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     filters: props.tSidebar('threadSidebarFilters'),
   }
   const scopeCount = ThreadListScope.count(scopeInput)
-  const activeViewMark =
+  // The trigger marks the active preset as its row does: the diamond while one of its rows needs you, else the cross.
+  const activeViewAttention =
     activeViewTab === undefined
-      ? undefined
-      : presetMark({ attentionLabel: activeViewTab.attentionLabel, count: activeViewTab.visibleCount, countsWorking: activeViewTab.view.statusFilters.includes('working') })
+      ? []
+      : threadViewAttentionEntries
+          .filter(entry => ThreadViewModel.matchesAttentionView(entry, { filters: activeViewTab.view.statusFilters, sourceFilter: activeViewTab.view.sourceFilter }))
+          .map(entry => presetAttentionOf((threadStatusById.get(entry.thread.id) ?? childStatusById.get(entry.thread.id))?.status, entry.attentionLabel))
+  const activeViewMark = activeViewAttention.includes('needs-you') ? 'needs-you' : activeViewAttention.includes('failed') ? 'failed' : undefined
   // The Filter panel (round nine, owner annotation): one level instead of five submenus, every value shown where it
   // sits, a change applied at once beside the list; a footer for the list's other places; a phone sheet (the kit's).
   const closeFilterThen =
@@ -6798,19 +6823,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           presets={
             presetsOn
               ? {
-                  items: viewTabs.map(({ view, label, attentionLabel, visibleCount }) => {
-                    // A count of 0 draws nothing, so it is not spoken either; the mark is the list's own glyph.
-                    const count = visibleCount === 0 ? null : visibleCount
-                    const mark = presetMark({ attentionLabel, count: visibleCount, countsWorking: view.statusFilters.includes('working') })
+                  items: viewTabs.map(({ view, label }) => {
+                    const tally = presetTallies.get(view.id)
                     return {
                       id: view.id,
                       label,
-                      accessibleName:
-                        mark === undefined && count === null
-                          ? label
-                          : `${label}${count === null ? '' : ` (${count})`}${mark === undefined || attentionLabel === undefined ? '' : `, ${props.tSidebar(attentionLabel)}`}`,
-                      count,
-                      mark,
+                      count: view.showCount === false ? null : (tally?.count ?? null),
+                      needsYou: tally?.needsYou ?? 0,
+                      failed: tally?.failed ?? 0,
                     }
                   }),
                   activeId: listThreadView.id,

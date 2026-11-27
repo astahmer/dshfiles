@@ -1584,18 +1584,17 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
   const journey = finishedTurnJourneys.get(page)
   if (journey === undefined) throw new Error('No finished-turn journey was recorded for this browser page.')
   // The fixture turn fails (no provider), so its row reads Failed whether or not it was opened: a failure is not
-  // something reading clears. What is still unacknowledged shows in the Done preset's name and dot, read below.
+  // something reading clears. What is still unacknowledged is the row's unread mark (round 29, item 2: a preset marks
+  // only rows that need you or failed, never an unread finish), read in every tab.
   const failedLabel = (target: Page) => threadRow(target, journey.targetThreadId).getByRole('img', { name: 'Failed', exact: true })
+  const unreadRow = (target: Page) => threadRow(target, journey.targetThreadId)
   await recordAssertion(page, 'thread-sidebar-turn-finished-outlives-its-client', async () => {
     await page.reload()
     await expect(failedLabel(page)).toBeVisible({ timeout: 60_000 })
-    // The views are the Filter panel's presets (Q5, b:xpvk); each keeps the former tab's name and dot.
+    await expect(unreadRow(page)).toHaveAttribute('data-unread', '')
+    // The Done preset counts its rows and marks the failed one with the list's cross.
     const tabs = await ThreadListFilter.openViews(page, threadSidebar(page))
-    const doneTab = tabs.getByRole('radio', { name: 'Done (1), Turn finished', exact: true })
-    await expect(doneTab).toBeVisible()
-    // The preset draws the list's own glyph for a finished turn: the Ready dot (round 28, item 1).
-    await expect(doneTab.getByTestId('thread-view-attention-dot')).toHaveAttribute('data-status', 'ready')
-    await expect(tabs.getByRole('radio', { name: 'All threads', exact: true }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
+    await expect(tabs.getByRole('radio', { name: /^Done, \d+ threads?, \d+ failed$/u })).toBeVisible()
     await ThreadListFilter.close(page)
   })
   const otherTab = await page.context().newPage()
@@ -1603,35 +1602,19 @@ Then('every open tab shows the finished turn until one tab opens it', async ({ p
     await otherTab.goto(page.url())
     await recordAssertion(page, 'thread-sidebar-turn-finished-is-shared-across-tabs', async () => {
       await expect(failedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
-      await expect(
-        (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
-          .getByRole('radio', { name: 'Done (1), Turn finished', exact: true })
-          .getByTestId('thread-view-attention-dot'),
-      ).toBeVisible()
-      await ThreadListFilter.close(otherTab)
+      await expect(unreadRow(otherTab)).toHaveAttribute('data-unread', '')
       await otherTab.reload()
       await expect(failedLabel(otherTab)).toBeVisible({ timeout: 30_000 })
-      await expect(
-        (await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab)))
-          .getByRole('radio', { name: 'Done (1), Turn finished', exact: true })
-          .getByTestId('thread-view-attention-dot'),
-      ).toBeVisible()
-      await ThreadListFilter.close(otherTab)
+      await expect(unreadRow(otherTab)).toHaveAttribute('data-unread', '')
     })
     await recordAssertion(page, 'thread-sidebar-turn-finished-clears-in-every-tab', async () => {
       await openThreadRow(threadRow(otherTab, journey.targetThreadId))
-      // Opening it acknowledges the finish (the preset loses its count); the row stays Failed.
-      const otherViews = await ThreadListFilter.openViews(otherTab, threadSidebar(otherTab))
-      await expect(otherViews.getByRole('radio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 15_000 })
-      await expect(otherViews.getByRole('radio', { name: ThreadListFilter.viewName('Done') }).getByTestId('thread-view-attention-dot')).toHaveCount(0)
-      await ThreadListFilter.close(otherTab)
-      // Read with the panel closed, as a user would.
+      // Opening it acknowledges the finish; the row stays Failed.
+      await expect(unreadRow(otherTab)).not.toHaveAttribute('data-unread', '', { timeout: 15_000 })
       await expect(failedLabel(otherTab)).toBeVisible()
       await page.bringToFront()
       await page.reload()
-      const views = await ThreadListFilter.openViews(page, threadSidebar(page))
-      await expect(views.getByRole('radio', { name: 'Done (1), Turn finished', exact: true })).toHaveCount(0, { timeout: 30_000 })
-      await ThreadListFilter.close(page)
+      await expect(unreadRow(page)).not.toHaveAttribute('data-unread', '', { timeout: 30_000 })
     })
   } finally {
     await otherTab.close()
