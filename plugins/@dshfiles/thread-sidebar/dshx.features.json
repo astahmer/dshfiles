@@ -465,7 +465,7 @@
       "reach": [
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
-        "expect text \"Arrange manually\"",
+        "expect radio \"Arrange manually\"",
         "press Escape",
         "expect button \"Filter: *\""
       ],

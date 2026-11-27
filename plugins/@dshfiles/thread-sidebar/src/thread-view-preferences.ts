@@ -516,6 +516,19 @@ const applyThreadViewPreset = (settings: ThreadViewSettings, viewId: string): Ap
 }
 
 /**
+ * The Filter panel's Reset (council round 27, item 8): back to All threads with no status or source filter on, keeping
+ * the grouping the list shows (Group by sits below Reset, in the Display section, so Reset does not cover it). With
+ * presets off, or All threads hidden, the filters clear in place.
+ */
+const resetThreadViewFilters = (settings: ThreadViewSettings): AppliedThreadViewPreset => {
+  const { groupBy } = currentThreadViewFilters(settings)
+  if (!settings.showPresets || !settings.views.some(view => view.id === ALL_THREADS_VIEW_ID && view.enabled))
+    return { settings: editThreadViewFilters(settings, { statusFilters: [], sourceFilter: 'all' }) }
+  const applied = applyThreadViewPreset(settings, ALL_THREADS_VIEW_ID)
+  return { ...applied, settings: editThreadViewFilters(applied.settings, { groupBy }) }
+}
+
+/**
  * Write the list's current filters into one preset ("Save changes", "Update with current filters"). The project scope
  * joins it when the preset already names one or the list is scoped to a project; a project-neutral preset updated on
  * All projects stays neutral.
@@ -623,6 +636,7 @@ export class ThreadViewPreferencesModel {
   static readonly setPresetsEnabled = setPresetsEnabled
   static readonly isThreadViewEdited = isThreadViewEdited
   static readonly applyThreadViewPreset = applyThreadViewPreset
+  static readonly resetThreadViewFilters = resetThreadViewFilters
   static readonly saveCurrentFiltersToPreset = saveCurrentFiltersToPreset
   static readonly createPresetFromCurrent = createPresetFromCurrent
   static readonly insertThreadView = insertThreadView

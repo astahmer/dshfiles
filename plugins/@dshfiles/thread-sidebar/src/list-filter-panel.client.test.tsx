@@ -53,7 +53,13 @@ const panel = (overrides: Partial<ListFilterPanelProps> = {}): ListFilterPanelPr
   group: {
     value: 'state',
     options: ['state', 'project', 'date', 'status', 'none'],
-    labels: { state: 'Status', project: 'Project', date: 'Date', status: 'Arrange manually', none: 'None' },
+    labels: {
+      state: { short: 'Status', name: 'Status' },
+      project: { short: 'Project', name: 'Project' },
+      date: { short: 'Date', name: 'Date' },
+      status: { short: 'Manual', name: 'Arrange manually' },
+      none: { short: 'None', name: 'None' },
+    },
     onChange: vi.fn(),
   },
   reset: { disabled: true, onReset: vi.fn() },
@@ -72,7 +78,7 @@ describe('the Filter panel', () => {
     expect(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: false })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'All sources' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('radio', { name: 'Status' }).getAttribute('aria-checked')).toBe('true')
-    expect(screen.getByRole('button', { name: 'threadSidebarFilterReset' }).hasAttribute('disabled')).toBe(true)
+    expect(screen.getByRole('button', { name: 'threadSidebarFilterResetLabel' }).hasAttribute('disabled')).toBe(true)
   })
 
   it('applies a change at once: a preset, a status, a source, a grouping', () => {
@@ -94,7 +100,7 @@ describe('the Filter panel', () => {
     expect(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterClear' }))
     expect(props.status?.onChange).toHaveBeenCalledWith([])
-    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterReset' }))
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterResetLabel' }))
     expect(props.reset.onReset).toHaveBeenCalledOnce()
   })
 
@@ -322,5 +328,38 @@ describe('status chips (round 28, item 9)', () => {
     // A chip toggles itself off; the others stay.
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true }))
     expect(onChange).toHaveBeenLastCalledWith(['unread'])
+  })
+})
+
+// Council round 27, item 8: Source and Group by are segmented controls, not chips; Group by sits under its own
+// hairline in a Display section, below what Reset covers.
+describe('Source and Group by (round 28, item 8)', () => {
+  it('draws Source as the kit segmented control: a raised track, the thumb on the chosen segment', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const source = screen.getByRole('radiogroup', { name: 'threadSidebarFilterSource' })
+    expect(source.hasAttribute('data-segmented')).toBe(true)
+    expect(source.className).toContain('dshx:bg-muted')
+    // The dark popover is the raised step itself: the track takes the trigger fill there, one step off it.
+    expect(source.className).toContain('dshx:dark:bg-trigger-fill')
+    const all = within(source).getByRole('radio', { name: 'All sources' })
+    expect(all.className).toContain('dshx:data-[state=on]:bg-(--dshx-segment-thumb)')
+    expect(all.querySelector('[data-slot="segment-label"]')?.getAttribute('data-label')).toBe('All')
+  })
+
+  it('puts Group by in its own Display section under a hairline, Manual standing for Arrange manually', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const display = screen.getByRole('region', { name: 'threadSidebarFilterDisplay' })
+    const group = within(display).getByRole('radiogroup', { name: 'threadSidebarGroupBy' })
+    expect(group.hasAttribute('data-segmented')).toBe(true)
+    const manual = within(group).getByRole('radio', { name: 'Arrange manually' })
+    expect(manual.textContent).toBe('Manual')
+    // Its own top-level block, so the panel's hairline divides it from the filters; the filters hold no grouping.
+    expect(display.parentElement?.hasAttribute('data-thread-list-filter-panel')).toBe(true)
+    expect(screen.getByRole('toolbar', { name: 'threadSidebarFilterStatus' }).closest('section')?.contains(group)).toBe(false)
+  })
+
+  it('names Reset for what it covers', () => {
+    render(<ListFilterPanel {...panel()} />)
+    expect(screen.getByRole('button', { name: 'threadSidebarFilterResetLabel' }).textContent).toBe('threadSidebarFilterReset')
   })
 })

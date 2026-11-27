@@ -6642,12 +6642,16 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       : [{ id: 'customize', label: headerExtras.customize.label, icon: <SlidersHorizontalIcon />, onSelect: closeFilterThen(headerExtras.customize.toggle) }]),
   ]
   const projectNarrowed = scopeSlot !== null && projectFilterValue !== ALL_PROJECTS
-  /** Reset: All threads with no filter on (and, in the phone sheet, which holds the project, All projects). */
+  /**
+   * Reset: All threads with no filter on, the grouping kept (it sits below Reset, in the panel's Display section), and in
+   * the phone sheet, which holds the project, All projects.
+   */
   const resetListFilters = (): void => {
-    if (presetsOn && viewTabs.some(tab => tab.view.id === ALL_THREADS_VIEW_ID)) selectThreadViewPreset(ALL_THREADS_VIEW_ID)
-    else updateThreadView({ statusFilters: [], sourceFilter: 'all' })
-    if (projectNarrowed) selectProject(ALL_PROJECTS)
+    const reset = ThreadViewPreferencesModel.resetThreadViewFilters(threadViewSettings)
+    const threadViews = ThreadViewPreferencesModel.updateThreadViewSettings(reset.settings)
+    changePreferences(projectNarrowed ? { threadViews, workspaceFilter: null } : reset.workspaceFilter === undefined ? { threadViews } : { threadViews, workspaceFilter: reset.workspaceFilter })
   }
+  const resetDisabled = activeFilterLabels.length === 0 && !projectNarrowed
   const presetOptionsMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -6837,17 +6841,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   value: threadView.groupBy,
                   options: ThreadBoardViewModel.groupingsOf(false),
                   labels: {
-                    state: props.tSidebar(threadGroupLabelKeys.state),
-                    project: props.tSidebar(threadGroupLabelKeys.project),
-                    date: props.tSidebar(threadGroupLabelKeys.date),
-                    status: props.tSidebar(threadGroupLabelKeys.status),
-                    none: props.tSidebar(threadGroupLabelKeys.none),
+                    state: { short: props.tSidebar(threadGroupLabelKeys.state), name: props.tSidebar(threadGroupLabelKeys.state) },
+                    project: { short: props.tSidebar(threadGroupLabelKeys.project), name: props.tSidebar(threadGroupLabelKeys.project) },
+                    date: { short: props.tSidebar(threadGroupLabelKeys.date), name: props.tSidebar(threadGroupLabelKeys.date) },
+                    // "Manual" so the five fit one segmented row; its name stays "Arrange manually".
+                    status: { short: props.tSidebar('threadSidebarGroupManualShort'), name: props.tSidebar(threadGroupLabelKeys.status) },
+                    none: { short: props.tSidebar(threadGroupLabelKeys.none), name: props.tSidebar(threadGroupLabelKeys.none) },
                   },
                   onChange: groupBy => updateThreadView({ groupBy }),
                 }
               : undefined
           }
-          reset={{ disabled: !listFiltered && !projectNarrowed, onReset: resetListFilters }}
+          reset={{ disabled: resetDisabled, onReset: resetListFilters }}
           actions={filterActions}
         />
       </PopoverContent>

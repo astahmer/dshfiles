@@ -86,12 +86,13 @@ export interface ListFilterPanelProps {
   readonly group?: {
     readonly value: ThreadGroupBy
     readonly options: readonly ThreadGroupBy[]
-    readonly labels: Readonly<Record<ThreadGroupBy, string>>
+    /** Each grouping's shown label ("Manual") and its full name ("Arrange manually"), so the five fit one row. */
+    readonly labels: Readonly<Record<ThreadGroupBy, { readonly short: string; readonly name: string }>>
     readonly onChange: (value: ThreadGroupBy) => void
   } | undefined
   /** Each source's shown label ("Main") and its full name ("Main threads"), so the three fit one line. */
   readonly sourceLabels: Readonly<Record<ThreadSourceFilter, { readonly short: string; readonly name: string }>>
-  /** Back to All threads with no filter on; disabled while nothing narrows the list. */
+  /** Back to All threads with no filter on, the grouping kept; disabled while no filter narrows the list. */
   readonly reset: { readonly disabled: boolean; readonly onReset: () => void }
   /** The list's other places and settings (Board, Thread list settings, Sidebar settings), quiet rows at the foot. */
   readonly actions: readonly ListFilterAction[]
@@ -169,7 +170,16 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
     <div className="dshx:grid dshx:min-w-0 dshx:divide-y dshx:divide-border" data-thread-list-filter-panel="">
       <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2 dshx:py-1.5 dshx:pr-1.5 dshx:pl-3">
         <h2 className="dshx:text-sm dshx:font-medium">{t('threadSidebarFilter')}</h2>
-        <Button type="button" variant="ghost" size="sm" disabled={props.reset.disabled} onClick={props.reset.onReset} data-thread-filter-reset="">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          // Reset covers the filters, not the Display section under its own hairline (round 28, item 8).
+          aria-label={t('threadSidebarFilterResetLabel')}
+          disabled={props.reset.disabled}
+          onClick={props.reset.onReset}
+          data-thread-filter-reset=""
+        >
           {t('threadSidebarFilterReset')}
         </Button>
       </div>
@@ -252,7 +262,7 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           </Button>
         </section>
       )}
-      {props.status === undefined && props.source === undefined && props.group === undefined ? null : (
+      {props.status === undefined && props.source === undefined ? null : (
         <div className="dshx:grid dshx:gap-3 dshx:px-3 dshx:pt-2.5 dshx:pb-3">
           {props.status === undefined ? null : <StatusChips t={t} headingId={`${ids}-status`} {...props.status} />}
           {props.source === undefined ? null : (
@@ -260,48 +270,36 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
               <h3 id={`${ids}-source`} className={HEADING}>
                 {t('threadSidebarFilterSource')}
               </h3>
-              <ToggleGroup
-                type="single"
-                aria-labelledby={`${ids}-source`}
+              <Segmented
+                labelledBy={`${ids}-source`}
                 value={props.source.value}
-                onValueChange={value => (isSourceFilter(value) ? props.source?.onChange(value) : undefined)}
-                spacing={1}
-                className="dshx:w-full dshx:flex-wrap dshx:gap-1 dshx:pointer-coarse:gap-2"
-              >
-                {THREAD_SOURCE_FILTER_OPTIONS.map(option => (
-                  <ToggleGroupItem key={option} value={option} aria-label={props.sourceLabels[option].name} className={CHIP}>
-                    {props.sourceLabels[option].short}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </section>
-          )}
-          {props.group === undefined ? null : (
-            <section className="dshx:grid dshx:gap-1.5" aria-labelledby={`${ids}-group`}>
-              <h3 id={`${ids}-group`} className={HEADING}>
-                {t('threadSidebarGroupBy')}
-              </h3>
-              <ToggleGroup
-                type="single"
-                aria-labelledby={`${ids}-group`}
-                value={props.group.value}
-                onValueChange={value => {
-                  const option = props.group?.options.find(candidate => candidate === value)
-                  if (option !== undefined) props.group?.onChange(option)
-                }}
-                spacing={1}
-                className="dshx:w-full dshx:flex-wrap dshx:gap-1 dshx:pointer-coarse:gap-2"
-                data-thread-group-by=""
-              >
-                {props.group.options.map(option => (
-                  <ToggleGroupItem key={option} value={option} className={CHIP}>
-                    {props.group?.labels[option]}
-                  </ToggleGroupItem>
-                ))}
-              </ToggleGroup>
+                options={THREAD_SOURCE_FILTER_OPTIONS.map(option => ({ value: option, ...props.sourceLabels[option] }))}
+                onChange={value => (isSourceFilter(value) ? props.source?.onChange(value) : undefined)}
+              />
             </section>
           )}
         </div>
+      )}
+      {props.group === undefined ? null : (
+        // Display, under its own hairline: how the list is drawn, which Reset above does not cover.
+        <section className="dshx:grid dshx:gap-1.5 dshx:px-3 dshx:pt-2.5 dshx:pb-3" aria-labelledby={`${ids}-display`} data-thread-filter-display="">
+          <h3 id={`${ids}-display`} className={HEADING}>
+            {t('threadSidebarFilterDisplay')}
+          </h3>
+          <span id={`${ids}-group`} className="dshx:text-xs dshx:text-foreground">
+            {t('threadSidebarGroupBy')}
+          </span>
+          <Segmented
+            labelledBy={`${ids}-group`}
+            value={props.group.value}
+            options={props.group.options.map(option => ({ value: option, ...(props.group?.labels[option] ?? { short: option, name: option }) }))}
+            onChange={value => {
+              const option = props.group?.options.find(candidate => candidate === value)
+              if (option !== undefined) props.group?.onChange(option)
+            }}
+            data-thread-group-by=""
+          />
+        </section>
       )}
       {props.actions.length === 0 ? null : (
         <div className="dshx:grid dshx:gap-0.5 dshx:p-1.5">
@@ -327,6 +325,45 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
     </div>
   )
 }
+
+/**
+ * A segmented control (council round 27, item 8), drawn as the kit's segmented Tabs root: the raised track at the one
+ * control height, each segment inset 3px, the chosen one the segment thumb with its label at 550 (its width reserved, so
+ * choosing never moves a neighbour). A ToggleGroup underneath, so it is one radiogroup with arrow-key movement.
+ */
+const Segmented = (props: {
+  readonly labelledBy: string
+  readonly value: string
+  readonly options: readonly { readonly value: string; readonly short: string; readonly name: string }[]
+  readonly onChange: (value: string) => void
+  readonly 'data-thread-group-by'?: string
+}): JSX.Element => (
+  <ToggleGroup
+    type="single"
+    aria-labelledby={props.labelledBy}
+    value={props.value}
+    // Picking the chosen segment again would clear the group: a segmented control always holds one value.
+    onValueChange={value => (value === '' ? undefined : props.onChange(value))}
+    spacing={1}
+    data-segmented=""
+    data-thread-group-by={props['data-thread-group-by']}
+    // The raised track; in dark the popover is that same step, so the track takes the trigger fill to stay one step off it.
+    className="dshx:h-(--dshx-control-h) dshx:w-full dshx:gap-0 dshx:rounded-lg dshx:bg-muted dshx:p-[3px] dshx:dark:bg-trigger-fill"
+  >
+    {props.options.map(option => (
+      <ToggleGroupItem
+        key={option.value}
+        value={option.value}
+        aria-label={option.name === option.short ? undefined : option.name}
+        className="dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:rounded-md dshx:border dshx:border-transparent dshx:px-1.5 dshx:text-xs dshx:font-medium dshx:text-muted-foreground dshx:hover:bg-transparent dshx:hover:text-foreground dshx:data-[state=on]:border-(--dshx-segment-edge) dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:text-sm"
+      >
+        <span data-slot="segment-label" data-label={option.short} className="dshx:segment-label">
+          {option.short}
+        </span>
+      </ToggleGroupItem>
+    ))}
+  </ToggleGroup>
+)
 
 /** The statuses a list is usually narrowed by; why a thread waits and where it is stored open under More. */
 const LEADING_STATUS_GROUP = THREAD_STATUS_FILTER_GROUPS[0]
