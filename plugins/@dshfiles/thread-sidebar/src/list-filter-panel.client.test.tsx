@@ -10,6 +10,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { threadSidebarDictionaries } from './locales.js'
 import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, type ListFilterPanelProps } from './list-filter-panel.js'
 import { markShownCounts } from './mark-shown.js'
+import { PresetOptionsMenu } from './preset-options-menu.js'
 
 afterEach(cleanup)
 
@@ -25,6 +26,8 @@ const element = (found: Element | null | undefined): HTMLElement => {
 // A path, not a URL: under jsdom `URL` is the window's, which Node's fs does not take.
 const client = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
 const locales = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'locales.ts'), 'utf8')
+/** The presets ⋯ menu's source (its own file since council round 34, A5). */
+const optionsMenuSource = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'preset-options-menu.tsx'), 'utf8')
 /** The panel's own source. */
 const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'list-filter-panel.tsx'), 'utf8')
 /** The English table is the first one in the file. */
@@ -377,8 +380,7 @@ describe('the phone sheet (round 28, item 10)', () => {
   it('opens the sheet at 85dvh, names it Filters, and puts Save as… and an inline Project row where the client builds them', () => {
     expect(filterControl).toContain('dshx:phone:max-h-[85dvh]!')
     expect(filterControl).toContain("aria-label={props.tSidebar('threadSidebarFilters')}")
-    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
-    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveAsNew')")
+    expect(optionsMenuSource).toContain("t('threadSidebarPresetSaveAsNew')")
     // "Project · All projects ›": one row, its label and value inline, not a heading over a field.
     expect(filterControl).toMatch(/data-thread-project-row=""/u)
     expect(filterControl).toContain('<ChevronRightIcon')
@@ -468,8 +470,7 @@ describe('edges (round 28, item 16)', () => {
   })
 
   it("ends the presets' ⋯ glyph on the same right edge: its 24px box pulled 4px out", () => {
-    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
-    expect(optionsMenu).toMatch(/size="icon-xs"[^>]*?className="[^"]*dshx:-mr-1[^"]*"/su)
+    expect(optionsMenuSource).toMatch(/size="icon-xs"[^>]*?className="[^"]*dshx:-mr-1[^"]*"/su)
   })
 })
 
@@ -701,13 +702,12 @@ describe('one Group by label (round 29, item 11)', () => {
 
 // Council round 28, item 12: the preset ⋯ menu: its name as a quiet kit label, one text edge, one verb name.
 describe('the preset menu (round 29, item 12)', () => {
-  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
   it('labels the menu with the preset name in 12px secondary, puts every verb on one text edge and names Save one way', () => {
-    expect(optionsMenu).toContain('<DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">')
+    expect(optionsMenuSource).toContain('<DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">')
     // No verb carries an icon, so every label starts on one edge.
-    expect(optionsMenu).not.toMatch(/Icon aria-hidden/u)
-    expect(optionsMenu).not.toContain("'threadSidebarPresetUpdate'")
-    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })")
+    expect(optionsMenuSource).not.toMatch(/Icon aria-hidden/u)
+    expect(optionsMenuSource).not.toContain("'threadSidebarPresetUpdate'")
+    expect(optionsMenuSource).toContain("t('threadSidebarPresetSaveChanges', { name: props.label })")
   })
 })
 
@@ -851,14 +851,13 @@ describe('no edited dot (round 30, item 1)', () => {
 // Council round 29, item 2: the built-in preset's menu has no dead rows, says why in one line, and names its one save
 // verb as the row button does.
 describe('the built-in preset menu (round 30, item 2)', () => {
-  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
   it('hides Rename, Save changes and Delete for All threads and shows the built-in line under its label', () => {
-    expect(optionsMenu).not.toMatch(/disabled=\{[^}]*activeIsBuiltIn/u)
-    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetBuiltInHint')")
+    expect(optionsMenuSource).not.toMatch(/disabled=\{[^}]*builtIn/u)
+    expect(optionsMenuSource).toContain("t('threadSidebarPresetBuiltInHint')")
   })
 
   it('calls its save verb Save as new preset… in the menu and on the row alike', () => {
-    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveAsNew')")
+    expect(optionsMenuSource).toContain("t('threadSidebarPresetSaveAsNew')")
     expect(client).not.toContain("'threadSidebarPresetSaveAs')")
     expect(english).not.toContain('Save current filters as preset')
   })
@@ -1032,7 +1031,7 @@ describe('the phone sheet never scrolls sideways (round 30, item 4)', () => {
   })
 
   it("keeps the presets ⋯'s 44 px touch area inside the sheet: it reaches left, not past the edge", () => {
-    const trigger = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('</DropdownMenuTrigger>', client.indexOf('const presetOptionsMenu = (')))
+    const trigger = optionsMenuSource.slice(0, optionsMenuSource.indexOf('</DropdownMenuTrigger>'))
     expect(trigger).toContain('dshx:pointer-coarse:after:right-0 dshx:pointer-coarse:after:-left-5')
   })
 })
@@ -1199,18 +1198,17 @@ describe('the closed desktop trigger reads as a state (round 31, item 2)', () =>
 // Council round 30, item 4: the preset ⋯ menu stays inside the panel: a fixed 256px width aligned to the ⋯'s end, the
 // built-in caption wrapping, no repeated "All threads" label, and Save as new preset… described by the caption.
 describe('the preset menu fits the panel (round 31, item 4)', () => {
-  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
   it('is 256px wide, end-aligned, its caption wrapping', () => {
-    expect(optionsMenu).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64')
-    expect(optionsMenu).not.toContain('dshx:min-w-52')
-    expect(optionsMenu).toMatch(/data-preset-built-in-hint=""[^>]*>|className="[^"]*dshx:whitespace-normal[^"]*"[^>]*data-preset-built-in-hint/u)
+    expect(optionsMenuSource).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64')
+    expect(optionsMenuSource).not.toContain('dshx:min-w-52')
+    expect(optionsMenuSource).toMatch(/data-preset-built-in-hint=""[^>]*>|className="[^"]*dshx:whitespace-normal[^"]*"[^>]*data-preset-built-in-hint/u)
     expect(english).toContain("threadSidebarPresetBuiltInHint: 'Built in. Save changes as a new preset.',")
   })
 
   it("names the preset in a label only for a user preset, and describes Save as new preset… by the built-in caption", () => {
-    expect(optionsMenu).toMatch(/\{activeIsBuiltIn \? null : \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuLabel/u)
-    expect(optionsMenu).toContain('aria-describedby={activeIsBuiltIn ? builtInHintId : undefined}')
-    expect(optionsMenu).toContain('id={builtInHintId}')
+    expect(optionsMenuSource).toMatch(/\{props\.builtIn \? null : \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuLabel/u)
+    expect(optionsMenuSource).toContain('aria-describedby={props.builtIn ? builtInHintId : undefined}')
+    expect(optionsMenuSource).toContain('id={builtInHintId}')
   })
 })
 
@@ -1497,7 +1495,6 @@ describe('the desktop panel stops above the status bar (round 33, item 3)', () =
 // "… unread" with the count the list draws, act on those rows, sit last in the presets' ⋯ menu after a separator, and
 // "unread" shows only while something shown is read.
 describe('the mark verbs say their scope (round 33, item 4)', () => {
-  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
   it('says the shown scope in both labels and acts on the shown rows', () => {
     expect(english).toContain("threadSidebarMarkShownRead_other: 'Mark {count} shown as read',")
     expect(english).toContain("threadSidebarMarkShownUnread_other: 'Mark {count} shown as unread',")
@@ -1506,11 +1503,11 @@ describe('the mark verbs say their scope (round 33, item 4)', () => {
   })
 
   it('lists both last, after a separator', () => {
-    const manage = optionsMenu.indexOf("props.tSidebar('threadSidebarPresetManage')")
-    const marks = optionsMenu.indexOf('{markViewActions.map(action => (')
+    const manage = optionsMenuSource.indexOf("t('threadSidebarPresetManage')")
+    const marks = optionsMenuSource.indexOf('{props.markActions.map(action => (')
     expect(manage).toBeGreaterThan(-1)
     expect(marks).toBeGreaterThan(manage)
-    expect(optionsMenu.slice(manage, marks)).toContain('<DropdownMenuSeparator />')
+    expect(optionsMenuSource.slice(manage, marks)).toContain('<DropdownMenuSeparator />')
   })
 })
 
@@ -1597,8 +1594,7 @@ describe('a forced More statuses is one plain label (council round 34, A6)', () 
 // the Filters sheet's text starts at 20px (the kit sheet's 8 and the section's 12), the ⋯ sheet's at 16 (8 and the
 // item's 8). On a phone the ⋯ sheet pads 12px, so its items start at 20 too.
 it('gives the presets ⋯ sheet the Filters sheet content inset on a phone (round 33, item 8)', () => {
-  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
-  expect(optionsMenu).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64 dshx:phone:px-3!"')
+  expect(optionsMenuSource).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64 dshx:phone:px-3!"')
 })
 
 // Council round 32, item 9: the active preset is a checked radio; aria-current repeated it (and an edited one is still
@@ -1624,16 +1620,71 @@ describe('the mark verbs count what they change (council round 34, B11)', () => 
   })
 
   it('labels each verb with its own count and leaves it out at zero, separator included', () => {
-    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
     expect(client).toContain('const markCounts = markShownCounts(shownThreadIds, sessionId => attention.records.has(sessionId))')
     expect(client).toMatch(/\.\.\.\(markCounts\.toRead > 0\s*\?\s*\[\{ id: 'mark-read', label: plural\(props\.tSidebar, 'threadSidebarMarkShownRead', markCounts\.toRead\)/u)
     expect(client).toMatch(/\.\.\.\(markCounts\.toUnread > 0\s*\?\s*\[\{ id: 'mark-unread', label: plural\(props\.tSidebar, 'threadSidebarMarkShownUnread', markCounts\.toUnread\)/u)
     expect(client).not.toContain("plural(props.tSidebar, 'threadSidebarMarkShownRead', shownThreadIds.length)")
-    expect(optionsMenu).toContain('{markViewActions.length === 0 ? null : <DropdownMenuSeparator />}')
+    expect(optionsMenuSource).toContain('{props.markActions.length === 0 ? null : <DropdownMenuSeparator />}')
+    expect(client).toContain('markActions={markViewActions}')
   })
 
   it('names each preset row with its count', () => {
     render(<ListFilterPanel {...panel()} />)
     expect(screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other' })).toBeTruthy()
+  })
+})
+
+// Council round 34, A5 (thread-sidebar half): with the built-in All threads edited, its row already offers Save as new
+// preset…; the ⋯ sheet repeated it with a caption explaining it, and opened on a separator. It is shown once.
+describe('Save as new preset… is offered once (council round 34, A5)', () => {
+  const words: Readonly<Record<string, string>> = threadSidebarDictionaries.en
+  const translate: ListFilterPanelProps['t'] = (key, params) => (words[key] ?? key).replace(/\{(\w+)\}/gu, (_, name: string) => String(params?.[name] ?? ''))
+  const openOptions = (state: { readonly activeId: string; readonly edited: boolean }): HTMLElement => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const builtIn = state.activeId === 'all'
+    const label = presets.items.find(item => item.id === state.activeId)?.label ?? ''
+    const options = (
+      <PresetOptionsMenu
+        t={translate}
+        label={label}
+        builtIn={builtIn}
+        edited={state.edited}
+        canDelete
+        onSaveAs={vi.fn()}
+        onRename={vi.fn()}
+        onSaveChanges={vi.fn()}
+        onDelete={vi.fn()}
+        onManage={vi.fn()}
+        markActions={[{ id: 'mark-read', label: 'Mark 2 shown as read', icon: null, onSelect: vi.fn() }]}
+      />
+    )
+    render(<ListFilterPanel {...base} t={translate} presets={{ ...presets, ...state, builtInId: 'all', onSaveAs: vi.fn(), options }} />)
+    const trigger = screen.getByRole('button', { name: `Preset options: ${label}` })
+    fireEvent.pointerDown(trigger, { button: 0, ctrlKey: false })
+    fireEvent.keyDown(trigger, { key: 'Enter' })
+    const menu = document.querySelector<HTMLElement>('[role="menu"]')
+    if (menu === null) throw new Error('The preset menu did not open.')
+    return menu
+  }
+
+  it('drops the menu copy, its caption and its leading separator while the edited built-in row offers it', () => {
+    const menu = openOptions({ activeId: 'all', edited: true })
+    expect(screen.getAllByText('Save as new preset…')).toHaveLength(1)
+    expect(within(menu).queryByText('Save as new preset…')).toBeNull()
+    expect(document.querySelector('[data-preset-built-in-hint]')).toBeNull()
+    expect(menu.firstElementChild?.getAttribute('role')).not.toBe('separator')
+    expect(within(menu).getAllByRole('menuitem').map(item => item.textContent)).toEqual(['Manage presets…', 'Mark 2 shown as read'])
+  })
+
+  it('keeps the item and its caption on the unedited built-in preset, and the user preset menu as it was', () => {
+    const menu = openOptions({ activeId: 'all', edited: false })
+    expect(within(menu).getByRole('menuitem', { name: 'Save as new preset…' })).toBeTruthy()
+    expect(document.querySelector('[data-preset-built-in-hint]')).not.toBeNull()
+    cleanup()
+    const user = openOptions({ activeId: 'working', edited: true })
+    expect(within(user).getByRole('menuitem', { name: 'Save as new preset…' })).toBeTruthy()
+    expect(within(user).getByRole('menuitem', { name: 'Rename…' })).toBeTruthy()
   })
 })

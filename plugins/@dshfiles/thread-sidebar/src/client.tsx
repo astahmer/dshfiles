@@ -233,6 +233,7 @@ import type { ThreadWorkStatus } from './thread-status-client.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
 import { filterTriggerTipAdds, textTruncated, useEditedSuffixFit, useFilterTriggerTip } from './list-filter-trigger.js'
 import { markShownCounts } from './mark-shown.js'
+import { PresetOptionsMenu } from './preset-options-menu.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -6681,80 +6682,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   // The built-in All threads is never renamed, overwritten or deleted (council round 28, item 13).
   const activeIsBuiltIn = listThreadView.id === ALL_THREADS_VIEW_ID
-  const builtInHintId = useId()
   const presetOptionsMenu = (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-xs"
-          // Its 16px glyph ends on the panel's 12px inset, the edge Reset's label ends on (round 28, item 16). On a coarse
-          // pointer its 44px touch area reaches left (20px) instead of 10px each way, which put 2px past the sheet's edge
-          // and scrolled it sideways (council round 29, item 4).
-          className="dshx:-mr-1 dshx:text-muted-foreground dshx:pointer-coarse:after:right-0 dshx:pointer-coarse:after:-left-5"
-          aria-label={`${props.tSidebar('threadSidebarPresetOptions')}: ${activeViewTab?.label ?? ''}`}
-        >
-          <OverflowGlyph />
-        </Button>
-      </DropdownMenuTrigger>
-      {/* A fixed 256px, aligned to the ⋯'s end, so it stays inside the 320px panel (council round 30, item 4). As the sheet
-          opened from the Filters sheet on a phone, it pads 12px so its items start at the Filters sheet's 20px text edge
-          (council round 32, item 8). */}
-      <DropdownMenuContent align="end" className="dshx-root dshx:w-64 dshx:phone:px-3!" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
-        {/* The built-in All threads shows no dead rows (council round 29, item 2): one caption says why, and describes
-            the one way to keep its changes (a <p> in a menu is skipped unless an item points at it: round 30, item 4). */}
-        {activeIsBuiltIn ? (
-          <p id={builtInHintId} className="dshx:px-2 dshx:pt-1.5 dshx:pb-1 dshx:text-xs dshx:whitespace-normal dshx:text-muted-foreground" data-preset-built-in-hint="">
-            {props.tSidebar('threadSidebarPresetBuiltInHint')}
-          </p>
-        ) : null}
-        {/* Save as… left the panel for this menu, so the sheet opens on the filters (round 28, item 10). */}
-        <DropdownMenuItem onSelect={saveFiltersAsPreset} aria-describedby={activeIsBuiltIn ? builtInHintId : undefined}>
-          {/* One verb name, as on the edited built-in row's button (council round 29, item 2). */}
-          {props.tSidebar('threadSidebarPresetSaveAsNew')}
-        </DropdownMenuItem>
-        {/* One text edge (no verb carries an icon) and the preset's name as a quiet label (council round 28, item 12),
-            for a user preset only: the built-in caption already says which. */}
-        {activeIsBuiltIn ? null : (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
-            <DropdownMenuItem
-              onSelect={closeFilterThen(() =>
-                setPresetPrompt({
-                  mode: 'rename',
-                  viewId: listThreadView.id,
-                  name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
-                }),
-              )}
-            >
-              {props.tSidebar('threadSidebarPresetRename')}
-            </DropdownMenuItem>
-            <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
-              {/* One verb name, as on the edited row's button. */}
-              {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              variant="destructive"
-              disabled={threadViewSettings.views.length === 1 || viewTabs.length === 1}
-              onSelect={closeFilterThen(() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' }))}
-            >
-              {props.tSidebar('threadSidebarPresetDelete')}
-            </DropdownMenuItem>
-          </>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={closeFilterThen(() => setViewsManagerOpen(true))}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
-        {/* Last, after a separator, and saying their scope (council round 32, item 4): "Mark 2 shown as read". */}
-        {markViewActions.length === 0 ? null : <DropdownMenuSeparator />}
-        {markViewActions.map(action => (
-          <DropdownMenuItem key={action.id} disabled={action.disabled === true} onSelect={action.onSelect}>
-            {action.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <PresetOptionsMenu
+      t={props.tSidebar}
+      label={activeViewTab?.label ?? ''}
+      builtIn={activeIsBuiltIn}
+      edited={presetEdited}
+      canDelete={!(threadViewSettings.views.length === 1 || viewTabs.length === 1)}
+      onSaveAs={saveFiltersAsPreset}
+      onRename={closeFilterThen(() =>
+        setPresetPrompt({
+          mode: 'rename',
+          viewId: listThreadView.id,
+          name: activeViewTab?.label ?? threadViewPresetLabel(listThreadView, props.tSidebar),
+        }),
+      )}
+      onSaveChanges={() => savePresetChanges()}
+      onDelete={closeFilterThen(() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' }))}
+      onManage={closeFilterThen(() => setViewsManagerOpen(true))}
+      markActions={markViewActions}
+    />
   )
   const filterPanelStyle: FilterPanelRoomStyle | undefined = filterPanelRoom === null ? undefined : { '--filter-panel-room': `${String(filterPanelRoom)}px` }
   // The trigger's full name: "Filter: All threads (edited), 2 filters on". Also its tooltip on a desktop, where the button
