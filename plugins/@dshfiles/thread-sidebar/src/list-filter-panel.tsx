@@ -135,7 +135,7 @@ const ShownAnnouncer = (props: { readonly note: { readonly text: string; readonl
  * (council round 30, item 9: the kit toggle's hover fill is the dark sheet's own step, so a hovered chip lost its shape).
  */
 const CHIP =
-  'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:data-[state=on]:border-(--dshx-segment-edge) dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:hover:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
+  'dshx:h-7 dshx:w-full dshx:min-w-0 dshx:justify-start dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:data-[state=on]:border-(--dshx-segment-edge) dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:hover:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
 
 /** What a status chip's seat draws at rest: the glyph the list draws for that state (council round 27, item 9). */
 type ChipMark = WorkStatus | 'unread' | 'muted' | 'archived'
@@ -223,8 +223,8 @@ const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
 const QUIET_ROW =
   'dshx:-mx-1.5 dshx:justify-start dshx:justify-self-stretch dshx:gap-2 dshx:px-1.5 dshx:has-[>svg]:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:[&_svg]:size-4 dshx:pointer-coarse:h-11'
 const HEADING = 'dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
-/** One status group's chips: a wrapping row. */
-const STATUS_ROW = 'dshx:flex dshx:w-full dshx:flex-wrap dshx:gap-1 dshx:pointer-coarse:gap-2'
+/** One status group's chips: two aligned columns (council round 30, item 10); the longest label fits a cell at 390px. */
+const STATUS_ROW = 'dshx:grid dshx:w-full dshx:grid-cols-2 dshx:gap-1 dshx:pointer-coarse:gap-2'
 
 const isStatusFilter = (value: string): value is ThreadStatusFilter => value !== 'all' && THREAD_STATUS_FILTER_OPTIONS.some(option => option === value)
 const isSourceFilter = (value: string): value is ThreadSourceFilter => THREAD_SOURCE_FILTER_OPTIONS.some(option => option === value)
@@ -724,7 +724,7 @@ const StatusChips = (props: {
             ? THREAD_STATUS_FILTER_GROUPS.slice(1).map(group => (
                 <div key={group.id} role="group" aria-labelledby={`${moreId}-${group.id}`} className={STATUS_ROW} data-thread-status-group="">
                   {/* The group's label starts its own line: its full width breaks the row. 11px tertiary, 8px above (round 29). */}
-                  <span id={`${moreId}-${group.id}`} className="dshx:w-full dshx:pt-2 dshx:text-2xs dshx:text-(--dsw-alias-label-tertiary)">
+                  <span id={`${moreId}-${group.id}`} className="dshx:col-span-2 dshx:pt-2 dshx:text-2xs dshx:text-(--dsw-alias-label-tertiary)">
                     {props.t(threadStatusFilterGroupLabelKeys[group.id])}
                   </span>
                   {group.filters.map(chip)}

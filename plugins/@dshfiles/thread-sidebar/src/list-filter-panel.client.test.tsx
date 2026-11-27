@@ -1316,3 +1316,22 @@ describe('a hovered chip keeps its fill (round 31, item 9)', () => {
     expect(on.className).toContain('dshx:data-[state=on]:hover:bg-(--dshx-segment-thumb)')
   })
 })
+
+// Council round 30, item 10: the status chips align on a two-column grid, each chip filling its cell from the start.
+describe('status chips align (round 31, item 10)', () => {
+  it('lays every status group out as two columns, its label across both, each chip full width from the start', () => {
+    render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    const groups = Array.from(document.querySelectorAll<HTMLElement>('[data-thread-status-group]'))
+    expect(groups).toHaveLength(3)
+    for (const group of groups) {
+      for (const token of ['dshx:grid', 'dshx:grid-cols-2', 'dshx:gap-1', 'dshx:pointer-coarse:gap-2']) expect(group.className).toContain(token)
+      expect(group.className).not.toContain('dshx:flex-wrap')
+    }
+    const label = element(document.getElementById(element(groups[1]).getAttribute('aria-labelledby') ?? ''))
+    expect(label.className).toContain('dshx:col-span-2')
+    const chip = screen.getByRole('button', { name: 'threadSidebarApprovalNeeded' })
+    expect(chip.className).toContain('dshx:w-full')
+    expect(chip.className).toContain('dshx:justify-start')
+  })
+})
