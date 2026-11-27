@@ -1077,9 +1077,11 @@ svg [class*='_spinnerArc_'] {
   }
 
   /*
-   * A sheet opened from a sheet draws no second scrim (council round 30, item 3): the first one already dims the page.
-   * Nested is either a submenu Radix renders inside its parent sheet, or a sheet in a later top-level layer (a menu
-   * portaled to the body while the app holds an open sheet, or a body-level sheet after another).
+   * A sheet opened from a sheet scrims its parent (council round 34 A5): the child keeps its scrim, over the parent and
+   * the page, and the parent drops its own while the child is open, so the page is still dimmed once (council round 30,
+   * item 3) and the parent reads as the layer below. Nested is either a submenu Radix renders inside its parent sheet,
+   * or a sheet in a later top-level layer (a menu portaled to the body while the app holds an open sheet, or a
+   * body-level sheet after another).
    */
   html[data-shell-phone-nav]:not([data-phone-keyboard]) :is(
       [data-slot='dropdown-menu-content'],
@@ -1090,8 +1092,7 @@ svg [class*='_spinnerArc_'] {
       [data-slot='popover-content'],
       [data-menu-material][role='menu'],
       [data-menu-material][data-trigger-menu]
-    )
-    :is(
+    ):has(:is(
       [data-slot='dropdown-menu-content'],
       [data-slot='dropdown-menu-sub-content'],
       [data-slot='context-menu-content'],
@@ -1100,8 +1101,8 @@ svg [class*='_spinnerArc_'] {
       [data-slot='popover-content'],
       [data-menu-material][role='menu'],
       [data-menu-material][data-trigger-menu]
-    ),
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) body > :has(:is(
+    )),
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) body > :has(~ * :is(
       [data-slot='dropdown-menu-content'],
       [data-slot='dropdown-menu-sub-content'],
       [data-slot='context-menu-content'],
@@ -1111,7 +1112,7 @@ svg [class*='_spinnerArc_'] {
       [data-menu-material][role='menu'],
       [data-menu-material][data-trigger-menu]
     ))
-    ~ * :is(
+    :is(
       [data-slot='dropdown-menu-content'],
       [data-slot='dropdown-menu-sub-content'],
       [data-slot='context-menu-content'],

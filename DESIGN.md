@@ -733,7 +733,9 @@ Tailwind's own step names resolve to these levels in the kit `@theme` (`shadow-x
 Dark adds a 1px inner top highlight (`inset 0 1px 0`) to every level so raised layers read against near-black. Only
 s2/s3 may add a backdrop blur. Declare depth once — a bordered card has no shadow. Stacking bands: Host modals 1000,
 kit dialogs/sheets 1050, floating layers (select, popover, menu, tooltip) 1100. A kit dialog, alert dialog or sheet
-dims the page with `bg-scrim`: the warm ink at 32% in light, black at 50% in dark.
+dims the page with `bg-scrim`: the warm ink at 32% in light, black at 50% in dark. On a phone, a sheet opened from a
+sheet keeps that scrim over its parent, and the parent drops its own while the child is open: the page is dimmed once
+and the parent reads as the layer below (council round 34).
 
 Dialogs, alert dialogs and the command palette sit on `surface-dialog`: in light the page fill, the hairline and s3;
 in dark a raised warm fill `oklch(0.27 0.006 60)` (`#292624`, clear of the scrim), a faint light edge

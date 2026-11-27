@@ -29,8 +29,11 @@ describe('phone sheet fill', () => {
 
 /**
  * Council round 30, item 3: the sheet's scrim mixed 30% of the text ink, which is near-white in dark, so opening a sheet
- * brightened the page (#15120f → #55524f, #817e7c with a sheet opened from a sheet). It is the kit scrim token, and a sheet
- * opened from another sheet draws no second one.
+ * brightened the page (#15120f → #55524f, #817e7c with a sheet opened from a sheet). It is the kit scrim token, and the page
+ * is dimmed once however many sheets are open.
+ *
+ * Council round 34 A5: a sheet opened from a sheet left its parent bright beside it, so the two read as one surface. The
+ * child keeps its scrim, over the parent and the page, and the parent drops its own while the child is open.
  */
 describe('phone sheet scrim', () => {
   const sheetRule = /html\[data-shell-phone-nav\]:not\(\[data-phone-keyboard\]\)\s*:is\([^)]*'popover-content'[^)]*\)[^{]*\{([^}]*)\}/u.exec(styles)?.[1] ?? ''
@@ -40,10 +43,15 @@ describe('phone sheet scrim', () => {
     expect(styles).not.toMatch(/100vmax color-mix\(in oklch, var\(--dshx-tone-text/u)
   })
 
-  it('draws no second scrim for a sheet nested in a sheet, or opened in a later layer while one is open', () => {
-    const nested = /([^{}]*:has\([^{}]*\)\s*~\s*\*[^{}]*)\{\s*box-shadow:\s*var\(--dshx-elevation-3\)\s*!important;\s*\}/u.exec(styles)
-    expect(nested).not.toBeNull()
-    expect(nested?.[1]).toMatch(/body\s*>\s*:has\(/u)
+  it('scrims the parent sheet while a child sheet is open: the parent drops its scrim, the child keeps its own', () => {
+    const dropped = /([^{}]*)\{\s*box-shadow:\s*var\(--dshx-elevation-3\)\s*!important;\s*\}/u.exec(styles)
+    expect(dropped).not.toBeNull()
+    const selector = (dropped?.[1] ?? '').replace(/\s+/gu, ' ')
+    // The two nested shapes: a submenu rendered inside its parent sheet, and a sheet in a later top-level layer. The rule
+    // names the parent (the sheet that holds one, or the sheet in the earlier layer), never the child.
+    expect(selector).toMatch(/\]\s*\):has\(:is\(/u)
+    expect(selector).toMatch(/body > :has\(~ \* :is\(/u)
+    expect(selector).not.toMatch(/body > :has\(:is\([^{}]*\)\)\s*~\s*\*/u)
   })
 })
 
