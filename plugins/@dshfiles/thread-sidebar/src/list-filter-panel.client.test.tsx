@@ -455,3 +455,43 @@ describe('the shown count (round 28, item 15)', () => {
     expect(filterControl).toMatch(/shown=\{plural\(props\.tSidebar, 'threadSidebarFilterShown', visibleThreadEntries\.length\)\}/u)
   })
 })
+
+// Council round 27, item 16: one 12px content inset, one 16px glyph column, labels on one x (12 + 16 + 8 = 36px), and
+// the presets' ⋯ and Reset ending on one right edge, the 12px inset.
+describe('edges (round 28, item 16)', () => {
+  /** A ghost sm button's own padding: 10px (8px beside a glyph); kit button.tsx `sm`. */
+  it("ends Reset's label on the 12px inset: the header's 2px plus the button's 10px, on a desktop and a phone", () => {
+    render(<ListFilterPanel {...panel()} />)
+    const header = screen.getByRole('heading', { name: 'threadSidebarFilters' }).closest('[data-thread-filter-header]')
+    expect(header?.className).toContain('dshx:pr-0.5')
+    expect(header?.className).toContain('dshx:phone:px-0.5')
+    expect(header?.className).toContain('dshx:pl-3')
+  })
+
+  it('puts every quiet row on the glyph column: a 16px glyph at 12px, its label 8px after it', () => {
+    const base = panel({ status: { selected: [], onChange: vi.fn() } })
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const quiet = [
+      screen.getByRole('button', { name: /threadSidebarPresetSaveChanges/u }),
+      screen.getByRole('button', { name: 'threadSidebarPresetDiscardChanges' }),
+      screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }),
+      screen.getByRole('button', { name: 'Thread list settings' }),
+    ]
+    for (const row of quiet) {
+      expect(row.className, row.textContent ?? '').toContain('dshx:gap-2')
+      expect(row.className, row.textContent ?? '').toContain('dshx:[&_svg]:size-4')
+      expect(row.className, row.textContent ?? '').toContain('dshx:px-1.5')
+    }
+    // The preset rows: the same column (6px row padding inside a -6px bleed), the same 8px gap.
+    const preset = screen.getByRole('radio', { name: 'All threads' })
+    expect(preset.className).toContain('dshx:px-1.5')
+    expect(preset.className).toContain('dshx:gap-2')
+  })
+
+  it("ends the presets' ⋯ glyph on the same right edge: its 24px box pulled 4px out", () => {
+    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+    expect(optionsMenu).toMatch(/size="icon-xs"[^>]*?className="[^"]*dshx:-mr-1[^"]*"/su)
+  })
+})

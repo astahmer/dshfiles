@@ -6666,7 +6666,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           type="button"
           variant="ghost"
           size="icon-xs"
-          className="dshx:text-muted-foreground"
+          // Its 16px glyph ends on the panel's 12px inset, the edge Reset's label ends on (round 28, item 16).
+          className="dshx:-mr-1 dshx:text-muted-foreground"
           aria-label={`${props.tSidebar('threadSidebarPresetOptions')}: ${activeViewTab?.label ?? ''}`}
         >
           <OverflowGlyph />

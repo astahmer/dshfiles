@@ -167,8 +167,12 @@ const ChipSeat = (props: { readonly on: boolean; readonly filter: ThreadStatusFi
 )
 
 const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
-/** A quiet verb row in a section, its glyph on the preset rows' check column. */
-const QUIET_ROW = 'dshx:-mx-1.5 dshx:justify-start dshx:justify-self-stretch dshx:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:pointer-coarse:h-11'
+/**
+ * A quiet verb row (council round 27, item 16): its 16px glyph on the panel's one glyph column, 12px in (a 6px bleed,
+ * 6px padding), its label 8px after it at 36px, where the preset names start.
+ */
+const QUIET_ROW =
+  'dshx:-mx-1.5 dshx:justify-start dshx:justify-self-stretch dshx:gap-2 dshx:px-1.5 dshx:has-[>svg]:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:[&_svg]:size-4 dshx:pointer-coarse:h-11'
 const HEADING = 'dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
 /** One status group's chips: a wrapping row. */
 const STATUS_ROW = 'dshx:flex dshx:w-full dshx:flex-wrap dshx:gap-1 dshx:pointer-coarse:gap-2'
@@ -206,7 +210,7 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           The phone sheet keeps 20px of its own top padding for the grabber; the header sticks over it (-20px), so no row
           scrolls by above the header. */}
       <div
-        className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:phone:-top-5 dshx:items-center dshx:gap-2 dshx:bg-popover dshx:py-1.5 dshx:pr-1.5 dshx:pl-3 dshx:phone:grid dshx:phone:grid-cols-[1fr_auto_1fr] dshx:phone:px-1"
+        className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:phone:-top-5 dshx:items-center dshx:gap-2 dshx:bg-popover dshx:py-1.5 dshx:pr-0.5 dshx:pl-3 dshx:phone:grid dshx:phone:grid-cols-[1fr_auto_1fr] dshx:phone:px-0.5"
         data-thread-filter-header=""
       >
         <h2 className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:font-medium dshx:phone:text-base dshx:phone:font-semibold">{t('threadSidebarFilters')}</h2>
@@ -292,8 +296,16 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           </ToggleGroup>
           {presets.edited ? (
             // An edited preset offers its two ways out, stacked on the rows' own edge: keep the edits, or drop them.
-            <div className="dshx:grid dshx:justify-items-start dshx:gap-0.5 dshx:pt-1">
-              <Button type="button" size="sm" variant="secondary" className="dshx:min-w-0 dshx:max-w-full" data-preset-save-changes="" onClick={presets.onSaveChanges}>
+            <div className="dshx:grid dshx:gap-0.5 dshx:pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                // The way to keep the edits reads in ink at 500, on the glyph column like its neighbours (round 28, item 16).
+                className={cn(QUIET_ROW, 'dshx:min-w-0 dshx:font-medium dshx:text-foreground')}
+                data-preset-save-changes=""
+                onClick={presets.onSaveChanges}
+              >
                 <SaveIcon aria-hidden="true" />
                 <span className="dshx:truncate">
                   {t('threadSidebarPresetSaveChanges', { name: presets.items.find(item => item.id === presets.activeId)?.label ?? '' })}
@@ -356,7 +368,8 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
               size="sm"
               disabled={action.disabled === true}
               data-section={action.id}
-              className="dshx:justify-start dshx:px-1.5 dshx:font-normal dshx:pointer-coarse:h-11"
+              // The footer's 6px plus the row's 6px: the same glyph column and label x as every quiet row (round 28, item 16).
+              className="dshx:justify-start dshx:gap-2 dshx:px-1.5 dshx:has-[>svg]:px-1.5 dshx:font-normal dshx:[&_svg]:size-4 dshx:pointer-coarse:h-11"
               onClick={action.onSelect}
             >
               <span className="dshx:inline-flex dshx:size-4 dshx:items-center dshx:justify-center dshx:text-muted-foreground" aria-hidden="true">
@@ -488,7 +501,7 @@ const StatusChips = (props: {
         aria-controls={moreId}
         // A status in force never hides: while one of these is on, More stays open and cannot fold.
         disabled={forced}
-        className="dshx:-mx-1.5 dshx:justify-start dshx:justify-self-start dshx:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:pointer-coarse:h-11"
+        className={cn(QUIET_ROW, 'dshx:justify-self-start')}
         onClick={() => setOpened(current => !current)}
         data-thread-status-more=""
       >
