@@ -20,6 +20,9 @@ import { EntityKinds, type EntityPreviewProps } from '@dshfiles/input-trigger/en
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 
+/** The Backlog page and its editor load when the page first opens, not at page boot. */
+const BacklogPanel = lazyView(() => import('./backlog-panel.js').then(module => module.BacklogPanel), { label: 'Backlog' })
+
 import { AgentDispatchProvider } from './agent-dispatch-context.js'
 import { AgentComments, type AgentDispatchPort } from './agent-dispatch.js'
 import { backlogApi, BacklogViews } from './api.js'
@@ -32,7 +35,8 @@ import { BacklogMentionChip } from './backlog-mention-chip.js'
 import { BacklogMentionDropInput } from './backlog-mention-drop.js'
 import { backlogUserTextRule } from './backlog-user-text.js'
 import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
-import { BacklogPanel, type StartThreadPorts } from './backlog-panel.js'
+import type { StartThreadPorts } from './backlog-panel.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { BACKLOG_PANEL_ID } from './panel-draft.js'
 import { backlogInlineReference } from './backlog-inline-reference.js'
 import { RevisionBacklinks, ThreadBacklinks } from './backlinks-chips.js'
