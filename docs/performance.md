@@ -2237,3 +2237,63 @@ dominated by rendering the opened thread, so the saved listener time is below it
 ```sh
 pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/workbench-palette.test.ts src/sidebar-catalog.client.test.tsx
 ```
+
+## Start-up data: labels, settled threads, list columns and event re-reads (2026-11-27)
+
+Round nine, lane D. The live page load (spec measurements, Host PID 56335, read-only) received ~3 MB of start-up API
+data: `session/list` 1.27 MB, `settings/describe` 786 KB in two calls, `settings-shell/bundleLabels` 474 KB,
+`attention/list` 193 KB over 4 calls. Each owner was measured on a scratch DSH built from the branch (`dshx dev up`, all
+owned bundles) with a synthetic corpus shaped like the live one (1,545 Sessions: 280 blank, 1,025 subagent children, 240
+top-level threads; no private text), plus read-only aggregate sizes of the live projection cache and profile.
+
+| Read (page load)                     | Owner and cause                                                                                                   | Before                                         | After                                                        |
+| ------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------ |
+| `settings-shell/bundleLabels`        | every Loader row's title and description in all eight manifest languages, plus the never-shown package description | 1 call, 480.6 KB, 1.6 s (scratch); 474 KB live | `namespaceLabels`: 1 call, 75.5 KB, 10 ms (scratch, English) |
+| `settings/describe` (core, ×2)       | thread-sidebar kept 1,192 settled ids live (1,025 scratch) in its settings namespace, sent as value and user layer | 2 × 391.5 KB (scratch); 2 × 393 KB live        | 2 × 175.3 KB + one `thread-sidebar-settled/read` 108.2 KB    |
+| `session/list`                       | `tokenUsage` listed for every row; its only row reader (stock ui-subagent lineage) is shadowed by thread-sidebar's  | 1.27 MB live (tokenUsage ~163 KB of it)        | ~1.11 MB live estimate (column dropped)                      |
+| `attention/list`                     | a key read before its event stream connected was read again when it went live (dshx resource store)               | 4 calls, 193 KB live                           | 2 calls expected live; scratch never showed the re-read      |
+
+- **Labels.** The page resolves one fallback chain (core `LocaleRuntime.resolveText`: the active locale's chain, then
+  `en`), so `namespaceLabels({ languages })` keeps those languages and drops the package description and every
+  description `namespaceLabelOf` would not show. Each row resolves to the same title and description per chain
+  (`bundle-labels.test.ts`), and on the scratch the base `bundleLabels` answer (404 rows, 417,682 B) and the new
+  `namespaceLabels` answer (77,196 B) resolve, through `namespaceLabelOf`, to the same 404 rows in order and the same
+  363-entry label map the page installs. A language change reads the new chain (the old snapshot kept the previous
+  language's text).
+- **Settled threads.** They now live in a `thread_settled` storage domain (one record per thread) behind the unchanged
+  `SidebarSettings` service; the page reads them through `thread-sidebar-settled` and `usePreferences` merges them, so
+  the list, the dock and the header read the same set. The legacy fields move once, verified by read-back before they
+  are cleared. The status is one record in a `single`-layout domain: a first per-record version took ~2.5 min to write
+  the scratch scan's 1,025 settles (one file each, machine load 10–30) and held the store's lock meanwhile. Scratch, same
+  1,025 settled threads: 783 KB → 459 KB per load. Live estimate: `settings/describe` drops by ~260 KB per call (~520 KB
+  per load) for one ~110 KB settled read, and no settings write re-sends the settled ids again.
+- **`session/list` columns.** Live projection cache, 1,545 records, state bytes of the eight listed columns: tokenUsage
+  163 KB, userQuestions 172 KB, subagentTiming 112 KB, threadSidebarModelRoute 105 KB, subagent 104 KB,
+  sessionListMetadata 97 KB, promptedTurnCount 67 KB, title 50 KB. Only `tokenUsage` had no rendered row reader. The
+  scratch corpus has no projection checkpoints (cold rows list no columns), so the cut is a live estimate.
+- **Event re-reads.** A first read now waits while one of its push sources is still connecting (at most 1 s from the
+  store's subscription; a source reporting it will not connect releases it at once), so going live performs that read
+  instead of repeating it.
+
+Phone probe on the same scratch (`RTT=100 CPU=4 ROWS=4`, four taps each; before at load 15–25 on 10 cores, after at
+8–11, so the page load difference is mostly the machine):
+
+| Phone probe            | Before   | After    |
+| ---------------------- | -------- | -------- |
+| page load              | 23.2 s   | 14.7 s   |
+| tap → title (p50)      | 1,497 ms | 1,341 ms |
+| tap → first message    | 2,551 ms | 2,413 ms |
+| Back → list (p50)      | 1,663 ms | 1,767 ms |
+| calls per Back (p50)   | 8        | 8        |
+
+Still core (Host gap 99): the second `settings/describe`, `permissionPresets/catalog`, `session/modelCatalog` and
+`web/listProviders` reads after the first `connection/reset`; the schemastery `refs` schema is 141 KB of each
+describe answer. Live after-numbers need a build in the canonical checkout and a user restart (Host halves of
+settings-shell and thread-sidebar).
+
+```sh
+pnpm --dir plugins/@dshfiles/settings-shell exec vitest run src/bundle-labels.test.ts
+pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/settled-store.test.ts src/settled-preferences.client.test.tsx
+pnpm --dir plugins/@dshfiles/session-controller exec vitest run tests/client/session-state-eviction.test.ts
+pnpm --dir tooling/dshx/packages/dshx exec vitest run tests/resource-store.spec.ts tests/resource-react.spec.ts
+```
