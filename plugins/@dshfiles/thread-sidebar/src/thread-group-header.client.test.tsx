@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
@@ -101,7 +103,9 @@ describe('ThreadGroupHeader', () => {
     const drafts = readFileSync('src/drafts-section.tsx', 'utf8')
     expect(client).not.toMatch(/Chevron(?:Up|Down)Icon strokeWidth=\{1\.5\} size=\{12\}/u)
     expect(drafts).not.toMatch(/Chevron(?:Up|Down)Icon strokeWidth=\{1\.5\} size=\{12\}/u)
-    expect(client).toContain('<GroupChevron open={!collapsed} last />')
+    // The Custom sections draw it through the standard head since council round 34, B10.
+    expect(client).not.toContain('<GroupChevron open={!collapsed} last />')
+    expect(readFileSync('src/thread-group-header.tsx', 'utf8')).toContain('<GroupChevron\n            open={collapsed !== true}')
     expect(drafts).toContain('<GroupChevron open={props.open} last={!props.cleanable} />')
   })
 
@@ -231,5 +235,65 @@ describe('ThreadGroupHeader', () => {
     expect(header.container.querySelector('[title]')).toBeNull()
     fireEvent.click(create)
     expect(header.startProjectSession).toHaveBeenCalledExactlyOnceWith('long-project')
+  })
+})
+
+// Council round 34, B10 (Fable; Opus and Fable in rounds 30–33): the Custom grouping drew its own heads ("⚡ Active (6)"
+// with a rule and a native tooltip, "Approval needed (1)" as a coloured word) and its rows a second status vocabulary.
+describe('the Custom grouping uses the standard heads and rows (council round 34, B10)', () => {
+  const client = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
+  const t = ((key: string) => key) as Parameters<typeof ThreadGroupHeader>[0]['t']
+
+  it('draws a group that stands for no status with a neutral pill count, its total spoken', () => {
+    render(<ThreadGroupHeader label="Active" count={6} pill collapsed={false} className="" onToggle={vi.fn()} t={t} />)
+    const pill = document.querySelector<HTMLElement>('[data-group-count="plain"]')
+    expect(pill?.textContent).toBe('6')
+    expect(pill?.getAttribute('aria-hidden')).toBe('true')
+    for (const token of ['dshx:rounded-full', 'dshx:bg-muted', 'dshx:h-4.5', 'dshx:text-2xs']) expect(pill?.className).toContain(token)
+    expect(screen.getByRole('button', { name: /Active/u }).textContent).toContain('(6)')
+    expect(screen.getByText('(6)').className).toContain('dshx:sr-only')
+  })
+
+  it('draws a hoisted group that does not fold as the same head with no button and no chevron', () => {
+    render(<ThreadGroupHeader label="Approval needed" count={1} statusCounts={{ needsYou: 1, failed: 0 }} className="" t={t} />)
+    expect(screen.queryByRole('button')).toBeNull()
+    expect(document.querySelector('[data-group-chevron]')).toBeNull()
+    expect(document.querySelector('[data-group-count="needs-you"]')?.textContent).toContain('1')
+    expect(document.querySelector('[data-thread-group-head]')?.className).toContain('dshx:text-muted-foreground')
+  })
+
+  it('passes the Custom sections\' drag and keyboard reorder to its fold button', () => {
+    const onPointerDown = vi.fn()
+    const onKeyDown = vi.fn()
+    render(
+      <>
+        <span id="hint">Drag to reorder</span>
+        <ThreadGroupHeader label="Active" count={2} pill collapsed={false} className="" onToggle={vi.fn()} t={t} toggleProps={{ onPointerDown, onKeyDown, 'aria-describedby': 'hint', className: 'dshx:opacity-70' }} />
+      </>,
+    )
+    const head = screen.getByRole('button', { name: /Active/u })
+    fireEvent.pointerDown(head)
+    fireEvent.keyDown(head, { key: 'ArrowUp', altKey: true })
+    expect(onPointerDown).toHaveBeenCalledOnce()
+    expect(onKeyDown).toHaveBeenCalledOnce()
+    expect(head.getAttribute('aria-describedby')).toBe('hint')
+    expect(head.className).toContain('dshx:opacity-70')
+    expect(head.hasAttribute('title')).toBe(false)
+  })
+
+  it('gives Custom rows the status glyphs and draws its sections and hoisted groups through the standard head', () => {
+    expect(client).toContain("const statusGlyphs = stateGrouping || threadView.groupBy === 'project' || threadView.groupBy === 'status'")
+    const custom = client.slice(client.indexOf("{threadView.groupBy === 'status'\n              ? ("), client.indexOf(': groupedThreadEntries.map(group => {'))
+    expect(custom).toMatch(/<ThreadGroupHeader\s+label=\{props\.tSidebar\(sectionLabels\[section\]\)\}\s+count=\{sectionRows\.length\}\s+pill/u)
+    expect(custom).not.toContain("title={props.tSidebar('threadSidebarSectionReorderHint')}")
+    expect(custom).not.toContain('<GripVerticalIcon')
+    expect(custom).not.toContain('dshx:h-px dshx:flex-1 dshx:bg-border')
+    for (const key of ['threadSidebarInterrupted', 'threadSidebarNeedsResume', 'threadSidebarApprovalNeeded', 'threadSidebarInputNeeded', 'threadSidebarTurnFinished']) {
+      const at = client.indexOf(`aria-label={props.tSidebar('${key}')}>`)
+      expect(at, key).toBeGreaterThan(-1)
+      const head = client.slice(at, at + 500)
+      expect(head, key).toContain('<ThreadGroupHeader')
+      expect(head, key).not.toContain('attentionLabelClass')
+    }
   })
 })

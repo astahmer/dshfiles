@@ -31,7 +31,7 @@ import { ProjectIcon } from '@dshfiles/workspace-folder-picker/project-icon-view
 import { LiveElapsed } from '@dshfiles/plugin-ui/components/live-elapsed'
 import { LiveActivityLine, useLiveTurns, type LiveTurnView } from './live-activity.js'
 import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-lifecycle-api'
-import { GroupChevron, groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
+import { groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
 import { RemoteThreadInventoryModel, useRemoteSidebarThreads, useRemoteThreadArchive, type RemoteSidebarThread } from './remote-thread-inventory.js'
@@ -107,7 +107,6 @@ import { Spinner } from '@dshfiles/plugin-ui/components/ui/spinner'
 import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
-  ActivityIcon,
   AlarmClockIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
@@ -118,17 +117,14 @@ import {
   ChevronRightIcon,
   CircleCheckIcon,
   CircleDashedIcon,
-  CirclePauseIcon,
   FolderIcon,
   GitBranchIcon,
-  GripVerticalIcon,
   LayersIcon,
   LinkIcon,
   ListFilterIcon,
   MailIcon,
   MonitorIcon,
   PanelRightOpenIcon,
-  PauseIcon,
   PinIcon,
   PinOffIcon,
   PlayIcon,
@@ -158,7 +154,6 @@ import {
   useSyncExternalStore,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
-  type ReactNode,
   type CSSProperties,
 } from 'react'
 import { createPortal } from 'react-dom'
@@ -494,15 +489,6 @@ const threadTabFocusEventSchema = Schema.StructWithRest(Schema.Struct({ sessionI
 const noticeClass = 'dshx:w-auto dshx:px-3 dshx:py-2 dshx:text-xs'
 // The list sits on the sidebar fill, so its sticky headers do too (no lighter band over a recessive surface).
 const stickyHeaderClass = 'dshx:sticky dshx:top-0 dshx:z-10 dshx:bg-(--dsw-specific-sidebar-fill)'
-
-const sectionIcons = {
-  pinned: <PinIcon strokeWidth={1.5} size={14} />,
-  active: <ActivityIcon className="dshx:size-3.5" />,
-  parked: <PauseIcon strokeWidth={1.5} size={14} />,
-  settled: <CircleCheckIcon strokeWidth={1.5} size={14} />,
-  inactive: <CirclePauseIcon className="dshx:size-3.5" />,
-  archived: <ArchiveIcon strokeWidth={1.5} size={14} />,
-} satisfies Record<SidebarSection, ReactNode>
 
 const setIncludes = (values: readonly string[]): ReadonlySet<string> => new Set(values)
 
@@ -4364,7 +4350,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const stateGrouping = threadView.groupBy === 'state'
   // Rows keep the status glyphs (and their detail line) when grouped by project, so a project section still says what
   // needs you; only the status grouping sorts and sections by them.
-  const statusGlyphs = stateGrouping || threadView.groupBy === 'project'
+  // The Custom grouping too (council round 34, B10): it drew a second status vocabulary (dots and an inline status word
+  // that cut the title), where every other list draws the glyph and the kind on line 2.
+  const statusGlyphs = stateGrouping || threadView.groupBy === 'project' || threadView.groupBy === 'status'
   const inbox = useInboxThreadSignals({ enabled: statusGlyphs && sessionState.phase === 'ready' })
   /**
    * Resume one row however it stopped: its inbox verb (quota, another provider), its stored quota continuation when the
@@ -4997,6 +4985,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [orderedSections, preferences.separateRemoteThreads, props.openRemoteThreads, remoteRowsBySection, rowsBySection],
   )
   const sectionHeaderRefs = useRef<(HTMLButtonElement | null)[]>([])
+  // How to reorder the Custom sections, said to a screen reader instead of a native tooltip (council round 34, B10).
+  const sectionReorderHintId = useId()
   const commitSectionOrder = (fromShownIndex: number, toShownIndex: number): void => {
     if (fromShownIndex === toShownIndex) return
     changePreferences({
@@ -7573,44 +7563,40 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           ) : null}
           {hoistedInterruptedRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInterrupted')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarInterrupted', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarInterrupted')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({hoistedInterruptedRows.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedInterruptedRows)}>
-                  {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
-                  {props.tSidebar('threadSidebarResumeAll')}
-                </Button>
-              </div>
-              <p className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground">{props.tSidebar('threadSidebarInterruptedHint')}</p>
+              {/* The standard group head (council round 34, B10): a muted label and its status count, not a coloured word. */}
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarInterrupted')}
+                count={hoistedInterruptedRows.length}
+                statusCounts={{ needsYou: 0, failed: hoistedInterruptedRows.length }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+                action={
+                  <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedInterruptedRows)}>
+                    {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                    {props.tSidebar('threadSidebarResumeAll')}
+                  </Button>
+                }
+              >
+                <p className="dshx:px-2.5 dshx:pb-1 dshx:text-xs dshx:text-muted-foreground dshx:phone:px-3">{props.tSidebar('threadSidebarInterruptedHint')}</p>
+              </ThreadGroupHeader>
               {hoistedInterruptedRows.map(session => renderThreadRow(session, 'threadSidebarInterrupted'))}
             </section>
           ) : null}
           {hoistedNeedsResumeRows.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarNeedsResume')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarNeedsResume', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarNeedsResume')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({hoistedNeedsResumeRows.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedNeedsResumeRows)}>
-                  {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
-                  {props.tSidebar('threadSidebarResumeAll')}
-                </Button>
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarNeedsResume')}
+                count={hoistedNeedsResumeRows.length}
+                statusCounts={{ needsYou: hoistedNeedsResumeRows.length, failed: 0 }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+                action={
+                  <Button type="button" size="xs" variant="outline" disabled={resumeAllBusy} onClick={() => void resumeAllAttention(hoistedNeedsResumeRows)}>
+                    {resumeAllBusy ? <Spinner className="dshx:size-3" /> : null}
+                    {props.tSidebar('threadSidebarResumeAll')}
+                  </Button>
+                }
+              />
               {hoistedNeedsResumeRows.map(session => renderThreadRow(session, 'threadSidebarNeedsResume'))}
             </section>
           ) : null}
@@ -7653,56 +7639,46 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           />
           {groupedAttentionRows.approvalNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarApprovalNeeded')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarApprovalNeeded', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarApprovalNeeded')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.approvalNeeded.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarApprovalNeeded')}
+                count={groupedAttentionRows.approvalNeeded.length}
+                statusCounts={{ needsYou: groupedAttentionRows.approvalNeeded.length, failed: 0 }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+              />
               {groupedAttentionRows.approvalNeeded.map(session => renderThreadRow(session, 'threadSidebarApprovalNeeded'))}
             </section>
           ) : null}
           {groupedAttentionRows.inputNeeded.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarInputNeeded')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarInputNeeded', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarInputNeeded')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.inputNeeded.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarInputNeeded')}
+                count={groupedAttentionRows.inputNeeded.length}
+                statusCounts={{ needsYou: groupedAttentionRows.inputNeeded.length, failed: 0 }}
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+              />
               {groupedAttentionRows.inputNeeded.map(session => renderThreadRow(session, 'threadSidebarInputNeeded'))}
             </section>
           ) : null}
           {groupedAttentionRows.turnFinished.length > 0 ? (
             <section className="dshx:mt-1" aria-label={props.tSidebar('threadSidebarTurnFinished')}>
-              <div className={cn(stickyHeaderClass, 'dshx:flex dshx:h-8 dshx:items-center dshx:gap-2 dshx:px-2.5 dshx:text-sm')}>
-                <span
-                  className={cn(
-                    'dshx:whitespace-nowrap dshx:font-medium',
-                    ThreadAttentionPresentationModel.attentionLabelClass('threadSidebarTurnFinished', preferences.attentionColors),
-                  )}
-                >
-                  {props.tSidebar('threadSidebarTurnFinished')}
-                </span>
-                <span className="dshx:text-xs dshx:tabular-nums">({groupedAttentionRows.turnFinished.length})</span>
-                <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-              </div>
+              <ThreadGroupHeader
+                label={props.tSidebar('threadSidebarTurnFinished')}
+                count={groupedAttentionRows.turnFinished.length}
+                status="ready"
+                className={stickyHeaderClass}
+                t={props.tSidebar}
+              />
               {groupedAttentionRows.turnFinished.map(session => renderThreadRow(session, 'threadSidebarTurnFinished'))}
             </section>
           ) : null}
           <div className={cn(isBoard && 'dshx:flex dshx:min-h-full dshx:items-start dshx:gap-3 dshx:overflow-x-auto dshx:pb-2')}>
+            {threadView.groupBy === 'status' ? (
+              <span id={sectionReorderHintId} className="dshx:sr-only">
+                {props.tSidebar('threadSidebarSectionReorderHint')}
+              </span>
+            ) : null}
             {threadView.groupBy === 'status'
               ? (isBoard ? orderedSections.filter(section => section !== 'remote') : renderedSections).map((section, index) => {
                   if (section === 'remote') {
@@ -7776,75 +7752,66 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                       data-thread-board-column={isBoard ? section : undefined}
                       aria-label={isBoard ? `${props.tSidebar(sectionLabels[section])} column` : undefined}
                     >
-                      <button
-                        ref={element => {
-                          sectionHeaderRefs.current[index] = element
-                        }}
-                        type="button"
-                        data-thread-section-header=""
-                        title={props.tSidebar('threadSidebarSectionReorderHint')}
-                        className={cn(
-                          stickyHeaderClass,
-                          'dshx:group dshx:flex dshx:h-8 dshx:w-full dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2.5 dshx:text-sm dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50',
-                          activeRowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
-                          activeRowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
-                          activeSectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
-                        )}
-                        aria-expanded={!collapsed}
-                        onPointerDown={event => {
-                          if (isBoard || event.button !== 0) return
-                          sendDrag({ type: 'section.press', pointerId: event.pointerId, from: index, startY: event.clientY })
-                        }}
-                        onPointerMove={event => {
-                          const gesture = drag.context.section
-                          if (gesture === null || gesture.pointerId !== event.pointerId) return
-                          if (gesture.centers === null) {
-                            if (Math.abs(event.clientY - gesture.startY) < SECTION_DRAG_THRESHOLD_PX) return
-                            event.currentTarget.setPointerCapture(event.pointerId)
-                            sendDrag({ type: 'section.drag', pointerId: event.pointerId, centers: sectionHeaderCenters() })
-                          }
-                          event.preventDefault()
-                          sendDrag({ type: 'section.move', pointerId: event.pointerId, position: event.clientY })
-                        }}
-                        onPointerUp={event => {
-                          const gesture = drag.context.section
-                          if (gesture === null || gesture.pointerId !== event.pointerId) return
-                          sendDrag({ type: 'section.drop', pointerId: event.pointerId, position: event.clientY })
-                        }}
-                        onPointerCancel={() => sendDrag({ type: 'section.end' })}
-                        onLostPointerCapture={() => {
-                          if (drag.matches('section')) sendDrag({ type: 'section.end' })
-                        }}
-                        onKeyDown={event => {
-                          if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
-                          const fromShownIndex = shownSections.indexOf(section)
-                          const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
-                          if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
-                          event.preventDefault()
-                          commitSectionOrder(fromShownIndex, toShownIndex)
-                        }}
-                        onClick={() => {
+                      {/* The standard group head (council round 34, B10): a muted label and a pill count, as every other
+                          grouping draws; a press and drag still reorders the sections, and Alt+Arrow moves one. */}
+                      <ThreadGroupHeader
+                        label={props.tSidebar(sectionLabels[section])}
+                        count={sectionRows.length}
+                        pill
+                        collapsed={collapsed}
+                        className={stickyHeaderClass}
+                        t={props.tSidebar}
+                        onToggle={() => {
                           if (dragActor.getSnapshot().context.suppressed === 'section') {
                             sendDrag({ type: 'suppression.consume' })
                             return
                           }
                           toggleSection(section)
                         }}
-                      >
-                        <span
-                          className="dshx:inline-flex dshx:shrink-0 dshx:opacity-0 dshx:transition-opacity dshx:group-hover:opacity-100 dshx:group-focus-visible:opacity-100"
-                          aria-hidden="true"
-                        >
-                          <GripVerticalIcon className="dshx:size-3 dshx:cursor-grab dshx:active:cursor-grabbing" />
-                        </span>
-                        <span className="dshx:inline-flex dshx:shrink-0" aria-hidden="true">
-                          {sectionIcons[section]}
-                        </span>
-                        <span className="dshx:whitespace-nowrap">{props.tSidebar(sectionLabels[section])}</span>
-                        <span className="dshx:text-xs dshx:tabular-nums">({sectionRows.length})</span>
-                        <span className="dshx:h-px dshx:flex-1 dshx:bg-border" aria-hidden="true" />
-                        <GroupChevron open={!collapsed} last />
-                      </button>
+                        toggleProps={{
+                          ref: element => {
+                            sectionHeaderRefs.current[index] = element
+                          },
+                          'aria-describedby': sectionReorderHintId,
+                          className: cn(
+                            activeRowDrag !== null && 'dshx:ring-1 dshx:ring-ring/20',
+                            activeRowDropSection === section && 'dshx:bg-accent dshx:text-foreground dshx:ring-ring/50',
+                            activeSectionDrag?.from === index && 'dshx:cursor-grabbing dshx:bg-accent dshx:opacity-70',
+                          ),
+                          onPointerDown: event => {
+                            if (isBoard || event.button !== 0) return
+                            sendDrag({ type: 'section.press', pointerId: event.pointerId, from: index, startY: event.clientY })
+                          },
+                          onPointerMove: event => {
+                            const gesture = drag.context.section
+                            if (gesture === null || gesture.pointerId !== event.pointerId) return
+                            if (gesture.centers === null) {
+                              if (Math.abs(event.clientY - gesture.startY) < SECTION_DRAG_THRESHOLD_PX) return
+                              event.currentTarget.setPointerCapture(event.pointerId)
+                              sendDrag({ type: 'section.drag', pointerId: event.pointerId, centers: sectionHeaderCenters() })
+                            }
+                            event.preventDefault()
+                            sendDrag({ type: 'section.move', pointerId: event.pointerId, position: event.clientY })
+                          },
+                          onPointerUp: event => {
+                            const gesture = drag.context.section
+                            if (gesture === null || gesture.pointerId !== event.pointerId) return
+                            sendDrag({ type: 'section.drop', pointerId: event.pointerId, position: event.clientY })
+                          },
+                          onPointerCancel: () => sendDrag({ type: 'section.end' }),
+                          onLostPointerCapture: () => {
+                            if (drag.matches('section')) sendDrag({ type: 'section.end' })
+                          },
+                          onKeyDown: event => {
+                            if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
+                            const fromShownIndex = shownSections.indexOf(section)
+                            const toShownIndex = fromShownIndex + (event.key === 'ArrowUp' ? -1 : 1)
+                            if (fromShownIndex < 0 || toShownIndex < 0 || toShownIndex >= shownSections.length) return
+                            event.preventDefault()
+                            commitSectionOrder(fromShownIndex, toShownIndex)
+                          },
+                        }}
+                      />
                       {!collapsed ? (
                         <VirtualThreadRows
                           entries={sectionRows}
