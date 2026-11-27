@@ -11,7 +11,7 @@
  *   4. does an agent profile under an `additionalDirectories` root narrow the tool set (a mutating builtin must be
  *      gone), and do its `instructions` reach the model?
  *
- * Usage: node plugins/@dshfiles/ai-accounts/scripts/vibe-acp-spike.mjs [--home <VIBE_HOME>] [--binary <vibe-acp>]
+ * Usage: node plugins/@dshfiles/ai-accounts/scripts/vibe-acp-spike.mjs [--home <VIBE_HOME>] [--binary <vibe-acp>] [--model <id>]
  *
  * Exits 1 with the CLI's own stderr when `vibe-acp` cannot start: Vibe 3.1.5 imports ACP symbols
  * (`acp.helpers.ContentBlock`, `AcpMcpServer`, …) that the `agent-client-protocol` release shipped beside it on this
@@ -29,6 +29,7 @@ const flag = name => {
 }
 const home = flag('--home') ?? process.env.VIBE_HOME ?? join(homedir(), '.vibe')
 const binary = flag('--binary') ?? 'vibe-acp'
+const model = flag('--model') ?? 'deepseek-v4-1-flash-1017'
 const root = mkdtempSync(join(tmpdir(), 'vibe-acp-spike-'))
 const workspace = join(root, 'workspace')
 const agentsRoot = join(root, 'agents')
@@ -68,7 +69,7 @@ createInterface({ input: process.stdin }).on('line', async line => {
 const AGENT_PROFILE = `display_name = "DeepSeek Harness spike"
 description = "Read-only Vibe builtins plus DSH's bridged tools."
 instructions = "Every reply must start with the exact token DSHSPIKE and nothing else before it."
-enabled_tools = ["dsh_*", "read_file", "grep", "web_fetch", "web_search", "todo"]
+enabled_tools = ["mcp_dsh.*", "dsh_*", "read_file", "grep", "web_fetch", "web_search", "todo"]
 `
 writeFileSync(join(agentsRoot, '.vibe', 'agents', 'dsh.toml'), AGENT_PROFILE)
 
@@ -96,11 +97,8 @@ child.stderr.on('data', chunk => {
 const send = message => child.stdin.write(`${JSON.stringify(message)}\n`)
 const pending = new Map()
 let nextId = 1
-const request = (method, params) =>
+const request = (method, params, id = nextId++) =>
   new Promise((resolve, reject) => {
-    // oxlint-disable-next-line antislop/no-passthrough-variable -- the id this request owns, fixed before nextId moves on for the next one
-    const id = nextId
-    nextId += 1
     pending.set(id, { resolve, reject })
     send({ jsonrpc: '2.0', id, method, params })
     setTimeout(() => {
@@ -134,14 +132,18 @@ createInterface({ input: child.stdout }).on('line', line => {
     updates.push(update)
     const kind = update.sessionUpdate
     if (kind === 'tool_call')
-      record('acp', `tool_call ${update.toolCallId} ${update.name ?? '(no name)'} status=${update.status} input=${JSON.stringify(update.rawInput ?? null)}`)
+      record(
+        'acp',
+        `tool_call ${update.toolCallId} ${update._meta?.tool_name ?? update.name ?? '(no name)'} status=${update.status} input=${JSON.stringify(update.rawInput ?? null)}`,
+      )
     else if (kind === 'usage_update')
       record('acp', `usage used=${update.used} size=${update.size} cost=${JSON.stringify(update.cost ?? null)} meta=${JSON.stringify(update._meta ?? null)}`)
     else if (kind === 'tool_call_update') record('acp', `tool_call_update ${update.toolCallId} ${update.status}`)
     else if (kind === 'agent_message_chunk') record('acp', `text ${JSON.stringify(update.content?.text ?? '')}`)
     else if (kind === 'agent_thought_chunk') record('acp', 'thought')
     else record('acp', kind)
-    if (kind === 'tool_call' && String(update.name ?? '').startsWith('dsh_')) writeFileSync(sentinel, String(Date.now()))
+    // Vibe 3.1.5 names a bridged call only in `_meta.tool_name` (`mcp_dsh.<tool>`).
+    if (kind === 'tool_call' && String(update._meta?.tool_name ?? update.name ?? '').startsWith('mcp_dsh.')) writeFileSync(sentinel, String(Date.now()))
     return
   }
   if (message.method === 'session/request_permission') {
@@ -230,17 +232,17 @@ const main = async () => {
     const options = await open()
     const agentIds = (options.find(option => option.id === 'agent')?.options ?? []).map(option => option.value)
     if (agentIds.includes('dsh')) await select('agent', 'dsh')
-    await select('model', 'mistral-medium-latest')
+    await select('model', model)
 
     // A tool call the DSH route must see, and the bridge must not be able to answer before it does.
-    const first = await prompt('Call the tool named dsh_echo with the value "ping". Then reply with what it returned.')
+    const first = await prompt('Call the tool named mcp_dsh.echo with the value "ping". Then reply with what it returned.')
     const toolCalls = first.updates.filter(update => update.sessionUpdate === 'tool_call')
     const usage = first.updates.filter(update => update.sessionUpdate === 'usage_update')
 
     // A mutating builtin the managed profile must have dropped.
     const sneaky = join(root, 'sneaky.txt')
     const second = await prompt(`Create the file ${sneaky} containing "hi" using your write_file tool. Then say done.`)
-    const builtinCalls = second.updates.filter(update => update.sessionUpdate === 'tool_call').map(update => update.name)
+    const builtinCalls = second.updates.filter(update => update.sessionUpdate === 'tool_call').map(update => update._meta?.tool_name ?? update.name)
 
     report([
       `binary        ${binary}`,
@@ -251,7 +253,7 @@ const main = async () => {
       `agent option  ${JSON.stringify(agentIds)} (dsh discovered: ${String(agentIds.includes('dsh'))})`,
       '',
       '--- prompt 1: tool call ---',
-      `tool_calls    ${JSON.stringify(toolCalls.map(update => ({ id: update.toolCallId, name: update.name, status: update.status, input: update.rawInput })))}`,
+      `tool_calls    ${JSON.stringify(toolCalls.map(update => ({ id: update.toolCallId, name: update._meta?.tool_name ?? update.name, status: update.status, input: update.rawInput })))}`,
       `stopReason    ${first.result?.stopReason}`,
       `usage result  ${JSON.stringify(first.result?.usage ?? null)}`,
       `usage updates ${JSON.stringify(usage.map(update => ({ used: update.used, size: update.size, cost: update.cost, meta: update._meta })))}`,

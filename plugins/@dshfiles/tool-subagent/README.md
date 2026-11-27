@@ -96,7 +96,7 @@ gate set).
 The guard listens at the loop's awaited `agent/turn-stopping` event in a delegated child's own turn. When that turn
 
 1. is `completed` and in a Session whose header `origin` is `subagent`,
-2. made fewer than `minToolCalls` tool calls, and
+2. made no file change and no commit of its own, and
 3. closed with text matching `handBackPatterns` (case-insensitive regular expressions),
 
 it steers one continuing message (`resumeMessage`) instead of letting the turn close. The loop re-reads its inbox,
@@ -104,9 +104,14 @@ runs another step in the same turn, and only then can the child settle; the pare
 result. Each child may receive at most `maxResumes` messages. After that the guard reports normally and notes the
 hand-back to the parent once, so a real blocker costs at most two extra steps instead of vanishing.
 
-A turn that made `minToolCalls` calls is ordinary work, whatever it says, and a turn that closes with ordinary text is
-never touched: the guard cannot fire on a normal finish. It costs one regex test on the closing message of a completed
-turn.
+The wording decides, not the tool count: on 2026-11-27 23:20 a `gpt-6.1-terra` child fetched, rebased and installed
+(more than `minToolCalls` calls), then closed with "remains unfinished; no implementation changes made in this turn … Do not
+land the WIP" — three calls had been enough to call that turn work, so the guard stayed quiet. A hand-back is now
+resumed whatever the count. What protects real work is evidence, not volume: a call to an `edit`/`write`/`apply_patch`
+tool (`fileChangeTools`) or a shell call running `jj describe`, `jj commit` or `git commit` marks the turn as work, so
+its closing wording is a report and is never resumed. `minToolCalls` survives as the silent-quit trigger: no closing
+text at all and fewer calls than that is a quit too (`0` drops it). A turn that closes with ordinary text is never
+touched, so the guard cannot fire on a normal finish.
 
 ```yaml
 # profiles/web/cordis.patch.yml, inside the preset-standard `delegation` group
@@ -117,9 +122,10 @@ turn.
     toolName: subagent
     childTurnGuard:
       enabled: true # false is the off switch
-      minToolCalls: 3 # a turn with this many tool calls is work; 0 guards any count
+      minToolCalls: 3 # resumes a turn that quit with no closing text and fewer calls; 0 drops it
       maxResumes: 2 # continuing messages one child may receive
-      handBackPatterns: ['reassign', 'cannot implement', 'no implementation', 'hand[- ]?off', 'take over']
+      fileChangeTools: ['apply_patch', 'edit', 'write'] # a call here is work, never resumed
+      handBackPatterns: ['reassign', 'cannot implement', 'no implementation', 'unfinished', 'do not land', 'hand[- ]?off', 'take over']
       resumeMessage: 'You stopped without implementing. Continue: the next step.'
 ```
 
@@ -130,8 +136,9 @@ under a preset without this package, or a composition that renames the tool, has
 any `childTurnGuard` block; a Host restart is needed once after the row changes.
 
 `src/child-turn-guard.test.ts` drives a scripted child through the real agent loop and spawn backend: one hand-back
-then work, three hand-backs hitting the budget with the parent notice, a busy turn whose wording reads like a
-hand-back, a normal finish, and the off switch. The decision rules are unit-tested beside it.
+then work, three hand-backs hitting the budget with the parent notice, the live miss (fetch, rebase and install calls,
+then a hand-back that also says not to land), a hand-back after an `edit` and after a `jj describe` (never resumed), a
+normal finish, and the off switch. The decision rules and the per-call classification are unit-tested beside it.
 
 ## Wiring
 

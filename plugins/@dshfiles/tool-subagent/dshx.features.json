@@ -101,8 +101,8 @@
     {
       "id": "child-turn-guard",
       "title": "Keep a delegated child working when its turn hands the task back",
-      "summary": "A subagent that stops early and hands its task back is asked to keep working, a bounded number of times.",
-      "details": "A delegated child that ends a turn as completed after fewer than minToolCalls tool calls while its closing text hands the task back (reassign, cannot complete, no implementation, hand back, take over) receives one continuing message at the loop's turn-stopping boundary, so the same turn runs another step instead of the parent receiving a hand-back as the child's result. The guard is bounded per child: after maxResumes messages it reports the completion normally and notes the hand-back to the parent. A turn that made enough tool calls, or that closed with ordinary text, is never touched.",
+      "summary": "A subagent that hands its task back before doing real work is asked to keep working, a bounded number of times.",
+      "details": "A delegated child that ends a turn as completed while its closing text hands the task back (reassign, cannot complete, no implementation, unfinished, remains unverified, do not land, not implemented, hand back, take over) receives one continuing message at the loop's turn-stopping boundary, so the same turn runs another step instead of the parent receiving a hand-back as the child's result. The wording decides, not the tool count: a turn that fetched, rebased and installed and then handed back is resumed too. A turn that already changed files (fileChangeTools) or ran jj describe/jj commit is real work and is never resumed, and minToolCalls only resumes a turn that quit with no closing text. The guard is bounded per child: after maxResumes messages it reports the completion normally and notes the hand-back to the parent.",
       "surfaces": ["host"],
       "configuration": [
         {
@@ -114,8 +114,8 @@
         {
           "key": "childTurnGuard.minToolCalls",
           "defaultValue": "3",
-          "constraints": "Non-negative integer; a turn with at least this many tool calls is ordinary work, 0 guards any tool count.",
-          "coveredBy": ["tool-subagent.guard-busy-turn"]
+          "constraints": "Non-negative integer; resumes a turn that quit with no closing text and fewer calls than this. A hand-back is resumed whatever the count; 0 drops the silent-quit trigger.",
+          "coveredBy": ["tool-subagent.guard-silent-quit"]
         },
         {
           "key": "childTurnGuard.maxResumes",
@@ -125,9 +125,15 @@
         },
         {
           "key": "childTurnGuard.handBackPatterns",
-          "defaultValue": "reassign, cannot complete, no implementation, not implemented yet, hand back, handoff, take over",
+          "defaultValue": "reassign, cannot complete, no implementation, unfinished, remains unverified, do not land, not implemented, hand back, handoff, take over",
           "constraints": "Case-insensitive regular expression sources; an invalid source is reported and skipped.",
           "coveredBy": ["tool-subagent.guard-patterns"]
+        },
+        {
+          "key": "childTurnGuard.fileChangeTools",
+          "defaultValue": "apply_patch, edit, write, str_replace_editor",
+          "constraints": "Non-empty array of tool names, matched without their namespace; a turn with any of these calls is work, so its hand-back wording is never resumed.",
+          "coveredBy": ["tool-subagent.guard-already-worked"]
         },
         {
           "key": "childTurnGuard.resumeMessage",
@@ -136,10 +142,11 @@
           "coveredBy": ["tool-subagent.guard-resume"]
         }
       ],
-      "states": ["off", "hand-back-resumed", "budget-exhausted", "ordinary-finish"],
+      "states": ["off", "hand-back-resumed", "silent-quit-resumed", "budget-exhausted", "already-worked", "ordinary-finish"],
       "failureModes": [
         "A child spawned under a preset without this package has no guard; its hand-back stays a completed result.",
         "Only a completed stop boundary is inspected: an errored or aborted child turn already reports itself.",
+        "A file-changing tool outside childTurnGuard.fileChangeTools is not recognized, so such a turn's hand-back costs up to maxResumes extra steps.",
         "A real blocker reported as a hand-back costs up to maxResumes extra steps before the parent sees it."
       ],
       "externalDependencies": [],
@@ -152,9 +159,33 @@
         },
         {
           "kind": "unit-test",
-          "id": "tool-subagent.guard-busy-turn",
+          "id": "tool-subagent.guard-live-miss",
           "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
-          "testName": "never touches a busy turn whose closing text happens to read like a hand-back"
+          "testName": "resumes the live miss: fetch, rebase and install, then a hand-back that also says not to land"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-already-worked",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "does not resume a hand-back from a turn that already changed files or committed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-work-kind",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "tells a file change and a commit from a plain call, whatever the tool namespace"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-silent-quit",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "resumes a silent quit under minToolCalls, and only the budget bounds the resumes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-call-count",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "resumes a hand-back whatever the tool count, unless the turn already changed files or committed"
         },
         {
           "kind": "unit-test",

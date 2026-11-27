@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message, type Model } from '@earendil-works/pi-ai'
 import { defineTool } from '@dshfiles/dshx/host'
@@ -31,10 +32,16 @@ afterEach(async () => {
 })
 
 /** The calling DSH session as the Host resolves it: its file mode, and an approval answer recorded per tool. */
-const callingSession = (input: { readonly fileMode: VibeCallingSession['fileMode']; readonly answer: boolean; readonly asks: string[] }) =>
+const callingSession = (input: {
+  readonly fileMode: VibeCallingSession['fileMode']
+  readonly answer: boolean
+  readonly asks: string[]
+  readonly writableRoots?: readonly string[]
+}) =>
   vibeBuiltinAuthorizer({
     session: () => ({
       fileMode: input.fileMode,
+      writableRoots: input.writableRoots ?? [],
       ask: async ask => {
         input.asks.push(ask.toolName)
         return input.answer
@@ -92,16 +99,33 @@ describe('the Vibe ACP route', () => {
     expect(fake.events().filter(event => event.startsWith('session/new '))).toHaveLength(1)
   })
 
-  it('runs Vibe with the managed agent profile: DSH instructions, read-only builtins and DSH tools listed, the account home', async () => {
+  it('runs Vibe with the managed agent profile: DSH instructions, DSH tools and the builtins the route gates listed, the account home', async () => {
     const { cli, fake, model } = setup('/synthetic/work-home')
     await finished(cli.stream(model(), context([{ role: 'user', content: 'plain answer', timestamp: 1 }]), { sessionId: 'profile' }))
     const profile = managedProfile(fake)
     expect(profile.roots[0]).toContain('dsh-vibe-acp-')
     expect(profile.toml).toContain('instructions = "You are inside DSH."')
-    expect(profile.toml).toContain('enabled_tools = ["mcp_dsh.*","dsh_*","read_file","grep","web_fetch","web_search","todo","search_tool_functions","skill"]')
-    for (const mutation of ['write_file', 'edit', 'bash', 'run_typescript', 'git_bash', 'powershell', 'task', 'ask_user_question'])
+    // Vibe denies a builtin its catalogue lacks before asking the route, so the gated ones must stay listed.
+    expect(profile.toml).toContain(
+      'enabled_tools = ["mcp_dsh.*","dsh_*","read_file","grep","web_fetch","web_search","todo","search_tool_functions","skill","bash","write_file","edit"]',
+    )
+    for (const mutation of ['run_typescript', 'git_bash', 'powershell', 'task', 'ask_user_question'])
       expect(profile.toml).not.toMatch(new RegExp(`"${mutation}"`, 'u'))
     expect(fake.events()).toContain('set_config_option agent=dsh')
+  })
+
+  it('tells Vibe to use the bridged DSH tools for shell and file work instead of its own builtins', async () => {
+    const { cli, fake, model } = setup()
+    const dshTool = (name: string) => ({ name, description: name, parameters: { type: 'object', properties: {} } })
+    const tools = [dshTool('bash'), dshTool('write'), dshTool('read'), dshTool('todo_write')]
+    const messages: Message[] = [{ role: 'user', content: 'plain answer', timestamp: 1 }]
+    await finished(cli.stream(model(), normalizeContext({ systemPrompt: 'You are inside DSH.', tools: tools as never, messages }), { sessionId: 'guided' }))
+    // The profile holds the instructions as one JSON string, so the guidance follows DSH's prompt inside it.
+    const instructions = /^instructions = (.*)$/mu.exec(managedProfile(fake).toml)?.[1] ?? ''
+    expect(instructions.startsWith(JSON.stringify('You are inside DSH.\n\n# Tools on this route\n').slice(0, -1))).toBe(true)
+    expect(instructions).toContain('use them (`mcp_dsh.bash`, `mcp_dsh.read`, `mcp_dsh.write`)')
+    expect(instructions).toContain("Do not use Vibe's own bash, write_file, edit, read_file or grep for project work")
+    expect(instructions).not.toContain('todo_write')
   })
 
   it('refuses to run a step when Vibe did not load the managed profile instead of leaving its own tools enabled', async () => {
@@ -208,6 +232,53 @@ describe('the Vibe ACP route', () => {
     expect(textOf(reply)).toBe(ran ? 'bash ran' : 'tool_denied: Tool execution denied by approval callback')
   })
 
+  it('runs Vibe s own shell and file writes in a subagent of a full-access session whose approvals are off, without asking', async () => {
+    const asks: string[] = []
+    const { cli, fake, model } = setup('/synthetic/vibe-home', { authorizeBuiltin: callingSession({ fileMode: 'danger-full-access', answer: false, asks }) })
+    const bash = await finished(cli.stream(model(), context([{ role: 'user', content: 'BUILTIN_BASH', timestamp: 1 }]), { sessionId: 'child-bash' }))
+    expect(textOf(bash)).toBe('bash ran')
+    const write = await finished(
+      cli.stream(model(), context([{ role: 'user', content: 'BUILTIN_WRITE_FILE /synthetic/elsewhere/vibe-smoke.txt', timestamp: 1 }]), {
+        sessionId: 'child-write',
+      }),
+    )
+    expect(textOf(write)).toBe('write_file ran')
+    expect(fake.events()).not.toContain('denied-by-policy bash')
+    expect(asks).toEqual([])
+  })
+
+  it.each([
+    { write: 'inside the workspace, approvals off', target: 'inside', approvals: 'session', answer: false, asked: false, ran: true },
+    { write: 'outside the workspace, approvals off', target: 'outside', approvals: 'session', answer: false, asked: true, ran: false },
+    { write: 'through a symlink leaving the workspace, approvals off', target: 'escape', approvals: 'session', answer: false, asked: true, ran: false },
+    { write: 'outside the workspace, user approves', target: 'outside', approvals: 'session', answer: true, asked: true, ran: true },
+    { write: 'inside the workspace, builtin approvals set to ask', target: 'inside', approvals: 'ask', answer: true, asked: true, ran: true },
+  ] as const)(
+    'confines Vibe s own file writes in a workspace-write session as DSH confines its own ($write)',
+    async ({ target, approvals, answer, asked, ran }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-acp-workspace-')))
+      const outside = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-acp-outside-')))
+      directories.push(root, outside)
+      mkdirSync(join(root, 'src'))
+      symlinkSync(outside, join(root, 'link'))
+      const path = {
+        inside: join(root, 'src', 'new', 'vibe-smoke.txt'),
+        outside: join(outside, 'vibe-smoke.txt'),
+        escape: join(root, 'link', 'vibe-smoke.txt'),
+      }[target]
+      const asks: string[] = []
+      const { cli, model } = setup('/synthetic/vibe-home', {
+        settings: () => ({ acpApprovalPolicy: approvals, strictTools: false }),
+        authorizeBuiltin: callingSession({ fileMode: 'workspace-write', answer, asks, writableRoots: [root] }),
+      })
+      const reply = await finished(
+        cli.stream(model(), context([{ role: 'user', content: `BUILTIN_WRITE_FILE ${path}`, timestamp: 1 }]), { sessionId: 'confined' }),
+      )
+      expect(asks).toEqual(asked ? ['write_file'] : [])
+      expect(textOf(reply)).toBe(ran ? 'write_file ran' : 'tool_denied: Tool execution denied by approval callback')
+    },
+  )
+
   it('runs Vibe s read-only builtins without asking, or asks for each one when builtin approvals are set to ask', async () => {
     const quiet: string[] = []
     const following = setup('/synthetic/vibe-home', { authorizeBuiltin: callingSession({ fileMode: 'read-only', answer: false, asks: quiet }) })
@@ -247,7 +318,7 @@ describe('the Vibe ACP route', () => {
     const reply = await finished(cli.stream(model(), context([{ role: 'user', content: 'PERMISSION_READ', timestamp: 1 }]), { sessionId: 'strict' }))
     const profile = managedProfile(fake)
     expect(profile.toml).toContain('enabled_tools = ["mcp_dsh.*","dsh_*"]')
-    expect(textOf(reply)).toBe('builtin denied')
+    expect(textOf(reply)).toBe('tool_denied: Tool execution denied by approval policy')
     expect(asks).toEqual([])
     cli.retainAccounts(new Map())
     expect(cli.processCount).toBe(0)

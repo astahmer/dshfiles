@@ -610,7 +610,7 @@
           "kind": "unit-test",
           "id": "ai-accounts.vibe-acp-managed-profile",
           "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
-          "testName": "runs Vibe with the managed agent profile: DSH instructions, read-only builtins and DSH tools listed, the account home"
+          "testName": "runs Vibe with the managed agent profile: DSH instructions, DSH tools and the builtins the route gates listed, the account home"
         },
         {
           "kind": "unit-test",
@@ -635,6 +635,24 @@
           "id": "ai-accounts.vibe-acp-builtin-approval",
           "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
           "testName": "runs Vibe s own shell as the calling session allows a native one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-full-access-subagent",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "runs Vibe s own shell and file writes in a subagent of a full-access session whose approvals are off, without asking"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-workspace-write",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "confines Vibe s own file writes in a workspace-write session as DSH confines its own"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-bridged-tool-guidance",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "tells Vibe to use the bridged DSH tools for shell and file work instead of its own builtins"
         },
         {
           "kind": "unit-test",

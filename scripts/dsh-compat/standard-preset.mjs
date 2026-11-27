@@ -45,7 +45,7 @@ export const OVERRIDES = [
     name: '@dshfiles/tool-subagent',
     addConfig: { childTurnGuard: { enabled: true, minToolCalls: 3, maxResumes: 2 } },
     reason:
-      'owned fork: child model routes follow the Subagents setting in running threads (b:rmkm), and the child turn guard resumes a child that hands its task back (enabled: false is its off switch, plugins/@dshfiles/tool-subagent/README.md#the-child-turn-guard)',
+      'owned fork: child model routes follow the Subagents setting in running threads (b:rmkm), and the child turn guard resumes a child that hands its task back (enabled: false is its off switch; a turn that edited files or committed is never resumed, and minToolCalls only resumes a turn that quit with no closing text; plugins/@dshfiles/tool-subagent/README.md#the-child-turn-guard)',
   },
   { id: 'tool-subagent-fork', name: '@dshfiles/tool-subagent', reason: 'the same owned fork for subagent_fork' },
   {

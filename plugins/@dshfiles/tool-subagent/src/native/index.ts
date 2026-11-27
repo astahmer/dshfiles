@@ -87,10 +87,13 @@ export interface Config extends PresetSelectionConfig {
   maxDepth?: number | 'provider-managed'
   /**
    * Keep a delegated child working when its completed turn hands the task back
-   * ("no implementation yet, please reassign") instead of implementing it.
-   * A child turn that made `minToolCalls` calls is ordinary work whatever it
-   * says; at most `maxResumes` continuing messages are steered, then the parent
-   * is told. `enabled: false` is the off switch.
+   * ("no implementation yet, please reassign") instead of implementing it. A
+   * closing text matching `handBackPatterns` is resumed whatever the tool count,
+   * unless that turn already changed files or committed (`fileChangeTools`, or a
+   * `jj describe`/`jj commit` in a shell call); `minToolCalls` only resumes a turn
+   * that quit with no closing text at all. At most `maxResumes` continuing
+   * messages are steered, then the parent is told. `enabled: false` is the off
+   * switch.
    */
   childTurnGuard?: ChildTurnGuardRow
 }
@@ -122,6 +125,7 @@ export const Config: z<Config> = z.object({
     minToolCalls: z.natural().max(Number.MAX_SAFE_INTEGER).default(ChildTurnGuard.DEFAULT.minToolCalls),
     maxResumes: z.natural().max(Number.MAX_SAFE_INTEGER).default(ChildTurnGuard.DEFAULT.maxResumes),
     handBackPatterns: z.array(z.string()).default(undefined as unknown as string[]),
+    fileChangeTools: z.array(z.string().min(1)).min(1).default(undefined as unknown as string[]),
     resumeMessage: z.string().min(1).default(ChildTurnGuard.DEFAULT.resumeMessage),
   }).default(undefined as unknown as ChildTurnGuardRow),
 })

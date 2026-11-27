@@ -138,7 +138,7 @@
 # BEGIN DERIVED preset-standard (node scripts/dsh-compat/standard-preset.mjs --write)
 # Generated from @deepseek-ai/dsh-web-app 0.2.2-rc.2 presets/standard.patch.yml; do not edit by hand. A patch
 # replaces a row's whole config, so this restates the shipped preset with these changes:
-#   tool-subagent: owned fork: child model routes follow the Subagents setting in running threads (b:rmkm), and the child turn guard resumes a child that hands its task back (enabled: false is its off switch, plugins/@dshfiles/tool-subagent/README.md#the-child-turn-guard)
+#   tool-subagent: owned fork: child model routes follow the Subagents setting in running threads (b:rmkm), and the child turn guard resumes a child that hands its task back (enabled: false is its off switch; a turn that edited files or committed is never resumed, and minToolCalls only resumes a turn that quit with no closing text; plugins/@dshfiles/tool-subagent/README.md#the-child-turn-guard)
 #   tool-subagent-fork: the same owned fork for subagent_fork
 #   tool-ask-user: owned fork that tells the model the form renders markdown and html previews (b:6); timed mode lets a question stay answerable while the agent works (timeout -1 blocks)
 #   skill-filesystem: stock points customSkillDirs at @deepseek-ai/dsh-agent-preset resolved from the patch file; from a profile patch that package does not resolve and the expression would break the whole preset, so this row keeps the default skill directories

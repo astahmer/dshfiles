@@ -2,15 +2,18 @@
  * Turn-quality guard for delegated children.
  *
  * A provider that reads a long brief as a handoff can finish its turn as
- * `completed` after a few setup calls and answer "no implementation yet, please
- * reassign". The parent then sees a healthy completion and a child that never
- * started. This module decides, from the child's own turn, whether that
- * completed turn is such a hand-back; the Host wiring turns the verdict into a
- * continuing message.
+ * `completed` answering "no implementation yet, please reassign". The parent
+ * then sees a healthy completion and a child that never started. This module
+ * decides, from the child's own turn, whether that completed turn handed the
+ * task back; the Host wiring turns the verdict into a continuing message.
  *
- * The decision is data, not a counter of failures: a turn that made enough tool
- * calls is work whatever it says, and a turn whose closing text does not hand
- * the task back is a normal finish and is never touched.
+ * The decision is data, not a counter of failures. A closing text that matches a
+ * hand-back pattern is a hand-back whatever the tool count: a child can spend
+ * its turn on setup (fetch, rebase, install) and still hand back, which is how
+ * the guard missed a real one on 2026-11-27. Only a turn that already changed
+ * files or committed has advanced the task, so its wording is a report and is
+ * never resumed. `minToolCalls` stays as the extra trigger for a turn that quit
+ * silently: no closing text and fewer calls than that is a quit too.
  *
  * @module @dshfiles/tool-subagent/child-turn-guard
  */
@@ -20,14 +23,20 @@ export interface ChildTurnGuardConfig {
   /** Whether the guard runs at all; `false` is the off switch. */
   readonly enabled?: boolean
   /**
-   * Tool calls that make one turn ordinary work. A turn with at least this many
-   * calls is never resumed; `0` drops the tool-count condition entirely.
+   * Tool calls that make one turn ordinary work. A hand-back is resumed whatever
+   * this count is; a turn that closes with no text and fewer calls than this is a
+   * silent quit and is resumed too. `0` drops the silent-quit trigger.
    */
   readonly minToolCalls?: number
   /** Continuing messages one child may receive before the parent is told instead. */
   readonly maxResumes?: number
   /** Case-insensitive regular expressions that recognize a hand-back in the closing text. */
   readonly handBackPatterns?: readonly string[]
+  /**
+   * Tool names whose calls change files. A turn with any of them has advanced the
+   * task, so a hand-back wording in the same turn is a report, not a hand-back.
+   */
+  readonly fileChangeTools?: readonly string[]
   /** The message steered into a child that handed its task back. */
   readonly resumeMessage?: string
 }
@@ -55,6 +64,7 @@ export interface ChildTurnGuardRow {
   minToolCalls?: number
   maxResumes?: number
   handBackPatterns?: string[]
+  fileChangeTools?: string[]
   resumeMessage?: string
 }
 
@@ -64,12 +74,23 @@ export interface ChildTurnGuardPolicy {
   readonly minToolCalls: number
   readonly maxResumes: number
   readonly handBackPatterns: readonly string[]
+  readonly fileChangeTools: readonly string[]
   readonly resumeMessage: string
+}
+
+/** One `tool/call` a child made in this turn, as the Session event recorded it. */
+export interface TurnToolCall {
+  readonly name: string
+  readonly arguments: string
 }
 
 /** One child turn as the guard read it: how much work it did and how it closed. */
 export interface TurnObservation {
   readonly toolCalls: number
+  /** Calls that changed files in this turn. */
+  readonly fileChanges: number
+  /** Shell calls that ran `jj describe`/`jj commit` or `git commit` in this turn. */
+  readonly commits: number
   readonly closingText: string
 }
 
@@ -82,6 +103,12 @@ export interface CompiledHandBackPatterns {
   readonly rejected: readonly string[]
 }
 
+/** How the tracker tells a turn's file changes and commits from its plain calls. */
+export interface TurnWorkRules {
+  readonly fileChangeTools: ReadonlySet<string>
+  readonly commitCommands: RegExp
+}
+
 /** One completed turn, as the wiring asks the guard to judge it. */
 export interface GuardVerdictInput {
   readonly policy: ChildTurnGuardPolicy
@@ -90,9 +117,26 @@ export interface GuardVerdictInput {
   readonly resumesUsed: number
 }
 
+/** The native tools that write files, including the visible-filesystem editor. */
+const DEFAULT_FILE_CHANGE_TOOLS: readonly string[] = ['apply_patch', 'edit', 'write', 'str_replace_editor']
+
+/** Shell tools: a commit is run through one of them, never as a dedicated tool. */
+const SHELL_TOOLS: ReadonlySet<string> = new Set(['bash', 'exec_command', 'powershell', 'pwsh', 'run_command', 'sh', 'shell', 'terminal_send', 'zsh'])
+
+/** A shell call that records the turn's work on the repository. */
+const COMMIT_COMMANDS = /\b(?:jj\s+(?:describe|commit)|git\s+commit)\b/u
+
+/** The tool name without its namespace: `tool:edit` and `mcp_dsh.edit` both read as `edit`. */
+const bareToolName = (name: string): string =>
+  name
+    .slice(Math.max(name.lastIndexOf('.'), name.lastIndexOf(':')) + 1)
+    .trim()
+    .toLowerCase()
+
 /**
  * The guard's decision rules, as one policy object: defaults, config merge,
- * hand-back matching and the verdict for one completed child turn.
+ * hand-back matching, per-call classification and the verdict for one completed
+ * child turn.
  */
 export class ChildTurnGuard {
   static readonly DEFAULT: ChildTurnGuardPolicy = {
@@ -104,11 +148,15 @@ export class ChildTurnGuard {
       'cannot complete',
       "can't complete",
       'no implementation',
-      'not implemented yet',
+      'unfinished',
+      'remains unverified',
+      'do not land',
+      'not implemented',
       'hand(?:ing|ed)? back',
       'hand[- ]?off',
       'take over',
     ],
+    fileChangeTools: DEFAULT_FILE_CHANGE_TOOLS,
     resumeMessage: DEFAULT_RESUME_MESSAGE,
   }
 
@@ -137,8 +185,25 @@ export class ChildTurnGuard {
       minToolCalls: ChildTurnGuard.boundedCount(config?.minToolCalls, ChildTurnGuard.DEFAULT.minToolCalls),
       maxResumes: ChildTurnGuard.boundedCount(config?.maxResumes, ChildTurnGuard.DEFAULT.maxResumes),
       handBackPatterns: config?.handBackPatterns ?? ChildTurnGuard.DEFAULT.handBackPatterns,
+      fileChangeTools: config?.fileChangeTools ?? ChildTurnGuard.DEFAULT.fileChangeTools,
       resumeMessage: config?.resumeMessage ?? ChildTurnGuard.DEFAULT.resumeMessage,
     }
+  }
+
+  /** The rules one tracker needs to tell a turn's work from its plain calls. */
+  static workRules(policy: ChildTurnGuardPolicy): TurnWorkRules {
+    return {
+      fileChangeTools: new Set(policy.fileChangeTools.map(bareToolName)),
+      commitCommands: COMMIT_COMMANDS,
+    }
+  }
+
+  /** Whether one tool call advanced the task, by changing a file or committing. */
+  static workKind(call: TurnToolCall, rules: TurnWorkRules): 'file-change' | 'commit' | 'other' {
+    const name = bareToolName(call.name)
+    if (rules.fileChangeTools.has(name)) return 'file-change'
+    if (SHELL_TOOLS.has(name) && rules.commitCommands.test(call.arguments)) return 'commit'
+    return 'other'
   }
 
   /** Whether this closing text hands the task back instead of reporting work. */
@@ -149,16 +214,19 @@ export class ChildTurnGuard {
   /**
    * Decide one completed child turn.
    *
-   * Order matters: a closing text that is not a hand-back is a normal finish
-   * whatever the tool count, and a turn that made enough calls is work however
-   * it is worded. Only the remaining hand-backs spend resume budget.
+   * Order matters: a turn that changed files or committed is work whatever its
+   * closing text says. Past that, a closing text that matches a hand-back is a
+   * hand-back at any tool count, and a text-less turn with fewer than
+   * `minToolCalls` calls is a silent quit. Only those spend resume budget.
    */
   static verdict(input: GuardVerdictInput): GuardVerdict {
     const observation = input.observation
-    if (observation === undefined || observation.closingText.trim().length === 0) return 'not-hand-back'
-    if (!ChildTurnGuard.matches(observation.closingText, input.patterns)) return 'not-hand-back'
-    // minToolCalls 0 means "guard any tool count", not "no turn counts as work".
-    if (input.policy.minToolCalls > 0 && observation.toolCalls >= input.policy.minToolCalls) return 'worked'
+    if (observation === undefined) return 'not-hand-back'
+    if (observation.fileChanges > 0 || observation.commits > 0) return 'worked'
+    const closing = observation.closingText.trim()
+    const handBack = closing.length > 0 && ChildTurnGuard.matches(observation.closingText, input.patterns)
+    const silentQuit = closing.length === 0 && input.policy.minToolCalls > 0 && observation.toolCalls < input.policy.minToolCalls
+    if (!handBack && !silentQuit) return 'not-hand-back'
     if (input.resumesUsed >= input.policy.maxResumes) return 'budget-exhausted'
     return 'resume'
   }
@@ -177,20 +245,30 @@ export class ChildTurnGuard {
 export class ChildTurnTracker {
   private turn: number | undefined
   private toolCalls = 0
+  private fileChanges = 0
+  private commits = 0
   private closingText = ''
+
+  /** `rules` decides which tool calls count as a file change or a commit. */
+  constructor(private readonly rules: TurnWorkRules = ChildTurnGuard.workRules(ChildTurnGuard.DEFAULT)) {}
 
   /** A `turn/start` opened `turn`; a resumed or ordinary later turn starts clean. */
   turnStarted(turn: number): void {
     if (this.turn === turn) return
     this.turn = turn
     this.toolCalls = 0
+    this.fileChanges = 0
+    this.commits = 0
     this.closingText = ''
   }
 
   /** One `tool/call` ran in `turn`. */
-  toolCalled(turn: number): void {
+  toolCalled(turn: number, call: TurnToolCall): void {
     this.turnStarted(turn)
     this.toolCalls += 1
+    const kind = ChildTurnGuard.workKind(call, this.rules)
+    if (kind === 'file-change') this.fileChanges += 1
+    if (kind === 'commit') this.commits += 1
   }
 
   /** One `assistant/message` spoke in `turn`; the last one is the turn's closing text. */
@@ -202,6 +280,6 @@ export class ChildTurnTracker {
   /** What the tracker saw for `turn`, or nothing when it saw no turn at all. */
   observation(turn: number): TurnObservation | undefined {
     if (this.turn !== turn) return undefined
-    return { toolCalls: this.toolCalls, closingText: this.closingText }
+    return { toolCalls: this.toolCalls, fileChanges: this.fileChanges, commits: this.commits, closingText: this.closingText }
   }
 }

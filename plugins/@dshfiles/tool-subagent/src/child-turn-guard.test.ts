@@ -16,7 +16,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ChildTurnGuard, ChildTurnTracker } from './child-turn-guard.ts'
+import { ChildTurnGuard, ChildTurnTracker, type TurnObservation } from './child-turn-guard.ts'
 import { installChildTurnGuard } from './child-turn-guard-host.ts'
 import * as tool from './native/index.ts'
 
@@ -27,8 +27,14 @@ afterEach(async () => {
   for (const dispose of suspended.splice(0).reverse()) await dispose()
 })
 
+/** One tool call in a scripted step: the name and raw arguments the loop records. */
+interface ScriptedCall {
+  readonly name: string
+  readonly arguments?: string
+}
+
 /** One scripted model answer: spoken text, or a step of tool calls, never both. */
-type Reply = { readonly text: string } | { readonly toolCalls: number }
+type Reply = { readonly text: string } | { readonly toolCalls: readonly ScriptedCall[] }
 
 /** The only external seam: a model that answers from the test's script, never provider I/O. */
 class ScriptedModel extends LlmAdapter {
@@ -46,10 +52,12 @@ class ScriptedModel extends LlmAdapter {
     const reply = this.answer(options)
     this.requests.push(options)
     if ('toolCalls' in reply) {
-      for (let call = 0; call < reply.toolCalls; call++) {
+      for (const [call, scripted] of reply.toolCalls.entries()) {
+        const id = `call-${String(call)}`
+        const args = scripted.arguments ?? '{}'
         yield { type: 'block-start', index: call, blockType: 'tool-call' }
-        yield { type: 'tool-call-delta', index: call, id: `call-${String(call)}`, name: 'probe', argumentsDelta: '{}' }
-        yield { type: 'block-end', index: call, block: { type: 'tool-call', id: `call-${String(call)}`, name: 'probe', arguments: '{}' } }
+        yield { type: 'tool-call-delta', index: call, id, name: scripted.name, argumentsDelta: args }
+        yield { type: 'block-end', index: call, block: { type: 'tool-call', id, name: scripted.name, arguments: args } }
       }
       yield { type: 'finish', reason: { kind: 'tool-calls' } }
       return
@@ -114,6 +122,25 @@ const boot = async (input: {
       execute: async () => ({ ok: true }),
     }),
   )
+  // Stand-ins for the real file-changing and shell tools: the guard reads only
+  // the recorded tool names and arguments, never their effects.
+  for (const [name, parameter] of [
+    ['edit', 'file_path'],
+    ['bash', 'command'],
+  ] as const) {
+    ctx.tools.register(
+      defineTool({
+        name,
+        description: `Run the scripted ${name} call.`,
+        parameters: { [parameter]: { type: 'string', required: true } },
+        output: {
+          schema: { type: 'object', properties: { ok: { type: 'boolean' } }, additionalProperties: false },
+          render: () => [{ type: 'text', text: 'ok' }],
+        },
+        execute: async () => ({ ok: true }),
+      }),
+    )
+  }
   ctx.on('agent/created', ({ agent }) => {
     children.push(agent)
   })
@@ -164,6 +191,9 @@ const closingOutput = (result: SubagentResult): string => result.output.flatMap(
 
 const HAND_BACK = 'Handoff: I cannot complete this implementation in this run; please reassign.'
 
+// The live miss on 2026-11-27 23:20: fetch, rebase and install calls, then this text.
+const LIVE_HAND_BACK = 'Remains unfinished; no implementation changes made in this turn: the checkout was fetched, rebased and installed. Do not land the WIP.'
+
 describe('child turn guard decision', () => {
   it('recognizes every hand-back wording the child sessions used, and no ordinary finish', () => {
     const { patterns } = ChildTurnGuard.compile(ChildTurnGuard.DEFAULT.handBackPatterns)
@@ -174,6 +204,9 @@ describe('child turn guard decision', () => {
       'Handoff: unable to complete implementation in this turn… Please reassign.',
       'I cannot complete D3/D4 in this run; please reassign.',
       'no implementation yet, please reassign',
+      LIVE_HAND_BACK,
+      'Verification remains unverified after the install.',
+      'Not implemented: only the plan draft exists.',
       HAND_BACK,
     ]
     for (const text of handBacks) expect([text, ChildTurnGuard.matches(text, patterns)]).toEqual([text, true])
@@ -188,29 +221,43 @@ describe('child turn guard decision', () => {
     expect(ChildTurnGuard.matches('please reassign', compiled.patterns)).toBe(true)
   })
 
-  it('never resumes a turn that did enough work, whatever its closing text says', () => {
-    const policy = ChildTurnGuard.normalize({ maxResumes: 0 })
+  it('resumes a hand-back whatever the tool count, unless the turn already changed files or committed', () => {
+    const policy = ChildTurnGuard.normalize({})
     const { patterns } = ChildTurnGuard.compile(policy.handBackPatterns)
-    const verdict = (toolCalls: number) => ChildTurnGuard.verdict({ policy, patterns, resumesUsed: 99, observation: { toolCalls, closingText: HAND_BACK } })
-    expect(verdict(ChildTurnGuard.DEFAULT.minToolCalls - 1)).toBe('budget-exhausted')
-    expect(verdict(ChildTurnGuard.DEFAULT.minToolCalls)).toBe('worked')
+    const decide = (observation: TurnObservation) => ChildTurnGuard.verdict({ policy, patterns, resumesUsed: 0, observation })
+    // The live miss: fetch, rebase and install are calls, not progress on the task.
+    expect(decide({ toolCalls: 23, fileChanges: 0, commits: 0, closingText: LIVE_HAND_BACK })).toBe('resume')
+    expect(decide({ toolCalls: ChildTurnGuard.DEFAULT.minToolCalls, fileChanges: 0, commits: 0, closingText: HAND_BACK })).toBe('resume')
+    expect(decide({ toolCalls: 4, fileChanges: 1, commits: 0, closingText: HAND_BACK })).toBe('worked')
+    expect(decide({ toolCalls: 4, fileChanges: 0, commits: 1, closingText: HAND_BACK })).toBe('worked')
+    expect(decide({ toolCalls: 0, fileChanges: 0, commits: 0, closingText: 'Added the guard test; the suite passes.' })).toBe('not-hand-back')
   })
 
-  it('spends budget only on hand-backs, and lets minToolCalls 0 guard any tool count', () => {
-    const anyCount = ChildTurnGuard.normalize({ minToolCalls: 0, maxResumes: 2 })
-    const { patterns } = ChildTurnGuard.compile(anyCount.handBackPatterns)
+  it('resumes a silent quit under minToolCalls, and only the budget bounds the resumes', () => {
+    const policy = ChildTurnGuard.normalize({ maxResumes: 2 })
+    const { patterns } = ChildTurnGuard.compile(policy.handBackPatterns)
     const decide = (input: { resumesUsed: number; closingText: string; toolCalls: number }) =>
       ChildTurnGuard.verdict({
-        policy: anyCount,
+        policy,
         patterns,
         resumesUsed: input.resumesUsed,
-        observation: { toolCalls: input.toolCalls, closingText: input.closingText },
+        observation: { ...input, fileChanges: 0, commits: 0 },
       })
-    expect(decide({ resumesUsed: 0, closingText: HAND_BACK, toolCalls: 8 })).toBe('resume')
-    expect(decide({ resumesUsed: 1, closingText: HAND_BACK, toolCalls: 0 })).toBe('resume')
-    expect(decide({ resumesUsed: 2, closingText: HAND_BACK, toolCalls: 0 })).toBe('budget-exhausted')
+    expect(decide({ resumesUsed: 0, closingText: HAND_BACK, toolCalls: 0 })).toBe('resume')
+    expect(decide({ resumesUsed: 1, closingText: '', toolCalls: 1 })).toBe('resume')
+    expect(decide({ resumesUsed: 2, closingText: '', toolCalls: 1 })).toBe('budget-exhausted')
+    expect(decide({ resumesUsed: 0, closingText: '', toolCalls: ChildTurnGuard.DEFAULT.minToolCalls })).toBe('not-hand-back')
     expect(decide({ resumesUsed: 0, closingText: 'Eight calls done; committed.', toolCalls: 8 })).toBe('not-hand-back')
-    expect(decide({ resumesUsed: 0, closingText: '   ', toolCalls: 0 })).toBe('not-hand-back')
+    const noSilentTrigger = ChildTurnGuard.normalize({ minToolCalls: 0 })
+    const compiled = ChildTurnGuard.compile(noSilentTrigger.handBackPatterns)
+    expect(
+      ChildTurnGuard.verdict({
+        policy: noSilentTrigger,
+        patterns: compiled.patterns,
+        resumesUsed: 0,
+        observation: { toolCalls: 0, fileChanges: 0, commits: 0, closingText: '   ' },
+      }),
+    ).toBe('not-hand-back')
   })
 
   it('keeps the defaults when the row omits the guard block', () => {
@@ -236,14 +283,32 @@ describe('child turn guard decision', () => {
     const tracker = new ChildTurnTracker()
     expect(tracker.observation(1)).toBeUndefined()
     tracker.turnStarted(1)
-    tracker.toolCalled(1)
+    tracker.toolCalled(1, { name: 'bash', arguments: '{"command":"jj git fetch"}' })
     tracker.assistantSpoke(1, HAND_BACK)
     tracker.assistantSpoke(1, 'Implemented the next step.')
-    tracker.toolCalled(1)
-    expect(tracker.observation(1)).toEqual({ toolCalls: 2, closingText: 'Implemented the next step.' })
+    tracker.toolCalled(1, { name: 'edit', arguments: '{"file_path":"/tmp/guard.ts"}' })
+    expect(tracker.observation(1)).toEqual({
+      toolCalls: 2,
+      fileChanges: 1,
+      commits: 0,
+      closingText: 'Implemented the next step.',
+    })
     expect(tracker.observation(2)).toBeUndefined()
     tracker.turnStarted(2)
-    expect(tracker.observation(2)).toEqual({ toolCalls: 0, closingText: '' })
+    expect(tracker.observation(2)).toEqual({ toolCalls: 0, fileChanges: 0, commits: 0, closingText: '' })
+  })
+
+  it('tells a file change and a commit from a plain call, whatever the tool namespace', () => {
+    const rules = ChildTurnGuard.workRules(ChildTurnGuard.DEFAULT)
+    const kind = (name: string, args = '{}') => ChildTurnGuard.workKind({ name, arguments: args }, rules)
+    expect(kind('edit')).toBe('file-change')
+    expect(kind('mcp_dsh.apply_patch')).toBe('file-change')
+    expect(kind('bash', '{"command":"jj describe -m ship it"}')).toBe('commit')
+    expect(kind('bash', '{"command":"jj commit -m done"}')).toBe('commit')
+    expect(kind('bash', '{"command":"git commit -m done"}')).toBe('commit')
+    expect(kind('bash', '{"command":"jj git fetch && pnpm install"}')).toBe('other')
+    expect(kind('write', '{"content":"jj commit"}')).toBe('file-change')
+    expect(kind('probe', '{"command":"jj commit -m x"}')).toBe('other')
   })
 })
 
@@ -286,20 +351,49 @@ describe('child turn guard in a scripted child', () => {
     expect(child.status).toBe('idle')
   })
 
-  it('never touches a busy turn whose closing text happens to read like a hand-back', async () => {
+  it('resumes the live miss: fetch, rebase and install, then a hand-back that also says not to land', async () => {
     let childSteps = 0
     const host = await boot({
       answer: prompt => {
-        if (prompt.includes(RESUME_MESSAGE)) return { text: 'Implemented the next step.' }
+        if (prompt.includes(RESUME_MESSAGE)) return { text: 'Implemented the guard.' }
         if (!prompt.includes('Implement the guard task')) return { text: 'Parent noted the result.' }
         childSteps += 1
-        return childSteps === 1 ? { toolCalls: ChildTurnGuard.DEFAULT.minToolCalls } : { text: HAND_BACK }
+        // Four real calls, none of them a file change: the turn spent itself on setup.
+        return childSteps === 1
+          ? {
+              toolCalls: [
+                { name: 'bash', arguments: '{"command":"jj git fetch"}' },
+                { name: 'bash', arguments: '{"command":"jj rebase -s @ -d main@origin"}' },
+                { name: 'bash', arguments: '{"command":"pnpm install --frozen-lockfile"}' },
+                { name: 'probe' },
+              ],
+            }
+          : { text: LIVE_HAND_BACK }
       },
     })
     const { result, events } = await host.spawn('Implement the guard task.')
-    // Three tool calls make the turn work, so its closing wording is never resumed.
-    expect(closingOutput(result)).toBe(HAND_BACK)
-    expect(userMessages(events, RESUME_MESSAGE)).toHaveLength(0)
+    expect(closingOutput(result)).toBe('Implemented the guard.')
+    expect(userMessages(events, RESUME_MESSAGE)).toHaveLength(1)
+  })
+
+  it('does not resume a hand-back from a turn that already changed files or committed', async () => {
+    for (const call of [
+      { name: 'edit', arguments: '{"file_path":"/tmp/guard.ts"}' },
+      { name: 'bash', arguments: '{"command":"jj describe -m ship the guard"}' },
+    ]) {
+      let childSteps = 0
+      const host = await boot({
+        answer: prompt => {
+          if (prompt.includes(RESUME_MESSAGE)) return { text: 'Implemented the next step.' }
+          if (!prompt.includes('Implement the guard task')) return { text: 'Parent noted the result.' }
+          childSteps += 1
+          return childSteps === 1 ? { toolCalls: [call] } : { text: LIVE_HAND_BACK }
+        },
+      })
+      const { result, events } = await host.spawn('Implement the guard task.')
+      expect([call.name, closingOutput(result)]).toEqual([call.name, LIVE_HAND_BACK])
+      expect(userMessages(events, RESUME_MESSAGE)).toHaveLength(0)
+    }
   })
 
   it('never resumes a normal finish', async () => {
