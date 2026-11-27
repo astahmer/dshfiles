@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ListFilterPanel, nextStatusFilters, presetMark, type ListFilterPanelProps } from './list-filter-panel.js'
 
@@ -238,9 +239,54 @@ describe('the status sub-groups (round 28, item 4)', () => {
       'threadSidebarFilterGroupStorage',
     ])
     // No label is hidden from assistive tech, and the stored Done chip sits in the Storage group.
-    expect(status.querySelector('[aria-hidden="true"]:not(svg):not([data-slot="status-glyph"])')).toBeNull()
+    expect(status.querySelector('[aria-hidden="true"]:not(svg):not([data-slot="status-glyph"]):not([data-chip-seat])')).toBeNull()
     expect(within(groups[2] as HTMLElement).getByRole('button', { name: 'threadSidebarSettled' })).toBeTruthy()
     const chips = within(status).getAllByRole('button')
     expect(chips.every(chip => chip.closest('[role="group"]') !== null)).toBe(true)
+  })
+})
+
+/** `over` (with its alpha) on an opaque `under`, composited in gamma sRGB as a browser paints it. */
+const paint = (under: Oklch, over: Oklch): Oklch => {
+  const alpha = over.alpha ?? 1
+  const channels = (color: Oklch): readonly number[] => (PaletteMath.toHex({ ...color, alpha: 1 }).slice(1, 7).match(/../g) ?? []).map(pair => Number.parseInt(pair, 16))
+  const [u, o] = [channels(under), channels(over)]
+  return PaletteMath.hexToOklch(`#${u.map((value, i) => Math.round(value * (1 - alpha) + (o[i] ?? 0) * alpha).toString(16).padStart(2, '0')).join('')}`)
+}
+
+// Council round 27, item 6: a selected chip reads at a glance, in both schemes and on the phone sheet.
+describe('the selected state (round 28, item 6)', () => {
+  it('draws a selected chip as the segment thumb with the field edge and the 550 ink; a resting one in secondary ink', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
+    const on = screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })
+    const off = screen.getByRole('button', { name: 'threadSidebarUnread', pressed: false })
+    for (const token of ['dshx:data-[state=on]:bg-(--dshx-segment-thumb)', 'dshx:data-[state=on]:border-field-border', 'dshx:data-[state=on]:font-selected', 'dshx:data-[state=on]:text-foreground'])
+      expect(on.className).toContain(token)
+    // Not the selected wash, which sat one step off the light phone sheet and darker than its neighbours in dark.
+    expect(on.className).not.toContain('bg-selected-wash')
+    expect(off.className).toContain('dshx:text-muted-foreground')
+  })
+
+  it('shows a 12px check on a selected status chip, so the multi-select reads as checkboxes', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
+    const on = screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })
+    const seat = on.querySelector('[data-chip-seat]')
+    expect(seat?.className).toContain('dshx:size-3')
+    expect(seat?.querySelector('[data-chip-check]')).not.toBeNull()
+    expect(screen.getByRole('button', { name: 'threadSidebarUnread', pressed: false }).querySelector('[data-chip-check]')).toBeNull()
+  })
+
+  it.each(['light', 'dark'] as const)('holds AA for the labels and 3:1 for the edge on every surface a chip sits on (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    const ink = p.neutral[10] as Oklch
+    const secondary = p.neutral[9] as Oklch
+    // The desktop popover and the phone sheet: paper in light (raised before round 28's item 7), the dialog step in dark.
+    const surfaces = scheme === 'light' ? [p.neutral[0], p.neutral[2]] : [p.neutral[2]]
+    for (const surface of surfaces as Oklch[]) {
+      expect(PaletteMath.contrastRatio(secondary, paint(surface, p.triggerFill))).toBeGreaterThanOrEqual(4.5)
+      // WCAG 1.4.11: the selected chip's edge against the surface around it.
+      expect(PaletteMath.contrastRatio(p.fieldBorder, surface)).toBeGreaterThanOrEqual(3)
+    }
+    expect(PaletteMath.contrastRatio(ink, p.segmentThumb)).toBeGreaterThanOrEqual(4.5)
   })
 })

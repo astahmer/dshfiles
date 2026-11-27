@@ -98,11 +98,19 @@ export interface ListFilterPanelProps {
 }
 
 /**
- * A chip: the quiet trigger fill at rest (no hairline: sixteen edged chips read as a form), the selected wash, the 3:1
- * field edge and the ink at 500 when on, so the choices in force read at a glance.
+ * A chip (council round 27, item 6): the quiet trigger fill and the secondary ink at rest (no hairline: sixteen edged
+ * chips read as a form); selected, the kit segment thumb (paper, #302C28 in dark) under the 3:1 field edge, its label
+ * the ink at 550, so the choices in force read at a glance on the popover and on the phone sheet alike.
  */
 const CHIP =
-  'dshx:h-7 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:border-field-border dshx:hover:bg-trigger-fill dshx:hover:text-foreground dshx:data-[state=on]:border-field-border dshx:data-[state=on]:bg-selected-wash dshx:data-[state=on]:font-medium dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
+  'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:text-foreground dshx:data-[state=on]:border-field-border dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
+
+/** A multi-select chip's leading 12px seat: a check while it is on, so the row reads as checkboxes, not radios. */
+const ChipSeat = (props: { readonly on: boolean }): JSX.Element => (
+  <span className="dshx:inline-flex dshx:size-3 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-chip-seat="">
+    {props.on ? <CheckIcon className="dshx:size-3" strokeWidth={2.5} data-chip-check="" /> : null}
+  </span>
+)
 
 const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
 /** A quiet verb row in a section, its glyph on the preset rows' check column. */
@@ -332,6 +340,7 @@ const StatusChips = (props: {
           </ToggleGroupItem>
           {LEADING_STATUS_GROUP.filters.map(filter => (
             <ToggleGroupItem key={filter} value={filter} className={CHIP}>
+              <ChipSeat on={props.selected.includes(filter)} />
               {props.t(threadStatusFilterLabelKeys[filter])}
             </ToggleGroupItem>
           ))}
@@ -347,6 +356,7 @@ const StatusChips = (props: {
                   </span>
                   {group.filters.map(filter => (
                     <ToggleGroupItem key={filter} value={filter} className={CHIP}>
+                      <ChipSeat on={props.selected.includes(filter)} />
                       {props.t(threadStatusFilterLabelKeys[filter])}
                     </ToggleGroupItem>
                   ))}
