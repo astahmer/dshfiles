@@ -1,3 +1,4 @@
+import { TOOL_ACCESS_ALL, toolAccessSchema } from '@dshfiles/tool-search/access'
 import { Effect, Schema } from 'effect'
 
 export const AGENT_HANDLE_PATTERN = /^[a-z][a-z0-9-]{0,31}$/u
@@ -57,6 +58,23 @@ export const agentDelegationSchema = Schema.Struct({
   subagents: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(true))),
 }).pipe(Schema.withDecodingDefaultKey(Effect.sync(() => ({ ...AGENT_DELEGATION_UNRESTRICTED }))))
 
+/**
+ * Which agents this agent's subagents may run as (wave 2 wires the `subagent` tool's `agent` argument to it): `any`
+ * or a list of handles, and the agent a subagent runs as when none is named (null: the parent thread's own agent).
+ */
+export const AGENT_SUBAGENTS_UNRESTRICTED = { allowed: 'any' as const, default: null }
+
+export const agentSubagentsSchema = Schema.Struct({
+  allowed: Schema.Union([Schema.Literal('any'), Schema.Array(handleSchema).check(Schema.isMaxLength(MAX_PEER_HANDLES))]),
+  default: Schema.NullOr(handleSchema),
+}).pipe(Schema.withDecodingDefaultKey(Effect.sync(() => ({ ...AGENT_SUBAGENTS_UNRESTRICTED }))))
+
+/**
+ * The tools this agent's threads get: sparse enabled/pinned entries per tool and per tool group, the
+ * `@dshfiles/tool-search/access` contract. Empty (the default) means every tool on, none pinned.
+ */
+export const agentToolsSchema = toolAccessSchema.pipe(Schema.withDecodingDefaultKey(Effect.sync(() => ({ tools: {}, groups: {} }))))
+
 /** Everything a person or an agent decides about an agent; the rest is usage metadata. */
 const agentDraftFields = {
   handle: handleSchema,
@@ -71,6 +89,8 @@ const agentDraftFields = {
   /** A routine line the opening message asks the thread to keep with DSH's own schedule tools; empty means none. */
   routine: Schema.String.check(Schema.isMaxLength(MAX_ROUTINE_CHARS)).pipe(Schema.withDecodingDefaultKey(Effect.succeed(''))),
   delegation: agentDelegationSchema,
+  tools: agentToolsSchema,
+  subagents: agentSubagentsSchema,
   enabled: Schema.Boolean,
 }
 
@@ -106,6 +126,8 @@ export type AgentThread = typeof agentThreadSchema.Type
 
 export type AgentRoute = typeof agentRouteSchema.Type
 export type AgentDelegation = typeof agentDelegationSchema.Type
+export type AgentSubagents = typeof agentSubagentsSchema.Type
+export type AgentTools = typeof agentToolsSchema.Type
 export type AgentDraft = typeof agentDraftSchema.Type
 export type Agent = typeof agentSchema.Type
 
@@ -177,6 +199,8 @@ export class Agents {
       memoryScope: null,
       routine: '',
       delegation: { ...AGENT_DELEGATION_UNRESTRICTED },
+      tools: { ...TOOL_ACCESS_ALL },
+      subagents: { ...AGENT_SUBAGENTS_UNRESTRICTED },
       enabled: true,
       builtIn: true,
       createdAt: now,
@@ -222,15 +246,31 @@ export class Agents {
    */
   static openingMessage(input: { readonly agent: AgentIdentity; readonly text: string; readonly fallback: string }): string {
     const task = input.text.trim() === '' ? input.fallback : input.text.trim()
-    const header = [`Work as @${input.agent.handle} — ${input.agent.name}.`, input.agent.description].filter(line => line.trim() !== '').join('\n')
-    const instructions = input.agent.instructions.trim()
-    const routine = Agents.routineSection(input.agent.routine ?? '')
-    const separator = '\n\n---\n\n'
-    const preamble = [instructions, routine].filter(section => section !== '').join('\n\n')
+    const { header, preamble, separator } = Agents.openingParts(input.agent)
     if (preamble === '') return clip(`${header}${separator}${task}`, MAX_MESSAGE_CHARS)
     const room = MAX_MESSAGE_CHARS - header.length - '\n\n'.length - separator.length - task.length
     if (room <= 0) return clip(`${header}${separator}${task}`, MAX_MESSAGE_CHARS)
     return `${header}\n\n${clip(preamble, room)}${separator}${task}`
+  }
+
+  /**
+   * A message the person typed, opened the way a dispatch opens: identity, instructions, then their text exactly as
+   * written. Nothing of the text is clipped or trimmed (the composer has no dispatch length limit); only the preamble
+   * keeps its own bound.
+   */
+  static introducedMessage(input: { readonly agent: AgentIdentity; readonly text: string }): string {
+    const { header, preamble, separator } = Agents.openingParts(input.agent)
+    const intro = preamble === '' ? header : `${header}\n\n${clip(preamble, MAX_MESSAGE_CHARS)}`
+    return `${intro}${separator}${input.text}`
+  }
+
+  /** The identity line, the instructions-and-routine preamble and the separator before the task. */
+  private static openingParts(agent: AgentIdentity) {
+    const header = [`Work as @${agent.handle} — ${agent.name}.`, agent.description].filter(line => line.trim() !== '').join('\n')
+    const instructions = agent.instructions.trim()
+    const routine = Agents.routineSection(agent.routine ?? '')
+    const preamble = [instructions, routine].filter(section => section !== '').join('\n\n')
+    return { header, preamble, separator: '\n\n---\n\n' }
   }
 
   /**

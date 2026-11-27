@@ -2,7 +2,7 @@
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AccountDraftModel } from './account-draft.js'
 import { ModelCuration } from './model-curation.js'
 import { AccountModelDefaults } from './account-model-defaults.js'
@@ -48,6 +48,8 @@ const mount = async (draft: AccountDraft, defaults = false, models: AccountsCata
 }
 
 afterEach(async () => {
+  vi.unstubAllGlobals()
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   await act(async () => root?.unmount())
   container?.remove()
   root = undefined
@@ -69,7 +71,7 @@ describe('reference Models table', () => {
   })
   it('starts at five rows, reveals the real remaining count, and keeps custom ID entry behind disclosure', async () => {
     await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: false, favoriteModelIds: ['model-0'] })
-    expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effortAuto: provider default', 'Show model', 'Source', 'Actions'])
+    expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effortAuto: provider default', 'Context window', 'Show model', 'Source', 'Actions'])
     expect(container.querySelectorAll('tbody tr')).toHaveLength(5)
     const more = [...container.querySelectorAll('button')].find(element => element.textContent?.includes('Show 4 more models'))
     await click(more ?? null)
@@ -108,6 +110,46 @@ describe('reference Models table', () => {
     for (const look of ['dshx:w-fit', 'dshx:max-w-full', 'dshx:px-2']) expect(classes).toContain(look)
     expect(classes).not.toContain('dshx:w-full')
     expect(classes).not.toContain('dshx:w-40')
+  })
+
+  it('offers context windows up to the provider maximum and keeps the account inheriting', async () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe(): void {}
+        unobserve(): void {}
+        disconnect(): void {}
+      },
+    )
+    Element.prototype.scrollIntoView ??= () => undefined
+    const state = await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true }, false, [
+      { ...catalog[0]!, id: 'gpt-6.2-astra', name: 'GPT-6.2-Astra', contextWindow: 272_000, maxContextWindow: 872_000 },
+      { ...catalog[1]!, id: 'gpt-5.6-luna', name: 'GPT-5.6-Luna', contextWindow: 272_000 },
+    ])
+    const trigger = container.querySelector('[aria-label="Context window for GPT-6.2-Astra"]')
+    expect(trigger?.textContent).toBe('Default (272k)')
+    // No disclosed maximum above the default: nothing to raise, so the window is plain text.
+    expect(container.querySelector('[aria-label="Context window for GPT-5.6-Luna"]')).toBeNull()
+    expect(container.textContent).toContain('272k')
+    await click(trigger)
+    const options = [...document.body.querySelectorAll('[role="option"]')]
+    expect(options.map(option => option.textContent)).toEqual(['Default (272k)', '128k', '200k', '400k', '500k', '600k', '750k', '872k (max)'])
+    await click(options.find(option => option.textContent === '872k (max)') ?? null)
+    expect(state.draft().contextWindowOverrides).toEqual({ 'gpt-6.2-astra': 872_000 })
+    expect(state.draft().inheritModelSettings).toBe(true)
+    expect(container.querySelector('[aria-label="Context window for GPT-6.2-Astra"]')?.textContent).toBe('872k (max)')
+  })
+
+  it('draws a default context window like an inherited effort: quiet text sized to its value', async () => {
+    await mount({ ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }), inheritModelSettings: true }, false, [
+      { ...catalog[0]!, id: 'gpt-6.2-astra', name: 'GPT-6.2-Astra', contextWindow: 272_000, maxContextWindow: 872_000 },
+    ])
+    const head = [...container.querySelectorAll('th')].find(element => element.textContent === 'Context window')
+    // The header starts on the values, like Reasoning effort's.
+    expect(head?.className).toContain('dshx:pl-[21px]')
+    const classes = (container.querySelector('[aria-label="Context window for GPT-6.2-Astra"]')?.getAttribute('class') ?? '').split(' ')
+    for (const look of ['dshx:w-fit', 'dshx:max-w-full', 'dshx:px-2', 'dshx:bg-transparent', 'dshx:text-muted-foreground']) expect(classes).toContain(look)
+    expect(classes).not.toContain('dshx:w-full')
   })
 
   it('edits the rendered inherited value without accidentally deleting a paused favorite', async () => {
@@ -150,7 +192,7 @@ describe('reference Models table', () => {
     // "Auto", its source said once at the column header (council round 17, D1); the accessible name keeps "Provider default".
     expect(container.querySelector('[role="combobox"][aria-label^="Default reasoning effort for Model 0"]')?.textContent).toBe('Auto')
     expect(container.querySelector('tbody')?.textContent).not.toContain('Inherited')
-    expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effortAuto: provider default', 'Show model', 'Actions'])
+    expect([...container.querySelectorAll('th')].map(element => element.textContent)).toEqual(['Model', 'Reasoning effortAuto: provider default', 'Context window', 'Show model', 'Actions'])
     await act(async () => root?.unmount())
     container.remove()
     // One overridden row brings the Source column back.

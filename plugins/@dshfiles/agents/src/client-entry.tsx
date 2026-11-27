@@ -21,6 +21,7 @@ import { AgentReference } from './agent-reference.js'
 import { agentUserTextRule } from './agent-user-text.js'
 import { AgentReferenceDecorations, AgentReferencePreview } from './agent-reference-preview.jsx'
 import { AgentsPanel, type AgentsPanelProps } from './agents-panel.js'
+import { registerComposerAgent } from './composer-wiring.js'
 import { agentsApi } from './api.js'
 import { AgentDispatch, type AgentDispatchRequest, type AgentModelSelection, type AgentThreadCreation } from './dispatch.js'
 
@@ -48,6 +49,7 @@ export default defineClient({
       ctx.slots.register({ name: 'conversation.user.text.node', key: 'agent', priority: 100 }, AgentMentionChip),
     )
     const api = createApiClient(ctx, agentsApi)
+    registerComposerAgent({ ctx, decorate, plugin: metadata?.plugin })
 
     const startThread = async (request: AgentDispatchRequest): Promise<{ readonly ok: true } | { readonly ok: false; readonly reason: string }> => {
       const target = AgentDispatch.creationArgs(request.target, ctx.workspaces.list.getSnapshot().items[0]?.workspaceId)
@@ -58,6 +60,9 @@ export default defineClient({
       } catch (cause) {
         return { ok: false, reason: `The thread was not created. Retry. ${cause instanceof Error ? cause.message : String(cause)}` }
       }
+      const title = AgentDispatch.title(request)
+      // Recorded before the opening message, so the thread's first request already has this agent's tools.
+      await api.safe.recordUse({ handle: request.agent.handle, thread: { sessionId: String(sessionId), title } })
       const route = request.agent.route
       if (route !== null) {
         const selection: AgentModelSelection =
@@ -67,7 +72,6 @@ export default defineClient({
         const selected = await ctx.remote.session.selectModel(selection)
         if (!selected.ok) console.warn(`agents: thread ${sessionId} kept the Host default model: ${selected.error.message}`)
       }
-      const title = AgentDispatch.title(request)
       const renamed = await ctx.remote.session.rename({ sessionId, title })
       if (!renamed.ok) console.warn(`agents: thread ${sessionId} title kept as created: ${renamed.error.message}`)
       const reference = ctx.sessions.retain(sessionId, { source: 'agentDispatch' })
@@ -83,7 +87,6 @@ export default defineClient({
       } finally {
         reference.release()
       }
-      await api.safe.recordUse({ handle: request.agent.handle, thread: { sessionId: String(sessionId), title } })
       ctx.uiWorkspace.openSession(sessionId)
       return { ok: true }
     }

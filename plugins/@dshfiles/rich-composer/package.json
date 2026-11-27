@@ -28,6 +28,10 @@
       "types": "./src/thread-views.ts",
       "default": "./dist/thread-views.js"
     },
+    "./composer-send": {
+      "types": "./src/composer-send.ts",
+      "default": "./dist/composer-send.js"
+    },
     "./composer-more": {
       "types": "./src/composer-more.ts",
       "default": "./dist/composer-more.js"

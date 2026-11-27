@@ -78,6 +78,39 @@
           "reason": "Pure filesystem existence checks with no process, socket or network; the caller's span covers them."
         }
       ]
+    },
+    {
+      "id": "workspace-attribution",
+      "title": "Which project a Session belongs to",
+      "summary": "WorkspaceAttribution (subpath ./workspace-attribution) maps a Session to its DSH project from the workspace registry: a thread workspace (<repository>-threads/thread-…, or a provider-reported custom threads directory) belongs to the project it was cut from; a Session no workspace lists falls back to its recorded cwd. thread-sidebar groups by it and agents picks a project's default agent with it.",
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "surfaces": ["host", "client"],
+      "configuration": [],
+      "states": ["project", "thread-workspace", "unattributed"],
+      "failureModes": ["A Session outside every registered project resolves to no project, so the caller keeps its own fallback."],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "vcs-provider-port.attribution-thread-workspace",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/workspace-attribution.test.ts",
+          "testName": "attributes a registered thread workspace session, and one whose thread workspace was forgotten, to the project"
+        },
+        {
+          "kind": "unit-test",
+          "id": "vcs-provider-port.attribution-custom-directory",
+          "file": "plugins/@dshfiles/vcs-provider-port/src/workspace-attribution.test.ts",
+          "testName": "uses a reported custom threads directory"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Pure functions over registry rows the caller passes; no I/O."
+        }
+      ]
     }
   ]
 }

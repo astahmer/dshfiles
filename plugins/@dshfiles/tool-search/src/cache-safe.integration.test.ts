@@ -10,7 +10,9 @@ import TokenMeter from '@deepseek-ai/dsh-token-meter'
 import { ToolRuntime, defineTool, type ToolDefinition } from '@deepseek-ai/dsh-tools'
 import * as NativeToolExecutor from '@deepseek-ai/dsh-tool-executor-native'
 import type { Schema } from 'effect'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { describe, expect, it } from 'vitest'
+import { TOOL_ACCESS_ALL, type ToolAccessConfig, type ToolAccessPolicy, type ToolAccessProvider, type ToolAccessSubject } from './access.js'
 import toolSearch from './host.js'
 
 /** One scripted model step: a tool call with the JSON arguments the model sends, or a final text. */
@@ -64,6 +66,12 @@ const runCacheSafe = async (input: {
   readonly denyTool?: string
   readonly config?: { readonly mode: 'cache-safe' | 'progressive'; readonly alwaysVisible: readonly string[] }
   readonly onRequest?: (index: number, ctx: Context) => void
+  /** A tool access provider registered before the agent exists, as @dshfiles/agents does. */
+  readonly provider?: ToolAccessProvider
+  /** Extra callable global tools (MCP-named ones, for groups), registered before the agent. */
+  readonly extraTools?: readonly string[]
+  /** The Session header the agent is created with. */
+  readonly meta?: { readonly cwd: string; readonly origin: 'subagent'; readonly parentSession: string; readonly delegationDepth: number }
 }) => {
   const ctx = new Context()
   const writes: { path: string; contents: string }[] = []
@@ -113,6 +121,9 @@ const runCacheSafe = async (input: {
       const denied = input.denyTool
       ctx.on('tools/pre-execute', (exec, next) => (exec.name === denied ? Promise.resolve({ kind: 'deny', reason: `policy refuses ${denied}` }) : next()))
     }
+    const calls: string[] = []
+    for (const name of input.extraTools ?? []) ctx.tools.register(callableTool(name, calls))
+    if (input.provider !== undefined) ctx.provide('dshfilesToolAccess', input.provider)
     if (toolSearch.setup === undefined) throw new Error('Tool-search Host setup is missing')
     await ctx.plugin({ ...toolSearch, apply: toolSearch.setup }, { mode: 'cache-safe', alwaysVisible: [], ...input.config })
 
@@ -121,11 +132,12 @@ const runCacheSafe = async (input: {
     const handle = await ctx.agents.create({
       sessionId: SessionId(`tool-search-cache-safe-${Date.now()}`),
       agentOptions: { provider: 'cache-safe-test', model: 'scripted' },
+      ...(input.meta !== undefined && { meta: { ...input.meta, parentSession: SessionId(input.meta.parentSession) } }),
     })
     disposeAgent = () => handle.dispose()
     await handle.agent.followup(createUserMessage({ content: [{ type: 'text', text: 'Do the task.' }], source: { kind: 'user' } }))
     await handle.agent.whenIdle()
-    return { writes, purges, requests: adapter.requests }
+    return { writes, purges, calls, sessionId: String(handle.agent.id), requests: adapter.requests }
   } finally {
     await disposeAgent?.()
     await ctx.fiber.dispose()
@@ -252,3 +264,159 @@ describe('tool-search mid-Session tool set changes', () => {
     expect(new Set(result.requests.map(request => request.tools)).size).toBe(1)
   })
 })
+
+/** A no-argument global tool that records its calls, standing in for an MCP server's tools. */
+function callableTool(name: string, calls: string[]): ToolDefinition {
+  return {
+    name,
+    description: `Run ${name.replaceAll('_', ' ')}.`,
+    parameters: { type: 'object', properties: {}, additionalProperties: false },
+    output: { schema: { type: 'object' }, render: () => [{ type: 'text', text: `${name} ran.` }] },
+    execute: async () => {
+      calls.push(name)
+      return {}
+    },
+  }
+}
+
+/**
+ * A provider as @dshfiles/agents implements it, reduced to one agent: `override` switches the thread to another tool set
+ * (null for "all tools") and reports the change, the way a per-thread override does.
+ */
+const scriptedProvider = (input: { readonly agent: string; readonly access: ToolAccessConfig }) => {
+  const listeners = new Set<(sessionId: string) => void>()
+  const subjects: ToolAccessSubject[] = []
+  let override: { readonly toolsFrom: string | null; readonly access: ToolAccessConfig } | undefined
+  const change = 'Change it in the Agents panel, or clear the override.'
+  const provider: ToolAccessProvider = {
+    resolve: subject => {
+      subjects.push(subject)
+      const policy: ToolAccessPolicy =
+        override === undefined
+          ? { agent: input.agent, source: 'agent', toolsFrom: input.agent, access: input.access, change }
+          : { agent: input.agent, source: 'override', toolsFrom: override.toolsFrom, access: override.access, change }
+      return policy
+    },
+    subscribe: listener => {
+      listeners.add(listener)
+      return () => listeners.delete(listener)
+    },
+  }
+  return {
+    provider,
+    subjects,
+    setOverride: (sessionId: string, next: { readonly toolsFrom: string | null; readonly access: ToolAccessConfig } | undefined) => {
+      override = next
+      for (const listener of listeners) listener(sessionId)
+    },
+  }
+}
+
+describe('tool-search per-agent tool access', () => {
+  const access: ToolAccessConfig = { tools: { write_file: { enabled: false }, purge_cache: { pinned: true } }, groups: {} }
+
+  it('keeps a disabled tool out of the declarations, tool_search, tool_call and a direct call, and declares a pinned one', async () => {
+    const scripted = scriptedProvider({ agent: 'reviewer', access })
+    const result = await runCacheSafe({
+      provider: scripted.provider,
+      steps: [
+        { call: 'tool_search', args: { query: 'write text to a file', limit: 2 } },
+        { call: 'tool_call', args: { name: 'write_file', args: writeArgs } },
+        { call: 'write_file', args: writeArgs },
+        { text: 'Refused.' },
+      ],
+    })
+
+    expect(result.writes).toEqual([])
+    expect(result.requests[0]?.toolNames).toEqual(['purge_cache', 'tool_call', 'tool_search'])
+    expect(new Set(result.requests.map(request => request.tools)).size).toBe(1)
+    expect(result.requests.every(request => !request.tools.includes('Write text content to a file'))).toBe(true)
+    expect(result.requests[1]?.lastMessage).not.toContain('## write_file')
+    expect(result.requests[1]?.lastMessage).toContain('disabled for this thread: write_file')
+    expect(result.requests[2]?.lastMessage).toContain('tool_call refused: write_file is disabled for this thread, whose tools come from @reviewer')
+    expect(result.requests[2]?.lastMessage).toContain('Change it in the Agents panel')
+    expect(result.requests[3]?.lastMessage).toContain('write_file is disabled for this thread, whose tools come from @reviewer')
+  })
+
+  it('lets a tool entry beat its group, disables a tool that appears later in a disabled group, and enables a new group', async () => {
+    const grouped: ToolAccessConfig = {
+      tools: { mcp__github__list_issues: { enabled: true, pinned: true } },
+      groups: { 'mcp:github': { enabled: false } },
+    }
+    const scripted = scriptedProvider({ agent: 'reviewer', access: grouped })
+    const result = await runCacheSafe({
+      provider: scripted.provider,
+      extraTools: ['mcp__github__list_issues', 'mcp__github__create_issue'],
+      onRequest: (index, ctx) => {
+        if (index !== 0) return
+        ctx.tools.register(callableTool('mcp__github__delete_repo', laterCalls))
+        ctx.tools.register(callableTool('mcp__linear__list_issues', laterCalls))
+      },
+      steps: [
+        { call: 'tool_call', args: { name: 'mcp__github__create_issue', args: {} } },
+        { call: 'tool_call', args: { name: 'mcp__github__delete_repo', args: {} } },
+        { call: 'tool_call', args: { name: 'mcp__linear__list_issues', args: {} } },
+        { call: 'mcp__github__list_issues', args: {} },
+        { text: 'Done.' },
+      ],
+    })
+
+    expect(result.requests[0]?.toolNames).toEqual(['mcp__github__list_issues', 'tool_call', 'tool_search'])
+    expect(result.requests[1]?.messages).toContain('mcp__github__create_issue is disabled for this thread')
+    // The tool-set notice names the new group's tool, never the one its disabled group keeps out.
+    expect(result.requests[1]?.messages).toContain('mcp__linear__list_issues')
+    expect(result.requests[1]?.messages).not.toContain('- mcp__github__delete_repo')
+    expect(result.requests[2]?.messages).toContain('mcp__github__delete_repo is disabled for this thread')
+    expect(laterCalls).toEqual(['mcp__linear__list_issues'])
+    expect(result.calls).toEqual(['mcp__github__list_issues'])
+  })
+
+  it('switches a thread to an override from its next request and back again', async () => {
+    using recorder = recordSpans()
+    const scripted = scriptedProvider({ agent: 'reviewer', access })
+    const purge = { call: 'tool_call', args: { name: 'purge_cache', args: { target: 'tmp', confirm: true } } } as const
+    const write = { call: 'tool_call', args: { name: 'write_file', args: writeArgs } } as const
+    const result = await runCacheSafe({
+      provider: scripted.provider,
+      onRequest: index => {
+        const sessionId = scripted.subjects[0]?.sessionId ?? ''
+        if (index === 1) scripted.setOverride(sessionId, { toolsFrom: null, access: TOOL_ACCESS_ALL })
+        if (index === 3) scripted.setOverride(sessionId, undefined)
+      },
+      steps: [write, purge, write, purge, write, { text: 'Done.' }],
+    })
+
+    // Set while request 1 streams, the override applies from request 2; cleared while request 3 streams, the agent's
+    // tool set is back from request 4, with the same declarations byte for byte.
+    expect(result.writes).toEqual([writeArgs])
+    expect(result.requests[1]?.lastMessage).toContain('write_file is disabled for this thread')
+    expect(result.requests[1]?.tools).toBe(result.requests[0]?.tools)
+    expect(result.requests[0]?.toolNames).toEqual(['purge_cache', 'tool_call', 'tool_search'])
+    expect(result.requests[2]?.toolNames).toEqual(['tool_call', 'tool_search'])
+    expect(result.requests[3]?.messages).toContain('Saved write.')
+    expect(result.requests[4]?.tools).toBe(result.requests[0]?.tools)
+    expect(result.requests[5]?.lastMessage).toContain('write_file is disabled for this thread')
+    expect(recorder.span('tool search access change')).toBeDefined()
+  })
+
+  it("hands the provider a subagent's parent Session and resolves it once", async () => {
+    const scripted = scriptedProvider({ agent: 'reviewer', access: TOOL_ACCESS_ALL })
+    await runCacheSafe({
+      provider: scripted.provider,
+      meta: { cwd: '/work/repo-threads/thread-1a2b3c', origin: 'subagent', parentSession: 'session-parent', delegationDepth: 1 },
+      steps: [{ call: 'write_file', args: writeArgs }, { text: 'Saved.' }],
+    })
+
+    expect(scripted.subjects).toHaveLength(1)
+    expect(scripted.subjects[0]).toMatchObject({ cwd: '/work/repo-threads/thread-1a2b3c', parentSessionId: 'session-parent' })
+  })
+
+  it('leaves every tool on without a provider, as before', async () => {
+    const result = await runCacheSafe({ steps: [{ call: 'tool_call', args: { name: 'write_file', args: writeArgs } }, { text: 'Saved.' }] })
+
+    expect(result.writes).toEqual([writeArgs])
+    expect(result.requests[0]?.toolNames).toEqual(['tool_call', 'tool_search'])
+  })
+})
+
+const laterCalls: string[] = []

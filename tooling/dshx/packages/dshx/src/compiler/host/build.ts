@@ -45,6 +45,7 @@ const HOST_OUTSIDE_RELOAD_PATH = fileURLToPath(new URL('../../host/outside-reloa
 const HOST_SDK_PATH = fileURLToPath(new URL('../../sdk/host.js', import.meta.url))
 const API_DEFINE_PATH = fileURLToPath(new URL('../../api/define.js', import.meta.url))
 const API_TOOL_CATALOG_PATH = fileURLToPath(new URL('../../api/tool-catalog.js', import.meta.url))
+const API_TOOL_SOURCES_PATH = fileURLToPath(new URL('../../api/tool-sources.js', import.meta.url))
 const API_ZOD_VIEW_PATH = fileURLToPath(new URL('../../api/zod-view.js', import.meta.url))
 const API_HOST_CLIENT_PATH = fileURLToPath(new URL('../../api/host-client.js', import.meta.url))
 const API_HOST_EVENTS_PATH = fileURLToPath(new URL('../../api/host-events.js', import.meta.url))
@@ -95,6 +96,7 @@ const RUNTIME_ENTRIES: readonly string[] = [
   HOST_SDK_PATH,
   API_DEFINE_PATH,
   API_TOOL_CATALOG_PATH,
+  API_TOOL_SOURCES_PATH,
   API_ZOD_VIEW_PATH,
   API_HOST_CLIENT_PATH,
   API_HOST_EVENTS_PATH,
@@ -201,6 +203,8 @@ function hostEntryPlugin(paths: Awaited<ReturnType<typeof resolveOptions>>, opti
           'export const scheduleOutsideReload = ReloadTransactionModel.schedule',
           "export { defineTool } from '@deepseek-ai/dsh-tools'",
           `export { pluginToolCatalog } from ${JSON.stringify(API_TOOL_CATALOG_PATH)}`,
+          `import { ToolSourcesModel } from ${JSON.stringify(API_TOOL_SOURCES_PATH)}`,
+          'export const toolSources = ToolSourcesModel.of',
           `import { HostApiClientModel } from ${JSON.stringify(API_HOST_CLIENT_PATH)}`,
           'export const createHostApiClient = HostApiClientModel.create',
           'export const isApiServed = HostApiClientModel.isServed',

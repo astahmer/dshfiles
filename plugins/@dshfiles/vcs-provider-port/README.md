@@ -57,6 +57,14 @@ and a linked `git worktree` (a `.git` file) whose common git directory sits besi
 worktree of a colocated repository is never handed to a git adapter. jj-integration and diffs-review use it to pick
 their jj or git adapter.
 
+`WorkspaceAttribution` from `@dshfiles/vcs-provider-port/workspace-attribution` is the one session → project rule:
+`workspaceForSessions` maps every Session to its project workspace and `projectOfSession` answers for one. A thread
+workspace (`<repository>-threads/thread-…`, or a folder a provider reported through `threadsDirectories`) belongs to
+the project it was cut from; a Session no workspace lists falls back to its recorded cwd. `WorkspacePaths` holds the
+path rules. It is pure (no Effect, no dshx), so browser and Host code share it: `@dshfiles/thread-sidebar` groups
+threads with it (and re-exports `WorkspacePaths` from its `thread-directories` module), `@dshfiles/agents` picks a
+project's default agent with it.
+
 Callers: `@dshfiles/backlog` (an item's thread starts isolated) and `@dshfiles/session-undo` (turn snapshots).
 Bundle the port in the Host entry (`host.bundleDependencies`).
 

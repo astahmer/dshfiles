@@ -4,6 +4,14 @@
 
 ![Manage agents](docs/screenshots/agent-registry.png)
 
+![Choose an agent's tools, subagents and projects](docs/screenshots/agent-tools-tree.png)
+
+<img alt="Choose an agent's tools at 390 px" src="docs/screenshots/agent-tools-tree-narrow.png" width="260">
+
+![Start a new thread as the project's default agent](docs/screenshots/composer-agent.png)
+
+![See and switch a running thread's tools](docs/screenshots/thread-tools.png)
+
 Persistent, mentionable agents. An agent is saved configuration — identity, instructions, model
 route and Agent preset — that dispatches an **ordinary DSH thread** when you mention its handle
 where a thread starts.
@@ -65,22 +73,45 @@ follows [DESIGN.md](../../../DESIGN.md).
 - **List.** Each row shows the glyph, name, `@handle`, model and thread count, with an enable switch that saves at
   once and a row menu: **Start thread…**, **Duplicate**, **Remove…**. A switched-off agent is greyed and says that
   mentions ignore it. A filter field appears past six agents.
-- **Editor.** Five sections — Identity, Instructions, Model and tools, Delegation, Memory and routine — with the
-  instructions in a tall monospace editor. The model field is the kit's searchable, provider-grouped Combobox over the
-  Host model catalog (no owned plugin exports a model picker to reuse), and reasoning offers only that model's efforts.
-  Peers are typed or picked from the saved agents.
+- **Editor.** Seven sections — Identity, Instructions, Model and tools, Tools, Delegation, Default for projects, Memory
+  and routine — with the instructions in a tall monospace editor. The model field is the kit's searchable,
+  provider-grouped Combobox over the Host model catalog (no owned plugin exports a model picker to reuse), and reasoning
+  offers only that model's efforts. Peers are typed or picked from the saved agents.
 - **Colour.** Under the glyph, the kit's `PalettePicker` offers the active theme's six identity colours; the handle's
   default is marked, and **Use default** clears a choice. The agent stores the slot (`tone`, 0–5), not a colour, so a
   theme change recolours it. Its glyph tile (list, editor heading, start dialog, peer buttons, mention card) and every
   `@{handle}` chip paint the colour on its own 18 % wash, like a project mark; an agent without a slot, including every
   agent saved before colours, takes the one its handle hashes to. `agents_save` takes `tone`: `null` clears it, leaving
   it out keeps it.
+- **Tools.** Like VS Code's _Configure Tools_: one collapsible group per MCP server, plugin or DSH, each with a
+  tri-state checkbox (checked, cleared, or a dash when some tools are on) and a `k/n` count; a checkbox and a pin per tool
+  with its first description sentence; a filter by name or description (Escape clears it); and an _N of M tools selected
+  · P pinned · U unsaved_ line. A pinned tool is declared from the thread's first request; other selected tools are found
+  through `tool_search`. A row says **set here** when it has its own entry or **from group** when its group decides,
+  and its reset button (or Delete) drops the entry so it inherits again; a group checkbox or pin clears its tools' own
+  value for that field so all of them follow it. A dot marks rows whose effective state is unsaved. Groups start
+  collapsed and an expanded group renders 50 tools at a time, so a ~1,000-tool Host starts at ~20 rows. The tree is a
+  WAI-ARIA tree with one tab stop: Up/Down/Home/End move, Right/Left open, enter or leave a group, Space toggles, Enter
+  opens a group, P pins, Delete resets. `tool_search` and `tool_call` always stay on.
+- **Subagents** (in Delegation): **Any agent** or **Only listed** (tap the saved agents) for what its subagents may run
+  as, and a **Default subagent** Combobox (the parent thread's agent, or one allowed agent). A default outside the list
+  blocks the save with a one-tap fix.
+- **Default for projects.** A checklist of registered projects (`EntityLabels.projectsOf`, never thread workspaces),
+  each saying which agent it uses now and what a save changes (`moves from @planner on save`). It lives in the agent
+  editor rather than a separate project → agent table because the person is deciding where _this_ agent applies, it
+  saves in the same batch as the agent's other settings, and the one-default-per-project conflict stays visible on each
+  row. A filter appears past six projects.
 - **Inline checks with a way out.** A missing name, a taken handle (with a free one offered), a bad memory scope (with
   the default offered), an empty peer list (with “no messaging” offered) block the save and sit under their field; a
   route this Host lacks, an unknown peer and instructions the 4,000-character opening message would clip are warnings.
   A new agent's errors wait until a field is left or **Create agent** is pressed.
 - **Saving.** A save bar appears only with unsaved edits (or for a new agent), names what blocks it and jumps to the
-  first problem; ⌘S/Ctrl+S saves. Leaving unsaved edits asks first.
+  first problem; ⌘S/Ctrl+S saves. Leaving unsaved edits asks first. One save runs a plan: `save` only when the agent's
+  own fields changed (a new agent is created whole, tools and subagents included), then one `setToolAccess` batch of the
+  sparse entry edits (split only past the Host's 200-edit limit), `setSubagents`, and `setProjectDefault` per changed
+  project. Sending edits instead of the whole agent keeps an untouched entry that another browser or an agent tool
+  changed meanwhile. If a step fails, the remaining changes stay unsaved against the refreshed agent, so saving again
+  sends only what is missing. Tool, subagent and project changes reach threads started afterwards.
 - **Threads tab.** The threads the agent started and its routines' reminders, each opening its thread; an empty tab
   offers **Start thread**.
 - **Start thread** opens a dialog: the task, the project it runs in (**Default project** or a registered one), and what the thread inherits (model, tools,
@@ -94,12 +125,107 @@ follows [DESIGN.md](../../../DESIGN.md).
 
 ## Surfaces
 
-| Surface              | Behavior                                                                                                                                                                                          |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Agents sidebar panel | List, create (blank or from a template), edit, duplicate, enable/disable and remove agents with undo (the built-in `@dsh` is not removable), start a thread, and open a thread the agent started. |
-| `@` menu             | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                                                                     |
-| Agent tools          | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in).                                                                                     |
-| Mention preview      | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                                                                               |
+| Surface               | Behavior                                                                                                                                                                                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Agents sidebar panel  | List, create (blank or from a template), edit, duplicate, enable/disable and remove agents with undo (the built-in `@dsh` is not removable), choose tools, subagents and default projects, start a thread, and open a thread the agent started. |
+| `@` menu              | An `Agents` group in every composer; `@agent:` / `@a:` scopes the menu to agents. Picking inserts `@handle `.                                                                                                                                   |
+| Agent tools           | `agents_list`, `agents_get`, `agents_threads`, `agents_save`, `agents_remove` (destructive, explicit opt-in), and the [tool access](#tool-access) tools.                                                                                        |
+| Mention preview       | A rendered `@handle` opens a card with the agent's details and threads; **Open in Agents** selects it in the panel.                                                                                                                             |
+| New-thread agent chip | "as @reviewer" in a new thread's composer: the agent the thread starts as. See [Composer](#composer).                                                                                                                                           |
+| Tools control         | A wrench "@reviewer" in a running thread's composer: its agent, where it came from and whose tools apply. See [Composer](#composer).                                                                                                            |
+
+## Tool access
+
+An agent decides which tools its threads get. This plugin provides the
+[`@dshfiles/tool-search/access`](../tool-search/README.md#per-agent-tool-access) contract (the `dshfilesToolAccess`
+Cordis service); tool-search applies it. Without tool-search installed nothing changes.
+
+- **Per agent: `tools`.** Sparse entries keyed by tool name (`tools`) or group key (`groups`: `mcp:<server>`,
+  `plugin:<package>`, `native`), each `{ enabled?, pinned? }`. Every tool is on and deferred by default, tools that
+  appear later included; a tool entry beats its group entry beats the default, and a tool added later to a disabled group
+  is disabled. `tool_search` and `tool_call` are never disabled.
+- **Per agent: `subagents`.** `{ allowed: 'any' | handles[], default: handle | null }`: which agents its subagents may
+  run as and which one they run as by default (null: the parent thread's agent), edited in the panel's Delegation
+  section. The `subagent` tool applies it; see [Subagents as agents](#subagents-as-agents).
+- **Per project: a default agent**, keyed by the project's workspace id. A Session belongs to a project by the shared
+  [`@dshfiles/vcs-provider-port/workspace-attribution`](../vcs-provider-port/README.md) rule, so a thread workspace
+  (`<repo>-threads/thread-…`, or a provider's custom threads folder) counts for its project.
+- **Per thread: its agent, decided once.** When the thread's DSH agent attaches: a recorded dispatch or mention
+  (`explicit`) → a subagent's parent thread's agent (`inherited`) → the project's default agent → `@dsh`. The decision and
+  the agent's tools at that moment are stored (`sessions` table, newest 5,000 threads), so editing the agent or the project
+  default reaches only threads started afterwards. A dispatch recorded after the thread attached still makes it the
+  thread's explicit agent and reports the change. Dispatches record the agent before sending the opening message.
+- **Per thread: an override**, reversible: another agent's tools (as they are when chosen) or every tool. tool-search
+  applies it from the thread's next model request; that request loses its prompt cache once.
+
+| Capability                               | API method               | Agent tool                                   |
+| ---------------------------------------- | ------------------------ | -------------------------------------------- |
+| Tool catalog, grouped, first sentences   | `toolCatalog`            | `agents_tool_catalog` (read-only)            |
+| Read an agent's tool access              | `toolAccess` (and `get`) | `agents_tool_access_get` (read-only)         |
+| Enable/disable/pin/unpin tools or groups | `setToolAccess`          | `agents_tool_access_set` (entry null undoes) |
+| Subagent choices                         | `setSubagents`           | `agents_subagents_set`                       |
+| Project default agents                   | `projectDefaults`        | `agents_project_defaults` (read-only)        |
+| Set or clear a project default           | `setProjectDefault`      | `agents_project_default_set`                 |
+| A thread's agent and effective policy    | `threadAccess`           | `agents_thread_access` (read-only)           |
+| Set or clear a thread override           | `setThreadOverride`      | `agents_thread_override_set`                 |
+| Record a thread's agent explicitly       | `recordThreadAgent`      | none (a cross-plugin write for subagents)    |
+
+Write tools run only when the user asked. The calling thread can read its own agent and access with tool-search's
+`tool_search_access`.
+
+## Subagents as agents
+
+This plugin provides the [`@dshfiles/tool-subagent/agent-resolver`](../tool-subagent/README.md#the-agent-argument)
+contract (the `dshfilesSubagentAgents` Cordis service). The `subagent` tool's `agent` argument asks it which agent a
+fresh child starts as:
+
+1. The `agent` argument, else the calling agent's `subagents.default`, else nothing: the child inherits its parent
+   thread's agent, as before.
+2. The calling agent's `subagents.allowed` must list the handle, unless it is `any` or the calling agent itself. An
+   unlisted handle is refused with both handles, the allowed ones and `agents_subagents_set`; an unknown or disabled
+   one is refused with the valid handles. A default that no longer exists is refused the same way, so it is noticed.
+3. The tool gets the agent's route, preset and a preamble (`Work as @handle — Name.`, the description and the
+   instructions, clipped to 4,000 characters; nothing for the bare built-in `@dsh`; no routine). It reserves the child's
+   Session id and awaits `record`, which stores the agent as the child's `explicit` agent, before the child exists, so
+   tool-search applies that agent's tools from the child's first request.
+4. `list_subagent_models` with no arguments lists the agents the caller may start, the default, and how to change it.
+
+A child started this way is not added to the agent's thread list (that list holds dispatches).
+
+## Composer
+
+Both controls sit in the composer's left tool row (`conversation.input.left`), from `src/composer-wiring.tsx`.
+
+**A new thread starts as the project's default agent.** The chip shows the agent a new thread starts as: a message that
+starts with an `@agent` mention → the agent picked in the chip for this one thread → the project's default agent (a
+thread workspace counts for its project) → `@dsh` (`ComposerAgent.resolve`, `src/composer-agent.ts`). It shows once the
+project has a default, a pick was made, or any enabled agent of the person's own exists; someone without agents never
+sees it. Its menu switches this one thread to another agent or `@dsh`, and **Make @x this project's default** / **Stop
+using @x as this project's default** set or clear the default (`setProjectDefault`, the same
+`agents_project_default_set` the Agent has).
+
+The first send applies it the way a dispatch does, through rich-composer's `composer-send` registry
+(`src/composer-agent-preparer.ts`): the agent's Agent preset (staged on a local draft, else `agentPresets.select` on
+the blank Session), its model route unless the person picked a model for the draft, a thread title from the request,
+and an opening message from `AgentDispatch.composerMessage` (identity, instructions and routine, then the text exactly
+as typed). The Host decides the project default (or `@dsh`) itself when the thread's agent attaches, so the thread's
+agent is recorded (`recordThreadAgent`) only when it differs from that decision — a pick, a mention, or a blank Session
+the Host already decided before the project got its default. A slash command as the first message is sent as typed. A
+Host step that fails is logged and skipped; the message still goes out. The pick is page state of one draft (no tool).
+
+**A running thread shows its tools.** The Tools control names the thread's agent and how it was decided (agent,
+project default, override, default; "decided at its next request" while the Host has not recorded it yet). Its menu
+switches this thread to another agent's tools or **All tools**, and **Reset to @x's tools** clears the override
+(`threadAccess`, `setThreadOverride` / `agents_thread_override_set`). It says that the change applies from the
+thread's next request.
+
+Both menus open on a click or Enter/Space, not on pointer-down: on a phone the kit shows a menu as a sheet over the
+composer, and a pointer-down open let the finger's release choose the row under it. At pane-narrow widths the chip
+drops "as" and the Tools control shows its wrench alone (its accessible name keeps the words); touch targets are 44 px.
+
+| Composer at 390 px                                                                        | Tools at 390 px                                                                  |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| ![The agent chip's menu as a sheet at 390 px](docs/screenshots/composer-agent-narrow.png) | ![The Tools menu as a sheet at 390 px](docs/screenshots/thread-tools-narrow.png) |
 
 ## Decisions
 
@@ -126,7 +252,8 @@ See [research.md](docs/research.md) for the reference-product comparison and the
 - A handle is the identity: it cannot be renamed after creation.
 - 50 threads are kept per agent, newest first; an older row is pruned on dispatch.
 - Memory, routines and delegation targets are per agent (see above). Delegation target _handles_ apply to messaging;
-  subagents and workflows are allowed or refused as a whole, because the native tools expose no target to filter.
+  `delegation.subagents` allows or refuses subagents and workflows as a whole, and `subagents.allowed` then narrows
+  which agents a `subagent` child may run as. Workflow children and `subagent_fork` children keep the parent's agent.
 - A routine is text, not a parsed rule: the thread decides the timing with the schedule tool, so the schedule record
   stays the single source of truth and the panel reads it back from the Host's catalog.
 
@@ -138,7 +265,9 @@ pnpm typecheck
 pnpm build
 DSHX_E2E_ONLY=agents node --run check:e2e    # from the repository root
 node --run screenshots -- --only agents       # refresh docs/screenshots/agent-registry.png
+node --run screenshots -- --only agents --feature agent-tools-tree   # the Tools tree
 ```
 
 The journeys live in `tooling/dshx/e2e/features/agents.feature`: mention dispatch from a backlog comment, creating an
-agent and keeping its settings, thread history after a reload, and inline `@` completion in the comment box.
+agent and keeping its settings, thread history after a reload, inline `@` completion in the comment box, and choosing
+an agent's tools and default project with the keyboard, then keeping and resetting them across a reload.

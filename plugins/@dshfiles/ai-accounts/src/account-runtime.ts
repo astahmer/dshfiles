@@ -25,7 +25,17 @@ interface AccountRuntime {
   rejectedRoutes?: readonly string[]
   refreshModelCatalog?: (instanceId: string) => Promise<void>
   /** Uncurated metadata for editing, including hidden model efforts and native provider defaults. */
-  modelCatalogForEditing?: (instanceId: string) => Promise<readonly (LlmResolvedModelInfo & { readonly accountAdditional: boolean })[]>
+  modelCatalogForEditing?: (instanceId: string) => Promise<
+    readonly (LlmResolvedModelInfo & {
+      readonly accountAdditional: boolean
+      /** The provider's default window, before this account's override. */
+      readonly defaultContextWindow?: number
+      /** The largest window the provider accepts, when it disclosed one (Codex `max_context_window`). */
+      readonly maxContextWindow?: number
+    })[]
+  >
+  /** The largest context window per model id one account's provider disclosed; empty when it disclosed none. */
+  maxContextWindows?: (instanceId: string) => ReadonlyMap<string, number>
   usageCache?: UsageSnapshotPromise
   /** The last quota sweep, kept past a cache invalidation: the overage guard follows the last reading, not a cache state. */
   lastUsage?: AccountsUsage

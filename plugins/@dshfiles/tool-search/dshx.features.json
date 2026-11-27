@@ -133,6 +133,90 @@
           "testName": "records an Effect span when a tool search runs"
         }
       ]
+    },
+    {
+      "id": "agent-tool-access",
+      "title": "Tools per agent: enabled and pinned",
+      "summary": "The thread's agent decides which tools reach it. tool-search declares the @dshfiles/tool-search/access contract (the dshfilesToolAccess Cordis service, provided by @dshfiles/agents): every tool is on by default, a disabled tool or group is never declared, searched, proxied or called, a pinned one is declared from the first request, and a per-thread override applies from the next request. tool_search_access shows the calling thread's agent and effective access.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: agent tool tool_search_access; contract module @dshfiles/tool-search/access",
+      "configuration": [],
+      "states": ["no-provider", "agent", "override", "project-default", "default"],
+      "failureModes": [
+        "Without a provider every tool is on and nothing beyond alwaysVisible is pinned, as before.",
+        "A provider that throws while an agent attaches leaves that agent unattached and logs a warning naming the cause.",
+        "tool_search and tool_call are never disabled, whatever an entry says."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-disabled-everywhere",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "keeps a disabled tool out of the declarations, tool_search, tool_call and a direct call, and declares a pinned one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-groups",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "lets a tool entry beat its group, disables a tool that appears later in a disabled group, and enables a new group"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-override",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "switches a thread to an override from its next request and back again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-subject",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "hands the provider a subagent's parent Session and resolves it once"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-no-provider",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "leaves every tool on without a provider, as before"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-precedence",
+          "file": "plugins/@dshfiles/tool-search/src/access.test.ts",
+          "testName": "lets a tool entry beat its group entry, field by field, and the group beat the default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-later-tools",
+          "file": "plugins/@dshfiles/tool-search/src/access.test.ts",
+          "testName": "disables a tool added later to a disabled group, and enables one from a group never configured"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-search.access-reserved",
+          "file": "plugins/@dshfiles/tool-search/src/access.test.ts",
+          "testName": "never disables tool-search itself"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "tool-search.access-no-browser-surface",
+          "reason": "tool-search has no browser surface; the agents plugin owns the controls (its UI wave), and the AgentLoop integration tests drive declarations, tool_search, tool_call and direct calls through a real Host context."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "tool search access change",
+          "file": "plugins/@dshfiles/tool-search/src/cache-safe.integration.test.ts",
+          "testName": "switches a thread to an override from its next request and back again"
+        }
+      ]
     }
   ],
   "kind": "bundle"

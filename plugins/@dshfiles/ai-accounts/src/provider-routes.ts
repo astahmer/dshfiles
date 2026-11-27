@@ -74,7 +74,7 @@ export interface AntigravityRoute {
 export type Route = CodexRoute | KeyedRoute | ClaudeRoute | GitHubCopilotRoute | AntigravityRoute
 
 /** Routes whose model list is discovered from the account rather than read from a static catalog. */
-export type DiscoveringRoute = KeyedRoute | AntigravityRoute
+export type DiscoveringRoute = KeyedRoute | AntigravityRoute | CodexRoute
 
 const shadowHomeFor = (account: CodexAccountConfig, instanceId: string, root: string): string => {
   const explicit = account.shadowHomePath.trim()

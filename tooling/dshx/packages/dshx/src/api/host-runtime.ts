@@ -10,7 +10,6 @@ import type {
   ApiSchema,
   RegistryApiView,
   RegistryMethodView,
-  RegistryToolSource,
   RegistryToolView,
   RegistryListInput,
   RegistryListing,
@@ -29,6 +28,7 @@ import { BrowserTracesIngest } from '../tracing/browser-ingest.js'
 import { PluginStorageModel } from '../host/plugin-storage.js'
 import { PluginStorageContract } from './storage.js'
 import { ApiChannelModel } from './channel.js'
+import { ToolSourcesModel } from './tool-sources.js'
 
 // Node resolves the Connection package only where DSH itself has it installed
 // (the profile bundle tree), so load it lazily: a Host artifact built without a
@@ -340,17 +340,8 @@ async function listSkills(ctx: Context, options: { readonly cwd?: string; readon
   }
 }
 
-const toolSource = (name: string, apiOwner: string | undefined, pluginOwner: string | undefined): RegistryToolSource => {
-  if (apiOwner !== undefined) return 'api'
-  if (name.startsWith('mcp__')) return 'mcp'
-  return pluginOwner === undefined ? 'tool' : 'plugin'
-}
-
 async function describeRegistry(ctx: Context, registry: ApiRegistry, input: RegistryListInput): Promise<RegistryListing> {
-  const apiTools = new Map<string, string>()
-  for (const api of registry.apis.values()) {
-    for (const definition of Object.values(api.methods)) if (definition.tool !== undefined) apiTools.set(definition.tool.name, api.owner)
-  }
+  const apiTools = ToolSourcesModel.apiToolOwners(registry)
   const agent = viewingAgent(ctx, input.sessionId)
   const runtime = toolsOf(ctx)
   const visible = runtime?.schemas(agent) ?? []
@@ -362,7 +353,13 @@ async function describeRegistry(ctx: Context, registry: ApiRegistry, input: Regi
     const pluginOwner = definition === undefined ? undefined : registry.toolOwners?.get(definition)
     const owner = apiOwner ?? pluginOwner
     const readOnly = definition?.isConcurrencySafe !== undefined
-    const view = { name: schema.name, description: schema.description, source: toolSource(schema.name, apiOwner, pluginOwner), readOnly, enabled }
+    const view = {
+      name: schema.name,
+      description: schema.description,
+      source: ToolSourcesModel.classify(schema.name, apiOwner, pluginOwner),
+      readOnly,
+      enabled,
+    }
     if (owner !== undefined) Object.assign(view, { owner })
     return view
   }

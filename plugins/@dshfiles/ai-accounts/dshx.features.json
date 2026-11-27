@@ -467,8 +467,8 @@
     {
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Choose the models each provider offers and how requests spread across accounts with the same model.",
-      "details": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover.",
+      "summary": "Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.",
+      "details": "Curate provider model lists and reasoning defaults; add or remove manually entered model IDs; then route requests through sticky, priority, round-robin, or balanced pools of compatible same-provider, same-model accounts with matching request capabilities and cooldown-aware failover. Codex accounts list the models their plan exposes from the ChatGPT backend (visible ones only) with its context windows, and each account can raise a model's context window up to the backend maximum.",
       "reach": [
         "seed tool-call-thread",
         "click tab \"Settings\"",
@@ -525,7 +525,9 @@
         "A stream that sends no data until its idle timeout names its route, model and silence in the retry rows; a turn it stops tells the user to Resume or pick another model, and how to turn on stalled-stream fallback.",
         "Only manually added IDs absent from the provider catalog get a delete action; provider models remain provider-owned.",
         "A Mistral model offers only the reasoning efforts Mistral accepts for it, never an Off that would send a rejected `none`.",
-        "A Mistral model that Mistral documents as reading images offers image input even when its catalog entry leaves vision out."
+        "A Mistral model that Mistral documents as reading images offers image input even when its catalog entry leaves vision out.",
+        "A failed Codex model discovery keeps the previous (or static pi-ai) model list and logs a warning naming the account and how to retry or sign in again.",
+        "A context window override above the provider's disclosed maximum is saved and applied as that maximum."
       ],
       "externalDependencies": [
         {
@@ -628,6 +630,30 @@
           "id": "ai-accounts.discovered-model-capabilities",
           "file": "plugins/@dshfiles/ai-accounts/src/provider-profile.test.ts",
           "testName": "keeps the context window and image input a provider catalog reports"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.codex-model-discovery",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "offers a listed model absent from the static catalog as a complete Codex model with the backend window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.codex-discovery-fallback",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "keeps the previous model list when a refresh fails"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.context-window-override",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "applies a window override clamped to the backend maximum, and DSH resolves the clamped window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.context-window-editor",
+          "file": "plugins/@dshfiles/ai-accounts/src/model-curation.test.tsx",
+          "testName": "offers context windows up to the provider maximum and keeps the account inheriting"
         }
       ],
       "telemetry": [
@@ -644,6 +670,12 @@
           "span": "ai-accounts provider request",
           "file": "plugins/@dshfiles/ai-accounts/src/provider-request.test.ts",
           "testName": "records an ai-accounts provider request span with host and status, never the path or credentials"
+        },
+        {
+          "kind": "custom",
+          "span": "ai-accounts provider request",
+          "file": "plugins/@dshfiles/ai-accounts/src/codex-model-catalog.test.ts",
+          "testName": "sends the Codex CLI headers and records a catalog provider request span without the token"
         }
       ]
     },

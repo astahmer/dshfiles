@@ -254,6 +254,11 @@ export class ThreadStart extends Context.Service<
         // A resume prompts the same request id again: the Host answers `accepted` for a message it already has (inbox or
         // log), so a retried start never delivers its opening message twice and never drops it either.
         yield* keepAlive(input.intent.id)
+        // Recorded before the opening message, so the thread's first request already has this agent's tools.
+        if (input.agent !== null)
+          yield* agents
+            .recordUse({ handle: input.agent.handle, thread: { sessionId, title } })
+            .pipe(Effect.catch(error => Effect.logWarning(`backlog: agent @${input.agent?.handle ?? ''} thread history was not updated`, error)))
         const content: PromptContentPart[] = [{ type: 'text', text: message }]
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- the prompt parts keep the item's attachment order.
         for (const attachment of attachments) {
@@ -268,10 +273,6 @@ export class ThreadStart extends Context.Service<
           .prompt({ requestId: requestIdOf(input.intent.promptRequestId), sessionId, mode: 'queue', content })
           .pipe(Effect.mapError(cause => new ThreadContextNotDelivered({ sessionId, cause })))
         yield* keepAlive(input.intent.id)
-        if (input.agent !== null)
-          yield* agents
-            .recordUse({ handle: input.agent.handle, thread: { sessionId, title } })
-            .pipe(Effect.catch(error => Effect.logWarning(`backlog: agent @${input.agent?.handle ?? ''} thread history was not updated`, error)))
         const linked: number[] = []
         // oxlint-disable-next-line effect-antislop/no-sequential-effect-yield-in-loop -- each link is one serialized store write and `linked` keeps the request order.
         for (const detail of input.details) {

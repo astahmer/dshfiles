@@ -34,7 +34,12 @@
     "@dshfiles/dshx": "workspace:*",
     "@dshfiles/input-trigger": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
+    "@dshfiles/rich-composer": "workspace:*",
+    "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
+    "@dshfiles/tool-search": "workspace:*",
+    "@dshfiles/tool-subagent": "workspace:*",
+    "@dshfiles/vcs-provider-port": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

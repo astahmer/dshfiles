@@ -26,7 +26,20 @@ const codexResponseEventSchema = Schema.Struct({
   }),
 })
 
-const CODEX_FAST_MODE_MODEL_IDS = new Set(['gpt-6-astra', 'gpt-6-luna', 'gpt-6-sol', 'gpt-6.1-sol', 'gpt-5.6-luna', 'gpt-5.6-sol', 'gpt-5.6-terra', 'gpt-5.5'])
+// gpt-6.2-astra and gpt-6.2-sol list the same `priority` ("Fast") service tier as gpt-6.1-sol at
+// `/backend-api/codex/models` (sample: src/fixtures/codex-models.json, 2026-11-25).
+const CODEX_FAST_MODE_MODEL_IDS = new Set([
+  'gpt-6-astra',
+  'gpt-6-luna',
+  'gpt-6-sol',
+  'gpt-6.1-sol',
+  'gpt-6.2-astra',
+  'gpt-6.2-sol',
+  'gpt-5.6-luna',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'gpt-5.5',
+])
 
 export const isCodexFastModeModel = (model: { readonly api: string; readonly id: string }): boolean =>
   model.api === 'openai-codex-responses' && CODEX_FAST_MODE_MODEL_IDS.has(model.id)

@@ -21,6 +21,8 @@ const draft = (fields: Partial<Omit<AgentDraft, 'tone'>> = {}): Omit<AgentDraft,
   memoryScope: null,
   routine: '',
   delegation: { messaging: 'any', handles: [], subagents: true },
+  tools: { tools: {}, groups: {} },
+  subagents: { allowed: 'any', default: null },
   enabled: true,
   ...fields,
 })

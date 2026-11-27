@@ -1,13 +1,12 @@
 import type { WorkspaceView } from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type { WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { workCountParts, type WorkCountPart, type WorkCountWords } from '@dshfiles/plugin-ui/lib/work-count'
+import { type ThreadDirectories, WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 import type { ProjectColorPalette } from './organization.js'
 import type { ProjectChip } from './project-colors.js'
-import type { ThreadDirectories } from './thread-directories.js'
 import type { SubagentTerminal } from './subagent-provenance/subagent-feed.js'
 import type { SubagentModelRoute } from './subagent-provenance/route-label.js'
 import type { ThreadWorkStatus } from './thread-status-client.js'
-import { WorkspacePaths } from './workspace-paths.js'
 
 /**
  * The phone thread header's second line (council round 17 B2.2): `[mark] project · Working · 1 subagent`, the thread

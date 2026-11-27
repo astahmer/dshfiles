@@ -50,7 +50,7 @@ interface AgentContext {
 
 interface TestAgent {
   readonly id: string
-  readonly session: { readonly requestHeader: () => { readonly tools?: ToolSchema[] } | undefined }
+  readonly session: { readonly requestHeader: () => { readonly tools?: ToolSchema[] } | undefined; readonly header: Record<never, never> }
   readonly ctx: AgentContext
 }
 
@@ -138,6 +138,7 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
             ...(restored.length === 0 ? [] : [schema('tool_search', 'Search global tools')]),
           ],
         }),
+        header: {},
       },
       ctx: context,
     }
@@ -150,6 +151,8 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
   const providers = new Map<string, ToolSearchVisibility>()
   const root = {
     tools: {
+      /** The plugin's own global tool (tool_search_access) stays out of the fixture catalog. */
+      register: () => () => undefined,
       schemas: (scope?: TestAgent) => (scope === undefined ? [...schemas.values()] : visibleGlobals(scope)),
       get: (name: string, scope?: TestAgent) => {
         const tool = globalTools.get(name)
@@ -162,6 +165,8 @@ const harness = async (plugin: BuiltPlugin, options: { readonly restored?: reado
       providers.set(name, value)
     },
     get: (name: string) => providers.get(name),
+    /** No tool access provider is ever provided here: the watcher waits on nothing. */
+    inject: () => ({ dispose: async () => undefined }),
     once: () => () => undefined,
     emit: () => undefined,
     parallel: () => undefined,

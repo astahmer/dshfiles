@@ -1259,9 +1259,24 @@ importers:
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
+      '@dshfiles/rich-composer':
+        specifier: workspace:*
+        version: link:../rich-composer
+      '@dshfiles/session-controller':
+        specifier: workspace:*
+        version: link:../session-controller
       '@dshfiles/shared-runtime':
         specifier: workspace:*
         version: link:../shared-runtime
+      '@dshfiles/tool-search':
+        specifier: workspace:*
+        version: link:../tool-search
+      '@dshfiles/tool-subagent':
+        specifier: workspace:*
+        version: link:../tool-subagent
+      '@dshfiles/vcs-provider-port':
+        specifier: workspace:*
+        version: link:../vcs-provider-port
       effect:
         specifier: 'catalog:'
         version: 4.1.2
@@ -32121,7 +32136,7 @@ snapshots:
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.3.2(@types/node@22.19.20)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
+      vite: 8.3.2(@types/node@22.20.5)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.1)
 
   '@vitest/pretty-format@4.1.12':
     dependencies:

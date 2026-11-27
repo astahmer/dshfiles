@@ -3,7 +3,7 @@ import { defineConfig } from '@dshfiles/dshx'
 
 export default defineConfig({
   name: '@dshfiles/agents',
-  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts' },
+  host: { dshxRuntime: 'snapshot', entry: 'src/host.ts', bundleDependencies: ['@dshfiles/vcs-provider-port'] },
   client: { entry: 'src/client-entry.tsx', dshxRuntime: 'shared', shared: '@dshfiles/shared-runtime', vite: { plugins: [pluginUiVite()] } },
   modules: { contract: 'src/contract.ts' },
   build: { sourcemap: true, declarations: true, minify: true },

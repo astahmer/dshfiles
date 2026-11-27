@@ -32,6 +32,7 @@ import { readConversationDraft } from '../stores.ts'
 import { AgentWarmup } from '../../agent-warmup.ts'
 import { observeSessionDraft } from '../../session-draft-tracking.ts'
 import { submitMaterializedDraft } from '../../draft-submission.ts'
+import { ComposerSendPipeline } from '../../composer-send-pipeline.ts'
 import type {} from '@dshfiles/session-controller/draft-client'
 import { isRetainedScope } from '../../retained-scope.ts'
 
@@ -297,6 +298,8 @@ export class InputHub implements SessionInputResolver {
     if (text === '' && attachmentIds.length === 0) {
       return session.prompt([], mode, signal).then(result => result.ok ? { kind: 'success' } : { kind: 'error' })
     }
+    // Read before creation settles: a new thread's first message passes through the send preparers (composer-send).
+    const firstMessage = session.getSnapshot().blank
     return whileSessionRetained({
       sessions: this.sessions(),
       session,
@@ -312,7 +315,12 @@ export class InputHub implements SessionInputResolver {
           void drafts.retry(session.sessionId).catch(() => undefined)
           await drafts.whenCreated(session.sessionId, waiterSignal)
         },
-        send: () => this.conversation().sendSession(session, text, attachmentIds, mode, signal, accept),
+        send: async () => {
+          const outgoing = firstMessage && text !== ''
+            ? await ComposerSendPipeline.prepare({ sessionId: session.sessionId, text, signal })
+            : text
+          return this.conversation().sendSession(session, outgoing, attachmentIds, mode, signal, accept)
+        },
       }),
     })
   }

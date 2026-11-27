@@ -6,7 +6,7 @@
       "id": "agent-registry",
       "title": "Manage agents",
       "summary": "Create, edit and remove agents with their own instructions, model and tools, shared by every browser.",
-      "details": "Create, edit, enable, duplicate and remove agents \u2014 handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort \u2014 from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
+      "details": "Create, edit, enable, duplicate and remove agents — handle, name, glyph, description, instructions, Agent preset, model route and reasoning effort — from one Host-owned registry every browser and agent reads. The panel lists each agent with its glyph, handle, model and an enable switch; the editor groups identity, instructions, model and tools, delegation, and memory and routine, checks fields inline with a fix for each problem, and asks before dropping unsaved edits; a new agent can start from a template; removal asks first and offers Undo. An agent keeps the threads it started (history and usage survive a Host restart), an optional routine line rides the opening message while the panel reads the reminders back from the Host's schedule catalog, and delegation targets constrain which Agents that agent's threads may message. On a phone the list and the editor take the whole pane in turn. A built-in @dsh agent ships with the harness defaults and cannot be deleted. Thread rows in the thread sidebar show the @handle of the agent that started the thread (agents.threadHandles), falling back to the preset chip.",
       "reach": [
         "click button \"Agents\"",
         "expect text \"Start from a template\"",
@@ -16,12 +16,28 @@
         "expect text \"Saved.\"",
         "expect text \"@reviewer\""
       ],
-      "surfaces": ["client", "host", "storage", "tool"],
+      "surfaces": [
+        "client",
+        "host",
+        "storage",
+        "tool"
+      ],
       "surface": "destinationSection",
       "destination": "agents",
       "currentSurface": "left-nav: Agents",
       "configuration": [],
-      "states": ["empty", "built-in-only", "editing", "unsaved", "invalid", "enabled", "disabled", "thread-history", "delegation-listed", "removed-undoable"],
+      "states": [
+        "empty",
+        "built-in-only",
+        "editing",
+        "unsaved",
+        "invalid",
+        "enabled",
+        "disabled",
+        "thread-history",
+        "delegation-listed",
+        "removed-undoable"
+      ],
       "failureModes": [
         "A handle is a slug; a name alone is enough to create one.",
         "Removing the built-in @dsh agent is refused and reported.",
@@ -104,7 +120,7 @@
           "kind": "unit-test",
           "id": "agents.registry-thread-prune",
           "file": "plugins/@dshfiles/agents/src/store.test.ts",
-          "testName": "lists an agent\u2019s threads newest first and drops one when the agent goes"
+          "testName": "lists an agent’s threads newest first and drops one when the agent goes"
         },
         {
           "kind": "gherkin",
@@ -121,7 +137,7 @@
           "kind": "unit-test",
           "id": "agents.routine-schedule-catalog",
           "file": "plugins/@dshfiles/agents/src/dispatch.test.ts",
-          "testName": "narrows the schedule catalog to one agent\u2019s threads"
+          "testName": "narrows the schedule catalog to one agent’s threads"
         },
         {
           "kind": "unit-test",
@@ -241,13 +257,22 @@
       "id": "agent-mentions",
       "title": "Mention an agent where a thread starts",
       "summary": "Start a thread on an agent by typing its @handle at the start of your message.",
-      "details": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was \u2014 the backlog reports the new thread in a toast whose Open action shows it \u2014 the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
-      "surfaces": ["client", "host", "tool"],
+      "details": "A leading @handle dispatches an ordinary thread on that agent: its preset, its model route, its instructions and the user's text as the opening prompt. The dispatch stays where it was — the backlog reports the new thread in a toast whose Open action shows it — the @ menu lists enabled agents, @agent:/@a: narrows it, another source's scope stays empty, and a backlog comment box completes agent handles inline without hijacking @b:/@t:/@f:.",
+      "surfaces": [
+        "client",
+        "host",
+        "tool"
+      ],
       "surface": "composerContribution",
       "destination": "composer",
       "currentSurface": "composer: @agent mention",
       "configuration": [],
-      "states": ["idle", "mentioned", "dispatched", "reported"],
+      "states": [
+        "idle",
+        "mentioned",
+        "dispatched",
+        "reported"
+      ],
       "failureModes": [
         "An unknown handle stays a plain comment.",
         "A disabled agent is not offered and does not dispatch.",
@@ -255,7 +280,9 @@
       ],
       "externalDependencies": [],
       "onboarding": {
-        "prerequisites": ["account"],
+        "prerequisites": [
+          "account"
+        ],
         "firstAction": "Start a new thread with @ followed by an agent's handle and your request.",
         "doneWhen": "A thread runs on that agent with your text as its first prompt."
       },
@@ -287,7 +314,7 @@
           "kind": "unit-test",
           "id": "agents.comment-autocomplete-scopes",
           "file": "plugins/@dshfiles/backlog/src/inline-completion.test.ts",
-          "testName": "another source\u2019s scope keeps its own meaning, so no agent row appears"
+          "testName": "another source’s scope keeps its own meaning, so no agent row appears"
         },
         {
           "kind": "gherkin",
@@ -305,19 +332,30 @@
           "source": "agent-tool"
         }
       ],
-      "reach": ["fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@agent:\"", "expect text \"@dsh\""]
+      "reach": [
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"@agent:\"",
+        "expect text \"@dsh\""
+      ]
     },
     {
       "id": "agent-mention-preview",
       "title": "Preview an agent from its mention",
       "summary": "Click an agent's @handle anywhere to see its card with its model, tools, instructions and recent threads.",
       "details": "Every rendered @{handle} reference (and legacy @handle mention) that names a saved agent becomes a link: clicking it (or pressing Enter) opens a card above the reference with the agent's glyph, name, description, model route, tool preset, memory scope, delegation, routine, instructions and its recent threads, and an Open in Agents action selects it in the panel. The card follows the reference while the conversation scrolls; an unknown, removed or misspelled handle stays plain text, so an email address or a menu scope never becomes a link.",
-      "surfaces": ["client"],
+      "surfaces": [
+        "client"
+      ],
       "surface": "entityProvider",
       "destination": "agents",
       "currentSurface": "overlay: shared reference preview card (input-trigger entity registry), agent kind",
       "configuration": [],
-      "states": ["known-agent", "disabled-agent", "removed-agent", "many-mentions", "thread-history"],
+      "states": [
+        "known-agent",
+        "disabled-agent",
+        "removed-agent",
+        "many-mentions",
+        "thread-history"
+      ],
       "failureModes": [
         "An unknown handle stays plain text.",
         "A removed agent's mention stays plain text until the registry list refreshes.",
@@ -389,6 +427,406 @@
         "click button \"Reply\"",
         "click button \"Preview agent @luna\"",
         "expect button \"Open in Agents\""
+      ]
+    },
+    {
+      "id": "agent-tool-access",
+      "title": "An agent decides its threads' tools",
+      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; editor UI in agent-tools-tree",
+      "configuration": [],
+      "states": [
+        "explicit",
+        "inherited",
+        "project-default",
+        "default",
+        "override-agent",
+        "override-all"
+      ],
+      "failureModes": [
+        "A project default naming a removed agent falls back to @dsh for threads started afterwards.",
+        "An override naming an unknown agent is refused (missing-agent) and the thread keeps its tools.",
+        "A custom threads directory is attributed by the default <repository>-threads layout until the VCS providers' answer lands."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-agent-order",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "decides a thread agent in order: explicit, inherited by a subagent, project default (thread workspaces too), then @dsh"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-agent-stable",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "keeps a decided thread on its agent and tools when the project default or the agent changes, across a restart"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-override",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "sets, reports and clears a thread override, and refuses an unknown agent"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-late-dispatch",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "makes a dispatch recorded after the thread attached its explicit agent and reports the change"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-access-edits",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "edits tool access entry by entry and reverses an edit, and stores subagent choices"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-access-provider",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "provides dshfilesToolAccess on the Host while the plugin lives and withdraws it on unload"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.api-schema-parity",
+          "file": "plugins/@dshfiles/agents/tests/api-schema-parity.spec.ts",
+          "testName": "keeps the published API and agent-tool schemas stable"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.tool-access-host-contract",
+          "reason": "Host contract and agent tools; the browser journey that edits and reloads tool access is agents.tool-access-tree under agent-tools-tree."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "subagent-agents",
+      "title": "A subagent starts as a configured agent",
+      "summary": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own agent); unknown, disabled or unlisted handles are refused with the handles involved and agents_subagents_set. The child gets the agent's route, preset and a bounded preamble, and its Session is recorded as the agent's explicit thread before it exists, so tool-search applies that agent's tools from its first request. list_subagent_models lists the agents a caller may start.",
+      "surfaces": [
+        "host",
+        "integration"
+      ],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: the dshfilesSubagentAgents Cordis service, read by @dshfiles/tool-subagent's subagent and list_subagent_models tools",
+      "configuration": [],
+      "states": [
+        "inherit",
+        "agent",
+        "default-agent",
+        "refused"
+      ],
+      "failureModes": [
+        "Without @dshfiles/tool-subagent's rows in the profile, the native subagent tool has no agent argument and children inherit their parent's agent.",
+        "A default naming a removed agent refuses subagent calls that omit agent until the default is changed or agent is passed.",
+        "subagent_fork and workflow children keep the parent's agent; only subagent takes agent."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.subagent-rules",
+          "file": "plugins/@dshfiles/agents/src/subagent-agents.test.ts",
+          "testName": "refuses an unlisted handle naming both handles, the allowed ones and how to change it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.subagent-default",
+          "file": "plugins/@dshfiles/agents/src/subagent-agents.test.ts",
+          "testName": "starts the parent's default agent when none is named"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.subagent-provider",
+          "file": "plugins/@dshfiles/agents/src/store.test.ts",
+          "testName": "provides dshfilesSubagentAgents: a default agent recorded for the child before it attaches, refusals, a listing"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.subagent-no-ui",
+          "reason": "Host-only contract: the Subagents controls belong to the Agents panel wave; the tool side is covered by @dshfiles/tool-subagent unit tests on the real runtimes."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ]
+    },
+    {
+      "id": "agent-tools-tree",
+      "title": "Choose an agent's tools, subagents and projects",
+      "summary": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through tool_search), a filter by name or description and an N of M selected count. Each row says whether its state is set on it or inherited from its group, and a reset drops an explicit entry. Collapsed groups render one row and expanded ones a page at a time, and the tree has one tab stop (arrows, Space, P, Delete). Delegation picks which agents subagents may run as and the default one; Default for projects picks the projects this agent is the default of, showing the agent each uses now. One Save sends the agent's changed fields, one setToolAccess batch of sparse edits, subagents and project defaults; threads started afterwards get them.",
+      "reach": [
+        "click tab \"Agents\"",
+        "click button \"New agent\"",
+        "fill textbox \"Name\" \"Reviewer\"",
+        "click treeitem \"DSH, DSH*\"",
+        "click treeitem \"read, default\"",
+        "expect treeitem \"read, set here, unsaved\"",
+        "expect text \"unsaved*\"",
+        "click button \"Pin present\"",
+        "expect treeitem \"present, pinned, set here, unsaved\"",
+        "click textbox \"Filter tools\"",
+        "expect text \"2 unsaved*\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Agents*\"",
+        "click button \"New agent\"",
+        "fill textbox \"Name\" \"Reviewer\"",
+        "click treeitem \"DSH, DSH*\"",
+        "click treeitem \"read, default\"",
+        "expect treeitem \"read, set here, unsaved\"",
+        "expect text \"unsaved*\"",
+        "click button \"Pin present\"",
+        "expect treeitem \"present, pinned, set here, unsaved\"",
+        "click textbox \"Filter tools\"",
+        "expect text \"2 unsaved*\""
+      ],
+      "surfaces": ["client"],
+      "surface": "destinationSection",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents › agent editor › Tools, Delegation, Default for projects",
+      "configuration": [],
+      "states": ["collapsed", "expanded", "filtered", "inherited", "set-here", "pinned", "unsaved", "catalog-error", "no-projects"],
+      "failureModes": [
+        "A tool list that fails to load says so with Retry and the restart hint for an updated Host.",
+        "A default subagent outside the allowed list blocks the save, with a fix to use the parent thread's agent.",
+        "A save that fails part-way keeps the remaining edits dirty against the refreshed agent, so saving again sends only what is missing.",
+        "tool_search and tool_call stay selected whatever their group says."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "gherkin",
+          "id": "agents.tool-access-tree",
+          "featureFile": "tooling/dshx/e2e/features/agents.feature"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-tristate",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "a group checkbox is checked, cleared or mixed by its children"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-inherited",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "a tool shows whether its state is set on it or inherited from its group"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-batch",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "the save batch holds one edit per changed entry, null for a removed one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tool-tree-reset",
+          "file": "plugins/@dshfiles/agents/src/tool-tree.test.ts",
+          "testName": "toggling back to the inherited value leaves no entry, and reset drops an entry"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.save-plan-tools-only",
+          "file": "plugins/@dshfiles/agents/src/agent-save-plan.test.ts",
+          "testName": "a tools-only change sends one setToolAccess batch and no whole-agent save"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.save-plan-projects",
+          "file": "plugins/@dshfiles/agents/src/agent-save-plan.test.ts",
+          "testName": "project picks set new defaults and clear only projects this agent holds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.tools-tree-keyboard",
+          "file": "plugins/@dshfiles/agents/src/agent-tools-tree.test.tsx",
+          "testName": "opens a group with the keyboard, pages long groups, and toggles and pins tools"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
+    },
+    {
+      "id": "composer-agent",
+      "title": "Start a new thread as the project's default agent",
+      "summary": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the person picked a model for the draft), the recorded thread agent and an opening message with its instructions ahead of the text as typed. The chip's menu switches this one thread to another agent or @dsh, and makes the shown agent the project's default or stops it being one; a message that starts with an @agent mention runs as that agent instead.",
+      "surfaces": ["client", "host", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: new-thread agent chip",
+      "configuration": [],
+      "states": ["hidden", "project-default", "picked", "mentioned", "sent"],
+      "failureModes": [
+        "Someone with no agents of their own and no project default sees no chip; the composer is unchanged.",
+        "A preset, model or record step the Host refuses is logged and skipped; the message still goes out with the agent's instructions.",
+        "A slash command as the first message is sent as typed and leaves the thread's agent undecided.",
+        "A project default that names a removed or disabled agent falls back to @dsh, as the Host's resolution does."
+      ],
+      "externalDependencies": [],
+      "onboarding": {
+        "firstAction": "In a new thread, open the \"as @agent\" chip beside the composer's tools and make an agent this project's default.",
+        "doneWhen": "New threads in that project start as that agent without picking it."
+      },
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-project-default",
+          "file": "plugins/@dshfiles/agents/src/composer-agent.test.ts",
+          "testName": "starts a new thread as the project default agent with no manual step"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-mention-wins",
+          "file": "plugins/@dshfiles/agents/src/composer-agent.test.ts",
+          "testName": "a leading mention wins over the pick and the project default"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-first-send",
+          "file": "plugins/@dshfiles/agents/src/composer-agent-preparer.test.ts",
+          "testName": "starts the thread as the project default agent: preset, model and instructions, no manual step"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-agent-chip",
+          "file": "plugins/@dshfiles/agents/src/composer-agent-chip.test.tsx",
+          "testName": "shows the project default agent with no manual step"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.composer-send-preparers",
+          "file": "plugins/@dshfiles/rich-composer/src/draft-retry.test.ts",
+          "testName": "send the first message of a blank Session as the preparers rewrote it"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.composer-agent-no-gherkin-journey",
+          "reason": "Its reach steps walk it on a scratch DSH with dshx dev open (create an agent, pick it in the chip, make it the project default); the resolution order, the first send and the chip states are unit-tested, and the send hook itself in rich-composer's draft-retry.test.ts through the real composer shell."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "reach": [
+        "click tab \"Agents\"",
+        "expect text \"Start from a template\"",
+        "click button \"Reviews diffs and pull requests*\"",
+        "expect textbox \"Instructions\"",
+        "click button \"Create agent\"",
+        "expect text \"Saved.\"",
+        "click button \"New thread\"",
+        "click button \"New thread runs as @dsh (default). Change agent\"",
+        "click text \"@reviewer\"",
+        "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+        "click menuitem \"Make @reviewer this project’s default\"",
+        "expect button \"New thread runs as @reviewer (project default). Change agent\"",
+        "click button \"New thread\"",
+        "click button \"New thread runs as @reviewer (project default). Change agent\"",
+        "expect menuitem \"Stop using @reviewer as this project’s default\""
+      ]
+    },
+    {
+      "id": "thread-tools",
+      "title": "See and switch a running thread's tools",
+      "summary": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread's next request, the same agents_thread_override_set the Agent has.",
+      "surfaces": ["client", "host", "tool"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: Tools control",
+      "configuration": [],
+      "states": ["agent", "project-default", "override", "default", "preview"],
+      "failureModes": [
+        "An override naming an agent removed meanwhile is refused with a sentence to pick another one or reset; nothing changes.",
+        "A thread whose agent is not decided yet shows the preview its next request would decide."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-tools-state",
+          "file": "plugins/@dshfiles/agents/src/thread-tools-model.test.ts",
+          "testName": "names the agent, its source and its own tools"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-tools-request",
+          "file": "plugins/@dshfiles/agents/src/thread-tools-model.test.ts",
+          "testName": "maps a choice to the override; picking the thread agent clears it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "agents.thread-tools-control",
+          "file": "plugins/@dshfiles/agents/src/composer-agent-chip.test.tsx",
+          "testName": "shows an all-tools override"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "agents.thread-tools-no-gherkin-journey",
+          "reason": "Its reach steps send a first message as the project default agent on a scratch DSH (the opening message shows its instructions) and open the Tools control; the control's states and the override request are unit-tested, and the override write is the existing agents_thread_override_set method."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        }
+      ],
+      "reach": [
+        "click tab \"Agents\"",
+        "expect text \"Start from a template\"",
+        "click button \"Reviews diffs and pull requests*\"",
+        "expect textbox \"Instructions\"",
+        "click button \"Create agent\"",
+        "expect text \"Saved.\"",
+        "click button \"New thread\"",
+        "click button \"New thread runs as @dsh (default). Change agent\"",
+        "click text \"@reviewer\"",
+        "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+        "click menuitem \"Make @reviewer this project’s default\"",
+        "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Review the open diff\"",
+        "press Enter",
+        "expect text \"Review the change for correctness first*\"",
+        "click button \"Tools: *\"",
+        "click menuitemradio \"All tools\"",
+        "expect button \"Tools: All tools*\"",
+        "click button \"Tools: *\"",
+        "expect menuitem \"Reset to @reviewer’s tools\""
       ]
     }
   ]

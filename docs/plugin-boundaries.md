@@ -18,6 +18,9 @@ When plugin A shows something that plugin B knows how to produce:
   never add an optional peer dependency to get around the cycle check.
 - **A contract module never imports the plugin that fills it**, directly or through a file it imports: the provider
   depends on the contract, not the reverse. `--only boundaries` reports it as `contract-imports-provider`.
+- **Host contracts go the same way.** When A's Host needs an answer synchronously from B's Host, A's dshx module
+  declares the Cordis service type and B registers it with `ctx.provide`; A behaves as before while nothing provides it.
+  Example: `@dshfiles/tool-search/access` declares `dshfilesToolAccess`; `@dshfiles/agents` provides it.
 
 ## Extend another owner's UI through its seats, not its DOM
 

@@ -90,3 +90,24 @@ describe('dense checkbox ink (council round 12 A3)', () => {
     expect(PaletteMath.contrastRatio(fill, p.neutral[10]!)).toBeGreaterThan(2.5)
   })
 })
+
+describe('indeterminate checkbox (a partial tools-tree group)', () => {
+  it('fills like a checked box on the on-state tokens and draws a dash instead of the tick', () => {
+    const box = render(<Checkbox aria-label="DSH group" checked="indeterminate" />).getByRole('checkbox')
+    expect(box.getAttribute('data-state')).toBe('indeterminate')
+    expect(box.getAttribute('aria-checked')).toBe('mixed')
+    expect(classes(box)).toEqual(
+      expect.arrayContaining(['dshx:group', 'dshx:data-[state=indeterminate]:bg-control-on', 'dshx:data-[state=indeterminate]:text-control-on-foreground', 'dshx:dark:data-[state=indeterminate]:bg-control-on']),
+    )
+    expect(classes(box).join(' ')).not.toContain('bg-primary')
+    const [tick, dash] = [...box.querySelectorAll('svg')]
+    expect(classes(tick ?? null)).toContain('dshx:group-data-[state=indeterminate]:hidden')
+    expect(classes(dash ?? null)).toEqual(expect.arrayContaining(['dshx:hidden', 'dshx:group-data-[state=indeterminate]:block']))
+  })
+
+  it('keeps the dense fill and the 12px marks for a partial dense box', () => {
+    const box = render(<Checkbox aria-label="Group" size="sm" checked="indeterminate" />).getByRole('checkbox')
+    expect(classes(box)).toEqual(expect.arrayContaining(['dshx:data-[state=indeterminate]:bg-control-on-dense', 'dshx:dark:data-[state=indeterminate]:bg-control-on-dense']))
+    for (const mark of box.querySelectorAll('svg')) expect(mark.getAttribute('width')).toBe('12')
+  })
+})

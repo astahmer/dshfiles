@@ -155,6 +155,87 @@
                   ],
                   "additionalProperties": false
                 },
+                "tools": {
+                  "type": "object",
+                  "properties": {
+                    "tools": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "maxProperties": 1000
+                    },
+                    "groups": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "maxProperties": 1000
+                    }
+                  },
+                  "required": [
+                    "tools",
+                    "groups"
+                  ],
+                  "additionalProperties": false
+                },
+                "subagents": {
+                  "type": "object",
+                  "properties": {
+                    "allowed": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "any"
+                          ]
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          "maxItems": 50
+                        }
+                      ]
+                    },
+                    "default": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "allowed",
+                    "default"
+                  ],
+                  "additionalProperties": false
+                },
                 "enabled": {
                   "type": "boolean"
                 },
@@ -212,6 +293,8 @@
                 "memoryScope",
                 "routine",
                 "delegation",
+                "tools",
+                "subagents",
                 "enabled",
                 "builtIn",
                 "createdAt",
@@ -314,6 +397,38 @@
                   ],
                   "additionalProperties": false
                 },
+                "tools": {
+                  "type": "object",
+                  "properties": {
+                    "tools": {
+                      "type": "object",
+                      "properties": {}
+                    },
+                    "groups": {
+                      "type": "object",
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "tools",
+                    "groups"
+                  ],
+                  "additionalProperties": false
+                },
+                "subagents": {
+                  "type": "object",
+                  "properties": {
+                    "allowed": {},
+                    "default": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "allowed",
+                    "default"
+                  ],
+                  "additionalProperties": false
+                },
                 "enabled": {
                   "type": "boolean"
                 },
@@ -347,6 +462,8 @@
                 "memoryScope",
                 "routine",
                 "delegation",
+                "tools",
+                "subagents",
                 "enabled",
                 "builtIn",
                 "createdAt",
@@ -522,6 +639,87 @@
                     ],
                     "additionalProperties": false
                   },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      },
+                      "groups": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "any"
+                            ]
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                            },
+                            "maxItems": 50
+                          }
+                        ]
+                      },
+                      "default": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
                   "enabled": {
                     "type": "boolean"
                   },
@@ -579,6 +777,8 @@
                   "memoryScope",
                   "routine",
                   "delegation",
+                  "tools",
+                  "subagents",
                   "enabled",
                   "builtIn",
                   "createdAt",
@@ -688,6 +888,38 @@
                 ],
                 "additionalProperties": false
               },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "groups": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "subagents": {
+                "type": "object",
+                "properties": {
+                  "allowed": {},
+                  "default": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "allowed",
+                  "default"
+                ],
+                "additionalProperties": false
+              },
               "enabled": {
                 "type": "boolean"
               },
@@ -721,6 +953,8 @@
               "memoryScope",
               "routine",
               "delegation",
+              "tools",
+              "subagents",
               "enabled",
               "builtIn",
               "createdAt",
@@ -926,6 +1160,87 @@
                 ],
                 "additionalProperties": false
               },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  },
+                  "groups": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "subagents": {
+                "type": "object",
+                "properties": {
+                  "allowed": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "any"
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        "maxItems": 50
+                      }
+                    ]
+                  },
+                  "default": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "allowed",
+                  "default"
+                ],
+                "additionalProperties": false
+              },
               "enabled": {
                 "type": "boolean"
               },
@@ -1112,6 +1427,87 @@
                       ],
                       "additionalProperties": false
                     },
+                    "tools": {
+                      "type": "object",
+                      "properties": {
+                        "tools": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "pinned": {
+                                "type": "boolean"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxProperties": 1000
+                        },
+                        "groups": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "pinned": {
+                                "type": "boolean"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxProperties": 1000
+                        }
+                      },
+                      "required": [
+                        "tools",
+                        "groups"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "subagents": {
+                      "type": "object",
+                      "properties": {
+                        "allowed": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "any"
+                              ]
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                              },
+                              "maxItems": 50
+                            }
+                          ]
+                        },
+                        "default": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "allowed",
+                        "default"
+                      ],
+                      "additionalProperties": false
+                    },
                     "enabled": {
                       "type": "boolean"
                     },
@@ -1169,6 +1565,8 @@
                     "memoryScope",
                     "routine",
                     "delegation",
+                    "tools",
+                    "subagents",
                     "enabled",
                     "builtIn",
                     "createdAt",
@@ -1309,6 +1707,87 @@
                     ],
                     "additionalProperties": false
                   },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      },
+                      "groups": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "any"
+                            ]
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                            },
+                            "maxItems": 50
+                          }
+                        ]
+                      },
+                      "default": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
                   "enabled": {
                     "type": "boolean"
                   },
@@ -1366,6 +1845,8 @@
                   "memoryScope",
                   "routine",
                   "delegation",
+                  "tools",
+                  "subagents",
                   "enabled",
                   "builtIn",
                   "createdAt",
@@ -1530,6 +2011,87 @@
                       ],
                       "additionalProperties": false
                     },
+                    "tools": {
+                      "type": "object",
+                      "properties": {
+                        "tools": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "pinned": {
+                                "type": "boolean"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxProperties": 1000
+                        },
+                        "groups": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                              "enabled": {
+                                "type": "boolean"
+                              },
+                              "pinned": {
+                                "type": "boolean"
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          "maxProperties": 1000
+                        }
+                      },
+                      "required": [
+                        "tools",
+                        "groups"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "subagents": {
+                      "type": "object",
+                      "properties": {
+                        "allowed": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "any"
+                              ]
+                            },
+                            {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                              },
+                              "maxItems": 50
+                            }
+                          ]
+                        },
+                        "default": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "allowed",
+                        "default"
+                      ],
+                      "additionalProperties": false
+                    },
                     "enabled": {
                       "type": "boolean"
                     },
@@ -1587,6 +2149,8 @@
                     "memoryScope",
                     "routine",
                     "delegation",
+                    "tools",
+                    "subagents",
                     "enabled",
                     "builtIn",
                     "createdAt",
@@ -1680,6 +2244,38 @@
                 "required": [
                   "messaging",
                   "handles"
+                ],
+                "additionalProperties": false
+              },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "groups": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "subagents": {
+                "type": "object",
+                "properties": {
+                  "allowed": {},
+                  "default": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "allowed",
+                  "default"
                 ],
                 "additionalProperties": false
               },
@@ -1798,6 +2394,38 @@
                       ],
                       "additionalProperties": false
                     },
+                    "tools": {
+                      "type": "object",
+                      "properties": {
+                        "tools": {
+                          "type": "object",
+                          "properties": {}
+                        },
+                        "groups": {
+                          "type": "object",
+                          "properties": {}
+                        }
+                      },
+                      "required": [
+                        "tools",
+                        "groups"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "subagents": {
+                      "type": "object",
+                      "properties": {
+                        "allowed": {},
+                        "default": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "allowed",
+                        "default"
+                      ],
+                      "additionalProperties": false
+                    },
                     "enabled": {
                       "type": "boolean"
                     },
@@ -1831,6 +2459,8 @@
                     "memoryScope",
                     "routine",
                     "delegation",
+                    "tools",
+                    "subagents",
                     "enabled",
                     "builtIn",
                     "createdAt",
@@ -1915,6 +2545,38 @@
                     ],
                     "additionalProperties": false
                   },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "properties": {}
+                      },
+                      "groups": {
+                        "type": "object",
+                        "properties": {}
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {},
+                      "default": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
                   "enabled": {
                     "type": "boolean"
                   },
@@ -1948,6 +2610,8 @@
                   "memoryScope",
                   "routine",
                   "delegation",
+                  "tools",
+                  "subagents",
                   "enabled",
                   "builtIn",
                   "createdAt",
@@ -2054,6 +2718,38 @@
                       ],
                       "additionalProperties": false
                     },
+                    "tools": {
+                      "type": "object",
+                      "properties": {
+                        "tools": {
+                          "type": "object",
+                          "properties": {}
+                        },
+                        "groups": {
+                          "type": "object",
+                          "properties": {}
+                        }
+                      },
+                      "required": [
+                        "tools",
+                        "groups"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "subagents": {
+                      "type": "object",
+                      "properties": {
+                        "allowed": {},
+                        "default": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "allowed",
+                        "default"
+                      ],
+                      "additionalProperties": false
+                    },
                     "enabled": {
                       "type": "boolean"
                     },
@@ -2087,6 +2783,8 @@
                     "memoryScope",
                     "routine",
                     "delegation",
+                    "tools",
+                    "subagents",
                     "enabled",
                     "builtIn",
                     "createdAt",
@@ -2285,6 +2983,87 @@
                   ],
                   "additionalProperties": false
                 },
+                "tools": {
+                  "type": "object",
+                  "properties": {
+                    "tools": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "maxProperties": 1000
+                    },
+                    "groups": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "maxProperties": 1000
+                    }
+                  },
+                  "required": [
+                    "tools",
+                    "groups"
+                  ],
+                  "additionalProperties": false
+                },
+                "subagents": {
+                  "type": "object",
+                  "properties": {
+                    "allowed": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "any"
+                          ]
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          "maxItems": 50
+                        }
+                      ]
+                    },
+                    "default": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "allowed",
+                    "default"
+                  ],
+                  "additionalProperties": false
+                },
                 "enabled": {
                   "type": "boolean"
                 },
@@ -2342,6 +3121,8 @@
                 "memoryScope",
                 "routine",
                 "delegation",
+                "tools",
+                "subagents",
                 "enabled",
                 "builtIn",
                 "createdAt",
@@ -2469,6 +3250,38 @@
                   ],
                   "additionalProperties": false
                 },
+                "tools": {
+                  "type": "object",
+                  "properties": {
+                    "tools": {
+                      "type": "object",
+                      "properties": {}
+                    },
+                    "groups": {
+                      "type": "object",
+                      "properties": {}
+                    }
+                  },
+                  "required": [
+                    "tools",
+                    "groups"
+                  ],
+                  "additionalProperties": false
+                },
+                "subagents": {
+                  "type": "object",
+                  "properties": {
+                    "allowed": {},
+                    "default": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "allowed",
+                    "default"
+                  ],
+                  "additionalProperties": false
+                },
                 "enabled": {
                   "type": "boolean"
                 },
@@ -2502,6 +3315,8 @@
                 "memoryScope",
                 "routine",
                 "delegation",
+                "tools",
+                "subagents",
                 "enabled",
                 "builtIn",
                 "createdAt",
@@ -2705,6 +3520,87 @@
                   ],
                   "additionalProperties": false
                 },
+                "tools": {
+                  "type": "object",
+                  "properties": {
+                    "tools": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "maxProperties": 1000
+                    },
+                    "groups": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "pinned": {
+                            "type": "boolean"
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "maxProperties": 1000
+                    }
+                  },
+                  "required": [
+                    "tools",
+                    "groups"
+                  ],
+                  "additionalProperties": false
+                },
+                "subagents": {
+                  "type": "object",
+                  "properties": {
+                    "allowed": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "any"
+                          ]
+                        },
+                        {
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          "maxItems": 50
+                        }
+                      ]
+                    },
+                    "default": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "allowed",
+                    "default"
+                  ],
+                  "additionalProperties": false
+                },
                 "enabled": {
                   "type": "boolean"
                 },
@@ -2762,6 +3658,8 @@
                 "memoryScope",
                 "routine",
                 "delegation",
+                "tools",
+                "subagents",
                 "enabled",
                 "builtIn",
                 "createdAt",
@@ -3047,6 +3945,87 @@
                     ],
                     "additionalProperties": false
                   },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      },
+                      "groups": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "any"
+                            ]
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                            },
+                            "maxItems": 50
+                          }
+                        ]
+                      },
+                      "default": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
                   "enabled": {
                     "type": "boolean"
                   },
@@ -3104,6 +4083,8 @@
                   "memoryScope",
                   "routine",
                   "delegation",
+                  "tools",
+                  "subagents",
                   "enabled",
                   "builtIn",
                   "createdAt",
@@ -3121,6 +4102,3246 @@
         },
         "required": [
           "agent"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "toolCatalog",
+      "description": "Every tool this Host serves, grouped by MCP server (mcp:<server>), owning plugin (plugin:<package>) or DSH itself (native), with the first sentence of each description: the keys agents_tool_access_set takes. Read-only.",
+      "tool": {
+        "name": "agents_tool_catalog",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "mcp",
+                    "plugin",
+                    "native"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "key",
+                "kind",
+                "label",
+                "tools"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "null"
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "groups": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "mcp",
+                    "plugin",
+                    "native"
+                  ]
+                },
+                "label": {
+                  "type": "string"
+                },
+                "tools": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "summary": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "summary"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "key",
+                "kind",
+                "label",
+                "tools"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "toolAccess",
+      "description": "One agent's tool access: sparse enabled/pinned entries per tool name and per group; every tool without an entry is enabled and deferred behind tool_search. Null when no agent has that handle. Read-only.",
+      "tool": {
+        "name": "agents_tool_access_get",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "access": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  },
+                  "groups": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "handle",
+          "access"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "access": {
+            "type": "object",
+            "properties": {
+              "tools": {
+                "type": "object",
+                "properties": {}
+              },
+              "groups": {
+                "type": "object",
+                "properties": {}
+              }
+            },
+            "required": [
+              "tools",
+              "groups"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "handle",
+          "access"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setToolAccess",
+      "description": "Enable, disable, pin or unpin tools or whole groups for one agent; a tool entry beats its group entry. Threads started afterwards get it (a running thread keeps its tools; override it with agents_thread_override_set). Reversible: an edit with entry null removes that entry. May run only when the user asked for that change.",
+      "tool": {
+        "name": "agents_tool_access_set",
+        "readOnly": false
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "tool",
+                        "group"
+                      ]
+                    },
+                    "key": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 240
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "key"
+                  ],
+                  "additionalProperties": false
+                },
+                "entry": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "target",
+                "entry"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "maxItems": 200
+          }
+        },
+        "required": [
+          "handle",
+          "edits"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              },
+              "revision": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "Infinity",
+                      "-Infinity",
+                      "NaN"
+                    ]
+                  }
+                ]
+              },
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "glyph": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 8
+                  },
+                  "description": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 200
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "preset": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "route": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "reasoningEffort": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "model"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "memoryScope": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "allOf": [
+                          {
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "routine": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        "maxItems": 50
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      },
+                      "groups": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "any"
+                            ]
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                            },
+                            "maxItems": 50
+                          }
+                        ]
+                      },
+                      "default": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "tone": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "updatedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastUsedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "threadCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "tools",
+                  "subagents",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agent"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "missing"
+                ]
+              },
+              "revision": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "Infinity",
+                      "-Infinity",
+                      "NaN"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "tool",
+                        "group"
+                      ]
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "key"
+                  ],
+                  "additionalProperties": false
+                },
+                "entry": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "target",
+                "entry"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "handle",
+          "edits"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              },
+              "revision": {},
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "glyph": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "instructions": {
+                    "type": "string"
+                  },
+                  "preset": {
+                    "type": "string"
+                  },
+                  "route": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "reasoningEffort": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "memoryScope": {
+                    "type": "string"
+                  },
+                  "routine": {
+                    "type": "string"
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "properties": {}
+                      },
+                      "groups": {
+                        "type": "object",
+                        "properties": {}
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {},
+                      "default": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "tone": {
+                    "type": "integer"
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer"
+                  },
+                  "updatedAt": {
+                    "type": "integer"
+                  },
+                  "lastUsedAt": {
+                    "type": "integer"
+                  },
+                  "threadCount": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "tools",
+                  "subagents",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agent"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "missing"
+                ]
+              },
+              "revision": {}
+            },
+            "required": [
+              "kind",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "setSubagents",
+      "description": "Which agents this agent's subagents may run as ('any' or a list of handles) and the default one (null: the parent thread's agent). Reversible by setting the previous value. May run only when the user asked for that change.",
+      "tool": {
+        "name": "agents_subagents_set",
+        "readOnly": false
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "subagents": {
+            "type": "object",
+            "properties": {
+              "allowed": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "any"
+                    ]
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                    },
+                    "maxItems": 50
+                  }
+                ]
+              },
+              "default": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "allowed",
+              "default"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              },
+              "revision": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "Infinity",
+                      "-Infinity",
+                      "NaN"
+                    ]
+                  }
+                ]
+              },
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  },
+                  "name": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "glyph": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 8
+                  },
+                  "description": {
+                    "type": "string",
+                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                    "maxLength": 200
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 8000
+                  },
+                  "preset": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "route": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "provider": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128
+                          },
+                          "model": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          "reasoningEffort": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          }
+                        },
+                        "required": [
+                          "provider",
+                          "model"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "memoryScope": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                        "minLength": 1,
+                        "maxLength": 80,
+                        "allOf": [
+                          {
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9:._/-]*$"
+                          }
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "routine": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                        },
+                        "maxItems": 50
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      },
+                      "groups": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "any"
+                            ]
+                          },
+                          {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                            },
+                            "maxItems": 50
+                          }
+                        ]
+                      },
+                      "default": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "tone": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 5
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "updatedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "lastUsedAt": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "threadCount": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "tools",
+                  "subagents",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agent"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "missing"
+                ]
+              },
+              "revision": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "string",
+                    "enum": [
+                      "Infinity",
+                      "-Infinity",
+                      "NaN"
+                    ]
+                  }
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "subagents": {
+            "type": "object",
+            "properties": {
+              "allowed": {},
+              "default": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "allowed",
+              "default"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "applied"
+                ]
+              },
+              "revision": {},
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "glyph": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "instructions": {
+                    "type": "string"
+                  },
+                  "preset": {
+                    "type": "string"
+                  },
+                  "route": {
+                    "type": "object",
+                    "properties": {
+                      "provider": {
+                        "type": "string"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "reasoningEffort": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "provider",
+                      "model"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "memoryScope": {
+                    "type": "string"
+                  },
+                  "routine": {
+                    "type": "string"
+                  },
+                  "delegation": {
+                    "type": "object",
+                    "properties": {
+                      "messaging": {
+                        "type": "string",
+                        "enum": [
+                          "any",
+                          "listed",
+                          "none"
+                        ]
+                      },
+                      "handles": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "subagents": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "messaging",
+                      "handles",
+                      "subagents"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "tools": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "properties": {}
+                      },
+                      "groups": {
+                        "type": "object",
+                        "properties": {}
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "subagents": {
+                    "type": "object",
+                    "properties": {
+                      "allowed": {},
+                      "default": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "allowed",
+                      "default"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "tone": {
+                    "type": "integer"
+                  },
+                  "builtIn": {
+                    "type": "boolean"
+                  },
+                  "createdAt": {
+                    "type": "integer"
+                  },
+                  "updatedAt": {
+                    "type": "integer"
+                  },
+                  "lastUsedAt": {
+                    "type": "integer"
+                  },
+                  "threadCount": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "handle",
+                  "name",
+                  "glyph",
+                  "description",
+                  "instructions",
+                  "preset",
+                  "route",
+                  "memoryScope",
+                  "routine",
+                  "delegation",
+                  "tools",
+                  "subagents",
+                  "enabled",
+                  "builtIn",
+                  "createdAt",
+                  "updatedAt",
+                  "lastUsedAt",
+                  "threadCount"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "kind",
+              "revision",
+              "agent"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "missing"
+                ]
+              },
+              "revision": {}
+            },
+            "required": [
+              "kind",
+              "revision"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "projectDefaults",
+      "description": "The default agent of each DSH project (by project workspace id). A thread no agent started, in that project, gets it; projects without one use @dsh. Read-only.",
+      "tool": {
+        "name": "agents_project_defaults",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "handle": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "projectId",
+                "handle",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "null"
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "projectId",
+                "handle",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "projects"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setProjectDefault",
+      "description": "Set a DSH project's default agent, or clear it with handle null (threads then use @dsh). Threads started afterwards get it; running threads keep theirs. May run only when the user asked for that change.",
+      "tool": {
+        "name": "agents_project_default_set",
+        "readOnly": false
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "handle": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "missing-agent"
+            ]
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "handle": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                },
+                "updatedAt": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "projectId",
+                "handle",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "projects"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "missing-agent"
+            ]
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "projectId": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "projectId",
+                "handle",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "kind",
+          "projects"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "threadAccess",
+      "description": "One thread's agent, how it was decided (explicit, inherited from a subagent's parent, the project default or the @dsh fallback), its override and the tool policy that results. recorded: false is a preview for a thread whose agent is not decided yet. Read-only.",
+      "tool": {
+        "name": "agents_thread_access",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "recorded": {
+            "type": "boolean"
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "handle": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+              },
+              "resolution": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "inherited",
+                  "project-default",
+                  "default"
+                ]
+              },
+              "projectId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "inheritedFrom": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "access": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  },
+                  "groups": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "decidedAt": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "override": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "agent"
+                        ]
+                      },
+                      "handle": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "access": {
+                        "type": "object",
+                        "properties": {
+                          "tools": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "pinned": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "maxProperties": 1000
+                          },
+                          "groups": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "pinned": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "maxProperties": 1000
+                          }
+                        },
+                        "required": [
+                          "tools",
+                          "groups"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "handle",
+                      "access"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "all"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "sessionId",
+              "handle",
+              "resolution",
+              "projectId",
+              "inheritedFrom",
+              "access",
+              "decidedAt",
+              "override"
+            ],
+            "additionalProperties": false
+          },
+          "policy": {
+            "type": "object",
+            "properties": {
+              "agent": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "agent",
+                  "override",
+                  "project-default",
+                  "default"
+                ]
+              },
+              "toolsFrom": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "access": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  },
+                  "groups": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "type": "object",
+                      "properties": {
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "pinned": {
+                          "type": "boolean"
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    "maxProperties": 1000
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "change": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "agent",
+              "source",
+              "toolsFrom",
+              "access",
+              "change"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "sessionId",
+          "recorded",
+          "agent",
+          "policy"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "recorded": {
+            "type": "boolean"
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string"
+              },
+              "handle": {
+                "type": "string"
+              },
+              "resolution": {
+                "type": "string",
+                "enum": [
+                  "explicit",
+                  "inherited",
+                  "project-default",
+                  "default"
+                ]
+              },
+              "projectId": {
+                "type": "string"
+              },
+              "inheritedFrom": {
+                "type": "string"
+              },
+              "access": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "groups": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "decidedAt": {
+                "type": "integer"
+              },
+              "override": {
+                "oneOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "agent"
+                        ]
+                      },
+                      "handle": {
+                        "type": "string"
+                      },
+                      "access": {
+                        "type": "object",
+                        "properties": {
+                          "tools": {
+                            "type": "object",
+                            "properties": {}
+                          },
+                          "groups": {
+                            "type": "object",
+                            "properties": {}
+                          }
+                        },
+                        "required": [
+                          "tools",
+                          "groups"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "handle",
+                      "access"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "all"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "required": [
+              "sessionId",
+              "handle",
+              "resolution",
+              "projectId",
+              "inheritedFrom",
+              "access",
+              "decidedAt",
+              "override"
+            ],
+            "additionalProperties": false
+          },
+          "policy": {
+            "type": "object",
+            "properties": {
+              "agent": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "agent",
+                  "override",
+                  "project-default",
+                  "default"
+                ]
+              },
+              "toolsFrom": {
+                "type": "string"
+              },
+              "access": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "groups": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "change": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "agent",
+              "source",
+              "toolsFrom",
+              "access",
+              "change"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "sessionId",
+          "recorded",
+          "agent",
+          "policy"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "setThreadOverride",
+      "description": "Override one thread's tools with another agent's tools ({ kind: 'agent', handle }) or every tool ({ kind: 'all' }); null clears it. It applies from that thread's next model request, which loses its prompt cache once. May run only when the user asked for that change.",
+      "tool": {
+        "name": "agents_thread_override_set",
+        "readOnly": false
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "agent"
+                    ]
+                  },
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "handle"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "all"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sessionId",
+          "override"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "missing-agent"
+            ]
+          },
+          "view": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "recorded": {
+                "type": "boolean"
+              },
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                  },
+                  "resolution": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "inherited",
+                      "project-default",
+                      "default"
+                    ]
+                  },
+                  "projectId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "inheritedFrom": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "access": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      },
+                      "groups": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "decidedAt": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "override": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "agent"
+                            ]
+                          },
+                          "handle": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                          },
+                          "access": {
+                            "type": "object",
+                            "properties": {
+                              "tools": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "type": "boolean"
+                                    },
+                                    "pinned": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "maxProperties": 1000
+                              },
+                              "groups": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "object",
+                                  "properties": {
+                                    "enabled": {
+                                      "type": "boolean"
+                                    },
+                                    "pinned": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "maxProperties": 1000
+                              }
+                            },
+                            "required": [
+                              "tools",
+                              "groups"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle",
+                          "access"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "all"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "sessionId",
+                  "handle",
+                  "resolution",
+                  "projectId",
+                  "inheritedFrom",
+                  "access",
+                  "decidedAt",
+                  "override"
+                ],
+                "additionalProperties": false
+              },
+              "policy": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "agent",
+                      "override",
+                      "project-default",
+                      "default"
+                    ]
+                  },
+                  "toolsFrom": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "access": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      },
+                      "groups": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "type": "object",
+                          "properties": {
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "pinned": {
+                              "type": "boolean"
+                            }
+                          },
+                          "additionalProperties": false
+                        },
+                        "maxProperties": 1000
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "change": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "agent",
+                  "source",
+                  "toolsFrom",
+                  "access",
+                  "change"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "sessionId",
+              "recorded",
+              "agent",
+              "policy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "kind",
+          "view"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "override": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "agent"
+                    ]
+                  },
+                  "handle": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "handle"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "all"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "sessionId",
+          "override"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "applied",
+              "missing-agent"
+            ]
+          },
+          "view": {
+            "type": "object",
+            "properties": {
+              "sessionId": {
+                "type": "string"
+              },
+              "recorded": {
+                "type": "boolean"
+              },
+              "agent": {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string"
+                  },
+                  "handle": {
+                    "type": "string"
+                  },
+                  "resolution": {
+                    "type": "string",
+                    "enum": [
+                      "explicit",
+                      "inherited",
+                      "project-default",
+                      "default"
+                    ]
+                  },
+                  "projectId": {
+                    "type": "string"
+                  },
+                  "inheritedFrom": {
+                    "type": "string"
+                  },
+                  "access": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "properties": {}
+                      },
+                      "groups": {
+                        "type": "object",
+                        "properties": {}
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "decidedAt": {
+                    "type": "integer"
+                  },
+                  "override": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "agent"
+                            ]
+                          },
+                          "handle": {
+                            "type": "string"
+                          },
+                          "access": {
+                            "type": "object",
+                            "properties": {
+                              "tools": {
+                                "type": "object",
+                                "properties": {}
+                              },
+                              "groups": {
+                                "type": "object",
+                                "properties": {}
+                              }
+                            },
+                            "required": [
+                              "tools",
+                              "groups"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "handle",
+                          "access"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "all"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "sessionId",
+                  "handle",
+                  "resolution",
+                  "projectId",
+                  "inheritedFrom",
+                  "access",
+                  "decidedAt",
+                  "override"
+                ],
+                "additionalProperties": false
+              },
+              "policy": {
+                "type": "object",
+                "properties": {
+                  "agent": {
+                    "type": "string"
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "agent",
+                      "override",
+                      "project-default",
+                      "default"
+                    ]
+                  },
+                  "toolsFrom": {
+                    "type": "string"
+                  },
+                  "access": {
+                    "type": "object",
+                    "properties": {
+                      "tools": {
+                        "type": "object",
+                        "properties": {}
+                      },
+                      "groups": {
+                        "type": "object",
+                        "properties": {}
+                      }
+                    },
+                    "required": [
+                      "tools",
+                      "groups"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "change": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "agent",
+                  "source",
+                  "toolsFrom",
+                  "access",
+                  "change"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "sessionId",
+              "recorded",
+              "agent",
+              "policy"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "kind",
+          "view"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "recordThreadAgent",
+      "description": "Record a thread's agent explicitly (a subagent started with an agent, a mention) before or after it attaches; null when no agent has that handle. A cross-plugin write, not an agent tool.",
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "handle": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          }
+        },
+        "required": [
+          "sessionId",
+          "handle"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "view": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "sessionId": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  },
+                  "recorded": {
+                    "type": "boolean"
+                  },
+                  "agent": {
+                    "type": "object",
+                    "properties": {
+                      "sessionId": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 256
+                      },
+                      "handle": {
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                      },
+                      "resolution": {
+                        "type": "string",
+                        "enum": [
+                          "explicit",
+                          "inherited",
+                          "project-default",
+                          "default"
+                        ]
+                      },
+                      "projectId": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "inheritedFrom": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 256
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "access": {
+                        "type": "object",
+                        "properties": {
+                          "tools": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "pinned": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "maxProperties": 1000
+                          },
+                          "groups": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "pinned": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "maxProperties": 1000
+                          }
+                        },
+                        "required": [
+                          "tools",
+                          "groups"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "decidedAt": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "override": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "agent"
+                                ]
+                              },
+                              "handle": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                              },
+                              "access": {
+                                "type": "object",
+                                "properties": {
+                                  "tools": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "object",
+                                      "properties": {
+                                        "enabled": {
+                                          "type": "boolean"
+                                        },
+                                        "pinned": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "maxProperties": 1000
+                                  },
+                                  "groups": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                      "type": "object",
+                                      "properties": {
+                                        "enabled": {
+                                          "type": "boolean"
+                                        },
+                                        "pinned": {
+                                          "type": "boolean"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    "maxProperties": 1000
+                                  }
+                                },
+                                "required": [
+                                  "tools",
+                                  "groups"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "kind",
+                              "handle",
+                              "access"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "all"
+                                ]
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": [
+                      "sessionId",
+                      "handle",
+                      "resolution",
+                      "projectId",
+                      "inheritedFrom",
+                      "access",
+                      "decidedAt",
+                      "override"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "policy": {
+                    "type": "object",
+                    "properties": {
+                      "agent": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string",
+                        "enum": [
+                          "agent",
+                          "override",
+                          "project-default",
+                          "default"
+                        ]
+                      },
+                      "toolsFrom": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "access": {
+                        "type": "object",
+                        "properties": {
+                          "tools": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "pinned": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "maxProperties": 1000
+                          },
+                          "groups": {
+                            "type": "object",
+                            "additionalProperties": {
+                              "type": "object",
+                              "properties": {
+                                "enabled": {
+                                  "type": "boolean"
+                                },
+                                "pinned": {
+                                  "type": "boolean"
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            "maxProperties": 1000
+                          }
+                        },
+                        "required": [
+                          "tools",
+                          "groups"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "change": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "agent",
+                      "source",
+                      "toolsFrom",
+                      "access",
+                      "change"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "sessionId",
+                  "recorded",
+                  "agent",
+                  "policy"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "view"
         ],
         "additionalProperties": false
       }

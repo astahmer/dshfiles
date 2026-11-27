@@ -158,6 +158,35 @@ short code in AI Accounts. Each account's OAuth grant is stored as a DSH
 credential record, separate from `accounts.json`; the plugin refreshes tokens
 through pi-ai and offers the Copilot models returned for that subscription.
 
+### Codex models and context windows
+
+A Codex account lists the models its plan exposes. The Host reads
+`GET https://chatgpt.com/backend-api/codex/models` with the account's own
+ChatGPT login, the same endpoint Codex CLI reads. A stale login is refreshed
+through the same path requests use. This happens at Host start and each time
+the account's **Models** tab opens (`ai_accounts_catalog`). Only models the
+backend marks `visibility: "list"` appear; hidden ones (`gpt-reserve`, review
+helpers) never do. pi-ai's static Codex models stay listed. The backend's
+`context_window` replaces the static window, and a model pi-ai does not know
+yet becomes a full `openai-codex-responses` model (128k output, the reasoning
+levels of its family). If discovery fails, the account keeps its previous or
+static list. The Host log says why, with the next step: reopen **Models** to
+retry, or sign in again if the login expired.
+
+Each model's **Context window** column in **Models** raises or lowers the
+window DSH uses for that model on this account. The choices go up to the
+backend's `max_context_window` (for example, `gpt-6.2-astra`: default 272k, max
+872k). The window changes when DSH compacts and how much a request may carry. A
+larger window uses more of the plan per turn; pi-ai prices input above 272k at
+a higher tier. **Default** removes the override. Overrides are stored per account as
+`contextWindowOverrides` in the accounts file. They apply even while the
+account inherits the provider's model settings. A value above the backend
+maximum is saved as that maximum. Agents read the windows with
+`ai_accounts_catalog` (`context 272k (max 872k)`) and change them with
+`ai_accounts_set_context_window` (`contextWindow: null` restores the default)
+only when the user asks. Accounts in one fail-over pool must use the same
+window for a model, or they stop counting as compatible for it.
+
 The plugin reads Claude Code's login but never refreshes it. When that token
 expires, run Claude Code once on the account. Quota needs the interactive
 login, because a setup token cannot read usage.

@@ -1,5 +1,6 @@
 import { identityToneIndex, PalettePicker } from '@dshfiles/plugin-ui/components/palette-picker'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Checkbox } from '@dshfiles/plugin-ui/components/ui/checkbox'
 import { Combobox, type ComboboxOption } from '@dshfiles/plugin-ui/components/ui/combobox'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
@@ -10,9 +11,11 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 
 import { AGENT_GLYPHS, AgentEditor, type AgentField, type AgentFix, type AgentReview } from './agent-editor.js'
+import type { ProjectDefaults } from './agent-save-plan.js'
 import { AgentGlyph, AgentTone } from './agent-tone.js'
-import { agentLimits, Agents, type Agent, type AgentDraft } from './agent.js'
-import type { AgentPresetRow } from './api.js'
+import { AgentToolsTree } from './agent-tools-tree.js'
+import { agentLimits, Agents, type Agent, type AgentDraft, type AgentTools } from './agent.js'
+import type { AgentPresetRow, ToolCatalogView } from './api.js'
 import type { AgentModelOption } from './dispatch.js'
 
 /** The id of the control an issue belongs to, so the save bar can focus the first one that blocks a save. */
@@ -22,13 +25,14 @@ const DESCRIPTION_ID = 'dshfiles-agent-field-description'
 const Section = (props: { readonly id: string; readonly title: string; readonly description: string; readonly children: ReactNode }): JSX.Element => (
   <section
     aria-labelledby={`${props.id}-title`}
-    className="dshx:grid dshx:grid-cols-[13rem_minmax(0,1fr)] dshx:gap-x-8 dshx:gap-y-3 dshx:border-b dshx:border-border dshx:py-6 dshx:last:border-b-0 dshx:@max-pane-compact:grid-cols-1"
+    className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b dshx:border-border dshx:py-5 dshx:last:border-b-0"
   >
-    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+    {/* One header line above the fields, so the fields get the pane's full width. */}
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-3 dshx:gap-y-0.5">
       <h3 id={`${props.id}-title`} className="dshx:text-sm dshx:font-semibold">
         {props.title}
       </h3>
-      <p className="dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">{props.description}</p>
+      <p className="dshx:min-w-0 dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">{props.description}</p>
     </div>
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">{props.children}</div>
   </section>
@@ -83,6 +87,95 @@ const Label = (props: { readonly htmlFor?: string; readonly children: ReactNode;
   </div>
 )
 
+/**
+ * Which projects this agent is the default of, picked here rather than in a separate project list: the choice saves
+ * with the agent's other settings, and each row names the agent the project uses now, so moving a project from
+ * another agent is visible before saving.
+ */
+const ProjectDefaultsSection = (props: {
+  readonly handle: string
+  readonly agents: readonly Agent[]
+  readonly projects: AgentEditorFormProps['projects']
+}): JSX.Element => {
+  const { list, defaults, selected } = props.projects
+  const [filter, setFilter] = useState('')
+  const needle = filter.trim().toLowerCase()
+  const visible = needle === '' ? list : list.filter(project => `${project.title} ${project.path}`.toLowerCase().includes(needle))
+  const toggle = (id: string): void => {
+    const next = new Set(selected)
+    if (!next.delete(id)) next.add(id)
+    props.projects.onChange(next)
+  }
+  const nameOf = (handle: string): string => props.agents.find(agent => agent.handle === handle)?.name ?? handle
+  return (
+    <Section
+      id="dshfiles-agent-projects"
+      title="Default for projects"
+      description="A thread started in one of these projects without a named agent runs as this one. Running threads keep their agent."
+    >
+      {props.projects.error === null ? null : (
+        <p role="alert" className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-destructive">
+          <span className="dshx:min-w-0 dshx:flex-1">The project defaults did not load ({props.projects.error}).</span>
+          <Button type="button" size="xs" variant="outline" onClick={props.projects.retry}>
+            Retry
+          </Button>
+        </p>
+      )}
+      {list.length === 0 ? (
+        <p className="dshx:text-xs dshx:text-muted-foreground">No projects are registered yet. Add a folder as a project in DSH, then pick it here.</p>
+      ) : (
+        <div className="dshx:flex dshx:flex-col dshx:gap-2">
+          {list.length > 6 ? (
+            <Input aria-label="Filter projects" placeholder="Filter projects…" value={filter} onChange={event => setFilter(event.currentTarget.value)} />
+          ) : null}
+          <div role="group" aria-label="Projects" className="dshx:flex dshx:flex-col dshx:overflow-hidden dshx:rounded-md dshx:border dshx:border-border">
+            {visible.map((project, index) => {
+              const owner = defaults.get(project.id)
+              const on = selected.has(project.id)
+              const id = `dshfiles-agent-project-${String(index)}`
+              const status = projectStatus({ on, owner, handle: props.handle, nameOf })
+              return (
+                <label
+                  key={project.id}
+                  htmlFor={id}
+                  className={cn(
+                    'dshx:flex dshx:min-h-11 dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:px-3 dshx:py-1.5 dshx:hover:bg-accent/40',
+                    index > 0 && 'dshx:border-t dshx:border-border/60',
+                  )}
+                >
+                  <Checkbox id={id} checked={on} onCheckedChange={() => toggle(project.id)} />
+                  <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
+                    <span className="dshx:truncate dshx:text-sm">{project.title}</span>
+                    <span className="dshx:truncate dshx:font-mono dshx:text-[11px] dshx:text-muted-foreground">{project.path}</span>
+                  </span>
+                  <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:max-w-28 dshx:@max-pane-narrow:truncate">
+                    {status}
+                  </span>
+                </label>
+              )
+            })}
+            {visible.length === 0 ? <p className="dshx:px-3 dshx:py-3 dshx:text-xs dshx:text-muted-foreground">No project matches.</p> : null}
+          </div>
+        </div>
+      )}
+    </Section>
+  )
+}
+
+/** What a project row says about its default: now, and after this save. */
+const projectStatus = (input: {
+  readonly on: boolean
+  readonly owner: string | undefined
+  readonly handle: string
+  readonly nameOf: (handle: string) => string
+}): string => {
+  const { on, owner, handle } = input
+  if (on) return owner !== undefined && owner !== handle ? `moves from @${owner} on save` : `uses @${handle}`
+  if (owner === handle) return 'back to @dsh on save'
+  if (owner === undefined) return 'uses @dsh'
+  return `uses @${owner} (${input.nameOf(owner)})`
+}
+
 const describedBy = (review: AgentReview, field: AgentField, reveal: boolean) => {
   const found = AgentEditor.issueFor(review, field)
   if (found === null || (found.severity === 'error' && !reveal)) return {}
@@ -102,9 +195,32 @@ export interface AgentEditorFormProps {
   readonly onFix: (fix: AgentFix) => void
   /** True after a save was attempted, or for a saved agent, so every error shows at once. */
   readonly revealAll: boolean
+  readonly tools: {
+    readonly catalog: ToolCatalogView | undefined
+    readonly loading: boolean
+    readonly error: string | null
+    readonly retry: () => void
+    /** The saved access the tree marks changes against. */
+    readonly saved: AgentTools
+  }
+  readonly projects: {
+    readonly list: readonly AgentEditorProject[]
+    readonly defaults: ProjectDefaults
+    readonly error: string | null
+    readonly retry: () => void
+    /** The projects this agent should be the default of. */
+    readonly selected: ReadonlySet<string>
+    readonly onChange: (next: ReadonlySet<string>) => void
+  }
 }
 
-/** The agent's settings in four sections: who it is, how it works, what it runs on, and how it reaches others. */
+export interface AgentEditorProject {
+  readonly id: string
+  readonly title: string
+  readonly path: string
+}
+
+/** The agent's settings: who it is, how it works, what it runs on and with which tools, how it reaches others, and where it is the default. */
 export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
   const { draft, review, patch } = props
   // Peers keep the raw text while typing, so "reviewer, " is not reformatted before the next handle is typed.
@@ -146,6 +262,23 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
   ]
   const otherAgents = props.agents.filter(agent => agent.handle !== review.handle)
   const memoryPlaceholder = Agents.defaultMemoryScope(review.handle)
+  const subagents = draft.subagents
+  const subagentChoices = subagents.allowed === 'any' ? props.agents.map(agent => agent.handle) : subagents.allowed
+  const defaultOptions: readonly ComboboxOption[] = [
+    { value: '', label: "Parent thread's agent", description: 'a subagent runs as the thread that started it' },
+    ...subagentChoices.map(handle => {
+      const agent = props.agents.find(candidate => candidate.handle === handle)
+      return { value: handle, label: `@${handle}`, description: agent === undefined ? 'not a saved agent' : agent.name }
+    }),
+    ...(subagents.default !== null && !subagentChoices.includes(subagents.default)
+      ? [{ value: subagents.default, label: `@${subagents.default}`, description: 'not allowed above' }]
+      : []),
+  ]
+  const toggleAllowed = (handle: string): void => {
+    const current = subagents.allowed === 'any' ? [] : subagents.allowed
+    const allowed = current.includes(handle) ? current.filter(peer => peer !== handle) : [...current, handle]
+    patch({ subagents: { ...subagents, allowed } })
+  }
 
   const setPeers = (text: string): void => {
     setPeersText(text)
@@ -388,6 +521,22 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
       </Section>
 
       <Section
+        id="dshfiles-agent-tools"
+        title="Tools"
+        description="Which tools its threads may use. A pinned tool is in the tool list from the first request; other selected tools are found through tool_search. Changes apply to threads started afterwards."
+      >
+        <AgentToolsTree
+          catalog={props.tools.catalog}
+          loading={props.tools.loading}
+          error={props.tools.error}
+          onRetry={props.tools.retry}
+          access={draft.tools}
+          saved={props.tools.saved}
+          onChange={tools => patch({ tools })}
+        />
+      </Section>
+
+      <Section
         id="dshfiles-agent-delegation"
         title="Delegation"
         description="Which agents its threads may message, and whether they may spawn subagents or workflows."
@@ -478,7 +627,80 @@ export const AgentEditorForm = (props: AgentEditorFormProps): JSX.Element => {
             </span>
           </span>
         </label>
+
+        <div id={agentFieldId('subagents')} className="dshx:flex dshx:flex-col dshx:gap-2" tabIndex={-1}>
+          <span id="dshfiles-agent-subagents-label" className="dshx:text-sm dshx:font-medium">
+            Subagents may run as
+          </span>
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            aria-labelledby="dshfiles-agent-subagents-label"
+            value={subagents.allowed === 'any' ? 'any' : 'listed'}
+            className="dshx:w-full dshx:max-w-sm"
+            onValueChange={value => {
+              if (value === 'any') patch({ subagents: { ...subagents, allowed: 'any' } })
+              else if (value === 'listed' && subagents.allowed === 'any')
+                patch({ subagents: { ...subagents, allowed: subagents.default === null ? [] : [subagents.default] } })
+            }}
+          >
+            {/* Messages above has the same two words; the names say which choice this is, starting with the visible text. */}
+            <ToggleGroupItem value="any" aria-label="Any agent as subagent" className="dshx:flex-1">
+              Any agent
+            </ToggleGroupItem>
+            <ToggleGroupItem value="listed" aria-label="Only listed subagents" className="dshx:flex-1">
+              Only listed
+            </ToggleGroupItem>
+          </ToggleGroup>
+          {subagents.allowed === 'any' ? null : (
+            <div role="group" aria-label="Allowed subagent agents" className="dshx:flex dshx:flex-wrap dshx:gap-1">
+              {props.agents.map(agent => {
+                const on = subagents.allowed !== 'any' && subagents.allowed.includes(agent.handle)
+                return (
+                  <Button
+                    key={agent.handle}
+                    type="button"
+                    size="xs"
+                    variant={on ? 'secondary' : 'outline'}
+                    aria-pressed={on}
+                    onClick={() => toggleAllowed(agent.handle)}
+                  >
+                    <span aria-hidden>{agent.glyph}</span>@{agent.handle}
+                  </Button>
+                )
+              })}
+            </div>
+          )}
+          <div className="dshx:flex dshx:max-w-sm dshx:flex-col dshx:gap-1.5">
+            <Label>Default subagent</Label>
+            <Combobox
+              label="Default subagent"
+              matchTriggerWidth
+              value={subagents.default ?? ''}
+              options={defaultOptions}
+              searchAbove={8}
+              searchPlaceholder="Search agents…"
+              triggerClassName="dshx:h-9"
+              onValueChange={value => patch({ subagents: { ...subagents, default: value === '' ? null : value } })}
+            />
+          </div>
+          <IssueLine
+            reveal={shown('subagents')}
+            field="subagents"
+            review={review}
+            onFix={props.onFix}
+            hint={
+              draft.delegation.subagents
+                ? subagents.allowed !== 'any' && subagents.allowed.length === 0
+                  ? 'No agent is listed, so its subagents can only run as the default above.'
+                  : 'A subagent started without an agent runs as the default.'
+                : 'Subagents are off above; these choices apply once they are on.'
+            }
+          />
+        </div>
       </Section>
+
+      <ProjectDefaultsSection handle={review.handle} agents={props.agents} projects={props.projects} />
 
       <Section id="dshfiles-agent-memory" title="Memory and routine" description="Notes its threads read, and a standing task they keep with DSH's schedules.">
         <div className="dshx:flex dshx:flex-col dshx:gap-1.5">

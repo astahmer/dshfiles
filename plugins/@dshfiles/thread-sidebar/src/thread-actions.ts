@@ -5,7 +5,7 @@ import type { FolderInspection } from '@dshfiles/workspace-folder-picker/project
 import { Effect, Option, Schedule, Schema } from 'effect'
 import { ThreadHostCallFailed } from './sidebar-errors.js'
 import { ThreadReferencesModel, type ThreadReferenceMention, type ThreadReferenceThread } from './thread-references.js'
-import { type ThreadDirectories, WorkspacePaths } from './workspace-paths.js'
+import { type ThreadDirectories, WorkspacePaths } from '@dshfiles/vcs-provider-port/workspace-attribution'
 
 /** One Host verb as the actions read it; its failure carries the Host's own error as `cause`. */
 export type HostEffect<A> = Effect.Effect<A, ThreadHostCallFailed>

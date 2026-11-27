@@ -34,6 +34,7 @@ import { agentEditorMachine, type AgentEditorSelection } from './agent-editor-ma
 import { AgentFocusModel } from './agent-focus.js'
 import { AGENT_TEMPLATES, AgentEditor, type AgentFix, type AgentTemplate } from './agent-editor.js'
 import { AgentEditorForm, agentFieldId } from './agent-editor-form.js'
+import { AgentSavePlans, type AgentSavePlan, type ProjectDefaults } from './agent-save-plan.js'
 import { AgentList, AgentName, AgentTemplates } from './agent-list.js'
 import { AgentTone } from './agent-tone.js'
 import { AgentStartDialog } from './agent-start-dialog.js'
@@ -101,12 +102,19 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const options = useMemo(() => catalog.data?.options ?? [], [catalog.data])
   // The chips elsewhere on the page repaint with a colour saved here without waiting for their own refetch.
   useEffect(() => AgentTone.setAgents(agents), [agents])
+  const projectDefaults = useQuery({ queryKey: [AGENTS_QUERY_ROOT, 'project-defaults'], queryFn: ({ signal }) => api.projectDefaults(undefined, { signal }) })
+  const defaults: ProjectDefaults = useMemo(
+    () => new Map((projectDefaults.data?.projects ?? []).map(project => [project.projectId, project.handle])),
+    [projectDefaults.data],
+  )
 
   const [editor, sendEditor, editorActor] = useMachine(agentEditorMachine)
   const [draft, setDraft] = useState<AgentDraft>(() => AgentEditor.draftOf(null))
   const [tab, setTab] = useState<'settings' | 'threads'>('settings')
   const [notice, setNotice] = useState<Notice | null>(null)
   const [attempted, setAttempted] = useState(false)
+  /** The projects this agent should be the default of, once the person touched the picker; null follows the Host. */
+  const [projectPick, setProjectPick] = useState<ReadonlySet<string> | null>(null)
   const selection = editor.context.selection
   const modal = editor.context.modal
   const [toggling, setToggling] = useState<ReadonlySet<string>>(() => new Set())
@@ -116,7 +124,16 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
   const current = useMemo(() => agents.find(agent => agent.handle === selectedHandle) ?? null, [agents, selectedHandle])
   const creating = selection.kind === 'new'
   const base = useMemo(() => (selection.kind === 'new' ? selection.base : AgentEditor.draftOf(current)), [selection, current])
-  const dirty = selection.kind !== 'none' && AgentEditor.isDirty(draft, base)
+  const savedProjects = useMemo(() => AgentSavePlans.projectsOf(defaults, creating ? '' : base.handle), [defaults, creating, base.handle])
+  const pickedProjects = projectPick ?? savedProjects
+  const projectsDirty = projectPick !== null && (projectPick.size !== savedProjects.size || [...projectPick].some(id => !savedProjects.has(id)))
+  const dirty = selection.kind !== 'none' && (AgentEditor.isDirty(draft, base) || projectsDirty)
+  const toolCatalog = useQuery({
+    queryKey: [AGENTS_QUERY_ROOT, 'tool-catalog'],
+    queryFn: ({ signal }) => api.toolCatalog(undefined, { signal }),
+    enabled: selection.kind !== 'none',
+    staleTime: 5 * 60_000,
+  })
   const review = useMemo(
     () => AgentEditor.review(draft, { creating, agents, catalog: catalog.isSuccess ? options : null }),
     [draft, creating, agents, catalog.isSuccess, options],
@@ -155,6 +172,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       setTab('settings')
       setNotice(null)
       setAttempted(false)
+      setProjectPick(null)
     })
     return () => subscription.unsubscribe()
   }, [editorActor, agents])
@@ -170,19 +188,66 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
 
   const invalidateList = () => client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'list'] })
 
+  /**
+   * One Save runs the plan in order: the agent's own fields (or its creation), one batch of tool edits, subagents, then
+   * project defaults. A step that fails leaves the rest of the draft dirty against the refreshed agent, so saving again
+   * sends only what is still missing.
+   */
   const save = useMutation({
-    mutationFn: async (input: AgentDraft) => api.save({ agent: input }),
-    onSuccess: async result => {
-      await invalidateList()
+    mutationFn: async (
+      plan: AgentSavePlan,
+    ): Promise<{ readonly kind: 'limit' } | { readonly kind: 'applied'; readonly agent: Agent | null; readonly projectsFailed: string | null }> => {
+      let agent: Agent | null = null
+      const missing = (): Error => new Error(`@${plan.handle} no longer exists, perhaps removed from another window`)
+      if (plan.save !== null) {
+        const saved = await api.save({ agent: plan.save })
+        if (saved.kind === 'limit') return { kind: 'limit' }
+        agent = saved.agent
+      }
+      for (const edits of plan.toolEdits) {
+        const updated = await api.setToolAccess({ handle: plan.handle, edits: [...edits] })
+        if (updated.kind === 'missing') throw missing()
+        agent = updated.agent
+      }
+      if (plan.subagents !== null) {
+        const updated = await api.setSubagents({ handle: plan.handle, subagents: plan.subagents })
+        if (updated.kind === 'missing') throw missing()
+        agent = updated.agent
+      }
+      try {
+        for (const project of plan.projects) {
+          const updated = await api.setProjectDefault(project)
+          if (updated.kind === 'missing-agent') throw missing()
+        }
+      } catch (cause) {
+        // A created agent exists now: report the projects instead of failing the whole save, which would retry the create.
+        if (plan.save === null || !creating) throw cause
+        return { kind: 'applied', agent, projectsFailed: errorMessage(cause, 'unknown error') }
+      }
+      return { kind: 'applied', agent, projectsFailed: null }
+    },
+    onSuccess: async (result, plan) => {
+      await Promise.all([invalidateList(), client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'project-defaults'] })])
       if (result.kind === 'limit') {
         setNotice({ tone: 'error', text: `At most ${String(agentLimits.agents)} agents are kept. Remove one you no longer use, then save again.` })
         return
       }
-      sendEditor({ type: 'APPLY', selection: { kind: 'agent', handle: result.agent.handle } })
-      setDraft(AgentEditor.draftOf(result.agent))
-      setNotice({ tone: 'ok', text: 'Saved.' })
+      if (creating) sendEditor({ type: 'APPLY', selection: { kind: 'agent', handle: plan.handle } })
+      if (result.agent !== null) setDraft(AgentEditor.draftOf(result.agent))
+      setProjectPick(null)
+      if (result.projectsFailed !== null) {
+        setNotice({
+          tone: 'error',
+          text: `Created @${plan.handle}, but its projects were not saved: ${sentence(result.projectsFailed)} Pick them again under Default for projects and save.`,
+        })
+        return
+      }
+      setNotice({ tone: 'ok', text: plan.toolEdits.length > 0 || plan.subagents !== null ? 'Saved. Threads started from now on get these tools.' : 'Saved.' })
     },
-    onError: error => setNotice({ tone: 'error', text: `${sentence(errorMessage(error, 'The agent was not saved.'))} Your edits are still here. Save again.` }),
+    onError: async error => {
+      await Promise.all([invalidateList(), client.invalidateQueries({ queryKey: [AGENTS_QUERY_ROOT, 'project-defaults'] })])
+      setNotice({ tone: 'error', text: `${sentence(errorMessage(error, 'The agent was not saved.'))} Your edits are still here. Save again.` })
+    },
   })
   const saveDraft = (): void => {
     if (review.errors.length > 0) {
@@ -191,7 +256,13 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
       if (first !== undefined) document.getElementById(agentFieldId(first.field))?.focus()
       return
     }
-    save.mutate(Agents.normalizeDraft(draft, { creating }))
+    const plan = AgentSavePlans.of({ creating, base, draft: Agents.normalizeDraft(draft, { creating }), defaults, projects: projectPick })
+    if (AgentSavePlans.isEmpty(plan)) {
+      setDraft(base)
+      setProjectPick(null)
+      return
+    }
+    save.mutate(plan)
   }
 
   const toggle = useMutation({
@@ -286,6 +357,7 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
     else if (action.kind === 'use-handle') patch({ handle: action.handle })
     else if (action.kind === 'clear-memory-scope') patch({ memoryScope: null })
     else if (action.kind === 'messaging-none') patch({ delegation: { ...draft.delegation, messaging: 'none' } })
+    else if (action.kind === 'subagent-default-parent') patch({ subagents: { ...draft.subagents, default: null } })
     else patch({ route: null })
   }
   const newAgent = useCallback((seed: AgentDraft = AgentEditor.draftOf(null)): void => navigate({ kind: 'new', base: seed }), [navigate])
@@ -487,6 +559,21 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                         patch={patch}
                         onFix={fix}
                         revealAll={revealAll}
+                        tools={{
+                          catalog: toolCatalog.data,
+                          loading: toolCatalog.isPending,
+                          error: toolCatalog.isError ? errorMessage(toolCatalog.error, 'unknown error') : null,
+                          retry: () => void toolCatalog.refetch(),
+                          saved: base.tools,
+                        }}
+                        projects={{
+                          list: projects,
+                          defaults,
+                          error: projectDefaults.isError ? errorMessage(projectDefaults.error, 'unknown error') : null,
+                          retry: () => void projectDefaults.refetch(),
+                          selected: pickedProjects,
+                          onChange: setProjectPick,
+                        }}
                       />
                     </div>
                   </TabsContent>
@@ -533,7 +620,10 @@ export const AgentsPanel = (props: AgentsPanelProps): JSX.Element => {
                     size="sm"
                     onClick={() => {
                       if (creating) apply(NONE)
-                      else setDraft(base)
+                      else {
+                        setDraft(base)
+                        setProjectPick(null)
+                      }
                     }}
                   >
                     {creating ? 'Cancel' : 'Discard'}

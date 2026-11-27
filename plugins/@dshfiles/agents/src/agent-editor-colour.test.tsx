@@ -30,6 +30,8 @@ const renderForm = (draft: AgentDraft, patch: (next: Partial<AgentDraft>) => voi
         patch={patch}
         onFix={() => undefined}
         revealAll
+        tools={{ catalog: undefined, loading: false, error: null, retry: () => undefined, saved: draft.tools }}
+        projects={{ list: [], defaults: new Map(), error: null, retry: () => undefined, selected: new Set(), onChange: () => undefined }}
       />,
     ),
   )
