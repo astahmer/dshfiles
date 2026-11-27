@@ -32,6 +32,13 @@ test('shows nothing for the quiet window, then one quiet loading line, then the 
   expect(container.textContent).toBe('panel graph')
 })
 
+test('a view inside a sentence names its own loading line', () => {
+  const View = lazyView(() => new Promise<typeof Panel>(() => undefined), { label: 'Diff', loading: 'Loading the diff…' })
+  render(<View name="hunk" />)
+  act(() => vi.advanceTimersByTime(LAZY_VIEW_QUIET_MS))
+  expect(screen.getByRole('status').textContent).toBe('Loading the diff…')
+})
+
 test('renders at once, with no loading state, once the view has loaded', async () => {
   const View = lazyView(async () => Panel, { label: 'Backlog' })
   await act(async () => View.preload())

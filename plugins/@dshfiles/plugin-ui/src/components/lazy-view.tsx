@@ -17,7 +17,7 @@ export interface LazyView<P> extends React.FC<P> {
 }
 
 /** Renders nothing for the quiet window, then one muted loading line. */
-function QuietLoading(props: { readonly label: string }): React.ReactNode {
+function QuietLoading(props: { readonly text: string }): React.ReactNode {
   const [visible, setVisible] = React.useState(false)
   React.useEffect(() => {
     const timer = setTimeout(() => setVisible(true), LAZY_VIEW_QUIET_MS)
@@ -31,7 +31,7 @@ function QuietLoading(props: { readonly label: string }): React.ReactNode {
       className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:px-4 dshx:py-8 dshx:text-sm dshx:text-muted-foreground"
     >
       <Spinner aria-hidden role="presentation" aria-label={undefined} />
-      {`Loading ${props.label}…`}
+      {props.text}
     </div>
   )
 }
@@ -42,7 +42,15 @@ function QuietLoading(props: { readonly label: string }): React.ReactNode {
  * {@link LAZY_VIEW_QUIET_MS}, then a quiet loading line; a chunk that fails to load says so with Retry. Once loaded,
  * every later mount renders the view at once.
  */
-export function lazyView<P extends object>(load: () => Promise<React.ComponentType<P>>, options: { readonly label: string }): LazyView<P> {
+export function lazyView<P extends object>(
+  load: () => Promise<React.ComponentType<P>>,
+  options: {
+    /** What the view is, as a page names it: "Backlog", "Usage history"; the loading line and the load error use it. */
+    readonly label: string
+    /** The loading line, for a view inside a sentence ("Loading the diff…"); defaults to "Loading <label>…". */
+    readonly loading?: string
+  },
+): LazyView<P> {
   let state: LazyState<P> = { status: 'idle' }
   let pending: Promise<void> | undefined
   const listeners = new Set<() => void>()
@@ -75,7 +83,7 @@ export function lazyView<P extends object>(load: () => Promise<React.ComponentTy
     }, [current.status])
     if (current.status === 'loaded') return <current.component {...props} />
     if (current.status === 'failed') return <LoadError subject={options.label} error={current.error} onRetry={() => void start()} />
-    return <QuietLoading label={options.label} />
+    return <QuietLoading text={options.loading ?? `Loading ${options.label}…`} />
   }
   View.displayName = `LazyView(${options.label})`
   return Object.assign(View, { preload: start })

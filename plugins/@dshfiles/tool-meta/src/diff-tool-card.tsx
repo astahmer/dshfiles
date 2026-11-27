@@ -10,7 +10,7 @@ import { hunkDiffs, hunkTotals, type HunkDiff } from './file-hunk-diff.js'
 import { FileToolModels, type FileHunk, type FileToolCall } from './file-tool-models.js'
 
 /** The renderer and shiki load when a hunk first opens; collapsed rows only count lines. */
-const PatchView = lazyView(() => import('@dshfiles/plugin-ui/diff').then(module => module.PatchView), { label: 'Diff' })
+const PatchView = lazyView(() => import('@dshfiles/plugin-ui/diff').then(module => module.PatchView), { label: 'Diff', loading: 'Loading the diff…' })
 
 /** The Host conversation labels this card borrows, so a zh profile reads it like the native rows. */
 export type DiffTranslate = (
