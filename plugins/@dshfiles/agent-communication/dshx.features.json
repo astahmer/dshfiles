@@ -90,7 +90,7 @@
       "externalDependencies": [],
       "onboarding": {
         "firstAction": "Open Agents \u203a Messages and send a direct message to a live Agent.",
-        "doneWhen": "Your message shows in that Agent\u2019s conversation.",
+        "doneWhen": "Your message shows in that Agent\u2019s thread.",
         "open": {
           "panel": "agent-communication"
         }
