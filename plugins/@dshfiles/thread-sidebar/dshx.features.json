@@ -1496,6 +1496,11 @@
           "id": "thread-sidebar.reminder-wake-unit-scan",
           "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
           "testName": "keeps a thread an active reminder will wake, and reports the reminder as the skip reason"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "thread-sidebar.reminder-wake-browser",
+          "reason": "Host-only: the wake pass changes a thread's stored status on a timer and draws nothing; the Host tests drive it against a fake Schedule service, and the toggle is a generated Settings row."
         }
       ],
       "telemetry": [
@@ -4485,6 +4490,11 @@
         {
           "kind": "gherkin",
           "id": "thread-sidebar.subagent-live-preview",
+          "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "thread-sidebar.subagent-run-cards",
           "featureFile": "tooling/dshx/e2e/features/thread-sidebar.feature"
         },
         {
