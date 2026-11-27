@@ -105,10 +105,12 @@ describe('DestinationShell', () => {
 
   it('lists the Settings pages without a layout switch: one sidebar layout (b:952m)', () => {
     setPhone(false)
-    const shell = renderShell()
+    const shell = renderShell({ activePanelId: 'dshfiles-settings' })
     fireEvent.click(screen.getByRole('tab', { name: 'Settings' }))
     expect(screen.getByRole('button', { name: 'Plugins' })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'All settings' }))
+    const allSettings = screen.getByRole('button', { name: 'All settings' })
+    expect(allSettings.getAttribute('aria-current')).toBe('page')
+    fireEvent.click(allSettings)
     expect(shell.openSettings).toHaveBeenCalled()
     expect(screen.queryByRole('radio', { name: 'Free docking' })).toBeNull()
     expect(screen.queryByRole('group', { name: 'Layout' })).toBeNull()

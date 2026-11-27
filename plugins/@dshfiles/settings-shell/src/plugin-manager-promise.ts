@@ -23,12 +23,27 @@ export interface PluginManagerSurface<Id extends string> {
   setPluginEnabled(id: Id, enabled: boolean): Promise<PluginChangeResult>
   /** Absent on a manager that predates bundle records; the entries then name no owner. */
   listBundles?(): Promise<readonly BundleInfoLike[]>
+  /** Absent on a manager that predates bundle toggling. */
+  setBundleEnabled?(name: string, enabled: boolean): Promise<PluginChangeResult>
 }
+
+export type BundleLocalizedText = string | ({ readonly en: string } & Readonly<Record<string, string>>)
 
 /** What the controls read of a bundle record; `BundleInfo` satisfies it. */
 export interface BundleInfoLike {
   readonly name: string
-  readonly rows: readonly { readonly rowId: string; readonly entryId?: string }[]
+  readonly official?: boolean
+  readonly availability?: 'installation' | 'profile' | 'missing'
+  readonly version?: string
+  readonly description?: string
+  readonly meta?: {
+    readonly title?: BundleLocalizedText
+    readonly description?: BundleLocalizedText
+  }
+  readonly enabled?: boolean
+  readonly installed?: boolean
+  readonly readOnlyReason?: string
+  readonly rows: readonly { readonly rowId: string; readonly entryId?: string; readonly moduleName?: string }[]
   readonly overrides: readonly string[]
 }
 
@@ -59,4 +74,9 @@ export const pluginManagerCalls = <Id extends string>(manager: PluginManagerSurf
   /** A manager without bundle records lists none. */
   listBundles: Effect.tryPromise({ try: () => manager.listBundles?.() ?? Promise.resolve([]), catch: managerFailed }),
   setPluginEnabled: (id: Id, enabled: boolean) => Effect.tryPromise({ try: () => manager.setPluginEnabled(id, enabled), catch: managerFailed }),
+  setBundleEnabled: (name: string, enabled: boolean) =>
+    Effect.tryPromise({
+      try: () => manager.setBundleEnabled?.(name, enabled) ?? Promise.reject(new Error('This Host does not support bundle enablement changes.')),
+      catch: managerFailed,
+    }),
 })

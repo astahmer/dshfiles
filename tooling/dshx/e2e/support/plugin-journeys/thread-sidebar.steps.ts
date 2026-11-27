@@ -3005,6 +3005,28 @@ Then("the transcript row opens the subagent's thread", async ({ page }: { page: 
   await finishJourneyAssertions(page)
 })
 
+When('Settings is opened from the destination rail', async ({ page }: { page: Page }) => {
+  const destinations = page.getByRole('navigation', { name: 'Destinations', exact: true })
+  const settingsTab = destinations.getByRole('tab', { name: 'Settings', exact: true })
+  await expect(settingsTab).toBeVisible()
+  await settingsTab.click()
+  await expect(page.locator('[data-settings-view]')).toBeVisible()
+})
+
+Then('clicking All settings keeps the Settings tab open without switching back to a conversation tab', async ({ page }: { page: Page }) => {
+  const allSettings = page.getByRole('button', { name: 'All settings', exact: true })
+  await recordAssertion(page, 'thread-sidebar-all-settings-keeps-tab', async () => {
+    await expect(allSettings).toBeVisible()
+    await expect(allSettings).toHaveAttribute('aria-current', 'page')
+    await allSettings.click()
+    await expect(page.locator('[data-settings-view]')).toBeVisible()
+    await expect(allSettings).toHaveAttribute('aria-current', 'page')
+    await allSettings.click()
+    await expect(page.locator('[data-settings-view]')).toBeVisible()
+  })
+  await finishJourneyAssertions(page)
+})
+
 // Three children at once is the shape that squashed: one card per child in a 288 px dock, each a flex item whose
 // overflow-hidden wrapper had no automatic minimum height, so every card clipped to a sliver under the next one. Each
 // child sleeps on its own command, because the fake provider runs a `[[once call ...]]` directive only once per process.

@@ -836,6 +836,134 @@
           "reason": "A settings field plus a one-time settings write through DSH's settings forms on Host start; no fetch, socket, process or long job. The Jev calls that use the key keep their jev classify span."
         }
       ]
+    },
+    {
+      "id": "settings-origin-distinction",
+      "title": "Distinguish default DSH categories from plugin categories",
+      "summary": "Every Settings category is classified as stock DSH or a DSH plugin from bundle metadata (with core namespace fallback). The sidebar offers an All / DSH / Plugins scope filter with counts, subtle per-row origin cues (DSH pill vs plugin icon), category icons, and origin badges in each entry header and search result.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect group \"Filter categories by source\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "expect group \"Filter categories by source\""
+      ],
+      "surfaces": ["client", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: sidebar source filter and entry header badge",
+      "configuration": [],
+      "states": ["all", "dsh-only", "plugins-only"],
+      "failureModes": [
+        "Before bundle labels load from the Host, known stock DSH sections and namespaces fall back to DSH default while @dshfiles and unknown namespaces fall back to Plugin."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-classification",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "classifies stock DSH defaults separately from DSH plugin categories and filters by origin"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-filter-view",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
+          "testName": "narrows the navigation and moves off an entry the filter hides"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-filter-search",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-view.test.tsx",
+          "testName": "searches only the entries of the chosen origin"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.origin-forked-core",
+          "file": "plugins/@dshfiles/settings-shell/src/settings-groups.test.ts",
+          "testName": "keeps a stock DSH category DSH when a dshfiles fork serves it, and trusts bundle labels over the core prefix guess"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.origin-distinction",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Client-only: reads already-loaded bundle labels and filters rendered navigation entries without starting new Host work."
+        }
+      ]
+    },
+    {
+      "id": "dshfiles-plugins-page",
+      "title": "Plugins by category: a second plugin view in Settings and as a panel",
+      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin; DSH core's Plugins manager lists a first card (its plugins.item seat) that opens it. It lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enable/disable switches backed by PluginManager.setBundleEnabled, restart indicators, and deep links to each plugin's settings page.",
+      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Plugins by category\"", "expect switch \"Enable *\""],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Settings Accounts, tools, secrets and plugins.\"",
+        "click combobox \"Sections\"",
+        "click option \"Plugins by category\"",
+        "expect switch \"Enable *\""
+      ],
+      "surfaces": ["client", "host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins › Plugins by category",
+      "configuration": [],
+      "states": ["loading", "ready", "filtered", "toggling", "pending-restart", "error"],
+      "failureModes": [
+        "A Host without pluginManager returns plugin-manager-unavailable and the page displays an actionable alert instead of crashing.",
+        "Protected management bundles show a Protected badge and disable their switch.",
+        "Changes that require a Host restart display Starts/Stops after a restart without restarting DSH automatically.",
+        "A bundle disabled elsewhere (the Plugins tab) while its rows still run shows Stops after a restart; a failed or cancelled toggle keeps the earlier restart notice.",
+        "A bundle the profile names but whose files are missing shows Not installed.",
+        "A dshfiles bundle missing from the category map lands in Other; bundle-categories.test.ts fails until it is placed."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.bundle-controls",
+          "file": "plugins/@dshfiles/settings-shell/src/plugin-controls.test.ts",
+          "testName": "lists bundles with origin classification and toggles enablement with restart tracking"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.dshfiles-plugins-view",
+          "file": "plugins/@dshfiles/settings-shell/src/dshfiles-plugins-page.test.tsx",
+          "testName": "defaults to dshfiles plugins, filters by status and scope, toggles enablement, and jumps to Settings"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.dshfiles-plugins-badges",
+          "file": "plugins/@dshfiles/settings-shell/src/dshfiles-plugins-page.test.tsx",
+          "testName": "marks protected, restart-pending and missing bundles and announces a failed toggle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "settings-shell.bundle-categories",
+          "file": "plugins/@dshfiles/settings-shell/src/bundle-categories.test.ts",
+          "testName": "places every bundle under plugins/@dshfiles in a functional area"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.dshfiles-plugins-page",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "settings-shell.plugin-list-launcher",
+          "featureFile": "tooling/dshx/e2e/features/settings-shell.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        }
+      ]
     }
   ]
 }

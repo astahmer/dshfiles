@@ -526,7 +526,13 @@ const FolderIndex = (props: {
         ) : (
           <nav aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col dshx:gap-0.5">
             {settings === null ? null : (
-              <SectionButton label="All settings" description="Appearance, models, agents, tools and more." selected={false} onSelect={settings} />
+              <SectionButton
+                panelId={SETTINGS_PANEL_ID}
+                label="All settings"
+                description="Appearance, models, agents, tools and more."
+                selected={props.activePanelId === SETTINGS_PANEL_ID}
+                onSelect={settings}
+              />
             )}
             {rows(mapped, props.phone !== true)}
             {folderUi === undefined || resolved === undefined || props.phone === true ? null : <AddPanelButton folder={resolved} ui={folderUi} />}

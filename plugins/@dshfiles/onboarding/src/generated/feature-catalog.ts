@@ -522,7 +522,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "settings-shell",
       "description": "VS Code-style DSH Settings shell with plugin settings, search, and notices for new DSH releases.",
       "ui": true,
-      "features": 14
+      "features": 16
     },
     {
       "name": "settings-subagent",
@@ -21255,10 +21255,32 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "secret-catalog",
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with co…",
+      "summary": "List aliases as metadata only, run a command with the workspace's aliases injected through `secret mcp` (output scrubbed by the Host), and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve…",
       "destination": "none",
-      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias",
-      "reach": [],
+      "currentSurface": "agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias",
+      "reach": [
+        {
+          "text": "seed fake-secret-cli",
+          "action": "seed",
+          "by": null,
+          "name": null,
+          "value": "fake-secret-cli"
+        },
+        {
+          "text": "click button \"Secrets\"",
+          "action": "click",
+          "by": "button",
+          "name": "Secrets",
+          "value": null
+        },
+        {
+          "text": "expect text \"GITHUB_TOKEN\"",
+          "action": "expect",
+          "by": "text",
+          "name": "GITHUB_TOKEN",
+          "value": null
+        }
+      ],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -22827,6 +22849,139 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "text",
           "name": "Key",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "settings-shell#settings-origin-distinction",
+      "plugin": "settings-shell",
+      "id": "settings-origin-distinction",
+      "title": "Distinguish default DSH categories from plugin categories",
+      "summary": "Every Settings category is classified as stock DSH or a DSH plugin from bundle metadata (with core namespace fallback). The sidebar offers an All / DSH / Plugins scope filter with counts, subtle per-row origin cues (DSH pill vs plugin icon), category icons, and origin badges in…",
+      "destination": "settings",
+      "currentSurface": "settings: sidebar source filter and entry header badge",
+      "reach": [
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "expect group \"Filter categories by source\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Filter categories by source",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "expect group \"Filter categories by source\"",
+          "action": "expect",
+          "by": "group",
+          "name": "Filter categories by source",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "settings-shell#dshfiles-plugins-page",
+      "plugin": "settings-shell",
+      "id": "dshfiles-plugins-page",
+      "title": "Plugins by category: a second plugin view in Settings and as a panel",
+      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin; DSH core's Plugins manager lists a first card (its plugins.item seat) that opens it. It lists global @dshfiles/* bu…",
+      "destination": "settings",
+      "currentSurface": "settings: Plugins › Plugins by category",
+      "reach": [
+        {
+          "text": "click button \"Account menu\"",
+          "action": "click",
+          "by": "button",
+          "name": "Account menu",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Settings*\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Settings*",
+          "value": null
+        },
+        {
+          "text": "click button \"Plugins by category\"",
+          "action": "click",
+          "by": "button",
+          "name": "Plugins by category",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Enable *\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Enable *",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Settings Accounts, tools, secrets and plugins.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Settings Accounts, tools, secrets and plugins.",
+          "value": null
+        },
+        {
+          "text": "click combobox \"Sections\"",
+          "action": "click",
+          "by": "combobox",
+          "name": "Sections",
+          "value": null
+        },
+        {
+          "text": "click option \"Plugins by category\"",
+          "action": "click",
+          "by": "option",
+          "name": "Plugins by category",
+          "value": null
+        },
+        {
+          "text": "expect switch \"Enable *\"",
+          "action": "expect",
+          "by": "switch",
+          "name": "Enable *",
           "value": null
         }
       ],

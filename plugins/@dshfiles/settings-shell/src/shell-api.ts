@@ -1,7 +1,8 @@
 import { defineApi, method } from '@dshfiles/dshx/api'
 import { settingsSearchEntryFields } from '@dshfiles/dshx/settings'
 import * as Schema from 'effect/Schema'
-import { bundleLabelSchema } from './bundle-labels.js'
+import { bundleLabelSchema, displayTextSchema } from './bundle-labels.js'
+import { pluginBundleOriginSchema } from './origin.js'
 import { dshReleaseStatusSchema } from './release-status.js'
 
 /** One namespace's field patch: JSON values only, validated by the Host against that namespace's schema. */
@@ -48,6 +49,34 @@ const pluginChangeSchema = Schema.Struct({
   warnings: Schema.Array(Schema.String).check(Schema.isMaxLength(50)),
 })
 export type PluginChange = typeof pluginChangeSchema.Type
+
+const pluginBundleSchema = Schema.Struct({
+  name: Schema.String,
+  origin: pluginBundleOriginSchema,
+  title: Schema.NullOr(displayTextSchema),
+  description: Schema.NullOr(displayTextSchema),
+  packageDescription: Schema.NullOr(Schema.String),
+  version: Schema.NullOr(Schema.String),
+  enabled: Schema.Boolean,
+  installed: Schema.Boolean,
+  availability: Schema.Literals(['installation', 'profile', 'missing']),
+  readOnlyReason: Schema.NullOr(Schema.String),
+  pendingRestart: Schema.NullOr(Schema.Literals(['enable', 'disable'])),
+  rowIds: Schema.Array(Schema.String).check(Schema.isMaxLength(200)),
+  activeRowCount: Schema.Number,
+})
+export type PluginBundle = typeof pluginBundleSchema.Type
+
+const pluginBundleChangeSchema = Schema.Struct({
+  name: Schema.String,
+  changed: Schema.Boolean,
+  enabled: Schema.NullOr(Schema.Boolean),
+  application: Schema.Literals(['applied', 'restart-required', 'overridden', 'failed', 'cancelled']),
+  restartReason: Schema.NullOr(Schema.String),
+  error: Schema.NullOr(Schema.String),
+  warnings: Schema.Array(Schema.String).check(Schema.isMaxLength(50)),
+})
+export type PluginBundleChange = typeof pluginBundleChangeSchema.Type
 
 const SOURCE_LABELS = {
   user: 'override',
@@ -279,6 +308,18 @@ export const settingsShellApi = defineApi({
             .filter(part => part !== undefined)
             .join(' · '),
       },
+    }),
+    /** Installed and available bundles of the active profile, with their origin and enablement state. */
+    bundles: method({
+      input: Schema.Struct({ query: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(128))) }),
+      output: Schema.Struct({ bundles: Schema.Array(pluginBundleSchema).check(Schema.isMaxLength(2000)) }),
+      description: 'List bundles in the active profile (dshfiles, stock DSH, and community) with enablement and restart state. Read-only.',
+    }),
+    /** Enable or disable one bundle in the active profile through the plugin manager. */
+    setBundleEnabled: method({
+      input: Schema.Struct({ name: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)), enabled: Schema.Boolean }),
+      output: pluginBundleChangeSchema,
+      description: 'Enable or disable one bundle in the active profile through the plugin manager, reporting whether it applied live or waits for a restart.',
     }),
     /** Reset one field of a namespace to its schema default without restating the rest of the section. */
     unset: method({
