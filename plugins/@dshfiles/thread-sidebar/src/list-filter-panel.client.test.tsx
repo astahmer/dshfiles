@@ -851,8 +851,7 @@ describe('the built-in preset menu (round 30, item 2)', () => {
   const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
   it('hides Rename, Save changes and Delete for All threads and shows the built-in line under its label', () => {
     expect(optionsMenu).not.toMatch(/disabled=\{[^}]*activeIsBuiltIn/u)
-    expect(optionsMenu).toMatch(/\{activeIsBuiltIn \? \(\s*<p className="dshx:px-2 dshx:pb-1\.5 dshx:text-xs dshx:text-muted-foreground"[^>]*>\s*\{props\.tSidebar\('threadSidebarPresetBuiltInHint'/u)
-    expect(english).toContain("threadSidebarPresetBuiltInHint: 'All threads is built in. Save your changes as a new preset.',")
+    expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetBuiltInHint')")
   })
 
   it('calls its save verb Save as new preset… in the menu and on the row alike', () => {
@@ -1181,5 +1180,23 @@ describe('the closed desktop trigger reads as a state (round 31, item 2)', () =>
     expect(trigger).toContain('{scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}')
     expect(client).not.toContain('const activeViewShortLabel')
     expect(trigger).toMatch(/className=\{cn\('dshx:truncate', scopeSlot === null && scopeCount !== null && 'dshx:text-foreground'\)\}/u)
+  })
+})
+
+// Council round 30, item 4: the preset ⋯ menu stays inside the panel: a fixed 256px width aligned to the ⋯'s end, the
+// built-in caption wrapping, no repeated "All threads" label, and Save as new preset… described by the caption.
+describe('the preset menu fits the panel (round 31, item 4)', () => {
+  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+  it('is 256px wide, end-aligned, its caption wrapping', () => {
+    expect(optionsMenu).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64"')
+    expect(optionsMenu).not.toContain('dshx:min-w-52')
+    expect(optionsMenu).toMatch(/data-preset-built-in-hint=""[^>]*>|className="[^"]*dshx:whitespace-normal[^"]*"[^>]*data-preset-built-in-hint/u)
+    expect(english).toContain("threadSidebarPresetBuiltInHint: 'Built in. Save changes as a new preset.',")
+  })
+
+  it("names the preset in a label only for a user preset, and describes Save as new preset… by the built-in caption", () => {
+    expect(optionsMenu).toMatch(/\{activeIsBuiltIn \? null : \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuLabel/u)
+    expect(optionsMenu).toContain('aria-describedby={activeIsBuiltIn ? builtInHintId : undefined}')
+    expect(optionsMenu).toContain('id={builtInHintId}')
   })
 })

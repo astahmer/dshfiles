@@ -6651,6 +6651,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
   // The built-in All threads is never renamed, overwritten or deleted (council round 28, item 13).
   const activeIsBuiltIn = listThreadView.id === ALL_THREADS_VIEW_ID
+  const builtInHintId = useId()
   const presetOptionsMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -6667,23 +6668,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           <OverflowGlyph />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
+      {/* A fixed 256px, aligned to the ⋯'s end, so it stays inside the 320px panel (council round 30, item 4). */}
+      <DropdownMenuContent align="end" className="dshx-root dshx:w-64" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
+        {/* The built-in All threads shows no dead rows (council round 29, item 2): one caption says why, and describes
+            the one way to keep its changes (a <p> in a menu is skipped unless an item points at it: round 30, item 4). */}
+        {activeIsBuiltIn ? (
+          <p id={builtInHintId} className="dshx:px-2 dshx:pt-1.5 dshx:pb-1 dshx:text-xs dshx:whitespace-normal dshx:text-muted-foreground" data-preset-built-in-hint="">
+            {props.tSidebar('threadSidebarPresetBuiltInHint')}
+          </p>
+        ) : null}
         {/* Save as… left the panel for this menu, so the sheet opens on the filters (round 28, item 10). */}
-        <DropdownMenuItem onSelect={saveFiltersAsPreset}>
+        <DropdownMenuItem onSelect={saveFiltersAsPreset} aria-describedby={activeIsBuiltIn ? builtInHintId : undefined}>
           {/* One verb name, as on the edited built-in row's button (council round 29, item 2). */}
           {props.tSidebar('threadSidebarPresetSaveAsNew')}
         </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        {/* One text edge (no verb carries an icon) and the preset's name as a quiet label (council round 28, item 12). */}
-        <DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
-        {/* The built-in All threads shows no dead rows (council round 29, item 2): one line says why, and Save as new
-            preset… above is its way to keep the changes. */}
-        {activeIsBuiltIn ? (
-          <p className="dshx:px-2 dshx:pb-1.5 dshx:text-xs dshx:text-muted-foreground" data-preset-built-in-hint="">
-            {props.tSidebar('threadSidebarPresetBuiltInHint')}
-          </p>
-        ) : (
+        {/* One text edge (no verb carries an icon) and the preset's name as a quiet label (council round 28, item 12),
+            for a user preset only: the built-in caption already says which. */}
+        {activeIsBuiltIn ? null : (
           <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
             <DropdownMenuItem
               onSelect={closeFilterThen(() =>
                 setPresetPrompt({
