@@ -213,6 +213,7 @@ function declarations(p: Palette, input: Omit<PaletteInput, 'scheme'>): string[]
   push('--dshx-segment-thumb', PaletteMath.toCss(p.segmentThumb))
   push('--dshx-segment-edge', PaletteMath.toCss(p.segmentEdge))
   push('--dshx-segment-track', PaletteMath.toCss(p.segmentTrack))
+  push('--dshx-segment-track-floating', PaletteMath.toCss(p.segmentTrackFloating))
   push('--dshx-prompt-fill', PaletteMath.toCss(p.promptFill))
   push('--dshx-tone-nav', PaletteMath.toCss(p.navSurface))
   push('--dshx-ready-mark', PaletteMath.toCss(p.readyMark))

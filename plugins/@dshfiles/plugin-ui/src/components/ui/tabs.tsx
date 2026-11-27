@@ -18,7 +18,7 @@ function Tabs({ className, orientation = 'horizontal', ...props }: React.Compone
 /**
  * The segmented root (`default`) takes the one control height (council round 5 A1: `--dshx-control-h`, 32px, 44px on a
  * coarse pointer) with its items inset 3px, so it lines up with the fields and buttons beside it. `line` keeps 32px.
- * Its track is `bg-segment-track` (#EBE9E7 light, #1A1715 dark: council round 28, item 14) and the selected item the one segment thumb
+ * Its track is `bg-segment-track` (#EBE9E7 light, #23201D dark; #1A1715 in a dark popover: council round 34 B3) and the selected item the one segment thumb
  * (council round 10 A3: `segment-thumb`, its label at 550).
  */
 const tabsListVariants = cva(

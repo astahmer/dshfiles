@@ -68,8 +68,8 @@
    */
   --color-trigger-fill: var(--dshx-trigger-fill, var(--dsw-alias-interactive-bg-hover-solid));
   /*
-   * A segmented control's track (council round 28, item 14): `bg-segment-track`, the raised step in light and #1A1715 in
-   * dark, below the popover fill, so the segment thumb stands off it. Falls back to the muted step without ui-styles.
+   * A segmented control's track: `bg-segment-track`, the raised step in both schemes (#23201D in dark: council round 34
+   * B3); inside a popover it is `--dshx-segment-track-floating`, #1A1715 in dark, below the popover fill (round 28). Falls back to the muted step without ui-styles.
    */
   --color-segment-track: var(--dshx-segment-track, var(--dsw-alias-bg-module-platform));
   /*

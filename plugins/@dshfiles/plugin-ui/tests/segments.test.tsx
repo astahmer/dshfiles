@@ -106,10 +106,29 @@ describe('one selected segment (council round 10 A3)', () => {
 // Council round 28, item 14: the dark thumb was a hair off its track (1.10:1 against a popover of the same step). The dark
 // track drops to #1A1715 and the thumb's edge to an opaque #4D4843, so the chosen segment reads at a glance; light keeps
 // the raised #EBE9E7 track.
-describe('the segment track (council round 28, item 14)', () => {
-  it.each(schemes)('is its own token, #EBE9E7 in light and #1A1715 in dark, with the dark edge at #4D4843 (%s)', scheme => {
+// Council round 34 B3: at #1A1715 the dark track sat on the page at 1.05:1 and under Usage's cards (#1B1815) at 1.01:1,
+// so the range and measure controls had no track. On the page and cards the track is the raised step in both schemes
+// (#23201D in dark, round ten's value); only inside a popover, whose dark fill is that raised step, does it drop to
+// #1A1715 (`segmentTrackFloating`), as the Filters panel needs.
+describe('the segment track (council round 28, item 14; round 34 B3)', () => {
+  it.each(schemes)('stands off the page and a card at least as far in dark as in light (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    expect(PaletteMath.toHex(p.segmentTrack)).toBe(scheme === 'light' ? '#ebe9e7' : '#1a1715')
+    const [page, card] = [p.neutral[0]!, p.neutral[scheme === 'light' ? 0 : 1]!]
+    expect(PaletteMath.contrastRatio(p.segmentTrack, page), 'track on the page').toBeGreaterThanOrEqual(1.14)
+    expect(PaletteMath.contrastRatio(p.segmentTrack, card), 'track on a card').toBeGreaterThanOrEqual(1.08)
+  })
+
+  it.each(schemes)('drops below the popover fill inside a popover, so the thumb stands off it there (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    expect(PaletteMath.toHex(p.segmentTrackFloating)).toBe(scheme === 'light' ? '#ebe9e7' : '#1a1715')
+    expect(ThemeCss.themeCss()).toContain(`--dshx-segment-track-floating: ${PaletteMath.toCss(p.segmentTrackFloating)};`)
+    const popover = readFileSync(join(process.cwd(), 'src/components/ui/popover.tsx'), 'utf8')
+    expect(popover).toContain('dshx:[--dshx-segment-track:var(--dshx-segment-track-floating)]')
+  })
+
+  it.each(schemes)('is its own token, #EBE9E7 in light and #23201D in dark, with the dark edge at #4D4843 (%s)', scheme => {
+    const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+    expect(PaletteMath.toHex(p.segmentTrack)).toBe(scheme === 'light' ? '#ebe9e7' : '#23201d')
     if (scheme === 'dark') expect(PaletteMath.toHex(p.segmentEdge)).toBe('#4d4843')
     // Secondary labels stay AA on the track; the thumb and its edge stand off it.
     expect(PaletteMath.contrastRatio(p.neutral[9]!, p.segmentTrack)).toBeGreaterThanOrEqual(4.5)

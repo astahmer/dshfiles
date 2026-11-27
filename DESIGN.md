@@ -806,8 +806,9 @@ confirmation when they lose work.
 hairline, the active one in ink over a 2px ink bar, the same bar as the window tab strip. The segmented control only for
 up to four view modes of one list. **One selected segment** (council round 10 A3): the segmented `TabsList`, the
 page's sliding indicator and `SlidingSegments` share `segment-thumb`: paper (`#FEFCFA`) on the `#EBE9E7` track in light,
-a raised `#302C28` on the `#1A1715` track in dark (`bg-segment-track`; council round 28: below the popover fill, so the
-thumb stands off it, its edge an opaque `#4D4843`), inset 3px at a 6px radius with a quiet 1px edge and no shadow, the
+a raised `#302C28` on the `#23201D` track in dark (`bg-segment-track`, the raised step on the page and a card: council
+round 34; inside a popover the track drops to `#1A1715`, below the popover fill, so the thumb stands off it: round 28),
+its edge an opaque `#4D4843`, inset 3px at a 6px radius with a quiet 1px edge and no shadow, the
 selected label the ink at 550 (its width reserved by `SegmentLabel`, so selecting never moves a neighbour); past four items the tabs are always underline. A filter over one list (Running /
 Finished / All) is a `ToggleGroup`.
 

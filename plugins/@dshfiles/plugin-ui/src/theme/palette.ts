@@ -100,11 +100,16 @@ export interface Palette {
    */
   readonly segmentEdge: Oklch
   /**
-   * A segmented control's track (council round 28, item 14): the raised step in light (#EBE9E7); in dark #1A1715, below
-   * the popover and dialog fills it sits on, where the raised step (#23201D) was the popover itself and the #302C28
-   * thumb barely stood off it.
+   * A segmented control's track on the page and a card: the raised step in both schemes (#EBE9E7 light, #23201D dark;
+   * council round 34 B3). Round 28's #1A1715 sat on the dark page at 1.05:1 and under a card at 1.01:1.
    */
   readonly segmentTrack: Oklch
+  /**
+   * The track inside a popover (council round 28, item 14): the popover's dark fill is the raised step, so there the track
+   * drops below it to #1A1715 and the #302C28 thumb stands off it; light keeps the raised step. `PopoverContent` points
+   * `--dshx-segment-track` at it.
+   */
+  readonly segmentTrackFloating: Oklch
   /**
    * The user prompt bubble (council round 6 A5): a faint cool tint at hue 230, 40° from the default attention indigo,
    * so your own words read apart from the agent's without saying attention. Ink, secondary and faint text and links hold
@@ -248,7 +253,8 @@ function palette(input: PaletteInput): Palette {
     triggerFill,
     segmentThumb: dark ? { l: 0.296, c: round((chroma * 9) / 7, 4), h: hue } : bg,
     segmentEdge: dark ? { l: 0.4049, c: round((chroma * 23) / 15, 4), h: hue + 2.5 } : withAlpha(neutral[10] ?? { l: 0.22, c: 0, h: hue }, 0.1),
-    segmentTrack: dark ? { l: 0.2074, c: round((chroma * 13) / 15, 4), h: hue - 9 } : raised,
+    segmentTrack: raised,
+    segmentTrackFloating: dark ? { l: 0.2074, c: round((chroma * 13) / 15, 4), h: hue - 9 } : raised,
     primaryFill: dark ? { l: 0.88, c: 0.006, h: hue } : { l: 0.3, c: primaryChroma, h: hue },
     primaryHover: dark ? { l: round(0.88 * 0.86 + bg.l * 0.14, 4), c: round(0.006 * 0.86 + bg.c * 0.14, 4), h: hue } : { l: 0.24, c: primaryChroma, h: hue },
   }
