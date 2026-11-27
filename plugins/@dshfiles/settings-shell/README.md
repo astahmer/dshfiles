@@ -8,7 +8,7 @@
 
 ![Settings grouped by task, with deep links](docs/screenshots/settings-task-groups.png)
 
-![Settings sidebar distinguishing default DSH and plugin categories](docs/screenshots/settings-origin-distinction.png)
+![Settings filtered to DSH defaults from the head of the category list](docs/screenshots/settings-origin-distinction.png)
 
 ![Plugins by category](docs/screenshots/dshfiles-plugins-page.png)
 
