@@ -926,7 +926,8 @@ describe('preset end columns (round 30, item 6)', () => {
     for (const row of rows) {
       const count = element(row.querySelector('[data-preset-count]'))
       for (const token of COLUMN) expect(count.className, row.getAttribute('aria-label') ?? '').toContain(token)
-      expect(row.lastElementChild).toBe(count)
+      // The count ends line 1; an edited row's coarse-pointer second line follows it (round 31, item 1).
+      expect(Array.from(row.children).filter(child => !child.className.includes('dshx:pointer-coarse:basis-full')).at(-1)).toBe(count)
     }
     expect(screen.getByRole('radio', { name: 'Empty' }).querySelector('[data-preset-count]')?.textContent).toBe('')
   })
@@ -937,8 +938,9 @@ describe('preset end columns (round 30, item 6)', () => {
     if (presets === undefined) throw new Error('The fixture has presets.')
     const { container } = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
     // The row's 6px padding, the 20px column and an 8px gap: the buttons end 34px from the row's end.
-    // Outside the radiogroup since round 30 (item 13): the row ends 6px inside the section, so 40px from the section.
-    expect(element(container.querySelector('[data-preset-actions]')).className).toContain('dshx:right-10')
+    // Laid over the row's own seat before the count since round 31 (item 1), outside the radiogroup.
+    expect(element(container.querySelector('[data-preset-actions]')).className).toContain('dshx:absolute')
+    expect(element(container.querySelector('[data-preset-actions-seat]')).nextElementSibling?.hasAttribute('data-preset-count')).toBe(true)
   })
 
   it('counts an edited preset by what the list draws, in its row and its name', () => {
@@ -971,7 +973,7 @@ describe('labelled Save and Discard on a phone (round 30, item 8)', () => {
 
   it('says Save as new… for the built-in preset', () => {
     render(edited('all'))
-    expect(screen.getByRole('button', { name: 'threadSidebarPresetSaveAsNew' }).querySelector('[data-row-button-text]')?.textContent).toBe('threadSidebarPresetSaveAsNewShort')
+    expect(screen.getByRole('button', { name: 'threadSidebarPresetSaveAsNew' }).querySelector('[data-row-button-text]')?.textContent).toBe('threadSidebarPresetSaveAsNew')
   })
 })
 
@@ -1102,5 +1104,71 @@ describe("the edited row's count stays at its end (round 30, item 6)", () => {
     const seat = element(row.querySelector('[data-preset-actions-seat]'))
     expect(seat.nextElementSibling?.hasAttribute('data-preset-count')).toBe(true)
     expect(seat.previousElementSibling?.hasAttribute('data-preset-label')).toBe(true)
+  })
+})
+
+// Council round 30, item 1: the phone edited row never truncates "edited" and takes a second line for Discard and Save;
+// Save and Discard are placed from the row's own seat and follow it (a ResizeObserver), not from a one-off measure.
+describe('the edited row on two lines (round 31, item 1)', () => {
+  const edited = (activeId: string, label?: string) => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const items = label === undefined ? presets.items : presets.items.map(item => (item.id === activeId ? { ...item, label } : item))
+    return <ListFilterPanel {...base} presets={{ ...presets, items, activeId, edited: true, builtInId: 'all', onSaveAs: vi.fn() }} />
+  }
+
+  it('truncates only the preset name, never the edited tag', () => {
+    render(edited('working', 'A very long custom preset name that runs on'))
+    const row = screen.getByRole('radio', { name: /^A very long/u })
+    const name = element(row.querySelector('[data-preset-name]'))
+    const tag = element(row.querySelector('[data-preset-edited-tag]'))
+    expect(name.className).toContain('dshx:truncate')
+    expect(name.className).toContain('dshx:min-w-0')
+    expect(tag.className).toContain('dshx:shrink-0')
+    expect(tag.contains(name)).toBe(false)
+  })
+
+  it('gives a coarse-pointer edited row a 44pt second line at the label x, and a desktop seat before the count', () => {
+    render(edited('working'))
+    const row = screen.getByRole('radio', { name: /^Working, /u })
+    expect(row.className).toContain('dshx:pointer-coarse:flex-wrap')
+    expect(row.className).toContain('dshx:pointer-coarse:h-auto')
+    const [desk, line] = Array.from(row.querySelectorAll('[data-preset-actions-seat]'))
+    expect(element(desk).className).toContain('dshx:pointer-coarse:hidden')
+    expect(element(desk).nextElementSibling?.hasAttribute('data-preset-count')).toBe(true)
+    for (const token of ['dshx:hidden', 'dshx:pointer-coarse:block', 'dshx:pointer-coarse:basis-full', 'dshx:pointer-coarse:h-11']) expect(element(line).className).toContain(token)
+    expect(element(line).previousElementSibling?.hasAttribute('data-preset-count')).toBe(true)
+    // Their words start at the label's x on that line: 24px in (the 16px check and an 8px gap), less the button's 8px.
+    expect(element(document.querySelector('[data-preset-actions]')).className).toContain('dshx:pointer-coarse:pl-4')
+  })
+
+  it('puts Discard first and spells Save out on a phone: "Save as new preset…" for the built-in, "Save" for a user preset', () => {
+    const { unmount } = render(edited('all'))
+    const words = () => Array.from(document.querySelectorAll('[data-preset-actions] [data-row-button-text]')).map(node => node.textContent)
+    expect(words()).toEqual(['threadSidebarPresetDiscardShort', 'threadSidebarPresetSaveAsNew'])
+    unmount()
+    render(edited('working'))
+    expect(words()).toEqual(['threadSidebarPresetDiscardShort', 'threadSidebarPresetSaveShort'])
+  })
+
+  it('follows the seat it lies over with a ResizeObserver, so a rename, a zoom or a rotation never leaves it behind', () => {
+    const observed: Element[] = []
+    const original = globalThis.ResizeObserver
+    globalThis.ResizeObserver = class {
+      observe(target: Element): void {
+        observed.push(target)
+      }
+      unobserve(): void {}
+      disconnect(): void {}
+    }
+    try {
+      render(edited('working'))
+      const seats = Array.from(document.querySelectorAll('[data-preset-actions-seat]'))
+      expect(seats.every(seat => observed.includes(seat))).toBe(true)
+      expect(observed.includes(element(document.querySelector('[data-thread-presets]')))).toBe(true)
+    } finally {
+      globalThis.ResizeObserver = original
+    }
   })
 })

@@ -223,21 +223,31 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const presets = props.presets
   const panelRef = useRef<HTMLDivElement | null>(null)
   const actionsRef = useRef<HTMLDivElement | null>(null)
-  // The edited row's Save and Discard: their width, so the label gives way to exactly them (their text on a phone).
-  const [actionsBox, setActionsBox] = useState({ width: 0, top: 0, height: 0 })
-  const actionsWidth = actionsBox.width
-  const editingId = presets?.edited === true ? presets.activeId : undefined
   const presetsRef = useRef<HTMLElement | null>(null)
-  // Save and Discard live outside the radiogroup (council round 29, item 13), laid over the edited row: its top and
-  // height, measured against the presets section, and their own width, which the row's label gives way to.
+  // Save and Discard live outside the radiogroup (council round 29, item 13), laid over a seat the edited row keeps for
+  // them: before the count on a mouse, the row's second line on a coarse pointer. They follow that seat (council round 30,
+  // item 1): placed after every render, and again whenever the seat or the section changes size (a rename, a zoom, a
+  // rotation, a late font), so they never sit over the wrong row.
   useLayoutEffect(() => {
     const actions = actionsRef.current
     const section = presetsRef.current
-    const row = section?.querySelector('[data-preset-active]')
-    if (actions === null || section === null || row === null || row === undefined) return
-    const rowBox = row.getBoundingClientRect()
-    setActionsBox({ width: actions.offsetWidth, top: rowBox.top - section.getBoundingClientRect().top, height: rowBox.height })
-  }, [editingId, presets?.items.length])
+    if (actions === null || section === null) return
+    const seats = Array.from(section.querySelectorAll<HTMLElement>('[data-preset-actions-seat]'))
+    const place = (): void => {
+      const seat = seats.find(candidate => candidate.getClientRects().length > 0)
+      if (seat === undefined) return
+      const box = seat.getBoundingClientRect()
+      const origin = section.getBoundingClientRect()
+      actions.style.left = `${String(box.left - origin.left)}px`
+      actions.style.top = `${String(box.top - origin.top)}px`
+      actions.style.height = `${String(box.height)}px`
+    }
+    place()
+    if (globalThis.ResizeObserver === undefined) return
+    const observer = new ResizeObserver(place)
+    for (const target of [section, ...seats]) observer.observe(target)
+    return () => observer.disconnect()
+  })
   /** The last change, named for the live region. */
   const [change, setChange] = useState<string | undefined>(undefined)
   /** Save and Discard vanish as they act: focus moves to the preset row first, never to the page (round 28, item 18). */
@@ -341,30 +351,41 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                   aria-label={active && presets.edited ? `${presetName(t, preset)}, ${t('threadSidebarPresetEditedShort')}` : presetName(t, preset)}
                   aria-current={active ? 'true' : undefined}
                   data-preset-active={active ? '' : undefined}
-                  className="dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11"
+                  className={cn(
+                    'dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11',
+                    // On a coarse pointer the edited row takes a second 44pt line for Discard and Save (council round 30,
+                    // item 1), so line 1 never truncates "edited" beside them.
+                    editing && 'dshx:pointer-coarse:h-auto dshx:pointer-coarse:flex-wrap dshx:pointer-coarse:gap-y-0',
+                  )}
                 >
                   {/* The check says which preset the list shows; "· edited" says it changed (no dot: council round 29, item 1). */}
                   <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-preset-seat="">
                     {active ? <CheckIcon className="dshx:size-4" /> : null}
                   </span>
-                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left" data-preset-label="">
-                    {preset.label}
-                    {active && presets.edited ? (
-                      <span className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground" data-preset-edited-tag="">
+                  {/* Only the name truncates; "· edited" always shows whole (council round 30, item 1). */}
+                  <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:text-left dshx:pointer-coarse:h-11" data-preset-label="">
+                    <span className="dshx:min-w-0 dshx:truncate" data-preset-name="">
+                      {preset.label}
+                    </span>
+                    {editing ? (
+                      <span className="dshx:shrink-0 dshx:text-xs dshx:font-normal dshx:whitespace-pre dshx:text-muted-foreground" data-preset-edited-tag="">
                         {` · ${t('threadSidebarPresetEditedShort')}`}
                       </span>
                     ) : null}
                   </span>
                   {editing ? (
-                    // The seat Save and Discard lie over, between the label and the count, so the count stays at the row's
-                    // end and the label gives way to exactly their width.
-                    <span aria-hidden="true" className="dshx:shrink-0" style={{ width: `${String(actionsWidth)}px` }} data-preset-actions-seat="" />
+                    // The mouse seat Save and Discard lie over: two 24px icons and their 2px gap, before the count.
+                    <span aria-hidden="true" className="dshx:w-[50px] dshx:shrink-0 dshx:pointer-coarse:hidden" data-preset-actions-seat="" />
                   ) : null}
                   {/* One fixed end column on every row, edited or not (council round 29, item 6): a 20px right-aligned
                       count in the secondary ink, empty at zero (DESIGN.md › Layout › Counts). */}
                   <span className="dshx:w-5 dshx:shrink-0 dshx:text-right dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-preset-count="">
                     {preset.count === null || preset.count === 0 ? '' : preset.count}
                   </span>
+                  {editing ? (
+                    // The coarse-pointer seat: the row's second line, under the label.
+                    <span aria-hidden="true" className="dshx:hidden dshx:pointer-coarse:block dshx:pointer-coarse:h-11 dshx:pointer-coarse:basis-full" data-preset-actions-seat="" />
+                  ) : null}
                 </ToggleGroupItem>
                 </div>
               )
@@ -374,33 +395,28 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
             const preset = presets.items.find(item => item.id === presets.activeId)
             if (!presets.edited || preset === undefined) return null
             return (
-              // After the row's "edited" tag, before its count column: the row ends 6px inside the section, then its 6px
-              // padding, the 20px column and an 8px gap (40px). Over the edited row, but outside the radiogroup, so it
-              // holds only radios (council round 29, item 13).
-              <div
-                ref={actionsRef}
-                className="dshx:absolute dshx:right-10 dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:gap-0"
-                style={{ top: `${String(actionsBox.top)}px`, height: `${String(actionsBox.height)}px` }}
-                data-preset-actions=""
-              >
-                    {preset.id === presets.builtInId ? (
-                      // The built-in All threads is never overwritten (council round 28, item 13): its edits become a new preset.
-                      <RowIconButton label={t('threadSidebarPresetSaveAsNew')} text={t('threadSidebarPresetSaveAsNewShort')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
-                        <BookmarkPlusIcon />
-                      </RowIconButton>
-                    ) : (
-                      <RowIconButton
-                        label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
-                        text={t('threadSidebarPresetSaveShort')}
-                        onClick={focusPresetThen(presets.onSaveChanges)}
-                        data-preset-save-changes=""
-                      >
-                        <SaveIcon />
-                      </RowIconButton>
-                    )}
-                    <RowIconButton label={t('threadSidebarPresetDiscardChanges')} text={t('threadSidebarPresetDiscardShort')} onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
-                      <RotateCcwIcon />
-                    </RowIconButton>
+              // Over the edited row's seat (placed by the layout effect above), outside the radiogroup, so it holds only
+              // radios. On a coarse pointer their words start at the label's x: 24px into the second line, less the
+              // button's own 8px padding.
+              <div ref={actionsRef} className="dshx:absolute dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:gap-1 dshx:pointer-coarse:pl-4" data-preset-actions="">
+                <RowIconButton label={t('threadSidebarPresetDiscardChanges')} text={t('threadSidebarPresetDiscardShort')} onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
+                  <RotateCcwIcon />
+                </RowIconButton>
+                {preset.id === presets.builtInId ? (
+                  // The built-in All threads is never overwritten (council round 28, item 13): its edits become a new preset.
+                  <RowIconButton label={t('threadSidebarPresetSaveAsNew')} text={t('threadSidebarPresetSaveAsNew')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
+                    <BookmarkPlusIcon />
+                  </RowIconButton>
+                ) : (
+                  <RowIconButton
+                    label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
+                    text={t('threadSidebarPresetSaveShort')}
+                    onClick={focusPresetThen(presets.onSaveChanges)}
+                    data-preset-save-changes=""
+                  >
+                    <SaveIcon />
+                  </RowIconButton>
+                )}
               </div>
             )
           })()}
