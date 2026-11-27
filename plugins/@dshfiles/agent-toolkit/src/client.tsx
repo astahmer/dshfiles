@@ -1,3 +1,4 @@
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
@@ -14,8 +15,11 @@ import { useSyncExternalStore } from 'react'
 import { ContextFacet } from './context-facet.js'
 import { AGENT_TOOLKIT_LOCALE_NAMESPACE, agentToolkitLocale, type AgentToolkitKey } from './locales.js'
 import { sameThreadRows } from './thread-projection.js'
-import { AgentToolkitPanel, type ToolkitThread } from './toolkit-panel.js'
+import type { ToolkitThread } from './toolkit-panel.js'
 import { dispatchOpenSettings } from '@dshfiles/settings-shell/open-settings'
+
+/** The Agent toolkit page loads when it first opens, not at page boot. */
+const AgentToolkitPanel = lazyView(() => import('./toolkit-panel.js').then(module => module.AgentToolkitPanel), { label: 'Agent toolkit' })
 
 const PANEL_ID = 'dshfiles-agent-toolkit'
 const MEMORY_PANEL_ID = 'dshfiles-memory-panel'
