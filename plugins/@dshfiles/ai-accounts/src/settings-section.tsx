@@ -327,7 +327,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
 
       <Group
         heading="Mistral Vibe ACP"
-        description="Applies to Vibe accounts switched to ACP host tools. DSH tools always use the calling session’s permissions."
+        description="Applies to Vibe accounts switched to ACP host tools. DSH tools always use the calling thread’s permissions."
       >
         <Row label="Vibe builtin approvals">
           {id => (
@@ -342,7 +342,7 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="session">Follow session</SelectItem>
+                <SelectItem value="session">Follow thread</SelectItem>
                 <SelectItem value="ask">Ask in DSH</SelectItem>
               </SelectContent>
             </Select>
