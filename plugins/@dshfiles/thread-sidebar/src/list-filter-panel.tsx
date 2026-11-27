@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { ArchiveIcon, BellOffIcon, BookmarkPlusIcon, CheckIcon, CircleCheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { plural } from '@dshfiles/dshx/client'
-import { useId, useState, type ReactNode } from 'react'
+import { useId, useRef, useState, type ReactNode } from 'react'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
 import { threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, type ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
@@ -236,10 +236,22 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const t = props.t
   const ids = useId()
   const presets = props.presets
+  const panelRef = useRef<HTMLDivElement | null>(null)
+  /** Save and Discard vanish as they act: focus moves to the preset row first, never to the page (round 28, item 18). */
+  const focusPresetThen =
+    (action: () => void): (() => void) =>
+    () => {
+      panelRef.current?.querySelector<HTMLElement>('[data-thread-presets] [data-preset-active]')?.focus()
+      action()
+    }
   return (
     // The panel is its own scroller (council round 28, item 7), so the sticky header stays pinned to it while the
     // popover (and, on a phone, the sheet with its grabber) holds still around it.
-    <div className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:divide-y dshx:divide-border dshx:overflow-y-auto dshx:overscroll-contain" data-thread-list-filter-panel="">
+    <div
+      ref={panelRef}
+      className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:divide-y dshx:divide-border dshx:overflow-y-auto dshx:overscroll-contain"
+      data-thread-list-filter-panel=""
+    >
       <ShownAnnouncer shown={props.shown} />
       {/* Sticky, so Reset and Done stay in reach while the sheet scrolls (round 28, item 10). A desktop reads "Filters …
           Reset"; a phone reads "Reset · Filters · Done", the sheet's own close. One word for the button and the title.
@@ -357,13 +369,13 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                     ) : (
                       <RowIconButton
                         label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
-                        onClick={presets.onSaveChanges}
+                        onClick={focusPresetThen(presets.onSaveChanges)}
                         data-preset-save-changes=""
                       >
                         <SaveIcon />
                       </RowIconButton>
                     )}
-                    <RowIconButton label={t('threadSidebarPresetDiscardChanges')} onClick={presets.onDiscard} data-preset-discard-changes="">
+                    <RowIconButton label={t('threadSidebarPresetDiscardChanges')} onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
                       <RotateCcwIcon />
                     </RowIconButton>
                   </div>
@@ -517,7 +529,17 @@ const StatusChips = (props: {
           {props.t('threadSidebarFilterStatus')}
         </h3>
         {props.selected.length === 0 ? null : (
-          <Button type="button" variant="ghost" size="xs" className="dshx:-mr-2 dshx:font-normal dshx:text-muted-foreground" onClick={() => props.onChange([])}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            className="dshx:-mr-2 dshx:font-normal dshx:text-muted-foreground"
+            onClick={event => {
+              // Clear vanishes as it acts: focus moves to the first chip, never to the page (council round 28, item 18).
+              event.currentTarget.closest('section')?.querySelector<HTMLElement>('[data-thread-status-filters] [data-slot="toggle-group-item"]')?.focus()
+              props.onChange([])
+            }}
+          >
             {props.t('threadSidebarFilterClear')}
           </Button>
         )}

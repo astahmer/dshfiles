@@ -804,3 +804,25 @@ describe('chip and segment names (round 29, item 17)', () => {
     expect(filterControl).toContain("subagents: { short: props.tSidebar('threadSidebarFilterSubagentsShort'), name: props.tSidebar('threadSidebarFilterSubagentsShort') }")
   })
 })
+
+// Council round 28, item 18: the buttons that vanish after they act hand focus on, never to the page.
+describe('focus after Clear, Save and Discard (round 29, item 18)', () => {
+  it('moves focus to the first status chip after Clear', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
+    const clear = screen.getByRole('button', { name: 'threadSidebarFilterClear' })
+    clear.focus()
+    fireEvent.click(clear)
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'threadSidebarWorking' }))
+  })
+
+  it.each(['threadSidebarPresetSaveChanges', 'threadSidebarPresetDiscardChanges'])('moves focus to the active preset after %s', name => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const button = screen.getByRole('button', { name })
+    button.focus()
+    fireEvent.click(button)
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: /^Working, /u }))
+  })
+})
