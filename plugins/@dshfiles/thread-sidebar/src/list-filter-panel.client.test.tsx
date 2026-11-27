@@ -1497,7 +1497,7 @@ describe('the count badge has a shape (round 33, item 1)', () => {
   })
 
   it('draws the phone label in the ink while a count shows, and gives the desktop trigger its full name as a tooltip', () => {
-    expect(trigger).toContain("<span className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>")
+    expect(trigger).toContain("<span ref={filterTriggerNameRef} className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>")
     expect(filterControl).toMatch(/<TooltipContent[^>]*data-thread-list-filter-tooltip=""[^>]*>\s*\{filterTriggerLabel\}/u)
     expect(filterControl).toContain('aria-label={filterTriggerLabel}')
   })

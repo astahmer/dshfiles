@@ -231,6 +231,7 @@ import { HeldUpdatesPill } from './held-updates-pill.js'
 import { RunningJobsModel } from './running-jobs.js'
 import type { ThreadWorkStatus } from './thread-status-client.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
+import { filterTriggerTipAdds, textTruncated, useEditedSuffixFit, useFilterTriggerTip } from './list-filter-trigger.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
 import { OwnWorkspaceModel, type OwnWorkspace as OwnWorkspaceView, type OwnWorkspaceStateKind, type OwnWorkspaceThread } from './own-workspace.js'
 import { indexQueuedIntegrationSessions } from './queued-integrations.js'
@@ -2535,6 +2536,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // The room below the Filter trigger (council round 30, item 7): the desktop panel is capped at it, so a taller state
   // (More open) scrolls inside instead of Radix shifting the panel up off its trigger; measured on open and on resize.
   const filterTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const filterTriggerNameRef = useRef<HTMLSpanElement | null>(null)
+  const filterTriggerSuffixRef = useRef<HTMLSpanElement | null>(null)
+  // One object for the suffix fit's observer, so it is set up once, not on every render.
+  const filterTriggerParts = useMemo(() => ({ trigger: filterTriggerRef, name: filterTriggerNameRef, suffix: filterTriggerSuffixRef }), [])
   const [filterPanelRoom, setFilterPanelRoom] = useState<number | null>(null)
   useLayoutEffect(() => {
     if (!filterOpen) return
@@ -6754,10 +6759,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // The trigger's full name: "Filter: All threads (edited), 2 filters on". Also its tooltip on a desktop, where the button
   // shows a badge and a truncating name (council round 32, item 1).
   const filterTriggerLabel = `${props.tSidebar('threadSidebarFilter')}: ${filterTriggerName}${scopeSlot === null || scopeInput.project === null ? '' : ` · ${scopeInput.project}`}${scopeCount === null ? '' : `, ${plural(props.tSidebar, 'threadSidebarFiltersOn', scopeCount)}`}`
+  // Only when it adds something, never on the focus the closing panel gives back (council round 34, A4).
+  const filterTip = useFilterTriggerTip({
+    panelOpen: filterOpen,
+    enabled: scopeSlot === null && !coarsePointer(),
+    adds: () => filterTriggerTipAdds({ count: scopeCount, edited: presetEdited, truncated: textTruncated(filterTriggerNameRef.current) }),
+  })
+  useEditedSuffixFit(filterTriggerParts, scopeSlot === null && presetEdited)
   const filterMenu = (
     <Popover open={filterOpen} onOpenChange={setFilterOpen}>
-      {/* The desktop trigger's tooltip says its whole name on hover and focus; the phone scope button shows no tooltip. */}
-      <Tooltip {...(scopeSlot === null && !filterOpen ? {} : { open: false })}>
+      {/* The desktop trigger's tooltip says its whole name; the phone scope button shows no tooltip. */}
+      <Tooltip open={filterTip.open} onOpenChange={filterTip.onOpenChange}>
       <TooltipTrigger asChild>
       <PopoverTrigger asChild>
         <Button
@@ -6791,6 +6803,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           // …and how many filters are on, as the count beside it shows (council round 29, item 11): "Filter: All threads,
           // 2 filters on".
           aria-label={filterTriggerLabel}
+          // The tooltip repeats the name: no description that restates it (round-33 follow-ups, item 1).
+          aria-describedby={undefined}
+          onPointerLeave={filterTip.release}
+          onBlur={filterTip.release}
           data-preset-edited={presetEdited ? '' : undefined}
           data-thread-list-scope-button={scopeSlot === null ? undefined : ''}
           data-scope-narrowed={scopeSlot !== null && ThreadListScope.narrowed(scopeInput) ? '' : undefined}
@@ -6812,9 +6828,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           )}
           {/* The preset's full name, \"All threads\" not \"All\" (council round 30, item 2: \"All 2\" read as two results), in the
               ink while the count pill beside it says filters are on. */}
-          <span className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>
+          <span ref={filterTriggerNameRef} className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>
             {scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
+          {scopeSlot === null && presetEdited ? (
+            // "All threads · edited" (council round 34, A4): the badge beside it then reads as filters on, not a result
+            // count. Whole while the name truncates; the accessible name already says "(edited)". The secondary ink, as on
+            // the panel's edited row: the tertiary step sat 4.47:1 on the light trigger fill, under AA.
+            // It shows only while the name fits beside it (useEditedSuffixFit): it goes before the name is cut.
+            <span ref={filterTriggerSuffixRef} aria-hidden="true" className="dshx:shrink-0 dshx:font-normal dshx:whitespace-pre dshx:text-muted-foreground" data-filter-trigger-edited="">
+              {`· ${props.tSidebar('threadSidebarPresetEditedShort')}`}
+            </span>
+          ) : null}
           {scopeSlot !== null && scopeCount !== null ? (
             // The phone's "Filters 2" (council round 11 B2): a neutral pill after the word (council round 29, item 11).
             <Badge
@@ -6830,7 +6855,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         </Button>
       </PopoverTrigger>
       </TooltipTrigger>
-      <TooltipContent side="bottom" data-thread-list-filter-tooltip="">
+      {/* Beside the trigger, over the transcript, so it never covers the rows (round-33 follow-ups, item 1). */}
+      <TooltipContent side="right" align="center" sideOffset={6} data-thread-list-filter-tooltip="">
         {filterTriggerLabel}
       </TooltipContent>
       </Tooltip>
