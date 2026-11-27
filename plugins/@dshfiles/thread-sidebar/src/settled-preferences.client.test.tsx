@@ -35,6 +35,8 @@ const host = vi.hoisted(() => {
     mutate: vi.fn(),
   }
 })
+/** `useApi` hands out one client per contract, as dshx caches it; `useResource` a new read object each render. */
+const settledApi = { change: (change: SettledChange) => host.changeSettled(change) }
 
 vi.mock('@dshfiles/dshx/api', async importOriginal => {
   const original = await importOriginal<typeof import('@dshfiles/dshx/api')>()
@@ -49,7 +51,7 @@ vi.mock('@dshfiles/dshx/api', async importOriginal => {
 vi.mock('@dshfiles/dshx/client', async importOriginal => ({
   ...(await importOriginal<typeof import('@dshfiles/dshx/client')>()),
   useSettings: () => ({ status: 'ready', writable: true, value: host.state.settingsValue, setMany: host.setMany }),
-  useApi: () => ({ change: host.changeSettled }),
+  useApi: () => settledApi,
   useResource: () => ({ ...host.state.read, refetch: () => undefined }),
   apiResource: () => 'settled-key',
   resourceStore: () => ({ mutate: host.mutate }),
@@ -140,5 +142,20 @@ describe('settled status in the sidebar preferences', () => {
     })
     expect(host.changeSettled).not.toHaveBeenCalled()
     expect(host.setMany.mock.calls.at(-1)?.[0]).toEqual({ settledSessionIds: ['session-b'], settledAt: { 'session-b': 2_000 } })
+  })
+})
+
+// Performance P1 (round 34): the settled store pair was a new object on every render, so `updatePreferences` was too,
+// and the sidebar re-added every command palette row (a dependency of their memo) on each thread switch.
+describe('updatePreferences keeps its identity (performance P1)', () => {
+  afterEach(cleanup)
+  it('is the same function after a re-render with unchanged data', () => {
+    host.state.settingsValue = settingsWith(STATUS)
+    storeAnswers(STATUS)
+    const { result, rerender } = renderHook(() => usePreferences())
+    const first = result.current.updatePreferences
+    rerender()
+    rerender()
+    expect(result.current.updatePreferences).toBe(first)
   })
 })

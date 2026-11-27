@@ -70,6 +70,10 @@ export const usePreferences = (): PreferencesSnapshot & {
 } => {
   const settings = useOptionalSettings()
   const settledStore = useOptionalSettledStore()
+  // The store's write client is one object per contract; the store pair around it is new on every render, so the
+  // callbacks below depend on the client, never on the pair (performance P1: an unstable `updatePreferences` re-added
+  // every command palette row on each thread switch).
+  const settledApi = settledStore?.api ?? null
   const settledData = settledStore?.read.data
   const settledError = settledStore?.read.error
   const settledServed = settledStore !== null
@@ -161,7 +165,7 @@ export const usePreferences = (): PreferencesSnapshot & {
   const updatePreferences = useCallback(
     (patch: Partial<SidebarPreferences>) => {
       const { settled, rest } = SettledPreferencesModel.split(patch)
-      if (settled === null || settledStore === null || settledSource.kind === 'settings') {
+      if (settled === null || settledApi === null || settledSource.kind === 'settings') {
         writeSettings(patch)
         return
       }
@@ -169,10 +173,9 @@ export const usePreferences = (): PreferencesSnapshot & {
       const current: SettledStatus = { settledSessionIds: [...preferencesRef.current.settledSessionIds], settledAt: { ...preferencesRef.current.settledAt } }
       const next: SettledStatus = { settledSessionIds: [...(settled.settledSessionIds ?? current.settledSessionIds)], settledAt: { ...(settled.settledAt ?? current.settledAt) } }
       setOptimisticSettled(next)
-      const { api } = settledStore
-      api.change(SettledThreadsModel.changeBetween(current, next)).then(
+      settledApi.change(SettledThreadsModel.changeBetween(current, next)).then(
         answered => {
-          resourceStore().mutate(apiResource({ client: api, method: 'read', input: {}, options: SETTLED_READ }), () => answered)
+          resourceStore().mutate(apiResource({ client: settledApi, method: 'read', input: {}, options: SETTLED_READ }), () => answered)
           setOptimisticSettled(latest => (latest === next ? null : latest))
           setSettledWriteFailed(false)
         },
@@ -184,7 +187,7 @@ export const usePreferences = (): PreferencesSnapshot & {
         },
       )
     },
-    [settledSource.kind, settledStore, writeSettings],
+    [settledApi, settledSource.kind, writeSettings],
   )
 
   const threadViewWritePending = snapshot.context.pendingOperationIds.threadViews !== undefined
