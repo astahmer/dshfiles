@@ -300,6 +300,9 @@ describe('ResourceStore', () => {
     const key = store.register({ key: 'board', fetch, tags: ['board'], pollInterval: 1_000, livePollInterval: 60_000, invalidatedBy: [pushes] })
     const unsubscribe = store.subscribe(key, () => undefined)
     await flush()
+    // The source never connected: its first read waits out the connect window, then the key polls.
+    await vi.advanceTimersByTimeAsync(1_000)
+    expect(fetch).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(1_000)
     expect(fetch).toHaveBeenCalledTimes(2)
     handlers[0]?.onLive(true)
@@ -315,6 +318,64 @@ describe('ResourceStore', () => {
     expect(fetch).toHaveBeenCalledTimes(5)
     unsubscribe()
     expect(unsubscribeSource).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads a key once when its event source connects just after the first subscriber', async () => {
+    const store = ResourceStoreModel.create()
+    const fetch = countingFetch()
+    const handlers: Array<{ onInvalidate: () => void; onLive: (live: boolean) => void }> = []
+    const pushes: ResourceInvalidationSource = { id: 'attention.changed', tags: ['attention'], subscribe: next => (handlers.push(next), () => undefined) }
+    const key = store.register({ key: 'attention', fetch, tags: ['attention'], pollInterval: 15_000, invalidatedBy: [pushes] })
+    store.subscribe(key, () => undefined)
+    await flush()
+    expect(fetch).toHaveBeenCalledTimes(0)
+    await vi.advanceTimersByTimeAsync(300)
+    handlers[0]?.onLive(true)
+    await flush()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(store.getSnapshot(key)).toMatchObject({ status: 'success', data: 1 })
+  })
+
+  it('never holds a read for a source that did not connect within its first second', async () => {
+    const store = ResourceStoreModel.create()
+    const first = countingFetch()
+    const second = countingFetch()
+    const pushes: ResourceInvalidationSource = { id: 'board.changed', tags: ['board'], subscribe: () => () => undefined }
+    const a = store.register({ key: 'board-a', fetch: first, tags: ['board'], invalidatedBy: [pushes] })
+    const b = store.register({ key: 'board-b', fetch: second, tags: ['board'], invalidatedBy: [pushes] })
+    store.subscribe(a, () => undefined)
+    await vi.advanceTimersByTimeAsync(999)
+    expect(first).toHaveBeenCalledTimes(0)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(first).toHaveBeenCalledTimes(1)
+    store.subscribe(b, () => undefined)
+    await flush()
+    expect(second).toHaveBeenCalledTimes(1)
+  })
+
+  it('stops holding a first read when its source reports it will not connect', async () => {
+    const store = ResourceStoreModel.create()
+    const fetch = countingFetch()
+    const handlers: Array<{ onUnavailable: () => void }> = []
+    const pushes: ResourceInvalidationSource = { id: 'board.changed', tags: ['board'], subscribe: next => (handlers.push(next), () => undefined) }
+    store.subscribe(store.register({ key: 'board', fetch, tags: ['board'], invalidatedBy: [pushes] }), () => undefined)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(fetch).toHaveBeenCalledTimes(0)
+    handlers[0]?.onUnavailable()
+    await flush()
+    expect(fetch).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('reads a key without push sources at once', async () => {
+    const store = ResourceStoreModel.create()
+    const fetch = countingFetch()
+    store.subscribe(store.register({ key: 'plain', fetch }), () => undefined)
+    await flush()
+    expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   it('keeps one store on the page for every bundle', () => {

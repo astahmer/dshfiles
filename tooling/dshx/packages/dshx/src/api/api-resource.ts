@@ -71,7 +71,10 @@ const invalidationSources = (client: ApiClient, methodTags: readonly string[], c
       subscribe: handlers =>
         ApiClientEventsModel.subscribe(client, name, {
           onEvent: () => handlers.onInvalidate(),
-          onStatus: status => handlers.onLive(status === 'live'),
+          onStatus: status => {
+            handlers.onLive(status === 'live')
+            if (status === 'unavailable') handlers.onUnavailable()
+          },
         }),
     }))
 }

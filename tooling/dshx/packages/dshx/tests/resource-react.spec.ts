@@ -180,17 +180,18 @@ describe('useResource', () => {
       const key = ApiChannelModel.eventKey('@acme/board', 'board', 'changed')
       await act(() => source?.send({ type: 'catalog', events: [key] }))
       await flush()
-      // Turning live re-reads once, because pushes sent before it are not replayed.
-      expect(callsTo(fixture.call, 'revision')).toBe(2)
+      // The first read waited for the stream to connect, so going live reads it once instead of twice; a key without
+      // the event (rows) read at once.
+      expect(callsTo(fixture.call, 'revision')).toBe(1)
       await act(async () => {
         await vi.advanceTimersByTimeAsync(10_000)
       })
-      expect(callsTo(fixture.call, 'revision')).toBe(2)
+      expect(callsTo(fixture.call, 'revision')).toBe(1)
       await act(() => source?.send({ type: 'event', key, version: 1, data: { revision: 9 } }))
       await flush()
-      expect(callsTo(fixture.call, 'revision')).toBe(3)
+      expect(callsTo(fixture.call, 'revision')).toBe(2)
       expect(callsTo(fixture.call, 'rows')).toBe(1)
-      expect(container.textContent).toBe('3|1')
+      expect(container.textContent).toBe('2|1')
     } finally {
       vi.useRealTimers()
     }
