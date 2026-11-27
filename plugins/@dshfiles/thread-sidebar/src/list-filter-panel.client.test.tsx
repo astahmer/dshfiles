@@ -748,14 +748,16 @@ describe('the built-in All threads (round 29, item 13)', () => {
 
 // Council round 28, item 14: one selected look across chips and segments.
 describe('one selected look (round 29, item 14)', () => {
-  it('draws the segmented track with the kit track token and a chip\'s on state with the segment edge and shadow-xs', () => {
+  it('draws the segmented track with the kit track token and a chip\'s on state as the segment thumb with its edge', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['working'], onChange: vi.fn() } })} />)
     const track = screen.getByRole('radiogroup', { name: 'threadSidebarFilterSource' })
     expect(track.className).toContain('dshx:bg-segment-track')
     expect(track.className).not.toContain('dshx:dark:bg-trigger-fill')
     const chip = screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })
     expect(chip.className).toContain('dshx:data-[state=on]:border-(--dshx-segment-edge)')
-    expect(chip.className).toContain('dshx:data-[state=on]:shadow-xs')
+    // The segment thumb carries no shadow (DESIGN.md › One selected segment), so a selected chip carries none either:
+    // the same thumb, the same edge (and the design-token check allows no default shadow here).
+    expect(chip.className).not.toMatch(/shadow-(?:xs|sm)\b/u)
     expect(chip.className).not.toContain('dshx:data-[state=on]:border-field-border')
   })
 })
