@@ -1903,6 +1903,10 @@
       "reason": "Vibe CLI transport of a model stream: each stream runs under the agent-telemetry chat <model> span, and the `vibe` child lives only as long as that stream."
     },
     {
+      "file": "src/vibe-acp.ts",
+      "reason": "Vibe ACP transport of a model stream: each stream runs under the agent-telemetry chat <model> span, and the vibe-acp child and its local MCP socket live as long as that conversation's streams."
+    },
+    {
       "file": "src/antigravity-acp.ts",
       "reason": "Antigravity CLI transport of a model stream: each stream runs under agent-telemetry chat <model> span, and the agy child lives as long as that conversation's streams."
     },
