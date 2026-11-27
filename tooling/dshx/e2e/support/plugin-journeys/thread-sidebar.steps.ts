@@ -1494,7 +1494,7 @@ When('a view context menu marks a thread unread', async ({ page }: { page: Page 
   await expect(row).toHaveCount(1)
   // Productivity pass Q5: the view's read / unread verbs are in the Filter menu, under the active preset's options.
   await ThreadListFilter.selectView(page, threadSidebar(page), 'All threads')
-  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Mark all as unread')
+  await ThreadListFilter.clickViewItem(page, threadSidebar(page), /^Mark \d+ shown as unread$/u)
   // The fixture turn fails (no provider): the row's glyph says Failed, so the unread mark is read from the row itself.
   await expect(row).toHaveAttribute('data-unread', '')
 })
@@ -1503,7 +1503,7 @@ Then('the same view context menu marks it read', async ({ page }: { page: Page }
   const threadId = viewContextUnreadJourneys.get(page)
   if (threadId === undefined) throw new Error('view context menu journey did not create a thread')
   const row = threadRow(page, threadId)
-  await ThreadListFilter.clickViewItem(page, threadSidebar(page), 'Mark all as read')
+  await ThreadListFilter.clickViewItem(page, threadSidebar(page), /^Mark \d+ shown as read$/u)
   await recordAssertion(page, 'thread-sidebar-view-context-read-unread', async () => {
     await expect(row).not.toHaveAttribute('data-unread', '')
   })

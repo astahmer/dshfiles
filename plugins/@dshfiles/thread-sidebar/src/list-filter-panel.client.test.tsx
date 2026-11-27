@@ -1508,3 +1508,26 @@ describe('the desktop panel stops above the status bar (round 33, item 3)', () =
     expect(client).toContain('floor - trigger.getBoundingClientRect().top - FILTER_PANEL_COLLISION_PADDING')
   })
 })
+
+// Council round 32, item 4: "Mark all as read/unread" did not say their scope. They read "Mark 5 shown as read" /
+// "… unread" with the count the list draws, act on those rows, sit last in the presets' ⋯ menu after a separator, and
+// "unread" shows only while something shown is read.
+describe('the mark verbs say their scope (round 33, item 4)', () => {
+  const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+  it('counts the shown rows in both labels and acts on them', () => {
+    expect(english).toContain("threadSidebarMarkShownRead_other: 'Mark {count} shown as read',")
+    expect(english).toContain("threadSidebarMarkShownUnread_other: 'Mark {count} shown as unread',")
+    expect(client).toContain("plural(props.tSidebar, 'threadSidebarMarkShownRead', shownThreadIds.length)")
+    expect(client).toContain('const shownThreadIds = visibleThreadEntries.map(entry => entry.session.id)')
+    expect(client).not.toContain('const activeViewThreadIds')
+  })
+
+  it('offers unread only while something shown is read, and lists both last, after a separator', () => {
+    expect(client).toMatch(/\.\.\.\(shownThreadIds\.some\(sessionId => !attention\.records\.has\(sessionId\)\)\s*\?/u)
+    const manage = optionsMenu.indexOf("props.tSidebar('threadSidebarPresetManage')")
+    const marks = optionsMenu.indexOf('{markViewActions.map(action => (')
+    expect(manage).toBeGreaterThan(-1)
+    expect(marks).toBeGreaterThan(manage)
+    expect(optionsMenu.slice(manage, marks)).toContain('<DropdownMenuSeparator />')
+  })
+})

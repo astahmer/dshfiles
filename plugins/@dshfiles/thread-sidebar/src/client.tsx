@@ -6553,23 +6553,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     : presetEdited
       ? props.tSidebar('threadSidebarPresetEdited', { name: activePresetLabel })
       : activePresetLabel
-  const activeViewThreadIds =
-    activeViewTab === undefined
-      ? []
-      : threadViewAttentionEntries
-          .filter(entry =>
-            ThreadViewModel.matchesAttentionView(entry, { filters: activeViewTab.view.statusFilters, sourceFilter: activeViewTab.view.sourceFilter }),
-          )
-          .map(entry => entry.thread.id)
+  // The rows the list draws now (council round 32, item 4): what Mark … shown as read / unread act on and count, the
+  // same rows the live region counts, edited filters included.
+  const shownThreadIds = visibleThreadEntries.map(entry => entry.session.id)
   const clearActiveViewUnread = (): void => {
-    const entries = activeViewThreadIds.flatMap(sessionId => {
+    const entries = shownThreadIds.flatMap(sessionId => {
       const record = attention.records.get(sessionId)
       return record === undefined ? [] : [{ sessionId, version: record.version }]
     })
     if (entries.length > 0) attention.clearUnreadMany(entries)
   }
   const markActiveViewUnread = (): void => {
-    const sessionIds = activeViewThreadIds.filter(sessionId => !attention.records.has(sessionId))
+    const sessionIds = shownThreadIds.filter(sessionId => !attention.records.has(sessionId))
     if (sessionIds.length > 0) attention.markUnreadMany(sessionIds)
   }
   const listFiltered = listThreadView.id !== ALL_THREADS_VIEW_ID || activeFilterLabels.length > 0 || presetEdited
@@ -6626,18 +6621,23 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const markViewActions: ListFilterAction[] = [
     {
       id: 'mark-read',
-      label: props.tSidebar('threadSidebarMarkViewRead'),
+      label: plural(props.tSidebar, 'threadSidebarMarkShownRead', shownThreadIds.length),
       icon: null,
-      disabled: !attention.available || !activeViewThreadIds.some(sessionId => attention.records.has(sessionId)),
+      disabled: !attention.available || !shownThreadIds.some(sessionId => attention.records.has(sessionId)),
       onSelect: clearActiveViewUnread,
     },
-    {
-      id: 'mark-unread',
-      label: props.tSidebar('threadSidebarMarkViewUnread'),
-      icon: null,
-      disabled: !attention.available || activeViewThreadIds.length === 0,
-      onSelect: markActiveViewUnread,
-    },
+    // Only while something shown is read: otherwise it would mark nothing.
+    ...(shownThreadIds.some(sessionId => !attention.records.has(sessionId))
+      ? [
+          {
+            id: 'mark-unread',
+            label: plural(props.tSidebar, 'threadSidebarMarkShownUnread', shownThreadIds.length),
+            icon: null,
+            disabled: !attention.available,
+            onSelect: markActiveViewUnread,
+          },
+        ]
+      : []),
   ]
   const filterActions: ListFilterAction[] = [
     // With presets on, the preset's own menu holds these.
@@ -6737,13 +6737,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           </>
         )}
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={closeFilterThen(() => setViewsManagerOpen(true))}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
+        {/* Last, after a separator, and saying their scope (council round 32, item 4): "Mark 5 shown as read". */}
+        <DropdownMenuSeparator />
         {markViewActions.map(action => (
           <DropdownMenuItem key={action.id} disabled={action.disabled === true} onSelect={action.onSelect}>
             {action.label}
           </DropdownMenuItem>
         ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={closeFilterThen(() => setViewsManagerOpen(true))}>{props.tSidebar('threadSidebarPresetManage')}</DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

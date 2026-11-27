@@ -6,7 +6,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
  * one panel (a dialog named Filters; a bottom sheet on a phone) instead of a menu of submenus: the presets are radios,
  * Status is a row of toggle chips with no Any chip (the rarer ones under More statuses, a Clear in its heading), Source and Group by are radio chips, and Board,
  * Thread list settings and Sidebar settings are buttons at its foot. The active preset's own verbs (Rename…, Delete…,
- * Mark all as read…) stay in a small "Preset options" menu beside the Presets heading. The Board page keeps its inline
+ * Mark N shown as read) stay in a small "Preset options" menu beside the Presets heading. The Board page keeps its inline
  * Group and Filter buttons, so each helper uses a direct button first when the scope still has one.
  */
 /**
@@ -91,12 +91,12 @@ const selectView = async (page: Page, scope: Locator, name: string): Promise<voi
   await close(page)
 }
 
-/** An item of the presets' options menu: Save as new preset…, Rename…, Save changes to “‹preset›”, Delete…, Mark all as read / unread, Manage presets…. */
-const clickViewItem = async (page: Page, scope: Locator, name: string): Promise<void> => {
+/** An item of the presets' options menu: Save as new preset…, Rename…, Save changes to “‹preset›”, Delete…, Manage presets…, then Mark N shown as read / unread (match those by pattern). */
+const clickViewItem = async (page: Page, scope: Locator, name: string | RegExp): Promise<void> => {
   await (await open(scope)).getByRole('button', { name: /^Preset options: /u }).click()
   const menu = page.getByRole('menu', { name: /^Preset options/u })
   await expect(menu).toBeVisible()
-  await menu.getByRole('menuitem', { name, exact: true }).click()
+  await menu.getByRole('menuitem', typeof name === 'string' ? { name, exact: true } : { name }).click()
 }
 
 /** Customize sidebar: the Fixed layout's Filter panel button, else Free docking's header button. */
