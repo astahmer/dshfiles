@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { cleanup, fireEvent, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -863,12 +866,12 @@ describe('a hovered attention row (round 29, item 10)', () => {
   it('deepens its wash on hover instead of the grey fill; a plain row keeps the grey fill', async () => {
     const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
     const fill = asking.querySelector<HTMLElement>('[data-row-wash]')?.className ?? ''
-    expect(fill).toContain('dshx:hover:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_3%)]')
-    expect(fill).toContain('dshx:dark:hover:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_8%)]')
+    expect(fill).toContain('dshx:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_3%)]')
+    expect(fill).toContain('dshx:dark:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_8%)]')
     expect(fill).not.toContain('dshx:hover:bg-accent/60')
     cleanup()
     const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
-    expect(failed.querySelector<HTMLElement>('[data-row-wash]')?.className).toContain('var(--color-wash-failed),var(--color-foreground)_3%')
+    expect(failed.querySelector<HTMLElement>('[data-row-wash]')?.className).toContain('var(--dshx-wash-failed),var(--dsw-alias-label-primary)_3%')
     cleanup()
     const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
     expect(idle.querySelector<HTMLElement>('article > div')?.className).toContain('dshx:hover:bg-accent/60')
@@ -894,5 +897,22 @@ describe('a state-changing verb beside the title (round 29, item 1)', () => {
       const name = seat.querySelector('button')?.getAttribute('aria-label') ?? ''
       expect(seat.hasAttribute('data-strip-changes'), name).toBe(name !== 'threadSidebarOpenInSidePanel')
     }
+  })
+})
+
+// Found on the scratch (round 29, item 10): the kit declares its colours with `@theme inline`, so `--color-*` names
+// never exist at runtime; an arbitrary value that reads one resolves to nothing, and the hovered Needs-you row lost its
+// wash instead of deepening it. Arbitrary values read the runtime tokens (`--dshx-*`, `--dsw-alias-*`) instead.
+describe('arbitrary colour values read runtime tokens (round 29, item 10)', () => {
+  it('never reads a --color-* name the kit only declares inline', () => {
+    const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
+    expect(source.match(/var\(--color-[a-z-]+\)/gu) ?? []).toEqual([])
+  })
+
+  it('deepens the Needs-you and Failed washes from their runtime tokens', async () => {
+    const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    expect(asking.querySelector<HTMLElement>('[data-row-wash]')?.className).toContain(
+      'dshx:hover:bg-[color-mix(in_oklab,var(--dshx-wash-needs-you),var(--dsw-alias-label-primary)_3%)]',
+    )
   })
 })
