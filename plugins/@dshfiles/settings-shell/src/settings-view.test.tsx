@@ -604,6 +604,16 @@ describe('settings view: where the source filter sits (merge of upstream #290)',
     view.unmount()
   })
 
+  it('says who ships a phone category above its fields, where the screen-reader-only header cannot', () => {
+    const view = mount({ activeId: 'general', onBack: () => {} })
+    const line = view.host.querySelector('[data-settings-phone-origin]')
+    expect(line?.querySelector('[data-origin-badge="dsh"]')).not.toBeNull()
+    // A phone line only: a wide pane carries the badge in its header.
+    expect(line?.className).toContain('dshx:hidden')
+    expect(line?.className).toContain('dshx:@max-pane-compact:flex')
+    view.unmount()
+  })
+
   it('heads its own category list with the filter when no column draws the list', () => {
     const view = mount({ activeId: 'general' })
     expect(view.host.querySelector('[data-settings-toolbar] [data-settings-origin-filter]')).toBeNull()

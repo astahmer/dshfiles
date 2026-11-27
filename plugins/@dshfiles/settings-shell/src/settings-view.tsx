@@ -704,6 +704,13 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             {/* One reading width for every entry: sections, plugin pages and search results share this 680px column, so a
                 value sits near its label (council round 4 B5). */}
             <div className={cn(SETTINGS_COLUMN_WIDTH, atRoot && 'dshx:@max-pane-compact:hidden')} data-settings-column="">
+              {/* A phone's category page names itself in its Back row and hides the header with the badge: the badge
+                  leads the fields instead. */}
+              {drilled && picked !== undefined && (
+                <div className="dshx:hidden dshx:pb-3 dshx:@max-pane-compact:flex" data-settings-phone-origin="">
+                  <OriginBadge origin={picked.origin} showBundle={false} t={t} />
+                </div>
+              )}
               {searching && <SearchResults {...props} onSelect={openEntry} result={result} />}
               {!searching && active !== undefined && <EntryView {...props} entry={active} jevNamespaces={jevNamespaces} key={active.id} />}
             </div>
