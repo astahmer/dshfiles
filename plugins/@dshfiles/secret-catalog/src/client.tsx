@@ -12,12 +12,15 @@ import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { ProjectFolderPicker } from '@dshfiles/workspace-folder-picker/picker'
 import { CatalogNavigation } from './catalog-navigation.js'
 import { SECRET_CATALOG_LOCALE_NAMESPACE, secretCatalogLocale } from './locales.js'
-import { SecretCatalogPanel } from './secret-catalog-panel.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { JevInlineSetup } from './jev-inline-setup.js'
 import { SecretRequestCards } from './secret-request-card.js'
 import { SecretInputOverlay } from './secret-input-overlay.js'
 import { SecretLinkRevealControl } from './secret-link-reveal.js'
 import { createWorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
+
+/** The Secrets page loads when it first opens, not at page boot. */
+const SecretCatalogPanel = lazyView(() => import('./secret-catalog-panel.js').then(module => module.SecretCatalogPanel), { label: 'Secrets' })
 
 const PANEL_ID = 'secret-catalog'
 
