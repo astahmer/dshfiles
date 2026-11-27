@@ -8,6 +8,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArchiveIcon, BellOffIcon, CheckIcon, CircleCheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { plural } from '@dshfiles/dshx/client'
@@ -173,6 +174,29 @@ const ChipSeat = (props: { readonly on: boolean; readonly filter: ThreadStatusFi
   </span>
 )
 
+/** A 24px icon button in a preset row (a 44px seat on a coarse pointer), named and with the kit tooltip. */
+const RowIconButton = (props: { readonly label: string; readonly onClick: () => void; readonly children: ReactNode } & Record<`data-${string}`, string>): JSX.Element => {
+  const { label, onClick, children, ...data } = props
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={label}
+          onClick={onClick}
+          className="dshx:size-6 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:size-11 dshx:[&_svg]:size-3.5"
+          {...data}
+        >
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent side="top">{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
 /**
  * A quiet verb row (council round 27, item 16): its 16px glyph on the panel's one glyph column, 12px in (a 6px bleed,
@@ -272,16 +296,23 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           >
             {presets.items.map(preset => {
               const active = preset.id === presets.activeId
+              const editing = active && presets.edited
               return (
+                // The row: the preset's radio and, while it is edited, its Save and Discard over the row's end, so the
+                // sections below never move as an edit starts (council round 28, item 6).
+                <div key={preset.id} className="dshx:relative" data-preset-row="">
                 <ToggleGroupItem
-                  key={preset.id}
                   value={preset.id}
                   // An edited preset is announced, not only drawn (round 28, item 3): its name says so, and it stays the
                   // current one although nothing is checked.
                   aria-label={active && presets.edited ? `${presetName(t, preset)}, ${t('threadSidebarPresetEditedShort')}` : presetName(t, preset)}
                   aria-current={active ? 'true' : undefined}
                   data-preset-active={active ? '' : undefined}
-                  className="dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11"
+                  className={cn(
+                    'dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11',
+                    // Room for the two 24px buttons (44px seats on a coarse pointer) over the row's end.
+                    editing && 'dshx:pr-14 dshx:pointer-coarse:pr-23',
+                  )}
                 >
                   {/* The check says which preset the list shows; an edited one adds a dot at the check's corner. */}
                   <span className="dshx:relative dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-preset-seat="">
@@ -308,32 +339,24 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                     </span>
                   )}
                 </ToggleGroupItem>
+                {editing ? (
+                  <div className="dshx:absolute dshx:inset-y-0 dshx:right-1 dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:right-0 dshx:pointer-coarse:gap-0">
+                    <RowIconButton
+                      label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
+                      onClick={presets.onSaveChanges}
+                      data-preset-save-changes=""
+                    >
+                      <SaveIcon />
+                    </RowIconButton>
+                    <RowIconButton label={t('threadSidebarPresetDiscardChanges')} onClick={presets.onDiscard} data-preset-discard-changes="">
+                      <RotateCcwIcon />
+                    </RowIconButton>
+                  </div>
+                ) : null}
+                </div>
               )
             })}
           </ToggleGroup>
-          {presets.edited ? (
-            // An edited preset offers its two ways out, stacked on the rows' own edge: keep the edits, or drop them.
-            <div className="dshx:grid dshx:gap-0.5 dshx:pt-1">
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                // The way to keep the edits reads in ink at 500, on the glyph column like its neighbours (round 28, item 16).
-                className={cn(QUIET_ROW, 'dshx:min-w-0 dshx:font-medium dshx:text-foreground')}
-                data-preset-save-changes=""
-                onClick={presets.onSaveChanges}
-              >
-                <SaveIcon aria-hidden="true" />
-                <span className="dshx:truncate">
-                  {t('threadSidebarPresetSaveChanges', { name: presets.items.find(item => item.id === presets.activeId)?.label ?? '' })}
-                </span>
-              </Button>
-              <Button type="button" size="sm" variant="ghost" className={QUIET_ROW} onClick={presets.onDiscard}>
-                <RotateCcwIcon aria-hidden="true" />
-                {t('threadSidebarPresetDiscardChanges')}
-              </Button>
-            </div>
-          ) : null}
         </section>
       )}
       {props.status === undefined && props.source === undefined ? null : (

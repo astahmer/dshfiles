@@ -2,12 +2,17 @@
 import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { cleanup, fireEvent, render as renderUi, screen, within } from '@testing-library/react'
+import type { ReactElement } from 'react'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, presetAttentionOf, type ListFilterPanelProps } from './list-filter-panel.js'
 
 afterEach(cleanup)
+
+/** The panel's icon buttons carry kit tooltips, which need the provider the sidebar mounts. */
+const render = (ui: ReactElement): ReturnType<typeof renderUi> => renderUi(ui, { wrapper: TooltipProvider })
 
 /** The element a query found, or a failure that names what was missing. */
 const element = (found: Element | null | undefined): HTMLElement => {
@@ -442,9 +447,8 @@ describe('edges (round 28, item 16)', () => {
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    // Save and Discard are icon buttons in the edited row since round 29 (item 6).
     const quiet = [
-      screen.getByRole('button', { name: /threadSidebarPresetSaveChanges/u }),
-      screen.getByRole('button', { name: 'threadSidebarPresetDiscardChanges' }),
       screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }),
       screen.getByRole('button', { name: 'Thread list settings' }),
     ]
@@ -592,12 +596,13 @@ describe('the Done chip at rest (round 29, item 4)', () => {
 
 // Council round 28, item 5: an edited preset keeps its identity.
 describe('an edited preset keeps its identity (round 29, item 5)', () => {
-  const edited = (): { readonly props: ListFilterPanelProps; readonly onApply: () => void } => {
+  const edited = () => {
     const base = panel()
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     const onApply = vi.fn()
-    return { props: { ...base, presets: { ...presets, activeId: 'working', edited: true, onApply } }, onApply }
+    const props: ListFilterPanelProps = { ...base, presets: { ...presets, activeId: 'working', edited: true, onApply } }
+    return { props, onApply }
   }
 
   it('stays checked, with its check, an edited dot in the same seat and the tag inline after the label', () => {
@@ -622,5 +627,30 @@ describe('an edited preset keeps its identity (round 29, item 5)', () => {
     expect(onApply).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('radio', { name: 'All threads' }))
     expect(onApply).toHaveBeenCalledWith('all')
+  })
+})
+
+// Council round 28, item 6: editing never moves the chips under the pointer: Save and Discard live in the preset's row.
+describe('Save and Discard in the edited row (round 29, item 6)', () => {
+  it('puts them in the active row as two icon buttons with names, adding nothing below the presets', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const { container, rerender } = render(<ListFilterPanel {...base} />)
+    const section = (): HTMLElement => element(container.querySelector('[data-thread-presets]'))
+    const rowsBefore = section().children.length
+    rerender(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    expect(section().children.length).toBe(rowsBefore)
+    const row = element(screen.getByRole('radio', { name: /^Working, /u }).closest('[data-preset-row]'))
+    const save = within(row).getByRole('button', { name: 'threadSidebarPresetSaveChanges' })
+    const discard = within(row).getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })
+    for (const button of [save, discard]) {
+      expect(button.className).toContain('dshx:size-6')
+      expect(button.className).toContain('dshx:pointer-coarse:size-11')
+    }
+    fireEvent.click(discard)
+    expect(presets.onDiscard).toHaveBeenCalledOnce()
+    // The other rows carry no buttons.
+    expect(within(element(screen.getByRole('radio', { name: 'All threads' }).closest('[data-preset-row]'))).queryAllByRole('button')).toHaveLength(0)
   })
 })
