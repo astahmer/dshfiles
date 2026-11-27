@@ -127,7 +127,7 @@ From the onboarding feature catalog: 213 features, the 103 curated ones first.
 77. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
 78. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
 79. **Use a Google AI plan through the Antigravity CLI** (`ai-accounts`, settings) — Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.
-80. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
+80. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.
 81. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
 82. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
 83. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.

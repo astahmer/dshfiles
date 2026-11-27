@@ -24,7 +24,7 @@ Pack id `accounts`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 46 features, the 33 curated ones first.
+From the onboarding feature catalog: 47 features, the 33 curated ones first.
 
 ### Curated
 
@@ -33,7 +33,7 @@ From the onboarding feature catalog: 46 features, the 33 curated ones first.
 3. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
 4. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
 5. **Use a Google AI plan through the Antigravity CLI** (`ai-accounts`, settings) — Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.
-6. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers and how requests spread across accounts with the same model.
+6. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.
 7. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
 8. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
 9. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
@@ -77,6 +77,7 @@ From the onboarding feature catalog: 46 features, the 33 curated ones first.
 11. **Idle compaction before cache expiry** (`context-compaction`) — Off by default: a large idle thread compacts before its prompt cache expires.
 12. **Next automatic compaction for a thread** (`context-compaction`) — The agent can ask how many tokens remain before a thread compacts.
 13. **Search and disclose tools per agent** (`tool-search`) — The agent starts with a small set of tools and finds others by searching for them.
+14. **Tools per agent: enabled and pinned** (`tool-search`) — Tools an agent turns off never reach its threads, and the tools it pins are there from the first request.
 
 ## Enable it
 

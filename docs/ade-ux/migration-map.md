@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-577 features from 121 plugins.
+585 features from 121 plugins.
 
 ## Counts
 
@@ -16,14 +16,14 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Inbox |  | 19 |  |  | 3 |  |  |  | 1 |  |  |  |  |  | 23 |
 | Land |  |  | 2 |  | 7 | 2 | 1 |  | 4 |  |  |  |  |  | 16 |
 | Work |  |  | 1 |  | 24 | 8 | 1 |  | 8 |  |  |  |  |  | 42 |
-| Agents |  |  |  |  | 5 |  | 1 |  |  |  |  |  |  |  | 6 |
+| Agents |  |  |  |  | 6 |  | 1 |  |  |  |  |  |  |  | 7 |
 | Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
 | Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
 | Settings |  |  |  |  | 3 |  |  |  | 1 |  | 67 |  |  |  | 71 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
-| Composer |  |  |  | 70 |  |  |  |  |  |  |  |  |  |  | 70 |
+| Composer |  |  |  | 72 |  |  |  |  |  |  |  |  |  |  | 72 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 44 | 44 |
-| No place of its own | 28 |  | 22 |  |  |  | 1 | 134 |  |  |  | 10 |  |  | 195 |
+| No place of its own | 29 |  | 22 |  |  |  | 1 | 138 |  |  |  | 10 |  |  | 200 |
 
 ## By current left-nav entry
 
@@ -34,7 +34,7 @@ Every entry of today's Navigation list and where its features go. No entry survi
 | Activity Timeline: Activity | Inbox, Observe | activity-timeline/activity-condensation → Inbox (attentionProvider)<br>activity-timeline/activity-feed → Observe (destinationSection)<br>activity-timeline/verification-receipts → Observe (destinationSection) |
 | Agent CLI threads | Knowledge | agentsview/agent-sessions-panel → Knowledge (destinationSection) |
 | Agent Toolkit: Capabilities | Thread panel | agent-toolkit/agent-toolkit-page → Thread panel (threadFacet) |
-| Agents | Agents | agents/agent-colour → Agents (destinationSection)<br>agents/agent-registry → Agents (destinationSection) |
+| Agents | Agents | agents/agent-colour → Agents (destinationSection)<br>agents/agent-registry → Agents (destinationSection)<br>agents/agent-tools-tree → Agents (destinationSection) |
 | AI Accounts: Accounts | Settings | ai-accounts/account-lifecycle → Settings (settingsSection)<br>ai-accounts/model-routing → Settings (settingsSection)<br>ai-accounts/reference-dashboard → Settings (settingsSection) |
 | AI Accounts: Quota forecast | Observe | ai-accounts/quota-forecast → Observe (destinationSection) |
 | AI Accounts: Usage history | Observe | ai-accounts/usage-history-and-pricing → Observe (destinationSection) |
@@ -70,7 +70,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | Add workspace › setup step | 1 | Composer 1 |
 | agent tool | 27 | No place of its own 22, Inbox 2, Knowledge 1, Settings 1, Thread panel 1 |
 | agent tool notify_user; in-app toast and system notification | 1 | No place of its own 1 |
-| agent tools | 5 | No place of its own 5 |
+| agent tools | 6 | No place of its own 6 |
 | agent tools contributed by configured plugins | 1 | No place of its own 1 |
 | Agent tools theme_define / theme_set (customTheme) / theme_remove / theme_get; Settings › General › Appearance (Custom theme id, Dracula preset) | 1 | Settings 1 |
 | agent tools traces_store_space, traces_reclaim_space | 1 | No place of its own 1 |
@@ -81,7 +81,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | client | 17 | No place of its own 17 |
 | command palette | 1 | No place of its own 1 |
 | command palette and New tab page | 1 | Inbox 1 |
-| composer | 63 | Composer 60, Settings 1, Thread panel 1, Transcript 1 |
+| composer | 65 | Composer 62, Settings 1, Thread panel 1, Transcript 1 |
 | composer ⋯ | 1 | Composer 1 |
 | composer and transcript | 1 | Threads 1 |
 | composer dock | 1 | Composer 1 |
@@ -91,13 +91,13 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | conversation.chat.assistant-actions | 1 | Work 1 |
 | dialog | 4 | Settings 2, No place of its own 1, Thread panel 1 |
 | empty thread view (first run); palette | 1 | Threads 1 |
-| host | 72 | No place of its own 72 |
+| host | 76 | No place of its own 76 |
 | host and client | 1 | No place of its own 1 |
 | Host contract | 1 | Inbox 1 |
 | Hosts › Add folder (directory-only picker) | 1 | Composer 1 |
 | Inbox | 1 | Inbox 1 |
 | keyboard | 5 | No place of its own 5 |
-| left-nav | 122 | Work 37, Observe 24, Settings 16, Land 15, Inbox 13, Knowledge 6, Agents 5, Thread panel 4, No place of its own 1, Threads 1 |
+| left-nav | 123 | Work 37, Observe 24, Settings 16, Land 15, Inbox 13, Agents 6, Knowledge 6, Thread panel 4, No place of its own 1, Threads 1 |
 | main-tabs | 12 | No place of its own 7, Thread panel 4, Settings 1 |
 | module | 1 | No place of its own 1 |
 | new-thread screen | 2 | Composer 2 |
@@ -281,7 +281,7 @@ rail destination; 42 features.
 
 ### Agents
 
-rail destination; 6 features.
+rail destination; 7 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -290,6 +290,7 @@ rail destination; 6 features.
 | agent-communication/passive-messaging: Store and browse agent messages | destinationSection | left-nav: Messages |
 | agents/agent-colour: Colour an agent | destinationSection | left-nav: Agents |
 | agents/agent-registry: Manage agents | destinationSection | left-nav: Agents |
+| agents/agent-tools-tree: Choose an agent's tools, subagents and projects | destinationSection | left-nav: Agents › agent editor › Tools, Delegation, Default for projects |
 | agents/agent-mention-preview: Preview an agent from its mention | entityProvider | overlay: shared reference preview card (input-trigger entity registry), agent kind |
 
 ### Observe
@@ -468,7 +469,7 @@ facets of the active thread; 32 features.
 
 ### Composer
 
-run row, chips, `/` and `@` sources; 70 features.
+run row, chips, `/` and `@` sources; 72 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -477,6 +478,8 @@ run row, chips, `/` and `@` sources; 70 features.
 | agent-plan/pinned-step: Current plan step pinned beside the composer | composerContribution | composer: plan chip beside plan mode |
 | agent-preset/draft-preset-selection: Choose an agent preset before typing | composerContribution | composer: agent mode chip, shown for a non-default preset or from ⋯ › Agent mode… (b:4v6p) |
 | agents/agent-mentions: Mention an agent where a thread starts | composerContribution | composer: @agent mention |
+| agents/composer-agent: Start a new thread as the project's default agent | composerContribution | composer: new-thread agent chip |
+| agents/thread-tools: See and switch a running thread's tools | composerContribution | composer: Tools control |
 | ai-accounts/idle-cache-warning: Warn before re-sending an idle thread past its prompt-cache lifetime | composerContribution | composer: meter line |
 | ai-accounts/thread-account-switch: Use another account for this thread | composerContribution | status-strip: Quota › Use this account for this thread |
 | annotations/backlog-composers: Annotate from Backlog composers | composerContribution | Backlog composer: Annotate an element |
@@ -596,7 +599,7 @@ cards inline in the active thread; 44 features.
 
 ### No place of its own
 
-palette commands, status items, agent tools, infrastructure; 195 features.
+palette commands, status items, agent tools, infrastructure; 200 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -625,6 +628,7 @@ palette commands, status items, agent tools, infrastructure; 195 features.
 | tool-bash/bash-tool: Shell commands for the agent | agentToolOnly | agent tool: bash |
 | tool-fs/file-tools: Read, write and edit files | agentToolOnly | agent tools: read, write, edit, read_image |
 | tool-subagent/live-model-selection-policy: Subagent models follow your setting | agentToolOnly | agent tools: subagent, subagent_fork, list_subagent_models |
+| tool-subagent/subagent-agent-argument: subagent starts a child as a configured agent | agentToolOnly | agent tools: subagent (agent argument), list_subagent_models (agent listing) |
 | tweet-context/public-post-context: Fetch public X post, photos, video samples, and thread posts | agentToolOnly | agent tool: tweet_context |
 | usage/usage-otel-export: Export usage as metrics | agentToolOnly | agent tool: usage_otel_metrics |
 | whiteboard/agent-diagrams: Agent-drawn diagrams | agentToolOnly | agent tools: whiteboard_list, whiteboard_read, whiteboard_write, whiteboard_rename, whiteboard_delete, whiteboard_restore |
@@ -660,6 +664,8 @@ palette commands, status items, agent tools, infrastructure; 195 features.
 | agent-telemetry/nested-tool-spans: Plugin work nests under the tool and model call that caused it | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
 | agent-telemetry/span-cost: List-price cost on model spans | infrastructure | host: OTel spans (read in transcript: Traces view) |
 | agent-telemetry/subagent-traces: Subagents join their parent's trace | infrastructure | host: OTel spans (read in left-nav: Traces: Explorer) |
+| agents/agent-tool-access: An agent decides its threads' tools | infrastructure | host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; editor UI in agent-tools-tree |
+| agents/subagent-agents: A subagent starts as a configured agent | infrastructure | host: the dshfilesSubagentAgents Cordis service, read by @dshfiles/tool-subagent's subagent and list_subagent_models tools |
 | backlog/capture-project-target: File a thread capture under its project | infrastructure | host: capture project resolution |
 | backlog/lifecycle-signals: Move items from thread and revision signals | infrastructure | host: thread and revision signals |
 | backlog/shared-activity: Backlog work in the Activity timeline | infrastructure | host: backlog.* events into left-nav: Activity Timeline: Activity |
@@ -759,6 +765,7 @@ palette commands, status items, agent tools, infrastructure; 195 features.
 | thread-sidebar/sidebar-folders: Folders of plugin panels on the rail | infrastructure | sidebar: the rail's folders (agent tools sidebar_*) |
 | thread-sidebar/thread-inventory-reads: Read workspaces only while the list is visible | infrastructure | thread-list: inventory reads |
 | thread-sidebar/workbench-sidebar-assemblies: Dock sidebar views as tabs | infrastructure | main-tabs: New tab › Thread Sidebar views |
+| tool-search/agent-tool-access: Tools per agent: enabled and pinned | infrastructure | host: agent tool tool_search_access; contract module @dshfiles/tool-search/access |
 | tool-search/progressive-tool-disclosure: Search and disclose tools per agent | infrastructure | host: tool search (not mounted) |
 | traces/browser-interaction-traces: Browser interaction traces | infrastructure | host: browser interaction spans |
 | traces/event-loop-stalls: DSH stalls | infrastructure | host: probe; agent tool traces_stalls |
@@ -770,6 +777,7 @@ palette commands, status items, agent tools, infrastructure; 195 features.
 | usage/usage-index: Usage index from thread logs | infrastructure | host: usage ledger |
 | vcs-provider-port/vcs-detection: Which VCS owns a path | infrastructure | host: library |
 | vcs-provider-port/vcs-provider-resolution: One port for version-control providers | infrastructure | host: library |
+| vcs-provider-port/workspace-attribution: Which project a thread belongs to | infrastructure | host: library |
 | whiteboard/xstate-diagram: State machine diagrams | infrastructure | module: @dshfiles/whiteboard/xstate-diagram |
 | workbench/all-region-drag: Drag panels across centre right and bottom | infrastructure | workbench: panel drag |
 | workbench/conversation-header: Keep the thread header inside each thread | infrastructure | thread-header: conversation toolbar |

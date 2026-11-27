@@ -28,7 +28,7 @@ Pack id `agents`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 53 features, the 43 curated ones first.
+From the onboarding feature catalog: 58 features, the 46 curated ones first.
 
 ### Curated
 
@@ -36,58 +36,63 @@ From the onboarding feature catalog: 53 features, the 43 curated ones first.
 2. **Colour an agent** (`agents`, agents) — Give an agent a colour from the theme's palette, so its tile and mentions are easy to tell apart.
 3. **Mention an agent where a thread starts** (`agents`, composer) — Start a thread on an agent by typing its @handle at the start of your message.
 4. **Preview an agent from its mention** (`agents`, agents) — Click an agent's @handle anywhere to see its card with its model, tools, instructions and recent threads.
-5. **Find running agents** (`agent-communication`, agents) — Agents can find the other running agents, with the ones in the same project listed first.
-6. **Store and browse agent messages** (`agent-communication`, agents) — Messages between agents are kept. A request wakes an idle agent, and a notice or a read never starts any work.
-7. **Send direct messages from the Messages panel** (`agent-communication`, agents) — Message an agent's thread directly. A request wakes it when idle, and a notice never starts its work.
-8. **Ask and answer a subagent's question** (`agent-questions`, inbox) — A subagent can ask its parent thread a question, and only the parent can answer it.
-9. **Timed questions keep the agent working** (`agent-questions`, transcript) — A timed question counts down while the agent keeps working, and a later answer still reaches it.
-10. **Steady countdown on question cards** (`agent-questions`, transcript) — The question card keeps a steady countdown and folds long questions to three lines.
-11. **List and answer thread questions** (`agent-questions`, inbox) — Agents can list open questions across threads and answer the ones they are allowed to.
-12. **Subagent questions in the Inbox, answerable in place** (`agent-questions`, inbox) — A subagent's question appears in the Inbox, and choosing an option answers it and wakes the subagent.
-13. **Thread questions in the Inbox** (`agent-questions`, inbox) — Questions waiting in a thread appear in the Inbox, and simple ones can be answered there.
-14. **Background jobs across threads** (`background-jobs`, observe) — The Jobs tab in Processes lists every background job of every thread, running or finished.
-15. **Stop a selection of running jobs** (`background-jobs`, observe) — Select several running jobs and stop them with one confirmation.
-16. **Jobs that outlived their turn** (`background-jobs`, observe) — A job still running after its turn ended is marked, and after two hours it is stopped.
-17. **Processes: jobs, dev servers and RAM** (`background-jobs`, observe) — One Processes page holds jobs, dev servers and RAM, each in its own tab.
-18. **Jobs tab in the thread panel** (`background-jobs`, thread-panel) — The thread panel's Jobs tab shows this thread's jobs, dev servers and RAM, with Stop.
-19. **Live job preview in the transcript and above the composer** (`background-jobs`, transcript) — A running job is one row above the composer, and its card moves under its tool call once it finishes.
-20. **Add and identify hosts** (`multi-host`, settings) — Add a host over SSH, then test, reconnect, edit or remove it on the Hosts page.
-21. **Manage hosts on a dedicated page** (`multi-host`, observe) — The Hosts page lists your hosts with their load and memory, and adds projects to them.
-22. **Group remote threads under matching local projects** (`multi-host`, threads) — Threads on another host group under the matching local project, with a host badge.
-23. **Update every host from the Hosts page** (`multi-host`, observe) — Check every host for updates and update them all from the Hosts page.
-24. **Sync a jj checkout on another host** (`multi-host`, observe) — Compare a host's checkout with its bookmark on origin, then sync it after a preview.
-25. **Weight Auto placement and fetch before new threads** (`multi-host`, observe) — Weight how often Auto picks a host and whether new threads fetch first.
-26. **Link machines without SSH, both ways** (`multi-host`, observe) — Link another machine with a short pairing code, without SSH, so threads can run on it.
-27. **Use the native composer for remote threads** (`multi-host`, composer) — Start a thread on another host from the normal composer, or let Auto pick the least busy one.
-28. **Open the host's own DSH UI** (`multi-host`, observe) — Open another host's own DSH in a new tab.
-29. **Mention remote threads safely** (`multi-host`, composer) — Mention a thread on another host, and its text arrives as read-only context.
-30. **Every thread on every host** (`multi-host`, threads) — One panel lists the threads on every host, grouped by host.
-31. **Open a mirrored thread on its host** (`multi-host`, threads) — Open a thread from another host in that host's own DSH.
-32. **Answer a remote agent's questions and approvals in this client** (`multi-host`, composer) — Answer questions and approvals from a thread on another host right here.
-33. **Work a remote thread's repository from this client** (`multi-host`, threads) — Land, undo and other workspace actions on a thread from another host run on that host.
-34. **Open a remote thread's terminal on its host** (`multi-host`, threads) — A terminal tab on another host's thread opens that thread in the host's own DSH.
-35. **Agent toolkit page** (`agent-toolkit`, thread-panel) — See every tool, skill, plugin and MCP server the agent can use in a thread.
-36. **See what a thread loads into its context** (`agent-toolkit`, thread-panel) — The Context tab lists what a thread loads into its context, with an estimated token cost for each.
-37. **Open the manager for skills, MCP servers or plugins from one page** (`capabilities-hub`, settings) — One Settings page counts your skills, MCP servers and plugins and opens the page that manages each.
-38. **Manage local and remote MCP server definitions** (`mcp-servers`, settings) — Add, edit, connect and remove local or remote MCP servers, with credentials kept as secret references.
-39. **Use secrets for MCP server credentials** (`mcp-servers`, settings) — Pick a secret for each MCP server header or environment variable, and its value stays on DSH.
-40. **Reference configured MCP servers and tools in the composer** (`mcp-servers`, composer) — Mention an MCP server or tool in the composer with @.
-41. **Search curated providers and the MCP Registry** (`mcp-servers`, settings) — Find MCP servers in a curated list or the official MCP Registry.
-42. **Authorize remote OAuth servers** (`mcp-servers`, settings) — Sign in to remote MCP servers that use OAuth, and sign out again.
-43. **Batch enable, disable and remove MCP servers** (`mcp-servers`, settings) — Select several MCP servers to turn on, turn off or remove them at once.
+5. **Choose an agent's tools, subagents and projects** (`agents`, agents) — Pick the tools an agent's threads get and pin the ones they need from the start, like VS Code's Configure Tools.
+6. **Start a new thread as the project's default agent** (`agents`, composer) — A new thread starts as its project's default agent, and the chip beside the composer's tools switches or sets it.
+7. **See and switch a running thread's tools** (`agents`, composer) — A running thread shows which agent decides its tools and can switch to another agent's tools or to every tool.
+8. **Find running agents** (`agent-communication`, agents) — Agents can find the other running agents, with the ones in the same project listed first.
+9. **Store and browse agent messages** (`agent-communication`, agents) — Messages between agents are kept. A request wakes an idle agent, and a notice or a read never starts any work.
+10. **Send direct messages from the Messages panel** (`agent-communication`, agents) — Message an agent's thread directly. A request wakes it when idle, and a notice never starts its work.
+11. **Ask and answer a subagent's question** (`agent-questions`, inbox) — A subagent can ask its parent thread a question, and only the parent can answer it.
+12. **Timed questions keep the agent working** (`agent-questions`, transcript) — A timed question counts down while the agent keeps working, and a later answer still reaches it.
+13. **Steady countdown on question cards** (`agent-questions`, transcript) — The question card keeps a steady countdown and folds long questions to three lines.
+14. **List and answer thread questions** (`agent-questions`, inbox) — Agents can list open questions across threads and answer the ones they are allowed to.
+15. **Subagent questions in the Inbox, answerable in place** (`agent-questions`, inbox) — A subagent's question appears in the Inbox, and choosing an option answers it and wakes the subagent.
+16. **Thread questions in the Inbox** (`agent-questions`, inbox) — Questions waiting in a thread appear in the Inbox, and simple ones can be answered there.
+17. **Background jobs across threads** (`background-jobs`, observe) — The Jobs tab in Processes lists every background job of every thread, running or finished.
+18. **Stop a selection of running jobs** (`background-jobs`, observe) — Select several running jobs and stop them with one confirmation.
+19. **Jobs that outlived their turn** (`background-jobs`, observe) — A job still running after its turn ended is marked, and after two hours it is stopped.
+20. **Processes: jobs, dev servers and RAM** (`background-jobs`, observe) — One Processes page holds jobs, dev servers and RAM, each in its own tab.
+21. **Jobs tab in the thread panel** (`background-jobs`, thread-panel) — The thread panel's Jobs tab shows this thread's jobs, dev servers and RAM, with Stop.
+22. **Live job preview in the transcript and above the composer** (`background-jobs`, transcript) — A running job is one row above the composer, and its card moves under its tool call once it finishes.
+23. **Add and identify hosts** (`multi-host`, settings) — Add a host over SSH, then test, reconnect, edit or remove it on the Hosts page.
+24. **Manage hosts on a dedicated page** (`multi-host`, observe) — The Hosts page lists your hosts with their load and memory, and adds projects to them.
+25. **Group remote threads under matching local projects** (`multi-host`, threads) — Threads on another host group under the matching local project, with a host badge.
+26. **Update every host from the Hosts page** (`multi-host`, observe) — Check every host for updates and update them all from the Hosts page.
+27. **Sync a jj checkout on another host** (`multi-host`, observe) — Compare a host's checkout with its bookmark on origin, then sync it after a preview.
+28. **Weight Auto placement and fetch before new threads** (`multi-host`, observe) — Weight how often Auto picks a host and whether new threads fetch first.
+29. **Link machines without SSH, both ways** (`multi-host`, observe) — Link another machine with a short pairing code, without SSH, so threads can run on it.
+30. **Use the native composer for remote threads** (`multi-host`, composer) — Start a thread on another host from the normal composer, or let Auto pick the least busy one.
+31. **Open the host's own DSH UI** (`multi-host`, observe) — Open another host's own DSH in a new tab.
+32. **Mention remote threads safely** (`multi-host`, composer) — Mention a thread on another host, and its text arrives as read-only context.
+33. **Every thread on every host** (`multi-host`, threads) — One panel lists the threads on every host, grouped by host.
+34. **Open a mirrored thread on its host** (`multi-host`, threads) — Open a thread from another host in that host's own DSH.
+35. **Answer a remote agent's questions and approvals in this client** (`multi-host`, composer) — Answer questions and approvals from a thread on another host right here.
+36. **Work a remote thread's repository from this client** (`multi-host`, threads) — Land, undo and other workspace actions on a thread from another host run on that host.
+37. **Open a remote thread's terminal on its host** (`multi-host`, threads) — A terminal tab on another host's thread opens that thread in the host's own DSH.
+38. **Agent toolkit page** (`agent-toolkit`, thread-panel) — See every tool, skill, plugin and MCP server the agent can use in a thread.
+39. **See what a thread loads into its context** (`agent-toolkit`, thread-panel) — The Context tab lists what a thread loads into its context, with an estimated token cost for each.
+40. **Open the manager for skills, MCP servers or plugins from one page** (`capabilities-hub`, settings) — One Settings page counts your skills, MCP servers and plugins and opens the page that manages each.
+41. **Manage local and remote MCP server definitions** (`mcp-servers`, settings) — Add, edit, connect and remove local or remote MCP servers, with credentials kept as secret references.
+42. **Use secrets for MCP server credentials** (`mcp-servers`, settings) — Pick a secret for each MCP server header or environment variable, and its value stays on DSH.
+43. **Reference configured MCP servers and tools in the composer** (`mcp-servers`, composer) — Mention an MCP server or tool in the composer with @.
+44. **Search curated providers and the MCP Registry** (`mcp-servers`, settings) — Find MCP servers in a curated list or the official MCP Registry.
+45. **Authorize remote OAuth servers** (`mcp-servers`, settings) — Sign in to remote MCP servers that use OAuth, and sign out again.
+46. **Batch enable, disable and remove MCP servers** (`mcp-servers`, settings) — Select several MCP servers to turn on, turn off or remove them at once.
 
 ### More
 
-1. **Read and acknowledge direct messages** (`agent-communication`) — Agents read and acknowledge their own direct messages, which survive a restart.
-2. **Handle an expired question** (`agent-questions`) — An expired question returns its recommended choice or is saved for later, never taken as an answer.
-3. **Give anchored feedback on a document** (`agent-questions`) — Leave line-anchored feedback on a subagent's document and send back what was accepted or rejected.
-4. **Resolve feedback in bounded batches** (`agent-questions`) — Resolve up to twenty feedback items at once, all or nothing.
-5. **Delegate a task to another host** (`multi-host`) — The agent can run a task as a thread on another host and get its answer back.
-6. **Connect to a host over SSH** (`multi-host`) — DSH reaches a host over SSH with a verified identity and never accepts an unknown host key.
-7. **Open the agent toolkit from the command palette** (`agent-toolkit`) — The command palette's “Open the agent toolkit” opens the page about the thread the palette was opened from.
-8. **Drive DSH threads from an outside agent over MCP** (`mcp-endpoint`) — Let Claude Code, Codex or any MCP client list, start and follow DSH threads.
-9. **Expose plugin tools to MCP clients** (`mcp-endpoint`) — Off by default: MCP clients can also use agent tools, read-only or read and write.
-10. **Issue an MCP token and connect a client** (`mcp-endpoint`, settings) — Create an MCP token and copy setup steps for Claude Code, Codex, Cursor or VS Code.
+1. **An agent decides its threads' tools** (`agents`) — Each agent says which tools its threads get, and a thread takes its own agent, its parent's, its project's default or @dsh.
+2. **A subagent starts as a configured agent** (`agents`) — A subagent can start as a configured agent, limited to the agents its caller allows.
+3. **Read and acknowledge direct messages** (`agent-communication`) — Agents read and acknowledge their own direct messages, which survive a restart.
+4. **Handle an expired question** (`agent-questions`) — An expired question returns its recommended choice or is saved for later, never taken as an answer.
+5. **Give anchored feedback on a document** (`agent-questions`) — Leave line-anchored feedback on a subagent's document and send back what was accepted or rejected.
+6. **Resolve feedback in bounded batches** (`agent-questions`) — Resolve up to twenty feedback items at once, all or nothing.
+7. **Delegate a task to another host** (`multi-host`) — The agent can run a task as a thread on another host and get its answer back.
+8. **Connect to a host over SSH** (`multi-host`) — DSH reaches a host over SSH with a verified identity and never accepts an unknown host key.
+9. **Open the agent toolkit from the command palette** (`agent-toolkit`) — The command palette's “Open the agent toolkit” opens the page about the thread the palette was opened from.
+10. **Drive DSH threads from an outside agent over MCP** (`mcp-endpoint`) — Let Claude Code, Codex or any MCP client list, start and follow DSH threads.
+11. **Expose plugin tools to MCP clients** (`mcp-endpoint`) — Off by default: MCP clients can also use agent tools, read-only or read and write.
+12. **Issue an MCP token and connect a client** (`mcp-endpoint`, settings) — Create an MCP token and copy setup steps for Claude Code, Codex, Cursor or VS Code.
 
 ## Enable it
 

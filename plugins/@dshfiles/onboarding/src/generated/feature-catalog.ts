@@ -60,7 +60,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "agents",
       "description": "Persistent, mentionable agents: identity, instructions, model route and tool preset, dispatched into an ordinary thread.",
       "ui": true,
-      "features": 4
+      "features": 9
     },
     {
       "name": "agentsview",
@@ -642,13 +642,13 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "tool-search",
       "description": "Opt-in per-agent progressive discovery of native tools",
       "ui": false,
-      "features": 1
+      "features": 2
     },
     {
       "name": "tool-subagent",
       "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
       "ui": false,
-      "features": 1
+      "features": 2
     },
     {
       "name": "traces",
@@ -689,8 +689,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     {
       "name": "vcs-provider-port",
       "description": "The Host port through which version-control plugins (jj, git worktrees) provide workspace isolation and file snapshots, shared so callers never depend on one provider.",
-      "ui": false,
-      "features": 2
+      "ui": true,
+      "features": 3
     },
     {
       "name": "web-fetch-readable",
@@ -2761,6 +2761,472 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "agents#agent-tool-access",
+      "plugin": "agents",
+      "id": "agent-tool-access",
+      "title": "An agent decides its threads' tools",
+      "summary": "Each agent says which tools its threads get, and a thread takes its own agent, its parent's, its project's default or @dsh.",
+      "destination": "none",
+      "currentSurface": "host: agents API (toolCatalog, toolAccess, setToolAccess, setSubagents, projectDefaults, setProjectDefault, threadAccess, setThreadOverride, recordThreadAgent) and their agents_* tools; editor UI in agent-tools-tree",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "agents#subagent-agents",
+      "plugin": "agents",
+      "id": "subagent-agents",
+      "title": "A subagent starts as a configured agent",
+      "summary": "A subagent can start as a configured agent, limited to the agents its caller allows.",
+      "destination": "none",
+      "currentSurface": "host: the dshfilesSubagentAgents Cordis service, read by @dshfiles/tool-subagent's subagent and list_subagent_models tools",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "agents#agent-tools-tree",
+      "plugin": "agents",
+      "id": "agent-tools-tree",
+      "title": "Choose an agent's tools, subagents and projects",
+      "summary": "Pick the tools an agent's threads get and pin the ones they need from the start, like VS Code's Configure Tools.",
+      "destination": "agents",
+      "currentSurface": "left-nav: Agents › agent editor › Tools, Delegation, Default for projects",
+      "reach": [
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "click button \"New agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New agent",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Name\" \"Reviewer\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Name",
+          "value": "Reviewer"
+        },
+        {
+          "text": "click treeitem \"DSH, DSH*\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "DSH, DSH*",
+          "value": null
+        },
+        {
+          "text": "click treeitem \"read, default\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "read, default",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"read, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "read, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "expect text \"unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "unsaved*",
+          "value": null
+        },
+        {
+          "text": "click button \"Pin present\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pin present",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"present, pinned, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "present, pinned, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Filter tools\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Filter tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 unsaved*",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents*",
+          "value": null
+        },
+        {
+          "text": "click button \"New agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New agent",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Name\" \"Reviewer\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Name",
+          "value": "Reviewer"
+        },
+        {
+          "text": "click treeitem \"DSH, DSH*\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "DSH, DSH*",
+          "value": null
+        },
+        {
+          "text": "click treeitem \"read, default\"",
+          "action": "click",
+          "by": "treeitem",
+          "name": "read, default",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"read, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "read, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "expect text \"unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "unsaved*",
+          "value": null
+        },
+        {
+          "text": "click button \"Pin present\"",
+          "action": "click",
+          "by": "button",
+          "name": "Pin present",
+          "value": null
+        },
+        {
+          "text": "expect treeitem \"present, pinned, set here, unsaved\"",
+          "action": "expect",
+          "by": "treeitem",
+          "name": "present, pinned, set here, unsaved",
+          "value": null
+        },
+        {
+          "text": "click textbox \"Filter tools\"",
+          "action": "click",
+          "by": "textbox",
+          "name": "Filter tools",
+          "value": null
+        },
+        {
+          "text": "expect text \"2 unsaved*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "2 unsaved*",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "agents#composer-agent",
+      "plugin": "agents",
+      "id": "composer-agent",
+      "title": "Start a new thread as the project's default agent",
+      "summary": "A new thread starts as its project's default agent, and the chip beside the composer's tools switches or sets it.",
+      "destination": "composer",
+      "currentSurface": "composer: new-thread agent chip",
+      "reach": [
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "expect text \"Start from a template\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Start from a template",
+          "value": null
+        },
+        {
+          "text": "click button \"Reviews diffs and pull requests*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reviews diffs and pull requests*",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Instructions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Instructions",
+          "value": null
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved.",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @dsh (default). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @dsh (default). Change agent",
+          "value": null
+        },
+        {
+          "text": "click text \"@reviewer\"",
+          "action": "click",
+          "by": "text",
+          "name": "@reviewer",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @reviewer (for this thread). Change agent",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Make @reviewer this project’s default\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Make @reviewer this project’s default",
+          "value": null
+        },
+        {
+          "text": "expect button \"New thread runs as @reviewer (project default). Change agent\"",
+          "action": "expect",
+          "by": "button",
+          "name": "New thread runs as @reviewer (project default). Change agent",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @reviewer (project default). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @reviewer (project default). Change agent",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Stop using @reviewer as this project’s default\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Stop using @reviewer as this project’s default",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": {
+        "firstAction": "In a new thread, open the \"as @agent\" chip beside the composer's tools and make an agent this project's default.",
+        "doneWhen": "New threads in that project start as that agent without picking it."
+      }
+    },
+    {
+      "key": "agents#thread-tools",
+      "plugin": "agents",
+      "id": "thread-tools",
+      "title": "See and switch a running thread's tools",
+      "summary": "A running thread shows which agent decides its tools and can switch to another agent's tools or to every tool.",
+      "destination": "composer",
+      "currentSurface": "composer: Tools control",
+      "reach": [
+        {
+          "text": "click tab \"Agents\"",
+          "action": "click",
+          "by": "tab",
+          "name": "Agents",
+          "value": null
+        },
+        {
+          "text": "expect text \"Start from a template\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Start from a template",
+          "value": null
+        },
+        {
+          "text": "click button \"Reviews diffs and pull requests*\"",
+          "action": "click",
+          "by": "button",
+          "name": "Reviews diffs and pull requests*",
+          "value": null
+        },
+        {
+          "text": "expect textbox \"Instructions\"",
+          "action": "expect",
+          "by": "textbox",
+          "name": "Instructions",
+          "value": null
+        },
+        {
+          "text": "click button \"Create agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "Create agent",
+          "value": null
+        },
+        {
+          "text": "expect text \"Saved.\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Saved.",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @dsh (default). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @dsh (default). Change agent",
+          "value": null
+        },
+        {
+          "text": "click text \"@reviewer\"",
+          "action": "click",
+          "by": "text",
+          "name": "@reviewer",
+          "value": null
+        },
+        {
+          "text": "click button \"New thread runs as @reviewer (for this thread). Change agent\"",
+          "action": "click",
+          "by": "button",
+          "name": "New thread runs as @reviewer (for this thread). Change agent",
+          "value": null
+        },
+        {
+          "text": "click menuitem \"Make @reviewer this project’s default\"",
+          "action": "click",
+          "by": "menuitem",
+          "name": "Make @reviewer this project’s default",
+          "value": null
+        },
+        {
+          "text": "fill textbox \"Describe what you want to build, / commands, @ files or threads\" \"Review the open diff\"",
+          "action": "fill",
+          "by": "textbox",
+          "name": "Describe what you want to build, / commands, @ files or threads",
+          "value": "Review the open diff"
+        },
+        {
+          "text": "press Enter",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Enter"
+        },
+        {
+          "text": "expect text \"Review the change for correctness first*\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Review the change for correctness first*",
+          "value": null
+        },
+        {
+          "text": "click button \"Tools: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Tools: *",
+          "value": null
+        },
+        {
+          "text": "click menuitemradio \"All tools\"",
+          "action": "click",
+          "by": "menuitemradio",
+          "name": "All tools",
+          "value": null
+        },
+        {
+          "text": "expect button \"Tools: All tools*\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Tools: All tools*",
+          "value": null
+        },
+        {
+          "text": "click button \"Tools: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Tools: *",
+          "value": null
+        },
+        {
+          "text": "expect menuitem \"Reset to @reviewer’s tools\"",
+          "action": "expect",
+          "by": "menuitem",
+          "name": "Reset to @reviewer’s tools",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "agentsview#agent-sessions-panel",
       "plugin": "agentsview",
       "id": "agent-sessions-panel",
@@ -3099,7 +3565,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "ai-accounts",
       "id": "model-routing",
       "title": "Curate models and choose account routes",
-      "summary": "Choose the models each provider offers and how requests spread across accounts with the same model.",
+      "summary": "Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.",
       "destination": "settings",
       "currentSurface": "left-nav: AI Accounts: Accounts › Models",
       "reach": [
@@ -27960,6 +28426,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "tool-search#agent-tool-access",
+      "plugin": "tool-search",
+      "id": "agent-tool-access",
+      "title": "Tools per agent: enabled and pinned",
+      "summary": "Tools an agent turns off never reach its threads, and the tools it pins are there from the first request.",
+      "destination": "none",
+      "currentSurface": "host: agent tool tool_search_access; contract module @dshfiles/tool-search/access",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "tool-subagent#live-model-selection-policy",
       "plugin": "tool-subagent",
       "id": "live-model-selection-policy",
@@ -27967,6 +28445,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Running threads use the subagent models you allowed in Settings without a restart.",
       "destination": "none",
       "currentSurface": "agent tools: subagent, subagent_fork, list_subagent_models",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#subagent-agent-argument",
+      "plugin": "tool-subagent",
+      "id": "subagent-agent-argument",
+      "title": "subagent starts a child as a configured agent",
+      "summary": "The subagent tool takes an agent handle, so a child starts with that agent's model, preset, instructions and tools.",
+      "destination": "none",
+      "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null
@@ -29690,6 +30180,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "id": "vcs-detection",
       "title": "Which VCS owns a path",
       "summary": "DSH tells whether a folder uses Jujutsu or git from the folder itself.",
+      "destination": "none",
+      "currentSurface": "host: library",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "vcs-provider-port#workspace-attribution",
+      "plugin": "vcs-provider-port",
+      "id": "workspace-attribution",
+      "title": "Which project a thread belongs to",
+      "summary": "Tells other plugins which project a thread belongs to, counting a thread workspace for the project it was cut from.",
       "destination": "none",
       "currentSurface": "host: library",
       "reach": [],

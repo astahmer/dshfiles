@@ -2284,6 +2284,28 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "publicSymbol": "AgentMentionTones",
+      "importFrom": "@dshfiles/rich-composer/agent-mention-tones",
+      "owner": "@dshfiles/rich-composer",
+      "source": "plugins/@dshfiles/rich-composer/src/agent-mention-tones.ts:17",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "key": "registry:@dshfiles/rich-composer.agent-mention-tones",
+      "kind": "registry",
+      "title": "AgentMentionTones",
+      "summary": "Contribution registry owned by @dshfiles/rich-composer.",
+      "scope": "client",
+      "mode": "many contributors",
+      "registration": "metadata?.plugin?.add(AgentMentionTones, { … })",
+      "risk": "additive",
+      "riskNote": "Additive: each contribution adds an entry; @dshfiles/rich-composer renders nothing for it when absent.",
+      "details": [
+        "Registry id: @dshfiles/rich-composer.agent-mention-tones"
+      ],
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "PhoneThreadMenu",
       "importFrom": "@dshfiles/rich-composer/phone-thread-menu",
       "owner": "@dshfiles/rich-composer",
@@ -3754,7 +3776,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/activity-timeline › inbox-push"
       ],
       "details": [
-        "Used by 85 catalog feature(s)",
+        "Used by 86 catalog feature(s)",
         "Destinations in use: agents, inbox, knowledge, land, observe, settings, threads, work"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
