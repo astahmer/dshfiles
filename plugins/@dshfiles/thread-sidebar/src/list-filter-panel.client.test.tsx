@@ -162,7 +162,7 @@ describe('the More statuses disclosure (round 28, item 2)', () => {
     more.focus()
     fireEvent.click(more)
     // Same element, still focused, now open; the region it names holds the hidden statuses.
-    expect(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })).toBe(more)
+    expect(screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })).toBe(more)
     expect(document.activeElement).toBe(more)
     expect(more.getAttribute('aria-expanded')).toBe('true')
     expect(more.querySelector('svg')?.getAttribute('class')).toContain('dshx:rotate-180')
@@ -174,9 +174,9 @@ describe('the More statuses disclosure (round 28, item 2)', () => {
 
   it('cannot fold while one of the statuses it holds is on', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
-    const more = screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
     expect(more.getAttribute('aria-expanded')).toBe('true')
-    expect(more.hasAttribute('disabled')).toBe(true)
+    expect(more.getAttribute('aria-disabled')).toBe('true')
     expect(screen.getByRole('button', { name: 'threadSidebarArchived', pressed: true })).toBeTruthy()
   })
 })
@@ -214,9 +214,11 @@ describe('the status sub-groups (round 28, item 4)', () => {
     ])
     // No label is hidden from assistive tech, and the stored Done chip sits in the Storage group.
     // A chip's seat is decoration beside its label; nothing else in the toolbar is hidden.
-    expect(Array.from(status.querySelectorAll('[aria-hidden="true"]')).filter(element => element.closest('[data-chip-seat]') === null)).toEqual([])
+    expect(
+      Array.from(status.querySelectorAll('[aria-hidden="true"]')).filter(element => element.closest('[data-chip-seat], [data-thread-status-more]') === null),
+    ).toEqual([])
     expect(within(element(groups[2])).getByRole('button', { name: 'threadSidebarSettled' })).toBeTruthy()
-    const chips = within(status).getAllByRole('button')
+    const chips = within(status).getAllByRole('button').filter(chip => !chip.hasAttribute('data-thread-status-more'))
     expect(chips.every(chip => chip.closest('[role="group"]') !== null)).toBe(true)
   })
 })
@@ -533,5 +535,43 @@ describe('preset tallies (round 29, item 2)', () => {
     expect(presetAttentionOf(undefined, 'threadSidebarApprovalNeeded')).toBe('needs-you')
     expect(presetAttentionOf(undefined, 'threadSidebarInterrupted')).toBe('failed')
     expect(presetAttentionOf(undefined, 'threadSidebarTurnFinished')).toBeUndefined()
+  })
+})
+
+// Council round 28, item 3: "More statuses" is a disclosure above what it reveals.
+describe('the More statuses disclosure, placed (round 29, item 3)', () => {
+  it('sits directly under the leading chip row, open or folded, and reads Fewer statuses when open', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const leading = screen.getByRole('group', { name: 'threadSidebarFilterGroupActivity' })
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })
+    const follows = (): boolean => (leading.compareDocumentPosition(more) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+    expect(follows()).toBe(true)
+    fireEvent.click(more)
+    expect(more.textContent).toBe('threadSidebarFilterFewerStatuses')
+    expect(more.getAttribute('aria-expanded')).toBe('true')
+    // The revealed groups come after it, so it stays above what it reveals.
+    const revealed = screen.getByRole('group', { name: 'threadSidebarFilterGroupStorage' })
+    expect(more.compareDocumentPosition(revealed) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0)
+    expect(follows()).toBe(true)
+  })
+
+  it('makes the first revealed chip the next Tab stop: the revealed chips are their own roving group', () => {
+    render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    const region = document.getElementById(screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' }).getAttribute('aria-controls') ?? '')
+    // A roving group of its own (Radix focuses its first chip when Tab reaches the group), right after the disclosure.
+    expect(element(region).getAttribute('tabindex')).toBe('0')
+    expect(element(region).querySelector('button')?.textContent).toBe('threadSidebarApprovalNeeded')
+    expect(region?.contains(screen.getByRole('button', { name: 'threadSidebarWorking' }))).toBe(false)
+  })
+
+  it('stays open while a revealed status is on with aria-disabled and a description, never disabled', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
+    expect(more.hasAttribute('disabled')).toBe(false)
+    expect(more.getAttribute('aria-disabled')).toBe('true')
+    expect(document.getElementById(more.getAttribute('aria-describedby') ?? '')?.textContent).toBe('threadSidebarFilterFoldHint')
+    fireEvent.click(more)
+    expect(more.getAttribute('aria-expanded')).toBe('true')
   })
 })

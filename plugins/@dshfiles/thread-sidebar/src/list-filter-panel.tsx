@@ -437,9 +437,10 @@ const LEADING_STATUS_GROUP = THREAD_STATUS_FILTER_GROUPS[0]
 const isLeadingStatus = (filter: ThreadStatusFilter): boolean => LEADING_STATUS_GROUP.filters.some(candidate => candidate === filter)
 
 /**
- * Status: "Any" and the activity chips; More statuses (a disclosure, round 28 item 2) opens why a thread waits and
- * where it is stored, each on its own line. It stays mounted, says whether it is open, folds again, and cannot fold
- * while one of the statuses it holds is on.
+ * Status: the activity chips; then More statuses, a disclosure directly under them (council round 28, item 3) that
+ * opens why a thread waits and where it is stored, each on its own labelled line. It reads Fewer statuses while open,
+ * and while one of the statuses it reveals is on it stays open: `aria-disabled` with a description of how to fold it.
+ * The leading row and the revealed rows are two roving groups, so the first revealed chip is the next Tab stop.
  */
 const StatusChips = (props: {
   readonly t: ThreadSidebarTranslate
@@ -451,6 +452,14 @@ const StatusChips = (props: {
   const moreId = useId()
   const forced = props.selected.some(filter => !isLeadingStatus(filter))
   const expanded = opened || forced
+  const leading = props.selected.filter(isLeadingStatus)
+  const revealed = props.selected.filter(filter => !isLeadingStatus(filter))
+  const chip = (filter: ThreadStatusFilter): JSX.Element => (
+    <ToggleGroupItem key={filter} value={filter} className={CHIP}>
+      <ChipSeat on={props.selected.includes(filter)} filter={filter} />
+      {props.t(threadStatusFilterLabelKeys[filter])}
+    </ToggleGroupItem>
+  )
   return (
     <section className="dshx:grid dshx:gap-1.5" aria-labelledby={props.headingId}>
       {/* No status on means any (no Any chip); a ghost Clear stands in the heading while one is on. */}
@@ -465,26 +474,54 @@ const StatusChips = (props: {
           </Button>
         )}
       </div>
-      <ToggleGroup
-        type="multiple"
-        aria-labelledby={props.headingId}
-        value={[...props.selected]}
-        onValueChange={next => props.onChange(nextStatusFilters(next))}
-        spacing={1}
-        // One labelled group per status group (round 28, item 4), so a screen reader hears which "Done" a chip is.
-        className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2"
-        data-thread-status-filters=""
-      >
-        <div role="group" aria-label={props.t(threadStatusFilterGroupLabelKeys[LEADING_STATUS_GROUP.id])} className={STATUS_ROW} data-thread-status-group="">
-          {LEADING_STATUS_GROUP.filters.map(filter => (
-            <ToggleGroupItem key={filter} value={filter} className={CHIP}>
-              <ChipSeat on={props.selected.includes(filter)} filter={filter} />
-              {props.t(threadStatusFilterLabelKeys[filter])}
-            </ToggleGroupItem>
-          ))}
-        </div>
+      <div className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2" role="toolbar" aria-labelledby={props.headingId} data-thread-status-filters="">
+        <ToggleGroup
+          type="multiple"
+          // One labelled group per status group (round 28, item 4), so a screen reader hears which "Done" a chip is.
+          aria-label={props.t(threadStatusFilterGroupLabelKeys[LEADING_STATUS_GROUP.id])}
+          role="group"
+          value={leading}
+          onValueChange={next => props.onChange(nextStatusFilters([...next, ...revealed]))}
+          spacing={1}
+          className={STATUS_ROW}
+          data-thread-status-group=""
+        >
+          {LEADING_STATUS_GROUP.filters.map(chip)}
+        </ToggleGroup>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          aria-expanded={expanded}
+          aria-controls={moreId}
+          // A status in force never hides: while one of these is on, the disclosure stays open and says how to fold it.
+          aria-disabled={forced ? true : undefined}
+          aria-describedby={forced ? `${moreId}-hint` : undefined}
+          className={cn(QUIET_ROW, 'dshx:justify-self-start dshx:aria-disabled:opacity-60')}
+          onClick={() => (forced ? undefined : setOpened(current => !current))}
+          data-thread-status-more=""
+        >
+          <ChevronDownIcon
+            aria-hidden="true"
+            className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-hover)', expanded && 'dshx:rotate-180')}
+          />
+          {props.t(expanded ? 'threadSidebarFilterFewerStatuses' : 'threadSidebarFilterMoreStatuses')}
+        </Button>
+        {forced ? (
+          <span id={`${moreId}-hint`} className="dshx:sr-only">
+            {props.t('threadSidebarFilterFoldHint')}
+          </span>
+        ) : null}
         {/* The disclosure's region stays mounted (its aria-controls target); it holds the other groups while open. */}
-        <div id={moreId} className="dshx:grid dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2" data-thread-status-more-region="">
+        <ToggleGroup
+          type="multiple"
+          id={moreId}
+          value={revealed}
+          onValueChange={next => props.onChange(nextStatusFilters([...leading, ...next]))}
+          spacing={1}
+          className="dshx:grid dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2"
+          data-thread-status-more-region=""
+        >
           {expanded
             ? THREAD_STATUS_FILTER_GROUPS.slice(1).map(group => (
                 <div key={group.id} role="group" aria-labelledby={`${moreId}-${group.id}`} className={STATUS_ROW} data-thread-status-group="">
@@ -492,35 +529,12 @@ const StatusChips = (props: {
                   <span id={`${moreId}-${group.id}`} className="dshx:w-full dshx:pt-1 dshx:text-xs dshx:text-muted-foreground">
                     {props.t(threadStatusFilterGroupLabelKeys[group.id])}
                   </span>
-                  {group.filters.map(filter => (
-                    <ToggleGroupItem key={filter} value={filter} className={CHIP}>
-                      <ChipSeat on={props.selected.includes(filter)} filter={filter} />
-                      {props.t(threadStatusFilterLabelKeys[filter])}
-                    </ToggleGroupItem>
-                  ))}
+                  {group.filters.map(chip)}
                 </div>
               ))
             : null}
-        </div>
-      </ToggleGroup>
-      <Button
-        type="button"
-        variant="ghost"
-        size="sm"
-        aria-expanded={expanded}
-        aria-controls={moreId}
-        // A status in force never hides: while one of these is on, More stays open and cannot fold.
-        disabled={forced}
-        className={cn(QUIET_ROW, 'dshx:justify-self-start')}
-        onClick={() => setOpened(current => !current)}
-        data-thread-status-more=""
-      >
-        <ChevronDownIcon
-          aria-hidden="true"
-          className={cn('dshx:transition-transform dshx:duration-(--dshx-duration-hover)', expanded && 'dshx:rotate-180')}
-        />
-        {props.t('threadSidebarFilterMoreStatuses')}
-      </Button>
+        </ToggleGroup>
+      </div>
     </section>
   )
 }

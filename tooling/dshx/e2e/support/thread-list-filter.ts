@@ -118,6 +118,7 @@ const selectSource = async (page: Page, scope: Locator, triggerName: string, nam
 /** A status chip of the open panel, opening More statuses when it sits there. */
 const statusChip = async (filter: Locator, label: string): Promise<Locator> => {
   const chip = filter.getByRole('button', { name: label, exact: true })
+  // More statuses reads Fewer statuses while open (round 29, item 3).
   if ((await chip.count()) === 0) await filter.getByRole('button', { name: 'More statuses', exact: true }).click()
   return chip
 }
