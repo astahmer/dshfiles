@@ -23,9 +23,16 @@
           "constraints": "One of project or all; without a current project the Threads tab lists every thread.",
           "choices": ["project", "all"],
           "coveredBy": ["command-palette.threads-project-scope"]
+        },
+        {
+          "key": "messageSelectBehavior",
+          "defaultValue": "reveal",
+          "constraints": "One of reveal (open thread and scroll to matched message) or open (open thread only).",
+          "choices": ["reveal", "open"],
+          "coveredBy": ["command-palette.message-select-behavior"]
         }
       ],
-      "states": ["closed", "open-empty", "thread-results", "file-results", "content-results"],
+      "states": ["closed", "open-empty", "thread-results", "message-results", "file-results", "content-results"],
       "failureModes": [
         "A thread title or project match is omitted from results.",
         "A child session or subagent appears in the Threads list.",
@@ -107,6 +114,18 @@
           "id": "command-palette.content-search-native-subagents",
           "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
           "testName": "does not render native content hits that are not in the top-level thread list"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-search-tab",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "searches user and agent messages across threads, narrows by sender filter, and reports the selected message"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-select-behavior",
+          "file": "plugins/@dshfiles/command-palette/src/message-search-source.test.ts",
+          "testName": "opens the thread and requests message focus when behavior is reveal, and only opens when behavior is open"
         }
       ],
       "telemetry": [

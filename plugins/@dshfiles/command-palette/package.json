@@ -53,6 +53,7 @@
     "@deepseek-ai/dsh-client-ui-workspace": "catalog:",
     "@deepseek-ai/dsh-tools": "catalog:",
     "@deepseek-ai/schemastery": "catalog:",
+    "@dshfiles/chat": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
     "@testing-library/dom": "catalog:",
     "@testing-library/react": "catalog:",

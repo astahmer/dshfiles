@@ -16,6 +16,15 @@ const copy: ThreadPaletteCopy = {
   backlogUnavailable: 'Install Backlog to capture this draft.',
   recent: 'Recent',
   threads: 'Threads',
+  messages: 'Messages',
+  messagesPlaceholder: 'Search user and agent messages across threads…',
+  messagesFilterLabel: 'Filter messages by sender',
+  messagesRoleAll: 'All',
+  messagesRoleAssistant: 'Agent',
+  messagesRoleUser: 'User',
+  messagesEmptyPrompt: 'Type to search user and agent messages across threads.',
+  messagesSearching: 'Searching messages…',
+  messagesUnavailable: 'Message search requires @dshfiles/session-search on this Host.',
   destinations: 'Destinations',
   commands: 'Commands',
   files: 'Files',
@@ -536,5 +545,110 @@ describe('ThreadPalette thread actions and keycaps', () => {
     const newThread = options.find(option => option.textContent?.includes('New thread'))
     expect(newThread?.textContent).toContain('⌘⇧O')
     for (const dispose of disposers) dispose()
+  })
+})
+
+describe('ThreadPalette Messages tab', () => {
+  const thread = {
+    id: 'session-quartz',
+    title: 'Quartz rollout',
+    project: 'dshfiles',
+    cwd: '/repo/dshfiles',
+    updatedAt: 1_700_000_000_000,
+    running: false,
+  }
+
+  it('searches user and agent messages across threads, narrows by sender filter, and reports the selected message', async () => {
+    const searchMessages = vi.fn(async ({ query, role }: { readonly query: string; readonly role: 'all' | 'user' | 'assistant' }) => {
+      const allHits = [
+        { sessionId: 'session-quartz', seq: 4, role: 'user' as const, time: 1_700_000_000_000, snippet: `User asked about ${query}` },
+        { sessionId: 'session-quartz', seq: 9, role: 'assistant' as const, time: 1_700_000_050_000, snippet: `Agent answered ${query}` },
+        { sessionId: 'session-archived', seq: 2, role: 'assistant' as const, time: 1_700_000_060_000, snippet: `Archived ${query}` },
+      ]
+      return {
+        kind: 'ready' as const,
+        hasMore: false,
+        hits: role === 'all' ? allHits : allHits.filter(hit => hit.role === role),
+      }
+    })
+    const onSelectMessage = vi.fn()
+    const onClose = vi.fn()
+
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[thread]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        searchMessages={searchMessages}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onSelectMessage={onSelectMessage}
+        onClose={onClose}
+      />,
+    )
+
+    const messagesTab = screen.getByRole('tab', { name: 'Messages' })
+    fireEvent.mouseDown(messagesTab, { button: 0 })
+    fireEvent.click(messagesTab)
+    expect(messagesTab.getAttribute('aria-selected')).toBe('true')
+    expect(await screen.findByText('Type to search user and agent messages across threads.')).toBeTruthy()
+
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: 'quartz' } })
+
+    expect(await screen.findByText('User asked about quartz')).toBeTruthy()
+    expect(screen.getByText('Agent answered quartz')).toBeTruthy()
+    expect(screen.queryByText('Archived quartz')).toBeNull()
+
+    const agentFilter = screen.getByRole('button', { name: 'Agent' })
+    fireEvent.click(agentFilter)
+    expect(agentFilter.getAttribute('aria-pressed')).toBe('true')
+    await waitFor(() => expect(screen.queryByText('User asked about quartz')).toBeNull())
+    expect(screen.getByText('Agent answered quartz')).toBeTruthy()
+
+    const userFilter = screen.getByRole('button', { name: 'User' })
+    fireEvent.click(userFilter)
+    expect(userFilter.getAttribute('aria-pressed')).toBe('true')
+    await waitFor(() => expect(screen.queryByText('Agent answered quartz')).toBeNull())
+    const userOption = await screen.findByRole('option', { name: /User asked about quartz/ })
+    fireEvent.click(userOption)
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onSelectMessage).toHaveBeenCalledWith({
+      sessionId: 'session-quartz',
+      seq: 4,
+      role: 'user',
+      query: 'quartz',
+    })
+  })
+
+  it('shows a clear unavailable message when session-search message search is unavailable', async () => {
+    render(
+      <ThreadPalette
+        mode="messages"
+        threads={[thread]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        searchMessages={async () => ({ kind: 'unavailable' })}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: 'quartz' } })
+    expect(await screen.findByText('Message search requires @dshfiles/session-search on this Host.')).toBeTruthy()
   })
 })

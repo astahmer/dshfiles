@@ -17,6 +17,20 @@ workspaces included; **Everything** still searches every project, and a session
 ID or link finds any thread. Settings › Command palette › `threadsScope`
 switches the tab to `all` projects. Without a current project it lists them all.
 
+## Messages tab
+
+The **Messages** tab searches only user and agent messages across top-level
+threads via `@dshfiles/session-search`'s `searchMessages` API (tool calls, tool
+results, thinking and subagent threads are left out). Compact **All** /
+**Agent** / **User** filter chips narrow the lookup by sender.
+
+Settings › Command palette › `messageSelectBehavior` controls what happens when
+you pick a hit:
+
+- `reveal` (default): opens the thread and scrolls to and highlights the matched
+  message (paging older turns in and unfolding long prompts when needed).
+- `open`: opens the thread without scrolling to the message.
+
 ## Ask DSH
 
 On an empty search the palette shows **Ask DSH** with a `Tab` keycap. Tab (or a click on the hint) swaps the
