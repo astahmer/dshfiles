@@ -150,7 +150,6 @@ import { ThreadMenuModel } from './thread-menu-model.js'
 import {
   type CSSProperties,
   createContext,
-  Fragment,
   memo,
   useCallback,
   useContext,
@@ -777,6 +776,33 @@ const finishedSubagentsLabels = {
   collapse: 'threadSidebarFinishedSubagentsCollapse',
   hide: 'threadSidebarFinishedSubagentsHide',
 } as const
+
+/**
+ * The hover strip's budget (round nine, owner report): the time slot it replaces plus a quarter of what the title has,
+ * so the title keeps three quarters of its width under the pointer and a click aimed at it still opens the thread. A
+ * strip of k seats (24px buttons, 2px apart, its end 6px inside the row) takes 26k + 4px, and that fits a row of
+ * 104k - 24px; the actions past it give way from the end of the strip (they stay in the row menu, which holds every row
+ * verb). Literal classes, one per seat count, because Tailwind only sees whole strings: `STRIP_SEAT_FIT[i]` hides the
+ * i-th action below the width where it and the row menu fit, and `STRIP_FIT_TIERS` gives line 1 the matching reserve.
+ * Both query the row's box (`rowbox`), not its button, whose padding would shift line 1's tiers off the strip's.
+ */
+const STRIP_SEAT_FIT = [
+  'dshx:@max-[11.5rem]/rowbox:hidden',
+  'dshx:@max-[18rem]/rowbox:hidden',
+  'dshx:@max-[24.5rem]/rowbox:hidden',
+  'dshx:@max-[31rem]/rowbox:hidden',
+  'dshx:@max-[37.5rem]/rowbox:hidden',
+  'dshx:@max-[44rem]/rowbox:hidden',
+  'dshx:@max-[50.5rem]/rowbox:hidden',
+  'dshx:@max-[57rem]/rowbox:hidden',
+  'dshx:@max-[63.5rem]/rowbox:hidden',
+] as const
+const STRIP_FIT_TIERS = [
+  'dshx:[--strip-fit:1.875rem] dshx:@min-[11.5rem]/rowbox:[--strip-fit:3.5rem] dshx:@min-[18rem]/rowbox:[--strip-fit:5.125rem]',
+  'dshx:@min-[24.5rem]/rowbox:[--strip-fit:6.75rem] dshx:@min-[31rem]/rowbox:[--strip-fit:8.375rem] dshx:@min-[37.5rem]/rowbox:[--strip-fit:10rem]',
+  'dshx:@min-[44rem]/rowbox:[--strip-fit:11.625rem] dshx:@min-[50.5rem]/rowbox:[--strip-fit:13.25rem] dshx:@min-[57rem]/rowbox:[--strip-fit:14.875rem]',
+  'dshx:@min-[63.5rem]/rowbox:[--strip-fit:16.5rem]',
+].join(' ')
 
 const withTooltip = (label: string, anchor: ReactElement): JSX.Element => (
   <Tooltip>
@@ -1797,7 +1823,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
 
   // The hover actions sit in the first line's time slot. While they show, that line gives them their width and the
   // time steps aside, so the title truncates before them instead of being covered (each seat is a 24px button and a
-  // 2px gap; the last one is the row menu).
+  // 2px gap; the last one is the row menu). The row's width caps both (`STRIP_SEAT_FIT`), so the title keeps three quarters.
   const hoverActions = nearViewport
     ? props.rowActions.flatMap(action => {
         const element = renderRowAction(action)
@@ -1851,6 +1877,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         <div
           className={cn(
             'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:text-foreground dshx:pointer-coarse:touch-pan-y',
+            // The hover strip sits outside the row's button, so it measures the row here (`STRIP_SEAT_FIT`).
+            'dshx:@container/rowbox',
             // Selection is the quieter cue (round five B3): its low-chroma wash plus the leading accent bar. A Needs-you or
             // Failed row keeps its stronger attention wash when selected and takes only the bar.
             'dshx:group-data-[selected=true]/row:selected-marker',
@@ -1920,12 +1948,15 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     // A row without a second line keeps the verb on this one; on touch the verb also sits left of the
                     // row menu button.
                     verbSeat === 'head' && 'dshx:pr-17.5 dshx:pointer-coarse:pr-19',
-                    // Wherever the strip can show (it hides on a coarse pointer, where the row menu button keeps its own corner).
-                    verbSeat !== 'head' &&
-                      stripSeats > 0 &&
-                      'dshx:not-pointer-coarse:group-hover/row:pr-(--thread-row-strip) dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:pr-(--thread-row-strip)',
+                    // Wherever the strip can show (it hides on a coarse pointer, where the row menu button keeps its own
+                    // corner): its seats, capped by what the row's width lends it, so it never takes the title's place.
+                    stripSeats > 0 && STRIP_FIT_TIERS,
+                    stripSeats > 0 &&
+                      (verbSeat === 'head'
+                        ? 'dshx:not-pointer-coarse:group-hover/row:pr-[calc(4.375rem+min(var(--thread-row-strip),var(--strip-fit)))] dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:pr-[calc(4.375rem+min(var(--thread-row-strip),var(--strip-fit)))]'
+                        : 'dshx:not-pointer-coarse:group-hover/row:pr-[min(var(--thread-row-strip),var(--strip-fit))] dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:pr-[min(var(--thread-row-strip),var(--strip-fit))]'),
                   )}
-                  style={verbSeat !== 'head' && stripSeats > 0 ? stripStyle : undefined}
+                  style={stripSeats > 0 ? stripStyle : undefined}
                   data-thread-head=""
                 >
                   {(() => {
@@ -2243,12 +2274,16 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
                     verbSeat !== 'head'
                       ? 'dshx:-top-0.5 dshx:right-0'
-                      : // Beside a first-line verb the strip has no slot of its own: it floats over the title's end.
-                        'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:shadow-xs',
+                      : // Beside a first-line verb the strip takes the seat line 1 gives it left of the verb, as every row's
+                        // strip does in the time slot: nothing floats over the title.
+                        'dshx:top-1/2 dshx:right-full dshx:mr-1 dshx:-translate-y-1/2',
                   )}
                 >
-                  {hoverActions.map(({ action, element }) => (
-                    <Fragment key={action}>{element}</Fragment>
+                  {hoverActions.map(({ action, element }, index) => (
+                    // The actions past the row's budget give way from the strip's end; the row menu keeps them.
+                    <span key={action} className={cn('dshx:contents', STRIP_SEAT_FIT[index] ?? 'dshx:hidden')}>
+                      {element}
+                    </span>
                   ))}
                   {/* Every other verb of the row: the same menu a right-click opens. */}
                   {withTooltip(

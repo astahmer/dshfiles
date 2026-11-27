@@ -687,7 +687,11 @@ in; `rowActionOrder` stores that order and `hiddenRowActions` the ones a row hid
 — an absent id means shown, so a new action ships visible at the end of the saved
 order. The shipped order puts Done in Archive's slot and Archive just before it,
 so a row that hides Archive ends on Done. Hiding one removes only its hover
-button; the context menu keeps every action.
+button; the context menu keeps every action. The strip never takes the title's place: it
+gets the time slot plus a quarter of the title, so the title keeps three quarters
+of its width under the pointer and a click aimed at it opens the thread. The
+actions past that budget give way from the strip's end (a 260px row shows two
+seats, the first action and `⋯`); they stay in the row menu.
 
 By default a row shows **one** verb on hover, Done, and a `⋯` that opens the
 row menu (a row that needs a resume adds Resume and Dismiss; an archived row shows

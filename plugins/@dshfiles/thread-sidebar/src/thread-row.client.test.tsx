@@ -54,6 +54,18 @@ describe('a working thread row', () => {
 const stripLabels = (row: HTMLElement): (string | null)[] =>
   Array.from(row.querySelectorAll('[data-testid="thread-row-actions"] button')).map(button => button.getAttribute('aria-label'))
 
+const remPx = (rem: string | undefined): number => Number.parseFloat(rem ?? 'NaN') * 16
+
+/** What line 1 gives the hover strip at a row width, read from its classes the way the stylesheet resolves them. */
+const reservedPx = (head: HTMLElement, width: number): number => {
+  const strip = remPx(head.style.getPropertyValue('--thread-row-strip'))
+  if (!head.className.includes('dshx:not-pointer-coarse:group-hover/row:pr-[min(var(--thread-row-strip),var(--strip-fit))]')) return strip
+  let fit = remPx(/(?:^|\s)dshx:\[--strip-fit:([\d.]+)rem\]/u.exec(head.className)?.[1])
+  for (const [, min, value] of head.className.matchAll(/dshx:@min-\[([\d.]+)rem\]\/rowbox:\[--strip-fit:([\d.]+)rem\]/gu))
+    if (width >= remPx(min)) fit = Math.max(fit, remPx(value))
+  return Math.min(strip, fit)
+}
+
 describe('the hover actions of a thread row', () => {
   it('shows one verb and the row menu by default, and keeps the title readable beside them', async () => {
     const row = await renderRow()
@@ -62,7 +74,7 @@ describe('the hover actions of a thread row', () => {
     // sitting under a floating strip; the time they replace steps aside.
     const head = row.querySelector<HTMLElement>('[data-thread-head]')
     expect(head?.style.getPropertyValue('--thread-row-strip')).toBe('3.5rem')
-    expect(head?.className).toContain('dshx:not-pointer-coarse:group-hover/row:pr-(--thread-row-strip)')
+    expect(head?.className).toContain('dshx:not-pointer-coarse:group-hover/row:pr-[min(var(--thread-row-strip),var(--strip-fit))]')
     expect(row.querySelector('[data-thread-time]')?.className).toContain('dshx:not-pointer-coarse:group-hover/row:hidden')
     expect(row.querySelector('[data-testid="thread-row-actions"]')?.className).not.toContain('dshx:bg-popover')
   })
@@ -77,6 +89,32 @@ describe('the hover actions of a thread row', () => {
       'threadSidebarSettle',
       'threadSidebarContextMenu',
     ])
+  })
+
+  // Round nine (owner report): with every hover action on, the strip took the title's place under the pointer, so a
+  // click at the title's middle pinned or snoozed the thread instead of opening it. The strip now shows only the seats
+  // that fit in the time slot and a quarter of the title; the rest wait in the row menu, which holds every row verb.
+  it('never takes more than a quarter of the title, whatever the row width and however many actions are on', async () => {
+    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder, needsResume: true })
+    const strip = row.querySelector<HTMLElement>('[data-row-strip]')
+    const head = row.querySelector<HTMLElement>('[data-thread-head]')
+    if (strip === null || head === null) throw new Error('The row has no strip or no first line.')
+    const seats = Array.from(strip.children)
+    for (let width = 160; width <= 1_000; width += 2) {
+      const shown = seats.filter(seat => {
+        const rule = /dshx:@max-\[([\d.]+)rem\]\/rowbox:hidden/u.exec(seat.className)
+        return rule === null || width >= remPx(rule[1])
+      })
+      // The row menu always shows, and the actions that give way are the last ones, beside it.
+      expect(shown.at(-1)?.querySelector('button')?.getAttribute('aria-label')).toBe('threadSidebarContextMenu')
+      expect(shown).toEqual([...seats.slice(0, shown.length - 1), seats.at(-1)])
+      // Each seat is a 24px button and a 2px gap; the strip ends 6px inside the row.
+      const stripPx = shown.length * 26 - 2
+      const reserve = reservedPx(head, width)
+      expect(stripPx + 6, `strip at ${width}px`).toBeLessThanOrEqual(reserve)
+      // The time slot it replaces, plus a quarter of what the title has (the row less its padding, glyph and gaps).
+      expect(reserve, `reserve at ${width}px`).toBeLessThanOrEqual(32 + (width - 88) / 4)
+    }
   })
 
   it('opens the row menu from the strip', async () => {
