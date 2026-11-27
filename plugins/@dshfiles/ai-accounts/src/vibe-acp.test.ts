@@ -1,4 +1,5 @@
-import { existsSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message, type Model } from '@earendil-works/pi-ai'
 import { defineTool } from '@dshfiles/dshx/host'
@@ -31,10 +32,16 @@ afterEach(async () => {
 })
 
 /** The calling DSH session as the Host resolves it: its file mode, and an approval answer recorded per tool. */
-const callingSession = (input: { readonly fileMode: VibeCallingSession['fileMode']; readonly answer: boolean; readonly asks: string[] }) =>
+const callingSession = (input: {
+  readonly fileMode: VibeCallingSession['fileMode']
+  readonly answer: boolean
+  readonly asks: string[]
+  readonly writableRoots?: readonly string[]
+}) =>
   vibeBuiltinAuthorizer({
     session: () => ({
       fileMode: input.fileMode,
+      writableRoots: input.writableRoots ?? [],
       ask: async ask => {
         input.asks.push(ask.toolName)
         return input.answer
@@ -223,6 +230,38 @@ describe('the Vibe ACP route', () => {
     expect(fake.events()).not.toContain('denied-by-policy bash')
     expect(asks).toEqual([])
   })
+
+  it.each([
+    { write: 'inside the workspace, approvals off', target: 'inside', approvals: 'session', answer: false, asked: false, ran: true },
+    { write: 'outside the workspace, approvals off', target: 'outside', approvals: 'session', answer: false, asked: true, ran: false },
+    { write: 'through a symlink leaving the workspace, approvals off', target: 'escape', approvals: 'session', answer: false, asked: true, ran: false },
+    { write: 'outside the workspace, user approves', target: 'outside', approvals: 'session', answer: true, asked: true, ran: true },
+    { write: 'inside the workspace, builtin approvals set to ask', target: 'inside', approvals: 'ask', answer: true, asked: true, ran: true },
+  ] as const)(
+    'confines Vibe s own file writes in a workspace-write session as DSH confines its own ($write)',
+    async ({ target, approvals, answer, asked, ran }) => {
+      const root = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-acp-workspace-')))
+      const outside = realpathSync(mkdtempSync(join(tmpdir(), 'vibe-acp-outside-')))
+      directories.push(root, outside)
+      mkdirSync(join(root, 'src'))
+      symlinkSync(outside, join(root, 'link'))
+      const path = {
+        inside: join(root, 'src', 'new', 'vibe-smoke.txt'),
+        outside: join(outside, 'vibe-smoke.txt'),
+        escape: join(root, 'link', 'vibe-smoke.txt'),
+      }[target]
+      const asks: string[] = []
+      const { cli, model } = setup('/synthetic/vibe-home', {
+        settings: () => ({ acpApprovalPolicy: approvals, strictTools: false }),
+        authorizeBuiltin: callingSession({ fileMode: 'workspace-write', answer, asks, writableRoots: [root] }),
+      })
+      const reply = await finished(
+        cli.stream(model(), context([{ role: 'user', content: `BUILTIN_WRITE_FILE ${path}`, timestamp: 1 }]), { sessionId: 'confined' }),
+      )
+      expect(asks).toEqual(asked ? ['write_file'] : [])
+      expect(textOf(reply)).toBe(ran ? 'write_file ran' : 'tool_denied: Tool execution denied by approval callback')
+    },
+  )
 
   it('runs Vibe s read-only builtins without asking, or asks for each one when builtin approvals are set to ask', async () => {
     const quiet: string[] = []

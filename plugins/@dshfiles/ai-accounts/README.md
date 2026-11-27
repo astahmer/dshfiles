@@ -309,8 +309,11 @@ moved `vibe_budget` from 0 % to 0.00336 %.
 - **Vibe's own tools.** Vibe 3.1.5 lists its `write_file`, `edit`, `bash` and `run_typescript` whatever the agent
   profile says, but denies (`Tool execution denied by approval policy`, without asking DSH) any builtin the profile's
   `enabled_tools` leaves out. The managed profile therefore lists `bash`, `write_file` and `edit` beside the read-only
-  builtins. DSH runs Vibe in its `ask` mode and answers each request the way the calling session treats a native tool: reads run; under `danger-full-access` everything runs without asking; under a confining file
-  policy a write or command (which DSH cannot sandbox) asks the session, and a session with approvals off denies it.
+  builtins. DSH runs Vibe in its `ask` mode and answers each request the way the calling session (a subagent inherits
+  its parent's) treats a native tool: reads run; under `danger-full-access` everything runs without asking; under
+  `workspace-write` a `write_file`/`edit` whose file (symlinks resolved) lies inside the session's writable roots runs;
+  any other write or command (which DSH cannot sandbox) asks the session, and a session with approvals off denies it.
+  Vibe's own resolver may still run a command it deems read-only (such as `uname`) without asking.
 - **Vibe ACP preferences.** Under Settings → AI Accounts → Mistral Vibe ACP, **Vibe builtin approvals**
   (`vibe.acpApprovalPolicy`) follows the calling session (`session`, default) or asks the session before every Vibe
   builtin, reads included (`ask`). **Only use DSH tools** (`vibe.strictTools`, off by default) denies every Vibe

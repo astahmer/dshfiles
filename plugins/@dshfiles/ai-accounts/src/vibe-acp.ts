@@ -1,8 +1,8 @@
 import { randomBytes } from 'node:crypto'
-import { mkdirSync, mkdtempSync, promises as fsPromises, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, promises as fsPromises, realpathSync, writeFileSync } from 'node:fs'
 import { createServer, type Server, type Socket } from 'node:net'
 import { tmpdir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
   createAssistantMessageEventStream,
   getCurrentSystemPrompt,
@@ -67,6 +67,9 @@ const READ_ONLY_BUILTINS = ['read_file', 'grep', 'web_fetch', 'web_search', 'tod
  * full-access session.
  */
 const GATED_BUILTINS = ['bash', 'write_file', 'edit'] as const
+/** The gated builtins that write one file, named by their input; a workspace-write session can confine those. */
+const FILE_BUILTINS = ['write_file', 'edit'] as const
+const FILE_PATH_KEYS = ['filePath', 'file_path', 'path'] as const
 /** The Vibe approval mode that sends every builtin's permission request to the route. */
 const VIBE_ASK_MODE = 'ask'
 /** Vibe's thinking levels, in increasing order, as its `thinking` config option takes them. */
@@ -130,22 +133,47 @@ export interface VibeBuiltinRequest {
   readonly sessionId: string
   readonly name: string
   readonly readOnly: boolean
+  /** The absolute file a file builtin writes; undefined when the call can write anywhere (a shell) or names no file. */
+  readonly target: string | undefined
   readonly alwaysAsk: boolean
   readonly signal: AbortSignal
 }
 
+/** The path with symlinks resolved as far as it exists, so a link inside a root cannot carry a write out of it. */
+const physicalPath = (path: string): string => {
+  let existing = path
+  while (!existsSync(existing) && dirname(existing) !== existing) existing = dirname(existing)
+  try {
+    return join(realpathSync(existing), relative(existing, path))
+  } catch {
+    return path
+  }
+}
+
+const insideRoots = (target: string, roots: readonly string[]): boolean => {
+  const physical = physicalPath(target)
+  return roots.some(root => {
+    const offset = relative(physicalPath(root), physical)
+    return offset === '' || (!offset.startsWith('..') && !isAbsolute(offset))
+  })
+}
+
 /**
  * What a native DSH tool with a builtin's effect would do under the session's file policy: reads and full access run
- * without asking; a write under a confining policy escapes DSH's sandbox, so it needs the session's approval. Without a
- * file policy service DSH's own tools run unconfined, so the builtin does too.
+ * without asking; under workspace-write a file write inside the writable roots runs, as DSH's own write would; any
+ * other write or command escapes DSH's sandbox, so it needs the session's approval. Without a file policy service
+ * DSH's own tools run unconfined, so the builtin does too.
  */
 const vibeBuiltinVerdict = (input: {
   readonly fileMode: VibeFileMode | undefined
+  readonly writableRoots: readonly string[]
   readonly readOnly: boolean
+  readonly target: string | undefined
   readonly alwaysAsk: boolean
 }): 'allow' | 'ask' => {
   if (input.alwaysAsk) return 'ask'
   if (input.readOnly || input.fileMode === undefined || input.fileMode === 'danger-full-access') return 'allow'
+  if (input.fileMode === 'workspace-write' && input.target !== undefined && insideRoots(input.target, input.writableRoots)) return 'allow'
   return 'ask'
 }
 
@@ -154,6 +182,8 @@ type VibeFileMode = 'read-only' | 'workspace-write' | 'danger-full-access'
 /** The calling DSH session as the builtin verdict needs it: its standing file mode and its approval request. */
 export interface VibeCallingSession {
   readonly fileMode: VibeFileMode | undefined
+  /** Where workspace-write lets the session's own tools write: its workspace root and any added roots. */
+  readonly writableRoots: readonly string[]
   /** Resolves true only for an `allowed-once` answer; a session whose approvals are off rejects without asking. */
   readonly ask: (input: { readonly toolName: string; readonly reason: string; readonly signal: AbortSignal }) => Promise<boolean>
 }
@@ -164,7 +194,14 @@ export const vibeBuiltinAuthorizer =
   async (request: VibeBuiltinRequest): Promise<boolean> => {
     const session = input.session(request.sessionId)
     if (request.signal.aborted || session === undefined) return false
-    if (vibeBuiltinVerdict({ fileMode: session.fileMode, readOnly: request.readOnly, alwaysAsk: request.alwaysAsk }) === 'allow') return true
+    const verdict = vibeBuiltinVerdict({
+      fileMode: session.fileMode,
+      writableRoots: session.writableRoots,
+      readOnly: request.readOnly,
+      target: request.target,
+      alwaysAsk: request.alwaysAsk,
+    })
+    if (verdict === 'allow') return true
     const reason = `Mistral Vibe wants to run its own ${request.readOnly ? 'read-only' : 'unsandboxed'} tool ${request.name}.`
     return session.ask({ toolName: request.name, reason, signal: request.signal })
   }
@@ -246,6 +283,8 @@ interface Session {
   readonly pendingToolUses: { readonly id: string; readonly name: string; readonly argumentsJson: string }[]
   /** Every tool call Vibe published, so a permission request that carries only an id can be classified. */
   readonly toolNamesById: Map<string, string>
+  /** The input of each published call, so a file builtin's permission can be judged by the file it writes. */
+  readonly toolInputsById: Map<string, ToolArguments>
   /** The cumulative usage Vibe last reported, and what the ledger already took from it. */
   totals: UsageTotals
   reported: UsageTotals
@@ -509,6 +548,7 @@ export class VibeAcpSessions {
     session.prompting = false
     session.pendingToolUses.length = 0
     session.toolNamesById.clear()
+    session.toolInputsById.clear()
     const decoded = AiAccountsSchema.decodeResult(promptResultSchema, result)
     if (decoded._tag === 'Success') this.absorbPromptUsage(session, decoded.success)
     const next = session.queued.splice(0)
@@ -599,6 +639,7 @@ export class VibeAcpSessions {
     const wireName = update._meta?.tool_name ?? update.name
     if (wireName === undefined) return
     session.toolNamesById.set(update.toolCallId, wireName)
+    if (update.rawInput !== undefined) session.toolInputsById.set(update.toolCallId, update.rawInput)
     const tool = this.bridgedTool(session, wireName)
     if (tool === undefined) return
     const input = declaredArguments(tool, update.rawInput ?? {})
@@ -643,20 +684,37 @@ export class VibeAcpSessions {
       return { result: { outcome: { outcome: 'cancelled' } } }
     const id = decoded.success.toolCall.toolCallId
     const name = (id === undefined ? undefined : session.toolNamesById.get(id)) ?? decoded.success.toolCall.name ?? id
-    const runnable = name !== undefined && (await this.permit(session, name, scope.controller.signal))
+    const input = id === undefined ? undefined : session.toolInputsById.get(id)
+    const runnable = name !== undefined && (await this.permit({ session, name, input, signal: scope.controller.signal }))
     const option = decoded.success.options.find(candidate => candidate.kind === (runnable ? 'allow_once' : 'reject_once'))
     return { result: { outcome: option === undefined ? { outcome: 'cancelled' } : { outcome: 'selected', optionId: option.optionId } } }
   }
 
-  private async permit(session: Session, name: string, signal: AbortSignal): Promise<boolean> {
+  /** The absolute file a file builtin's input names, resolved against Vibe's own working directory. */
+  private static fileTarget(session: Session, name: string, input: ToolArguments | undefined): string | undefined {
+    if (!FILE_BUILTINS.some(builtin => builtin === name) || input === undefined) return undefined
+    const path = FILE_PATH_KEYS.map(key => input[key]).find(value => typeof value === 'string')
+    return typeof path === 'string' ? resolve(join(session.directory, 'workspace'), path) : undefined
+  }
+
+  private async permit(call: {
+    readonly session: Session
+    readonly name: string
+    readonly input: ToolArguments | undefined
+    readonly signal: AbortSignal
+  }): Promise<boolean> {
+    const session = call.session
     // Allow transport, not execution: the MCP request becomes an ordinary native DSH tool call, with all its guards.
-    if (this.bridgedTool(session, name) !== undefined) return true
+    if (this.bridgedTool(session, call.name) !== undefined) return true
     if (session.settings.strictTools) return false
-    const readOnly = READ_ONLY_BUILTINS.some(builtin => builtin === name)
+    const readOnly = READ_ONLY_BUILTINS.some(builtin => builtin === call.name)
     const alwaysAsk = session.settings.acpApprovalPolicy === 'ask'
     if (readOnly && !alwaysAsk) return true
     if (session.dshSessionId === undefined || this.options.authorizeBuiltin === undefined) return false
-    return this.options.authorizeBuiltin({ sessionId: session.dshSessionId, name, readOnly, alwaysAsk, signal }).catch(() => false)
+    const target = VibeAcpSessions.fileTarget(session, call.name, call.input)
+    return this.options
+      .authorizeBuiltin({ sessionId: session.dshSessionId, name: call.name, readOnly, target, alwaysAsk, signal: call.signal })
+      .catch(() => false)
   }
 
   private spawn(input: {
@@ -757,6 +815,7 @@ export class VibeAcpSessions {
       unmatchedCalls: [],
       pendingToolUses: [],
       toolNamesById: new Map(),
+      toolInputsById: new Map(),
       totals: zeroTotals(),
       reported: zeroTotals(),
       metaSeen: false,

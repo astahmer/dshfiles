@@ -635,6 +635,12 @@
         },
         {
           "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-workspace-write",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "confines Vibe s own file writes in a workspace-write session as DSH confines its own"
+        },
+        {
+          "kind": "unit-test",
           "id": "ai-accounts.vibe-acp-strict-tools",
           "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
           "testName": "strictTools denies every Vibe builtin request and cleans up when the account is removed"

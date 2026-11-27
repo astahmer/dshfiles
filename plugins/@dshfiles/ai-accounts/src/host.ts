@@ -378,8 +378,10 @@ const startAccountsHost = (input: {
       session: sessionId => {
         const agent = ctx.agents.get(SessionId(sessionId))
         if (agent === undefined) return undefined
+        const policy = ctx.get('sandboxPolicy')?.resolve({ session: agent.session })
         return {
-          fileMode: ctx.get('sandboxPolicy')?.resolve({ session: agent.session }).mode,
+          fileMode: policy?.mode,
+          writableRoots: policy === undefined ? [] : [policy.workspaceRoot, ...(policy.additionalWritableRoots ?? [])],
           ask: async ask => {
             const approval = ctx.get('approval')
             return (
