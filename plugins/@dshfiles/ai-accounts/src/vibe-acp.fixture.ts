@@ -38,6 +38,7 @@ const mcp = (method, params) =>
 /** The agent profiles this Host discovers: Vibe's own plus one file per directory under additionalDirectories. */
 const agentNames = directories => {
   const names = ['default', 'explore', 'lean']
+  if (process.env.FAKE_VIBE_ACP_NO_AGENTS) return names
   for (const directory of directories) {
     const folder = join(directory, '.vibe', 'agents')
     if (!existsSync(folder)) continue
@@ -117,16 +118,15 @@ createInterface({ input: process.stdin }).on('line', async line => {
     const text = message.params.prompt.map(block => block.text ?? '').join('')
     log('prompt ' + JSON.stringify(text))
     const say = value => update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: value }, messageId: 'm' + steps })
-    const answer = () => {
-      update(sessionId, {
-        sessionUpdate: 'usage_update',
-        used: 4000 * steps,
-        size: 1048576,
-        cost: { amount: 0.5 * steps, currency: 'USD' },
-        _meta: { steps, promptTokens, completionTokens, cachedTokens, totalTokens: promptTokens + completionTokens, lastTurnTotalTokens: 1234 },
-      })
-      return reply({ stopReason: 'end_turn', usage: { inputTokens: promptTokens, outputTokens: completionTokens, totalTokens: promptTokens + completionTokens, cachedReadTokens: cachedTokens } })
-    }
+    // Vibe reports the session's cumulative stats after each LLM call, so the route can bill one step's share.
+    update(sessionId, {
+      sessionUpdate: 'usage_update',
+      used: 4000 * steps,
+      size: 1048576,
+      cost: { amount: 0.5 * steps, currency: 'USD' },
+      _meta: { steps, promptTokens, completionTokens, cachedTokens, totalTokens: promptTokens + completionTokens, lastTurnTotalTokens: 1234 },
+    })
+    const answer = () => reply({ stopReason: 'end_turn', usage: { inputTokens: promptTokens, outputTokens: completionTokens, totalTokens: promptTokens + completionTokens, cachedReadTokens: cachedTokens } })
     const toolName = tools[0] ? tools[0].name : 'echo'
     const permission = params =>
       new Promise(resolve => {
@@ -157,6 +157,7 @@ createInterface({ input: process.stdin }).on('line', async line => {
         return answer()
       }
       const called = await mcp('tools/call', { name: toolName, arguments: { value: 'ping' } })
+      log('bridge-answered')
       say('tool said ' + called.result.content.map(block => block.text).join(''))
       return answer()
     }
@@ -197,6 +198,11 @@ export const fakeVibeAcp = (source: string = FAKE_VIBE_ACP): FakeVibeAcp => {
     executable,
     directory,
     logPath,
-    events: () => (existsSync(logPath) ? readFileSync(logPath, 'utf8').split('\n').filter(line => line !== '') : []),
+    events: () =>
+      existsSync(logPath)
+        ? readFileSync(logPath, 'utf8')
+            .split('\n')
+            .filter(line => line !== '')
+        : [],
   }
 }

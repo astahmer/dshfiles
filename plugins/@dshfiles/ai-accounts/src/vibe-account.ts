@@ -1,9 +1,10 @@
 import { isAbsolute, join } from 'node:path'
 import { homedir } from 'node:os'
 import type { ThinkingLevelMap } from '@earendil-works/pi-ai'
-import type { UsageCard } from './api.js'
+import { vibeBridge, type UsageCard, type VibeBridge } from './api.js'
 import type { CredentialValueResolver } from './credentials.js'
 import { MistralAccountModel } from './mistral-account.js'
+import { ShellCommand } from './shell-command.js'
 
 /**
  * Mistral Vibe through the official `vibe` CLI, with the login `vibe --setup` stored.
@@ -16,6 +17,7 @@ import { MistralAccountModel } from './mistral-account.js'
  */
 
 export const VIBE_KIND = 'vibe'
+
 const VIBE_LOGIN_HINT = 'vibe --setup   # choose Launch browser and sign in with your Mistral plan, then retry this route'
 /** A model Vibe 3.1.5 lists locally (`$VIBE_HOME/model_catalog_cache.json`, `vibe --model`), with its own aliases. */
 interface VibeModelEntry {
@@ -115,6 +117,25 @@ const readLogin = async (home: string): Promise<string> => MistralAccountModel.r
 
 export class VibeAccountModel {
   static readonly loginHint = VIBE_LOGIN_HINT
+  /** The stored bridge, or the default for an account that never chose one. */
+  static readonly bridge = (value: VibeBridge | undefined): VibeBridge => vibeBridge(value)
+  /** `vibe --setup` as the user types it for this account's VIBE_HOME. */
+  static readonly command = (home: string): string => {
+    const resolved = resolveHome(home)
+    return resolved === vibeHome() ? 'vibe --setup' : ShellCommand.withEnvironment('VIBE_HOME', resolved, 'vibe --setup')
+  }
+
+  /**
+   * The environment a Vibe process runs with: the account's VIBE_HOME, and no inherited API key, which the CLI would
+   * bill as API credit instead of drawing the Vibe & Studio allowance the login pays. Its `.env` and keyring stay
+   * untouched, since that signed-in session is what these routes exist for.
+   */
+  static readonly cliEnvironment = (input: { readonly environment: NodeJS.ProcessEnv; readonly home: string }): Readonly<Record<string, string>> => {
+    const env: NodeJS.ProcessEnv = { ...input.environment, VIBE_HOME: resolveHome(input.home) }
+    delete env['MISTRAL_API_KEY']
+    delete env['VIBE_CWD']
+    return Object.fromEntries(Object.entries(env).flatMap(([key, value]) => (value === undefined ? [] : [[key, value]])))
+  }
   static readonly models = VIBE_CATALOG
   static readonly resolveHome = resolveHome
   static readonly canonicalModelId = canonicalModelId

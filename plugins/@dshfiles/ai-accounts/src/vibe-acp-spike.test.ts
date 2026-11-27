@@ -7,6 +7,7 @@ import { createInterface } from 'node:readline'
 import * as Schema from 'effect/Schema'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AcpRpc, type AcpJson } from './acp-rpc.js'
+import { AiAccountsSchema } from './effect-schema.js'
 import { bridgeCallSchema, CliBridge, MCP_BRIDGE_SOURCE } from './cli-bridge.js'
 import { fakeVibeAcp, type FakeVibeAcp } from './vibe-acp.fixture.js'
 
@@ -32,6 +33,15 @@ const usageUpdateSchema = Schema.Struct({
   size: finite,
   cost: Schema.optional(Schema.NullOr(Schema.Struct({ amount: Schema.Number, currency: Schema.String }))),
   _meta: Schema.optional(Schema.Struct({ promptTokens: finite, completionTokens: finite, cachedTokens: finite, steps: finite })),
+})
+
+const newSessionSchema = Schema.Struct({ sessionId: Schema.String })
+
+/** The parts of an ACP update the spike reads, decoded instead of narrowed off the raw JSON. */
+const incomingSchema = Schema.Struct({
+  sessionUpdate: Schema.String,
+  toolCallId: Schema.optional(Schema.String),
+  name: Schema.optional(Schema.String),
 })
 
 const tool = { name: 'echo', description: 'Echo a value', parameters: { type: 'object', properties: { value: { type: 'string' } } } }
@@ -97,37 +107,51 @@ const inspect = async (input: { readonly prompt: string }): Promise<Inspection> 
     send: line => child.stdin.write(`${line}\n`),
     onNotification: (method, params) => {
       if (method !== 'session/update') return
-      const update = (params as { update?: AcpJson } | null)?.update
-      if (update !== undefined) updates.push(update)
+      const decoded = AiAccountsSchema.decodeResult(Schema.Struct({ update: Schema.Json }), params)
+      if (decoded._tag === 'Success') updates.push(decoded.success.update)
     },
     onRequest: (method, params) => {
       if (method !== 'session/request_permission') return undefined
-      const request = params as { toolCall?: { toolCallId?: string }; options?: { optionId: string; kind: string }[] } | null
+      const decoded = AiAccountsSchema.decodeResult(
+        Schema.Struct({
+          toolCall: Schema.Struct({ toolCallId: Schema.optional(Schema.String) }),
+          options: Schema.Array(Schema.Struct({ optionId: Schema.String, kind: Schema.String })),
+        }),
+        params,
+      )
+      if (decoded._tag !== 'Success') return { result: { outcome: { outcome: 'cancelled' } } }
       const bridged = updates.some(update => {
-        const candidate = update as { sessionUpdate?: string; toolCallId?: string; name?: string }
+        const candidate = Schema.decodeUnknownSync(incomingSchema)(update)
         return (
-          candidate.sessionUpdate === 'tool_call' &&
-          candidate.toolCallId === request?.toolCall?.toolCallId &&
-          String(candidate.name ?? '').startsWith('dsh_')
+          candidate.sessionUpdate === 'tool_call' && candidate.toolCallId === decoded.success.toolCall.toolCallId && (candidate.name ?? '').startsWith('dsh_')
         )
       })
-      const option = (request?.options ?? []).find(candidate => candidate.kind.startsWith(bridged ? 'allow' : 'reject'))
+      const option = decoded.success.options.find(candidate => candidate.kind.startsWith(bridged ? 'allow' : 'reject'))
       return { result: option === undefined ? { outcome: { outcome: 'cancelled' } } : { outcome: { outcome: 'selected', optionId: option.optionId } } }
     },
   })
   createInterface({ input: child.stdout }).on('line', line => rpc.accept(line))
   await rpc.request('initialize', { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'dsh', version: '1' } })
-  const created = (await rpc.request('session/new', {
-    cwd: bridgeDirectory,
-    additionalDirectories: [join(fake.directory, 'agents')],
-    mcpServers: [
-      { name: 'dsh', command: process.execPath, args: ['--input-type=module', '-e', MCP_BRIDGE_SOURCE, join(bridgeDirectory, 'tools.json'), socketPath], env: [] },
-    ],
-  })) as { sessionId: string }
-  void rpc.request('session/prompt', { sessionId: created.sessionId, prompt: [{ type: 'text', text: input.prompt }] })
+  const created = AiAccountsSchema.decodeResult(
+    newSessionSchema,
+    await rpc.request('session/new', {
+      cwd: bridgeDirectory,
+      additionalDirectories: [join(fake.directory, 'agents')],
+      mcpServers: [
+        {
+          name: 'dsh',
+          command: process.execPath,
+          args: ['--input-type=module', '-e', MCP_BRIDGE_SOURCE, join(bridgeDirectory, 'tools.json'), socketPath],
+          env: [],
+        },
+      ],
+    }),
+  )
+  if (created._tag !== 'Success') throw new Error('the fake answered session/new with no session id')
+  void rpc.request('session/prompt', { sessionId: created.success.sessionId, prompt: [{ type: 'text', text: input.prompt }] })
   return {
     fake,
-    sessionId: created.sessionId,
+    sessionId: created.success.sessionId,
     updates,
     bridgeCalls,
     answer: result => release?.(result),
@@ -136,9 +160,12 @@ const inspect = async (input: { readonly prompt: string }): Promise<Inspection> 
 
 const toolCallNames = (updates: readonly AcpJson[]): string[] =>
   updates.flatMap(update => {
-    const candidate = update as { sessionUpdate?: string; name?: string }
+    const candidate = Schema.decodeUnknownSync(incomingSchema)(update)
     return candidate.sessionUpdate === 'tool_call' && candidate.name !== undefined ? [candidate.name] : []
   })
+
+const hasUpdate = (updates: readonly AcpJson[], kind: string): boolean =>
+  updates.some(update => Schema.decodeUnknownSync(incomingSchema)(update).sessionUpdate === kind)
 
 describe('the Vibe ACP ordering spike', () => {
   it('publishes a DSH tool as dsh_<tool> and emits its tool_call before the bridge call can be answered', async () => {
@@ -158,11 +185,15 @@ describe('the Vibe ACP ordering spike', () => {
 
   it('reports context size, cost and cumulative token meta on usage_update', async () => {
     const inspected = await inspect({ prompt: 'plain answer' })
-    await vi.waitFor(() => expect(inspected.updates.some(update => (update as { sessionUpdate?: string }).sessionUpdate === 'usage_update')).toBe(true), {
-      timeout: 10_000,
+    await vi.waitFor(() => expect(hasUpdate(inspected.updates, 'usage_update')).toBe(true), { timeout: 10_000 })
+    const usage = inspected.updates.find(update => Schema.decodeUnknownSync(incomingSchema)(update).sessionUpdate === 'usage_update')
+    const decoded = Schema.decodeUnknownSync(usageUpdateSchema)(usage)
+    expect(decoded).toMatchObject({
+      used: 4000,
+      size: 1_048_576,
+      cost: { amount: 0.5, currency: 'USD' },
+      _meta: { promptTokens: 1200, completionTokens: 34, cachedTokens: 900, steps: 1 },
     })
-    const decoded = Schema.decodeUnknownSync(usageUpdateSchema)(inspected.updates.find(update => (update as { sessionUpdate?: string }).sessionUpdate === 'usage_update'))
-    expect(decoded).toMatchObject({ used: 4000, size: 1_048_576, cost: { amount: 0.5, currency: 'USD' }, _meta: { promptTokens: 1200, completionTokens: 34, cachedTokens: 900, steps: 1 } })
   })
 
   it('answers a permission request for a bridged tool with allow, and one for a builtin with reject', async () => {

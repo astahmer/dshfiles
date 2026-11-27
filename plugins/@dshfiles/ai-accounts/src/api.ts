@@ -214,6 +214,11 @@ export const accountProfileSchema = Schema.Struct({
   apiKeyEnv: apiKeyEnvSchema,
   /** Explicit credential ownership; absent preserves legacy environment/CLI discovery precedence. */
   authSource: Schema.optional(Schema.Literals(['cli', 'reference'])),
+  /**
+   * How a Vibe account reaches its plan: `acp` runs one `vibe-acp` process per conversation and bridges DSH's tools
+   * into it, `headless` runs `vibe` once per step without them. Absent means `headless`.
+   */
+  bridge: Schema.optional(Schema.Literals(['acp', 'headless'])),
   /** Command Code accounts may point at a different API base. */
   apiBaseUrl: apiBaseUrlSchema,
   badge: Schema.String.check(Schema.isMaxLength(32)),
@@ -282,6 +287,7 @@ export const accountDraftSchema = Schema.Struct({
   shadowHomePath: accountProfileSchema.fields.shadowHomePath,
   apiKeyEnv: accountProfileSchema.fields.apiKeyEnv,
   authSource: accountProfileSchema.fields.authSource,
+  bridge: accountProfileSchema.fields.bridge,
   apiBaseUrl: accountProfileSchema.fields.apiBaseUrl,
   badge: accountProfileSchema.fields.badge,
   accentColor: accountProfileSchema.fields.accentColor,
@@ -499,6 +505,12 @@ export const identityResultSchema = Schema.Struct({
 })
 
 export type AccountProfile = typeof accountProfileSchema.Type
+/** The stored transport of a Vibe account: `acp` bridges DSH's tools, `headless` runs `vibe` per step. */
+export type VibeBridge = NonNullable<AccountProfile['bridge']>
+
+/** The bridge an account uses when it never chose one: the headless CLI, until the ACP bridge's settings work lands. */
+export const DEFAULT_VIBE_BRIDGE: VibeBridge = 'headless'
+export const vibeBridge = (value: VibeBridge | undefined): VibeBridge => value ?? DEFAULT_VIBE_BRIDGE
 export type AccountDraft = typeof accountDraftSchema.Type
 export type AccountsFile = typeof accountsFileSchema.Type
 export type AccountKind = typeof accountKindSchema.Type
