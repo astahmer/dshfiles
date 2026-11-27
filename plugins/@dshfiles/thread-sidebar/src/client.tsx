@@ -6791,7 +6791,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         }}
         aria-label={props.tSidebar('threadSidebarFilters')}
         // The phone sheet opens taller than the kit's 72dvh, so both Status rows show with three presets (round 28, item 10).
-        className="dshx-root dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:p-0 dshx:phone:max-h-[85dvh]!"
+        // A column that holds still: the panel inside scrolls under its sticky header (round 29, item 7).
+        className="dshx-root dshx:flex dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:flex-col dshx:overflow-hidden dshx:p-0 dshx:phone:max-h-[85dvh]! dshx:phone:overflow-hidden!"
       >
         <ListFilterPanel
           t={props.tSidebar}

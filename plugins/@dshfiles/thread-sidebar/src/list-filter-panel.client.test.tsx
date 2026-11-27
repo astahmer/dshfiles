@@ -348,8 +348,6 @@ describe('the phone sheet (round 28, item 10)', () => {
     const header = screen.getByRole('heading', { name: 'threadSidebarFilters' }).closest('[data-thread-filter-header]')
     expect(header?.className).toContain('dshx:sticky')
     expect(header?.className).toContain('dshx:top-0')
-    // On the phone sheet it sticks over the sheet's 20px grabber padding, so no row shows above it.
-    expect(header?.className).toContain('dshx:phone:-top-5')
     expect(header?.className).toContain('dshx:bg-popover')
     const done = within(element(header)).getByRole('button', { name: 'threadSidebarDone' })
     expect(done.className).toContain('dshx:hidden')
@@ -652,5 +650,20 @@ describe('Save and Discard in the edited row (round 29, item 6)', () => {
     expect(presets.onDiscard).toHaveBeenCalledOnce()
     // The other rows carry no buttons.
     expect(within(element(screen.getByRole('radio', { name: 'All threads' }).closest('[data-preset-row]'))).queryAllByRole('button')).toHaveLength(0)
+  })
+})
+
+// Council round 28, item 7: the header (Filters · Reset) stays in view: the panel itself is the scroll container.
+describe('the panel scrolls under its header (round 29, item 7)', () => {
+  it('scrolls the panel, not the popover, so the sticky header is pinned to the scroller it lives in', () => {
+    const { container } = render(<ListFilterPanel {...panel()} />)
+    const root = element(container.querySelector('[data-thread-list-filter-panel]'))
+    for (const token of ['dshx:min-h-0', 'dshx:overflow-y-auto', 'dshx:overscroll-contain']) expect(root.className).toContain(token)
+    const header = element(root.querySelector('[data-thread-filter-header]'))
+    expect(header.parentElement).toBe(root)
+    expect(header.className).toContain('dshx:top-0')
+    // The phone sheet's grabber padding now sits outside the scroller, so the header needs no offset there.
+    expect(header.className).not.toContain('dshx:phone:-top-5')
+    expect(filterControl).toMatch(/className="dshx-root dshx:flex dshx:w-80 dshx:max-w-\[calc\(100vw-1rem\)\] dshx:flex-col dshx:overflow-hidden dshx:p-0/u)
   })
 })

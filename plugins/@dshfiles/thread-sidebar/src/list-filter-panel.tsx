@@ -234,14 +234,15 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const ids = useId()
   const presets = props.presets
   return (
-    <div className="dshx:grid dshx:min-w-0 dshx:divide-y dshx:divide-border" data-thread-list-filter-panel="">
+    // The panel is its own scroller (council round 28, item 7), so the sticky header stays pinned to it while the
+    // popover (and, on a phone, the sheet with its grabber) holds still around it.
+    <div className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:divide-y dshx:divide-border dshx:overflow-y-auto dshx:overscroll-contain" data-thread-list-filter-panel="">
       <ShownAnnouncer shown={props.shown} />
       {/* Sticky, so Reset and Done stay in reach while the sheet scrolls (round 28, item 10). A desktop reads "Filters …
           Reset"; a phone reads "Reset · Filters · Done", the sheet's own close. One word for the button and the title.
-          The phone sheet keeps 20px of its own top padding for the grabber; the header sticks over it (-20px), so no row
-          scrolls by above the header. */}
+          The panel scrolls, not the sheet, so the grabber's 20px stays above the header. */}
       <div
-        className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:phone:-top-5 dshx:items-center dshx:gap-2 dshx:bg-popover dshx:py-1.5 dshx:pr-0.5 dshx:pl-3 dshx:phone:grid dshx:phone:grid-cols-[1fr_auto_1fr] dshx:phone:px-0.5"
+        className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:items-center dshx:gap-2 dshx:bg-popover dshx:py-1.5 dshx:pr-0.5 dshx:pl-3 dshx:phone:grid dshx:phone:grid-cols-[1fr_auto_1fr] dshx:phone:px-0.5"
         data-thread-filter-header=""
       >
         <h2 className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:font-medium dshx:phone:text-base dshx:phone:font-semibold">{t('threadSidebarFilters')}</h2>
