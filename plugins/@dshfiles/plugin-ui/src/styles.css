@@ -1069,7 +1069,9 @@ svg [class*='_spinnerArc_'] {
     overflow-y: auto !important;
     overscroll-behavior: contain;
     transform-origin: 50% 100% !important;
-    animation: dshx-sheet-in var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) both !important;
+    /* `backwards`, not `both`: a fill that outlives the animation keeps an (identity) transform, which makes this sheet
+       the containing block of a submenu's fixed sheet rendered inside it, so a taller submenu was clipped to it. */
+    animation: dshx-sheet-in var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) backwards !important;
   }
 
   html[data-shell-phone-nav]:not([data-phone-keyboard])
