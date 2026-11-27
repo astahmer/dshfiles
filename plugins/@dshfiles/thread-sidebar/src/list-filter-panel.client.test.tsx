@@ -23,6 +23,8 @@ const element = (found: Element | null | undefined): HTMLElement => {
 // A path, not a URL: under jsdom `URL` is the window's, which Node's fs does not take.
 const client = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
 const locales = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'locales.ts'), 'utf8')
+/** The panel's own source. */
+const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'list-filter-panel.tsx'), 'utf8')
 /** The English table is the first one in the file. */
 const english = locales.slice(0, locales.indexOf('const zh'))
 /** The list's one Filter control, from its declaration to the list's markup. */
@@ -1422,5 +1424,25 @@ describe('scrolling under the header (round 32, item 4)', () => {
     const root = element(container.querySelector('[data-thread-list-filter-panel]'))
     expect(root.className).toContain('dshx:scroll-pt-11')
     expect(root.className).toContain('dshx:scroll-pb-6')
+  })
+})
+
+// Council round 31, item 5: Discard is the quiet action on the phone's second line, and says which preset it discards.
+describe('Discard is the quiet action (round 32, item 5)', () => {
+  it('draws Discard in the secondary ink at 400 and Save in the ink at 600 on a coarse pointer', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const discard = element(document.querySelector('[data-preset-discard-changes]'))
+    const save = element(document.querySelector('[data-preset-save-changes]'))
+    for (const token of ['dshx:pointer-coarse:font-normal', 'dshx:pointer-coarse:text-muted-foreground']) expect(discard.className).toContain(token)
+    for (const token of ['dshx:pointer-coarse:font-semibold', 'dshx:pointer-coarse:text-foreground']) expect(save.className).toContain(token)
+    expect(discard.className).not.toContain('dshx:pointer-coarse:text-foreground')
+  })
+
+  it('names Discard by its preset: "Discard changes to “Working”"', () => {
+    expect(english).toContain("threadSidebarPresetDiscardChanges: 'Discard changes to “{name}”',")
+    expect(source).toContain("label={t('threadSidebarPresetDiscardChanges', { name: preset.label })}")
   })
 })

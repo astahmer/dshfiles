@@ -187,9 +187,16 @@ const ChipSeat = (props: { readonly on: boolean; readonly filter: ThreadStatusFi
  * seat (council round 29, item 8: "Save", "Discard"), the full name kept as its accessible name.
  */
 const RowIconButton = (
-  props: { readonly label: string; readonly text: string; readonly onClick: () => void; readonly children: ReactNode } & Record<`data-${string}`, string>,
+  props: {
+    readonly label: string
+    readonly text: string
+    /** On a coarse pointer, where it is a word: the quiet secondary 400 (Discard) or the ink at 600 (Save). */
+    readonly tone: 'quiet' | 'primary'
+    readonly onClick: () => void
+    readonly children: ReactNode
+  } & Record<`data-${string}`, string>,
 ): JSX.Element => {
-  const { label, text, onClick, children, ...data } = props
+  const { label, text, tone, onClick, children, ...data } = props
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -199,7 +206,11 @@ const RowIconButton = (
           size="icon-xs"
           aria-label={label}
           onClick={onClick}
-          className="dshx:size-6 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-auto dshx:pointer-coarse:px-2 dshx:pointer-coarse:text-sm dshx:pointer-coarse:font-medium dshx:pointer-coarse:text-foreground dshx:[&_svg]:size-3.5"
+          className={cn(
+            'dshx:size-6 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-auto dshx:pointer-coarse:px-2 dshx:pointer-coarse:text-sm dshx:[&_svg]:size-3.5',
+            // Discard is the quiet action beside Save (council round 31, item 5).
+            tone === 'quiet' ? 'dshx:pointer-coarse:font-normal dshx:pointer-coarse:text-muted-foreground' : 'dshx:pointer-coarse:font-semibold dshx:pointer-coarse:text-foreground',
+          )}
           {...data}
         >
           <span className="dshx:inline-flex dshx:pointer-coarse:hidden" data-row-button-icon="">
@@ -455,18 +466,19 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
               // radios. On a coarse pointer their words start at the label's x: 24px into the second line, less the
               // button's own 8px padding.
               <div ref={actionsRef} className="dshx:absolute dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:gap-1 dshx:pointer-coarse:pl-4" data-preset-actions="">
-                <RowIconButton label={t('threadSidebarPresetDiscardChanges')} text={t('threadSidebarPresetDiscardShort')} onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
+                <RowIconButton label={t('threadSidebarPresetDiscardChanges', { name: preset.label })} text={t('threadSidebarPresetDiscardShort')} tone="quiet" onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
                   <RotateCcwIcon />
                 </RowIconButton>
                 {preset.id === presets.builtInId ? (
                   // The built-in All threads is never overwritten (council round 28, item 13): its edits become a new preset.
-                  <RowIconButton label={t('threadSidebarPresetSaveAsNew')} text={t('threadSidebarPresetSaveAsNew')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
+                  <RowIconButton label={t('threadSidebarPresetSaveAsNew')} text={t('threadSidebarPresetSaveAsNew')} tone="primary" onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
                     <BookmarkPlusIcon />
                   </RowIconButton>
                 ) : (
                   <RowIconButton
                     label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
                     text={t('threadSidebarPresetSaveShort')}
+                    tone="primary"
                     onClick={focusPresetThen(presets.onSaveChanges)}
                     data-preset-save-changes=""
                   >
