@@ -15,12 +15,16 @@ import { AlertNotifier } from './alerts/alert-notifier.js'
 import { TRACES_ALERTS_LOCALE_NAMESPACE, tracesAlertsLocale } from './alerts/alerts-locale.js'
 import { TRACES_LOCALE_NAMESPACE, tracesLocale } from './locales.js'
 import { createThreadOpener } from './open-thread.js'
-import { TracesPanel } from './panel.js'
-import { SessionRequestsView } from './session-requests-view.js'
-import { SessionTracesView } from './session-view.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { ThreadLinks } from './thread-links.js'
 import { TurnTraceButton } from './turn-trace-button.js'
 import { panelStores } from './panel-stores.js'
+
+/** The Traces page and the thread's Traces and Requests views load when one first opens, not at page boot. */
+const views = () => import('./lazy-views.js')
+const TracesPanel = lazyView(() => views().then(module => module.TracesPanel), { label: 'Traces' })
+const SessionTracesView = lazyView(() => views().then(module => module.SessionTracesView), { label: 'Traces' })
+const SessionRequestsView = lazyView(() => views().then(module => module.SessionRequestsView), { label: 'Requests' })
 
 const PANEL_ID = 'traces'
 
