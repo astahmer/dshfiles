@@ -137,6 +137,8 @@ export interface FindRevealTarget {
    * opens, the Turn's rows of that kind are searched first.
    */
   readonly prefer?: string
+  /** Row kinds the active find filter keeps; the fallback scan of a Turn's rows skips every other kind. */
+  readonly allowed?: ReadonlySet<string>
 }
 
 export type FindRevealOutcome = { readonly kind: 'text'; readonly range: Range } | { readonly kind: 'row'; readonly element: HTMLElement } | { readonly kind: 'missed' }
@@ -183,7 +185,11 @@ export const revealFindHit = (target: FindRevealTarget, done: (outcome: FindReve
   const scanTurn = (list: HTMLElement, turn: number, anyRow: boolean): Range[] | null => {
     const scope = `[data-chat-turn="${String(turn)}"]`
     const groups = target.prefer === undefined ? [] : [[...list.querySelectorAll<HTMLElement>(`${scope} [data-chat-flow-kind="${target.prefer}"], ${scope}[data-chat-flow-kind="${target.prefer}"]`)]]
-    if (anyRow || target.prefer === undefined) groups.push([...list.querySelectorAll<HTMLElement>(`${scope} [data-chat-node-key], ${scope}[data-chat-node-key]`)])
+    if (anyRow || target.prefer === undefined) {
+      const rows = [...list.querySelectorAll<HTMLElement>(`${scope} [data-chat-node-key], ${scope}[data-chat-node-key]`)]
+      const allowed = target.allowed
+      groups.push(allowed === undefined ? rows : rows.filter(row => allowed.has(row.dataset.chatFlowKind ?? '')))
+    }
     for (const rows of groups) {
       for (const row of rows) {
         if (hiddenAncestor(row) !== null) continue

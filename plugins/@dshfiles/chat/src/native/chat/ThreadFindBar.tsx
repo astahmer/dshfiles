@@ -129,10 +129,11 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
         terms,
         ...(hit.occurrence === undefined ? {} : { occurrence: hit.occurrence }),
         ...(prefer === undefined ? {} : { prefer }),
+        ...(flowKinds === undefined ? {} : { allowed: flowKinds }),
       },
       () => {},
     )
-  }, [hit, terms])
+  }, [hit, terms, flowKinds])
   useEffect(() => () => clearFindHighlight(), [])
 
   useLayoutEffect(() => {

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
-import { afterEach, describe, expect, it } from 'vitest'
-import { findInLoadedRows, findTextRanges } from '../src/native/chat/find-reveal.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { findInLoadedRows, findTextRanges, revealFindHit, type FindRevealOutcome } from '../src/native/chat/find-reveal.ts'
 import { SinceYouLeftRecapModel } from '../src/native/chat/since-you-left.ts'
 import { ThreadFindModel, type FindHit } from '../src/native/chat/thread-find-model.ts'
 import { mergeTurnRailItems, seenBoundaryIndex, type TurnRailItem } from '../src/native/chat/turn-rail-items.ts'
@@ -149,6 +149,35 @@ describe('find model', () => {
     // Selecting the remaining category collapses back to All.
     expect(ThreadFindModel.toggleFilter(conversation, 'tools')).toEqual([])
     expect(ThreadFindModel.toggleFilter(agent, 'assistant')).toEqual([])
+  })
+})
+
+describe('find reveal', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+  // jsdom has no CSS namespace; the reveal escapes row keys with CSS.escape.
+  const stubCss = () => vi.stubGlobal('CSS', { escape: (value: string) => value.replace(/[^\w-]/g, character => `\\${character}`) })
+  const revealIn = (allowed: ReadonlySet<string> | undefined) => {
+    stubCss()
+    document.body.innerHTML = [
+      '<div id="list"><div data-chat-turn="1">',
+      '<div data-chat-node-key="process" data-chat-flow-kind="turn-process">Worked for 3s</div>',
+      '<div data-chat-node-key="tool" data-chat-flow-kind="tool-call">quartzite tool output</div>',
+      '<div data-chat-node-key="agent" data-chat-flow-kind="assistant-step">quartzite agent reply</div>',
+      '</div></div>',
+    ].join('')
+    const target = { list: () => document.getElementById('list'), turn: 1, row: () => 'process', terms: ['quartzite'] }
+    return new Promise<FindRevealOutcome>(resolve => {
+      revealFindHit(allowed === undefined ? target : { ...target, allowed }, resolve)
+    })
+  }
+  const landedRow = (outcome: FindRevealOutcome) =>
+    outcome.kind === 'text' ? outcome.range.startContainer.parentElement?.closest<HTMLElement>('[data-chat-node-key]')?.dataset.chatNodeKey : outcome.kind
+
+  it('lands inside the rows the active filter keeps when it scans a Turn', async () => {
+    expect(landedRow(await revealIn(undefined))).toBe('tool')
+    expect(landedRow(await revealIn(ThreadFindModel.flowKindsFor(['assistant'])))).toBe('agent')
   })
 })
 
