@@ -62,7 +62,13 @@ const connect = (plugin: PluginContext): (() => void) => {
 /** Add rows to the command palette until the returned disposer runs. */
 const addActions = (actions: readonly PaletteAction[]): (() => void) => (sidebarPlugin === undefined ? () => {} : addActionsTo(sidebarPlugin, actions))
 
+/**
+ * One batch, one palette publish (performance P1): each `add` and each withdrawal republished the palette's whole list,
+ * so N rows cost N rebuilds to add and N to remove. A page whose shared DSHX runtime predates `addAll` adds them one by
+ * one, as before.
+ */
 const addActionsTo = (plugin: PluginContext, actions: readonly PaletteAction[]): (() => void) => {
+  if (typeof plugin.addAll === 'function') return plugin.addAll(PaletteActions, actions)
   const disposers = actions.map(action => plugin.add(PaletteActions, action))
   return () => {
     for (const dispose of disposers) dispose()
@@ -84,6 +90,8 @@ const setRecentLimit = (limit: number): void => {
 
 export class PaletteBridge {
   static readonly connect = connect
+  /** Register a batch with one plugin context; `addActions` uses the connected one. */
+  static readonly addActionsTo = addActionsTo
   static readonly addActions = addActions
   static readonly addProjectColors = addProjectColors
   static readonly open = open

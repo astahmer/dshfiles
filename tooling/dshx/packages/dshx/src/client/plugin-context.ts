@@ -67,6 +67,11 @@ export interface PluginContext extends PluginServices {
   readonly signal: AbortSignal
   /** Contribute one item; the returned function withdraws it early. */
   add<T>(registry: RegistryToken<T>, item: ItemSource<T>): () => void
+  /**
+   * Contribute several items as one change: the registry publishes once for them, and once when the returned function
+   * (or this scope's end) withdraws them all. Prefer it to a loop of `add` for a list that is replaced as a whole.
+   */
+  addAll<T>(registry: RegistryToken<T>, items: readonly T[]): () => void
   /** Every item contributed to a registry, in contribution order. */
   list<T>(registry: RegistryToken<T>): Subscribable<readonly T[]>
   /** Provide a contract; one provider at a time, withdrawn with this scope. */
@@ -244,6 +249,33 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
     return remove
   }
 
+  const addBatch = <T>(registry: RegistryToken<T>, given: readonly T[]): (() => void) => {
+    const items = options.prefixIds === true ? given.map(item => prefixedId(options.owner, item)) : given
+    const entries = BrowserBroker.addMany(registry, items, options.owner)
+    const unmounts: (() => void)[] = []
+    for (const item of items) {
+      try {
+        unmounts.push(mountNative(registry, item))
+      } catch (error) {
+        for (const unmount of unmounts) unmount()
+        entries.remove()
+        BrowserBroker.reportFailure({ owner: options.owner, kind: 'registry', id: `${registry.id}:${itemLabel(item)}`, error })
+        return () => {}
+      }
+    }
+    let removed = false
+    let unregister = (): void => {}
+    const remove = (): void => {
+      if (removed) return
+      removed = true
+      unregister()
+      for (const unmount of unmounts) unmount()
+      entries.remove()
+    }
+    unregister = options.scope.onDispose(remove)
+    return remove
+  }
+
   const addReactive = <T>(registry: RegistryToken<T>, compute: (track: Track) => T | undefined): (() => void) => {
     let current: { readonly item: T; readonly remove: () => void } | undefined
     const withdraw = (): void => {
@@ -289,6 +321,7 @@ const createPluginContext = (options: PluginContextOptions): PluginContext => {
       }
       return addFixed(registry, item)
     },
+    addAll: (registry, items) => addBatch(registry, items),
     list: registry => {
       const cached = listCache.get(registry.id)
       if (cached !== undefined) return cached as Subscribable<readonly never[]>

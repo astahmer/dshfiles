@@ -186,6 +186,35 @@ describe('registries', () => {
     expect(list.get()).toEqual([])
   })
 
+  // A list replaced as a whole (thread-sidebar's command palette rows) published once per item: each publish rebuilt the
+  // palette's whole list, so 60 rows cost 60 rebuilds to add and 60 to remove.
+  it('publishes a batch once on add and once on withdrawal, however many items it holds', () => {
+    const owner = createPlugin('@test/owner')
+    const contributor = createPlugin('@test/contributor')
+    const list = owner.plugin.list(Exporters)
+    let publishes = 0
+    list.subscribe(() => {
+      publishes += 1
+    })
+    const items = Array.from({ length: 100 }, (_, index) => ({ id: `@test/contributor/${String(index)}`, title: `Export ${String(index)}` }))
+    const remove = contributor.plugin.addAll(Exporters, items)
+    expect(publishes).toBe(1)
+    expect(list.get().map(item => item.id)).toEqual(items.map(item => item.id))
+    remove()
+    expect(publishes).toBe(2)
+    expect(list.get()).toEqual([])
+    remove()
+    expect(publishes).toBe(2)
+    // An empty batch publishes nothing; a batch still out when its scope ends goes with it, once.
+    contributor.plugin.addAll(Exporters, [])
+    expect(publishes).toBe(2)
+    contributor.plugin.addAll(Exporters, items.slice(0, 3))
+    expect(publishes).toBe(3)
+    contributor.dispose()
+    expect(publishes).toBe(4)
+    expect(list.get()).toEqual([])
+  })
+
   it('recomputes a reactive item when a tracked source changes and withdraws it on undefined', async () => {
     const plugin = createPlugin('@test/owner').plugin
     const enabled = PluginContextModel.signal(true)

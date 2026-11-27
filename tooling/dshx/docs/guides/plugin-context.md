@@ -188,6 +188,10 @@ api.add(Exporter, { id: 'gist', title: 'Gist', run: upload })
 const exporters = api.list(Exporter) // Subscribable; useRegistry(Exporter) in React
 ```
 
+Each `add` and each withdrawal publishes the registry's whole list to its readers. A list you replace as a whole
+(a plugin's command palette rows) goes in as one batch: `api.addAll(Exporter, items)` publishes once, and its returned
+function (or the scope's end) withdraws every item with one more publish.
+
 ## Share an API: `defineContract`, `provide`, `use`
 
 ```ts

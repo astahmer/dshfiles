@@ -238,6 +238,30 @@ const addEntry = <T>(token: RegistryToken<T>, item: T, owner: string): RegistryE
   }
 }
 
+/**
+ * Add several items as one change: one snapshot and one notification for the batch, and one again when it is removed.
+ * A consumer that rebuilds on each notification then rebuilds once per batch, not once per item (thread-sidebar's
+ * command palette rows: 60 adds and 60 removes rebuilt the palette's whole list 120 times per thread switch).
+ */
+const addEntries = <T>(token: RegistryToken<T>, items: readonly T[], owner: string): { remove(): void } => {
+  const broker = brokerState()
+  const state = registryState(token.id)
+  const entryIds = items.map(item => {
+    const entryId = broker.nextEntryId
+    broker.nextEntryId += 1
+    state.entries.set(entryId, { owner, item })
+    return entryId
+  })
+  if (entryIds.length > 0) refreshRegistry(state)
+  return {
+    remove: () => {
+      let removed = false
+      for (const entryId of entryIds) if (state.entries.delete(entryId)) removed = true
+      if (removed) refreshRegistry(state)
+    },
+  }
+}
+
 const itemsOf = <T>(token: RegistryToken<T>): Subscribable<readonly T[]> => {
   const state = registryState(token.id)
   return {
@@ -292,6 +316,7 @@ export class BrowserBroker {
   static readonly live = liveOf
   static readonly whenActive = whenActive
   static readonly add = addEntry
+  static readonly addMany = addEntries
   static readonly items = itemsOf
   static readonly reportFailure = reportFailure
   static readonly clearFailure = clearFailure
