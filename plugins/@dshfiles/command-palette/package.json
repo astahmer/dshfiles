@@ -55,6 +55,7 @@
     "@deepseek-ai/schemastery": "catalog:",
     "@dshfiles/chat": "workspace:*",
     "@dshfiles/dshx": "workspace:*",
+    "@dshfiles/session-search": "workspace:*",
     "@testing-library/dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@types/node": "22.20.5",

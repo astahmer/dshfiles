@@ -50,7 +50,11 @@ export interface ThreadPaletteCopy {
   readonly messagesRoleUser: string
   readonly messagesEmptyPrompt: string
   readonly messagesSearching: string
+  readonly messagesTooShort: string
   readonly messagesUnavailable: string
+  readonly messagesNotOwner: string
+  readonly messagesFailed: string
+  readonly messagesMore: string
   readonly destinations: string
   readonly commands: string
   readonly files: string
@@ -165,6 +169,14 @@ type PaletteRow =
   | { readonly kind: 'backlog'; readonly text: string }
 
 const RESULT_LIMIT = 50
+
+/** The Messages tab's sender filters, in chip order; Alt+1–3 picks one without leaving the search field. */
+const MESSAGE_ROLES = [
+  { value: 'all', code: 'Digit1', copy: 'messagesRoleAll' },
+  { value: 'assistant', code: 'Digit2', copy: 'messagesRoleAssistant' },
+  { value: 'user', code: 'Digit3', copy: 'messagesRoleUser' },
+] as const satisfies readonly { readonly value: MessageSearchRole; readonly code: string; readonly copy: keyof ThreadPaletteCopy }[]
+const MESSAGE_ROLE_BY_CODE: ReadonlyMap<string, MessageSearchRole> = new Map(MESSAGE_ROLES.map(role => [role.code, role.value]))
 const COMMAND_LIMIT = 30
 const FRECENT_COMMANDS_ON_EMPTY = 5
 const GO_TO_FILE_ID = 'action:go-to-file'
@@ -547,6 +559,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const roleShortcut = view === 'messages' && event.altKey && !event.metaKey && !event.ctrlKey ? MESSAGE_ROLE_BY_CODE.get(event.code) : undefined
+    if (roleShortcut !== undefined) {
+      event.preventDefault()
+      event.stopPropagation()
+      setMessageRole(roleShortcut)
+      return
+    }
     // Tab on an empty search toggles the Ask DSH bar, as Linear's palette does for Ask Linear.
     if (event.key === 'Tab' && !event.shiftKey && !subview && query.length === 0) {
       event.preventDefault()
@@ -626,19 +645,12 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   else if (view === 'content' && content.status === 'searching') contentStatus = props.copy.contentSearching
   let messagesStatus: string | null = null
   if (view === 'messages') {
-    if (props.searchMessages === null || props.searchMessages === undefined || messages.status === 'unavailable' || messages.status === 'failed') {
-      messagesStatus = props.copy.messagesUnavailable
-    } else if (emptyQuery) {
-      messagesStatus = props.copy.messagesEmptyPrompt
-    } else if (messages.status === 'searching') {
-      messagesStatus = props.copy.messagesSearching
-    }
+    if (messages.status === 'unavailable') messagesStatus = messages.unavailable === 'not-owner' ? props.copy.messagesNotOwner : props.copy.messagesUnavailable
+    else if (messages.status === 'failed') messagesStatus = props.copy.messagesFailed
+    else if (emptyQuery) messagesStatus = props.copy.messagesEmptyPrompt
+    else if (messages.status === 'too-short') messagesStatus = props.copy.messagesTooShort
+    else if (messages.status === 'searching') messagesStatus = props.copy.messagesSearching
   }
-  const messageRoleOptions = [
-    { value: 'all' as const, label: props.copy.messagesRoleAll },
-    { value: 'assistant' as const, label: props.copy.messagesRoleAssistant },
-    { value: 'user' as const, label: props.copy.messagesRoleUser },
-  ]
   let filesStatus: string | null = null
   if (view === 'files' && workspaceFiles.status === 'unavailable') filesStatus = props.copy.filesUnavailable
   else if (view === 'files' && workspaceFiles.status === 'no-session') filesStatus = props.copy.filesNoSession
@@ -736,18 +748,19 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               aria-label={props.copy.messagesFilterLabel}
               className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-1.5"
             >
-              {messageRoleOptions.map(option => (
+              {MESSAGE_ROLES.map((option, index) => (
                 <Button
                   key={option.value}
                   type="button"
                   size="xs"
                   variant={messageRole === option.value ? 'secondary' : 'ghost'}
                   aria-pressed={messageRole === option.value}
+                  aria-keyshortcuts={`Alt+${String(index + 1)}`}
                   className="dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:px-3"
                   onMouseDown={event => event.preventDefault()}
                   onClick={() => setMessageRole(option.value)}
                 >
-                  {option.label}
+                  {props.copy[option.copy]}
                 </Button>
               ))}
             </div>
@@ -875,6 +888,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                     </CommandItem>
                   )
                 })}
+                {messages.hasMore ? <p className="dshx:px-2.5 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">{props.copy.messagesMore}</p> : null}
               </CommandGroup>
             ) : null}
             {threadActionRows.length > 0 ? (

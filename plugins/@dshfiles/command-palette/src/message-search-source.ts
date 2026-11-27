@@ -1,101 +1,74 @@
+import { isApiError, isApiOwnerMissing } from '@dshfiles/dshx/api'
+import { searchMessagesOutputSchema, type SearchMessagesOutput, type SearchMessagesRole } from '@dshfiles/session-search/search-api'
 import { Option } from 'effect'
 import * as Schema from 'effect/Schema'
 
-export type MessageSearchRole = 'all' | 'user' | 'assistant'
+export type MessageSearchRole = SearchMessagesRole
 
-export interface MessageHit {
-  readonly sessionId: string
-  readonly seq: number
-  readonly role: 'user' | 'assistant'
-  readonly time: number
-  readonly snippet: string
-  readonly cwd?: string | undefined
-}
+export type MessageHit = SearchMessagesOutput['matches'][number]
+
+/** Why the Messages tab cannot search: session-search (or its `searchMessages`) is not loaded, or it does not own thread search. */
+export type MessageSearchUnavailable = 'missing' | 'not-owner'
 
 export type MessageSearchOutcome =
   | { readonly kind: 'ready'; readonly hits: readonly MessageHit[]; readonly hasMore: boolean }
-  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'unavailable'; readonly reason: MessageSearchUnavailable }
 
 export type MessageSearch = (input: { readonly query: string; readonly role: MessageSearchRole }, signal: AbortSignal) => Promise<MessageSearchOutcome>
 
-type RegistryApiView = {
-  readonly owner: string
-  readonly id: string
-  readonly version: number
-  readonly methods: readonly { readonly name: string }[]
-}
-
-export type RegisteredMessageApi = { readonly owner: string; readonly id: string; readonly version: number }
-
-const SESSION_SEARCH_OWNER = '@dshfiles/session-search'
-const SESSION_SEARCH_API_ID = 'session-search'
+/** The API's own bound on `text`; longer typing is cut here instead of failing the call. */
+const MESSAGE_SEARCH_TEXT_MAX = 512
 const MESSAGE_SEARCH_LIMIT = 25
+/** One-character prefix queries scan most of the index (0.7–1 s on 237 000 messages) and rarely find what was meant. */
+const MESSAGE_SEARCH_MIN_CHARS = 2
 
-const messageHitSchema = Schema.Struct({
-  sessionId: Schema.String.check(Schema.isMinLength(1)),
-  seq: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
-  role: Schema.Literals(['user', 'assistant']),
-  time: Schema.Number.check(Schema.isFinite()),
-  snippet: Schema.String,
-  cwd: Schema.optionalKey(Schema.String),
-})
-
-const messageSearchPageSchema = Schema.Struct({
-  ownsService: Schema.Boolean,
-  matches: Schema.Array(messageHitSchema),
-  hasMore: Schema.Boolean,
-})
-
-export type MessageSearchPage = typeof messageSearchPageSchema.Type
-
-const decodePageOption = Schema.decodeUnknownOption(messageSearchPageSchema)
-
-const decodePage = (raw: unknown): MessageSearchPage | undefined => Option.getOrUndefined(decodePageOption(raw))
+const decodePage = Schema.decodeUnknownOption(searchMessagesOutputSchema)
 
 export interface MessageSearchDeps {
-  readonly listApis: () => Promise<readonly RegistryApiView[]>
-  readonly callSearch: (
-    api: RegisteredMessageApi,
+  /** Call `searchMessages` on the `@dshfiles/session-search` API; the palette wires `createApiClient` here. Its typed answer is still decoded. */
+  readonly call: (
     input: { readonly text: string; readonly role: MessageSearchRole; readonly limit: number },
     signal: AbortSignal,
-  ) => Promise<MessageSearchPage | undefined>
+  ) => Promise<SearchMessagesOutput>
 }
 
-const isAbortError = (error: unknown): boolean => error instanceof Error && error.name === 'AbortError'
+/** Trimmed and cut to the API's UTF-16 bound without splitting a surrogate pair. */
+const queryOf = (text: string): string => {
+  let kept = ''
+  for (const character of text.trim()) {
+    if (kept.length + character.length > MESSAGE_SEARCH_TEXT_MAX) break
+    kept += character
+  }
+  return kept.trim()
+}
+
+const isSearchable = (text: string): boolean => Array.from(text.trim()).length >= MESSAGE_SEARCH_MIN_CHARS
+
+/** A Host without session-search answers 404; one whose session-search predates `searchMessages` answers bad-request. */
+const isMissingMethod = (error: unknown): boolean =>
+  (error instanceof Error && isApiOwnerMissing(error)) || (isApiError(error) && error.remoteCode === 'bad-request')
 
 /**
- * Discovers `@dshfiles/session-search`'s `searchMessages` method through the Host registry so the palette stays
- * independent of session-search's build and degrades cleanly on a Host without the plugin or with an older version.
+ * Search through `@dshfiles/session-search`'s published contract. A missing plugin or method reads as `missing`; any
+ * other failure throws, so the tab can tell a broken call from an absent feature.
  */
-const create = (deps: MessageSearchDeps): MessageSearch => {
-  let discovered: RegisteredMessageApi | undefined | null
-  return async ({ query, role }, signal): Promise<MessageSearchOutcome> => {
-    const trimmed = query.trim()
-    if (trimmed.length === 0) return { kind: 'ready', hits: [], hasMore: false }
-    if (discovered === undefined) {
-      const apis = await deps.listApis().catch(() => undefined)
-      if (apis === undefined) return { kind: 'unavailable' }
-      const api = apis.find(
-        candidate =>
-          candidate.owner === SESSION_SEARCH_OWNER &&
-          candidate.id === SESSION_SEARCH_API_ID &&
-          candidate.methods.some(method => method.name === 'searchMessages'),
-      )
-      discovered = api === undefined ? null : { owner: api.owner, id: api.id, version: api.version }
-    }
-    if (discovered === null) return { kind: 'unavailable' }
-    let page: MessageSearchPage | undefined
+const create =
+  (deps: MessageSearchDeps): MessageSearch =>
+  async ({ query, role }, signal) => {
+    const text = queryOf(query)
+    if (!isSearchable(text)) return { kind: 'ready', hits: [], hasMore: false }
+    let raw: SearchMessagesOutput
     try {
-      page = await deps.callSearch(discovered, { text: trimmed, role, limit: MESSAGE_SEARCH_LIMIT }, signal)
+      raw = await deps.call({ text, role, limit: MESSAGE_SEARCH_LIMIT }, signal)
     } catch (error) {
-      if (isAbortError(error)) throw error
-      discovered = undefined
+      if (isMissingMethod(error)) return { kind: 'unavailable', reason: 'missing' }
       throw error
     }
-    if (page === undefined || !page.ownsService) return { kind: 'unavailable' }
-    return { kind: 'ready', hits: page.matches, hasMore: page.hasMore }
+    const page = decodePage(raw)
+    if (Option.isNone(page)) throw new Error('session-search answered searchMessages with an unexpected shape.')
+    if (!page.value.ownsService) return { kind: 'unavailable', reason: 'not-owner' }
+    return { kind: 'ready', hits: page.value.matches, hasMore: page.value.hasMore }
   }
-}
 
 export type MessageSelectBehavior = 'reveal' | 'open'
 
@@ -113,13 +86,14 @@ export interface ApplyMessageSelectionInput {
 const applySelection = (input: ApplyMessageSelectionInput): void => {
   input.openSession()
   if (input.behavior !== 'reveal') return
-  const query = input.query.trim()
+  const query = queryOf(input.query)
   const type = input.role === 'user' ? ('user/message' as const) : ('assistant/message' as const)
   input.requestFocus(query.length > 0 ? { seq: input.seq, type, query } : { seq: input.seq, type })
 }
 
 export class MessageSearchSource {
-  static readonly decodePage = decodePage
+  static readonly minChars = MESSAGE_SEARCH_MIN_CHARS
+  static readonly isSearchable = isSearchable
   static readonly create = create
   static readonly applySelection = applySelection
 }

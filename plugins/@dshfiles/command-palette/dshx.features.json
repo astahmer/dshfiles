@@ -38,7 +38,8 @@
         "A child session or subagent appears in the Threads list.",
         "A file basename match is buried below unrelated path matches.",
         "A persisted user message does not return from thread-content search.",
-        "Thread-content results include subagents, duplicate the title, or hide project, date, and status metadata."
+        "Thread-content results include subagents, duplicate the title, or hide project, date, and status metadata.",
+        "The Messages tab waits for 2 characters; without @dshfiles/session-search (or with one that predates searchMessages), with another sessionQuery owner, or after a failed call, it says which and what to do instead of showing no results."
       ],
       "externalDependencies": [],
       "onboarding": {
@@ -126,6 +127,42 @@
           "id": "command-palette.message-select-behavior",
           "file": "plugins/@dshfiles/command-palette/src/message-search-source.test.ts",
           "testName": "opens the thread and requests message focus when behavior is reveal, and only opens when behavior is open"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-search-host-generations",
+          "file": "plugins/@dshfiles/command-palette/src/message-search-source.test.ts",
+          "testName": "tells a missing or outdated session-search from one that does not own search, and throws other failures"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-search-stale-answers",
+          "file": "plugins/@dshfiles/command-palette/src/message-search-machine.test.ts",
+          "testName": "aborts a superseded search and ignores its late answer"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-search-not-owner-copy",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "says what to do with another search owner"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-search-failed-copy",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "says what to do with a failed call"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-search-typing-states",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "asks for two characters, says it is searching instead of “no results” while typing, and shows when more matches exist"
+        },
+        {
+          "kind": "unit-test",
+          "id": "command-palette.message-search-role-shortcuts",
+          "file": "plugins/@dshfiles/command-palette/src/thread-palette.client.test.tsx",
+          "testName": "switches the sender filter with Alt+1–3 without leaving the search field"
         }
       ],
       "telemetry": [

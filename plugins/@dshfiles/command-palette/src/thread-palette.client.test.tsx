@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PaletteApi } from './palette-api.js'
 import type { PaletteActionContext } from './palette-contract.js'
+import type { MessageSearch } from './message-search-source.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
 
 const copy: ThreadPaletteCopy = {
@@ -24,7 +25,11 @@ const copy: ThreadPaletteCopy = {
   messagesRoleUser: 'User',
   messagesEmptyPrompt: 'Type to search user and agent messages across threads.',
   messagesSearching: 'Searching messages…',
-  messagesUnavailable: 'Message search requires @dshfiles/session-search on this Host.',
+  messagesTooShort: 'Type at least 2 characters to search messages.',
+  messagesUnavailable: 'Message search needs @dshfiles/session-search.',
+  messagesNotOwner: 'Another plugin owns thread search.',
+  messagesFailed: 'Message search failed.',
+  messagesMore: 'Showing the best matches only.',
   destinations: 'Destinations',
   commands: 'Commands',
   files: 'Files',
@@ -628,7 +633,7 @@ describe('ThreadPalette Messages tab', () => {
     })
   })
 
-  it('shows a clear unavailable message when session-search message search is unavailable', async () => {
+  const renderMessages = (searchMessages: MessageSearch | null) =>
     render(
       <ThreadPalette
         mode="messages"
@@ -639,7 +644,7 @@ describe('ThreadPalette Messages tab', () => {
         mac
         copy={copy}
         searchContent={null}
-        searchMessages={async () => ({ kind: 'unavailable' })}
+        searchMessages={searchMessages}
         onAsk={vi.fn(async () => {})}
         onBacklogCapture={vi.fn(() => true)}
         onOpenThread={vi.fn()}
@@ -647,8 +652,62 @@ describe('ThreadPalette Messages tab', () => {
       />,
     )
 
+  const expectStatus = async (searchMessages: MessageSearch | null, expected: string): Promise<void> => {
+    renderMessages(searchMessages)
+    fireEvent.change(screen.getByRole<HTMLInputElement>('combobox'), { target: { value: 'quartz' } })
+    expect(await screen.findByText(expected)).toBeTruthy()
+  }
+
+  it('says what to do with no or an outdated session-search', async () => {
+    await expectStatus(null, copy.messagesUnavailable)
+    cleanup()
+    await expectStatus(async () => ({ kind: 'unavailable', reason: 'missing' }), copy.messagesUnavailable)
+  })
+
+  it('says what to do with another search owner', async () => {
+    await expectStatus(async () => ({ kind: 'unavailable', reason: 'not-owner' }), copy.messagesNotOwner)
+  })
+
+  it('says what to do with a failed call', async () => {
+    await expectStatus(async () => {
+      throw new Error('worker timed out')
+    }, copy.messagesFailed)
+  })
+
+  it('asks for two characters, says it is searching instead of “no results” while typing, and shows when more matches exist', async () => {
+    const answer: MessageSearch = async ({ query }) => ({
+      kind: 'ready',
+      hasMore: true,
+      hits: [{ sessionId: 'session-quartz', seq: 4, role: 'user', time: 1_700_000_000_000, snippet: `Asked about ${query}` }],
+    })
+    const searchMessages = vi.fn(answer)
+    renderMessages(searchMessages)
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+
+    fireEvent.change(input, { target: { value: 'q' } })
+    expect(await screen.findByText(copy.messagesTooShort)).toBeTruthy()
+    fireEvent.change(input, { target: { value: 'qu' } })
+    expect(await screen.findByText(copy.messagesSearching)).toBeTruthy()
+    expect(screen.queryByText(copy.empty)).toBeNull()
+    expect(await screen.findByText('Asked about qu')).toBeTruthy()
+    expect(screen.getByText(copy.messagesMore)).toBeTruthy()
+    expect(searchMessages).toHaveBeenCalledTimes(1)
+    expect(searchMessages).toHaveBeenCalledWith({ query: 'qu', role: 'all' }, expect.anything())
+  })
+
+  it('switches the sender filter with Alt+1–3 without leaving the search field', async () => {
+    const answer: MessageSearch = async () => ({ kind: 'ready', hasMore: false, hits: [] })
+    const searchMessages = vi.fn(answer)
+    renderMessages(searchMessages)
     const input = screen.getByRole<HTMLInputElement>('combobox')
     fireEvent.change(input, { target: { value: 'quartz' } })
-    expect(await screen.findByText('Message search requires @dshfiles/session-search on this Host.')).toBeTruthy()
+    await waitFor(() => expect(searchMessages).toHaveBeenCalledWith({ query: 'quartz', role: 'all' }, expect.anything()))
+
+    fireEvent.keyDown(input, { key: '™', code: 'Digit2', altKey: true })
+    expect(screen.getByRole('button', { name: 'Agent' }).getAttribute('aria-pressed')).toBe('true')
+    await waitFor(() => expect(searchMessages).toHaveBeenLastCalledWith({ query: 'quartz', role: 'assistant' }, expect.anything()))
+    fireEvent.keyDown(input, { key: '£', code: 'Digit3', altKey: true })
+    expect(screen.getByRole('button', { name: 'User' }).getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(input)
   })
 })

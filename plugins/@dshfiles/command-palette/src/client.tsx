@@ -10,6 +10,7 @@ import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sideb
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
 import { ChatFocusModel } from '@dshfiles/chat/chat-focus'
+import { sessionSearchApi } from '@dshfiles/session-search/search-api'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PaletteRules } from './palette.js'
@@ -252,7 +253,11 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         messagesRoleUser: props.translate('commandPaletteMessagesRoleUser'),
         messagesEmptyPrompt: props.translate('commandPaletteMessagesEmptyPrompt'),
         messagesSearching: props.translate('commandPaletteMessagesSearching'),
+        messagesTooShort: props.translate('commandPaletteMessagesTooShort'),
         messagesUnavailable: props.translate('commandPaletteMessagesUnavailable'),
+        messagesNotOwner: props.translate('commandPaletteMessagesNotOwner'),
+        messagesFailed: props.translate('commandPaletteMessagesFailed'),
+        messagesMore: props.translate('commandPaletteMessagesMore'),
         destinations: props.translate('commandPaletteDestinations'),
         commands: props.translate('commandPaletteCommands'),
         files: props.translate('commandPaletteFiles'),
@@ -380,9 +385,8 @@ export default defineClient({
     const translate = ctx.locale.bind(COMMAND_PALETTE_LOCALE_NAMESPACE)
     const themeStore = createSnapshotStore(ctx.theme.getTheme())
     ctx.on('theme/change', snapshot => themeStore.set(snapshot))
-    const listApis = async () => (await createApiClient(ctx, dshxRegistryApi).list({})).apis
     const searchContent = createThreadContentSearch({
-      listApis,
+      listApis: async () => (await createApiClient(ctx, dshxRegistryApi).list({})).apis,
       callFinder: async (api, input, signal) => {
         const client = createRegisteredApiClient(ctx, { ...api, methods: ['findThreads'] })
         return client.findThreads === undefined ? undefined : client.findThreads(input, { signal })
@@ -394,14 +398,8 @@ export default defineClient({
         return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
       },
     })
-    const searchMessages = MessageSearchSource.create({
-      listApis,
-      callSearch: async (api, input, signal) => {
-        const client = createRegisteredApiClient(ctx, { ...api, methods: ['searchMessages'] })
-        if (client.searchMessages === undefined) return undefined
-        return MessageSearchSource.decodePage(await client.searchMessages(input, { signal }))
-      },
-    })
+    const sessionSearch = createApiClient(ctx, sessionSearchApi)
+    const searchMessages = MessageSearchSource.create({ call: (input, signal) => sessionSearch.searchMessages(input, { signal }) })
     ctx.effect(
       () =>
         ctx.slots.inject('shell.overlay', () =>

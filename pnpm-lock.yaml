@@ -2692,6 +2692,9 @@ importers:
       '@dshfiles/dshx':
         specifier: workspace:*
         version: link:../../../tooling/dshx/packages/dshx
+      '@dshfiles/session-search':
+        specifier: workspace:*
+        version: link:../session-search
       '@testing-library/dom':
         specifier: 'catalog:'
         version: 10.4.2
