@@ -90,6 +90,8 @@
     "src/native/skeleton/composer-edge.test.ts",
     "src/native/skeleton/input-bar-overlay.test.ts",
     "src/native/skeleton/touch-targets.test.ts",
-    "src/native/skeleton/hero-project-mark.test.tsx"
+    "src/native/skeleton/hero-project-mark.test.tsx",
+    "src/native/input/sent-annotations.test.ts",
+    "src/native/input/sent-annotations.ts"
   ]
 }

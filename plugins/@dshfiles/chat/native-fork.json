@@ -137,6 +137,13 @@
     "src/native/image-gallery-scope.ts",
     "src/native/settings/ImageGalleryScopeRow.tsx",
     "src/native/settings/UnreadLandingRow.tsx",
-    "src/native/unread-landing.ts"
+    "src/native/unread-landing.ts",
+    "src/native/annotation-preferences.ts",
+    "src/native/chat/annotation-anchors.ts",
+    "src/native/chat/annotation-marks.module.css",
+    "src/native/chat/annotation-marks.tsx",
+    "src/native/seen-turns.ts",
+    "src/native/settings/AnnotationMarksRow.tsx",
+    "src/native/settings/AnnotationQuickCommentRow.tsx"
   ]
 }
