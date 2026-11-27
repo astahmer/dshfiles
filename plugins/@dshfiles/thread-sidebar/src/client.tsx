@@ -6517,16 +6517,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }, [attention.records, isPrimarySurface, selectedSession?.id, sessionStatus, sessions, tSidebar])
 
-  // The Filter menu's View section (productivity pass Q5, T5.3): the active view, its short label for the trigger, and
+  // The Filter menu's View section (productivity pass Q5, T5.3): the active view, and
   // the threads it matches for Mark view read / unread.
   const headerExtras = useSyncExternalStore(ListHeaderExtras.subscribe, ListHeaderExtras.get, () => ListHeaderExtras.empty)
   const activeViewTab = viewTabs.find(tab => tab.view.id === listThreadView.id)
-  const activeViewShortLabel =
-    activeViewTab === undefined
-      ? props.tSidebar('threadSidebarAllShort')
-      : activeViewTab.view.id === ALL_THREADS_VIEW_ID && activeViewTab.label === props.tSidebar('threadSidebarAllThreads')
-        ? props.tSidebar('threadSidebarAllShort')
-        : activeViewTab.label
   // The trigger's accessible name after "Filter: ": the active preset ("Needs you (edited)"), or with presets off the
   // filters themselves, as before b:xpvk.
   const activePresetLabel = activeViewTab?.label ?? props.tSidebar('threadSidebarAllThreads')
@@ -6763,8 +6757,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           data-scope-narrowed={scopeSlot !== null && ThreadListScope.narrowed(scopeInput) ? '' : undefined}
         >
           <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
-          <span className="dshx:truncate">
-            {scopeSlot === null ? (presetsOn ? activeViewShortLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
+          {/* The preset's full name, \"All threads\" not \"All\" (council round 30, item 2: \"All 2\" read as two results), in the
+              ink while the count pill beside it says filters are on. */}
+          <span className={cn('dshx:truncate', scopeSlot === null && scopeCount !== null && 'dshx:text-foreground')}>
+            {scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
           {scopeCount === null ? null : (
             // How many filters are on (council round 11 B2), on a desktop as on a phone (round 29, item 8): "All 2". A

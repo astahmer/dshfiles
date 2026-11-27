@@ -1172,3 +1172,14 @@ describe('the edited row on two lines (round 31, item 1)', () => {
     }
   })
 })
+
+// Council round 30, item 2: "All 2" read as two results. The closed desktop trigger names the preset in full, the count
+// pill after it, and its label in the ink while a count shows; the phone keeps "Filters 2".
+describe('the closed desktop trigger reads as a state (round 31, item 2)', () => {
+  const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
+  it('shows the full preset name, truncating, in the ink while a filter count shows', () => {
+    expect(trigger).toContain('{scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}')
+    expect(client).not.toContain('const activeViewShortLabel')
+    expect(trigger).toMatch(/className=\{cn\('dshx:truncate', scopeSlot === null && scopeCount !== null && 'dshx:text-foreground'\)\}/u)
+  })
+})
