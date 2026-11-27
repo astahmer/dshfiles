@@ -1413,15 +1413,25 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
     },
     archive: { kind: 'item', label: t('threadSidebarArchive'), disabled: session.running, onSelect: () => void props.actions.mutate(session.id, 'archive') },
   }
+  const phone = PhoneLayout.matches()
   return (
-    <ThreadMenu
-      kit={CONTEXT_MENU_KIT}
-      entries={entries}
-      archived={archived}
-      phone={PhoneLayout.matches()}
-      coarsePointer={coarsePointer()}
-      labels={{ openIn: t('threadSidebarOpenIn'), copy: t('threadSidebarCopy'), more: t('threadSidebarMore') }}
-    />
+    <>
+      {phone ? (
+        // The phone's sheet covers the row it acts on, so it names its thread (council round 34, B9, Astra): a quiet 14px
+        // semibold title at the items' text edge, up to two lines, not an item.
+        <ContextMenuLabel className="dshx:line-clamp-2 dshx:pt-1 dshx:pb-2 dshx:font-semibold dshx:break-words" data-thread-menu-title="">
+          {session.displayTitle}
+        </ContextMenuLabel>
+      ) : null}
+      <ThreadMenu
+        kit={CONTEXT_MENU_KIT}
+        entries={entries}
+        archived={archived}
+        phone={phone}
+        coarsePointer={coarsePointer()}
+        labels={{ openIn: t('threadSidebarOpenIn'), copy: t('threadSidebarCopy'), more: t('threadSidebarMore') }}
+      />
+    </>
   )
 }
 

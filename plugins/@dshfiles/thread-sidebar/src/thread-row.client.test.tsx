@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
 import { HoverStripFit, STRIP_SEAT_ON } from './hover-strip-fit.js'
 import { renderRow, rowProps, rowSession, rowStatus, VisibleObserver } from './thread-row.test-support.js'
+import { PhoneLayout } from './phone-layout.js'
 
 beforeEach(() => {
   vi.stubGlobal('IntersectionObserver', VisibleObserver)
@@ -966,5 +967,37 @@ describe('a row counts in one form (council round 34, A7)', () => {
     expect(reserve?.getAttribute('aria-hidden')).toBe('true')
     expect(reserve?.className).toContain('dshx:invisible')
     expect(where?.className).not.toMatch(/dshx:pr-1[68]\b/u)
+  })
+})
+
+// Council round 34, B9 (Astra): the phone's row menu is a sheet over the row it acts on, and it did not say which thread.
+describe('the phone row menu names its thread (council round 34, B9)', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+  const openMenu = async (phone: boolean): Promise<HTMLElement> => {
+    vi.spyOn(PhoneLayout, 'matches').mockReturnValue(phone)
+    const row = await renderRow({ session: rowSession({ displayTitle: 'Fix invoice tax rounding' }) })
+    fireEvent.contextMenu(row.querySelector('[data-thread-main-action]') ?? row, { clientX: 20, clientY: 20 })
+    const menu = document.querySelector<HTMLElement>('[data-slot="context-menu-content"]')
+    if (menu === null) throw new Error('The row menu did not open.')
+    return menu
+  }
+
+  it('leads the phone sheet with the thread title: 14px semibold, not an item, before the first verb', async () => {
+    const menu = await openMenu(true)
+    const title = menu.querySelector<HTMLElement>('[data-thread-menu-title]')
+    expect(title?.textContent).toBe('Fix invoice tax rounding')
+    expect(title?.getAttribute('data-slot')).toBe('context-menu-label')
+    expect(title?.getAttribute('role')).toBeNull()
+    expect(title?.closest('[role="menuitem"]')).toBeNull()
+    for (const token of ['dshx:text-sm', 'dshx:font-semibold', 'dshx:line-clamp-2']) expect(title?.className).toContain(token)
+    const first = menu.querySelector('[role="menuitem"]')
+    expect(first !== null && title !== null && (title.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true)
+  })
+
+  it('leaves the desktop menu, opened at the row, without it', async () => {
+    const menu = await openMenu(false)
+    expect(menu.querySelector('[data-thread-menu-title]')).toBeNull()
   })
 })
