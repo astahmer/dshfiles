@@ -1592,6 +1592,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   const jobCount = waitingOnSubagents ? 0 : (props.runningJobs ?? 0)
   // The same line also names how many it waits on, so the toggle keeps only its chevron (round five B1).
   const childCounterShown = !(waitingOnSubagents && workStatus?.detail !== undefined)
+  // The disclosure says what it counts, "1 subagent" (council round 34, A7): a bare "1" after a dot cluster beside a "1 job"
+  // chip read as three counting forms on one line.
+  const childCountWords = plural(t, 'subagentCount', childCount)
   // Why it needs you leads the second line, so the title keeps the first line to itself.
   const statusDetail =
     workStatus === undefined || (workStatus.status !== 'needs-you' && workStatus.status !== 'failed' && workStatus.detail === undefined)
@@ -2048,7 +2051,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     // Room for the subagent counter at this line's end; the verb beside it holds its own width through
                     // the invisible copy at the line's end (council round 14 B1).
                     // Touch: the chevron alone is a 44pt toggle in the time column (council round 18 B1.3).
-                    childCount > 0 && (childCounterShown ? (verbSeat === 'meta' ? 'dshx:pr-18' : 'dshx:pr-16') : 'dshx:pr-8 dshx:pointer-coarse:pr-11'),
+                    // A counter's words take their own width through the invisible copy at the line's end (council round 34, A7).
+                    childCount > 0 && !childCounterShown && 'dshx:pr-8 dshx:pointer-coarse:pr-11',
                     // Touch: line 2 is 16px on every row (council round 18 B1.3), so every row keeps one title-to-meta
                     // pitch; the 28px verb centres on it from outside instead of stretching it to 28px.
                     'dshx:pointer-coarse:h-4 dshx:pointer-coarse:text-xs/4',
@@ -2113,7 +2117,9 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   ) : null}
                   {ownWorkspace === undefined ? null : <OwnWorkspaceIndicator workspace={ownWorkspace} showState={liveStep === undefined} t={t} />}
                   {jobCount === 0 ? null : (
-                    <span className="dshx:shrink-0 dshx:rounded-sm dshx:bg-muted dshx:px-1 dshx:text-muted-foreground" data-thread-jobs="">
+                    // Text like the rest of line 2, "billing-api · 1 job" (council round 34, A7): the muted chip was a second form.
+                    <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1.5" data-thread-jobs="">
+                      {showProjectName || ownWorkspace !== undefined || metaKind !== undefined || liveStepText !== undefined ? <span aria-hidden="true">·</span> : null}
                       {plural(t, 'threadSidebarRunningJobs', jobCount)}
                     </span>
                   )}
@@ -2149,10 +2155,23 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                       data-verb-reserve=""
                       className={cn(
                         'dshx:invisible dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:px-2 dshx:text-xs/4 dshx:font-medium dshx:whitespace-nowrap',
-                        childCount > 0 ? 'dshx:-mr-2 dshx:pointer-coarse:-mr-1' : 'dshx:-mr-2',
+                        childCount > 0 && childCounterShown ? undefined : childCount > 0 ? 'dshx:-mr-2 dshx:pointer-coarse:-mr-1' : 'dshx:-mr-2',
                       )}
                     >
                       {t(inlineVerbLabelKeys[inlineVerb])}
+                    </span>
+                  ) : null}
+                  {childCount > 0 && childCounterShown ? (
+                    // The counter's seat, sized to its words: the toggle's own parts, invisible. It lies 8px past this line's
+                    // end on a mouse (the toggle stands in the row's padding), and its chevron seat reaches 8px into the menu
+                    // column on touch; the copy gives both back, so the line keeps exactly what the toggle leaves it.
+                    <span
+                      aria-hidden="true"
+                      data-children-reserve=""
+                      className="dshx:invisible dshx:inline-flex dshx:h-4 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:pl-1.5 dshx:text-xs/4 dshx:whitespace-nowrap dshx:-mr-2 dshx:pointer-coarse:mr-0"
+                    >
+                      {childCountWords}
+                      <span className="dshx:inline-block dshx:w-6 dshx:shrink-0 dshx:pointer-coarse:-mr-2" />
                     </span>
                   ) : null}
                 </span>
@@ -2195,31 +2214,12 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
               // row menu's column starts instead of reaching into it.
               className="dshx:flex dshx:h-6 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pl-1.5 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-accent dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/50 dshx:pointer-coarse:h-7 dshx:pointer-coarse:min-w-11 dshx:pointer-coarse:justify-end"
               aria-expanded={props.childrenOpen}
-              aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')} (${childCount})`}
+              // The visible words lead the spoken name (WCAG 2.5.3): "Hide child threads: 1 subagent".
+              aria-label={`${t(props.childrenOpen ? 'threadSidebarHideChildren' : 'threadSidebarShowChildren')}: ${childCountWords}`}
               onClick={() => props.actions.toggleChildren(session.id, props.childrenOpen)}
             >
-              {childCounterShown ? (
-              <span className="dshx:flex dshx:-space-x-0.5" aria-hidden="true">
-                {props.childThreads.slice(0, 3).map(child => {
-                  const attentionLabel = props.childAttentionLabels.get(child.id)
-                  return (
-                    <StatusDot
-                      key={child.id}
-                      className={cn(
-                        'dshx:ring-1 dshx:ring-background',
-                        ThreadAttentionPresentationModel.attentionDotClass({
-                          attentionLabel,
-                          attentionColors: rowStyle.attentionColors,
-                          unread: props.unreadSessionIds.has(child.id),
-                          running: child.running,
-                        }),
-                      )}
-                    />
-                  )
-                })}
-              </span>
-              ) : null}
-              {childCounterShown ? <span className="dshx:tabular-nums dshx:font-medium">{childCount}</span> : null}
+              {/* One form (council round 34, A7): "1 subagent ⌄" in line 2's words and ink, no dots and bare number. */}
+              {childCounterShown ? <span className="dshx:whitespace-nowrap" data-children-count="">{childCountWords}</span> : null}
               {/* A real chevron in a 24 px seat (round five B3), not a 12 px caret: it turns over when the sub-rows open. */}
               {/* Touch: the seat reaches 8px past the toggle so the glyph (4px seat inset, 4px of its own) ends on the time's
                   edge; drawn only, so the overhang takes no taps from the row menu beside it. */}

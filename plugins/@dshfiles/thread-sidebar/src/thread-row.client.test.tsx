@@ -173,10 +173,10 @@ describe('a row that needs you', () => {
     expect(toggle?.textContent).toBe('')
     expect(toggle?.querySelector('[data-children-chevron]')).not.toBeNull()
     // The spoken name keeps the count.
-    expect(toggle?.getAttribute('aria-label')).toBe('threadSidebarShowChildren (1)')
+    expect(toggle?.getAttribute('aria-label')).toMatch(/^threadSidebarShowChildren: subagentCount_(?:one|other)$/u)
     cleanup()
     const plain = await renderRow({ childThreads: [child], workStatus: rowStatus({ status: 'idle' }) })
-    expect(plain.querySelector('[data-thread-children-toggle]')?.textContent).toBe('1')
+    expect(plain.querySelector('[data-thread-children-toggle]')?.textContent).toMatch(/^subagentCount_(?:one|other)$/u)
   })
 
   it('keeps the question readable beside a subagent counter', async () => {
@@ -186,11 +186,11 @@ describe('a row that needs you', () => {
     const end = row.querySelector('[data-thread-row-end]')
     expect(end?.querySelector('[data-testid="thread-row-verb"]')).not.toBeNull()
     expect(end?.querySelector('[data-thread-children-toggle]')).not.toBeNull()
-    // The verb's own width (its invisible copy) plus the counter's 72px, not a fixed 136px.
+    // The verb's own width and the counter's own words (their invisible copies), not a fixed padding.
     const where = row.querySelector<HTMLElement>('[data-thread-where]')
-    expect(where?.className).not.toContain('dshx:pr-34')
-    expect(where?.className).toContain('dshx:pr-18')
+    expect(where?.className).not.toMatch(/dshx:pr-(?:16|18|34)\b/u)
     expect(where?.querySelector('[data-verb-reserve]')?.textContent).toBe(end?.querySelector('[data-testid="thread-row-verb"]')?.textContent)
+    expect(where?.querySelector('[data-children-reserve]')?.textContent).toBe(end?.querySelector('[data-thread-children-toggle]')?.textContent)
   })
 
   it('ends a touch row\'s verb label at the time column above it, the counter at the menu column (round nine B5)', async () => {
@@ -267,8 +267,9 @@ describe('the trailing column and the phone row (council round 17 B1.2)', () => 
     expect(end).not.toMatch(/(?<![:-])dshx:right-1\.5\b/u)
     // Touch keeps its columns: the counter at the menu column.
     expect(end).toContain('dshx:pointer-coarse:right-11')
-    // The verb's invisible copy follows it 8px past line 2's end.
-    expect(classOf(row, '[data-verb-reserve]')).toContain('dshx:-mr-2')
+    // Beside a counter the counter's copy, not the verb's, gives back the 8px past line 2's end (council round 34, A7).
+    expect(classOf(row, '[data-children-reserve]')).toContain('dshx:-mr-2')
+    expect(classOf(row, '[data-verb-reserve]')).not.toContain('dshx:-mr-2')
     cleanup()
     // A compact row pads 8px: its trailing parts sit on the row's edge box.
     const compact = await renderRow({ ...asking, rowStyle: { ...rowProps().rowStyle, density: 'compact' } })
@@ -432,11 +433,13 @@ describe('the project on line 2', () => {
 })
 
 describe('a thread that runs a background job', () => {
-  it('says so with a muted job chip and stays Idle, never Working', async () => {
+  it('says so in line 2\'s own words and ink and stays Idle, never Working', async () => {
     const row = await renderRow({ runningJobs: 1, workStatus: rowStatus({ status: 'idle' }) })
-    const chip = row.querySelector('[data-thread-jobs]')
-    expect(chip?.textContent).toMatch(/threadSidebarRunningJobs/u)
-    expect(chip?.className).toContain('dshx:text-muted-foreground')
+    const jobs = row.querySelector<HTMLElement>('[data-thread-jobs]')
+    expect(jobs?.textContent).toMatch(/threadSidebarRunningJobs/u)
+    // Plain text in the line's secondary ink (council round 34, A7): no chip fill or radius of its own.
+    expect(jobs?.className).not.toMatch(/dshx:(?:bg-|rounded)/u)
+    expect(jobs?.closest('[data-thread-where]')?.className).toContain('dshx:text-muted-foreground')
     expect(row.querySelector('[data-slot="status-glyph"]')?.getAttribute('data-status')).toBe('idle')
   })
 
@@ -932,5 +935,36 @@ describe('the Snooze glyph (round 30, item 12)', () => {
     expect(read('sidebar-shell.tsx')).toContain('  park: <AlarmClockIcon strokeWidth={1.5} size={14} />,')
     const batch = read('client.tsx')
     expect(batch).toContain("<AlarmClockIcon aria-hidden=\"true\" />\n          {props.t('threadSidebarPark')}")
+  })
+})
+
+// Council round 34, A7 (Opus, Fable): "billing-api [1 job] … ● 1 ⌄" counted in three forms on one line: a muted chip,
+// a dot cluster and a bare number. One form now: "billing-api · 1 job" as text, and the disclosure "1 subagent ⌄".
+describe('a row counts in one form (council round 34, A7)', () => {
+  it('reads "project · 1 job" and "1 subagent ⌄", with no chip and no dots', async () => {
+    const child = rowSession({ id: SessionId('c1'), parentId: SessionId('session-1'), origin: 'subagent' })
+    const row = await renderRow({ runningJobs: 1, childThreads: [child], workStatus: rowStatus({ status: 'idle' }) })
+    const jobs = row.querySelector<HTMLElement>('[data-thread-jobs]')
+    // A separator after the project name, as between every other part of line 2.
+    expect(jobs?.textContent).toMatch(/^·threadSidebarRunningJobs_(?:one|other)$/u)
+    expect(jobs?.firstElementChild?.getAttribute('aria-hidden')).toBe('true')
+    expect(jobs?.className).not.toContain('dshx:bg-muted')
+    const toggle = row.querySelector<HTMLElement>('[data-thread-children-toggle]')
+    expect(toggle?.textContent).toMatch(/^subagentCount_(?:one|other)$/u)
+    expect(toggle?.querySelector('[data-slot="status-dot"]')).toBeNull()
+    expect(toggle?.querySelector('[data-children-chevron]')).not.toBeNull()
+    // The spoken name starts with what the toggle does and ends with the words it shows.
+    expect(toggle?.getAttribute('aria-label')).toMatch(/^threadSidebar(?:Hide|Show)Children: subagentCount_(?:one|other)$/u)
+  })
+
+  it('keeps the words\' room on line 2 with an invisible copy of the toggle, not a fixed padding', async () => {
+    const children = ['c1', 'c2', 'c3'].map(id => rowSession({ id: SessionId(id), parentId: SessionId('session-1'), origin: 'subagent' }))
+    const row = await renderRow({ childThreads: children, workStatus: rowStatus({ status: 'idle' }) })
+    const where = row.querySelector<HTMLElement>('[data-thread-where]')
+    const reserve = where?.querySelector<HTMLElement>('[data-children-reserve]')
+    expect(reserve?.textContent).toBe('subagentCount_other')
+    expect(reserve?.getAttribute('aria-hidden')).toBe('true')
+    expect(reserve?.className).toContain('dshx:invisible')
+    expect(where?.className).not.toMatch(/dshx:pr-1[68]\b/u)
   })
 })
