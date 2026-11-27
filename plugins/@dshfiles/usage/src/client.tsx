@@ -12,12 +12,17 @@ import { defineClient, MenuItem } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { WorkbenchMainNavigation, workbenchPanels } from '@dshfiles/workbench/registry'
 import { TabPlaceGlyphs } from '@dshfiles/workbench/tab-status'
-import { AccountUsageDashboard } from './account-usage-dashboard.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type { OpenThread } from './format.js'
-import { UsagePanel, UsageTabs } from './panel.js'
-import { UsageQuota } from './quota-tab.js'
-import { ThreadCostFacet } from './thread-cost-facet.js'
+import { UsageTabs } from './panel-state.js'
+import { goToQuota } from './quota-location.js'
 import { UsageGlyph } from './usage-glyph.js'
+
+/** The Usage page, the account dashboard and the Cost facet load when one first opens, not at page boot. */
+const views = () => import('./lazy-views.js')
+const UsagePanel = lazyView(() => views().then(module => module.UsagePanel), { label: 'Usage' })
+const AccountUsageDashboard = lazyView(() => views().then(module => module.AccountUsageDashboard), { label: 'Account usage' })
+const ThreadCostFacet = lazyView(() => views().then(module => module.ThreadCostFacet), { label: 'Cost' })
 
 const PANEL_ID = 'dshfiles-usage'
 /** The thread panel's Cost facet (docs/ade-ux §4.4): a page tab type of the right pane. */
@@ -51,7 +56,7 @@ export default defineClient({
       // saved tabs open it through this contract.
       const openQuota = (target?: UsageQuotaTarget): void => {
         navigate(panelId => {
-          UsageQuota.go(target, panelId)
+          goToQuota(target, panelId)
           UsageTabs.show('quota', panelId)
         })
       }
@@ -149,7 +154,7 @@ export default defineClient({
               onOpenTraces={() => reveal(TRACES_PANEL_ID)}
               onOpenAccount={accountId => {
                 navigate(panelId => {
-                  UsageQuota.go({ view: 'accounts', accountId }, panelId)
+                  goToQuota({ view: 'accounts', accountId }, panelId)
                   UsageTabs.show('quota', panelId)
                 })
               }}

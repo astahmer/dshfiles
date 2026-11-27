@@ -1,67 +1,11 @@
-import { AccountQuotaViews, USAGE_QUOTA_VIEWS, type UsageQuotaTarget, type UsageQuotaView } from '@dshfiles/ai-accounts/quota-views'
+import { AccountQuotaViews, USAGE_QUOTA_VIEWS, type UsageQuotaView } from '@dshfiles/ai-accounts/quota-views'
 import { useContract } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { SlidingSegments } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
-import { panelOccurrence } from '@dshfiles/workbench/panel-occurrence'
 import { useSyncExternalStore } from 'react'
+import { accountOf, goToQuota, locationFor, type QuotaLocation } from './quota-location.js'
 
 const VIEW_LABELS = { accounts: 'Accounts', history: 'History', forecast: 'Forecast' } satisfies Record<UsageQuotaView, string>
-
-/**
- * Where Usage › Quota stands: the view and the account a caller asked for. Module state, not a stored preference: the
- * last view is a session detail, and `open` comes from other plugins through the `UsageNavigation` contract.
- */
-/** The account a quota view opens on, when a caller named one. */
-interface QuotaAccount {
-  readonly accountId?: string
-  readonly displayName?: string
-}
-
-interface QuotaLocation extends QuotaAccount {
-  readonly view: UsageQuotaView
-  /** Bumped on every navigation, so the same account opened twice still remounts its view. */
-  readonly visit: number
-}
-
-const createLocation = () => {
-  let location: QuotaLocation = { view: 'accounts', visit: 0 }
-  const listeners = new Set<() => void>()
-  return {
-    get: () => location,
-    subscribe: (listener: () => void) => {
-      listeners.add(listener)
-      return () => {
-        listeners.delete(listener)
-      }
-    },
-    set: (next: QuotaLocation) => {
-      location = next
-      for (const listener of listeners) listener()
-    },
-  }
-}
-const locations = new Map<string | undefined, ReturnType<typeof createLocation>>()
-const locationFor = (panelId?: string) => {
-  const key = panelId === undefined ? undefined : panelOccurrence({ panelId })
-  const existing = locations.get(key)
-  if (existing !== undefined) return existing
-  const location = createLocation()
-  locations.set(key, location)
-  return location
-}
-
-/** The account fields that are set, without carrying an explicit `undefined` into the location. */
-const accountOf = (source: { readonly accountId?: string | undefined; readonly displayName?: string | undefined }): QuotaAccount => {
-  const { accountId, displayName } = source
-  if (accountId === undefined) return displayName === undefined ? {} : { displayName }
-  return displayName === undefined ? { accountId } : { accountId, displayName }
-}
-
-const go = (target: UsageQuotaTarget = {}, panelId?: string): void => {
-  const location = locationFor(panelId)
-  const current = location.get()
-  location.set({ view: target.view ?? current.view, ...accountOf(target), visit: current.visit + 1 })
-}
 
 /**
  * Usage › Quota: ai-accounts' quota views (one account, history, forecast) inside the Usage page. They come from
@@ -99,7 +43,7 @@ const QuotaTab = (props: { readonly panelId?: string | undefined }): JSX.Element
 export class UsageQuota {
   static readonly Tab = QuotaTab
   /** Land on a view (and account) of the Quota tab; the caller selects the Usage page and its Quota tab. */
-  static readonly go = go
+  static readonly go = goToQuota
   /** Where the Quota tab stands now. */
   static readonly current = (panelId?: string): QuotaLocation => locationFor(panelId).get()
 }
