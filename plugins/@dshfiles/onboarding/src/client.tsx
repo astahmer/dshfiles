@@ -1,3 +1,4 @@
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
@@ -12,7 +13,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore, type R
 import { createPortal } from 'react-dom'
 import { onboardingApi } from './api.js'
 import { FirstRun } from './first-run.js'
-import { GettingStartedPage, type GettingStartedProps } from './getting-started-page.js'
+import type { GettingStartedProps } from './getting-started-page.js'
 import { OnScreenProjects, type OnScreenProject } from './on-screen-project.js'
 import type { Overview, OverviewInput } from './overview-model.js'
 import { Routes, type RouteServices } from './routes.js'
@@ -22,6 +23,9 @@ import { ShowMeWhere, WalkUnreadable } from './show-me-where.js'
 import { StarterTaskCards, StarterTasks } from './starter-tasks.js'
 import { WalkStore } from './walk-store.js'
 import { WizardStore } from './wizard-store.js'
+
+/** The Getting started page loads when it first opens, not at page boot. */
+const GettingStartedPage = lazyView(() => import('./getting-started-page.js').then(module => module.GettingStartedPage), { label: 'Getting started' })
 
 const PANEL_ID = 'dshfiles-onboarding'
 const WIZARD_STEP_ID = 'dshfiles-onboarding-setup'
