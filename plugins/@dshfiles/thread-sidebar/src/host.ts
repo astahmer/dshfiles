@@ -114,7 +114,7 @@ const hostEdge = Layer.mergeAll(
   SidebarSettings.layer.pipe(Layer.provideMerge(Settings.layer(threadSidebarSettings))),
 ).pipe(Layer.provideMerge(platform))
 
-const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer, OpenToolCalls.layer).pipe(
+const runtimeState = Layer.mergeAll(InflightTurns.layer, Recoveries.layer, NavigationCounter.layer, OpenToolCalls.layer, ThreadSubscriptions.layer).pipe(
   Layer.provideMerge(RecoveryStore.layer),
   Layer.provideMerge(StateFiles.layer),
 )
@@ -155,7 +155,7 @@ const services = Layer.mergeAll(
   ThreadAttention.layer,
   NotificationHistory.layer,
   subscriptionNoticeHostLayer,
-  ThreadSubscriptionActions.layer.pipe(Layer.provideMerge(ThreadSubscriptions.layer)),
+  ThreadSubscriptionActions.layer,
   restartWithUpdates,
   autoSettle,
   reminderWake,

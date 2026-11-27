@@ -1201,8 +1201,13 @@ level }` sets it (`default` clears it); subscribing an existing pair changes its
 level. Native subagent settlement notices do not pass through this filter: the
 subagent manager calls `parent.inject` / `sendWaking` directly, with no hook a
 plugin can register (see `plans/dsh-host-gaps.md`). Nothing is delivered
-without an edge, so the default stays silent: a created thread does not wake its
-creator. A thread cannot watch itself and a pair cannot watch itself in both
+without an edge, but `thread_create` called by an Agent stores one for it: the
+calling thread is subscribed to the new thread (default level) before its first
+message is handed over, so even a quick first turn reports back, and the result
+says `notify: 'subscribed'` (or `'failed'` with `notifyError`; the thread is
+still returned). `notifyCreator: false` opts out; a thread a person creates
+notifies nobody. `thread_prompt { watch: true }` does the same for a thread the
+caller did not create, before its message is queued. A thread cannot watch itself and a pair cannot watch itself in both
 directions (two threads that wake each other would keep each other running); an
 archived subscriber or target ends the edge — at once through this plugin's own
 archive path, and on the next notice pass for an archive made elsewhere — and a

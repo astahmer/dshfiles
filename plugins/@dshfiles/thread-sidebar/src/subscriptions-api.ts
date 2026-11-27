@@ -14,7 +14,7 @@ const ONLY_WHEN_ASKED = 'Call only when the user asked for this.'
 
 /**
  * One edge: the subscriber thread gets a compact notice when the target thread finishes a turn. Nothing wakes a
- * thread without an edge, so a thread started with `thread_create`/`thread_fork` stays silent.
+ * thread without an edge; `thread_create` called by an Agent stores one for its caller unless `notifyCreator: false`.
  */
 export const threadSubscriptionSchema = SchemaHelpers.strictStruct(
   Schema.Struct({

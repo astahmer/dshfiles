@@ -34,6 +34,7 @@ const actionsLayer = (input: { readonly settled: Ref.Ref<ReadonlyArray<string>>;
     continueIn: unused,
     create: unused,
     prompt: unused,
+    watch: unused,
     ownWorkspaceFor: unused,
     stop: unused,
     selectModel: unused,
