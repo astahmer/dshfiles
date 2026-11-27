@@ -541,26 +541,29 @@ and keeps the rest for Back and Forward.
 
 ![An acknowledged recent idle thread remains in the date-grouped Done view.](docs/screenshots/thread-list-views-done.png)
 
-**The Filters panel** (round nine, refined in rounds 28 to 30). The Filter
+**The Filters panel** (round nine, refined in rounds 28 to 31). The Filter
 button opens one panel beside the list, not a menu of submenus: every value
 shows where it sits and applies at once, so the rows it filters stay in view,
-and a polite live region names the change and the threads it leaves ("Unread
-on, 5 threads shown"). It opens on the preset in force; closed, the button
-carries the filters-on count as a neutral pill (`All 2`, named "Filter: All
-threads, 2 filters on").
-The panel scrolls under its sticky header, **Filters … Reset**; on a phone it is
+and a polite live region says each change once with the count it leads to
+("Unread on, 5 threads shown"), and a count change of its own without a verb.
+It opens on the preset in force; closed, the button names the preset in full
+with the filters-on count as a neutral pill after it (`All threads 2`, named
+"Filter: All threads, 2 filters on"). On a desktop the panel keeps its top under
+the button, no taller than the room below it, its foot fading while more waits
+below. The panel scrolls under its sticky header, **Filters … Reset**; on a phone it is
 the kit's bottom sheet (85dvh, the popover fill) with **Reset · Filters · Done**
 and the project as one inline row (Project · All projects ›). Then come the
 presets (each ending on one 20px count column, the count of its rows, empty at
-0; no status marks, which the list header already shows), **Status** chips (each with its status glyph, a check while on, the label's
+0; no status marks, which the list header already shows), **Status** chips in two aligned columns (each with its status glyph, a check while on, the label's
 width reserved; no status on means any, and **Clear** sits in the heading;
-**More statuses**, right under the first row, is a disclosure for Thread state
-and Storage, one labelled group each, and reads **Fewer statuses** while open;
-while one of those is on it stays open and says "Clear the statuses below to
-fold"), and **Source**, under its own hairline, as a segmented control (All /
+**More statuses**, right under the first row, is a
+disclosure for Thread state and Set aside, one labelled group each, that
+scrolls them into view and reads **Fewer statuses** while open; while one of
+those is on it stays open, with "Clear the statuses below to fold" on its own
+line under it), and **Source**, under its own hairline, as a segmented control (All /
 Main / Subagents). **Reset filters** covers those: back to All threads with no
-filter on, the grouping kept. Under its own hairline, **Group by** (Status / Project / Date / Manual /
-None, a segmented control), and the foot Board, Thread list settings and
+filter on, the grouping kept. Under its own hairline, **Group by** (Status / Project / Date / Custom /
+None, a segmented control; Custom is named Arrange manually), and the foot Board, Thread list settings and
 Sidebar settings in the secondary ink.
 
 **Filter presets** (b:xpvk). The saved views are the Filter panel's presets: its
@@ -569,10 +572,12 @@ checked, and the Filter button names it (`Filter: Needs you`). Changing a group,
 status or source filter afterwards never rewrites the preset: the change is a
 Host-synced `threadViews.draft`, the button reads `Filter: Needs you (edited)`,
 and the preset stays checked as `Needs you · edited`, counting what the list
-draws now, with **Save changes to “Needs you”** and **Discard changes** before
-its count (icons on a mouse, the words Save and Discard on a phone). The
-built-in All threads offers **Save as new preset…** instead, and its ⋯ menu
-shows no Rename, Save changes or Delete, only a line saying it is built in.
+draws now, with **Discard changes** and **Save changes to “Needs you”**: two
+icons before its count on a mouse, and on a phone the words Discard and Save on
+the row's own second line, so its name, never "edited", is what truncates. The
+built-in All threads offers **Save as new preset…** instead, and its ⋯ menu (a
+fixed 256px, inside the panel) shows no Rename, Save changes or Delete, only the
+caption "Built in. Save changes as a new preset."
 Pressing the edited preset again does nothing, and changing the filters back
 drops the draft. **Save as new preset…** (first in the presets' ⋯ menu) names a
 new preset (a dialog, pinned to the top on a phone so the
