@@ -871,18 +871,15 @@
     },
     {
       "id": "settings-origin-distinction",
-      "title": "Distinguish default DSH categories from plugin categories",
-      "summary": "Every Settings category is classified as stock DSH or a DSH plugin from bundle metadata (with core namespace fallback). The sidebar offers an All / DSH / Plugins scope filter with counts, subtle per-row origin cues (DSH pill vs plugin icon), category icons, and origin badges in each entry header and search result.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "expect group \"Filter categories by source\""],
-      "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "expect group \"Filter categories by source\""
-      ],
+      "title": "Tell DSH defaults from plugin categories",
+      "summary": "An All / DSH / Plugins filter beside the Settings search narrows the categories, the side column and the search results by who ships them.",
+      "details": "Each category is classified as stock DSH or a plugin from bundle metadata, with core namespace fallbacks before the labels load. A stock DSH category stays DSH when a dshfiles fork serves it (Agent loop); an entry that joins several plugins is DSH when any block is. The page header and each search result carry a DSH default or Plugin badge. On a phone the filter sits above the category list. Opening an entry of the other source from elsewhere shows every category again.",
+      "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "expect group \"Filter categories by source\""],
+      "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect group \"Filter categories by source\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: sidebar source filter and entry header badge",
+      "currentSurface": "settings: source filter beside the search, origin badge in the page header",
       "configuration": [],
       "states": ["all", "dsh-only", "plugins-only"],
       "failureModes": [
@@ -929,16 +926,11 @@
     },
     {
       "id": "dshfiles-plugins-page",
-      "title": "Plugins by category: a second plugin view in Settings and as a panel",
-      "summary": "Plugins by category, a second view beside DSH core's Plugins manager, is a Settings › Plugins section and a stage panel (dshfiles-plugin-list) the sidebar can pin; DSH core's Plugins manager lists a first card (its plugins.item seat) that opens it. It lists global @dshfiles/* bundles installed in the profile grouped by functional area, with live search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters, quick enable/disable switches backed by PluginManager.setBundleEnabled, restart indicators, and deep links to each plugin's settings page.",
-      "reach": ["click button \"Account menu\"", "click menuitem \"Settings*\"", "click button \"Plugins by category\"", "expect switch \"Enable *\""],
-      "reachNarrow": [
-        "click button \"More\"",
-        "click button \"Settings Accounts, tools, secrets and plugins.\"",
-        "click combobox \"Sections\"",
-        "click option \"Plugins by category\"",
-        "expect switch \"Enable *\""
-      ],
+      "title": "Plugins by category",
+      "summary": "Turn installed plugins on or off grouped by area, with search, source and status filters and a Settings link for each plugin.",
+      "details": "A second view beside DSH core's Plugins manager: a Settings › Plugins entry and a stage panel (dshfiles-plugin-list) the sidebar can pin; the Plugins manager's first card (its plugins.item seat) opens it. It lists the profile's bundles by functional area (src/bundle-categories.ts) with search, source (dshfiles / Community / All) and status (All / Enabled / Disabled) filters. Each switch calls PluginManager.setBundleEnabled and shows when a change waits for a restart; DSH is never restarted for it.",
+      "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "click button \"Plugins by category\"", "expect switch \"Enable *\""],
+      "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "click button \"Plugins by category\"", "expect switch \"Enable *\""],
       "surfaces": ["client", "host", "settings"],
       "surface": "settingsSection",
       "destination": "settings",

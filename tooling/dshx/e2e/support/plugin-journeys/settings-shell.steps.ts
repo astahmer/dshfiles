@@ -557,18 +557,20 @@ Then('the Subagent page renders the owned fork instead of a placeholder', async 
   await finishJourneyAssertions(page)
 })
 
+// The filter sits beside the search; without the thread sidebar's column the page lists its own categories, where Main
+// tabs is one block of Layout.
 Then('default DSH and plugin categories are marked and filterable in the sidebar', async ({ page }: { page: Page }) => {
   const nav = settingsView(page).getByRole('navigation', { name: 'Settings', exact: true })
-  const filter = settingsView(page).locator('aside [data-settings-origin-filter]')
+  const filter = settingsView(page).locator('[data-settings-toolbar] [data-settings-origin-filter]')
   await recordAssertion(page, 'settings-shell-origin-distinction', async () => {
     await expect(settingsView(page).locator('[data-origin-badge="dsh"]')).toBeVisible()
     await expect(nav.locator('[data-nav-id="general"]')).toHaveAttribute('data-entry-origin', 'dsh')
-    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toHaveAttribute('data-entry-origin', 'plugin')
+    await expect(nav.locator('[data-nav-id="layout"]')).toHaveAttribute('data-entry-origin', 'plugin')
     await filter.locator('[data-origin-option="dsh"]').click()
     await expect(nav.locator('[data-nav-id="general"]')).toBeVisible()
-    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toHaveCount(0)
+    await expect(nav.locator('[data-nav-id="layout"]')).toHaveCount(0)
     await filter.locator('[data-origin-option="plugin"]').click()
-    await expect(nav.locator('[data-nav-id="plugin:dshfiles-main-tabs"]')).toBeVisible()
+    await expect(nav.locator('[data-nav-id="layout"]')).toBeVisible()
     await expect(nav.locator('[data-nav-id="general"]')).toHaveCount(0)
     await filter.locator('[data-origin-option="all"]').click()
     await expect(nav.locator('[data-nav-id="general"]')).toBeVisible()
