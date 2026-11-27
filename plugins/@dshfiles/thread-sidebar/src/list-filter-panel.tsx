@@ -505,6 +505,9 @@ const StatusChips = (props: {
   const [opened, setOpened] = useState(false)
   const moreId = useId()
   const forced = props.selected.some(filter => !isLeadingStatus(filter))
+  // Latched open once forced (council round 29, item 3): turning the last revealed status off never folds the region
+  // under the pointer or drops the focus that sits in it.
+  if (forced && !opened) setOpened(true)
   const expanded = opened || forced
   const leading = props.selected.filter(isLeadingStatus)
   const revealed = props.selected.filter(filter => !isLeadingStatus(filter))
@@ -555,6 +558,7 @@ const StatusChips = (props: {
         >
           {LEADING_STATUS_GROUP.filters.map(chip)}
         </ToggleGroup>
+        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2">
         <Button
           type="button"
           variant="ghost"
@@ -575,10 +579,12 @@ const StatusChips = (props: {
           {props.t(expanded ? 'threadSidebarFilterFewerStatuses' : 'threadSidebarFilterMoreStatuses')}
         </Button>
         {forced ? (
-          <span id={`${moreId}-hint`} className="dshx:sr-only">
+          // Why it will not fold, on screen beside it (council round 29, item 3), and its description for a screen reader.
+          <span id={`${moreId}-hint`} className="dshx:text-xs dshx:text-muted-foreground" data-thread-status-fold-hint="">
             {props.t('threadSidebarFilterFoldHint')}
           </span>
         ) : null}
+        </div>
         {/* The disclosure's region stays mounted (its aria-controls target); it holds the other groups while open. */}
         <ToggleGroup
           type="multiple"

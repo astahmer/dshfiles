@@ -876,3 +876,31 @@ describe('the built-in preset menu (round 30, item 2)', () => {
     expect(english).not.toContain('Save current filters as preset')
   })
 })
+
+// Council round 29, item 3: the forced-open disclosure says why on screen, and never folds under the pointer.
+describe('the forced-open disclosure (round 30, item 3)', () => {
+  it('shows the fold hint as a 12px secondary caption, which the button is described by', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
+    const hint = element(document.getElementById(more.getAttribute('aria-describedby') ?? ''))
+    expect(hint.textContent).toBe('threadSidebarFilterFoldHint')
+    expect(hint.className).not.toContain('sr-only')
+    expect(hint.className).toContain('dshx:text-xs')
+    expect(hint.className).toContain('dshx:text-muted-foreground')
+  })
+
+  it('stays open after the last revealed status is turned off, so nothing folds under the pointer', () => {
+    const base = panel({ status: { selected: ['archived'], onChange: vi.fn() } })
+    const { rerender } = render(<ListFilterPanel {...base} />)
+    const chip = screen.getByRole('button', { name: 'threadSidebarArchived' })
+    chip.focus()
+    rerender(<ListFilterPanel {...base} status={{ selected: [], onChange: vi.fn() }} />)
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
+    expect(more.getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'threadSidebarArchived' }))
+    // Now nothing holds it open: it folds on request, and the caption is gone.
+    expect(more.hasAttribute('aria-disabled')).toBe(false)
+    fireEvent.click(more)
+    expect(more.getAttribute('aria-expanded')).toBe('false')
+  })
+})
