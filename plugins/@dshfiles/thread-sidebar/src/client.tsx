@@ -6782,15 +6782,26 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           data-thread-list-scope-button={scopeSlot === null ? undefined : ''}
           data-scope-narrowed={scopeSlot !== null && ThreadListScope.narrowed(scopeInput) ? '' : undefined}
         >
-          <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+          {scopeSlot === null && scopeCount !== null ? (
+            // On a desktop with filters on, the count takes the funnel's slot (council round 31, item 1): a 16px filter
+            // badge, so it reads as filters on, not as a result count, and the name gets the funnel's room ("All threads").
+            <span
+              aria-hidden="true"
+              data-testid="thread-scope-count"
+              className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-foreground dshx:tabular-nums"
+            >
+              {scopeCount}
+            </span>
+          ) : (
+            <ListFilterIcon className="dshx:size-3.5 dshx:shrink-0" aria-hidden="true" />
+          )}
           {/* The preset's full name, \"All threads\" not \"All\" (council round 30, item 2: \"All 2\" read as two results), in the
               ink while the count pill beside it says filters are on. */}
           <span className={cn('dshx:truncate', scopeSlot === null && scopeCount !== null && 'dshx:text-foreground')}>
             {scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
-          {scopeCount === null ? null : (
-            // How many filters are on (council round 11 B2), on a desktop as on a phone (round 29, item 8): "All 2". A
-            // neutral pill (council round 29, item 11): the muted fill, the ink, 11px, 16px tall; the name says it too.
+          {scopeSlot !== null && scopeCount !== null ? (
+            // The phone's "Filters 2" (council round 11 B2): a neutral pill after the word (council round 29, item 11).
             <Badge
               aria-hidden="true"
               data-testid="thread-scope-count"
@@ -6798,7 +6809,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             >
               {scopeCount}
             </Badge>
-          )}
+          ) : null}
           {/* With presets on the funnel already says "menu" and the preset name needs the room (b:xpvk). */}
           {presetsOn ? null : <ChevronDownIcon className="dshx:size-3 dshx:shrink-0" aria-hidden="true" />}
         </Button>

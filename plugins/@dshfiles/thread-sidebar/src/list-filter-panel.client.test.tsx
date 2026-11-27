@@ -659,7 +659,8 @@ describe('the panel scrolls under its header (round 29, item 7)', () => {
 describe('the closed trigger (round 29, item 8)', () => {
   it('draws the filters-on count badge on a desktop and a phone alike, and no edited dot or status mark', () => {
     const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
-    expect(trigger).toContain('{scopeCount === null ? null : (')
+    // A desktop's count sits in the funnel slot since round 32 (item 1), a phone's after "Filters".
+    expect(trigger).toContain('{scopeSlot === null && scopeCount !== null ? (')
     expect(trigger).toContain('data-testid="thread-scope-count"')
     expect(trigger).not.toContain('thread-preset-edited-dot')
     expect(trigger).not.toContain('thread-view-attention-dot')
@@ -1089,7 +1090,8 @@ describe('the panel Tab order (round 30, item 10)', () => {
 describe('the trigger count (round 30, item 11)', () => {
   const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
   it('draws the count as a 16px neutral pill: the muted fill, the ink, 11px, 5px across', () => {
-    const badge = trigger.slice(trigger.indexOf('data-testid="thread-scope-count"'))
+    // The phone's pill (the desktop count moved into the funnel slot in round 32).
+    const badge = trigger.slice(trigger.indexOf('<Badge'))
     for (const token of ['dshx:h-4', 'dshx:bg-muted', 'dshx:text-foreground', 'dshx:text-2xs', 'dshx:px-1.25', 'dshx:rounded-full']) expect(badge.slice(0, 400)).toContain(token)
   })
 
@@ -1364,4 +1366,17 @@ it('names the third status group Set aside and the manual grouping Custom (round
   expect(english).toContain("threadSidebarFilterGroupStorage: 'Set aside',")
   expect(english).toContain("threadSidebarGroupManualShort: 'Custom',")
   expect(english).toContain("threadSidebarGroupStatus: 'Arrange manually',")
+})
+
+// Council round 31, item 1: "All threa… 2". On a desktop with filters on, the count takes the funnel's slot at the start
+// as a 16px filter badge (11px / 600, tabular), so the preset name gets the funnel's room; the phone keeps "Filters 2".
+describe('the desktop trigger fits its name (round 32, item 1)', () => {
+  const trigger = filterControl.slice(filterControl.indexOf('<PopoverTrigger asChild>'), filterControl.indexOf('</PopoverTrigger>'))
+  it('draws the count badge in the funnel slot on a desktop while filters are on, the funnel otherwise', () => {
+    expect(trigger).toMatch(/\{scopeSlot === null && scopeCount !== null \? \([\s\S]{0,400}?<span\s+aria-hidden="true"\s+data-testid="thread-scope-count"[\s\S]{0,400}?<ListFilterIcon/u)
+    const badge = trigger.slice(trigger.indexOf('data-testid="thread-scope-count"'), trigger.indexOf('<ListFilterIcon'))
+    for (const token of ['dshx:size-4', 'dshx:rounded-full', 'dshx:bg-muted', 'dshx:text-2xs', 'dshx:font-semibold', 'dshx:tabular-nums']) expect(badge).toContain(token)
+    // The phone keeps its trailing pill after "Filters".
+    expect(trigger).toContain('{scopeSlot !== null && scopeCount !== null ? (')
+  })
 })
