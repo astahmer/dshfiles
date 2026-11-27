@@ -26,3 +26,23 @@ describe('phone sheet fill', () => {
     expect(/--dsw-alias-bg-layer-2:\s*var\(--dshx-tone-2\)/u.test(dark ?? '')).toBe(true)
   })
 })
+
+/**
+ * Council round 30, item 3: the sheet's scrim mixed 30% of the text ink, which is near-white in dark, so opening a sheet
+ * brightened the page (#15120f → #55524f, #817e7c with a sheet opened from a sheet). It is the kit scrim token, and a sheet
+ * opened from another sheet draws no second one.
+ */
+describe('phone sheet scrim', () => {
+  const sheetRule = /html\[data-shell-phone-nav\]:not\(\[data-phone-keyboard\]\)\s*:is\([^)]*'popover-content'[^)]*\)[^{]*\{([^}]*)\}/u.exec(styles)?.[1] ?? ''
+  it('dims with var(--dshx-scrim), never a mix of the text ink', () => {
+    expect(sheetRule).toMatch(/0 0 0 100vmax var\(--dshx-scrim/u)
+    expect(sheetRule).not.toContain('--dshx-tone-text')
+    expect(styles).not.toMatch(/100vmax color-mix\(in oklch, var\(--dshx-tone-text/u)
+  })
+
+  it('draws no second scrim for a sheet nested in a sheet, or opened in a later layer while one is open', () => {
+    const nested = /([^{}]*:has\([^{}]*\)\s*~\s*\*[^{}]*)\{\s*box-shadow:\s*var\(--dshx-elevation-3\)\s*!important;\s*\}/u.exec(styles)
+    expect(nested).not.toBeNull()
+    expect(nested?.[1]).toMatch(/body\s*>\s*:has\(/u)
+  })
+})

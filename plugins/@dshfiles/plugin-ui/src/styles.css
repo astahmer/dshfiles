@@ -1064,15 +1064,64 @@ svg [class*='_spinnerArc_'] {
     /* The popover's own fill (council round 27, item 7): the sheet is the surface it replaces, so its tokens mean the same. */
     background: var(--dsw-alias-bg-layer-2) !important;
     backdrop-filter: none !important;
+    /* The kit scrim (council round 30, item 3): a mix of the text ink brightened the page in dark, where the ink is near-white. */
     box-shadow:
       var(--dshx-elevation-3),
-      0 0 0 100vmax color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent) !important;
+      0 0 0 100vmax var(--dshx-scrim, rgb(0 0 0 / 0.4)) !important;
     overflow-y: auto !important;
     overscroll-behavior: contain;
     transform-origin: 50% 100% !important;
     /* `backwards`, not `both`: a fill that outlives the animation keeps an (identity) transform, which makes this sheet
        the containing block of a submenu's fixed sheet rendered inside it, so a taller submenu was clipped to it. */
     animation: dshx-sheet-in var(--dshx-duration-sheet) var(--dshx-motion-ease-enter) backwards !important;
+  }
+
+  /*
+   * A sheet opened from a sheet draws no second scrim (council round 30, item 3): the first one already dims the page.
+   * Nested is either a submenu Radix renders inside its parent sheet, or a sheet in a later top-level layer (a menu
+   * portaled to the body while the app holds an open sheet, or a body-level sheet after another).
+   */
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    )
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ),
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) body > :has(:is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ))
+    ~ * :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ) {
+    box-shadow: var(--dshx-elevation-3) !important;
   }
 
   html[data-shell-phone-nav]:not([data-phone-keyboard])
