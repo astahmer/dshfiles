@@ -248,14 +248,12 @@ export const nextStatusFilters = (next: readonly string[]): readonly ThreadStatu
   THREAD_STATUS_FILTER_OPTIONS.filter((option): option is ThreadStatusFilter => isStatusFilter(option) && next.includes(option))
 
 /**
- * Where focus lands when the panel opens (council round 27, item 14): the preset in force (checked, or current while
- * edited), else the first status chip, else the first control; never the presets' ⋯ menu.
+ * Where focus lands when the panel opens (council round 27, item 14): the preset in force (checked, edited or not), else the first status chip, else the first control; never the presets' ⋯ menu.
  */
 export const filterPanelInitialFocus = (root: ParentNode): HTMLElement | null => {
   const panel = root.querySelector('[data-thread-list-filter-panel]') ?? root
   const target =
     panel.querySelector('[data-thread-presets] [role="radio"][aria-checked="true"]') ??
-    panel.querySelector('[data-thread-presets] [role="radio"][aria-current="true"]') ??
     panel.querySelector('[data-thread-status-filters] button') ??
     panel.querySelector('button:not([disabled])')
   return target instanceof HTMLElement ? target : null
@@ -416,10 +414,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                 <div key={preset.id} data-preset-row="">
                 <ToggleGroupItem
                   value={preset.id}
-                  // An edited preset is announced, not only drawn (round 28, item 3): its name says so, and it stays the
-                  // current one although nothing is checked.
+                  // An edited preset is announced, not only drawn (round 28, item 3): its name says so, and it stays
+                  // checked (round 28, item 5), so aria-checked alone marks the active preset (council round 32, item 9).
                   aria-label={active && presets.edited ? `${presetName(t, preset)}, ${t('threadSidebarPresetEditedShort')}` : presetName(t, preset)}
-                  aria-current={active ? 'true' : undefined}
                   data-preset-active={active ? '' : undefined}
                   className={cn(
                     'dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11',

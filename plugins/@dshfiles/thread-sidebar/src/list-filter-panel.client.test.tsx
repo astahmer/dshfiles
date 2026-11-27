@@ -189,19 +189,20 @@ describe('the More statuses disclosure (round 28, item 2)', () => {
 
 // Council round 27, item 3: an edited preset is announced, not only drawn.
 describe('an edited preset (round 28, item 3)', () => {
-  it('names its row ", edited" and marks it current', () => {
+  it('names its row ", edited" and keeps it checked', () => {
     const base = panel()
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
     const row = screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' })
-    expect(row.getAttribute('aria-current')).toBe('true')
-    expect(screen.getByRole('radio', { name: 'All threads' }).hasAttribute('aria-current')).toBe(false)
+    // Checked, not aria-current, since round 33 (item 9).
+    expect(row.getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('radio', { name: 'All threads' }).getAttribute('aria-checked')).toBe('false')
   })
 
   it('keeps the plain name while the preset is as saved', () => {
     render(<ListFilterPanel {...panel()} />)
-    expect(screen.getByRole('radio', { name: 'All threads' }).getAttribute('aria-current')).toBe('true')
+    expect(screen.getByRole('radio', { name: 'All threads' }).getAttribute('aria-checked')).toBe('true')
   })
 })
 
@@ -1596,4 +1597,15 @@ describe('the fold hint names its cause (round 33, item 7)', () => {
 it('gives the presets ⋯ sheet the Filters sheet content inset on a phone (round 33, item 8)', () => {
   const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
   expect(optionsMenu).toContain('<DropdownMenuContent align="end" className="dshx-root dshx:w-64 dshx:phone:px-3!"')
+})
+
+// Council round 32, item 9: the active preset is a checked radio; aria-current repeated it (and an edited one is still
+// checked, so nothing needs it any more).
+it('marks the active preset with aria-checked only (round 33, item 9)', () => {
+  const base = panel()
+  const presets = base.presets
+  if (presets === undefined) throw new Error('The fixture has presets.')
+  render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+  for (const radio of within(screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })).getAllByRole('radio')) expect(radio.hasAttribute('aria-current')).toBe(false)
+  expect(screen.getByRole('radio', { name: /^Working, /u }).getAttribute('aria-checked')).toBe('true')
 })
