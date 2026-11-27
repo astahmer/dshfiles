@@ -7,10 +7,11 @@ import { SharedRuntime } from './shared-runtime.js'
 
 /**
  * `import()` targets become package-local lazy chunks that DSH fetches through `require.async("./client.<name>.js")`.
- * Each target is bundled on its own. A module the entry bundles too is not copied: the entry exports it in a table
- * (`__dshxLazyShared`) and the chunk reads it there through `require(<owner id>)`, which the DSH loader resolves to the
- * owner's already-run exports, so both run one instance. A target the entry also imports statically, or one that emits
- * an asset (CSS), stays inlined in `client.js`.
+ * Each target is bundled on its own. A module the entry bundles too is not copied: the chunk imports it from a facade
+ * over the entry's `__dshxLazyShared` table, which it reaches through `require(<owner id>)` (the DSH loader resolves
+ * that to the owner's already-run exports), so both run one instance. The table binds only the names the chunks read,
+ * so sharing a re-export hub (dshx's client module, plugin-ui/query) keeps the entry tree-shaken. A target the entry
+ * also imports statically, or one that emits an asset (CSS), stays inlined in `client.js`.
  */
 
 /** Same length as `require.async("./`, so rewriting the rendered import keeps every source-map column after it. */
@@ -35,13 +36,20 @@ export interface LazyChunkBuild {
   readonly modules: readonly string[]
   /** Why the target cannot load as a self-contained chunk; it is then inlined. */
   readonly unsupported: string | undefined
+  /** The names the chunk reads from each shared module, by table key. */
+  readonly used: ReadonlyMap<string, readonly string[]>
 }
 
-/** A module the entry hands its chunks: an ES module by its export names, a CommonJS one as its `module.exports`. */
+/** A module the entry hands its chunks: an ES module by the names they read, a CommonJS one as its `module.exports`. */
 export interface LazySharedModule {
   readonly id: string
+  /** Every export name, so a chunk's facade links whatever its importers name. */
   readonly names: readonly string[]
   readonly commonJs: boolean
+  /** Names some chunk reads: the only ones the entry binds. */
+  readonly used: Set<string>
+  /** The import() targets whose chunks read this module; it leaves the table when none is left. */
+  readonly targets: Set<string>
 }
 
 /** Lazy-chunk decisions shared by one build and its retries; a watcher keeps them across rebuilds. */
@@ -50,6 +58,8 @@ export interface LazyChunkState {
   readonly inline: Set<string>
   /** Shared modules by table key. */
   readonly shared: Map<string, LazySharedModule>
+  /** What the current entry build's table binds, by key; a chunk reading more needs another entry build. */
+  bound: ReadonlyMap<string, ReadonlySet<string>>
   readonly emitted: Set<string>
   readonly cache: Map<string, LazyChunkBuild>
   extraModules: readonly string[]
@@ -124,24 +134,50 @@ const chunkHash = async (root: string, id: string): Promise<string> => {
 
 export class ClientLazyChunks {
   static state(): LazyChunkState {
-    return { fileNames: new Map(), inline: new Set(), shared: new Map(), emitted: new Set(), cache: new Map(), extraModules: [], retrying: false }
+    return {
+      fileNames: new Map(),
+      inline: new Set(),
+      shared: new Map(),
+      bound: new Map(),
+      emitted: new Set(),
+      cache: new Map(),
+      extraModules: [],
+      retrying: false,
+    }
   }
 
-  /** The source the entry appends so `require(<owner>).__dshxLazyShared[key]` resolves every shared module. */
+  /**
+   * The source the entry appends so `require(<owner>).__dshxLazyShared[key]` resolves every shared module. ES names are
+   * getters, so a chunk reads the binding's value when it loads, not when the entry ran.
+   */
   private static entryTable(shared: ReadonlyMap<string, LazySharedModule>): string {
-    const modules = [...shared]
-    const esm = modules.filter(([, module]) => !module.commonJs)
-    const cjs = modules.some(([, module]) => module.commonJs)
+    const esm = [...shared].filter(([, module]) => !module.commonJs && module.used.size > 0)
+    const cjs = [...shared].some(([, module]) => module.commonJs)
+    const local = (index: number, slot: number): string => `__dshxLazy${index}_${slot}`
     return [
       '',
-      ...esm.map(([key], index) => `import * as __dshxLazyShared${index} from ${JSON.stringify(`${ENTRY_SHARED_PREFIX}${key}`)}`),
+      ...esm.map(
+        ([key, module], index) =>
+          `import { ${[...module.used].map((name, slot) => `${JSON.stringify(name)} as ${local(index, slot)}`).join(', ')} } from ${JSON.stringify(`${ENTRY_SHARED_PREFIX}${key}`)}`,
+      ),
       ...(cjs ? [`import __dshxLazySharedCjs from ${JSON.stringify(ENTRY_CJS_TABLE)}`] : []),
       `export const ${SHARED_EXPORT} = Object.freeze({`,
-      ...esm.map(([key], index) => `  ${JSON.stringify(key)}: __dshxLazyShared${index},`),
+      ...esm.map(
+        ([key, module], index) =>
+          `  ${JSON.stringify(key)}: Object.freeze({ ${[...module.used].map((name, slot) => `get ${JSON.stringify(name)}() { return ${local(index, slot)} }`).join(', ')} }),`,
+      ),
       ...(cjs ? ['  ...__dshxLazySharedCjs,'] : []),
       '})',
       '',
     ].join('\n')
+  }
+
+  /** A target that falls back to client.js stops holding its shared modules, so the entry stops binding them. */
+  private static release(state: LazyChunkState, target: string): void {
+    for (const [key, module] of state.shared) {
+      module.targets.delete(target)
+      if (module.targets.size === 0) state.shared.delete(key)
+    }
   }
 
   static plugin(options: {
@@ -181,7 +217,9 @@ export class ClientLazyChunks {
         ].join('\n')
       },
       transform(code, id) {
-        if (id !== options.entryId || state.shared.size === 0) return null
+        if (id !== options.entryId) return null
+        state.bound = new Map([...state.shared].map(([key, module]) => [key, new Set(module.commonJs ? ['*'] : module.used)]))
+        if (state.shared.size === 0) return null
         return { code: `${code}${ClientLazyChunks.entryTable(state.shared)}`, map: null }
       },
       async resolveDynamicImport(source, importer) {
@@ -201,45 +239,64 @@ export class ClientLazyChunks {
         const entry = Object.values(bundle).find((item): item is Rollup.OutputChunk => item.type === 'chunk' && item.isEntry)
         if (entry === undefined || targets.size === 0) return
         const entryModules = new Set(Object.keys(entry.modules))
-        const sharedIds = new Set([...state.shared.values()].map(module => module.id))
+        const sharedIn = (chunk: LazyChunkBuild): readonly string[] => chunk.modules.filter(module => entryModules.has(module) && !isFacade(module))
         const built = new Map<string, LazyChunkBuild>()
         const retry: string[] = []
-        const newlyShared: string[] = []
+        const rebind: string[] = []
+        const inline = (id: string): void => {
+          retry.push(id)
+          ClientLazyChunks.release(state, id)
+        }
         for (const [id, fileName] of targets) {
           let chunk = state.cache.get(id)
           if (chunk === undefined) {
             chunk = await options.buildChunk(id, fileName)
             state.cache.set(id, chunk)
           }
-          const shared = chunk.modules.filter(module => entryModules.has(module) && !isFacade(module))
           // The entry runs the target itself, or the target cannot be one chunk: keep it in client.js.
-          if (chunk.unsupported !== undefined || entryModules.has(id) || shared.some(module => sharedIds.has(module))) {
-            retry.push(id)
+          if (chunk.unsupported !== undefined || entryModules.has(id)) {
+            inline(id)
             continue
           }
+          const shared = sharedIn(chunk)
           if (shared.length > 0) {
             const described = await Promise.all(shared.map(async module => ({ module, names: await exportNames(this, module) })))
             // A star re-export of an external module has names only its runtime knows: keep that target in client.js.
             if (described.some(entry => entry.names === undefined)) {
-              retry.push(id)
+              inline(id)
               continue
             }
             for (const { module, names } of described) {
-              state.shared.set(sharedKey(options.root, module), { id: module, names: names ?? [], commonJs: this.getModuleInfo(module)?.inputFormat === 'cjs' })
+              const key = sharedKey(options.root, module)
+              const known = state.shared.get(key)
+              if (known !== undefined) known.targets.add(id)
+              else state.shared.set(key, { id: module, names: names ?? [], commonJs: this.getModuleInfo(module)?.inputFormat === 'cjs', used: new Set(), targets: new Set([id]) })
             }
-            state.cache.delete(id)
-            newlyShared.push(id)
-            continue
+            // Build it again over facades: what it reads from each is what the entry must bind.
+            chunk = await options.buildChunk(id, fileName)
+            state.cache.set(id, chunk)
+            if (chunk.unsupported !== undefined || sharedIn(chunk).length > 0) {
+              inline(id)
+              continue
+            }
+          }
+          for (const [key, names] of chunk.used) {
+            const module = state.shared.get(key)
+            if (module === undefined) continue
+            module.targets.add(id)
+            for (const name of names) module.used.add(name)
+            const bound = state.bound.get(key)
+            if (bound === undefined || (!module.commonJs && names.some(name => !bound.has(name)))) rebind.push(id)
           }
           built.set(fileName, chunk)
         }
-        if (retry.length > 0 || newlyShared.length > 0) {
+        if (retry.length > 0 || rebind.length > 0) {
           for (const id of retry) state.inline.add(id)
           state.retrying = !options.watch
-          const named = (ids: readonly string[]): string => ids.map(id => relative(options.root, id)).join(', ')
+          const named = (ids: readonly string[]): string => [...new Set(ids)].map(id => relative(options.root, id)).join(', ')
           const what = [
             ...(retry.length > 0 ? [`lazy import() targets inlined: ${named(retry)}`] : []),
-            ...(newlyShared.length > 0 ? [`entry modules shared with lazy chunks of ${named(newlyShared)}`] : []),
+            ...(rebind.length > 0 ? [`entry modules shared with lazy chunks of ${named(rebind)}`] : []),
           ].join('; ')
           // A watcher cannot rebuild from inside its own generation; the next change picks the new decisions up.
           throw options.watch
@@ -340,6 +397,11 @@ export class ClientLazyChunks {
     const chunk = chunks.find(item => item.fileName === fileName)
     const map = assets.find(item => item.fileName === `${fileName}.map`)
     const modules = chunk === undefined ? [] : Object.entries(chunk.modules).flatMap(([id, module]) => (module.renderedLength > 0 ? [id] : []))
+    const used = new Map(
+      Object.entries(chunk?.modules ?? {}).flatMap(([id, module]) =>
+        id.startsWith(CHUNK_SHARED_PREFIX) && module.renderedLength > 0 ? [[id.slice(CHUNK_SHARED_PREFIX.length), module.renderedExports] as const] : [],
+      ),
+    )
     const unexpected = assets.filter(item => item !== map && !item.fileName.endsWith('.js.map'))
     const unsupported =
       chunk === undefined || chunks.length !== 1
@@ -352,6 +414,7 @@ export class ClientLazyChunks {
       map: map === undefined ? (chunk?.map?.toString() ?? undefined) : typeof map.source === 'string' ? map.source : Buffer.from(map.source).toString('utf8'),
       modules,
       unsupported,
+      used,
     }
   }
 }

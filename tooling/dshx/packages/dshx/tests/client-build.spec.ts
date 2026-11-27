@@ -1737,6 +1737,28 @@ describe('client lazy chunks', () => {
     await expect(entry.apply()).resolves.toBe('virtual-thing shared')
   })
 
+  it('binds only the names a chunk reads, so the entry stays tree-shaken', async () => {
+    const root = await temporaryProject()
+    await writeFile(
+      resolve(root, 'src/kit.ts'),
+      [
+        'export const registry = new Map<string, string>()',
+        "export const forChunk = () => 'chunk-' + 'reads'",
+        "export const unused = () => 'nobody-' + 'readsthis'",
+        '',
+      ].join('\n'),
+    )
+    await writeFile(resolve(root, 'src/heavy.ts'), "import { forChunk, registry } from './kit'\nexport const heavy = `${forChunk()} ${registry.get('k') ?? 'missing'}`\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry.replace('export function apply()', "import { registry } from './kit'\nregistry.set('k', 'shared')\nexport function apply()"))
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    const chunkFile = chunkOf(report)
+    expect(chunkFile).toBeDefined()
+    const entryCode = await readFile(resolve(root, 'dist/client.js'), 'utf8')
+    expect(entryCode).not.toContain('readsthis')
+    const { entry } = loadChunks({ entry: entryCode, chunk: await readFile(resolve(root, 'dist', chunkFile!), 'utf8') })
+    await expect(entry.apply()).resolves.toBe('chunk-reads shared')
+  })
+
   it('shares a CommonJS dependency with the entry as the same module.exports', async () => {
     const root = await temporaryProject()
     await mkdir(resolve(root, 'node_modules/fake-cjs'), { recursive: true })
