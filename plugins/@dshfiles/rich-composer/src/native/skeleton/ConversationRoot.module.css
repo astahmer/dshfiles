@@ -802,6 +802,62 @@ button.crumbEditable {
   }
 }
 
+/* Council round 34 B8: the working subagents scroll inside four rows under their fold plate, as the phone's frame shows
+   two; the dock grew to 288px (eight rows) before it scrolled. The frame is the top edge, the 32px plate, four 33px
+   rows (32px and the hairline above each) and 8px of the next row's divider and padding, never text, where the edge
+   fades (as the phone's frame); a touch screen's rows are 44px. An open row (its feed and Stop) is taller:
+   the frame grows to at least that row and the plate, so its actions are never cut (thread-sidebar sets
+   --dshfiles-dock-open-row, one row open at a time). The plate stays on top and an edge with more rows past it fades. */
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+  --dshfiles-dock-row: 32px;
+  max-height: calc(1px + var(--dshfiles-dock-row) + 4 * (var(--dshfiles-dock-row) + 1px) + 8px);
+  min-height: calc(1px + var(--dshfiles-dock-open-row, 0px));
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold])) {
+  min-height: calc(1px + var(--dshfiles-dock-row) + var(--dshfiles-dock-open-row, 0px));
+  scroll-padding-top: var(--dshfiles-dock-row);
+}
+
+@media (pointer: coarse) {
+  :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
+    --dshfiles-dock-row: 44px;
+  }
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before,
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+  position: sticky;
+  z-index: 2;
+  display: block;
+  flex: none;
+  height: 16px;
+  content: '';
+  pointer-events: none;
+  opacity: 0;
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::before {
+  top: 0;
+  margin-bottom: -16px;
+  background: linear-gradient(180deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold]))::before {
+  top: var(--dshfiles-dock-row);
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
+  bottom: 0;
+  margin-top: -16px;
+  background: linear-gradient(0deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+}
+
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-above])::before,
+:global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-below])::after {
+  opacity: 1;
+}
+
 /* Council round 8 C3: the dock attaches to the composer card. Its bottom edge meets the card's top, so the card's 1px
    ring is the one line between them; only the dock's top corners are rounded (the composer's 12px), and the card's top
    corners square off under it, so dock and composer read as one object. Council round 25, item 5: the ring is drawn

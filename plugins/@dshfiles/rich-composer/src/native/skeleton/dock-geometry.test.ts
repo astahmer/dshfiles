@@ -163,6 +163,27 @@ describe('the desktop live work dock (round six C2)', () => {
     expect(jobLine?.body).toMatch(/height: 32px;/)
   })
 
+  // Council round 34 B8: six working subagents grew the desktop dock to 231px (it scrolled only past 288px, eight rows).
+  it('scrolls the working subagents inside four rows under their fold plate, and still shows an open row whole', () => {
+    const SUBAGENTS = `:global(html:not([data-shell-phone-nav])) .composerStack > ${DOCK} > :global([data-dshfiles-live-preview-dock='subagents'])`
+    const frame = rule(SUBAGENTS)
+    expect(frame).toMatch(/--dshfiles-dock-row: 32px;/)
+    expect(frame).toMatch(/max-height: calc\(1px \+ var\(--dshfiles-dock-row\) \+ 4 \* \(var\(--dshfiles-dock-row\) \+ 1px\) \+ 8px\);/)
+    // 1px edge + the 32px plate + four 33px rows + 8px of the next row's divider and padding, where the edge fades (so the
+    // fade never sits on the fourth row's words).
+    expect(1 + 32 + 4 * (32 + 1) + 8).toBe(173)
+    const touch = blocks().find(block => block.selector === SUBAGENTS && block.context === '@media (pointer: coarse)')
+    expect(touch?.body).toMatch(/--dshfiles-dock-row: 44px;/)
+    // An open row's feed and Stop are never cut: the frame grows to at least that row, under the plate when there is one.
+    expect(frame).toMatch(/min-height: calc\(1px \+ var\(--dshfiles-dock-open-row, 0px\)\);/)
+    const folded = rule(`${SUBAGENTS}:has(> :global([data-dshfiles-live-preview-fold]))`)
+    expect(folded).toMatch(/min-height: calc\(1px \+ var\(--dshfiles-dock-row\) \+ var\(--dshfiles-dock-open-row, 0px\)\);/)
+    expect(folded).toMatch(/scroll-padding-top: var\(--dshfiles-dock-row\);/)
+    // Only an edge with more rows past it fades.
+    expect(rule(`${SUBAGENTS}::before,\n${SUBAGENTS}::after`)).toMatch(/opacity: 0;/)
+    expect(rule(`${SUBAGENTS.replace("[data-dshfiles-live-preview-dock='subagents']", "[data-dshfiles-live-preview-dock='subagents'][data-more-above]")}::before,\n${SUBAGENTS.replace("[data-dshfiles-live-preview-dock='subagents']", "[data-dshfiles-live-preview-dock='subagents'][data-more-below]")}::after`)).toMatch(/opacity: 1;/)
+  })
+
   it('attaches to the composer card: one shared 1px edge, only the dock\'s top corners rounded (council round 8 C3)', () => {
     const last = rule(`${DESK}:last-child`)
     // The dock's bottom edge meets the top of the card's 1px ring (drawn outside the card's box), the one line between
