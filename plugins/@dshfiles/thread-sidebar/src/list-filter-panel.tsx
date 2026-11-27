@@ -624,15 +624,20 @@ const StatusChips = (props: {
 }): JSX.Element => {
   const [opened, setOpened] = useState(false)
   const moreId = useId()
-  // Opened by the user: bring what it revealed into view (council round 30, item 8: below the fold on a phone), from its
-  // start, below the header's scroll padding, so its last chip is not under the bottom fade (round 31, item 4).
+  // Opened by the user: bring what it revealed into view (council round 30, item 8: below the fold on a phone), the
+  // scroller's padding keeping its last chip clear of the bottom fade, and the toggle in view (round 32, item 2).
   const revealRequested = useRef(false)
   useEffect(() => {
     if (!opened || !revealRequested.current) return
     revealRequested.current = false
     const region = document.getElementById(moreId)
-    // jsdom (the unit tests) draws no layout and has no scrollIntoView.
-    if (region !== null && 'scrollIntoView' in region) region.scrollIntoView({ block: 'start' })
+    const toggle = document.querySelector<HTMLElement>(`[aria-controls="${moreId}"]`)
+    // jsdom (the unit tests) draws no layout and has no scrollIntoView. Nearest, inside the scroller's padding (council
+    // round 32, item 2): `start` scrolled the pressed toggle up under the header; then the toggle itself, so the control
+    // just pressed (by tap or keyboard) never leaves the scrollport (WCAG 2.4.11).
+    if (region === null || !('scrollIntoView' in region)) return
+    region.scrollIntoView({ block: 'nearest' })
+    toggle?.scrollIntoView({ block: 'nearest' })
   }, [moreId, opened])
   const forced = props.selected.some(filter => !isLeadingStatus(filter))
   // Latched open once forced (council round 29, item 3): turning the last revealed status off never folds the region
@@ -740,7 +745,9 @@ const StatusChips = (props: {
           spacing={1}
           // The full width and one column, as the leading row's group (council round 31, item 3: the kit's ToggleGroup is
           // w-fit, so the revealed chips came out 18px short of the ones above).
-          className="dshx:grid dshx:w-full dshx:grid-cols-[minmax(0,1fr)] dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2"
+          // A 4px scroll margin over the scroller's 24px padding, so the reveal leaves its last chip at least 24px above the
+          // panel's bottom even when the scroll lands on a subpixel (council round 32, item 2).
+          className="dshx:grid dshx:w-full dshx:scroll-mb-1 dshx:grid-cols-[minmax(0,1fr)] dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2"
           data-thread-status-more-region=""
         >
           {expanded

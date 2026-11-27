@@ -1291,7 +1291,7 @@ describe('the desktop panel holds its top (round 31, item 7)', () => {
 
 // Council round 30, item 8: on a phone the revealed statuses opened below the fold; they scroll into view.
 describe('More statuses reveals into view (round 31, item 8)', () => {
-  it('scrolls the revealed region into view from its start when More opens it, and not when it folds', () => {
+  it('scrolls the revealed region into view, keeping the toggle in view, when More opens it, and not when it folds (round 33, item 2)', () => {
     const calls: { readonly target: Element; readonly options: ScrollIntoViewOptions | boolean | undefined }[] = []
     const original = Element.prototype.scrollIntoView
     Element.prototype.scrollIntoView = function (this: Element, options?: ScrollIntoViewOptions | boolean) {
@@ -1302,10 +1302,16 @@ describe('More statuses reveals into view (round 31, item 8)', () => {
       const more = screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })
       fireEvent.click(more)
       const region = document.getElementById(more.getAttribute('aria-controls') ?? '')
-      // To the start since round 32 (item 4), so the last revealed chip is not under the bottom fade.
-      expect(calls).toEqual([{ target: region, options: { block: 'start' } }])
+      // Nearest since round 33 (item 2; the scroller's scroll padding keeps the fade clear), then the toggle itself, so
+      // the control just pressed never scrolls out of view.
+      expect(calls).toEqual([
+        { target: region, options: { block: 'nearest' } },
+        { target: more, options: { block: 'nearest' } },
+      ])
+      // Its last chip ends at least 24px above the panel's bottom: the scroller's 24px padding and the region's 4px margin.
+      expect(region?.className).toContain('dshx:scroll-mb-1')
       fireEvent.click(more)
-      expect(calls).toHaveLength(1)
+      expect(calls).toHaveLength(2)
     } finally {
       // jsdom has no scrollIntoView: put the prototype back as it was, not with an own `undefined` property.
       if (original === undefined) Reflect.deleteProperty(Element.prototype, 'scrollIntoView')
