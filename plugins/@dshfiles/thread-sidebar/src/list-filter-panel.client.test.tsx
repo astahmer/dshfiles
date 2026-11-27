@@ -516,7 +516,7 @@ describe('preset tallies (round 29, item 2)', () => {
     expect(working.querySelector('[data-slot="status-glyph"]')).toBeNull()
     expect(screen.getByRole('radio', { name: 'Done, 3 threads' }).querySelector('[data-slot="status-glyph"]')).toBeNull()
     const empty = screen.getByRole('radio', { name: 'Empty' })
-    expect(empty.querySelector('[data-preset-count]')).toBeNull()
+    expect(empty.querySelector('[data-preset-count]')?.textContent).toBe('')
     expect(empty.querySelector('[data-slot="status-glyph"]')).toBeNull()
   })
 })
@@ -904,5 +904,43 @@ describe('preset rows draw no mark (round 30, item 7)', () => {
     expect(done.querySelector('[data-slot="status-glyph"]')).toBeNull()
     expect(done.querySelector('[data-preset-count]')?.textContent).toBe('3')
     expect(english).not.toContain('threadSidebarPresetNeedsYou_one')
+  })
+})
+
+// Council round 29, item 6: fixed end columns. Every preset row ends on one 20px right-aligned tabular count column,
+// edited or not, empty at zero; Save and Discard sit after the "edited" tag and before that column; an edited preset
+// counts what the list draws.
+describe('preset end columns (round 30, item 6)', () => {
+  const COLUMN = ['dshx:w-5', 'dshx:shrink-0', 'dshx:text-right', 'dshx:tabular-nums']
+  it('ends every row on the same count column, empty at zero, the edited row included', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(
+      <ListFilterPanel
+        {...base}
+        presets={{ ...presets, activeId: 'working', edited: true, items: [...presets.items, { id: 'empty', label: 'Empty', count: 0 }] }}
+      />,
+    )
+    const rows = within(screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })).getAllByRole('radio')
+    for (const row of rows) {
+      const count = element(row.querySelector('[data-preset-count]'))
+      for (const token of COLUMN) expect(count.className, row.getAttribute('aria-label') ?? '').toContain(token)
+      expect(row.lastElementChild).toBe(count)
+    }
+    expect(screen.getByRole('radio', { name: 'Empty' }).querySelector('[data-preset-count]')?.textContent).toBe('')
+  })
+
+  it('puts Save and Discard before the count column, never over it', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const { container } = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    // The row's 6px padding, the 20px column and an 8px gap: the buttons end 34px from the row's end.
+    expect(element(container.querySelector('[data-preset-actions]')).className).toContain('dshx:right-[34px]')
+  })
+
+  it('counts an edited preset by what the list draws, in its row and its name', () => {
+    expect(filterControl).toContain('view.id === listThreadView.id && presetEdited ? visibleThreadEntries.length')
   })
 })

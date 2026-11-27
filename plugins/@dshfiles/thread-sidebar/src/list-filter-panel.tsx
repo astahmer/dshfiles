@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/com
 import { ArchiveIcon, BellOffIcon, BookmarkPlusIcon, CheckIcon, CircleCheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { plural } from '@dshfiles/dshx/client'
-import { useId, useRef, useState, type ReactNode } from 'react'
+import { useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { threadStatusFilterGroupLabelKeys, threadStatusFilterLabelKeys, type ThreadSidebarTranslate } from './thread-view-manager.js'
 import {
   THREAD_SOURCE_FILTER_OPTIONS,
@@ -175,6 +175,8 @@ const RowIconButton = (props: { readonly label: string; readonly onClick: () => 
   )
 }
 
+/** Where an edited row's Save and Discard end: the row's 6px padding, the 20px count column and an 8px gap. */
+const ACTIONS_END = 34
 const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
 /**
  * A quiet verb row (council round 27, item 16): its 16px glyph on the panel's one glyph column, 12px in (a 6px bleed,
@@ -212,6 +214,13 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const ids = useId()
   const presets = props.presets
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const actionsRef = useRef<HTMLDivElement | null>(null)
+  // The edited row's Save and Discard: their width, so the label gives way to exactly them (their text on a phone).
+  const [actionsWidth, setActionsWidth] = useState(0)
+  const editingId = presets?.edited === true ? presets.activeId : undefined
+  useLayoutEffect(() => {
+    setActionsWidth(actionsRef.current?.offsetWidth ?? 0)
+  }, [editingId])
   /** Save and Discard vanish as they act: focus moves to the preset row first, never to the page (round 28, item 18). */
   const focusPresetThen =
     (action: () => void): (() => void) =>
@@ -303,11 +312,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                   aria-label={active && presets.edited ? `${presetName(t, preset)}, ${t('threadSidebarPresetEditedShort')}` : presetName(t, preset)}
                   aria-current={active ? 'true' : undefined}
                   data-preset-active={active ? '' : undefined}
-                  className={cn(
-                    'dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11',
-                    // Room for the two 24px buttons (44px seats on a coarse pointer) over the row's end.
-                    editing && 'dshx:pr-14 dshx:pointer-coarse:pr-23',
-                  )}
+                  className="dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11"
+                  // While edited, the label gives way to Save and Discard, which sit before the count column.
+                  style={editing && actionsWidth > 0 ? { paddingRight: `${String(actionsWidth + ACTIONS_END + 8)}px` } : undefined}
                 >
                   {/* The check says which preset the list shows; "· edited" says it changed (no dot: council round 29, item 1). */}
                   <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-preset-seat="">
@@ -321,15 +328,15 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                       </span>
                     ) : null}
                   </span>
-                  {/* A plain row count in the secondary ink; a zero draws nothing (DESIGN.md › Layout › Counts). */}
-                  {preset.count === null || preset.count === 0 ? null : (
-                    <span className="dshx:min-w-4 dshx:shrink-0 dshx:text-right dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-preset-count="">
-                      {preset.count}
-                    </span>
-                  )}
+                  {/* One fixed end column on every row, edited or not (council round 29, item 6): a 20px right-aligned
+                      count in the secondary ink, empty at zero (DESIGN.md › Layout › Counts). */}
+                  <span className="dshx:w-5 dshx:shrink-0 dshx:text-right dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-preset-count="">
+                    {preset.count === null || preset.count === 0 ? '' : preset.count}
+                  </span>
                 </ToggleGroupItem>
                 {editing ? (
-                  <div className="dshx:absolute dshx:inset-y-0 dshx:right-1 dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:right-0 dshx:pointer-coarse:gap-0">
+                  // After the "edited" tag, before the count column: the row's 6px, the 20px column and an 8px gap (34px).
+                  <div ref={actionsRef} className="dshx:absolute dshx:inset-y-0 dshx:right-[34px] dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:gap-0" data-preset-actions="">
                     {preset.id === presets.builtInId ? (
                       // The built-in All threads is never overwritten (council round 28, item 13): its edits become a new preset.
                       <RowIconButton label={t('threadSidebarPresetSaveAsNew')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">

@@ -6820,7 +6820,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
             presetsOn
               ? {
                   items: viewTabs.map(({ view, label }) => {
-                    return { id: view.id, label, count: view.showCount === false ? null : (presetTallies.get(view.id) ?? null) }
+                    // An edited preset counts what the list draws now (council round 29, item 6), in its row and its name.
+                    const count = view.id === listThreadView.id && presetEdited ? visibleThreadEntries.length : (presetTallies.get(view.id) ?? null)
+                    return { id: view.id, label, count: view.showCount === false ? null : count }
                   }),
                   activeId: listThreadView.id,
                   edited: presetEdited,
