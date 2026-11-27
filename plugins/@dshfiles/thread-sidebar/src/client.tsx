@@ -6898,7 +6898,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                     project: { short: props.tSidebar(threadGroupLabelKeys.project), name: props.tSidebar(threadGroupLabelKeys.project) },
                     date: { short: props.tSidebar(threadGroupLabelKeys.date), name: props.tSidebar(threadGroupLabelKeys.date) },
                     // "Manual" so the five fit one segmented row; its name stays "Arrange manually".
-                    status: { short: props.tSidebar('threadSidebarGroupManualShort'), name: props.tSidebar(threadGroupLabelKeys.status) },
+                    // Label in name (council round 31, item 6): the visible "Custom" leads its name.
+                    status: { short: props.tSidebar('threadSidebarGroupManualShort'), name: props.tSidebar('threadSidebarGroupManualName') },
                     none: { short: props.tSidebar(threadGroupLabelKeys.none), name: props.tSidebar(threadGroupLabelKeys.none) },
                   },
                   onChange: groupBy => updateThreadView({ groupBy }),

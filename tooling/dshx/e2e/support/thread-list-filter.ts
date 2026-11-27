@@ -109,9 +109,12 @@ const openSidebarSettings = async (page: Page): Promise<void> => {
   await clickItem(page, page.getByRole('region', { name: 'Threads', exact: true }), 'Sidebar settings')
 }
 
+/** The panel's segment reads "Custom" and is named "Custom, arrange manually" (round 32, item 6); the Board keeps "Arrange manually". */
+const panelGroupName = (name: string): string => (name === 'Arrange manually' ? 'Custom, arrange manually' : name)
+
 const selectGroup = async (page: Page, scope: Locator, name: string): Promise<void> => {
   if (await hasMenu(scope)) {
-    await (await open(scope)).getByRole('radiogroup', { name: 'Group by', exact: true }).getByRole('radio', { name, exact: true }).click()
+    await (await open(scope)).getByRole('radiogroup', { name: 'Group by', exact: true }).getByRole('radio', { name: panelGroupName(name), exact: true }).click()
     await close(page)
     return
   }
@@ -188,7 +191,7 @@ const expectGroup = async (page: Page, scope: Locator, name: string): Promise<vo
     return
   }
   const group = (await open(scope)).getByRole('radiogroup', { name: 'Group by', exact: true })
-  await expect(group.getByRole('radio', { name, exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(group.getByRole('radio', { name: panelGroupName(name), exact: true })).toHaveAttribute('aria-checked', 'true')
   await close(page)
 }
 

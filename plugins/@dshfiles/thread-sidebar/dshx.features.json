@@ -465,7 +465,7 @@
       "reach": [
         "expect region \"Threads\"",
         "click button \"Filter: *\"",
-        "expect radio \"Arrange manually\"",
+        "expect radio \"Custom, arrange manually\"",
         "press Escape",
         "expect button \"Filter: *\""
       ],
@@ -3260,7 +3260,7 @@
         "expect region \"Needs you\"",
         "expect button \"Resume all\"",
         "click button \"Filter: *\"",
-        "click radio \"Arrange manually\"",
+        "click radio \"Custom, arrange manually\"",
         "press Escape",
         "expect region \"Usage limit\"",
         "expect button \"Resume this thread\""

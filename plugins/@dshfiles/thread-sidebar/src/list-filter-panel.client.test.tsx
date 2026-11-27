@@ -1446,3 +1446,9 @@ describe('Discard is the quiet action (round 32, item 5)', () => {
     expect(source).toContain("label={t('threadSidebarPresetDiscardChanges', { name: preset.label })}")
   })
 })
+
+// Council round 31, item 6 (WCAG 2.5.3, label in name): the segment that reads "Custom" is named "Custom, arrange manually".
+it('names the Custom segment with its visible word first (round 32, item 6)', () => {
+  expect(english).toContain("threadSidebarGroupManualName: 'Custom, arrange manually',")
+  expect(filterControl).toContain("status: { short: props.tSidebar('threadSidebarGroupManualShort'), name: props.tSidebar('threadSidebarGroupManualName') }")
+})
