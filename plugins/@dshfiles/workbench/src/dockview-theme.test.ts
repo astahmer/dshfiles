@@ -22,3 +22,27 @@ describe('the tab chrome (round five T5, council round 6 B6)', () => {
     expect(css).toMatch(/\.dshfiles-workbench-theme \.dv-tabs-container > \.dv-tab \{\s*padding-inline: 0;/u)
   })
 })
+
+describe('a tab close on a coarse pointer (merge 534773f0)', () => {
+  // The 20px close drew a 44px ::after hit area, but the next tab and dockview's horizontal scrollbar overlay sat above
+  // it, and the strip's clip cut the last tab's area at its end: a tap 20px right of or below the glyph missed it.
+  const coarse = /@media \(pointer: coarse\) \{([\s\S]*?)\n\}/u.exec(css)?.[1] ?? ''
+  const rule = (selector: string): string => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')
+    return new RegExp(`${escaped} \\{([^}]*)\\}`, 'u').exec(coarse)?.[1] ?? ''
+  }
+
+  it('keeps the 44px hit area round the 20px glyph', () => {
+    expect(rule('.dshfiles-workbench-theme [data-workbench-tab-close]::after')).toMatch(/inset: min\(0px, calc\(\(100% - 44px\) \/ 2\)\);/u)
+  })
+
+  it('raises the close over the next tab and the strip scrollbar', () => {
+    const close = rule('.dshfiles-workbench-theme [data-workbench-tab-close]')
+    expect(close).toMatch(/position: relative;/u)
+    expect(close).toMatch(/z-index: 1;/u)
+  })
+
+  it('ends each tab 12px after its close, so the strip never clips the hit area', () => {
+    expect(rule('.dshfiles-workbench-theme [data-workbench-tab-id]')).toMatch(/padding-inline-end: 12px;/u)
+  })
+})

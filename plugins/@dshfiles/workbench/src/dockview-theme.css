@@ -130,10 +130,17 @@
   mask-image: linear-gradient(to right, transparent, currentColor 28px, currentColor calc(100% - 28px), transparent);
 }
 
-/* Touch has no hover (visual refresh T5.4): a tab's close answers a 44pt tap. */
+/* Touch has no hover (visual refresh T5.4): a tab's close answers a 44pt tap. Raised over the next tab and dockview's
+ * horizontal scrollbar overlay, which otherwise took the area's right and bottom edges; each tab ends 12px after its
+ * close, so the strip's clip never cuts the area (merge 534773f0). */
 @media (pointer: coarse) {
   .dshfiles-workbench-theme [data-workbench-tab-close] {
     position: relative;
+    z-index: 1;
+  }
+
+  .dshfiles-workbench-theme [data-workbench-tab-id] {
+    padding-inline-end: 12px;
   }
 
   .dshfiles-workbench-theme [data-workbench-tab-close]::after {
