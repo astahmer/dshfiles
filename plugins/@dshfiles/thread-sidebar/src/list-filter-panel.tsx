@@ -185,8 +185,6 @@ const RowIconButton = (
   )
 }
 
-/** Where an edited row's Save and Discard end: the row's 6px padding, the 20px count column and an 8px gap. */
-const ACTIONS_END = 34
 const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
 /**
  * A quiet verb row (council round 27, item 16): its 16px glyph on the panel's one glyph column, 12px in (a 6px bleed,
@@ -344,8 +342,6 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                   aria-current={active ? 'true' : undefined}
                   data-preset-active={active ? '' : undefined}
                   className="dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11"
-                  // While edited, the label gives way to Save and Discard, which sit before the count column.
-                  style={editing && actionsWidth > 0 ? { paddingRight: `${String(actionsWidth + ACTIONS_END + 8)}px` } : undefined}
                 >
                   {/* The check says which preset the list shows; "· edited" says it changed (no dot: council round 29, item 1). */}
                   <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-preset-seat="">
@@ -359,6 +355,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                       </span>
                     ) : null}
                   </span>
+                  {editing ? (
+                    // The seat Save and Discard lie over, between the label and the count, so the count stays at the row's
+                    // end and the label gives way to exactly their width.
+                    <span aria-hidden="true" className="dshx:shrink-0" style={{ width: `${String(actionsWidth)}px` }} data-preset-actions-seat="" />
+                  ) : null}
                   {/* One fixed end column on every row, edited or not (council round 29, item 6): a 20px right-aligned
                       count in the secondary ink, empty at zero (DESIGN.md › Layout › Counts). */}
                   <span className="dshx:w-5 dshx:shrink-0 dshx:text-right dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground" data-preset-count="">

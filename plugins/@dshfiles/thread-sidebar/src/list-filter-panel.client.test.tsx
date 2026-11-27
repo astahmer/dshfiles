@@ -1088,3 +1088,19 @@ describe('the trigger count (round 30, item 11)', () => {
     expect(english).toContain("threadSidebarFiltersOn_other: '{count} filters on',")
   })
 })
+
+// Found in the round-30 phone capture (item 6): the edited row reserved Save and Discard's width as right padding, after
+// the count column, so on a phone the count drew before "Save Discard". The room is a seat before the count instead.
+describe("the edited row's count stays at its end (round 30, item 6)", () => {
+  it('reserves Save and Discard a seat between the label and the count, never padding after the count', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const row = screen.getByRole('radio', { name: /^Working, /u })
+    expect(row.style.paddingRight).toBe('')
+    const seat = element(row.querySelector('[data-preset-actions-seat]'))
+    expect(seat.nextElementSibling?.hasAttribute('data-preset-count')).toBe(true)
+    expect(seat.previousElementSibling?.hasAttribute('data-preset-label')).toBe(true)
+  })
+})
