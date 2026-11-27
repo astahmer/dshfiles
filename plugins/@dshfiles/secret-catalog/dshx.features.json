@@ -811,12 +811,5 @@
       ]
     }
   ],
-  "kind": "bundle",
-  "ioDelegation": [
-    {
-      "file": "src/secret-mcp.ts",
-      "tracedBy": "secret mcp run",
-      "reason": "Child-process client for the `secret mcp` server; the SecretMcp service opens the `secret mcp run` span around every call."
-    }
-  ]
+  "kind": "bundle"
 }
