@@ -1380,3 +1380,20 @@ describe('the desktop trigger fits its name (round 32, item 1)', () => {
     expect(trigger).toContain('{scopeSlot !== null && scopeCount !== null ? (')
   })
 })
+
+// Council round 31, item 3: the revealed status groups sat in a ToggleGroup without w-full (the kit's is w-fit), so their
+// chips came out 18px short of the leading row's on a desktop and 10px on a phone. The region spans the width, one column.
+describe('revealed chips share the grid above (round 32, item 3)', () => {
+  it('gives the More region the full width and the leading row its column template', () => {
+    render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    const region = element(document.querySelector('[data-thread-status-more-region]'))
+    expect(region.className).toContain('dshx:w-full')
+    expect(region.className).toContain('dshx:grid-cols-[minmax(0,1fr)]')
+    const leading = element(screen.getByRole('group', { name: 'threadSidebarFilterGroupActivity' }))
+    // Each revealed group's layout (the two-column grid, its gaps, the full width) is the leading row's.
+    const tokens = leading.className.split(/\s+/u)
+    for (const group of Array.from(region.querySelectorAll('[data-thread-status-group]')))
+      for (const token of group.className.split(/\s+/u)) expect(tokens, token).toContain(token)
+  })
+})

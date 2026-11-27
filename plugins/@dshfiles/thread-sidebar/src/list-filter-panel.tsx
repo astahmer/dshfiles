@@ -718,7 +718,9 @@ const StatusChips = (props: {
           value={revealed}
           onValueChange={next => toggle(nextStatusFilters(next), leading)}
           spacing={1}
-          className="dshx:grid dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2"
+          // The full width and one column, as the leading row's group (council round 31, item 3: the kit's ToggleGroup is
+          // w-fit, so the revealed chips came out 18px short of the ones above).
+          className="dshx:grid dshx:w-full dshx:grid-cols-[minmax(0,1fr)] dshx:gap-1.5 dshx:empty:hidden dshx:pointer-coarse:gap-2"
           data-thread-status-more-region=""
         >
           {expanded
