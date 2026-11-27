@@ -2,6 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import * as Schema from 'effect/Schema'
+import { findEventTypesSchema } from '../src/api-schemas.js'
 import { findExpression } from '../src/find-query.js'
 import type { SearchIndex } from '../src/index-db.js'
 import { runWithIndex } from './index-harness.js'
@@ -36,6 +38,16 @@ describe('findExpression', () => {
   it('refuses text without a searchable word', () => {
     expect(findExpression('')).toBeNull()
     expect(findExpression(' - * " ')).toBeNull()
+  })
+})
+
+describe('findEventTypesSchema', () => {
+  it('keeps the set of event types open but refuses a bare word that would match nothing', () => {
+    const accepts = (types: readonly string[]) => Schema.decodeUnknownResult(findEventTypesSchema)(types)._tag === 'Success'
+    expect(accepts(['assistant/message', 'tool/call', 'todo/write'])).toBe(true)
+    expect(accepts(['assistant'])).toBe(false)
+    expect(accepts(['Tool/call'])).toBe(false)
+    expect(accepts([])).toBe(false)
   })
 })
 
