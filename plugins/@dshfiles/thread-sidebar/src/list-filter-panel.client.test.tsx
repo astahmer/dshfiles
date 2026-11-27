@@ -605,14 +605,13 @@ describe('an edited preset keeps its identity (round 29, item 5)', () => {
     return { props, onApply }
   }
 
-  it('stays checked, with its check, an edited dot in the same seat and the tag inline after the label', () => {
+  it('stays checked, with its check and the tag inline after the label', () => {
     render(<ListFilterPanel {...edited().props} />)
     const row = screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' })
     expect(row.getAttribute('aria-checked')).toBe('true')
     expect(row.getAttribute('data-state')).toBe('on')
     const seat = row.querySelector('[data-preset-seat]')
     expect(seat?.querySelector('svg')).not.toBeNull()
-    expect(seat?.querySelector('[data-preset-edited-dot]')).not.toBeNull()
     const label = row.querySelector('[data-preset-label]')
     expect(label?.textContent).toBe('Working · threadSidebarPresetEditedShort')
     const tag = label?.querySelector('[data-preset-edited-tag]')
@@ -847,5 +846,18 @@ describe('a preset counts the rows the list shows (round 29, item 2)', () => {
     expect(tallies).toContain('threadEntriesForSource(view.sourceFilter)')
     expect(tallies).toContain('matchesListStatus(entry, view)')
     expect(tallies).not.toContain('matchesAttentionView')
+  })
+})
+
+// Council round 29, item 1: the edited dot on the check read as one odd glyph; "· edited" and Save/Discard say it.
+describe('no edited dot (round 30, item 1)', () => {
+  it('draws only the check in an edited preset seat', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const { container } = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    expect(container.querySelector('[data-preset-edited-dot]')).toBeNull()
+    const seat = element(container.querySelector('[data-preset-active] [data-preset-seat]'))
+    expect(seat.children).toHaveLength(1)
   })
 })

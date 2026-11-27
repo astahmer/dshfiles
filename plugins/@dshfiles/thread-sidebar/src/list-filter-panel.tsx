@@ -334,12 +334,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                     editing && 'dshx:pr-14 dshx:pointer-coarse:pr-23',
                   )}
                 >
-                  {/* The check says which preset the list shows; an edited one adds a dot at the check's corner. */}
-                  <span className="dshx:relative dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-preset-seat="">
+                  {/* The check says which preset the list shows; "· edited" says it changed (no dot: council round 29, item 1). */}
+                  <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-preset-seat="">
                     {active ? <CheckIcon className="dshx:size-4" /> : null}
-                    {active && presets.edited ? (
-                      <span className="dshx:absolute dshx:-top-0.5 dshx:-right-0.5 dshx:size-1.5 dshx:rounded-full dshx:bg-foreground" data-preset-edited-dot="" />
-                    ) : null}
                   </span>
                   <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left" data-preset-label="">
                     {preset.label}
