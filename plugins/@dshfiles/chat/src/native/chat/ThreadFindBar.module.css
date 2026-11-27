@@ -198,8 +198,9 @@
   }
 
   .filter {
-    height: 30px;
-    padding: 0 10px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0 12px;
   }
 }
 
