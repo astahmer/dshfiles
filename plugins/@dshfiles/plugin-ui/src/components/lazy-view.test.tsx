@@ -11,12 +11,10 @@ afterEach(() => {
 
 const deferred = <T,>() => {
   let resolve!: (value: T) => void
-  let reject!: (reason: unknown) => void
-  const promise = new Promise<T>((done, fail) => {
+  const promise = new Promise<T>(done => {
     resolve = done
-    reject = fail
   })
-  return { promise, resolve, reject }
+  return { promise, resolve }
 }
 
 const Panel = (props: { readonly name: string }) => <p>panel {props.name}</p>
