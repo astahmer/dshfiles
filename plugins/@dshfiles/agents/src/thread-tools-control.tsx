@@ -76,7 +76,9 @@ export const ThreadToolsControl = (props: ThreadToolsControlProps): ReactNode =>
           aria-label={label}
           data-thread-tools={state.value}
           data-thread-tools-source={access.data.policy.source}
-          className="dshx-root dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:min-w-11"
+          // The bar's 28px chip height: the composer row gives every button its 44pt tap area, so a taller box would only
+          // grow the bar and pull Send off the + control's line (council round 34 A2).
+          className="dshx-root dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-muted-foreground dshx:hover:text-foreground"
           onMouseDown={event => event.preventDefault()}
         >
           <WrenchIcon aria-hidden />

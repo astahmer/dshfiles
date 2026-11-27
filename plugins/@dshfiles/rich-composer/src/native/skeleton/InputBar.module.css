@@ -988,10 +988,12 @@
     --dsh-composer-send-seat: 92px;
   }
 
+  /* Send's centre is the row's line (council round 34 A2): the row's 8px bottom pad plus half its 32px model chip, so a
+     28px Send sits 10px up and a touch screen's 32px Send 8px up (below). */
   .send {
     position: absolute;
     right: 8px;
-    bottom: 8px;
+    bottom: 10px;
     z-index: 1;
   }
 
@@ -1019,10 +1021,12 @@
   white-space: nowrap;
 }
 
+/* A touch screen's 32px Send sits on the row's 8px bottom pad (council round 34 A2): a touch-only 6px put it 2px under
+   the + control's line, and a fine pointer's 28px Send at 8px sat 2px under it too. */
 @media (pointer: coarse) {
   @container (max-width: 560px) {
     .send {
-      bottom: 6px;
+      bottom: 8px;
     }
   }
 }

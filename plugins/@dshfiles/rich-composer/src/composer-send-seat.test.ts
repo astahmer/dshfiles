@@ -68,6 +68,23 @@ describe('the composer send seat (council round 13 C3)', () => {
   })
 })
 
+// Council round 34 A2: on a phone Send sat 2px under the + control's line (7.8px once a 44px chip grew the row).
+describe('Send on the bar\'s line (council round 34 A2)', () => {
+  it('shares the row\'s centre on a narrow card: Send\'s centre is the row\'s bottom pad plus half its 32px model chip', () => {
+    const pad = Number(/padding: 0 8px (\d+)px;/.exec(rules('', '.row'))?.[1])
+    const line = 32
+    const bottomOf = (body: string): number => Number(/bottom: (\d+)px;/.exec(body)?.[1])
+    // A fine pointer: the narrow rule (the first .send block under the container query) and the 28px Send.
+    const fine = bottomOf(rules('@container (max-width: 560px)', '.send'))
+    const fineSend = Number(/height: (\d+)px;/.exec(rules('', '.primary'))?.[1])
+    expect(fine + fineSend / 2).toBe(pad + line / 2)
+    // Touch: the coarse narrow rule and the 32px Send.
+    const touch = bottomOf(rules('@media (pointer: coarse)', '.send').split('\n').filter(line => /bottom:/.test(line)).join('\n'))
+    const touchSend = Number(/height: (\d+)px;/.exec(rules('@media (pointer: coarse)', '.primary'))?.[1])
+    expect(touch + touchSend / 2).toBe(pad + line / 2)
+  })
+})
+
 describe('Stop is quiet (council round 25, item 6)', () => {
   const STOP = '.primary:is([data-send-mode=\'stop\'], [data-stop]):not(:disabled)'
 

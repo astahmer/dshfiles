@@ -119,6 +119,17 @@ describe('the running thread Tools control', () => {
     expect(button?.getAttribute('aria-label')).toBe("Tools: @reviewer's tools. Thread agent @reviewer (project default). Change tools")
   })
 
+  // Council round 34 A2: a 44px Tools button made the phone bar 12px taller and put Send 8px off the + control's line.
+  // The bar's chips draw at 28px and take their 44pt tap area from the composer row (InputBar.module.css).
+  it("draws at the bar's chip height on touch, like the agent chip of a new thread", async () => {
+    const container = await render(control(access(null)))
+    const tools = container.querySelector<HTMLButtonElement>('button[data-thread-tools]')
+    expect(tools?.className).not.toMatch(/pointer-coarse:min-[hw]-/u)
+    act(() => root?.unmount())
+    const chipContainer = await render(chip({ agents: [dsh, reviewer], defaults: [{ projectId: 'w-app', handle: 'reviewer' }] }))
+    expect(trigger(chipContainer)?.className).not.toMatch(/pointer-coarse:min-[hw]-/u)
+  })
+
   it('shows an all-tools override', async () => {
     const container = await render(control(access({ kind: 'all' })))
     const button = container.querySelector<HTMLButtonElement>('button[data-thread-tools]')

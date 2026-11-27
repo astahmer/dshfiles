@@ -101,7 +101,8 @@ export const ComposerAgentChip = (props: ComposerAgentChipProps): ReactNode => {
           data-composer-agent={handle}
           data-composer-agent-source={resolution.source}
           aria-label={`New thread runs as @${handle} (${ComposerAgent.sourceLabel(resolution.source)}). Change agent`}
-          className="dshx-root dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:min-h-11"
+          // The bar's 28px chip height; the composer row gives it a 44pt tap area (council round 34 A2).
+          className="dshx-root dshx:min-w-0 dshx:shrink dshx:gap-1 dshx:px-2 dshx:text-muted-foreground dshx:hover:text-foreground"
           onMouseDown={event => event.preventDefault()}
         >
           <BotIcon aria-hidden />
