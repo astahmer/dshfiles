@@ -25,6 +25,6 @@
 
 /* Phone key row (plan P20): keys a software keyboard cannot send, above the screen. */
 .keyRow { display: flex; flex: none; gap: 4px; align-items: center; padding: 4px 8px; overflow-x: auto; border-bottom: 1px solid var(--dsw-alias-border-l1); background: var(--dsw-alias-bg-l1); overscroll-behavior-x: contain; }
-.keyButton { flex: none; min-width: 44px; height: 40px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font: inherit; font-size: var(--dshx-density-text-ui); line-height: 1; }
+.keyButton { flex: none; min-width: 44px; min-height: 44px; padding: 0 10px; border: 1px solid var(--dsw-alias-border-l2); border-radius: var(--dsw-radius-md); color: var(--dsw-alias-label-primary); background: var(--dsw-alias-bg-base); font: inherit; font-size: var(--dshx-density-text-ui); line-height: 1; }
 .keyButton:active { background: var(--dsw-alias-interactive-bg-hover); }
 .keyButton:disabled { opacity: 0.45; }
