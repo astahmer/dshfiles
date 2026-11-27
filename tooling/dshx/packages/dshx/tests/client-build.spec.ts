@@ -1737,6 +1737,21 @@ describe('client lazy chunks', () => {
     await expect(entry.apply()).resolves.toBe('virtual-thing shared')
   })
 
+  it('shares the dshx client module, which the entry plugin resolves to a virtual module', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/heavy.ts'), "import { defineContract } from '@dshfiles/dshx/client'\nexport const heavy = `${typeof defineContract} lazy` + 'only'\n")
+    await writeFile(
+      resolve(root, 'src/client.tsx'),
+      lazyEntry.replace('export function apply()', "import { defineContract } from '@dshfiles/dshx/client'\nexport const contract = defineContract\nexport function apply()"),
+    )
+    const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist' })
+    const chunkFile = chunkOf(report)
+    expect(chunkFile).toBeDefined()
+    const chunkCode = await readFile(resolve(root, 'dist', chunkFile!), 'utf8')
+    const { entry } = loadChunks({ entry: await readFile(resolve(root, 'dist/client.js'), 'utf8'), chunk: chunkCode })
+    await expect(entry.apply()).resolves.toBe('function lazyonly')
+  })
+
   it('binds only the names a chunk reads, so the entry stays tree-shaken', async () => {
     const root = await temporaryProject()
     await writeFile(

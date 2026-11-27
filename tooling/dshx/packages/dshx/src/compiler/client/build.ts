@@ -798,8 +798,9 @@ async function clientConfig(
           ClientCompilerGuards.singleClientChunkPlugin(lazyState.emitted),
         ]
       : [
-          clientEntryPlugin(paths, options),
+          // First, so it also sees the specifiers the entry plugin resolves to virtual modules (@dshfiles/dshx/client).
           ClientLazyChunks.chunkPlugin({ root: paths.root, state: lazyState, packageId: options.packageId }),
+          clientEntryPlugin(paths, options),
           ClientCompilerGuards.clientGuardPlugin(externals, options.packageId, bundleDependencies),
           ...userPlugins,
           ...consumer,
