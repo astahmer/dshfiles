@@ -21,13 +21,15 @@ inside this package, so no slot or settings plugin can reach it.
 
 ## Local delta
 
-| File                                  | Change                                                                                                                                                                                                                                                                          |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `src/native/model-selection-state.ts` | adds `dshfilesSubagentModelSelectionPolicy`, a Host-only projection over the same events that keeps the latest one, and `followingSubagentModelSelection`, a policy reader that appends a replacement event when the enabled setting's route list differs from the recorded one |
-| `src/native/index.ts`                 | the delegation and `list_subagent_models` tools read the policy through that following reader; a fresh-child tool declares `agent` and starts the child as the resolved agent (route, preset, preamble, reserved `childId` recorded before the start)                              |
-| `src/native/list-models.ts`           | with no arguments, appends the agents the caller may start (`agent-selection.ts`)                                                                                                                                                                                                |
-| `src/native/agent-selection.ts`       | added: the `agent` argument's description, validation, route/prompt merge and listing text                                                                                                                                                                                       |
-| `src/agent-resolver.ts`               | added, outside the vendored tree: the `@dshfiles/tool-subagent/agent-resolver` contract                                                                                                                                                                                         |
+| File                                  | Change                                                                                                                                                                                                                                                                                                                                              |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/native/model-selection-state.ts` | adds `dshfilesSubagentModelSelectionPolicy`, a Host-only projection over the same events that keeps the latest one, and `followingSubagentModelSelection`, a policy reader that appends a replacement event when the enabled setting's route list differs from the recorded one                                                                     |
+| `src/native/index.ts`                 | the delegation and `list_subagent_models` tools read the policy through that following reader; a fresh-child tool declares `agent` and starts the child as the resolved agent (route, preset, preamble, reserved `childId` recorded before the start); its config declares `childTurnGuard` and installs the guard ([below](#the-child-turn-guard)) |
+| `src/native/list-models.ts`           | with no arguments, appends the agents the caller may start (`agent-selection.ts`)                                                                                                                                                                                                                                                                   |
+| `src/native/agent-selection.ts`       | added: the `agent` argument's description, validation, route/prompt merge and listing text                                                                                                                                                                                                                                                          |
+| `src/agent-resolver.ts`               | added, outside the vendored tree: the `@dshfiles/tool-subagent/agent-resolver` contract                                                                                                                                                                                                                                                             |
+| `src/child-turn-guard.ts`             | added, outside the vendored tree: the hand-back patterns, the per-turn tracker and the verdict                                                                                                                                                                                                                                                      |
+| `src/child-turn-guard-host.ts`        | added, outside the vendored tree: the `agent/turn-stopping` listener, the bounded resume and the parent notice                                                                                                                                                                                                                                      |
 
 The fork folds under its own key because the native settings row registers the shared `subagentModelSelectionPolicy`
 unit first, and the projection registry shares the first definition of a key, so a changed fold on the shared key
@@ -82,6 +84,54 @@ and `@dshfiles/agents` provides as the `dshfilesSubagentAgents` Cordis service. 
 `src/agent-selection.test.ts` mounts the real tool on the real tool, LLM and subagent runtimes with a fake backend
 and resolver: schema, explicit agent, record-before-start, default agent, inherit, refusal, no provider, precedence,
 fork and listing.
+
+## The child turn guard
+
+A child can read a long brief as a handoff: it spends a few calls on setup, closes its turn as `completed` with
+"no implementation yet, please reassign", and the parent receives a hand-back as if it were the result. On
+2026-11-27, 8 of 9 implementation children from `gpt-6.1-terra` ended that way
+(`thread-410c9f`'s diagnosis; the models that drove on used `todo_write`/`job_output` loops and passed a far larger
+gate set).
+
+The guard listens at the loop's awaited `agent/turn-stopping` event in a delegated child's own turn. When that turn
+
+1. is `completed` and in a Session whose header `origin` is `subagent`,
+2. made fewer than `minToolCalls` tool calls, and
+3. closed with text matching `handBackPatterns` (case-insensitive regular expressions),
+
+it steers one continuing message (`resumeMessage`) instead of letting the turn close. The loop re-reads its inbox,
+runs another step in the same turn, and only then can the child settle; the parent never sees the hand-back as the
+result. Each child may receive at most `maxResumes` messages. After that the guard reports normally and notes the
+hand-back to the parent once, so a real blocker costs at most two extra steps instead of vanishing.
+
+A turn that made `minToolCalls` calls is ordinary work, whatever it says, and a turn that closes with ordinary text is
+never touched: the guard cannot fire on a normal finish. It costs one regex test on the closing message of a completed
+turn.
+
+```yaml
+# profiles/web/cordis.patch.yml, inside the preset-standard `delegation` group
+- id: tool-subagent
+  name: '@dshfiles/tool-subagent'
+  config:
+    provider: spawn
+    toolName: subagent
+    childTurnGuard:
+      enabled: true # false is the off switch
+      minToolCalls: 3 # a turn with this many tool calls is work; 0 guards any count
+      maxResumes: 2 # continuing messages one child may receive
+      handBackPatterns: ['reassign', 'cannot implement', 'no implementation', 'hand[- ]?off', 'take over']
+      resumeMessage: 'You stopped without implementing. Continue: the next step.'
+```
+
+The canonical `subagent` row owns the policy: the guard installs only from the row whose `toolName` is
+`subagent` (the default), so the `subagent_fork` row's defaults can never contradict the switch set here. Any other
+copy that does see the same child turns shares one resume budget and one stop boundary resumes once. A child spawned
+under a preset without this package, or a composition that renames the tool, has no guard. The defaults apply without
+any `childTurnGuard` block; a Host restart is needed once after the row changes.
+
+`src/child-turn-guard.test.ts` drives a scripted child through the real agent loop and spawn backend: one hand-back
+then work, three hand-backs hitting the budget with the parent notice, a busy turn whose wording reads like a
+hand-back, a normal finish, and the off switch. The decision rules are unit-tested beside it.
 
 ## Wiring
 

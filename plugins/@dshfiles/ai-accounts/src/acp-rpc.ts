@@ -31,6 +31,8 @@ export class AcpRequestFailed extends Error {
   }
 }
 
+type AcpRequestAnswer = { readonly result: AcpJson } | undefined
+
 export class AcpRpc {
   private nextId = 1
   private readonly pending = new Map<
@@ -46,7 +48,7 @@ export class AcpRpc {
       /** A notification from the agent, such as `session/update`. */
       readonly onNotification: (method: string, params: AcpJson) => void
       /** A request from the agent, such as `session/request_permission`: the result sent back, or none for an unsupported method. */
-      readonly onRequest: (method: string, params: AcpJson) => { readonly result: AcpJson } | undefined
+      readonly onRequest: (method: string, params: AcpJson) => AcpRequestAnswer | Promise<AcpRequestAnswer>
     },
   ) {}
 
@@ -95,11 +97,20 @@ export class AcpRpc {
       this.input.onNotification(message.method, message.params ?? null)
       return
     }
-    const answer = this.input.onRequest(message.method, message.params ?? null)
-    if (answer === undefined) {
-      this.write({ jsonrpc: '2.0', id: message.id, error: { code: -32601, message: `DSH does not serve ${message.method}` } })
-      return
+    void this.respond(message.id, message.method, message.params ?? null)
+  }
+
+  private async respond(id: string | number, method: string, params: AcpJson): Promise<void> {
+    try {
+      const answer = await this.input.onRequest(method, params)
+      if (this.closedWith !== undefined) return
+      if (answer === undefined) {
+        this.write({ jsonrpc: '2.0', id, error: { code: -32601, message: `DSH does not serve ${method}` } })
+        return
+      }
+      this.write({ jsonrpc: '2.0', id, result: answer.result })
+    } catch {
+      if (this.closedWith === undefined) this.write({ jsonrpc: '2.0', id, error: { code: -32603, message: 'DSH could not answer the ACP request.' } })
     }
-    this.write({ jsonrpc: '2.0', id: message.id, result: answer.result })
   }
 }

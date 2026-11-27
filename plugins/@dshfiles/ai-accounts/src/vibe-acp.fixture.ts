@@ -51,13 +51,14 @@ let directories = []
 let model = 'deepseek-v4-1-flash-1017'
 let thinking = 'low'
 let agent = 'default'
+let mode = 'accept-edits'
 const sessionId = 'session-' + process.pid
 let steps = 0
 let promptTokens = 0
 let completionTokens = 0
 let cachedTokens = 0
 const options = () => [
-  { id: 'mode', currentValue: 'ask', options: [{ value: 'ask', name: 'Ask' }, { value: 'accept-edits', name: 'Accept Edits' }] },
+  { id: 'mode', currentValue: mode, options: [{ value: 'ask', name: 'Ask' }, { value: 'accept-edits', name: 'Accept Edits' }] },
   { id: 'agent', currentValue: agent, options: agentNames(directories).map(value => ({ value, name: value })) },
   {
     id: 'model',
@@ -102,6 +103,11 @@ createInterface({ input: process.stdin }).on('line', async line => {
     }
     return reply({ sessionId, configOptions: options() })
   }
+  if (message.method === 'session/set_mode') {
+    mode = message.params.modeId
+    log('set_mode ' + mode)
+    return reply({})
+  }
   if (message.method === 'session/set_config_option') {
     const value = message.params.value
     if (message.params.configId === 'model') model = value
@@ -136,10 +142,16 @@ createInterface({ input: process.stdin }).on('line', async line => {
       })
     if (text.includes('CALL_TOOL')) {
       log('tool_call-before-bridge')
-      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'Echo', kind: 'other', status: 'pending', rawInput: { value: 'ping' }, name: 'dsh_' + toolName })
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'Echo', kind: 'other', status: 'pending', rawInput: { value: 'ping' }, _meta: { tool_name: 'mcp_dsh.' + toolName } })
       const called = await mcp('tools/call', { name: toolName, arguments: { value: 'ping' } })
       log('bridge-answered')
       say('tool said ' + called.result.content.map(block => block.text).join(''))
+      return answer()
+    }
+    if (text.includes('PERMISSION_READ')) {
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_read', title: 'Read file', kind: 'read', status: 'pending', _meta: { tool_name: 'read_file' } })
+      const decision = await permission({ sessionId, toolCall: { toolCallId: 'call_read' }, options: [{ optionId: 'allow_once', kind: 'allow_once' }, { optionId: 'reject_once', kind: 'reject_once' }] })
+      say(decision.result?.outcome?.optionId === 'allow_once' ? 'builtin allowed' : 'builtin denied')
       return answer()
     }
     if (text.includes('PERMISSION_BUILTIN')) {
@@ -149,11 +161,15 @@ createInterface({ input: process.stdin }).on('line', async line => {
       return answer()
     }
     if (text.includes('PERMISSION')) {
-      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_p1', title: 'Echo', kind: 'other', status: 'pending', rawInput: { value: 'ping' }, name: 'dsh_' + toolName })
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_p1', title: 'Echo', kind: 'other', status: 'pending', rawInput: { value: 'ping' }, _meta: { tool_name: 'mcp_dsh.' + toolName } })
       const decision = await permission({ sessionId, toolCall: { toolCallId: 'call_p1' }, options: [{ optionId: 'allow_once', kind: 'allow_once', name: 'Allow once' }, { optionId: 'reject_once', kind: 'reject_once', name: 'Reject' }] })
       log('permission ' + JSON.stringify(decision.result))
       if (decision.result?.outcome?.optionId !== 'allow_once') {
-        say('denied')
+        say('tool_denied: Tool execution denied by approval callback')
+        return answer()
+      }
+      if (text.includes('CANCEL_BEFORE_MCP')) {
+        say('Vibe cancelled its pending call')
         return answer()
       }
       const called = await mcp('tools/call', { name: toolName, arguments: { value: 'ping' } })
@@ -162,9 +178,17 @@ createInterface({ input: process.stdin }).on('line', async line => {
       return answer()
     }
     if (text.includes('BUILTIN_WRITE')) {
-      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_w1', title: 'Write sneaky.txt', kind: 'edit', status: 'pending', rawInput: { path: '/synthetic/sneaky.txt' }, name: 'write_file' })
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_w1', title: 'Write sneaky.txt', kind: 'edit', status: 'pending', rawInput: { path: '/synthetic/sneaky.txt' }, _meta: { tool_name: 'write_file', effect_kind: 'file_write' } })
       update(sessionId, { sessionUpdate: 'tool_call_update', toolCallId: 'call_w1', status: 'completed', rawOutput: { written: true } })
       say('wrote nothing DSH did not bridge')
+      return answer()
+    }
+    // Vibe 3.1.5 keeps its own shell whatever the agent profile says, and asks the client before running it.
+    if (text.includes('BUILTIN_BASH')) {
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_bash', title: 'bash', kind: 'execute', status: 'pending', rawInput: { command: 'true' }, _meta: { tool_name: 'bash', effect_kind: 'shell' } })
+      const decision = await permission({ sessionId, toolCall: { toolCallId: 'call_bash' }, options: [{ optionId: 'allow_once', kind: 'allow_once' }, { optionId: 'allow_always', kind: 'allow_always' }, { optionId: 'reject_once', kind: 'reject_once' }] })
+      log('permission ' + JSON.stringify(decision.result))
+      say(decision.result?.outcome?.optionId === 'allow_once' ? 'bash ran' : 'tool_denied: Tool execution denied by approval callback')
       return answer()
     }
     say('echo ' + process.pid + ' ' + model + '/' + thinking + '/' + agent + ': ' + text)

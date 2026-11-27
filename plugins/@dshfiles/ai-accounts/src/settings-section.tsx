@@ -325,6 +325,41 @@ export const AiAccountsSettingsSection = (props: { readonly close: () => void; r
         </Row>
       </Group>
 
+      <Group
+        heading="Mistral Vibe ACP"
+        description="Applies to Vibe accounts switched to ACP host tools. DSH tools always use the calling session’s permissions."
+      >
+        <Row label="Vibe builtin approvals">
+          {id => (
+            <Select
+              disabled={readOnly || preferences.vibe.strictTools}
+              value={preferences.vibe.acpApprovalPolicy}
+              onValueChange={value => {
+                if (value === 'ask' || value === 'session') write(settings.set('vibe', { ...preferences.vibe, acpApprovalPolicy: value }))
+              }}
+            >
+              <SelectTrigger className="dshx:w-36" id={id} size="sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="session">Follow session</SelectItem>
+                <SelectItem value="ask">Ask in DSH</SelectItem>
+              </SelectContent>
+            </Select>
+          )}
+        </Row>
+        <Row label="Only use DSH tools">
+          {id => (
+            <Switch
+              checked={preferences.vibe.strictTools}
+              disabled={readOnly}
+              id={id}
+              onCheckedChange={value => write(settings.set('vibe', { ...preferences.vibe, strictTools: value }))}
+            />
+          )}
+        </Row>
+      </Group>
+
       <FailureRecoveryGroup readOnly={readOnly} write={write} />
       {!preferences.failureRecovery.exhausted.failover ? (
         <Group

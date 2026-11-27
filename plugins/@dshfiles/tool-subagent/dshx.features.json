@@ -7,14 +7,9 @@
       "title": "Subagent models follow your setting",
       "summary": "Running threads use the subagent models you allowed in Settings without a restart.",
       "details": "The forked subagent and subagent_fork tools keep upstream's schema and delegation behaviour, but the allowed child model routes are re-read from the Subagents model-selection setting at each delegation or list_subagent_models call. A changed list appends a replacement subagent/model-selection-policy event, and the policy projection keeps the latest one, so a route added after a thread started is accepted without a new thread.",
-      "surfaces": [
-        "host"
-      ],
+      "surfaces": ["host"],
       "configuration": [],
-      "states": [
-        "enabled",
-        "disabled-mid-session"
-      ],
+      "states": ["enabled", "disabled-mid-session"],
       "failureModes": [
         "A profile whose preset-standard delegation rows still name @deepseek-ai/dsh-tool-subagent keeps the frozen per-Session route list.",
         "A thread that started with model selection off keeps a tool without provider/model fields until a new thread; turning the setting off mid-thread keeps the last recorded routes."
@@ -54,16 +49,9 @@
       "title": "subagent starts a child as a configured agent",
       "summary": "The subagent tool takes an agent handle, so a child starts with that agent's model, preset, instructions and tools.",
       "details": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's route (explicit provider/model win and stay under the Session policy; the agent's own route is admitted because the user configured it), its preset (explicit agent_preset wins) and a bounded preamble before the task; the tool reserves the child's Session id and records its agent before starting it, so the child's first request has that agent's tools. subagent_fork takes no agent. list_subagent_models without arguments also lists the agents the caller may start.",
-      "surfaces": [
-        "host"
-      ],
+      "surfaces": ["host"],
       "configuration": [],
-      "states": [
-        "no-provider",
-        "inherit",
-        "agent",
-        "refused"
-      ],
+      "states": ["no-provider", "inherit", "agent", "refused"],
       "failureModes": [
         "Without @dshfiles/agents loaded, agent is refused with the plugin to enable; omitting it keeps upstream behavior.",
         "A backend outside the Host (no reserved child ids) refuses agent, since the agent's tools could not apply to it."
@@ -109,6 +97,97 @@
       "surface": "agentToolOnly",
       "destination": "none",
       "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)"
+    },
+    {
+      "id": "child-turn-guard",
+      "title": "Keep a delegated child working when its turn hands the task back",
+      "summary": "A delegated child that ends a turn as completed after fewer than minToolCalls tool calls while its closing text hands the task back (reassign, cannot complete, no implementation, hand back, take over) receives one continuing message at the loop's turn-stopping boundary, so the same turn runs another step instead of the parent receiving a hand-back as the child's result. The guard is bounded per child: after maxResumes messages it reports the completion normally and notes the hand-back to the parent. A turn that made enough tool calls, or that closed with ordinary text, is never touched.",
+      "surfaces": ["host"],
+      "configuration": [
+        {
+          "key": "childTurnGuard.enabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; false is the off switch.",
+          "coveredBy": ["tool-subagent.guard-off"]
+        },
+        {
+          "key": "childTurnGuard.minToolCalls",
+          "defaultValue": "3",
+          "constraints": "Non-negative integer; a turn with at least this many tool calls is ordinary work, 0 guards any tool count.",
+          "coveredBy": ["tool-subagent.guard-busy-turn"]
+        },
+        {
+          "key": "childTurnGuard.maxResumes",
+          "defaultValue": "2",
+          "constraints": "Non-negative integer; continuing messages one child may receive before the parent is told.",
+          "coveredBy": ["tool-subagent.guard-budget"]
+        },
+        {
+          "key": "childTurnGuard.handBackPatterns",
+          "defaultValue": "reassign, cannot complete, no implementation, not implemented yet, hand back, handoff, take over",
+          "constraints": "Case-insensitive regular expression sources; an invalid source is reported and skipped.",
+          "coveredBy": ["tool-subagent.guard-patterns"]
+        },
+        {
+          "key": "childTurnGuard.resumeMessage",
+          "defaultValue": "You stopped without implementing. Continue: implement the next step of your task; only stop on a real blocker, and name it.",
+          "constraints": "Non-empty text of the one continuing message.",
+          "coveredBy": ["tool-subagent.guard-resume"]
+        }
+      ],
+      "states": ["off", "hand-back-resumed", "budget-exhausted", "ordinary-finish"],
+      "failureModes": [
+        "A child spawned under a preset without this package has no guard; its hand-back stays a completed result.",
+        "Only a completed stop boundary is inspected: an errored or aborted child turn already reports itself.",
+        "A real blocker reported as a hand-back costs up to maxResumes extra steps before the parent sees it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-patterns",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "recognizes every hand-back wording the child sessions used, and no ordinary finish"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-busy-turn",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "never touches a busy turn whose closing text happens to read like a hand-back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-resume",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "resumes a child that hands the task back, instead of reporting its hand-back as the result"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-budget",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "stops resuming after the budget and tells the parent the closing answer is a hand-back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "tool-subagent.guard-off",
+          "file": "plugins/@dshfiles/tool-subagent/src/child-turn-guard.test.ts",
+          "testName": "stays off when the row switches it off"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "tool-subagent.guard-no-browser-surface",
+          "reason": "Host-only policy over a child Session's turn; no client surface changes and the real-runtime tests drive a scripted child through the agent loop."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Runs synchronously inside the agent loop's turn-stopping dispatch in the child Session and performs no I/O of its own; its one action is a Session-logged message."
+        }
+      ],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "host: delegated child turns"
     }
   ]
 }
