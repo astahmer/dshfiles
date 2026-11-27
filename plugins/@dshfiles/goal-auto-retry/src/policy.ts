@@ -8,22 +8,14 @@
  */
 
 /** Failure codes that mean the account, not the request, has to wait. */
-export const RETRYABLE_CODES: readonly string[] = [
-  'ACCOUNT_QUOTA',
-  'ACCOUNT_SIGN_IN_REQUIRED',
-  'ACCOUNT_TOKEN_INVALID',
-  'CONTEXT_WINDOW_EXCEEDED',
-  'PI_AI_ERROR',
-  'QUOTA',
-  'RATE_LIMIT',
-]
+export const RETRYABLE_CODES: readonly string[] = ['ACCOUNT_QUOTA', 'ACCOUNT_SIGN_IN_REQUIRED', 'ACCOUNT_TOKEN_INVALID', 'PI_AI_ERROR', 'QUOTA', 'RATE_LIMIT']
 
 /**
  * `PI_AI_ERROR` is the provider-neutral fallback pi-ai reports when it has no
  * more specific code, so the message decides whether it is a waitable account
  * refusal or something a retry will only repeat.
  */
-const PI_AI_REFUSAL_PATTERN = /usage limit|rate.?limit|quota|exceeded|resets?|try again|too many requests|out of credits|you can retry/i
+const PI_AI_REFUSAL_PATTERN = /usage limit|rate.?limit|quota|resets?|try again|too many requests|out of credits|you can retry/i
 
 export interface FailureFacts {
   readonly code: string
@@ -125,7 +117,6 @@ export class ProviderTiming {
  */
 const retryable = (failure: FailureFacts): boolean => {
   if (failure.code === 'PI_AI_ERROR') return PI_AI_REFUSAL_PATTERN.test(failure.message)
-  if (failure.code === 'CONTEXT_WINDOW_EXCEEDED') return false
   return RETRYABLE_CODES.includes(failure.code)
 }
 

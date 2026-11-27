@@ -4,7 +4,7 @@ import type { GoalView } from '@deepseek-ai/dsh-goal'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import z from '@deepseek-ai/schemastery'
 import { Api, HostContext } from '@dshfiles/dshx/effect'
-import { Effect } from 'effect'
+import { Duration, Effect, Fiber } from 'effect'
 import { defineHost } from '@dshfiles/dshx/host'
 import { goalAutoRetryApi, type ArmingView, type PendingRetryView, type RetryFailureView, type RetryStatusView } from './api.js'
 import {
@@ -97,9 +97,11 @@ interface FailureFacts {
   readonly providerRetryAfterMs?: number
 }
 
+/** `LlmError.failure` carries `providerRetryAfterMs` only when the provider sent a Retry-After, so it is optional here. */
 const isFailureFacts = (value: unknown): value is FailureFacts => {
-  if (typeof value !== 'object' || value === null || !('code' in value)) return false
-  return 'message' in value && 'providerRetryAfterMs' in value
+  if (typeof value !== 'object' || value === null || !('code' in value) || !('message' in value)) return false
+  if (typeof value.code !== 'string' || typeof value.message !== 'string') return false
+  return !('providerRetryAfterMs' in value) || value.providerRetryAfterMs === undefined || typeof value.providerRetryAfterMs === 'number'
 }
 
 const isSubagentsService = (value: unknown): value is SubagentsService => typeof value === 'object' && value !== null && 'ownerOf' in value
@@ -183,12 +185,19 @@ const pendingView = (retry: PendingRetry): PendingRetryView => ({
  *
  * One timer per Session, replaced when a new refusal arrives. The timer runs on
  * the Host, not in a browser tab: closing the tab must not cancel the resume.
+ *
+ * Refusals are counted per goal across the resumes this manager fires, because a
+ * fired resume is not a success: the round it starts can be refused again. The
+ * count starts over when the goal changes, when it ran more than the one round a
+ * resume starts, or when a human resumes it.
  */
 export class GoalAutoRetry {
   readonly pending = new Map<string, PendingRetry>()
   readonly failed = new Map<string, { readonly retry: PendingRetry; readonly reason: string }>()
   private readonly armings = new Map<string, { readonly enabled: boolean; readonly delayMinutes: number }>()
-  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
+  private readonly timers = new Map<string, Fiber.Fiber<void>>()
+  private readonly attempts = new Map<string, { readonly goalId: string; readonly roundsStarted: number; readonly retry: PendingRetry }>()
+  private readonly resuming = new Set<string>()
 
   constructor(
     private readonly ctx: HostServices,
@@ -227,7 +236,9 @@ export class GoalAutoRetry {
     const sessionId = String(input.agent.id)
     const goal = this.goals?.get(input.agent)
     if (goal === undefined) return false
-    const attempt = (this.pending.get(sessionId)?.attempt ?? 0) + 1
+    const previous = this.attempts.get(sessionId)
+    const consecutive = previous !== undefined && previous.goalId === goal.id && goal.roundsStarted - previous.roundsStarted <= 1
+    const attempt = consecutive ? previous.retry.attempt + 1 : 1
     if (attempt > config.maxAttempts) {
       this.giveUp(sessionId, `gave up after ${String(config.maxAttempts)} refused attempts`)
       return false
@@ -246,7 +257,7 @@ export class GoalAutoRetry {
       maxBackoffMs: config.maxBackoffMinutes * 60_000,
     })
     this.failed.delete(sessionId)
-    this.arm({
+    const retry: PendingRetry = {
       sessionId,
       goalId: goal.id,
       revision: goal.revision,
@@ -255,7 +266,9 @@ export class GoalAutoRetry {
       delayMs: plan.delayMs,
       source: plan.source,
       failure: input.failure,
-    })
+    }
+    this.attempts.set(sessionId, { goalId: goal.id, roundsStarted: goal.roundsStarted, retry })
+    this.arm(retry)
     this.ctx.logger.info('goal-auto-retry: goal "%s" of thread "%s" retries in %s (%s)', goal.id, sessionId, describeWait(plan.delayMs), plan.source)
     return true
   }
@@ -270,13 +283,21 @@ export class GoalAutoRetry {
 
   cancel(sessionId: string): void {
     this.clearTimer(sessionId)
-    const had = this.pending.delete(sessionId) || this.failed.delete(sessionId)
-    if (had) this.publish(sessionId)
+    this.attempts.delete(sessionId)
+    const hadPending = this.pending.delete(sessionId)
+    const hadFailed = this.failed.delete(sessionId)
+    if (hadPending || hadFailed) this.publish(sessionId)
   }
 
-  /** A human resumed by hand: the pending resume is spent, so drop it without touching the goal. */
+  /**
+   * A human resumed by hand: the pending resume is spent, so drop it without
+   * touching the goal, and count refusals from zero again. DSH reports this
+   * manager's own resume through the same event, which is not a human one.
+   */
   noteManualResume(agent: Agent): void {
     const sessionId = String(agent.id)
+    if (this.resuming.has(sessionId)) return
+    this.attempts.delete(sessionId)
     if (!this.pending.has(sessionId)) return
     this.clearTimer(sessionId)
     this.pending.delete(sessionId)
@@ -312,11 +333,14 @@ export class GoalAutoRetry {
       this.fail(sessionId, `the goal used its ${String(goal.maxGoalRounds)} rounds`)
       return
     }
+    this.resuming.add(sessionId)
     try {
       goals.resume(agent, { id: goal.id, revision: goal.revision })
     } catch (error) {
       this.fail(sessionId, error instanceof Error ? error.message : String(error))
       return
+    } finally {
+      this.resuming.delete(sessionId)
     }
     this.pending.delete(sessionId)
     this.publish(sessionId)
@@ -327,23 +351,29 @@ export class GoalAutoRetry {
     this.pending.clear()
     this.failed.clear()
     this.armings.clear()
+    this.attempts.clear()
   }
 
   private arm(retry: PendingRetry): void {
     this.clearTimer(retry.sessionId)
     this.pending.set(retry.sessionId, retry)
     const delay = Math.min(Math.max(1, retry.at - Date.now()), 2 ** 31 - 1)
-    const timer = setTimeout(() => {
-      this.timers.delete(retry.sessionId)
-      this.fire(retry.sessionId)
-    }, delay)
-    timer.unref?.()
+    const timer = Effect.runFork(
+      Effect.sleep(Duration.millis(delay)).pipe(
+        Effect.andThen(
+          Effect.sync(() => {
+            this.timers.delete(retry.sessionId)
+            this.fire(retry.sessionId)
+          }),
+        ),
+      ),
+    )
     this.timers.set(retry.sessionId, timer)
     this.publish(retry.sessionId)
   }
 
   private fail(sessionId: string, reason: string): void {
-    const retry = this.pending.get(sessionId)
+    const retry = this.pending.get(sessionId) ?? this.attempts.get(sessionId)?.retry
     if (retry === undefined) return
     this.pending.delete(sessionId)
     this.clearTimer(sessionId)
@@ -360,8 +390,8 @@ export class GoalAutoRetry {
   private clearTimer(sessionId: string): void {
     const timer = this.timers.get(sessionId)
     if (timer === undefined) return
-    clearTimeout(timer)
     this.timers.delete(sessionId)
+    Effect.runFork(Fiber.interrupt(timer))
   }
 }
 

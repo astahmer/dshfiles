@@ -21,6 +21,7 @@ describe('retryable refusals', () => {
     expect(RetryPolicy.isRetryableFailure({ code: 'CONTEXT_WINDOW_EXCEEDED', message: 'context exceeded, try again in a new thread' })).toBe(false)
     expect(RetryPolicy.isRetryableFailure({ code: 'INVALID_REQUEST', message: 'bad request' })).toBe(false)
     expect(RetryPolicy.isRetryableFailure({ code: 'TRANSPORT', message: 'socket closed' })).toBe(false)
+    expect(RetryPolicy.isRetryableFailure({ code: 'PI_AI_ERROR', message: "This model's maximum context length was exceeded" })).toBe(false)
   })
 })
 

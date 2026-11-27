@@ -91,6 +91,51 @@ describe('goal auto retry timing', () => {
     f.manager.dispose()
   })
 
+  it('keeps counting refusals across the resumes it fired, so the attempt limit and the backoff still apply', () => {
+    const f = harness()
+    const failure = { code: 'QUOTA', message: 'quota exceeded' }
+    const refuseAndFire = (): boolean => {
+      const scheduled = f.manager.schedule({ agent: asAgent(f.agent), failure })
+      const retry = f.manager.pending.get('session-1')
+      if (retry !== undefined) f.manager.fire('session-1', retry.at + 1)
+      return scheduled
+    }
+    expect(refuseAndFire()).toBe(true)
+    expect(refuseAndFire()).toBe(true)
+    expect(f.manager.schedule({ agent: asAgent(f.agent), failure })).toBe(true)
+    expect(f.manager.pending.get('session-1')?.attempt).toBe(3)
+    expect(f.manager.pending.get('session-1')?.delayMs).toBeGreaterThan(5 * 60_000 + 3 * 60_000)
+    f.manager.fire('session-1', (f.manager.pending.get('session-1')?.at ?? 0) + 1)
+    expect(f.manager.schedule({ agent: asAgent(f.agent), failure })).toBe(false)
+    expect(f.manager.status('session-1')).toMatchObject({ kind: 'failed' })
+    f.manager.dispose()
+  })
+
+  it('its own resume, which DSH reports as a goal resume, does not count as a human one', () => {
+    const f = harness()
+    f.resume.mockImplementation(agent => {
+      f.manager.noteManualResume(agent)
+      return goalOf()
+    })
+    const failure = { code: 'QUOTA', message: 'quota exceeded' }
+    f.manager.schedule({ agent: asAgent(f.agent), failure })
+    f.manager.fire('session-1', (f.manager.pending.get('session-1')?.at ?? 0) + 1)
+    f.manager.schedule({ agent: asAgent(f.agent), failure })
+    expect(f.manager.pending.get('session-1')?.attempt).toBe(2)
+    f.manager.dispose()
+  })
+
+  it('starts counting again once the goal made progress between two refusals', () => {
+    const f = harness()
+    const failure = { code: 'QUOTA', message: 'quota exceeded' }
+    f.manager.schedule({ agent: asAgent(f.agent), failure })
+    f.manager.fire('session-1', (f.manager.pending.get('session-1')?.at ?? 0) + 1)
+    f.replaceGoal(goalOf({ roundsStarted: 9 }))
+    f.manager.schedule({ agent: asAgent(f.agent), failure })
+    expect(f.manager.pending.get('session-1')?.attempt).toBe(1)
+    f.manager.dispose()
+  })
+
   it('stays paused with a reason when the goal was replaced', () => {
     const f = harness({ goal: goalOf() })
     f.manager.schedule({ agent: asAgent(f.agent), failure: { code: 'QUOTA', message: 'try again in 2 min' } })
@@ -135,6 +180,16 @@ describe('what counts as a retryable refusal', () => {
     )
     expect(failure?.code).toBe('PI_AI_ERROR')
     expect(failure?.resetAtMs).toBeGreaterThan(Date.now())
+  })
+
+  it('reads an LlmError whose provider sent no Retry-After, which is how a usage limit usually arrives', () => {
+    const failure = RetryInputs.failure(
+      Object.assign(new Error('usage limit'), {
+        code: 'PI_AI_ERROR',
+        failure: { code: 'PI_AI_ERROR', message: 'You have hit your ChatGPT usage limit (plus plan). Try again in ~246 min.' },
+      }),
+    )
+    expect(failure).toEqual({ code: 'PI_AI_ERROR', message: 'You have hit your ChatGPT usage limit (plus plan). Try again in ~246 min.' })
   })
 
   it('control: a plain error with no failure code is not retryable', () => {
