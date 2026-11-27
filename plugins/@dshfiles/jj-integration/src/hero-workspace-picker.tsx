@@ -5,12 +5,12 @@ import { errorMessage, keepPreviousData, useQuery } from '@dshfiles/plugin-ui/qu
 import {
   ProjectFolderPicker,
   type DirectoryPickerPort,
+  type PickerAddAction,
   type ProjectFolderSelection,
   type RegisteredProject,
   type WorkspacePickerPorts,
 } from '@dshfiles/workspace-folder-picker/picker'
 import { useApi, useSettings } from '@dshfiles/dshx/client'
-import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { FolderOpenIcon, FolderPlusIcon, GitBranchIcon } from '@dshfiles/plugin-ui/icons'
 import { ProjectFolderSetup } from '@dshfiles/workspace-folder-picker/project-folder-setup'
 import { ProjectCloneDialog } from '@dshfiles/workspace-folder-picker/project-clone-dialog'
@@ -251,38 +251,14 @@ export const HeroWorkspacePicker = (
       .catch(() => undefined)
   }
 
-  const addActions = (
-    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-      {pickerCapabilities.data?.nativePicker === true ? (
-        <Button className="dshx:shrink-0" onClick={pickExistingFolder} size="sm" type="button" variant="outline">
-          <FolderOpenIcon aria-hidden />
-          Add folder…
-        </Button>
-      ) : null}
-      <Button
-        className="dshx:shrink-0"
-        disabled={projectTools.data?.jj !== true}
-        onClick={() => setAddDialog('create')}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
-        <FolderPlusIcon aria-hidden />
-        Create project…
-      </Button>
-      <Button
-        className="dshx:shrink-0"
-        disabled={projectTools.data?.git !== true}
-        onClick={() => setAddDialog('clone')}
-        size="sm"
-        type="button"
-        variant="outline"
-      >
-        <GitBranchIcon aria-hidden />
-        Clone repository…
-      </Button>
-    </div>
-  )
+  // Buttons in a wide picker, one Add menu in a phone sheet (the picker decides by its own width).
+  const addActions: PickerAddAction[] = [
+    ...(pickerCapabilities.data?.nativePicker === true
+      ? [{ id: 'add-folder', label: 'Add folder…', icon: <FolderOpenIcon aria-hidden />, onSelect: pickExistingFolder }]
+      : []),
+    { id: 'create', label: 'Create project…', icon: <FolderPlusIcon aria-hidden />, disabled: projectTools.data?.jj !== true, onSelect: () => setAddDialog('create') },
+    { id: 'clone', label: 'Clone repository…', icon: <GitBranchIcon aria-hidden />, disabled: projectTools.data?.git !== true, onSelect: () => setAddDialog('clone') },
+  ]
 
   return (
     <>
@@ -294,7 +270,8 @@ export const HeroWorkspacePicker = (
           recentFolders={recentFolders}
           pinnedWorkspaceIds={pinnedWorkspaceIds}
           directoryPicker={directoryPicker}
-          headerActions={addActions}
+          addActions={addActions}
+          projectColors={toneSettings.value?.projectColors}
           onRegisterWorkspace={async path => {
             const project = await props.ports.registerWorkspace(path)
             await projects.refetch()

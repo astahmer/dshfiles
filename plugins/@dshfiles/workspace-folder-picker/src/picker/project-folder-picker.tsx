@@ -15,17 +15,20 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Input } from '@dshfiles/plugin-ui/components/ui/input'
 import { Kbd, KbdGroup } from '@dshfiles/plugin-ui/components/ui/kbd'
+import { ProjectMark } from '@dshfiles/plugin-ui/components/ui/project-mark'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowUpIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon, HistoryIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowUpIcon, ChevronDownIcon, ChevronRightIcon, FolderIcon, FolderOpenIcon, HistoryIcon, PlusIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { keepPreviousData, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useMemo, useReducer, useRef, useState, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react'
+import { ProjectTone, type ProjectColorEntry } from '../project-tone.js'
 import { initialPickerFlow, pickerFlowReducer } from './picker-flow.js'
 import { ProjectFolderPickerModel, type PathStyle, type PickerEntry, type PickerSectionId, type PickerTab } from './project-folder-picker-model.js'
 
@@ -87,27 +90,28 @@ export interface ProjectFolderPickerProps {
   readonly pinnedWorkspaceIds?: readonly string[]
   /** Accessible list label and placeholder override for callers whose list is not only projects. */
   readonly placeholder?: string
-  /** Caller-owned controls after the search field, such as other ways to add a project. */
-  readonly headerActions?: ReactNode
+  /**
+   * Caller-owned ways to add a project, after the search field: buttons in a wide pane, one Add menu in a narrow one (a
+   * phone sheet), so the header never runs past the sheet's edge.
+   */
+  readonly addActions?: readonly PickerAddAction[]
+  /** The project colours chosen in Settings › Projects, so a row's mark matches the thread list's and the composer's. */
+  readonly projectColors?: readonly ProjectColorEntry[] | undefined
 }
 
-const projectGlyphTones = [
-  'dshx:bg-chart-1/15 dshx:text-chart-1',
-  'dshx:bg-chart-2/15 dshx:text-chart-2',
-  'dshx:bg-chart-3/15 dshx:text-chart-3',
-  'dshx:bg-chart-4/15 dshx:text-chart-4',
-  'dshx:bg-chart-5/15 dshx:text-chart-5',
-]
-
-const projectGlyphTone = (title: string): string => {
-  let hash = 0
-  for (const character of title) hash = (hash * 31 + character.charCodeAt(0)) % 997
-  return projectGlyphTones[hash % projectGlyphTones.length] ?? ''
+/** One way to add a project, offered beside the search field. */
+export interface PickerAddAction {
+  readonly id: string
+  readonly label: string
+  readonly icon: ReactNode
+  readonly disabled?: boolean | undefined
+  readonly onSelect: () => void
 }
 
 const optionClassName = (active: boolean): string =>
   cn(
-    'dshx:flex dshx:w-full dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-left dshx:outline-none',
+    // `min-w-0`: a row gives way to its remove button instead of scrolling the list sideways (council round 34 A1).
+    'dshx:flex dshx:w-full dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-left dshx:outline-none',
     active && 'dshx:bg-accent dshx:text-accent-foreground',
   )
 
@@ -355,7 +359,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
         open
       >
         <DialogContent
-          className="dshx-root dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
+          // One shrinkable column (council round 34 A1): a long path or a row of buttons never widens the sheet past the
+          // screen, and the sheet is the container its header and rows query.
+          className="dshx-root dshx:@container dshx:grid-cols-[minmax(0,1fr)] dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:sm:max-w-2xl"
           onOpenAutoFocus={(event: { preventDefault: () => void }) => {
             event.preventDefault()
             searchInput.current?.focus()
@@ -368,8 +374,8 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               ? 'Browse folders, or type a path to open a unique folder match automatically.'
               : 'Search registered projects, or type an absolute or ~/ path to browse folders. A unique match opens automatically.'}
           </DialogDescription>
-          <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2">
-            <div className="dshx:relative dshx:flex-1">
+          <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2 dshx:border-b dshx:p-2" data-picker-header="">
+            <div className="dshx:relative dshx:min-w-0 dshx:flex-1 dshx:@max-pane-narrow:basis-full">
               <SearchIcon
                 aria-hidden
                 className="dshx:pointer-events-none dshx:absolute dshx:top-1/2 dshx:left-2.5 dshx:size-4 dshx:-translate-y-1/2 dshx:text-muted-foreground"
@@ -377,7 +383,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               <Input
                 aria-label={props.mode === 'directories' ? 'Enter a folder path' : 'Search projects or enter a folder path'}
                 autoComplete="off"
-                className="dshx:h-9 dshx:pl-8"
+                className="dshx:h-9 dshx:pl-8 dshx:text-ellipsis dshx:pointer-coarse:h-11"
                 onChange={event => {
                   dispatchFlow({
                     type: 'query.typed',
@@ -391,7 +397,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                   createMutation.reset()
                 }}
                 onKeyDown={onKeyDown}
-                placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Type a folder path…' : 'Search projects or type a path to browse folders…')}
+                placeholder={props.placeholder ?? (props.mode === 'directories' ? 'Type a folder path…' : 'Search projects or type a path…')}
                 ref={searchInput}
                 value={query}
               />
@@ -399,7 +405,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
             {!pathMode && tabs.length > 2 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button aria-label="Filter by scope" className="dshx:shrink-0" size="sm" type="button" variant="outline">
+                  <Button aria-label="Filter by scope" className="dshx:shrink-0 dshx:pointer-coarse:h-11" size="sm" type="button" variant="outline">
                     {tabLabels[tab]}
                     <ChevronDownIcon aria-hidden />
                   </Button>
@@ -426,7 +432,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 Browse…
               </Button>
             )}
-            {props.headerActions}
+            {props.addActions === undefined || props.addActions.length === 0 ? null : <PickerAddActions actions={props.addActions} />}
           </div>
           {pathMode ? (
             <>
@@ -571,6 +577,7 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                           index={index}
                           key={entry.kind === 'project' ? entry.project.workspaceId : 'recent:' + entry.path}
                           machineName={props.machineName}
+                          color={entry.kind === 'project' ? ProjectTone.savedColorOf(entry.project.canonicalPath, props.projectColors) : undefined}
                           onHover={() => setSelectedIndex(index)}
                           onRemove={
                             props.onRemoveProject === undefined ||
@@ -597,7 +604,11 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
               </Alert>
             </div>
           )}
-          <footer className="dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground">
+          {/* The keyboard legend is for a keyboard: a touch sheet has none (council round 34 A1). */}
+          <footer
+            className="dshx:flex dshx:items-center dshx:gap-4 dshx:border-t dshx:bg-muted/40 dshx:px-3 dshx:py-2 dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:hidden"
+            data-picker-legend=""
+          >
             <span className="dshx:flex dshx:items-center dshx:gap-1.5">
               <KbdGroup>
                 <Kbd>↑</Kbd>
@@ -661,11 +672,75 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   )
 }
 
+/**
+ * The caller's ways to add a project. A wide pane shows them as buttons; a narrow one (a phone sheet) folds them into
+ * one Add menu on the scope's line, so the header keeps the sheet's width (council round 34 A1).
+ */
+const PickerAddActions = (props: { readonly actions: readonly PickerAddAction[] }): JSX.Element => (
+  <>
+    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:@max-pane-narrow:hidden" data-picker-add="buttons">
+      {props.actions.map(action => (
+        <Button className="dshx:shrink-0" disabled={action.disabled === true} key={action.id} onClick={action.onSelect} size="sm" type="button" variant="outline">
+          {action.icon}
+          {action.label}
+        </Button>
+      ))}
+    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          aria-label="Add a project"
+          className="dshx:hidden dshx:@max-pane-narrow:ml-auto dshx:@max-pane-narrow:inline-flex dshx:pointer-coarse:h-11"
+          data-picker-add="menu"
+          size="sm"
+          type="button"
+          variant="outline"
+        >
+          <PlusIcon aria-hidden />
+          Add
+          <ChevronDownIcon aria-hidden />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="dshx-root">
+        {props.actions.map(action => (
+          <DropdownMenuItem className="dshx:pointer-coarse:min-h-11" disabled={action.disabled === true} key={action.id} onSelect={action.onSelect}>
+            {action.icon}
+            {action.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  </>
+)
+
+/**
+ * A folder path that gives way in the middle (council round 34 A1): the parent folders truncate first, the folder's own
+ * name stays whole as long as it fits the row, so `/private/var/fo…/web-app` still says which folder it is.
+ */
+const PickerPath = (props: { readonly path: string; readonly machineName: string | undefined }): JSX.Element => {
+  const cut = Math.max(props.path.lastIndexOf('/'), props.path.lastIndexOf('\\'))
+  const head = cut > 0 ? props.path.slice(0, cut) : ''
+  const tail = cut > 0 ? props.path.slice(cut) : props.path
+  return (
+    <span className="dshx:flex dshx:min-w-0 dshx:text-xs dshx:text-muted-foreground" data-picker-path="">
+      <span className="dshx:min-w-0 dshx:truncate">
+        {props.machineName === undefined ? null : `${props.machineName} · `}
+        <span className="dshx:font-mono">{head}</span>
+      </span>
+      <span className="dshx:max-w-full dshx:shrink-0 dshx:truncate dshx:font-mono" data-picker-path-tail="">
+        {tail}
+      </span>
+    </span>
+  )
+}
+
 interface PickerEntryRowProps {
   readonly entry: PickerEntry
   readonly index: number
   readonly active: boolean
   readonly machineName: string | undefined
+  /** The project's chosen colour, when one was saved; otherwise its name picks the tone, as everywhere else. */
+  readonly color: ReturnType<typeof ProjectTone.savedColorOf>
   readonly onHover: () => void
   readonly onSelect: () => void
   readonly onRemove: (() => void) | undefined
@@ -685,15 +760,15 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
         type="button"
       >
         {props.entry.kind === 'project' ? (
-          <span
-            aria-hidden
-            className={cn(
-              'dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-2xs dshx:font-semibold',
-              projectGlyphTone(title),
-            )}
-          >
-            {title.slice(0, 2).toLocaleUpperCase()}
-          </span>
+          // The kit's project mark (council round 34 A1): the letters and colour the thread list, the tabs and the
+          // composer's headline draw for this project, at the row's 28px seat.
+          <ProjectMark
+            className="dshx:h-7 dshx:min-w-7 dshx:rounded-md dshx:text-xs"
+            color={props.color?.kind === 'custom' ? props.color.color : undefined}
+            data-picker-project-mark={title}
+            name={title}
+            tone={props.color?.kind === 'tone' ? props.color.tone : undefined}
+          />
         ) : (
           <span
             aria-hidden
@@ -707,13 +782,10 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
             <span className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-medium">{title}</span>
             {props.entry.kind === 'project' && props.entry.project.isJjWorkspace === true ? <Badge variant="muted">JJ workspace</Badge> : null}
           </span>
-          <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground">
-            {props.machineName === undefined ? null : `${props.machineName} · `}
-            <span className="dshx:font-mono">{path}</span>
-          </span>
+          <PickerPath machineName={props.machineName} path={path} />
         </span>
         {props.index < 9 && (
-          <KbdGroup>
+          <KbdGroup className="dshx:pointer-coarse:hidden">
             <Kbd>⌘</Kbd>
             <Kbd>{props.index + 1}</Kbd>
           </KbdGroup>

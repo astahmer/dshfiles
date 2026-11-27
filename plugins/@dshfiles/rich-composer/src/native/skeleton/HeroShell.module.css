@@ -38,7 +38,7 @@
 }
 
 /* Unslop r5 C5 (council round 4): the project in the headline carries its identity tile (the kit ProjectMark's look:
-   the project tone at 14% behind its letters pulled a quarter toward the ink, AA as in plugin-ui
+   the project tone at 18% behind its letters pulled a quarter toward the ink, AA as in plugin-ui
    tests/project-mark.test.tsx), sized with the headline (a 26px line gets a 29px tile with 13px letters) and kept on the
    name's line. Its letters are drawn from `data-letters`, so the heading's text stays the sentence. */
 .project {
@@ -55,7 +55,8 @@
   margin-right: 0.5em;
   padding: 0 0.4em;
   border-radius: var(--dsw-radius-sm);
-  background: color-mix(in oklab, currentColor 14%, transparent);
+  /* The kit mark's 18% (council round 5 A3), so the headline's tile and the project picker's read as one mark. */
+  background: color-mix(in oklab, currentColor 18%, transparent);
   font-size: 0.5em;
   font-weight: 600;
   line-height: 1;

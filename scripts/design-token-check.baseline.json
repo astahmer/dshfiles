@@ -35,7 +35,6 @@
     "chart-hue/backlog": 5,
     "chart-hue/memory": 1,
     "chart-hue/plugin-ui": 2,
-    "chart-hue/workspace-folder-picker": 10,
     "chart-hue/worktree-memory": 5,
     "default-shadow/agents": 1,
     "default-shadow/ai-accounts": 3,

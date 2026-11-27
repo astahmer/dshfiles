@@ -46,5 +46,7 @@ describe('the new-thread headline', () => {
     expect(css).toMatch(/\.projectMark \{[^}]*height: 2\.2em;[^}]*font-size: 0\.5em;/)
     // The kit mark's AA pull toward the ink.
     expect(css).toMatch(/color: color-mix\(in oklab, currentColor 75%, var\(--dsw-alias-label-primary\)\)/)
+    // Council round 34 A1: the kit mark's 18% tile (`bg-current/18`), so the headline and the project picker draw one mark.
+    expect(css).toMatch(/background: color-mix\(in oklab, currentColor 18%, transparent\);/)
   })
 })
