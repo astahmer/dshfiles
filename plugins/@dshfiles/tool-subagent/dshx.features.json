@@ -101,7 +101,8 @@
     {
       "id": "child-turn-guard",
       "title": "Keep a delegated child working when its turn hands the task back",
-      "summary": "A delegated child that ends a turn as completed after fewer than minToolCalls tool calls while its closing text hands the task back (reassign, cannot complete, no implementation, hand back, take over) receives one continuing message at the loop's turn-stopping boundary, so the same turn runs another step instead of the parent receiving a hand-back as the child's result. The guard is bounded per child: after maxResumes messages it reports the completion normally and notes the hand-back to the parent. A turn that made enough tool calls, or that closed with ordinary text, is never touched.",
+      "summary": "A subagent that stops early and hands its task back is asked to keep working, a bounded number of times.",
+      "details": "A delegated child that ends a turn as completed after fewer than minToolCalls tool calls while its closing text hands the task back (reassign, cannot complete, no implementation, hand back, take over) receives one continuing message at the loop's turn-stopping boundary, so the same turn runs another step instead of the parent receiving a hand-back as the child's result. The guard is bounded per child: after maxResumes messages it reports the completion normally and notes the hand-back to the parent. A turn that made enough tool calls, or that closed with ordinary text, is never touched.",
       "surfaces": ["host"],
       "configuration": [
         {
