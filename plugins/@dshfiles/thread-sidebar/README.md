@@ -541,35 +541,42 @@ and keeps the rest for Back and Forward.
 
 ![An acknowledged recent idle thread remains in the date-grouped Done view.](docs/screenshots/thread-list-views-done.png)
 
-**The Filters panel** (round nine, refined in round 28). The Filter button opens
-one panel beside the list, not a menu of submenus: every value shows where it
-sits and applies at once, so the rows it filters stay in view, and a polite live
-region says how many threads the change leaves. It opens on the preset in force.
-Its sticky header reads **Filters … Reset**; on a phone it is the kit's bottom
-sheet (85dvh, the popover fill) with **Reset · Filters · Done** and the project
-as one inline row (Project · All projects ›). Then come the presets (each marked
-with its rows' own glyph, nothing at a count of 0), **Status** chips (each with
-its status glyph, a check while on; no status on means any, and **Clear** sits in
-the heading; **More statuses** is a disclosure for why a thread waits and where
-it is stored, one labelled group each), and **Source** as a segmented control
-(All / Main / Subagents). **Reset filters** covers those: back to All threads
-with no filter on, the grouping kept. Under its own hairline, **Display** holds
-**Group by** (Status / Project / Date / Manual / None, a segmented control), and
-the foot Board, Thread list settings and Sidebar settings.
+**The Filters panel** (round nine, refined in rounds 28 and 29). The Filter
+button opens one panel beside the list, not a menu of submenus: every value
+shows where it sits and applies at once, so the rows it filters stay in view,
+and a polite live region says how many threads the change leaves. It opens on
+the preset in force; closed, the button carries the filters-on count (`All 2`).
+The panel scrolls under its sticky header, **Filters … Reset**; on a phone it is
+the kit's bottom sheet (85dvh, the popover fill) with **Reset · Filters · Done**
+and the project as one inline row (Project · All projects ›). Then come the
+presets (each with a plain count of its rows, and the Needs-you diamond or the
+Failed cross only while one of them needs you or failed; nothing at 0),
+**Status** chips (each with its status glyph, a check while on, the label's
+width reserved; no status on means any, and **Clear** sits in the heading;
+**More statuses**, right under the first row, is a disclosure for Thread state
+and Storage, one labelled group each, and reads **Fewer statuses** while open),
+and **Source** as a segmented control (All / Main / Subagents). **Reset
+filters** covers those: back to All threads with no filter on, the grouping
+kept. Under its own hairline, **Group by** (Status / Project / Date / Manual /
+None, a segmented control), and the foot Board, Thread list settings and
+Sidebar settings in the secondary ink.
 
 **Filter presets** (b:xpvk). The saved views are the Filter panel's presets: its
 **Presets** section comes first, one radio per enabled view, the active one
 checked, and the Filter button names it (`Filter: Needs you`). Changing a group,
 status or source filter afterwards never rewrites the preset: the change is a
-Host-synced `threadViews.draft`, the button reads `Filter: Needs you (edited)`
-with a dot, and the section offers **Save changes to “Needs you”** and **Discard
-changes**; changing the filters back drops the draft. **Save current filters as
+Host-synced `threadViews.draft`, the button reads `Filter: Needs you (edited)`,
+and the preset stays checked as `Needs you · edited` with two icon buttons in its
+row, **Save changes to “Needs you”** and **Discard changes** (the built-in All
+threads offers **Save as new preset…** instead, and cannot be renamed,
+overwritten or deleted); pressing the edited preset again does nothing, and
+changing the filters back drops the draft. **Save current filters as
 preset…** (first in the presets' ⋯ menu) names a new preset (a dialog, pinned to the top on a phone so the
 keyboard never covers it) that stores the
 grouping, filters and the current project scope (`projectFilter`: an id, `''` for
 Unassigned, `null` for All projects), and applies it. **Preset options** (the ⋯
 beside the Presets heading) holds
-**Rename…**, **Update with current filters**, **Delete…** (a confirmation, then an
+**Rename…**, **Save changes to “‹preset›”**, **Delete…** (a confirmation, then an
 Undo notice that puts the preset back where it was), Mark all read / unread and
 **Manage presets…** (the view manager, where a built-in can be hidden). A built-in
 names no project scope, so applying it leaves the project picker alone. ⌘K lists
@@ -704,13 +711,14 @@ in; `rowActionOrder` stores that order and `hiddenRowActions` the ones a row hid
 — an absent id means shown, so a new action ships visible at the end of the saved
 order. The shipped order puts Done in Archive's slot and Archive just before it,
 so a row that hides Archive ends on Done. Hiding one removes only its hover
-button; the context menu keeps every action. The strip never takes the title's place: it
-gets the time slot plus a quarter of the title, so the title keeps three quarters
-of its width under the pointer and a click aimed at it opens the thread. The
-actions past that budget give way from the strip's end (a 260px row shows two
-seats, the first action and `⋯`); they stay in the row menu. The strip lies over
-the time slot and the title's end fades under it, so nothing re-truncates on
-hover; it fades in on enter and leaves at once.
+button; the context menu keeps every action. The strip never overlaps the title:
+`⋯` always sits in the time slot (at least one seat wide), and each further
+action shows only when its whole button starts 8px clear of the resting title's
+last glyph (measured as the pointer enters the row), so a click anywhere on the
+title opens the thread. The actions that do not fit give way from the last one
+in the order; they stay in the row menu. The strip lies over the time slot, so nothing
+re-truncates on hover, and it fades in on enter and leaves at once. Hovering a
+Needs-you or Failed row deepens its wash instead of greying it.
 
 By default a row shows **one** verb on hover, Done, and a `⋯` that opens the
 row menu (a row that needs a resume adds Resume and Dismiss; an archived row shows
