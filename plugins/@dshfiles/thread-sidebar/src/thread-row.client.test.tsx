@@ -59,7 +59,8 @@ const remPx = (rem: string | undefined): number => Number.parseFloat(rem ?? 'NaN
 /** What line 1 gives the hover strip at a row width, read from its classes the way the stylesheet resolves them. */
 const reservedPx = (head: HTMLElement, width: number): number => {
   const strip = remPx(head.style.getPropertyValue('--thread-row-strip'))
-  if (!head.className.includes('dshx:not-pointer-coarse:group-hover/row:pr-[min(var(--thread-row-strip),var(--strip-fit))]')) return strip
+  const capped = 'min(var(--thread-row-strip),var(--strip-fit))'
+  if (!head.className.includes(`pr-[${capped}]`) && !head.className.includes(`transparent_0_${capped}`)) return strip
   let fit = remPx(/(?:^|\s)dshx:\[--strip-fit:([\d.]+)rem\]/u.exec(head.className)?.[1])
   for (const [, min, value] of head.className.matchAll(/dshx:@min-\[([\d.]+)rem\]\/rowbox:\[--strip-fit:([\d.]+)rem\]/gu))
     if (width >= remPx(min)) fit = Math.max(fit, remPx(value))
@@ -70,12 +71,12 @@ describe('the hover actions of a thread row', () => {
   it('shows one verb and the row menu by default, and keeps the title readable beside them', async () => {
     const row = await renderRow()
     expect(stripLabels(row)).toEqual(['threadSidebarSettle', 'threadSidebarContextMenu'])
-    // The first line gives the two seats their width while they show, so the title truncates before them instead of
-    // sitting under a floating strip; the time they replace steps aside.
+    // The two seats lie over the time slot and the title's end fades under them (round 28, item 11); the time keeps its
+    // place, hidden, so line 1 never reflows.
     const head = row.querySelector<HTMLElement>('[data-thread-head]')
     expect(head?.style.getPropertyValue('--thread-row-strip')).toBe('3.5rem')
-    expect(head?.className).toContain('dshx:not-pointer-coarse:group-hover/row:pr-[min(var(--thread-row-strip),var(--strip-fit))]')
-    expect(row.querySelector('[data-thread-time]')?.className).toContain('dshx:not-pointer-coarse:group-hover/row:hidden')
+    expect(head?.className).toContain('transparent_0_min(var(--thread-row-strip),var(--strip-fit))')
+    expect(row.querySelector('[data-thread-time]')?.className).toContain('dshx:not-pointer-coarse:group-hover/row:invisible')
     expect(row.querySelector('[data-testid="thread-row-actions"]')?.className).not.toContain('dshx:bg-popover')
   })
 
@@ -824,5 +825,33 @@ describe('the phone list (council round 18 B1.3)', () => {
       expect(classOf(row, 'ul [data-thread-child-head]')).toContain('dshx:pointer-coarse:h-7')
       cleanup()
     }
+  })
+})
+
+// Council round 27, item 11: the strip lies over the time slot and the title's end fades under it; nothing reflows.
+describe('the hover strip without reflow (round 28, item 11)', () => {
+  it('keeps line 1 as it is on hover: no padding change, the time kept in place but hidden', async () => {
+    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const head = row.querySelector<HTMLElement>('[data-thread-head]')
+    expect(head?.className).not.toMatch(/group-hover\/row:pr-/u)
+    const time = row.querySelector<HTMLElement>('[data-thread-time]')
+    expect(time?.className).toContain('dshx:not-pointer-coarse:group-hover/row:invisible')
+    expect(time?.className).not.toContain('group-hover/row:hidden')
+  })
+
+  it("fades the title's end under the strip with a mask as wide as the strip's capped reserve", async () => {
+    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const head = row.querySelector<HTMLElement>('[data-thread-head]')
+    expect(head?.className).toContain(
+      'dshx:not-pointer-coarse:group-hover/row:[mask-image:linear-gradient(to_left,transparent_0_min(var(--thread-row-strip),var(--strip-fit)),currentcolor_calc(min(var(--thread-row-strip),var(--strip-fit))+16px))]',
+    )
+  })
+
+  it('fades the strip in on hover only, so it leaves no ghost over the time on mouse-out', async () => {
+    const row = await renderRow()
+    const strip = row.querySelector<HTMLElement>('[data-row-strip]')
+    expect(strip?.className).toContain('dshx:transition-none')
+    expect(strip?.className).toContain('dshx:group-hover/row:transition-opacity')
+    expect(strip?.className).not.toMatch(/(?:^|\s)dshx:transition-opacity(?:\s|$)/u)
   })
 })

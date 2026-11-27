@@ -78,3 +78,8 @@ test('a setting description is one or two sentences', () => {
   expect(descriptions.filter(text => sentences(text) > 3)).toEqual([])
   expect(descriptions.some(text => text.startsWith('Restart DSH when idle to apply updates'))).toBe(true)
 })
+
+
+test("the hover actions setting says the actions a narrow row cannot fit stay in its ⋯ menu (round 28, item 11)", () => {
+  expect(/threadSidebarRowActionsHint: ["'][^\n]*⋯ menu[^\n]*["'],/u.test(english)).toBe(true)
+})

@@ -1818,6 +1818,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
   // The hover actions sit in the first line's time slot. While they show, that line gives them their width and the
   // time steps aside, so the title truncates before them instead of being covered (each seat is a 24px button and a
   // 2px gap; the last one is the row menu). The row's width caps both (`STRIP_SEAT_FIT`), so the title keeps three quarters.
+  // The strip fades in on enter only (round 28, item 11): on mouse-out it goes at once, as the time comes back.
   const hoverActions = nearViewport
     ? props.rowActions.flatMap(action => {
         const element = renderRowAction(action)
@@ -1945,10 +1946,13 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                     // Wherever the strip can show (it hides on a coarse pointer, where the row menu button keeps its own
                     // corner): its seats, capped by what the row's width lends it, so it never takes the title's place.
                     stripSeats > 0 && STRIP_FIT_TIERS,
+                    // The strip lies over the time slot and the title's end fades under it (round 28, item 11): line 1
+                    // keeps its layout, so nothing re-truncates on hover; the budget above keeps the title's first three
+                    // quarters clear for a click.
                     stripSeats > 0 &&
                       (verbSeat === 'head'
-                        ? 'dshx:not-pointer-coarse:group-hover/row:pr-[calc(4.375rem+min(var(--thread-row-strip),var(--strip-fit)))] dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:pr-[calc(4.375rem+min(var(--thread-row-strip),var(--strip-fit)))]'
-                        : 'dshx:not-pointer-coarse:group-hover/row:pr-[min(var(--thread-row-strip),var(--strip-fit))] dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:pr-[min(var(--thread-row-strip),var(--strip-fit))]'),
+                        ? 'dshx:not-pointer-coarse:group-hover/row:[mask-image:linear-gradient(to_left,transparent_0_calc(4.375rem+min(var(--thread-row-strip),var(--strip-fit))),currentcolor_calc(5.375rem+min(var(--thread-row-strip),var(--strip-fit))))] dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:[mask-image:linear-gradient(to_left,transparent_0_calc(4.375rem+min(var(--thread-row-strip),var(--strip-fit))),currentcolor_calc(5.375rem+min(var(--thread-row-strip),var(--strip-fit))))]'
+                        : 'dshx:not-pointer-coarse:group-hover/row:[mask-image:linear-gradient(to_left,transparent_0_min(var(--thread-row-strip),var(--strip-fit)),currentcolor_calc(min(var(--thread-row-strip),var(--strip-fit))+16px))] dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:[mask-image:linear-gradient(to_left,transparent_0_min(var(--thread-row-strip),var(--strip-fit)),currentcolor_calc(min(var(--thread-row-strip),var(--strip-fit))+16px))]'),
                   )}
                   style={stripSeats > 0 ? stripStyle : undefined}
                   data-thread-head=""
@@ -2042,7 +2046,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                         'dshx:shrink-0 dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground',
                         wrapTitle && 'dshx:mt-px',
                         stripSeats > 0 &&
-                          'dshx:not-pointer-coarse:group-hover/row:hidden dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:hidden',
+                          // Kept in place, so line 1 never reflows; the strip covers its slot (round 28, item 11).
+                          'dshx:not-pointer-coarse:group-hover/row:invisible dshx:not-pointer-coarse:group-has-[[data-row-strip]:focus-within]/row:invisible',
                       )}
                       data-thread-time=""
                     >
@@ -2265,7 +2270,7 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
                   data-testid="thread-row-actions"
                   data-row-strip=""
                   className={cn(
-                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:opacity-0 dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
+                    'dshx:pointer-events-none dshx:absolute dshx:flex dshx:gap-0.5 dshx:opacity-0 dshx:transition-none dshx:group-hover/row:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:hidden',
                     verbSeat !== 'head'
                       ? 'dshx:-top-0.5 dshx:right-0'
                       : // Beside a first-line verb the strip takes the seat line 1 gives it left of the verb, as every row's
