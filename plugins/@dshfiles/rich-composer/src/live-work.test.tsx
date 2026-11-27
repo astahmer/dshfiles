@@ -419,6 +419,22 @@ describe('the open phone dock is the composer card\'s top section (council round
     expect(css).not.toMatch(/3\.5 \* 54px/)
   })
 
+  it('grows the frame to the one open row, so its feed and Stop are never cut off (merge 534773f0)', () => {
+    // An opened row (54px head, its feed, Open beside and Stop) ran past the two-row frame: "Stop subagent" was cut off.
+    // thread-sidebar's dock keeps one row open and sets its height; the frame takes at least that row, plus its own
+    // edges and, beside running jobs, the 44px fold plate only while that fold row exists (four or more subagents: one
+    // subagent beside a job left a 44px blank under its open row). With no row open it is the closed two-row frame.
+    const ROW = 'var(--dshfiles-dock-open-row, 0px)'
+    const FOLD = ':has(> :global([data-dshfiles-live-preview-fold]))'
+    const minHeight = (rule: string): string | undefined => /min-height: ([^;]*);/u.exec(rule)?.[1]
+    expect(minHeight(ruleIn(NARROW, `${phone} .composerStack > ${DOCK} > ${SUBAGENTS}`))).toBe(`calc(${ROW} + 2px)`)
+    expect(minHeight(ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}`))).toBeUndefined()
+    expect(minHeight(ruleIn(NARROW, `${phone} .composerStack > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}${FOLD}`))).toBe(`calc(44px + ${ROW} + 2px)`)
+    expect(minHeight(ruleIn(NARROW, `${open} > ${DOCK} > ${SUBAGENTS}`))).toBe(ROW)
+    expect(minHeight(ruleIn(NARROW, `${open} > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}`))).toBe(`calc(${ROW} + 1px)`)
+    expect(minHeight(ruleIn(NARROW, `${open} > ${DOCK}:has(> ${OTHER}) > ${SUBAGENTS}${FOLD}`))).toBe(`calc(44px + ${ROW} + 1px)`)
+  })
+
   it('rests the last row on the frame\'s bottom edge at the scroll end, and no snap position cuts a row\'s text (council round 24, item 4)', () => {
     // The last row carried a 30px spacer, so the end position showed a blank half-row under it (17b).
     expect(css).not.toMatch(/nth-of-type\(n \+ 3\):last-of-type/)

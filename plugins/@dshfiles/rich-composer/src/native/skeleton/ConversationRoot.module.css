@@ -1497,9 +1497,12 @@ button.crumbEditable {
      without its title. Council round 24, item 4: the 8px under them is the next row's divider and padding (at the end,
      the row above's bottom padding), never text; a 31px title peek there left a blank half-row under the last row at
      the scroll end, and resting that row on the bottom edge instead would have cut a model line from its title at the
-     top. The edge fades (below) say the list scrolls. */
+     top. The edge fades (below) say the list scrolls. An open row (its feed and Stop) is taller than that frame: the
+     frame grows to at least the one open row (thread-sidebar's dock sets --dshfiles-dock-open-row, one row open at a
+     time), so its actions are never cut; closed, the frame is two rows again. */
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
     max-height: calc(2 * 54px + 1px + 8px + 2px);
+    min-height: calc(var(--dshfiles-dock-open-row, 0px) + 2px);
     scroll-snap-type: y mandatory;
     background: var(--dsw-specific-input-major);
     border: 1px solid var(--dshx-field-border, var(--dsw-alias-border-l3));
@@ -1578,6 +1581,11 @@ button.crumbEditable {
   :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
     max-height: calc(44px + 2 * 54px + 1px + 8px + 2px);
     scroll-padding-top: 44px;
+  }
+
+  /* With its fold row (four or more subagents), the open row's frame also holds the 44px plate over it. */
+  :global(html[data-shell-phone-nav]) .composerStack > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold])) {
+    min-height: calc(44px + var(--dshfiles-dock-open-row, 0px) + 2px);
   }
 
   /* There the top fade sits under the 44px plate, not behind it. */
@@ -1665,10 +1673,16 @@ button.crumbEditable {
   /* No card edges of their own: 117px of rows, plus the plate beside running jobs (and the divider above it there). */
   :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
     max-height: calc(2 * 54px + 1px + 8px);
+    min-height: var(--dshfiles-dock-open-row, 0px);
   }
 
   :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']) {
     max-height: calc(44px + 2 * 54px + 1px + 8px + 1px);
+    min-height: calc(var(--dshfiles-dock-open-row, 0px) + 1px);
+  }
+
+  :global(html[data-shell-phone-nav]) .composerStack[data-live-work-open]:not(:has(> :global([data-slot='conversation.input.dock']) > :not([data-dshfiles-live-preview-dock]))) > :global([data-slot='conversation.input.dock']):has(> :global([data-dshfiles-live-preview-dock]:not([data-dshfiles-live-preview-dock='subagents']))) > :global([data-dshfiles-live-preview-dock='subagents']):has(> :global([data-dshfiles-live-preview-fold])) {
+    min-height: calc(44px + var(--dshfiles-dock-open-row, 0px) + 1px);
   }
 
   /* A running job's row and fold row lie on the section too, instead of drawing a card inside it. */

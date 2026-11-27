@@ -7,7 +7,7 @@ import { ArrowUpRightIcon, BotIcon, ChevronRightIcon } from '@dshfiles/plugin-ui
 import { StatusGlyph } from '@dshfiles/plugin-ui/components/work-status'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { WORK_COUNT_SEPARATOR, workCountLabel } from '@dshfiles/plugin-ui/lib/work-count'
-import { useCallback, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { launchOrdered } from '../thread-children.js'
 import { ToolSteps } from '../tool-steps.js'
 import { SubagentLivePreview, subagentStateLabel, type SubagentPreviewBindings } from './subagent-live-preview.js'
@@ -50,6 +50,18 @@ const markScrollEdges = (element: HTMLElement): void => {
   element.toggleAttribute('data-more-below', rest > EDGE_SLACK)
 }
 
+/**
+ * The open row's height, for the phone composer: its dock frame shows two closed rows, and an open row (its feed and Stop)
+ * is taller, so the frame grows to at least the open row (rich-composer's `--dshfiles-dock-open-row` min-height). Only one
+ * row is open at a time, so the frame never holds more than that row.
+ */
+export const DOCK_OPEN_ROW_HEIGHT = '--dshfiles-dock-open-row'
+const markOpenRow = (element: HTMLElement): void => {
+  const row = element.querySelector<HTMLElement>(':scope > [data-dock-row-open]')
+  if (row === null) element.style.removeProperty(DOCK_OPEN_ROW_HEIGHT)
+  else element.style.setProperty(DOCK_OPEN_ROW_HEIGHT, `${row.offsetHeight}px`)
+}
+
 /** A callback ref that keeps the edges current on scroll, on a resize of the dock or any row, and as rows come and go. */
 const useScrollEdges = (): ((element: HTMLDivElement | null) => void) => {
   const release = useRef<(() => void) | undefined>(undefined)
@@ -57,7 +69,10 @@ const useScrollEdges = (): ((element: HTMLDivElement | null) => void) => {
     release.current?.()
     release.current = undefined
     if (element === null) return
-    const mark = (): void => markScrollEdges(element)
+    const mark = (): void => {
+      markOpenRow(element)
+      markScrollEdges(element)
+    }
     element.addEventListener('scroll', mark, { passive: true })
     const sizes = typeof ResizeObserver === 'function' ? new ResizeObserver(mark) : undefined
     const observeRows = (): void => {
@@ -85,10 +100,24 @@ const useScrollEdges = (): ((element: HTMLDivElement | null) => void) => {
  * model only.
  */
 const DockRow = (
-  props: DockProps & { readonly parentId: string; readonly childId: string; readonly preview: SubagentPreviewBindings; readonly runCards: boolean },
+  props: DockProps & {
+    readonly parentId: string
+    readonly childId: string
+    readonly preview: SubagentPreviewBindings
+    readonly runCards: boolean
+    readonly open: boolean
+    readonly onToggle: () => void
+  },
 ): JSX.Element => {
-  const { parentId, childId, preview, runCards } = props
-  const [open, setOpen] = useState(false)
+  const { parentId, childId, preview, runCards, open } = props
+  const section = useRef<HTMLElement>(null)
+  // The frame takes the open row's height before paint; the row then scrolls whole into the frame (its snap start).
+  useLayoutEffect(() => {
+    const dock = section.current?.parentElement
+    if (dock === null || dock === undefined) return
+    markOpenRow(dock)
+    if (open) section.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [open])
   const label = props.useSessions(
     list =>
       list.projectionsBySession[SessionId(parentId)]?.values.subagentCatalog?.find(entry => entry.id === childId)?.label ??
@@ -104,11 +133,13 @@ const DockRow = (
     // A row never shrinks (round 21 D2): in the dock's max-h-72 column six rows squeezed to 31px over their 44px touch
     // row; whole rows overflow the column, which scrolls under its sticky fold row instead.
     <section
+      ref={section}
       aria-label={`${preview.t('subagentPreviewKind')}: ${label}`}
       className="dshx-root dshx:group/dock-row dshx:@container dshx:my-1 dshx:min-w-0 dshx:shrink-0 dshx:overflow-hidden dshx:rounded-lg dshx:border dshx:border-border dshx:bg-background dshx:text-xs"
       data-dshfiles-live-preview="agent"
       data-dshfiles-live-preview-seat="dock"
       data-state="working"
+      data-dock-row-open={open ? '' : undefined}
       data-waiting={waiting ? '' : undefined}
     >
       {/* Council round 22, item 1: on a narrow pane (a phone) one line gave the name ~60px ("Check cr…") beside the model
@@ -123,7 +154,7 @@ const DockRow = (
           aria-expanded={open}
           aria-label={preview.t('subagentPreviewToggle', { label })}
           className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:pl-2 dshx:text-left dshx:hover:bg-accent dshx:@max-pane-narrow:grid dshx:@max-pane-narrow:h-auto dshx:@max-pane-narrow:grid-cols-[auto_minmax(0,1fr)] dshx:@max-pane-narrow:content-center dshx:@max-pane-narrow:gap-x-2 dshx:@max-pane-narrow:gap-y-0.5 dshx:@max-pane-narrow:py-2 dshx:@max-pane-narrow:pl-3"
-          onClick={() => setOpen(value => !value)}
+          onClick={props.onToggle}
         >
           <ChevronRightIcon
             aria-hidden
@@ -248,6 +279,8 @@ export const SubagentPreviewDock = (
   // Four or more working children fold into one row (b:7rv2), the same row as background-jobs' dock; the reader's
   // choice holds while children start and finish, and resets with the thread (the dock is keyed by its session).
   const [expanded, setExpanded] = useState(false)
+  // One row open at a time: opening another closes the first, so the phone frame grows to one row's detail at most.
+  const [openChild, setOpenChild] = useState<string | undefined>(undefined)
   const underLiveWork = useSyncExternalStore(subscribeLiveWork, readLiveWork, readLiveWorkOnServer)
   const scrollEdges = useScrollEdges()
   if (working === '') return null
@@ -295,7 +328,16 @@ export const SubagentPreviewDock = (
       ) : null}
       {/* Under the phone's Live work fold the rows stay mounted: the composer hides this fold row while Live work holds
           only subagents (one header, council round 22 item 5), and hides the rows behind it while it is closed. */}
-      {!folded || expanded || underLiveWork ? list.map(childId => <DockRow key={childId} {...props} parentId={props.sessionId} childId={childId} />) : null}
+      {!folded || expanded || underLiveWork ? list.map(childId => (
+            <DockRow
+              key={childId}
+              {...props}
+              parentId={props.sessionId}
+              childId={childId}
+              open={openChild === childId}
+              onToggle={() => setOpenChild(current => (current === childId ? undefined : childId))}
+            />
+          )) : null}
     </div>
   )
 }

@@ -148,8 +148,9 @@ export const SubagentLivePreview = (
               {t('subagentPreviewOpenThread')}
             </Button>
           )}
+          {/* A phone has no side panel to open beside (its thread panel is a sheet over the thread). */}
           {props.canOpenAside(childId) ? (
-            <Button size="xs" variant="ghost" className="dshx:shrink" onClick={() => props.openChildAside(childId)}>
+            <Button size="xs" variant="ghost" className="dshx:shrink dshx:phone:hidden" data-subagent-open-aside="" onClick={() => props.openChildAside(childId)}>
               {t('subagentPreviewOpenAside')}
             </Button>
           ) : null}

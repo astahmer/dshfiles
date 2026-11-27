@@ -414,6 +414,47 @@ describe('SubagentPreviewDock', () => {
     }
   })
 
+  it('opens one row at a time and tells the phone frame its height, so Stop is never cut off (merge 534773f0)', () => {
+    // On a phone the frame showed two closed rows (117px), and an opened row's feed and Stop ran past its bottom edge.
+    const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get(this: HTMLElement) {
+        return this.hasAttribute('data-dock-row-open') ? 168 : 54
+      },
+    })
+    try {
+      render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b'] })} />)
+      const dock = document.querySelector<HTMLElement>('[data-dshfiles-live-preview-dock="subagents"]')
+      const toggle = (label: string): HTMLElement => {
+        const button = rowOf(label).querySelector<HTMLElement>('[aria-expanded]')
+        if (button === null) throw new Error(`no toggle for ${label}`)
+        return button
+      }
+      expect(dock?.style.getPropertyValue('--dshfiles-dock-open-row')).toBe('')
+      fireEvent.click(toggle('Review'))
+      expect(toggle('Review').getAttribute('aria-expanded')).toBe('true')
+      expect(dock?.style.getPropertyValue('--dshfiles-dock-open-row')).toBe('168px')
+      fireEvent.click(toggle('Refactor'))
+      expect([toggle('Review').getAttribute('aria-expanded'), toggle('Refactor').getAttribute('aria-expanded')]).toEqual(['false', 'true'])
+      expect(document.querySelectorAll('[data-dock-row-open]')).toHaveLength(1)
+      fireEvent.click(toggle('Refactor'))
+      expect(document.querySelectorAll('[data-dock-row-open]')).toHaveLength(0)
+      expect(dock?.style.getPropertyValue('--dshfiles-dock-open-row')).toBe('')
+    } finally {
+      if (offsetHeight === undefined) Reflect.deleteProperty(HTMLElement.prototype, 'offsetHeight')
+      else Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight)
+    }
+  })
+
+  it('hides Open beside on the phone shell, which has no side panel', async () => {
+    const bindings = preview({ retainChild: childInTool().retainChild, canOpenAside: () => true })
+    render(<SubagentPreviewDock {...dockProps({ running: ['child-a'], bindings, runCards: true, childTiming: true })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'subagentPreviewToggle' }))
+    const aside = await screen.findByRole('button', { name: 'subagentPreviewOpenAside' })
+    expect(aside.className.split(/\s+/u)).toContain('dshx:phone:hidden')
+  })
+
   it("shows up to three rows, folds four or more into one closed row, and keeps the reader's choice", () => {
     const count = (n: number): string => `${n} subagents`
     const { rerender } = render(<SubagentPreviewDock {...dockProps({ running: ['child-a', 'child-b', 'child-d'] })} foldLabel={count} />)
