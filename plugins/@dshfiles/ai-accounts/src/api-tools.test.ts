@@ -84,6 +84,24 @@ describe('ai-accounts tool exposure', () => {
     ])
   })
 
+  test('save account tells agents how to switch a Vibe account s bridge', () => {
+    const method = aiAccountsApi.methods.save
+    expect(method.tool?.name).toBe('ai_accounts_save_account')
+    expect(method.description).toContain('draft.bridge: acp or headless')
+    const standard = method.input?.['~standard']
+    if (standard === undefined || !('jsonSchema' in standard)) throw new Error('AI Accounts save must publish its input schema')
+    const json = standard.jsonSchema.input({ target: 'draft-2020-12' })
+    expect(json).toMatchObject({
+      properties: {
+        draft: {
+          properties: {
+            bridge: { anyOf: [{ type: 'string', enum: ['acp', 'headless'], description: expect.stringContaining('acp bridges DSH tools') }, { type: 'null' }] },
+          },
+        },
+      },
+    })
+  })
+
   test('Copilot approval stays GUI-only and cancellation requires an explicit opt-in', async () => {
     const waiting: CopilotLoginState = {
       instanceId: 'copilot',
