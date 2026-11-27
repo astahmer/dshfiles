@@ -36,12 +36,16 @@ export const END = '# END DERIVED preset-standard'
 /**
  * Changes to the stock children, by child id. A child id the stock preset no
  * longer has fails generation: the override must be reviewed, never dropped.
+ * `config` replaces a child's config (`null` removes it); `addConfig` sets keys
+ * on the stock config and keeps the rest, so stock values are never restated.
  */
 export const OVERRIDES = [
   {
     id: 'tool-subagent',
     name: '@dshfiles/tool-subagent',
-    reason: 'owned fork: child model routes follow the Subagents setting in running threads (b:rmkm)',
+    addConfig: { childTurnGuard: { enabled: true, minToolCalls: 3, maxResumes: 2 } },
+    reason:
+      'owned fork: child model routes follow the Subagents setting in running threads (b:rmkm), and the child turn guard resumes a child that hands its task back (enabled: false is its off switch, plugins/@dshfiles/tool-subagent/README.md#the-child-turn-guard)',
   },
   { id: 'tool-subagent-fork', name: '@dshfiles/tool-subagent', reason: 'the same owned fork for subagent_fork' },
   {
@@ -92,6 +96,11 @@ export const derive = ({ root = ROOT } = {}) => {
     if (override.name !== undefined) child.set('name', quoted(doc, override.name))
     if (override.config === null) child.delete('config')
     else if (override.config !== undefined) child.set('config', doc.createNode(override.config))
+    if (override.addConfig !== undefined) {
+      const config = child.get('config', true)
+      if (!YAML.isMap(config)) throw new Error(`stock child "${override.id}" has no config map to add ${Object.keys(override.addConfig).join(', ')} to`)
+      for (const [key, value] of Object.entries(override.addConfig)) config.set(key, doc.createNode(value))
+    }
   }
   const row = new YAML.Document(null, { customTags: [JS_TAG] })
   row.contents = row.createNode([])
