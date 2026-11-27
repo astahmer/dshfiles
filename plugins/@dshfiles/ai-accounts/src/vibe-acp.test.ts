@@ -1,6 +1,9 @@
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message, type Model } from '@earendil-works/pi-ai'
+import { defineTool } from '@dshfiles/dshx/host'
+import { createTestHost } from '@dshfiles/dshx/testing'
+import { recordSpans } from '@dshfiles/dshx/tracing'
 import { layer as nodeChildProcessSpawnerLayer } from '@effect/platform-node/NodeChildProcessSpawner'
 import { Context, Effect, Layer, Scope } from 'effect'
 import * as Schema from 'effect/Schema'
@@ -9,7 +12,7 @@ import { CliProcesses, CliProcessesPromiseModel } from './cli-processes.js'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { fakeVibeAcp, type FakeVibeAcp } from './vibe-acp.fixture.js'
 import { createMistralProvider } from './mistral-provider.js'
-import { VibeAcpSessions } from './vibe-acp.js'
+import { VibeAcpSessions, vibeBuiltinAuthorizer, type VibeCallingSession } from './vibe-acp.js'
 import { createVibeAcpProvider } from './vibe-provider.js'
 
 /** The production process service on Effect's Node spawner, as the transport drives it through its Promise facade. */
@@ -27,11 +30,23 @@ afterEach(async () => {
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
 
-const setup = (home = '/synthetic/vibe-home', source?: string) => {
-  const fake = fakeVibeAcp(source)
+/** The calling DSH session as the Host resolves it: its file mode, and an approval answer recorded per tool. */
+const callingSession = (input: { readonly fileMode: VibeCallingSession['fileMode']; readonly answer: boolean; readonly asks: string[] }) =>
+  vibeBuiltinAuthorizer({
+    session: () => ({
+      fileMode: input.fileMode,
+      ask: async ask => {
+        input.asks.push(ask.toolName)
+        return input.answer
+      },
+    }),
+  })
+
+const setup = (home = '/synthetic/vibe-home', options?: Pick<ConstructorParameters<typeof VibeAcpSessions>[0], 'settings' | 'authorizeBuiltin'>) => {
+  const fake = fakeVibeAcp()
   directories.push(fake.directory)
   vi.stubEnv('FAKE_VIBE_ACP_LOG', fake.logPath)
-  const cli = new VibeAcpSessions({ processes, home: () => home, executable: fake.executable })
+  const cli = new VibeAcpSessions({ processes, home: () => home, executable: fake.executable, ...options })
   sessions.push(cli)
   const provider = createVibeAcpProvider({ upstream: createMistralProvider(), sessions: cli })
   const model = (id = 'deepseek-v4-1-flash-1017'): Model<string> => {
@@ -75,14 +90,14 @@ describe('the Vibe ACP route', () => {
     expect(fake.events().filter(event => event.startsWith('session/new '))).toHaveLength(1)
   })
 
-  it('runs Vibe with the managed agent profile: read-only builtins and dsh_* only, DSH instructions, the account home', async () => {
+  it('runs Vibe with the managed agent profile: DSH instructions, read-only builtins and DSH tools listed, the account home', async () => {
     const { cli, fake, model } = setup('/synthetic/work-home')
     await finished(cli.stream(model(), context([{ role: 'user', content: 'plain answer', timestamp: 1 }]), { sessionId: 'profile' }))
     const profile = managedProfile(fake)
     expect(profile.roots[0]).toContain('dsh-vibe-acp-')
     expect(profile.toml).toContain('instructions = "You are inside DSH."')
-    expect(profile.toml).toContain('enabled_tools = ["dsh_*","read_file","grep","web_fetch","web_search","todo"]')
-    for (const mutation of ['write_file', 'edit', 'bash', 'git_bash', 'powershell', 'task', 'skill', 'ask_user_question'])
+    expect(profile.toml).toContain('enabled_tools = ["mcp_dsh.*","dsh_*","read_file","grep","web_fetch","web_search","todo","search_tool_functions","skill"]')
+    for (const mutation of ['write_file', 'edit', 'bash', 'run_typescript', 'git_bash', 'powershell', 'task', 'ask_user_question'])
       expect(profile.toml).not.toMatch(new RegExp(`"${mutation}"`, 'u'))
     expect(fake.events()).toContain('set_config_option agent=dsh')
   })
@@ -126,27 +141,127 @@ describe('the Vibe ACP route', () => {
     expect(second.usage.totalTokens).toBe(0)
   })
 
-  it('allows a permission request for a bridged tool, and rejects one the route cannot name', async () => {
-    const { cli, fake, model } = setup()
-    const messages: Message[] = [{ role: 'user', content: 'PERMISSION please', timestamp: 1 }]
-    const first = await finished(cli.stream(model(), context(messages), { sessionId: 'permission' }))
-    expect(first.stopReason).toBe('toolUse')
-    expect(fake.events()).toContain('permission {"outcome":{"outcome":"selected","optionId":"allow_once"}}')
-    // DSH's own approval runs when DSH executes the tool; the ACP permission is answered before Vibe even calls it.
-    expect(fake.events()).not.toContain('bridge-answered')
-    messages.push(first, {
-      role: 'toolResult',
-      toolCallId: 'call_p1',
-      toolName: 'echo',
-      content: [{ type: 'text', text: 'pong' }],
-      isError: false,
-      timestamp: 2,
-    })
-    expect(textOf(await finished(cli.stream(model(), context(messages), { sessionId: 'permission' })))).toBe('tool said pong')
-    expect(fake.events()).toContain('bridge-answered')
+  it('admits a bridged DSH tool under Vibe 3.1.5 s real tool metadata in a full-access session whose approvals are off', async () => {
+    const asks: string[] = []
+    const { cli, fake, model } = setup('/synthetic/vibe-home', { authorizeBuiltin: callingSession({ fileMode: 'danger-full-access', answer: false, asks }) })
+    const host = await createTestHost()
+    try {
+      host.tools.register(
+        defineTool({
+          name: 'echo',
+          description: 'Echo a value',
+          parameters: { value: { type: 'string' } },
+          output: { schema: { type: 'string' }, render: (_args, text) => [{ type: 'text', text }] },
+          execute: async () => 'pong',
+        }),
+      )
+      const messages: Message[] = [{ role: 'user', content: 'PERMISSION please', timestamp: 1 }]
+      const first = await finished(cli.stream(model(), context(messages), { sessionId: 'permission' }))
+      expect(first.stopReason).toBe('toolUse')
+      expect(fake.events()).toContain('permission {"outcome":{"outcome":"selected","optionId":"allow_once"}}')
+      // DSH's own executor gates the call; the ACP permission only admits it, so the session was never asked.
+      expect(asks).toEqual([])
+      expect(fake.events()).not.toContain('bridge-answered')
+      const call = first.content[0]
+      if (call?.type !== 'toolCall') throw new Error('expected an ordinary native tool call')
+      const result = await host.runTool({ name: call.name, arguments: call.arguments })
+      expect(result.isError).toBe(false)
+      messages.push(first, {
+        role: 'toolResult',
+        toolCallId: call.id,
+        toolName: call.name,
+        content: result.content.flatMap(block => (block.type === 'text' ? [{ type: 'text' as const, text: block.text }] : [])),
+        isError: result.isError,
+        timestamp: 2,
+      })
+      expect(textOf(await finished(cli.stream(model(), context(messages), { sessionId: 'permission' })))).toBe('tool said pong')
+      expect(fake.events()).toContain('bridge-answered')
+    } finally {
+      await host.dispose()
+    }
+  })
 
-    await finished(cli.stream(model(), context([{ role: 'user', content: 'PERMISSION_BUILTIN please', timestamp: 1 }]), { sessionId: 'permission-builtin' }))
-    expect(fake.events()).toContain('permission {"outcome":{"outcome":"selected","optionId":"reject_once"}}')
+  it('does not execute a published tool call that Vibe never forwards to MCP', async () => {
+    const { cli, model } = setup()
+    const reply = await finished(
+      cli.stream(model(), context([{ role: 'user', content: 'PERMISSION CANCEL_BEFORE_MCP', timestamp: 1 }]), { sessionId: 'cancel-before-mcp' }),
+    )
+    expect(reply.stopReason).toBe('stop')
+    expect(reply.content).toEqual([{ type: 'text', text: 'Vibe cancelled its pending call' }])
+  })
+
+  it.each([
+    { session: 'full access, approvals off', fileMode: 'danger-full-access', answer: false, asked: false, ran: true },
+    { session: 'workspace-write, user approves', fileMode: 'workspace-write', answer: true, asked: true, ran: true },
+    { session: 'workspace-write, approvals off', fileMode: 'workspace-write', answer: false, asked: true, ran: false },
+    { session: 'read-only, user rejects', fileMode: 'read-only', answer: false, asked: true, ran: false },
+  ] as const)('runs Vibe s own shell as the calling session allows a native one ($session)', async ({ fileMode, answer, asked, ran }) => {
+    const asks: string[] = []
+    const { cli, fake, model } = setup('/synthetic/vibe-home', { authorizeBuiltin: callingSession({ fileMode, answer, asks }) })
+    const reply = await finished(cli.stream(model(), context([{ role: 'user', content: 'BUILTIN_BASH', timestamp: 1 }]), { sessionId: 'native-session' }))
+    // Vibe's ask mode is what sends its edits and commands to DSH at all; its default accept-edits would run them unasked.
+    expect(fake.events()).toContain('set_mode ask')
+    expect(asks).toEqual(asked ? ['bash'] : [])
+    expect(fake.events()).toContain(`permission {"outcome":{"outcome":"selected","optionId":"${ran ? 'allow_once' : 'reject_once'}"}}`)
+    expect(textOf(reply)).toBe(ran ? 'bash ran' : 'tool_denied: Tool execution denied by approval callback')
+  })
+
+  it('runs Vibe s read-only builtins without asking, or asks for each one when builtin approvals are set to ask', async () => {
+    const quiet: string[] = []
+    const following = setup('/synthetic/vibe-home', { authorizeBuiltin: callingSession({ fileMode: 'read-only', answer: false, asks: quiet }) })
+    expect(
+      textOf(
+        await finished(following.cli.stream(following.model(), context([{ role: 'user', content: 'PERMISSION_READ', timestamp: 1 }]), { sessionId: 'reads' })),
+      ),
+    ).toBe('builtin allowed')
+    expect(quiet).toEqual([])
+
+    const asks: string[] = []
+    const asking = setup('/synthetic/vibe-home', {
+      settings: () => ({ acpApprovalPolicy: 'ask', strictTools: false }),
+      authorizeBuiltin: callingSession({ fileMode: 'danger-full-access', answer: true, asks }),
+    })
+    expect(
+      textOf(
+        await finished(asking.cli.stream(asking.model(), context([{ role: 'user', content: 'PERMISSION_READ', timestamp: 1 }]), { sessionId: 'reads-ask' })),
+      ),
+    ).toBe('builtin allowed')
+    expect(asks).toEqual(['read_file'])
+  })
+
+  it('denies a builtin when the calling session is gone or unknown', async () => {
+    const { cli, model } = setup('/synthetic/vibe-home', { authorizeBuiltin: vibeBuiltinAuthorizer({ session: () => undefined }) })
+    expect(textOf(await finished(cli.stream(model(), context([{ role: 'user', content: 'BUILTIN_BASH', timestamp: 1 }]), { sessionId: 'gone' })))).toBe(
+      'tool_denied: Tool execution denied by approval callback',
+    )
+  })
+
+  it('strictTools denies every Vibe builtin request and cleans up when the account is removed', async () => {
+    const asks: string[] = []
+    const { cli, fake, model } = setup('/synthetic/vibe-home', {
+      settings: () => ({ acpApprovalPolicy: 'session', strictTools: true }),
+      authorizeBuiltin: callingSession({ fileMode: 'danger-full-access', answer: true, asks }),
+    })
+    const reply = await finished(cli.stream(model(), context([{ role: 'user', content: 'PERMISSION_READ', timestamp: 1 }]), { sessionId: 'strict' }))
+    const profile = managedProfile(fake)
+    expect(profile.toml).toContain('enabled_tools = ["mcp_dsh.*","dsh_*"]')
+    expect(textOf(reply)).toBe('builtin denied')
+    expect(asks).toEqual([])
+    cli.retainAccounts(new Map())
+    expect(cli.processCount).toBe(0)
+    await cli.dispose()
+    expect(existsSync(profile.roots[0] ?? '')).toBe(false)
+  })
+
+  it('records Vibe handshake and prompt spans without the home, instructions, prompt or models', async () => {
+    using recorder = recordSpans()
+    const { cli, model } = setup('/synthetic/private-home')
+    await finished(cli.stream(model(), context([{ role: 'user', content: 'private message', timestamp: 1 }]), { sessionId: 'spanned' }))
+    const describeSpan = recorder.span('vibe describe')
+    const promptSpan = recorder.span('vibe prompt')
+    expect(describeSpan?.attributes).toMatchObject({ 'process.executable.name': 'vibe-acp', 'dshx.vibe.tool_count': 1 })
+    expect(promptSpan?.attributes).toMatchObject({ 'process.executable.name': 'vibe-acp', 'dshx.vibe.prompt_blocks': 1 })
+    expect(JSON.stringify([describeSpan?.attributes, promptSpan?.attributes])).not.toMatch(/private-home|private message|inside DSH|deepseek-v4/u)
   })
 
   it('keeps Vibe s own builtin tool call out of the DSH transcript and ends the step normally', async () => {

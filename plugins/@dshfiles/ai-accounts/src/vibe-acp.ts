@@ -16,6 +16,7 @@ import {
   type Tool,
   type TranscriptContext,
 } from '@earendil-works/pi-ai'
+import { withSpan } from '@dshfiles/dshx/tracing'
 import * as Schema from 'effect/Schema'
 import { AcpRequestFailed, AcpRpc, type AcpJson } from './acp-rpc.js'
 import { clampOptionValue, configOptionsSchema, optionValues, type AcpConfigOptions } from './acp-session-config.js'
@@ -23,6 +24,7 @@ import { bridgeCallSchema, CliBridge, MCP_BRIDGE_SOURCE } from './cli-bridge.js'
 import type { CliOutcome, CliProcessesPromise, CliRunning } from './cli-processes.js'
 import { AiAccountsSchema } from './effect-schema.js'
 import { VibeAccountModel } from './vibe-account.js'
+import { DEFAULT_VIBE_ACP_SETTINGS, type VibeAcpSettings } from './settings.js'
 
 /**
  * Mistral Vibe through its own ACP server, `vibe-acp`.
@@ -33,9 +35,11 @@ import { VibeAccountModel } from './vibe-account.js'
  * as a `tool_call` before running it, the DSH step ends with `toolUse` while the MCP call is held, and the tool result
  * in DSH's next request releases it, continuing the same ACP prompt.
  *
- * Vibe's own mutating tools are not offered: a private agent profile in the process's folder keeps only read-only
- * builtins and the bridged `dsh_*` tools, so every write, edit and command runs through DSH's own tools, approvals,
- * diffs and undo. Vibe publishes MCP tools as `{server}_{tool}`, hence `dsh_apply_patch`.
+ * Vibe 3.1.5 publishes a bridged tool as `mcp_dsh.<tool>` in the `tool_call`'s `_meta.tool_name` and ignores an agent
+ * profile's `enabled_tools`/`disabled_tools`, so its own `write_file`, `edit`, `bash` and `run_typescript` stay listed.
+ * The route therefore runs Vibe in its `ask` mode and answers every `session/request_permission` itself: a bridged call
+ * is admitted and then gated by DSH's ordinary tool execution, and a Vibe builtin follows the calling DSH session's
+ * file policy and approval policy, as a native tool with the same effect would.
  */
 
 export const VIBE_ACP_EXECUTABLE = 'vibe-acp'
@@ -44,6 +48,7 @@ export const VIBE_ACP_INSTALL_HINT =
 
 const MCP_SERVER_NAME = 'dsh'
 const MCP_TOOL_PREFIX = `${MCP_SERVER_NAME}_`
+const MCP_EFFECT_PREFIX = `mcp_${MCP_SERVER_NAME}.`
 /** The agent profile written for one process, selected with `session/set_config_option`. */
 const AGENT_NAME = 'dsh'
 /** A process nobody asked for in this long is stopped; the next request replays the transcript into a new one. */
@@ -51,10 +56,12 @@ const IDLE_PROCESS_MS = 30 * 60_000
 /** Each process is a full Vibe session with its own MCP bridge; past this many, the least recently used one stops. */
 const MAX_PROCESSES = 6
 /**
- * The Vibe builtins this route leaves enabled. Everything else — `write_file`, `edit`, every shell, `task` (whose
- * subagent could mutate) — is absent from `tools/list`, so a mutation has to go through DSH's `dsh_*` tools.
+ * The Vibe builtins that only read: DSH's own reads never ask, so these run under every file policy. Any other builtin
+ * (`write_file`, `edit`, `bash`, `run_typescript`, a process or subagent tool) can write outside DSH's sandbox.
  */
-const READ_ONLY_BUILTINS = ['read_file', 'grep', 'web_fetch', 'web_search', 'todo'] as const
+const READ_ONLY_BUILTINS = ['read_file', 'grep', 'web_fetch', 'web_search', 'todo', 'search_tool_functions', 'skill'] as const
+/** The Vibe approval mode that sends every builtin's permission request to the route. */
+const VIBE_ASK_MODE = 'ask'
 /** Vibe's thinking levels, in increasing order, as its `thinking` config option takes them. */
 const THINKING_ORDER = ['off', 'low', 'medium', 'high', 'xhigh', 'max'] as const
 
@@ -88,6 +95,7 @@ const sessionUpdateSchema = Schema.Struct({
       sessionUpdate: Schema.Literal('tool_call'),
       toolCallId: Schema.String,
       name: Schema.optional(Schema.String),
+      _meta: Schema.optional(Schema.Struct({ tool_name: Schema.optional(Schema.String) })),
       rawInput: Schema.optional(toolArgumentsSchema),
     }),
     Schema.Struct({ sessionUpdate: Schema.String }),
@@ -96,6 +104,7 @@ const sessionUpdateSchema = Schema.Struct({
 
 /** Vibe sends only the call id: which tool it is comes from the `tool_call` it published first. */
 const permissionRequestSchema = Schema.Struct({
+  sessionId: Schema.String,
   toolCall: Schema.Struct({ toolCallId: Schema.optional(Schema.String), name: Schema.optional(Schema.String) }),
   options: Schema.Array(Schema.Struct({ optionId: Schema.String, kind: Schema.String })),
 })
@@ -109,6 +118,50 @@ type PromptResult = typeof promptResultSchema.Type
 const newSessionSchema = Schema.Struct({ sessionId: Schema.String, configOptions: Schema.optional(configOptionsSchema) })
 const configUpdateSchema = Schema.Struct({ configOptions: configOptionsSchema })
 
+/** One Vibe builtin waiting for the calling DSH session's verdict. */
+export interface VibeBuiltinRequest {
+  readonly sessionId: string
+  readonly name: string
+  readonly readOnly: boolean
+  readonly alwaysAsk: boolean
+  readonly signal: AbortSignal
+}
+
+/**
+ * What a native DSH tool with a builtin's effect would do under the session's file policy: reads and full access run
+ * without asking; a write under a confining policy escapes DSH's sandbox, so it needs the session's approval. Without a
+ * file policy service DSH's own tools run unconfined, so the builtin does too.
+ */
+const vibeBuiltinVerdict = (input: {
+  readonly fileMode: VibeFileMode | undefined
+  readonly readOnly: boolean
+  readonly alwaysAsk: boolean
+}): 'allow' | 'ask' => {
+  if (input.alwaysAsk) return 'ask'
+  if (input.readOnly || input.fileMode === undefined || input.fileMode === 'danger-full-access') return 'allow'
+  return 'ask'
+}
+
+type VibeFileMode = 'read-only' | 'workspace-write' | 'danger-full-access'
+
+/** The calling DSH session as the builtin verdict needs it: its standing file mode and its approval request. */
+export interface VibeCallingSession {
+  readonly fileMode: VibeFileMode | undefined
+  /** Resolves true only for an `allowed-once` answer; a session whose approvals are off rejects without asking. */
+  readonly ask: (input: { readonly toolName: string; readonly reason: string; readonly signal: AbortSignal }) => Promise<boolean>
+}
+
+/** Answer a Vibe builtin's permission request from the calling session's policy; an unknown session is denied. */
+export const vibeBuiltinAuthorizer =
+  (input: { readonly session: (sessionId: string) => VibeCallingSession | undefined }) =>
+  async (request: VibeBuiltinRequest): Promise<boolean> => {
+    const session = input.session(request.sessionId)
+    if (request.signal.aborted || session === undefined) return false
+    if (vibeBuiltinVerdict({ fileMode: session.fileMode, readOnly: request.readOnly, alwaysAsk: request.alwaysAsk }) === 'allow') return true
+    const reason = `Mistral Vibe wants to run its own ${request.readOnly ? 'read-only' : 'unsandboxed'} tool ${request.name}.`
+    return session.ask({ toolName: request.name, reason, signal: request.signal })
+  }
+
 /** Where a held tool call stands: the model asked for it, DSH answered it, or both (then it is released). */
 interface HeldCall {
   bridgeId?: string | number
@@ -117,6 +170,13 @@ interface HeldCall {
 }
 
 /** A holder for the session a process's callbacks need, which exists only after its own setup. */
+interface BridgeCall {
+  readonly name: string
+  readonly arguments: ToolArguments
+  readonly bridgeId: string | number
+  readonly socket: Socket
+}
+
 interface SessionRef {
   current: Session | undefined
 }
@@ -149,6 +209,10 @@ interface UsageTotals {
 interface Session {
   readonly key: string
   readonly signature: string
+  readonly provider: string
+  readonly dshSessionId: string | undefined
+  readonly settings: VibeAcpSettings
+  permissionScope: { readonly sessionId: string; readonly controller: AbortController } | undefined
   readonly running: CliRunning
   readonly rpc: AcpRpc
   readonly server: Server
@@ -171,8 +235,8 @@ interface Session {
   /** Events emitted with no stream listening wait here. */
   readonly backlog: AcpEvent[]
   readonly held: Map<string, HeldCall>
-  readonly unmatchedCalls: { readonly name: string; readonly argumentsJson: string; readonly bridgeId: string | number; readonly socket: Socket }[]
-  readonly emittedToolUses: { readonly id: string; readonly name: string; readonly argumentsJson: string }[]
+  readonly unmatchedCalls: BridgeCall[]
+  readonly pendingToolUses: { readonly id: string; readonly name: string; readonly argumentsJson: string }[]
   /** Every tool call Vibe published, so a permission request that carries only an id can be classified. */
   readonly toolNamesById: Map<string, string>
   /** The cumulative usage Vibe last reported, and what the ledger already took from it. */
@@ -209,16 +273,17 @@ const declaredArguments = (tool: Tool | undefined, input: ToolArguments): ToolAr
 
 /**
  * The agent profile `session/set_config_option` selects: DSH's instructions, and an `enabled_tools` allowlist holding
- * only read-only Vibe builtins plus the bridged `dsh_*` tools. Vibe reads agent files from `<root>/.vibe/agents` for
+ * only read-only Vibe builtins plus the bridged tools. Vibe 3.1.5 carries the instructions but not the allowlist, which
+ * stays for a Vibe that honours it; the permission answers are what keep its builtins in line. Vibe reads agent files from `<root>/.vibe/agents` for
  * every root in `session/new`'s `additionalDirectories`, so this profile lives in the process's own folder and never
  * touches the account's `VIBE_HOME`.
  */
-const agentFile = (system: string): string =>
+const agentFile = (system: string, strictTools: boolean): string =>
   [
     'display_name = "DeepSeek Harness"',
     'description = "DSH owns this conversation: read-only Vibe tools plus DSH\'s bridged tools."',
     `instructions = ${JSON.stringify(system)}`,
-    `enabled_tools = ${JSON.stringify([`${MCP_TOOL_PREFIX}*`, ...READ_ONLY_BUILTINS])}`,
+    `enabled_tools = ${JSON.stringify([`${MCP_EFFECT_PREFIX}*`, `${MCP_TOOL_PREFIX}*`, ...(strictTools ? [] : READ_ONLY_BUILTINS)])}`,
     '',
   ].join('\n')
 
@@ -236,6 +301,9 @@ export class VibeAcpSessions {
       readonly processes: CliProcessesPromise
       readonly home: (provider: string) => string
       readonly executable?: string
+      readonly settings?: () => VibeAcpSettings
+      /** Whether the calling DSH session lets a Vibe builtin run; `alwaysAsk` forces an approval request. Absent denies. */
+      readonly authorizeBuiltin?: (input: VibeBuiltinRequest) => Promise<boolean>
     },
   ) {}
 
@@ -272,6 +340,11 @@ export class VibeAcpSessions {
     return this.sessions.size
   }
 
+  /** Stop processes whose ACP account was removed, disabled, switched to headless or moved to a different home. */
+  retainAccounts(homes: ReadonlyMap<string, string>): void {
+    for (const session of this.sessions.values()) if (homes.get(session.provider) !== session.home) this.stopKey(session.key)
+  }
+
   /** Stop every process; resolves once their process ranges and private folders are gone. */
   dispose(): Promise<void> {
     for (const session of this.sessions.values()) this.stop(session)
@@ -279,7 +352,7 @@ export class VibeAcpSessions {
     return Promise.all(this.removals).then(() => undefined)
   }
 
-  private static pendingTools = (session: Session): boolean => session.held.size > 0 || session.unmatchedCalls.length > 0 || session.emittedToolUses.length > 0
+  private static pendingTools = (session: Session): boolean => session.held.size > 0 || session.unmatchedCalls.length > 0 || session.pendingToolUses.length > 0
 
   private static stopTimer(phase: SessionPhase): void {
     if (phase.kind === 'idle') phase.cancelReap()
@@ -318,7 +391,11 @@ export class VibeAcpSessions {
     const system = getCurrentSystemPrompt(messages)
     const tools = getCurrentTools(messages)
     const level = levelFor(streamOptions?.reasoning)
-    const signature = CliBridge.fingerprint(JSON.stringify({ model: model.id, provider: model.provider, system, tools: tools.map(CliBridge.toMcpTool), level }))
+    const settings = this.options.settings?.() ?? DEFAULT_VIBE_ACP_SETTINGS
+    const home = this.options.home(model.provider)
+    const signature = CliBridge.fingerprint(
+      JSON.stringify({ model: model.id, provider: model.provider, system, tools: tools.map(CliBridge.toMcpTool), level, home, settings }),
+    )
     // Title, compaction and memory requests share the Session id but not its opening, so they get processes of their own.
     const firstUser = messages.find(message => message.role === 'user')
     const firstSystem = messages.find(message => message.role === 'system')
@@ -337,7 +414,7 @@ export class VibeAcpSessions {
       if (this.sessions.size < MAX_PROCESSES) break
       if (candidate.phase.kind === 'idle') this.stopKey(candidate.key)
     }
-    const session = this.spawn({ key, signature, model, system, tools, level })
+    const session = this.spawn({ key, signature, model, system, tools, level, home, settings, dshSessionId: streamOptions?.sessionId })
     this.sessions.set(key, session)
     const conversation = messages.filter(message => message.role !== 'system')
     const pendingStart = CliBridge.trailingUserStart(conversation)
@@ -401,14 +478,30 @@ export class VibeAcpSessions {
   private async runPrompt(session: Session, blocks: readonly AcpJson[]): Promise<void> {
     let result: AcpJson
     try {
-      result = await session.rpc.request('session/prompt', { sessionId: await session.ready, prompt: blocks })
+      const sessionId = await session.ready
+      if (session.phase.kind === 'dead') return
+      session.permissionScope = { sessionId, controller: new AbortController() }
+      result = await withSpan(
+        'vibe prompt',
+        {
+          kind: 'client',
+          attributes: { 'process.executable.name': VIBE_ACP_EXECUTABLE, 'dshx.vibe.prompt_blocks': blocks.length },
+        },
+        () => session.rpc.request('session/prompt', { sessionId, prompt: blocks }),
+      )
     } catch (error) {
       session.prompting = false
       session.queued.splice(0)
       this.emit(session, { kind: 'failed', message: actionableFailure(error instanceof Error ? error.message : String(error), session.home) })
+      if (this.sessions.get(session.key) === session) this.stopKey(session.key)
       return
+    } finally {
+      session.permissionScope?.controller.abort()
+      session.permissionScope = undefined
     }
     session.prompting = false
+    session.pendingToolUses.length = 0
+    session.toolNamesById.clear()
     const decoded = AiAccountsSchema.decodeResult(promptResultSchema, result)
     if (decoded._tag === 'Success') this.absorbPromptUsage(session, decoded.success)
     const next = session.queued.splice(0)
@@ -460,41 +553,54 @@ export class VibeAcpSessions {
   }
 
   /** A call from the bridge carries no tool call id; it belongs to the first emitted tool call with the same name and input. */
-  private matchCall(
-    session: Session,
-    call: { readonly name: string; readonly argumentsJson: string; readonly bridgeId: string | number; readonly socket: Socket },
-  ): void {
-    const exact = session.emittedToolUses.findIndex(use => use.name === call.name && use.argumentsJson === call.argumentsJson)
-    const index = exact === -1 ? session.emittedToolUses.findIndex(use => use.name === call.name) : exact
+  private matchCall(session: Session, call: BridgeCall): void {
+    const tool = session.tools.find(candidate => candidate.name === call.name)
+    if (tool === undefined) {
+      call.socket.write(`${JSON.stringify({ id: call.bridgeId, content: [{ type: 'text', text: 'Tool not offered by DSH.' }], isError: true })}\n`)
+      return
+    }
+    const input = declaredArguments(tool, call.arguments)
+    const exact = session.pendingToolUses.findIndex(use => use.name === call.name && use.argumentsJson === JSON.stringify(input))
+    const index = exact === -1 ? session.pendingToolUses.findIndex(use => use.name === call.name) : exact
     if (index === -1) {
       session.unmatchedCalls.push(call)
       return
     }
-    const [use] = session.emittedToolUses.splice(index, 1)
+    const [use] = session.pendingToolUses.splice(index, 1)
     if (use === undefined) return
     const held = session.held.get(use.id) ?? {}
     held.bridgeId = call.bridgeId
     held.socket = call.socket
     session.held.set(use.id, held)
-    if (!this.release(session, use.id)) this.emit(session, { kind: 'toolsHeld' })
+    // An ACP update can describe a call Vibe subsequently rejects. Only the MCP request may dispatch it to DSH.
+    this.emit(session, { kind: 'toolCall', id: use.id, name: call.name, arguments: input })
+    this.emit(session, { kind: 'toolsHeld' })
     this.settle(session)
   }
 
   private onToolCall(
     session: Session,
-    update: { readonly toolCallId: string; readonly name?: string | undefined; readonly rawInput?: ToolArguments | undefined },
+    update: {
+      readonly toolCallId: string
+      readonly name?: string | undefined
+      readonly _meta?: { readonly tool_name?: string | undefined } | undefined
+      readonly rawInput?: ToolArguments | undefined
+    },
   ): void {
     // Vibe republishes a call as it progresses; only the first update carries the call itself.
     if (session.toolNamesById.has(update.toolCallId)) return
-    if (update.name !== undefined) session.toolNamesById.set(update.toolCallId, update.name)
-    // Vibe's own tools (read, grep, web) run inside `vibe-acp`; only DSH's tools become DSH tool calls.
-    if (update.name === undefined || !update.name.startsWith(MCP_TOOL_PREFIX)) return
-    const name = update.name.slice(MCP_TOOL_PREFIX.length)
-    const tool = session.tools.find(candidate => candidate.name === name)
+    const wireName = update._meta?.tool_name ?? update.name
+    if (wireName === undefined) return
+    session.toolNamesById.set(update.toolCallId, wireName)
+    const tool = this.bridgedTool(session, wireName)
+    if (tool === undefined) return
     const input = declaredArguments(tool, update.rawInput ?? {})
-    session.emittedToolUses.push({ id: update.toolCallId, name, argumentsJson: JSON.stringify(input) })
-    this.emit(session, { kind: 'toolCall', id: update.toolCallId, name, arguments: input })
+    session.pendingToolUses.push({ id: update.toolCallId, name: tool.name, argumentsJson: JSON.stringify(input) })
     for (const call of session.unmatchedCalls.splice(0)) this.matchCall(session, call)
+  }
+
+  private bridgedTool(session: Session, wireName: string): Tool | undefined {
+    return session.tools.find(tool => wireName === `${MCP_EFFECT_PREFIX}${tool.name}` || wireName === `${MCP_TOOL_PREFIX}${tool.name}`)
   }
 
   private onNotification(session: Session, method: string, params: AcpJson): void {
@@ -523,15 +629,28 @@ export class VibeAcpSessions {
    * because DSH is what gates them; a read-only builtin is allowed; anything else is rejected, so a mutating tool that
    * somehow reached this session still cannot run unattended.
    */
-  private answerPermission(session: Session, method: string, params: AcpJson): { readonly result: AcpJson } | undefined {
+  private async answerPermission(session: Session, method: string, params: AcpJson): Promise<{ readonly result: AcpJson } | undefined> {
     if (method !== 'session/request_permission') return undefined
     const decoded = AiAccountsSchema.decodeResult(permissionRequestSchema, params)
-    if (decoded._tag !== 'Success') return { result: { outcome: { outcome: 'cancelled' } } }
+    const scope = session.permissionScope
+    if (decoded._tag !== 'Success' || scope === undefined || scope.controller.signal.aborted || decoded.success.sessionId !== scope.sessionId)
+      return { result: { outcome: { outcome: 'cancelled' } } }
     const id = decoded.success.toolCall.toolCallId
-    const name = (id === undefined ? undefined : session.toolNamesById.get(id)) ?? decoded.success.toolCall.name
-    const runnable = name !== undefined && (name.startsWith(MCP_TOOL_PREFIX) || READ_ONLY_BUILTINS.some(builtin => builtin === name))
-    const option = decoded.success.options.find(candidate => candidate.kind.startsWith(runnable ? 'allow' : 'reject'))
+    const name = (id === undefined ? undefined : session.toolNamesById.get(id)) ?? decoded.success.toolCall.name ?? id
+    const runnable = name !== undefined && (await this.permit(session, name, scope.controller.signal))
+    const option = decoded.success.options.find(candidate => candidate.kind === (runnable ? 'allow_once' : 'reject_once'))
     return { result: { outcome: option === undefined ? { outcome: 'cancelled' } : { outcome: 'selected', optionId: option.optionId } } }
+  }
+
+  private async permit(session: Session, name: string, signal: AbortSignal): Promise<boolean> {
+    // Allow transport, not execution: the MCP request becomes an ordinary native DSH tool call, with all its guards.
+    if (this.bridgedTool(session, name) !== undefined) return true
+    if (session.settings.strictTools) return false
+    const readOnly = READ_ONLY_BUILTINS.some(builtin => builtin === name)
+    const alwaysAsk = session.settings.acpApprovalPolicy === 'ask'
+    if (readOnly && !alwaysAsk) return true
+    if (session.dshSessionId === undefined || this.options.authorizeBuiltin === undefined) return false
+    return this.options.authorizeBuiltin({ sessionId: session.dshSessionId, name, readOnly, alwaysAsk, signal }).catch(() => false)
   }
 
   private spawn(input: {
@@ -541,20 +660,31 @@ export class VibeAcpSessions {
     readonly system: string
     readonly tools: readonly Tool[]
     readonly level: string | undefined
+    readonly home: string
+    readonly settings: VibeAcpSettings
+    readonly dshSessionId: string | undefined
   }): Session {
     // A private folder keeps the conversation's files and the managed agent profile out of the account's own
     // `VIBE_HOME`; the empty `workspace` cwd keeps a project's AGENTS.md and config out of the conversation.
     const directory = mkdtempSync(join(tmpdir(), 'dsh-vibe-acp-'))
     const workspace = join(directory, 'workspace')
     const agentRoot = join(directory, 'agent')
-    mkdirSync(workspace)
-    mkdirSync(join(agentRoot, '.vibe', 'agents'), { recursive: true })
-    writeFileSync(join(agentRoot, '.vibe', 'agents', `${AGENT_NAME}.toml`), agentFile(input.system))
+    try {
+      mkdirSync(workspace)
+      mkdirSync(join(agentRoot, '.vibe', 'agents'), { recursive: true })
+      writeFileSync(join(agentRoot, '.vibe', 'agents', `${AGENT_NAME}.toml`), agentFile(input.system, input.settings.strictTools), { mode: 0o600 })
+    } catch (cause) {
+      void fsPromises.rm(directory, { recursive: true, force: true }).catch(() => undefined)
+      throw new Error(
+        'Could not write the private Vibe ACP agent profile. Make the Host temporary directory writable or explicitly switch this account to Headless CLI.',
+        { cause },
+      )
+    }
     // Windows has no Unix domain socket files; Node serves the same stream API on a named pipe with a random name.
     const socketPath =
       process.platform === 'win32' ? `\\\\.\\pipe\\${basename(directory)}-${randomBytes(12).toString('hex')}-bridge` : join(directory, 'bridge.sock')
     writeFileSync(join(directory, 'tools.json'), JSON.stringify(input.tools.map(CliBridge.toMcpTool)))
-    const home = this.options.home(input.model.provider)
+    const home = input.home
     let stderr = ''
     // A missing executable ends the process before the session object exists: hold that outcome until it does.
     let ended: CliOutcome | undefined
@@ -582,12 +712,27 @@ export class VibeAcpSessions {
       onNotification: (method, params) => this.onNotification(sessionOf(), method, params),
       onRequest: (method, params) => this.answerPermission(sessionOf(), method, params),
     })
-    const ready = this.open({ rpc, workspace, agentRoot, directory, socketPath, model: input.model, level: input.level })
+    const ready = withSpan(
+      'vibe describe',
+      {
+        kind: 'client',
+        attributes: {
+          'process.executable.name': VIBE_ACP_EXECUTABLE,
+          'dshx.vibe.strict_tools': input.settings.strictTools,
+          'dshx.vibe.tool_count': input.tools.length,
+        },
+      },
+      () => this.open({ rpc, workspace, agentRoot, directory, socketPath, model: input.model, level: input.level }),
+    )
     // A failed opening already fails the prompt that waits on it.
     ready.catch(() => undefined)
     const session: Session = {
       key: input.key,
       signature: input.signature,
+      provider: input.model.provider,
+      dshSessionId: input.dshSessionId,
+      settings: input.settings,
+      permissionScope: undefined,
       running,
       rpc,
       server: createServer(),
@@ -604,7 +749,7 @@ export class VibeAcpSessions {
       backlog: [],
       held: new Map(),
       unmatchedCalls: [],
-      emittedToolUses: [],
+      pendingToolUses: [],
       toolNamesById: new Map(),
       totals: zeroTotals(),
       reported: zeroTotals(),
@@ -630,7 +775,7 @@ export class VibeAcpSessions {
           const parsed = CliBridge.decodeJsonLine(bridgeCallSchema, buffer.slice(0, newline))
           buffer = buffer.slice(newline + 1)
           if (parsed._tag === 'Success')
-            this.matchCall(session, { name: parsed.success.name, argumentsJson: JSON.stringify(parsed.success.arguments), bridgeId: parsed.success.id, socket })
+            this.matchCall(session, { name: parsed.success.name, arguments: parsed.success.arguments, bridgeId: parsed.success.id, socket })
           newline = buffer.indexOf('\n')
         }
       })
@@ -688,7 +833,20 @@ export class VibeAcpSessions {
         -32602,
         'Vibe ACP did not load the managed DSH agent profile, so its own write, edit and shell tools would stay enabled. Refusing to run this step; update Mistral Vibe and retry.',
       )
+    if (!optionValues(options, 'mode').includes(VIBE_ASK_MODE))
+      throw new AcpRequestFailed(
+        'session/set_mode',
+        -32602,
+        'Vibe ACP does not offer its ask mode, so its own edits could run without DSH answering them. Refusing to run this step; update Mistral Vibe or switch this account to Headless CLI.',
+      )
+    await input.rpc.request('session/set_mode', { sessionId, modeId: VIBE_ASK_MODE })
     await select('agent', AGENT_NAME)
+    if (options?.find(option => option.id === 'agent')?.currentValue !== AGENT_NAME)
+      throw new AcpRequestFailed(
+        'session/set_config_option',
+        -32602,
+        'Vibe ACP did not activate the managed DSH profile. Update Mistral Vibe or explicitly switch this account to Headless CLI.',
+      )
     const modelId = VibeAccountModel.canonicalModelId(input.model.id)
     if (!optionValues(options, 'model').includes(modelId))
       throw new AcpRequestFailed(
@@ -858,6 +1016,7 @@ export class VibeAcpSessions {
   }
 
   private die(session: Session): void {
+    session.permissionScope?.controller.abort()
     VibeAcpSessions.stopTimer(session.phase)
     session.phase = { kind: 'dead' }
   }
@@ -870,6 +1029,7 @@ export class VibeAcpSessions {
   }
 
   private stop(session: Session): void {
+    if (session.phase.kind === 'streaming') this.emit(session, { kind: 'exited' })
     this.die(session)
     session.rpc.close(new Error('vibe-acp stopped'))
     this.cleanup(session)

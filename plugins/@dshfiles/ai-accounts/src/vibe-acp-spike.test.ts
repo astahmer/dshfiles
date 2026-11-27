@@ -15,7 +15,7 @@ import { fakeVibeAcp, type FakeVibeAcp } from './vibe-acp.fixture.js'
  * The ordering spike for the Vibe ACP bridge, run without product code: the smallest ACP client `vibe-acp` accepts —
  * one stdio MCP server, one session, one permission policy — proving the three facts the `vibe-acp` route is built on:
  *
- *   1. `session/new` projects the MCP server, and Vibe publishes DSH's tools as `dsh_<tool>` (not `mcp_dsh_<tool>`).
+ *   1. `session/new` projects the MCP server, and Vibe publishes DSH's tools as `mcp_dsh.<tool>` in ACP metadata.
  *   2. the tool's `tool_call` update is published before the MCP `tools/call` can be answered, so a step can end on the
  *      update while the call stays held for DSH's result.
  *   3. `usage_update` carries the context size, the session cost and the token meta the ledger reports, and
@@ -41,7 +41,7 @@ const newSessionSchema = Schema.Struct({ sessionId: Schema.String })
 const incomingSchema = Schema.Struct({
   sessionUpdate: Schema.String,
   toolCallId: Schema.optional(Schema.String),
-  name: Schema.optional(Schema.String),
+  _meta: Schema.optional(Schema.Struct({ tool_name: Schema.optional(Schema.String) })),
 })
 
 const tool = { name: 'echo', description: 'Echo a value', parameters: { type: 'object', properties: { value: { type: 'string' } } } }
@@ -123,7 +123,9 @@ const inspect = async (input: { readonly prompt: string }): Promise<Inspection> 
       const bridged = updates.some(update => {
         const candidate = Schema.decodeUnknownSync(incomingSchema)(update)
         return (
-          candidate.sessionUpdate === 'tool_call' && candidate.toolCallId === decoded.success.toolCall.toolCallId && (candidate.name ?? '').startsWith('dsh_')
+          candidate.sessionUpdate === 'tool_call' &&
+          candidate.toolCallId === decoded.success.toolCall.toolCallId &&
+          (candidate._meta?.tool_name ?? '').startsWith('mcp_dsh.')
         )
       })
       const option = decoded.success.options.find(candidate => candidate.kind.startsWith(bridged ? 'allow' : 'reject'))
@@ -161,18 +163,18 @@ const inspect = async (input: { readonly prompt: string }): Promise<Inspection> 
 const toolCallNames = (updates: readonly AcpJson[]): string[] =>
   updates.flatMap(update => {
     const candidate = Schema.decodeUnknownSync(incomingSchema)(update)
-    return candidate.sessionUpdate === 'tool_call' && candidate.name !== undefined ? [candidate.name] : []
+    return candidate.sessionUpdate === 'tool_call' && candidate._meta?.tool_name !== undefined ? [candidate._meta.tool_name] : []
   })
 
 const hasUpdate = (updates: readonly AcpJson[], kind: string): boolean =>
   updates.some(update => Schema.decodeUnknownSync(incomingSchema)(update).sessionUpdate === kind)
 
 describe('the Vibe ACP ordering spike', () => {
-  it('publishes a DSH tool as dsh_<tool> and emits its tool_call before the bridge call can be answered', async () => {
+  it('publishes a DSH tool as mcp_dsh.<tool> and emits its tool_call before the bridge call can be answered', async () => {
     const inspected = await inspect({ prompt: 'CALL_TOOL please' })
     await vi.waitFor(() => expect(inspected.bridgeCalls).toHaveLength(1), { timeout: 10_000 })
     // The call is still held inside Vibe's tool proxy, and the ACP update already reached the client.
-    expect(toolCallNames(inspected.updates)).toEqual(['dsh_echo'])
+    expect(toolCallNames(inspected.updates)).toEqual(['mcp_dsh.echo'])
     expect(inspected.bridgeCalls).toEqual([{ name: 'echo', arguments: '{"value":"ping"}' }])
     expect(inspected.fake.events()).toContain('tools ["echo"]')
     expect(inspected.fake.events().find(event => event.startsWith('session/new'))).toContain('mcp={"name":"dsh"')

@@ -105,7 +105,7 @@ import { ANTIGRAVITY_CLI_TOKEN, AntigravityAccountModel } from './antigravity-ac
 import { createAntigravityProvider } from './antigravity-provider.js'
 import { VIBE_CLI_TOKEN, VibeCliSessions } from './vibe-cli.js'
 import { createVibeAcpProvider, createVibeProvider } from './vibe-provider.js'
-import { VibeAcpSessions } from './vibe-acp.js'
+import { VibeAcpSessions, vibeBuiltinAuthorizer } from './vibe-acp.js'
 import { CliProcesses, CliProcessesPromiseModel, type CliProcessesPromise } from './cli-processes.js'
 
 /**
@@ -370,7 +370,26 @@ const startAccountsHost = (input: {
   const vibeCli = new VibeCliSessions({ home: vibeHome })
   onRelease(() => vibeCli.dispose())
   const vibeCliUpstream = createVibeProvider({ upstream: mistralUpstream, sessions: vibeCli })
-  const vibeAcp = new VibeAcpSessions({ processes: input.antigravity, home: vibeHome })
+  const vibeAcp = new VibeAcpSessions({
+    processes: input.antigravity,
+    home: vibeHome,
+    settings: () => readSettings().vibe,
+    authorizeBuiltin: vibeBuiltinAuthorizer({
+      session: sessionId => {
+        const agent = ctx.agents.get(SessionId(sessionId))
+        if (agent === undefined) return undefined
+        return {
+          fileMode: ctx.get('sandboxPolicy')?.resolve({ session: agent.session }).mode,
+          ask: async ask => {
+            const approval = ctx.get('approval')
+            return (
+              approval !== undefined && (await approval.request({ agent, toolName: ask.toolName, reason: ask.reason, signal: ask.signal })) === 'allowed-once'
+            )
+          },
+        }
+      },
+    }),
+  })
   onRelease(() => void vibeAcp.dispose())
   const vibeAcpUpstream = createVibeAcpProvider({ upstream: mistralUpstream, sessions: vibeAcp })
   const githubCopilotUpstream = githubCopilotProvider()
@@ -876,6 +895,9 @@ const startAccountsHost = (input: {
     pool.setDistribution(nextConfig.distribution)
     config = nextConfig
     routes = nextRoutes
+    vibeAcp.retainAccounts(
+      new Map([...nextRoutes].flatMap(([id, route]) => (route.kind === VIBE_KIND && route.enabled && route.bridge === 'acp' ? [[id, route.home]] : []))),
+    )
     profiles = buildProfiles(nextRoutes, sourceFile)
     reasoningDefaults.clear()
     for (const [id, pins] of buildReasoningDefaults()) reasoningDefaults.set(id, pins)
