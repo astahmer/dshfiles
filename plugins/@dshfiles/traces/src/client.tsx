@@ -22,9 +22,9 @@ import { panelStores } from './panel-stores.js'
 
 /** The Traces page and the thread's Traces and Requests views load when one first opens, not at page boot. */
 const views = () => import('./lazy-views.js')
-const TracesPanel = lazyView(() => views().then(module => module.TracesPanel), { label: 'Traces' })
-const SessionTracesView = lazyView(() => views().then(module => module.SessionTracesView), { label: 'Traces' })
-const SessionRequestsView = lazyView(() => views().then(module => module.SessionRequestsView), { label: 'Requests' })
+const TracesPanel = lazyView(() => views().then(module => module.LazyViews.TracesPanel), { label: 'Traces' })
+const SessionTracesView = lazyView(() => views().then(module => module.LazyViews.SessionTracesView), { label: 'Traces' })
+const SessionRequestsView = lazyView(() => views().then(module => module.LazyViews.SessionRequestsView), { label: 'Requests' })
 
 const PANEL_ID = 'traces'
 

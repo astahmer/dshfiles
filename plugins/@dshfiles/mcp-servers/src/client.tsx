@@ -18,8 +18,8 @@ import { createQuickPanelContribution, SessionQuickPanels, type QuickPanelState 
 
 /** The MCP servers manager and quick panel load when one first opens, not at page boot. */
 const views = () => import('./lazy-views.js')
-const ManagerView = lazyView(() => views().then(module => module.ManagerView), { label: 'MCP servers' })
-const McpQuickPanel = lazyView(() => views().then(module => module.McpQuickPanel), { label: 'MCP servers' })
+const ManagerView = lazyView(() => views().then(module => module.LazyViews.ManagerView), { label: 'MCP servers' })
+const McpQuickPanel = lazyView(() => views().then(module => module.LazyViews.McpQuickPanel), { label: 'MCP servers' })
 
 const PANEL_ID = 'mcp-servers'
 

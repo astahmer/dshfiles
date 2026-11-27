@@ -17,8 +17,8 @@ import type { ProjectChoice, WhiteboardClient } from './ui-model.js'
 
 /** The boards list and a board load when one first opens, not at page boot. */
 const views = () => import('./lazy-views.js')
-const BoardView = lazyView(() => views().then(module => module.BoardView), { label: 'Board' })
-const BoardsPanel = lazyView(() => views().then(module => module.BoardsPanel), { label: 'Boards' })
+const BoardView = lazyView(() => views().then(module => module.LazyViews.BoardView), { label: 'Board' })
+const BoardsPanel = lazyView(() => views().then(module => module.LazyViews.BoardsPanel), { label: 'Boards' })
 
 const PANEL_ID = 'dshfiles-whiteboard'
 

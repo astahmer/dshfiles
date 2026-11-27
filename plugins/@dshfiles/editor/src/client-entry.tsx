@@ -38,8 +38,8 @@ import { createWorkspaceFileIndex } from './workspace-files.js'
 
 /** The editor and Artifacts pages load when one first opens, not at page boot. */
 const views = () => import('./lazy-views.js')
-const ArtifactsPanel = lazyView(() => views().then(module => module.ArtifactsPanel), { label: 'Artifacts' })
-const EditorPanel = lazyView(() => views().then(module => module.EditorPanel), { label: 'Editor' })
+const ArtifactsPanel = lazyView(() => views().then(module => module.LazyViews.ArtifactsPanel), { label: 'Artifacts' })
+const EditorPanel = lazyView(() => views().then(module => module.LazyViews.EditorPanel), { label: 'Editor' })
 
 const RIGHT_PANE_KIND = 'dshfiles-editor-files'
 const WORKBENCH_PANEL_ID = 'dshfiles-editor.main'

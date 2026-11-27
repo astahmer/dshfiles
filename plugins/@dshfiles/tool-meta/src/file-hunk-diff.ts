@@ -1,4 +1,4 @@
-import { parseDiffFromFile, type FileDiffMetadata } from '@dshfiles/plugin-ui/diff-parse'
+import { DiffParse, type FileDiffMetadata } from '@dshfiles/plugin-ui/diff-parse'
 import type { FileHunk } from './file-tool-models.js'
 
 /** One applied hunk, parsed by the diff engine the review surfaces already render. */
@@ -31,7 +31,7 @@ const lineCounts = (diff: FileDiffMetadata): HunkTotals =>
  */
 export const hunkDiffs = (hunks: readonly FileHunk[]): readonly HunkDiff[] =>
   hunks.map(hunk => {
-    const diff = parseDiffFromFile(hunk.oldText === null ? null : { name: hunk.path, contents: hunk.oldText }, { name: hunk.path, contents: hunk.newText })
+    const diff = DiffParse.fromFile(hunk.oldText === null ? null : { name: hunk.path, contents: hunk.oldText }, { name: hunk.path, contents: hunk.newText })
     return { hunk, diff, ...lineCounts(diff) }
   })
 

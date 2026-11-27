@@ -68,8 +68,8 @@ import { NativeAsideOwners } from '@dshfiles/workbench/registry'
 
 /** The Workspaces page and the main-branch panel load when one first opens, not at page boot. */
 const views = () => import('./lazy-views.js')
-const ThreadWorkspacesPanel = lazyView(() => views().then(module => module.ThreadWorkspacesPanel), { label: 'Workspaces' })
-const ProjectMainBranchPanel = lazyView(() => views().then(module => module.ProjectMainBranchPanel), { label: 'Main branch' })
+const ThreadWorkspacesPanel = lazyView(() => views().then(module => module.LazyViews.ThreadWorkspacesPanel), { label: 'Workspaces' })
+const ProjectMainBranchPanel = lazyView(() => views().then(module => module.LazyViews.ProjectMainBranchPanel), { label: 'Main branch' })
 
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'

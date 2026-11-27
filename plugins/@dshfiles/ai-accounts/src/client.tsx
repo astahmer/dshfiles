@@ -46,12 +46,12 @@ import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
  */
 /** The account pages load when one first opens (a page, the Models footer, the Settings section), not at page boot. */
 const views = () => import('./lazy-views.js')
-const AccountsPanel = lazyView(() => views().then(module => module.AccountsPanel), { label: 'AI accounts' })
-const UsageHistoryPanel = lazyView(() => views().then(module => module.UsageHistoryPanel), { label: 'Usage history' })
-const QuotaForecastPanel = lazyView(() => views().then(module => module.QuotaForecastPanel), { label: 'Quota forecast' })
-const QuotaAccountsView = lazyView(() => views().then(module => module.QuotaAccountsView), { label: 'Accounts' })
-const ModelsPageAccounts = lazyView(() => views().then(module => module.ModelsPageAccounts), { label: 'Accounts' })
-const AiAccountsSettingsSection = lazyView(() => views().then(module => module.AiAccountsSettingsSection), { label: 'AI accounts' })
+const AccountsPanel = lazyView(() => views().then(module => module.LazyViews.AccountsPanel), { label: 'AI accounts' })
+const UsageHistoryPanel = lazyView(() => views().then(module => module.LazyViews.UsageHistoryPanel), { label: 'Usage history' })
+const QuotaForecastPanel = lazyView(() => views().then(module => module.LazyViews.QuotaForecastPanel), { label: 'Quota forecast' })
+const QuotaAccountsView = lazyView(() => views().then(module => module.LazyViews.QuotaAccountsView), { label: 'Accounts' })
+const ModelsPageAccounts = lazyView(() => views().then(module => module.LazyViews.ModelsPageAccounts), { label: 'Accounts' })
+const AiAccountsSettingsSection = lazyView(() => views().then(module => module.LazyViews.AiAccountsSettingsSection), { label: 'AI accounts' })
 
 const PANEL_ID = 'ai-accounts'
 const USAGE_PANEL_ID = 'ai-accounts-usage'
