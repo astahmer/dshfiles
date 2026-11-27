@@ -18,15 +18,9 @@ import {
 } from '@earendil-works/pi-ai'
 import * as Schema from 'effect/Schema'
 import { AcpRequestFailed, AcpRpc, type AcpJson } from './acp-rpc.js'
-import {
-  ANTIGRAVITY_EXECUTABLE,
-  ANTIGRAVITY_INSTALL_HINT,
-  AntigravityAccountModel,
-  configOptionsSchema,
-  type AcpConfigOptions,
-  type AntigravityLevel,
-} from './antigravity-account.js'
-import type { CliRunning, CliProcessesPromise } from './cli-processes.js'
+import { configOptionsSchema, type AcpConfigOptions } from './acp-session-config.js'
+import { ANTIGRAVITY_EXECUTABLE, ANTIGRAVITY_INSTALL_HINT, AntigravityAccountModel, type AntigravityLevel } from './antigravity-account.js'
+import type { CliOutcome, CliProcessesPromise, CliRunning } from './cli-processes.js'
 import { neutralSystemPrompt } from './antigravity-system-prompt.js'
 import { MCP_BRIDGE_SOURCE, bridgeCallSchema, CliBridge } from './cli-bridge.js'
 import { AiAccountsSchema } from './effect-schema.js'
@@ -109,6 +103,11 @@ interface HeldCall {
   bridgeId?: string | number
   socket?: Socket
   result?: { readonly content: readonly unknown[]; readonly isError: boolean }
+}
+
+/** A holder for the session a process's callbacks need, which exists only after its own setup. */
+interface SessionRef {
+  current: Session | undefined
 }
 
 type SessionPhase =
@@ -596,7 +595,13 @@ export class AntigravityAcpSessions {
       '--disable-telemetry',
     ]
     let stderr = ''
-    // The handlers run only once agy writes or ends, after `rpc` and `session` below exist.
+    // A missing executable ends the process before the session object exists: hold that outcome until it does.
+    let ended: CliOutcome | undefined
+    const holder: SessionRef = { current: undefined }
+    const sessionOf = (): Session => {
+      if (holder.current === undefined) throw new Error('the Antigravity session was not set up')
+      return holder.current
+    }
     const running = this.options.processes.launch({
       executable: this.options.executable ?? ANTIGRAVITY_EXECUTABLE,
       args,
@@ -607,24 +612,13 @@ export class AntigravityAcpSessions {
         stderr = `${stderr}${text}`.slice(-2_000)
       },
       onEnd: outcome => {
-        this.die(session)
-        rpc.close(new Error('agy exited'))
-        if (outcome.kind === 'failed')
-          this.emit(session, {
-            kind: 'failed',
-            message: outcome.missing
-              ? `Antigravity CLI (agy) is not installed on the Host. Install it with: ${ANTIGRAVITY_INSTALL_HINT}. Then retry.`
-              : `agy failed: ${outcome.message}`,
-          })
-        else if (outcome.code !== 0)
-          this.emit(session, { kind: 'failed', message: `agy exited with ${String(outcome.code)}${stderr.trim() === '' ? '' : `: ${stderr.trim()}`}` })
-        this.emit(session, { kind: 'exited' })
-        this.cleanup(session)
+        if (holder.current === undefined) ended = outcome
+        else this.ended(holder.current, outcome, stderr)
       },
     })
     const rpc = new AcpRpc({
       send: line => running.send(line),
-      onNotification: (method, params) => this.onNotification(session, method, params),
+      onNotification: (method, params) => this.onNotification(sessionOf(), method, params),
       onRequest: AntigravityAcpSessions.answerPermission,
     })
     const ready = this.open({ rpc, directory, socketPath, model: input.model, level: input.level })
@@ -655,6 +649,11 @@ export class AntigravityAcpSessions {
       seenToolCalls: new Set(),
       quotaWatch: AntigravityAcpSessions.watchQuota({ geminiDir, onSpent: () => this.quotaSpent(session) }),
       phase: { kind: 'starting' },
+    }
+    holder.current = session
+    if (ended !== undefined) {
+      this.ended(session, ended, stderr)
+      ended = undefined
     }
     session.server.on('connection', socket => {
       session.connections.add(socket)
@@ -879,6 +878,24 @@ export class AntigravityAcpSessions {
     AntigravityAcpSessions.stopTimer(session.phase)
     session.phase = { kind: 'streaming', sink: handle }
     for (const event of session.backlog.splice(0)) handle(event)
+  }
+
+  /** The process ended: fail the step that was waiting on it, then forget the session and its folder. */
+  private ended(session: Session, outcome: CliOutcome, stderr: string): void {
+    // Fail before the phase dies: a dying phase only queues events, and no later step drains them.
+    if (outcome.kind === 'failed')
+      this.emit(session, {
+        kind: 'failed',
+        message: outcome.missing
+          ? `Antigravity CLI (agy) is not installed on the Host. Install it with: ${ANTIGRAVITY_INSTALL_HINT}. Then retry.`
+          : `agy failed: ${outcome.message}`,
+      })
+    else if (outcome.code !== 0)
+      this.emit(session, { kind: 'failed', message: `agy exited with ${String(outcome.code)}${stderr.trim() === '' ? '' : `: ${stderr.trim()}`}` })
+    this.die(session)
+    session.rpc.close(new Error('agy exited'))
+    this.emit(session, { kind: 'exited' })
+    this.cleanup(session)
   }
 
   private die(session: Session): void {

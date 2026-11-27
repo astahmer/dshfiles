@@ -7,6 +7,7 @@ import { AcpRequestFailed, AcpRpc } from './acp-rpc.js'
 import type { CliLaunch, CliProcessesPromise } from './cli-processes.js'
 import type { UsageCard } from './api.js'
 import { withSpan } from '@dshfiles/dshx/tracing'
+import { clampOptionValue, configOptionsSchema, optionValues, type AcpConfigOptions } from './acp-session-config.js'
 import { AiAccountsSchema } from './effect-schema.js'
 import { ShellCommand } from './shell-command.js'
 import { ProviderUsageModel, type UsageWindow } from './usage.js'
@@ -50,14 +51,6 @@ export type AntigravityQuotaReading =
   | { readonly status: 'ok'; readonly windows: readonly UsageWindow[] }
   | { readonly status: 'unauthenticated'; readonly detail: string }
   | { readonly status: 'error'; readonly detail: string }
-
-const configOptionSchema = Schema.Struct({
-  id: Schema.String,
-  currentValue: Schema.optional(Schema.Unknown),
-  options: Schema.optional(Schema.Array(Schema.Struct({ value: Schema.String, name: Schema.optional(Schema.String) }))),
-})
-export const configOptionsSchema = Schema.Array(configOptionSchema)
-export type AcpConfigOptions = typeof configOptionsSchema.Type
 
 const newSessionSchema = Schema.Struct({
   sessionId: Schema.String,
@@ -161,8 +154,7 @@ const untilAborted = async (reading: Promise<AntigravityQuotaReading>, signal: A
 
 export class AntigravityAccountModel {
   /** The values one select option offers, such as every model id or every thought level. */
-  static optionValues = (options: AcpConfigOptions | undefined, id: string): readonly string[] =>
-    options?.find(option => option.id === id)?.options?.map(choice => choice.value) ?? []
+  static optionValues = optionValues
 
   /** The thought levels the selected model accepts. */
   static levelsOf = (options: AcpConfigOptions | undefined): readonly AntigravityLevel[] =>
@@ -194,11 +186,8 @@ export class AntigravityAccountModel {
   }
 
   /** The thought level `agy` accepts closest to the one asked for: that level, else the highest one below it, else the lowest. */
-  static clampLevel = (requested: AntigravityLevel, offered: readonly AntigravityLevel[]): AntigravityLevel | undefined => {
-    if (offered.includes(requested)) return requested
-    const rank = ANTIGRAVITY_LEVELS.indexOf(requested)
-    return [...offered].reverse().find(level => ANTIGRAVITY_LEVELS.indexOf(level) < rank) ?? offered[0]
-  }
+  static clampLevel = (requested: AntigravityLevel, offered: readonly AntigravityLevel[]): AntigravityLevel | undefined =>
+    clampOptionValue<AntigravityLevel>(requested, offered, ANTIGRAVITY_LEVELS)
 
   /** Sign-in state, plan and models of the login under `home`, cached for a while per home. */
   static describe = (input: {

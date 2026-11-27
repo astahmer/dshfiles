@@ -599,3 +599,30 @@ it('reports a login that /usage finds signed out as unauthenticated, and forgets
   })
   AntigravityAccountModel.forget(home)
 })
+
+it('fails a step whose agy exits before answering, instead of leaving the stream waiting forever', async () => {
+  const crashing = fakeAgy('#!/usr/bin/env node\nprocess.stderr.write("boom: worker crashed\\n")\nprocess.exit(3)\n')
+  const cli = new AntigravityAcpSessions({ processes, home: () => '/synthetic/agy-home', executable: crashing })
+  sessions.push(cli)
+  const provider = createAntigravityProvider(cli)
+  await expect(
+    finished(
+      cli.stream(provider.describeModel('gemini-fast'), normalizeContext({ systemPrompt: 'DSH.', messages: [{ role: 'user', content: 'hi', timestamp: 1 }] }), {
+        sessionId: 'crash',
+      }),
+    ),
+  ).rejects.toThrow(/agy exited with 3: boom: worker crashed/u)
+}, 15_000)
+
+it('names the install command when agy is missing, instead of waiting for a process that never started', async () => {
+  const cli = new AntigravityAcpSessions({ processes, home: () => '/synthetic/agy-home', executable: '/synthetic/missing/agy' })
+  sessions.push(cli)
+  const provider = createAntigravityProvider(cli)
+  await expect(
+    finished(
+      cli.stream(provider.describeModel('gemini-fast'), normalizeContext({ systemPrompt: 'DSH.', messages: [{ role: 'user', content: 'hi', timestamp: 1 }] }), {
+        sessionId: 'missing',
+      }),
+    ),
+  ).rejects.toThrow(/Antigravity CLI \(agy\) is not installed on the Host/u)
+}, 15_000)
