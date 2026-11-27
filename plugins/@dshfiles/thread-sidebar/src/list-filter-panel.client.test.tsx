@@ -1531,3 +1531,25 @@ describe('the mark verbs say their scope (round 33, item 4)', () => {
     expect(optionsMenu.slice(manage, marks)).toContain('<DropdownMenuSeparator />')
   })
 })
+
+// Council round 32, item 5: re-measured on iPhone WebKit (elementFromPoint, every chip in the two-column grid): 36pt
+// drawn, 44–45pt hit, 4–5pt beyond each edge. No slop is added; this pins the geometry that makes it so: the kit's
+// coarse-pointer ::after grows a toggle-group-item to 44pt, the chip draws 36pt, and the grid's 8pt gap (rows and
+// columns) leaves room for 4pt on each side without one chip's box reaching into its neighbour.
+describe('phone chip hit box (round 33, item 5)', () => {
+  const kit = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../plugin-ui/src/styles.css'), 'utf8')
+  it('extends a 36pt chip to 44pt through the kit rule, with an 8pt gap between rows and columns', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const chip = screen.getByRole('button', { name: 'threadSidebarWorking' })
+    expect(chip.getAttribute('data-slot')).toBe('toggle-group-item')
+    expect(chip.className).toContain('dshx:pointer-coarse:h-9')
+    const row = element(chip.parentElement)
+    expect(row.className).toContain('dshx:grid-cols-2')
+    expect(row.className).toContain('dshx:pointer-coarse:gap-2')
+    const coarse = kit.slice(kit.indexOf('@media (pointer: coarse)'))
+    const block = coarse.slice(0, coarse.indexOf('inset: min(0px, calc((100% - 44px) / 2))'))
+    const selectors = block.slice(block.lastIndexOf('}') + 1)
+    expect(selectors).toContain("[data-slot='toggle-group-item']")
+    expect(selectors).toContain('::after')
+  })
+})
