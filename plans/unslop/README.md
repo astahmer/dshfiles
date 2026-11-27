@@ -476,6 +476,12 @@ an `AgentMentionTones` registry that agents fills, breaking the agents ↔ rich-
 (`.cache/unslop-audit/merge-86ac34ba/`). Open: badge tint for Plugin vs DSH default; the Settings and agents e2e
 journeys were updated but not run.
 
+Final captures on the merged tip (`.cache/unslop-audit/r5/round-26/`): the 28 standard shots match round 25 apart from
+clocks and upstream's new content (Settings source filter, Plugins by category, the Context window column, the Tools
+control). The subagent scene lost its failed child from the list on a fresh page (and its notice lost the model line):
+a race in the session-controller fork's list, which served the checkpoint taken at creation when a Session detached
+before its final save landed. Fixed in `wowzqpwz`, which lists a detached Session from its final projection cut.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
