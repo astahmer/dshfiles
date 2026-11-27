@@ -157,7 +157,7 @@ Replaces session replay: the transcript is the replay, and each side links to th
 
 Both directions use DSH's own Conversation View focus request — every `conversation.view` entry is handed
 `openView(view, focus)` and the `viewRequest` addressed to it — plus the owned Chat fork's
-[`@dshfiles/chat/chat-focus`](../chat/README.md#focus-a-turn-step-or-tool-call-from-another-plugin) contract: the
+[`@dshfiles/chat/chat-focus`](../chat/README.md#focus-a-turn-step-tool-call-or-message-from-another-plugin) contract: the
 focus encoding, the pending request a panel leaves before it opens a thread, and the View opener Chat hands its Turn
 action rows. With the stock Chat row the Trace button does not render and Open thread opens the thread unfocused.
 

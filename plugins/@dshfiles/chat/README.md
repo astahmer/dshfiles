@@ -74,8 +74,8 @@ Every other vendored file is byte-identical to the pinned revision.
 
 | `src/client-entry.tsx` | new: dshx client entry calling the native `apply`; provides the dshx `Browser` contract over the Host browser page and adds an **Open web page…** action to the Workbench New tab chooser while that page type exists |
 | `src/link-embed-port.ts` | new: a chat link whose page refuses embedding (X-Frame-Options, `frame-ancestors`) opens in a browser tab instead of the blank Browser tab, and a link already open in that tab reports the refusal in a toast whose action opens the tab. Chat asks `@dshfiles/preview`'s Host probe by registered identity, like the find bar reaches session-search; without preview nothing changes |
-| `src/chat-focus.ts` | new: the published `@dshfiles/chat/chat-focus` contract — a Turn/Step/tool-call focus, its opaque view-request encoding, and the cross-thread pending request (below) |
-| `src/chat-focus-reveal.ts` | new: takes a focus from the native `viewRequest` or the pending request, jumps with the rail's `navigateToTurn`, opens folded groups with `beforematch` and highlights the row |
+| `src/chat-focus.ts` | new: the published `@dshfiles/chat/chat-focus` contract — a Turn/Step/tool-call or message-sequence focus, its opaque view-request encoding, and the cross-thread pending request (below) |
+| `src/chat-focus-reveal.ts` | new: takes a focus from the native `viewRequest` or the pending request, jumps with the rail's `navigateToTurn`, opens folded groups with `beforematch` and highlights the row; a message focus goes through `find-reveal.ts` |
 | `src/native/chat/ChatView.tsx` (also) | reads the native `viewRequest`/`completeViewRequest`/`openView` Conversation View props, runs `useChatFocus`, and provides `openView` to the Turn-tail seats |
 | `src/native/chat/ChatNodeSeat.tsx` | tags each row with `data-chat-step`, so a Step focus can find it (a tool row already carries the native `data-chat-call-id`) |
 | `src/native/chat/TurnTailNodeView.tsx` | adds the thread's `openView` to every `conversation.chat.turnTail` entry's owner props (`ChatTurnTailExtras`) |
@@ -134,10 +134,11 @@ account switches and picker changes all show where they took effect, not where t
 only its tools is silent. The row sits at the request, at group-tree position `turn`, so a folded Turn still shows it.
 The first header of a loaded window has no predecessor there and gets no row until older history loads.
 
-### Focus a Turn, Step or tool call from another plugin
+### Focus a Turn, Step, tool call or message from another plugin
 
-`@dshfiles/chat/chat-focus` is how a plugin scrolls Chat to one Turn (`{ turn }`), Step (`{ turn, step }`) or tool call
-(`{ turn, step, toolCallId }`) and highlights it — the traces plugin's **Show in chat** uses it.
+`@dshfiles/chat/chat-focus` is how a plugin scrolls Chat to one Turn (`{ turn }`), Step (`{ turn, step }`), tool call
+(`{ turn, step, toolCallId }`) or message (`{ seq, type?, query? }`, a `user/message` or `assistant/message` event
+sequence) and highlights it — the traces plugin's **Show in chat** and the command palette's **Messages** tab use it.
 
 - Inside the thread, a `conversation.view` entry calls the native `openView(CHAT_VIEW_ID, encodeChatFocus(focus))` it
   is handed: the shell selects Chat, which consumes the `viewRequest`. A Turn-footer entry
@@ -149,6 +150,11 @@ The first header of a loaded window has no predecessor there and gets no row unt
 Chat jumps through the turn rail's navigation (unloaded history pages in), opens the folded process group with the
 `beforematch` event browser find uses, scrolls the row to the middle and outlines it for 4 s. A tool call or Step that
 never appears within 4 s lands on its Turn.
+
+A message focus waits up to 4 s for the rail to place its sequence in a Turn (a cold thread's outline arrives after
+Chat mounts), then lands the way find in thread does: it opens a finished Turn's **Worked for…** row, folded groups and
+a folded long prompt, highlights the words of `query` with the CSS Custom Highlight API, and outlines the row for 4 s.
+A row it cannot reach within 6 s is outlined on its Turn instead.
 
 The latest **Task stopped** or **Turn error** notice from a turn a restart cut
 off, or whose model request failed (upstream outage, rate limit, transport),

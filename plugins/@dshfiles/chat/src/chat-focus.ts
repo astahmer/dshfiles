@@ -1,7 +1,9 @@
 /**
- * How another plugin asks the owned Chat fork to scroll to and highlight one Turn, Step or tool call.
+ * How another plugin asks the owned Chat fork to scroll to and highlight one Turn, Step, tool call or message.
  *
- * Published as its own contract module (`@dshfiles/chat/chat-focus`). Two routes, both carrying a {@link ChatFocus}:
+ * Published as its own contract module (`@dshfiles/chat/chat-focus`). Two routes, both carrying a {@link ChatFocusTarget}:
+ * a {@link ChatFocus} (Turn, Step, tool call) or a {@link ChatMessageFocus} (a message's event sequence, with the
+ * searched words to highlight).
  *
  * - Inside a thread, a Conversation View calls the native `openView(ChatFocusModel.viewId, ChatFocusModel.encode(focus))`
  *   it is handed: the shell selects Chat and Chat consumes the `viewRequest`.
