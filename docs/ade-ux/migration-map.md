@@ -143,7 +143,7 @@ rail destination (default); 35 features.
 | --- | --- | --- |
 | multi-host/remote-inventory: Every thread on every host | destinationSection | thread-list: All remote threads |
 | thread-sidebar/destination-rail: Switch destinations from the rail | destinationSection | rail: the Destinations tabs and the selected destination's list; collapsed, a folder's flyout |
-| thread-sidebar/filter-presets: Save and switch thread list filter presets | destinationSection | thread-list: Filter menu › Presets |
+| thread-sidebar/filter-presets: Save and switch thread list filter presets | destinationSection | thread-list: Filter panel › Presets |
 | thread-sidebar/live-working-activity: See what a working thread is doing right now | destinationSection | thread-list: working row second line; session header utilities; document title |
 | thread-sidebar/phone-drawer-navigation: Open the thread list as a drawer on a phone | destinationSection | shell: phone stack only (tab bar, full-screen list, Back) |
 | thread-sidebar/phone-stack-navigation: Navigate the phone as a stack | destinationSection | shell: phone tab bar only; the stage kept the desktop tab strip and no Back |

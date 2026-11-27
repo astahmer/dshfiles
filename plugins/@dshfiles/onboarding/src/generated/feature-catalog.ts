@@ -20096,9 +20096,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Sidebar settings\"",
+          "text": "click button \"Sidebar settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Sidebar settings",
           "value": null
         },
@@ -25306,16 +25306,16 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Group: Status\"",
+          "text": "expect radio \"Status\"",
           "action": "expect",
-          "by": "menuitem",
-          "name": "Group: Status",
+          "by": "radio",
+          "name": "Status",
           "value": null
         },
         {
-          "text": "click menuitem \"Board\"",
+          "text": "click button \"Board\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Board",
           "value": null
         },
@@ -25374,16 +25374,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Group: *\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Group: *",
-          "value": null
-        },
-        {
-          "text": "expect text \"Arrange manually\"",
+          "text": "expect radio \"Arrange manually\"",
           "action": "expect",
-          "by": "text",
+          "by": "radio",
           "name": "Arrange manually",
           "value": null
         },
@@ -25521,32 +25514,25 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
         },
         {
-          "text": "click button \"Filter: *\"",
+          "text": "click radio \"Project\"",
           "action": "click",
-          "by": "button",
-          "name": "Filter: *",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Group: *\"",
-          "action": "click",
-          "by": "menuitem",
-          "name": "Group: *",
-          "value": null
-        },
-        {
-          "text": "click menuitemradio \"Project\"",
-          "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "Project",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "expect button \"New thread in sample\"",
@@ -25736,30 +25722,23 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitemradio \"Done*\"",
+          "text": "expect radio \"Done*\"",
           "action": "expect",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "Done*",
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
         },
         {
-          "text": "click button \"Filter: *\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
           "by": "button",
-          "name": "Filter: *",
-          "value": null
-        },
-        {
-          "text": "click menuitem \"Thread list settings\"",
-          "action": "click",
-          "by": "menuitem",
           "name": "Thread list settings",
           "value": null
         },
@@ -25823,7 +25802,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "title": "Save and switch thread list filter presets",
       "summary": "Save the thread list's filters as a preset and switch presets in one click.",
       "destination": "threads",
-      "currentSurface": "thread-list: Filter menu › Presets",
+      "currentSurface": "thread-list: Filter panel › Presets",
       "reach": [
         {
           "text": "expect region \"Threads\"",
@@ -25840,17 +25819,24 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect group \"Presets\"",
+          "text": "expect radiogroup \"Presets\"",
           "action": "expect",
-          "by": "group",
+          "by": "radiogroup",
           "name": "Presets",
           "value": null
         },
         {
-          "text": "expect menuitemradio \"All threads*\"",
+          "text": "expect radio \"All threads*\"",
           "action": "expect",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
+          "value": null
+        },
+        {
+          "text": "click button \"Preset options: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preset options: *",
           "value": null
         },
         {
@@ -25891,10 +25877,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect group \"Presets\"",
+          "text": "expect radiogroup \"Presets\"",
           "action": "expect",
-          "by": "group",
+          "by": "radiogroup",
           "name": "Presets",
+          "value": null
+        },
+        {
+          "text": "click button \"Preset options: *\"",
+          "action": "click",
+          "by": "button",
+          "name": "Preset options: *",
           "value": null
         },
         {
@@ -25913,7 +25906,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
         }
       ],
       "onboarding": {
-        "firstAction": "Set the thread list's filters, then choose Filter › Save current filters as preset… and name it.",
+        "firstAction": "Set the thread list's filters, then choose Filters › ⋯ › Save current filters as preset… and name it.",
         "doneWhen": "The Filter button shows your preset's name and one click in its Presets section brings the filters back."
       }
     },
@@ -25934,11 +25927,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -26018,9 +26018,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -26064,11 +26064,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "expect button \"Filter: *\"",
@@ -26092,9 +26099,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -26122,11 +26129,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "expect button \"Filter: *\"",
@@ -26150,9 +26164,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -26183,11 +26197,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -26246,9 +26267,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -26280,11 +26301,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -26370,11 +26398,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -26633,9 +26668,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Sidebar settings\"",
+          "text": "click button \"Sidebar settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Sidebar settings",
           "value": null
         },
@@ -26823,9 +26858,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -26860,9 +26895,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Thread list settings\"",
+          "text": "click button \"Thread list settings\"",
           "action": "click",
-          "by": "menuitem",
+          "by": "button",
           "name": "Thread list settings",
           "value": null
         },
@@ -27074,11 +27109,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -27213,11 +27255,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitemradio \"All threads*\"",
+          "text": "click radio \"All threads*\"",
           "action": "click",
-          "by": "menuitemradio",
+          "by": "radio",
           "name": "All threads*",
           "value": null
+        },
+        {
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "click button \"New thread\"",
@@ -27317,18 +27366,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click menuitem \"Group: *\"",
+          "text": "click radio \"Arrange manually\"",
           "action": "click",
-          "by": "menuitem",
-          "name": "Group: *",
+          "by": "radio",
+          "name": "Arrange manually",
           "value": null
         },
         {
-          "text": "click menuitemradio \"Arrange manually\"",
-          "action": "click",
-          "by": "menuitemradio",
-          "name": "Arrange manually",
-          "value": null
+          "text": "press Escape",
+          "action": "press",
+          "by": null,
+          "name": null,
+          "value": "Escape"
         },
         {
           "text": "expect region \"Usage limit\"",
@@ -27687,9 +27736,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "expect menuitem \"Board\"",
+          "text": "expect button \"Board\"",
           "action": "expect",
-          "by": "menuitem",
+          "by": "button",
           "name": "Board",
           "value": null
         }
