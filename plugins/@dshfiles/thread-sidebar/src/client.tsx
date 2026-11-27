@@ -6651,6 +6651,17 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     changePreferences(projectNarrowed ? { threadViews, workspaceFilter: null } : reset.workspaceFilter === undefined ? { threadViews } : { threadViews, workspaceFilter: reset.workspaceFilter })
   }
   const resetDisabled = activeFilterLabels.length === 0 && !projectNarrowed
+  /** Save the current filters as a new preset: the name prompt, or the limit's warning. */
+  const saveFiltersAsPreset = (): void => {
+    if (threadViewSettings.views.length >= MAX_THREAD_VIEWS) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
+      return
+    }
+    setFilterOpen(false)
+    setPresetPrompt({ mode: 'create' })
+  }
+  // The built-in All threads is never renamed, overwritten or deleted (council round 28, item 13).
+  const activeIsBuiltIn = listThreadView.id === ALL_THREADS_VIEW_ID
   const presetOptionsMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -6667,22 +6678,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="dshx-root dshx:min-w-52" aria-label={props.tSidebar('threadSidebarPresetOptions')}>
         {/* Save as… left the panel for this menu, so the sheet opens on the filters (round 28, item 10). */}
-        <DropdownMenuItem
-          onSelect={() => {
-            if (threadViewSettings.views.length >= MAX_THREAD_VIEWS) {
-              setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarPresetFull', { count: MAX_THREAD_VIEWS }) })
-              return
-            }
-            setFilterOpen(false)
-            setPresetPrompt({ mode: 'create' })
-          }}
-        >
+        <DropdownMenuItem onSelect={saveFiltersAsPreset}>
           {props.tSidebar('threadSidebarPresetSaveAs')}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         {/* One text edge (no verb carries an icon) and the preset's name as a quiet label (council round 28, item 12). */}
         <DropdownMenuLabel className="dshx:truncate dshx:text-xs dshx:font-normal dshx:text-muted-foreground">{activeViewTab?.label ?? ''}</DropdownMenuLabel>
         <DropdownMenuItem
+          disabled={activeIsBuiltIn}
           onSelect={closeFilterThen(() =>
             setPresetPrompt({
               mode: 'rename',
@@ -6693,13 +6696,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         >
           {props.tSidebar('threadSidebarPresetRename')}
         </DropdownMenuItem>
-        <DropdownMenuItem disabled={!presetEdited} onSelect={() => savePresetChanges()}>
+        <DropdownMenuItem disabled={!presetEdited || activeIsBuiltIn} onSelect={() => savePresetChanges()}>
           {/* One verb name, as on the edited row's button. */}
           {props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })}
         </DropdownMenuItem>
         <DropdownMenuItem
           variant="destructive"
-          disabled={threadViewSettings.views.length === 1 || viewTabs.length === 1}
+          disabled={activeIsBuiltIn || threadViewSettings.views.length === 1 || viewTabs.length === 1}
           onSelect={closeFilterThen(() => setPresetToDelete({ id: listThreadView.id, label: activeViewTab?.label ?? '' }))}
         >
           {props.tSidebar('threadSidebarPresetDelete')}
@@ -6828,6 +6831,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
                   onApply: selectThreadViewPreset,
                   onSaveChanges: () => savePresetChanges(),
                   onDiscard: () => selectThreadViewPreset(listThreadView.id),
+                  builtInId: ALL_THREADS_VIEW_ID,
+                  onSaveAs: saveFiltersAsPreset,
                   options: presetOptionsMenu,
                 }
               : undefined

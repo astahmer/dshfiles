@@ -9,7 +9,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArchiveIcon, BellOffIcon, CheckIcon, CircleCheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, BellOffIcon, BookmarkPlusIcon, CheckIcon, CircleCheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { plural } from '@dshfiles/dshx/client'
 import { useId, useState, type ReactNode } from 'react'
@@ -82,6 +82,9 @@ export interface ListFilterPanelProps {
     readonly onApply: (id: string) => void
     readonly onSaveChanges: () => void
     readonly onDiscard: () => void
+    /** The built-in preset (All threads), which edits never overwrite: its row offers Save as new preset… instead. */
+    readonly builtInId?: string | undefined
+    readonly onSaveAs?: (() => void) | undefined
     /** The presets' own verbs (save as, rename, update, delete, mark read…), a small menu beside the heading. */
     readonly options: ReactNode
   } | undefined
@@ -346,13 +349,20 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                 </ToggleGroupItem>
                 {editing ? (
                   <div className="dshx:absolute dshx:inset-y-0 dshx:right-1 dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:right-0 dshx:pointer-coarse:gap-0">
-                    <RowIconButton
-                      label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
-                      onClick={presets.onSaveChanges}
-                      data-preset-save-changes=""
-                    >
-                      <SaveIcon />
-                    </RowIconButton>
+                    {preset.id === presets.builtInId ? (
+                      // The built-in All threads is never overwritten (council round 28, item 13): its edits become a new preset.
+                      <RowIconButton label={t('threadSidebarPresetSaveAsNew')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
+                        <BookmarkPlusIcon />
+                      </RowIconButton>
+                    ) : (
+                      <RowIconButton
+                        label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
+                        onClick={presets.onSaveChanges}
+                        data-preset-save-changes=""
+                      >
+                        <SaveIcon />
+                      </RowIconButton>
+                    )}
                     <RowIconButton label={t('threadSidebarPresetDiscardChanges')} onClick={presets.onDiscard} data-preset-discard-changes="">
                       <RotateCcwIcon />
                     </RowIconButton>

@@ -720,3 +720,26 @@ describe('the preset menu (round 29, item 12)', () => {
     expect(optionsMenu).toContain("props.tSidebar('threadSidebarPresetSaveChanges', { name: activeViewTab?.label ?? '' })")
   })
 })
+
+// Council round 28, item 13: the built-in All threads cannot be overwritten.
+describe('the built-in All threads (round 29, item 13)', () => {
+  it('offers Save as new preset… and Discard when edited, never Save changes', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const onSaveAs = vi.fn()
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'all', edited: true, builtInId: 'all', onSaveAs }} />)
+    const row = element(screen.getByRole('radio', { name: /^All threads/u }).closest('[data-preset-row]'))
+    expect(within(row).queryByRole('button', { name: 'threadSidebarPresetSaveChanges' })).toBeNull()
+    fireEvent.click(within(row).getByRole('button', { name: 'threadSidebarPresetSaveAsNew' }))
+    expect(onSaveAs).toHaveBeenCalledOnce()
+    expect(presets.onSaveChanges).not.toHaveBeenCalled()
+    expect(within(row).getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })).toBeTruthy()
+  })
+
+  it('disables Rename, Save changes and Delete in the menu while All threads is the active preset', () => {
+    const optionsMenu = client.slice(client.indexOf('const presetOptionsMenu = ('), client.indexOf('const filterMenu = ('))
+    expect(optionsMenu.match(/disabled=\{[^}]*activeIsBuiltIn/gu)?.length).toBe(3)
+    expect(client).toContain('const activeIsBuiltIn = listThreadView.id === ALL_THREADS_VIEW_ID')
+  })
+})
