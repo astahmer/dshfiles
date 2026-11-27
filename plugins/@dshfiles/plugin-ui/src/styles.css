@@ -1061,7 +1061,8 @@ svg [class*='_spinnerArc_'] {
     padding-right: max(8px, env(safe-area-inset-right, 0px)) !important;
     border-width: 1px 0 0 !important;
     border-radius: var(--dsw-radius-panel, 16px) var(--dsw-radius-panel, 16px) 0 0 !important;
-    background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2)) !important;
+    /* The popover's own fill (council round 27, item 7): the sheet is the surface it replaces, so its tokens mean the same. */
+    background: var(--dsw-alias-bg-layer-2) !important;
     backdrop-filter: none !important;
     box-shadow:
       var(--dshx-elevation-3),
