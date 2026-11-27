@@ -916,3 +916,21 @@ describe('arbitrary colour values read runtime tokens (round 29, item 10)', () =
     )
   })
 })
+
+// Council round 29, item 12: Snooze is a clock, not a pause glyph (pause reads as stopping a running turn).
+describe('the Snooze glyph (round 30, item 12)', () => {
+  const read = (name: string): string => readFileSync(join(dirname(fileURLToPath(import.meta.url)), name), 'utf8')
+  it('draws the alarm clock on the hover strip', async () => {
+    const row = await renderRow({ rowActions: ['park'] })
+    const seat = row.querySelector('[data-row-strip] [data-strip-seat]')
+    expect(seat?.querySelector('button')?.getAttribute('aria-label')).toBe('threadSidebarPark')
+    expect(seat?.querySelector('svg')?.getAttribute('class')).toContain('lucide-alarm-clock')
+  })
+
+  it('draws it in the row menu, the batch menu and the hover-actions setting too', () => {
+    expect(read('thread-menu.tsx')).toContain('  snooze: AlarmClockIcon,')
+    expect(read('sidebar-shell.tsx')).toContain('  park: <AlarmClockIcon strokeWidth={1.5} size={14} />,')
+    const batch = read('client.tsx')
+    expect(batch).toContain("<AlarmClockIcon aria-hidden=\"true\" />\n          {props.t('threadSidebarPark')}")
+  })
+})

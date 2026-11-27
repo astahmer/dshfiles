@@ -108,6 +108,7 @@ import { Textarea } from '@dshfiles/plugin-ui/components/ui/textarea'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
   ActivityIcon,
+  AlarmClockIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
   BellIcon,
@@ -119,8 +120,8 @@ import {
   CircleDashedIcon,
   CirclePauseIcon,
   FolderIcon,
-  GripVerticalIcon,
   GitBranchIcon,
+  GripVerticalIcon,
   LayersIcon,
   LinkIcon,
   ListFilterIcon,
@@ -1127,7 +1128,7 @@ const BatchThreadMenuItems = (props: {
       ) : null}
       {snapshot.anyUnparked ? (
         <ContextMenuItem onSelect={() => props.actions.batchSetParked(true)}>
-          <PauseIcon aria-hidden="true" />
+          <AlarmClockIcon aria-hidden="true" />
           {props.t('threadSidebarPark')}
         </ContextMenuItem>
       ) : null}
@@ -1737,7 +1738,8 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
           aria-label={t(parked ? 'threadSidebarUnpark' : 'threadSidebarPark')}
           onClick={() => props.actions.toggleParked(session.id)}
         >
-          {parked ? <PlayIcon strokeWidth={1.5} size={14} /> : <PauseIcon strokeWidth={1.5} size={14} />}
+          {/* Snooze is a clock, not a pause (council round 29, item 12). */}
+          {parked ? <PlayIcon strokeWidth={1.5} size={14} /> : <AlarmClockIcon strokeWidth={1.5} size={14} />}
         </Button>,
       )
     }

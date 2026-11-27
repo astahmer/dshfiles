@@ -24,6 +24,7 @@ import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import {
+  AlarmClockIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
   ArrowLeftIcon,
@@ -39,7 +40,6 @@ import {
   MessageSquareIcon,
   PanelLeftIcon,
   PanelRightOpenIcon,
-  PauseIcon,
   PinIcon,
   QrCodeIcon,
   RefreshCwIcon,
@@ -181,7 +181,7 @@ const rowActionIcons = {
   resumeDismiss: <XIcon size={14} />,
   aside: <PanelRightOpenIcon size={14} />,
   pin: <PinIcon strokeWidth={1.5} size={14} />,
-  park: <PauseIcon strokeWidth={1.5} size={14} />,
+  park: <AlarmClockIcon strokeWidth={1.5} size={14} />,
   settle: <CircleCheckIcon strokeWidth={1.5} size={14} />,
   mute: <BellIcon size={14} />,
   archive: <ArchiveIcon strokeWidth={1.5} size={14} />,

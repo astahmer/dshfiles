@@ -4,6 +4,7 @@
  * grouping and the icons, so the two menus cannot drift apart again.
  */
 import {
+  AlarmClockIcon,
   ArchiveIcon,
   ArchiveRestoreIcon,
   AtSignIcon,
@@ -23,7 +24,6 @@ import {
   MessageSquarePlusIcon,
   PanelRightIcon,
   PanelRightOpenIcon,
-  PauseIcon,
   PencilIcon,
   PinIcon,
   QuoteIcon,
@@ -80,7 +80,8 @@ const ICONS = {
   find: SearchIcon,
   pin: PinIcon,
   done: CircleCheckIcon,
-  snooze: PauseIcon,
+  // A clock, not a pause (council round 29, item 12).
+  snooze: AlarmClockIcon,
   restore: ArchiveRestoreIcon,
   rename: PencilIcon,
   'side-panel': PanelRightOpenIcon,
