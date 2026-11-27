@@ -52,7 +52,7 @@ import { SHELL_CHILDREN, type ShellRenderSlot } from './native/slots.js'
 import { useObservable } from './native/use-observable.js'
 import { WELCOME_LOCALE_NAMESPACE, WELCOME_STEP_ID, WelcomeNotice, WelcomeNoticeStore, welcomeLocale, type WelcomeTranslate } from './native/welcome-notice.js'
 import { settingsShellApi } from './shell-api.js'
-import { bundleLabelsOf, namespaceLabelOf, type BundleLabel } from './bundle-labels.js'
+import { bundleLabelsOf, LabelLanguages, namespaceLabelOf, type BundleLabel } from './bundle-labels.js'
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
@@ -243,14 +243,35 @@ export default defineClient({
     }
     const labelsApi = createApiClient(ctx, settingsShellApi, metadata?.packageId)
     ctx.inject(['remote.pluginManager'], scoped => {
-      // The Host caches these labels: core's listBundles reads every plugin's files on each call. A Host started before
-      // that method existed is asked the old way.
-      void (async () => {
+      // The Host caches these labels: core's listBundles reads every plugin's files on each call. It answers in the
+      // active language chain only (one or two of eight languages); a language change reads that chain. A Host started
+      // before `namespaceLabels` sends every language once, and one older still is asked the old way.
+      let requestedChain: string | null = null
+      let everyLanguage = false
+      const load = async (): Promise<void> => {
+        const chain = LabelLanguages.chainOf(ctx.locale.getSnapshot())
+        const key = chain.join('>')
+        if (everyLanguage || key === requestedChain) return
+        requestedChain = key
+        const trimmed = await labelsApi.safe.namespaceLabels({ languages: chain })
+        if (trimmed.ok) {
+          if (requestedChain === key) installLabels(trimmed.value)
+          return
+        }
+        everyLanguage = true
         const cached = await labelsApi.safe.bundleLabels()
         if (cached.ok) return installLabels(cached.value)
         const result = await scoped.remote.pluginManager.listBundles()
         if (result.ok) installLabels(bundleLabelsOf(result.value))
-      })()
+      }
+      void load()
+      scoped.effect(
+        () =>
+          ctx.locale.subscribe(() => {
+            void load()
+          }),
+        'settings-shell: bundle labels follow the language',
+      )
     })
 
     const describe = ctx.configForms.describe()
