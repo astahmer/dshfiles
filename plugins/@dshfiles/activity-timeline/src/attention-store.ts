@@ -73,6 +73,9 @@ const muteKeyOf = (source: string): string => AttentionModel.itemIdOf('mute', so
 
 const storageFailed = (operation: string) => (cause: unknown) => new AttentionStorageFailed({ operation, cause })
 
+/** Longest sleep between snooze checks: bounds the delay when a change slips between a check and the next wait. */
+const SNOOZE_RECHECK_MS = 60_000
+
 const make = Effect.gen(function* () {
   const domain = yield* (yield* StorageDomain).open(attentionDomain).pipe(Effect.mapError(storageFailed('open')))
   const items = domain.table('items')
@@ -209,6 +212,35 @@ const make = Effect.gen(function* () {
     return closed
   }).pipe(Effect.withSpan('attention expire unseen'))
 
+  /**
+   * Announce the counts when a timed snooze ends. Nothing is written then, so without this a reader only saw the item
+   * return at its next poll; with it the `changed` event covers every view change and readers need no fast poll.
+   */
+  const announceAt = Effect.fn('attention snooze end')(function* (at: number) {
+    const announced = yield* SynchronizedRef.modify(state, latest => {
+      const next: InboxState = { ...latest, revision: Math.max(latest.revision + 1, at) }
+      return [next, next] as const
+    })
+    yield* PubSub.publish(changes, { revision: announced.revision, counts: AttentionModel.countsOf(announced.items.values(), mutedSet(announced), at) })
+  })
+
+  const announceSnoozeEnds = Effect.scoped(
+    Effect.gen(function* () {
+      const subscription = yield* PubSub.subscribe(changes)
+      return yield* Effect.forever(
+        Effect.gen(function* () {
+          const current = yield* SynchronizedRef.get(state)
+          const now = yield* Clock.currentTimeMillis
+          const end = AttentionModel.nextSnoozeEnd(current.items.values(), now)
+          const wait = end === null ? SNOOZE_RECHECK_MS : Math.min(end - now, SNOOZE_RECHECK_MS)
+          const woke = yield* Effect.raceFirst(Effect.as(Effect.sleep(wait), 'timer' as const), Effect.as(PubSub.take(subscription), 'change' as const))
+          if (woke === 'change' || end === null || end > now + wait) return
+          yield* announceAt(end)
+        }),
+      )
+    }),
+  )
+
   type TransitionResult =
     | { readonly kind: 'missing' }
     | { readonly kind: 'refused'; readonly outcome: Extract<UserTransition, { ok: false }> }
@@ -256,6 +288,7 @@ const make = Effect.gen(function* () {
     snooze,
     reopen,
     muteSource,
+    announceSnoozeEnds,
     changes: Stream.fromPubSub(changes),
   })
 })
@@ -284,7 +317,9 @@ export class AttentionInbox extends Context.Service<
       readonly source: string
       readonly muted: boolean
     }) => Effect.Effect<{ readonly mutedSources: readonly string[] }, StoreError>
-    /** Every committed change with the counts after it. */
+    /** Runs for the Host's life: announces the counts each time a timed snooze ends. */
+    readonly announceSnoozeEnds: Effect.Effect<never>
+    /** Every committed change with the counts after it, and each snooze end. */
     readonly changes: Stream.Stream<AttentionChange>
   }
 >()('@dshfiles/activity-timeline/AttentionInbox') {

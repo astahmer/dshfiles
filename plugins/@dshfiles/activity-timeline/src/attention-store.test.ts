@@ -6,7 +6,7 @@ import { HostContext } from '@dshfiles/dshx/effect'
 import { StorageDomain } from '@dshfiles/dshx/effect/storage-domain'
 import { describe, expect, it } from '@effect/vitest'
 import { NodeServices } from '@effect/platform-node'
-import { Effect, Exit, FileSystem, Layer } from 'effect'
+import { Effect, Exit, Fiber, FileSystem, Layer, Stream } from 'effect'
 import { TestClock } from 'effect/testing'
 import type { AttentionDraft, AttentionPublish } from './attention-api.js'
 import { AttentionInbox } from './attention-store.js'
@@ -163,6 +163,27 @@ describe('attention inbox store', () => {
         // A provider stating something new about an expired item reopens it, like any Done item.
         yield* inbox.publish(publishInput('ready', { severity: 'ready', reason: 'Turn finished again' }))
         expect((yield* inbox.list({ view: 'other', limit: 10 })).items.map(item => item.dedupeKey)).toEqual(['ready'])
+      }).pipe(Effect.provide(inboxIn(root)))
+    }),
+  )
+
+  it.effect('announces a change when a timed snooze ends, so readers need no poll to see the item return', () =>
+    Effect.gen(function* () {
+      const root = yield* temporaryRoot
+      yield* Effect.gen(function* () {
+        const inbox = yield* AttentionInbox
+        yield* TestClock.setTime(10_000)
+        const { item } = yield* inbox.publish(publishInput('q1'))
+        yield* inbox.snooze({ id: item.id, until: 20_000 })
+        const announced = yield* Effect.forkChild(inbox.changes.pipe(Stream.take(1), Stream.runCollect))
+        yield* Effect.forkChild(inbox.announceSnoozeEnds)
+        yield* Effect.yieldNow
+        yield* TestClock.setTime(19_000)
+        yield* Effect.yieldNow
+        expect(announced.pollUnsafe()).toBeUndefined()
+        yield* TestClock.setTime(20_000)
+        const [change] = yield* Fiber.join(announced)
+        expect(change?.counts).toMatchObject({ needsYou: 1, snoozed: 0 })
       }).pipe(Effect.provide(inboxIn(root)))
     }),
   )

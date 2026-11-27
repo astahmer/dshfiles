@@ -214,8 +214,20 @@ const pruneIds = (items: readonly AttentionItem[], now: number, maxItems = MAX_I
   return [...expiredIds, ...evicted.map(item => item.id)]
 }
 
+/** When the earliest timed snooze of an open item ends after `now`; `null` when none is pending. */
+const nextSnoozeEnd = (items: Iterable<AttentionItem>, now: number): number | null => {
+  let next: number | null = null
+  for (const item of items) {
+    if (item.snoozeUntilChange || item.snoozedUntil === null || item.snoozedUntil <= now) continue
+    if (item.resolvedAt !== null || item.doneAt !== null) continue
+    if (next === null || item.snoozedUntil < next) next = item.snoozedUntil
+  }
+  return next
+}
+
 /** Pure inbox transitions; the store applies them durably and the tests pin them. */
 export class AttentionModel {
+  static readonly nextSnoozeEnd = nextSnoozeEnd
   static readonly itemIdOf = itemIdOf
   static readonly fingerprintOf = fingerprintOf
   static readonly publish = publish
