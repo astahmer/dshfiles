@@ -1026,3 +1026,20 @@ describe('the phone sheet never scrolls sideways (round 30, item 4)', () => {
     expect(trigger).toContain('dshx:pointer-coarse:after:right-0 dshx:pointer-coarse:after:-left-5')
   })
 })
+
+// Council round 29, item 5: a phone chip keeps its 36pt look and gets a 44pt hit box. Measured on iPhone WebKit
+// (elementFromPoint): every status chip already hits 44pt tall, from the kit's coarse-pointer ::after (4pt above and below
+// a 36pt chip). This pins the three facts that make it so, and that the 8pt row gap keeps neighbouring hit boxes apart.
+describe('phone chip hit areas (round 30, item 5)', () => {
+  const kit = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../plugin-ui/src/styles.css'), 'utf8')
+  it('draws a 36pt chip that the kit extends to a 44pt hit box on a coarse pointer, rows 8pt apart', () => {
+    render(<ListFilterPanel {...panel()} />)
+    const chip = screen.getByRole('button', { name: 'threadSidebarWorking' })
+    expect(chip.getAttribute('data-slot')).toBe('toggle-group-item')
+    expect(chip.className).toContain('dshx:pointer-coarse:h-9')
+    expect(element(chip.parentElement).className).toContain('dshx:pointer-coarse:gap-2')
+    const coarse = kit.slice(kit.indexOf('@media (pointer: coarse)'))
+    const rule = coarse.slice(0, coarse.indexOf('inset: min(0px, calc((100% - 44px) / 2))'))
+    expect(rule.slice(rule.lastIndexOf(':where(')).includes("[data-slot='toggle-group-item']") || rule.includes("[data-slot='toggle-group-item']")).toBe(true)
+  })
+})
