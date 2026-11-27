@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ThreadFindBar } from '../src/native/chat/ThreadFindBar.tsx'
+import { ThreadFindBar, type ThreadFindBarProps } from '../src/native/chat/ThreadFindBar.tsx'
 import { ThreadFindPort, type ThreadFindCall } from '../src/thread-find-port.ts'
 
 const LABELS = new Map<string, string>([
@@ -21,9 +21,11 @@ const LABELS = new Map<string, string>([
   ['chat.find.notInstalled', 'Not installed'],
   ['chat.find.failed', 'Failed: {message}'],
   ['chat.find.retry', 'Retry'],
+  ['chat.find.filterNeedsUpdate', 'Filters cover only the newest {limit} matches'],
 ])
 
-const t = (key: string) => LABELS.get(key) ?? key
+const t: ThreadFindBarProps['t'] = (key, params) =>
+  Object.entries(params ?? {}).reduce((label, [name, value]) => label.replace(`{${name}}`, String(value)), LABELS.get(key) ?? key)
 
 afterEach(() => {
   cleanup()
@@ -84,6 +86,45 @@ describe('ThreadFindBar filters', () => {
 
     fireEvent.keyDown(agentButton, { key: 'Escape' })
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('filters the newest matches here and says so when the Host refuses event types', async () => {
+    const corpus = [
+      { seq: 2, type: 'user/message', snippet: 'quartz prompt' },
+      { seq: 5, type: 'tool/result', snippet: 'quartz tool output' },
+      { seq: 10, type: 'assistant/message', snippet: 'quartz answer' },
+    ]
+    const calls: Parameters<ThreadFindCall>[0][] = []
+    ThreadFindPort.set(async input => {
+      calls.push(input)
+      if (input.types !== undefined) throw new Error('Unexpected key "types"')
+      return { ownsService: true, matches: corpus, hasMore: false }
+    })
+
+    render(
+      <ThreadFindBar
+        sessionId="session-old-host"
+        focusRequest={1}
+        onClose={() => {}}
+        list={() => null}
+        anchors={[{ turn: 1, seq: 1 }]}
+        rowFor={() => null}
+        revealTurn={() => {}}
+        readerSeq={() => null}
+        t={t}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Find in thread' }), { target: { value: 'quartz' } })
+    await waitFor(() => expect(screen.getByText('1 of 3')).toBeTruthy())
+    expect(screen.queryByText(/Filters cover only/)).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }))
+    await waitFor(() => expect(screen.getByText('1 of 1')).toBeTruthy())
+    expect(screen.getByText('Filters cover only the newest 500 matches')).toBeTruthy()
+    expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(calls.slice(1).map(call => call.types)).toEqual([['assistant/message'], undefined])
   })
 
   it('filters loaded DOM rows when session-search is unavailable', async () => {

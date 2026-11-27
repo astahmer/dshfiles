@@ -22,11 +22,16 @@ const findInThreadSchema = Schema.Struct({
   hasMore: Schema.Boolean,
 })
 
-/** What the find bar reads. `total` is the hits returned, or one more than that when the index holds more. */
+/**
+ * What the find bar reads. `total` is the hits returned, or one more than that when the index holds more.
+ * `filteredHere` means the Host refused `types` (a session-search older than the filters), so the newest matches were
+ * filtered in the browser instead and older filtered matches may be missing.
+ */
 export interface ThreadFindAnswer {
   readonly state: 'ready' | 'unavailable'
   readonly total: number
   readonly hits: readonly (typeof findHitSchema.Type)[]
+  readonly filteredHere: boolean
 }
 
 /** The find bar shows the newest 500 matches and "500+" past them rather than paging. */
@@ -88,17 +93,36 @@ export class ThreadFindPort {
     const call = globalThis.__dshfilesChatThreadFind
     if (call === null || call === undefined) throw new ThreadFindUnavailable(true, 'Thread search is not installed.')
     const types = input.types !== undefined && input.types.length > 0 ? input.types : undefined
-    const payload =
-      types === undefined
-        ? { sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true }
-        : { sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true, types }
-    const answer = await call(payload, signal)
+    const request = { sessionId: input.sessionId, text: input.query, limit: THREAD_FIND_LIMIT, newest: true }
+    const reply =
+      types === undefined ? { answer: await call(request, signal), filteredHere: false } : await ThreadFindPort.filtered({ call, request, types, signal })
+    const answer = reply.answer
     if (answer === undefined)
       throw new ThreadFindUnavailable(false, 'Thread search answered in a shape this view does not read. Update @dshfiles/session-search and restart DSH.')
+    const hits = types === undefined ? answer.matches : answer.matches.filter(match => types.includes(match.type))
     return {
       state: answer.ownsService ? 'ready' : 'unavailable',
-      total: answer.matches.length + (answer.hasMore ? 1 : 0),
-      hits: answer.matches,
+      total: hits.length + (answer.hasMore ? 1 : 0),
+      hits,
+      filteredHere: reply.filteredHere,
+    }
+  }
+
+  /**
+   * Ask with `types`; a Host that refuses them (strict decoding on a session-search older than the filters) is asked
+   * again without, and the caller filters the newest matches it returns. A failure of the unfiltered call is the real one.
+   */
+  private static readonly filtered = async (input: {
+    readonly call: ThreadFindCall
+    readonly request: Parameters<ThreadFindCall>[0]
+    readonly types: readonly string[]
+    readonly signal: AbortSignal
+  }): Promise<{ readonly answer: ThreadFindReply | undefined; readonly filteredHere: boolean }> => {
+    try {
+      return { answer: await input.call({ ...input.request, types: input.types }, input.signal), filteredHere: false }
+    } catch (error) {
+      if (input.signal.aborted) throw error
+      return { answer: await input.call(input.request, input.signal), filteredHere: true }
     }
   }
 }

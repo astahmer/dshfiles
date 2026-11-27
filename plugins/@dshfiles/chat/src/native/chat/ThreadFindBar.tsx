@@ -9,7 +9,7 @@ import { useDebouncedValue } from '@dshfiles/plugin-ui/hooks/debounced-value'
 import { keepPreviousData, PluginQueryProvider, useQuery } from '@dshfiles/plugin-ui/query'
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react'
 import type { ChatViewSlotProps } from '../contract/slots.ts'
-import { ThreadFindPort, ThreadFindUnavailable } from '../../thread-find-port.ts'
+import { THREAD_FIND_LIMIT, ThreadFindPort, ThreadFindUnavailable } from '../../thread-find-port.ts'
 import { clearFindHighlight, findInLoadedRows, revealFindHit } from './find-reveal.ts'
 import { FIND_FILTERS, ThreadFindModel, type FindFilter, type FindHit, type FindTurnAnchor } from './thread-find-model.ts'
 import css from './ThreadFindBar.module.css'
@@ -91,7 +91,8 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
     }
     if (search.isError) return { kind: 'error', message: search.error instanceof Error ? search.error.message : String(search.error) }
     if (search.data === undefined) return { kind: 'searching' }
-    return { kind: 'hits', source: 'index', hits: search.data.hits, total: search.data.total, note: null }
+    const note = search.data.filteredHere ? t('chat.find.filterNeedsUpdate', { limit: String(THREAD_FIND_LIMIT) }) : null
+    return { kind: 'hits', source: 'index', hits: search.data.hits, total: search.data.total, note }
   }, [query, needsLoaded, loaded, debounced, filterKey, unavailable, search.isError, search.error, search.data, t])
 
   const hits = answer.kind === 'hits' ? answer.hits : null
@@ -236,7 +237,7 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
       {answer.kind === 'hits' && answer.note !== null && (
         <div className={css.status} role="status">
           <span className={css.statusText}>{answer.note}</span>
-          {!unavailable && (
+          {answer.source === 'loaded' && !unavailable && (
             <button type="button" className={css.retry} onClick={() => void search.refetch()}>
               {t('chat.find.retry')}
             </button>
