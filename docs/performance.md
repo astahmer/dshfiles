@@ -2339,3 +2339,86 @@ pnpm --dir plugins/@dshfiles/thread-sidebar exec vitest run src/settled-store.te
 pnpm --dir plugins/@dshfiles/session-controller exec vitest run tests/client/session-state-eviction.test.ts
 pnpm --dir tooling/dshx/packages/dshx exec vitest run tests/resource-store.spec.ts tests/resource-react.spec.ts
 ```
+
+## Round nine combined (2026-11-27)
+
+Round nine as a whole: `3e5a3324` (the branch before it) against `08d1c0aa` (lazy plugin chunks, the kit served once,
+settled ids out of Settings, lighter start-up data, the Filters panel, upstream merges). Both revisions were built in one
+JJ workspace (`pnpm exec turbo run build --filter='./plugins/@dshfiles/*' --filter=@dshfiles/dshx`). Each ran on a scratch
+DSH seeded with the round-five capture fixture (`capture.mjs --skip-build --keep`: three projects, eight threads in
+every state, six Backlog items) and was measured with the same probe copies, BEFORE then AFTER, then alternated
+(A, B, A) on fresh scratches. Load is the 1-minute `uptime` average on 10 cores before → after each run.
+
+| Measure                                            | BEFORE `3e5a3324`       | AFTER `08d1c0aa`                        | Change               |
+| -------------------------------------------------- | ----------------------- | --------------------------------------- | -------------------- |
+| Client JS at boot, decoded (5 scripts)             | 25.43 MB (load 6.9)     | 18.21 MB (load 25–28)                   | −7.22 MB (−28 %)     |
+| Client JS at boot, transferred                     | 7.93 MB                 | 5.60 MB                                 | −2.33 MB (−29 %)     |
+| Two plugin bundles, decoded                        | 16,334 + 7,888 KB       | 9,583 + 7,248 KB                        | −7,391 KB            |
+| Page heap after load (GC, 15 s settle)             | 88.5 MB                 | 69.9 MB                                 | −18.6 MB (−21 %)     |
+| DOM nodes after load                               | 2,273                   | 2,273                                   | =                    |
+| Desktop switch, composer p50 (6 clicks per leg)    | 818 (7.5), 834 (9.8) ms | 1,072 (9.8), 937 (13.0), 1,052 (7.0) ms | **+~220 ms (+26 %)** |
+| Desktop switch, history p50                        | 875, 906 ms             | 1,152, 1,021, 1,109 ms                  | **+~200 ms**         |
+| Desktop switch, long tasks per click p50           | 456, 429 ms             | 665, 542, 652 ms                        | **+~200 ms**         |
+| Desktop switch, requests per click p50             | 12.5, 12.5              | 13, 12, 11.5                            | =                    |
+| Desktop switch, DOM after a click                  | 2,673–2,863             | 2,640–2,872                             | =                    |
+| Phone page load, better of 3 (spread)              | 12.8 s (12.8–14.2)      | 13.2 s (13.2–14.0)                      | ≈                    |
+| Phone tap → title p50                              | 1,469 ms (1,469–1,524)  | 1,461 ms (1,461–1,713)                  | ≈                    |
+| Phone tap → first message p50                      | 2,488 ms (2,488–2,735)  | 2,843 ms (2,843–3,272)                  | **+355 ms**          |
+| Phone Back → list p50                              | 1,957 ms (1,957–2,141)  | 2,162 ms (2,162–2,398)                  | **+205 ms**          |
+| Phone long tasks per open / per Back p50           | 3,282 / 2,252 ms        | 3,604 / 2,547 ms                        | **+322 / +295 ms**   |
+| API received in 45 s (`har-capture --seconds 45`)  | 956 KB (load 6.3)       | 553 KB (load 28)                        | −403 KB (−42 %)      |
+| API calls (POSTs; batches; calls inside)           | 93 (62; 14; 45)         | 95 (62; 15; 48)                         | +2                   |
+| Duplicate calls (same method and body; within 1 s) | 21 (7)                  | 20 (6)                                  | −1                   |
+| `session/list`                                     | 1 call, 7.1 KB          | 1 call, 6.2 KB                          | −0.9 KB              |
+| `settings/describe`                                | 2 calls, 351.7 KB       | 2 calls, 353.2 KB                       | ≈ (no settled ids)   |
+| `settings-shell/bundleLabels` → `namespaceLabels`  | 1 call, 480.6 KB        | 1 call, 75.3 KB                         | −405 KB (−84 %)      |
+| `thread-sidebar-settled/read`                      | (none)                  | 1 call, 0.1 KB                          | new                  |
+| `attention/list`                                   | 2 calls, 2.4 KB         | 2 calls, 3.0 KB                         | =                    |
+
+Phone runs: `RTT=100 CPU=4 ROWS=6 phone-switch-probe.mjs`, one run per leg. BEFORE at loads 6.7, 6.4 and 6.6; AFTER at
+7.9, 8.7 and 6.9. A fourth AFTER run whose load climbed to 25 is left out. Desktop runs: `switch-probe.mjs 8`. The approval
+and question threads have no composer textbox, so the probe waits its 30 s timeout there; those two rows are excluded
+from every leg. No click on AFTER fetched a script (lazy chunks load only with the surface that needs them). No
+request became slow either: the `REQUESTS=1` lists match.
+
+### The timing regression: palette actions re-registered on every click (found; fix in progress, lane S)
+
+Bytes went down, but each thread open got slower: about +220 ms per desktop click, at a lower load than BEFORE's. The
+cause holds at any load: a counting conditional breakpoint on the command palette's group `set` (it never pauses)
+gives 0 calls per desktop click on BEFORE and **546 calls (79,989 rows) per click** on AFTER, with 0 calls while idle on
+both.
+
+- Settled ids moved out of Settings, and `usePreferences` (`thread-sidebar/src/sidebar-state.tsx`) now builds
+  `updatePreferences` with `useCallback(…, [settledSource.kind, settledStore, writeSettings])`. `useSettledStore()`
+  returns a new `{ api, read }` object on every render, so `updatePreferences` gets a new identity on every render.
+- `updatePreferences` is a dependency of `paletteActions` (`sidebar-shell.tsx`), so each SidebarShell render runs
+  `useEffect(() => PaletteBridge.addActions(paletteActions), [paletteActions])` again.
+- `PaletteBridge.addActions` adds each action as its own broker registry entry, and its disposer removes them one by
+  one. Each add and each remove publishes a snapshot, and the palette re-runs `set` over the whole list: one
+  re-registration of N actions costs 2N full passes. On a phone this path already ran on BEFORE (resizing a BEFORE page
+  to 390 px and back: 1,252 calls).
+- CPU profile of three phone thread opens (CPU 4×), self time in that `set` per open: 600 ms BEFORE, 1,026–1,063 ms
+  AFTER. Total busy time per open is about the same (4.4 s vs 4.2 s) because forced layout from the transcript's
+  overflow check fell from 1,150 to 884 ms.
+
+Fix (lane S, thread-sidebar): give `updatePreferences` a stable identity, either by memoizing the settled store object
+or by reading it through a ref, and publish one registry change per batch instead of one per action. Its test: a
+simulated thread switch publishes no `PaletteActions` snapshot. These timing rows are to be measured again after it lands.
+
+### Caveats and what only shows at live scale
+
+- The scratch seed is far smaller than the live profile: 8 threads against 1,545 Sessions, 1,192 settled ids and a
+  1.27 MB `session/list` live. Savings that grow with data cannot show here:
+  - `settings/describe`: about −520 KB per live load (two calls of about −260 KB each, lane D's estimate) for one
+    ~110 KB settled read. Flat on the scratch, which settles nothing.
+  - `session/list`: the dropped `tokenUsage` column is about −163 KB live (1.27 → ~1.11 MB).
+  - `attention/list`: 4 calls live should become 2. The scratch already makes 2 on both revisions.
+- The byte-count savings carry to a live load with the same bundle set: boot JS −7.2 MB decoded and −2.3 MB
+  transferred, and `namespaceLabels` −400 KB (474 KB live). A live profile that still lists component-gallery keeps its
+  share of the JS, because the scratch composes from the `profiles/web` seed.
+- The page heap (88.5 → 69.9 MB) is a scratch number; the live page held 179 MB.
+- Loads: BEFORE ran at 6–10. AFTER's timing runs ran at 7–13 with the 5-minute average still 15–21 from other lanes'
+  captures. Its byte, heap and HAR runs ran at 25–39; those counts do not depend on load. The other lanes were
+  released after 38 minutes. The load then reached 496 (Time Machine and other captures), so no further matched pairs
+  were taken. The closest adjacent pair (B at 9.8, then A at 7.0) gives composer +218 ms, history +203 ms and long tasks
+  +224 ms, with AFTER at the lower load. The breakpoint count above is the load-independent proof.
