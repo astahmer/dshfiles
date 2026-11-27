@@ -1047,7 +1047,7 @@ export const ThreadWorkspacesPanel = (props: {
     {
       id: 'stale',
       title: t('staleHeading'),
-      description: t('staleDescription', { days: staleAfterDays }),
+      description: t('staleDescription', { days: staleAfterDays, bookmark: panelBookmark }),
       tone: 'stale',
     },
     {

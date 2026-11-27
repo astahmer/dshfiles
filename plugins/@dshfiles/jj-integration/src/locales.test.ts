@@ -31,4 +31,18 @@ describe('jj-integration copy', () => {
   it('calls the page by the name its navigation uses', () => {
     expect(english().get('title')).toBe('Workspaces')
   })
+
+  // The merge with upstream 534773f0 added {bookmark} to the Stale group's text while the panel passed only {days}, so
+  // the page printed "{bookmark}" literally.
+  it('fills every placeholder of a string the Workspaces page interpolates', () => {
+    const strings = english()
+    const source = readFileSync(fileURLToPath(new URL('./panel.tsx', import.meta.url)), 'utf8')
+    const missing: string[] = []
+    for (const match of source.matchAll(/\bt\('(\w+)'(?:,\s*\{([^{}]*)\})?\)/gu)) {
+      const key = match[1] ?? ''
+      const given = new Set((match[2] ?? '').split(',').map(part => part.split(':')[0]?.trim() ?? '').filter(Boolean))
+      for (const [, name] of (strings.get(key) ?? '').matchAll(/\{(\w+)\}/gu)) if (!given.has(name ?? '')) missing.push(`${key}: {${name}}`)
+    }
+    expect(missing).toEqual([])
+  })
 })
