@@ -46,3 +46,20 @@ describe('phone sheet scrim', () => {
     expect(nested?.[1]).toMatch(/body\s*>\s*:has\(/u)
   })
 })
+
+/**
+ * Council round 31, item 7: a sheet opened from a sheet shares its fill, so in dark its top edge (the sheet's 1px top
+ * border) vanished into the sheet below it. In dark a nested sheet's top edge takes the strong border step (#423F3C, the
+ * council's ~#45413C); light is unchanged.
+ */
+describe('a nested phone sheet in dark', () => {
+  it('draws its top edge in the strong border step, only under the dark theme', () => {
+    const rule = /([^{}]*body\[data-ds-dark-theme\][^{}]*)\{\s*border-top-color:\s*var\(--dshx-tone-border-strong[^;]*\)\s*!important;\s*\}/u.exec(styles)
+    expect(rule).not.toBeNull()
+    // The same two nested shapes as the scrim rule: inside a parent sheet, and in a later top-level layer.
+    expect(rule?.[1]).toMatch(/body\[data-ds-dark-theme\]\s*:is\(/u)
+    expect(rule?.[1]).toMatch(/body\[data-ds-dark-theme\]\s*>\s*:has\(/u)
+    const [light] = theme.split('body[data-ds-dark-theme]')
+    expect(light).not.toContain('border-top-color')
+  })
+})

@@ -1124,6 +1124,53 @@ svg [class*='_spinnerArc_'] {
     box-shadow: var(--dshx-elevation-3) !important;
   }
 
+  /*
+   * In dark a nested sheet shares the fill of the sheet under it, so its top edge vanished (council round 31, item 7): it
+   * takes the strong border step there (#423F3C). Light keeps its edge, which already reads against the scrim.
+   */
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) body[data-ds-dark-theme] :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    )
+    :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ),
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) body[data-ds-dark-theme] > :has(:is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ))
+    ~ * :is(
+      [data-slot='dropdown-menu-content'],
+      [data-slot='dropdown-menu-sub-content'],
+      [data-slot='context-menu-content'],
+      [data-slot='context-menu-sub-content'],
+      [data-slot='select-content'],
+      [data-slot='popover-content'],
+      [data-menu-material][role='menu'],
+      [data-menu-material][data-trigger-menu]
+    ) {
+    border-top-color: var(--dshx-tone-border-strong, var(--dsw-alias-border-l4)) !important;
+  }
+
   html[data-shell-phone-nav]:not([data-phone-keyboard])
     :is(
       [data-slot='dropdown-menu-content'],
