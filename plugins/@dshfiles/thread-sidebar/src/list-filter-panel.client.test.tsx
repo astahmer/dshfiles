@@ -863,14 +863,14 @@ describe('the built-in preset menu (round 30, item 2)', () => {
 
 // Council round 29, item 3: the forced-open disclosure says why on screen, and never folds under the pointer.
 describe('the forced-open disclosure (round 30, item 3)', () => {
-  it('shows the fold hint as a 12px secondary caption, which the button is described by', () => {
+  it('shows the fold hint on screen, which the button is described by', () => {
     render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
     const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
     const hint = element(document.getElementById(more.getAttribute('aria-describedby') ?? ''))
     expect(hint.textContent).toBe('threadSidebarFilterFoldHint')
     expect(hint.className).not.toContain('sr-only')
-    expect(hint.className).toContain('dshx:text-xs')
-    expect(hint.className).toContain('dshx:text-muted-foreground')
+    // On screen; its style is round 31's group-label line (item 5).
+    expect(hint.getClientRects).toBeDefined()
   })
 
   it('stays open after the last revealed status is turned off, so nothing folds under the pointer', () => {
@@ -1198,5 +1198,19 @@ describe('the preset menu fits the panel (round 31, item 4)', () => {
     expect(optionsMenu).toMatch(/\{activeIsBuiltIn \? null : \(\s*<>\s*<DropdownMenuSeparator \/>\s*<DropdownMenuLabel/u)
     expect(optionsMenu).toContain('aria-describedby={activeIsBuiltIn ? builtInHintId : undefined}')
     expect(optionsMenu).toContain('id={builtInHintId}')
+  })
+})
+
+// Council round 30, item 5: the forced-open hint is its own line under Fewer statuses, at the label's x (36px), in the
+// group-label style, and the control is no fainter than its explanation.
+describe('the forced-open hint line (round 31, item 5)', () => {
+  it('sits on its own line at the label x in 11px tertiary, and the button keeps its full ink', () => {
+    render(<ListFilterPanel {...panel({ status: { selected: ['archived'], onChange: vi.fn() } })} />)
+    const more = screen.getByRole('button', { name: 'threadSidebarFilterFewerStatuses' })
+    const hint = element(document.getElementById(more.getAttribute('aria-describedby') ?? ''))
+    expect(more.nextElementSibling).toBe(hint)
+    expect(hint.tagName).toBe('P')
+    for (const token of ['dshx:pl-6', 'dshx:text-2xs', 'dshx:text-(--dsw-alias-label-tertiary)']) expect(hint.className).toContain(token)
+    expect(more.className).not.toContain('opacity-60')
   })
 })

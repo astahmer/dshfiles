@@ -621,7 +621,6 @@ const StatusChips = (props: {
         >
           {LEADING_STATUS_GROUP.filters.map(chip)}
         </ToggleGroup>
-        <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-center dshx:gap-x-2">
         <Button
           type="button"
           variant="ghost"
@@ -631,7 +630,7 @@ const StatusChips = (props: {
           // A status in force never hides: while one of these is on, the disclosure stays open and says how to fold it.
           aria-disabled={forced ? true : undefined}
           aria-describedby={forced ? `${moreId}-hint` : undefined}
-          className={cn(QUIET_ROW, 'dshx:justify-self-start dshx:aria-disabled:opacity-60')}
+          className={cn(QUIET_ROW, 'dshx:justify-self-start')}
           onClick={() => (forced ? undefined : setOpened(current => !current))}
           data-thread-status-more=""
         >
@@ -642,12 +641,12 @@ const StatusChips = (props: {
           {props.t(expanded ? 'threadSidebarFilterFewerStatuses' : 'threadSidebarFilterMoreStatuses')}
         </Button>
         {forced ? (
-          // Why it will not fold, on screen beside it (council round 29, item 3), and its description for a screen reader.
-          <span id={`${moreId}-hint`} className="dshx:text-xs dshx:text-muted-foreground" data-thread-status-fold-hint="">
+          // Why it will not fold (council round 29, item 3): its own line under it, at its label's x (36px), in the group
+          // label style (council round 30, item 5); also its description for a screen reader.
+          <p id={`${moreId}-hint`} className="dshx:-mt-1 dshx:pl-6 dshx:text-2xs dshx:text-(--dsw-alias-label-tertiary)" data-thread-status-fold-hint="">
             {props.t('threadSidebarFilterFoldHint')}
-          </span>
+          </p>
         ) : null}
-        </div>
         {/* The disclosure's region stays mounted (its aria-controls target); it holds the other groups while open. */}
         <ToggleGroup
           type="multiple"
