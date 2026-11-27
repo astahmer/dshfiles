@@ -222,6 +222,8 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
             value={presets.edited ? '' : presets.activeId}
             // Picking the checked row again would clear the group; it re-applies the preset instead (dropping edits).
             onValueChange={value => presets.onApply(value === '' ? presets.activeId : value)}
+            // Rows that stand apart: with spacing the kit keeps each row's own rounded corners (round 28, item 13).
+            spacing={0.5}
             className="dshx:-mx-1.5 dshx:grid dshx:w-auto dshx:gap-0.5"
           >
             {presets.items.map(preset => {

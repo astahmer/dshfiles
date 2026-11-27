@@ -403,3 +403,13 @@ describe('the phone sheet (round 28, item 10)', () => {
     expect(filterControl).toContain('<ChevronRightIcon')
   })
 })
+
+// Council round 27, item 13: the kit squares the inner corners of a ToggleGroup with no spacing (a joined button bar);
+// the preset rows stand apart, so each keeps its own rounded corners.
+describe('preset rows (round 28, item 13)', () => {
+  it('keeps every preset row rounded: the group has spacing, so the kit never squares an inner corner', () => {
+    render(<ListFilterPanel {...panel()} />)
+    for (const row of within(screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })).getAllByRole('radio'))
+      expect(row.getAttribute('data-spacing')).not.toBe('0')
+  })
+})
