@@ -1,11 +1,13 @@
-import { Context, DateTime, Duration, Effect, Layer, Path, PubSub, RcMap, Ref, Schema, type Scope, Stream } from 'effect'
+import { Clock, Context, DateTime, Duration, Effect, Layer, Path, PubSub, RcMap, Ref, Schema, type Scope, Stream } from 'effect'
 import { Connectors } from './connectors/connectors.js'
 import type { Gateway } from './connectors/gateway.js'
-import { failureCodeOf, HostNotFound, isTransportFailure, RuntimeNotFound } from './errors.js'
+import { failureCodeOf, GatewayUnreachable, HostNotFound, isTransportFailure, RuntimeNotFound } from './errors.js'
 import { HostDirectory } from './host-directory.js'
 import { RemoteIdentity } from './remote-identity.js'
 
 const idleTimeToLive = Duration.minutes(5)
+const unreachableCooldown = Duration.seconds(30)
+const isGatewayUnreachable = Schema.is(GatewayUnreachable)
 
 /** One pooled connection: the gateway and the generation that tells a replaced connection from its successor. */
 export interface RuntimeLease {
@@ -39,7 +41,9 @@ const errorText = (error: unknown): { readonly code: string; readonly message: s
 /**
  * One live, identity-verified connection per runtime, shared by every caller until it idles out for five minutes or
  * its transport drops. A read that fails because the connection dropped retries once on a fresh one; a mutation
- * never does, so an admitted mutation is not replayed.
+ * never does, so an admitted mutation is not replayed. A runtime that could not be reached is not dialled again for
+ * thirty seconds: every caller in between gets the same failure at once instead of its own connect timeout. An
+ * explicit reconnect (`clearError`) ends the pause.
  */
 export class RuntimePool extends Context.Service<
   RuntimePool,
@@ -74,18 +78,29 @@ export class RuntimePool extends Context.Service<
       const connections = yield* PubSub.unbounded<string>()
       const changed = yield* PubSub.unbounded<string>()
       const nextGeneration = yield* Ref.make(1)
+      const unreachable = yield* Ref.make(new Map<string, { readonly until: number; readonly error: GatewayUnreachable }>())
 
       const recordError = (runtimeId: string, error: unknown) =>
         Effect.flatMap(DateTime.now, now =>
           Ref.update(errors, current => new Map(current).set(runtimeId, { ...errorText(error), at: DateTime.formatIso(now) })),
         ).pipe(Effect.andThen(PubSub.publish(changed, runtimeId)))
       const clearError = (runtimeId: string) =>
-        Ref.modify(errors, current => {
-          if (!current.has(runtimeId)) return [false, current] as const
+        Ref.update(unreachable, current => {
+          if (!current.has(runtimeId)) return current
           const next = new Map(current)
           next.delete(runtimeId)
-          return [true, next] as const
-        }).pipe(Effect.flatMap(cleared => (cleared ? PubSub.publish(changed, runtimeId) : Effect.void)))
+          return next
+        }).pipe(
+          Effect.andThen(
+            Ref.modify(errors, current => {
+              if (!current.has(runtimeId)) return [false, current] as const
+              const next = new Map(current)
+              next.delete(runtimeId)
+              return [true, next] as const
+            }),
+          ),
+          Effect.flatMap(cleared => (cleared ? PubSub.publish(changed, runtimeId) : Effect.void)),
+        )
 
       const leases: RcMap.RcMap<string, RuntimeLease, PoolError> = yield* RcMap.make({
         lookup: (runtimeId: string): Lookup =>
@@ -123,8 +138,22 @@ export class RuntimePool extends Context.Service<
           generation !== undefined && current.get(runtimeId) !== generation ? Effect.void : RcMap.invalidate(leases, runtimeId),
         )
 
-      /** A failed connect is not cached: the next caller connects again. */
-      const acquire = (runtimeId: string) => RcMap.get(leases, runtimeId).pipe(Effect.tapError(() => RcMap.invalidate(leases, runtimeId)))
+      const pauseUnreachable = (runtimeId: string, error: unknown) =>
+        isGatewayUnreachable(error)
+          ? Effect.flatMap(Clock.currentTimeMillis, now =>
+              Ref.update(unreachable, current => new Map(current).set(runtimeId, { until: now + Duration.toMillis(unreachableCooldown), error })),
+            )
+          : Effect.void
+
+      /** A failed connect is not cached as a lease: the next caller connects again, after the unreachable pause. */
+      const acquire = (runtimeId: string) =>
+        Effect.gen(function* () {
+          const paused = (yield* Ref.get(unreachable)).get(runtimeId)
+          if (paused !== undefined && (yield* Clock.currentTimeMillis) < paused.until) return yield* paused.error
+          return yield* RcMap.get(leases, runtimeId).pipe(
+            Effect.tapError(error => RcMap.invalidate(leases, runtimeId).pipe(Effect.andThen(pauseUnreachable(runtimeId, error)))),
+          )
+        })
 
       const use = <A, E, R>(runtimeId: string, request: (gateway: Gateway) => Effect.Effect<A, E, R>, options: { readonly mutation: boolean }) => {
         const once = Effect.scoped(

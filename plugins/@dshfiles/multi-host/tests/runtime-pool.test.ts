@@ -192,7 +192,7 @@ describe('RuntimePool', () => {
     }),
   )
 
-  it.effect('forgets a failed connect so the next call retries', () =>
+  it.effect('does not dial an unreachable runtime again for thirty seconds, then retries it', () =>
     Effect.gen(function* () {
       const fake = yield* fakeConnectors
       yield* Effect.gen(function* () {
@@ -200,6 +200,31 @@ describe('RuntimePool', () => {
         yield* Ref.set(fake.failNext, 1)
         const failed = yield* Effect.exit(Effect.scoped(pool.acquire(runtimeIds[0])))
         expect(Exit.isFailure(failed)).toBe(true)
+
+        yield* Ref.set(fake.failNext, 1)
+        const paused = yield* Effect.flip(Effect.scoped(pool.acquire(runtimeIds[0])))
+        expect(paused._tag).toBe('GatewayUnreachable')
+        expect(yield* Ref.get(fake.failNext)).toBe(1)
+        yield* Ref.set(fake.failNext, 0)
+
+        yield* Effect.scoped(pool.acquire(runtimeIds[1]))
+        expect(yield* Ref.get(fake.opened)).toHaveLength(1)
+
+        yield* TestClock.adjust(Duration.seconds(30))
+        yield* Effect.scoped(pool.acquire(runtimeIds[0]))
+        expect(yield* Ref.get(fake.opened)).toHaveLength(2)
+      }).pipe(Effect.provide(poolWith({ connectors: fake.layer })))
+    }),
+  )
+
+  it.effect('an explicit reconnect ends the unreachable pause', () =>
+    Effect.gen(function* () {
+      const fake = yield* fakeConnectors
+      yield* Effect.gen(function* () {
+        const pool = yield* RuntimePool
+        yield* Ref.set(fake.failNext, 1)
+        yield* Effect.exit(Effect.scoped(pool.acquire(runtimeIds[0])))
+        yield* pool.clearError(runtimeIds[0])
         yield* Effect.scoped(pool.acquire(runtimeIds[0]))
         expect(yield* Ref.get(fake.opened)).toHaveLength(1)
       }).pipe(Effect.provide(poolWith({ connectors: fake.layer })))
