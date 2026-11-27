@@ -152,9 +152,14 @@ const ChipSeat = (props: { readonly on: boolean; readonly filter: ThreadStatusFi
   </span>
 )
 
-/** A 24px icon button in a preset row (a 44px seat on a coarse pointer), named and with the kit tooltip. */
-const RowIconButton = (props: { readonly label: string; readonly onClick: () => void; readonly children: ReactNode } & Record<`data-${string}`, string>): JSX.Element => {
-  const { label, onClick, children, ...data } = props
+/**
+ * An edited preset row's button: a 24px icon with the kit tooltip on a mouse; on a coarse pointer a 13px word in a 44pt
+ * seat (council round 29, item 8: "Save", "Discard"), the full name kept as its accessible name.
+ */
+const RowIconButton = (
+  props: { readonly label: string; readonly text: string; readonly onClick: () => void; readonly children: ReactNode } & Record<`data-${string}`, string>,
+): JSX.Element => {
+  const { label, text, onClick, children, ...data } = props
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -164,10 +169,15 @@ const RowIconButton = (props: { readonly label: string; readonly onClick: () => 
           size="icon-xs"
           aria-label={label}
           onClick={onClick}
-          className="dshx:size-6 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:size-11 dshx:[&_svg]:size-3.5"
+          className="dshx:size-6 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-auto dshx:pointer-coarse:px-2 dshx:pointer-coarse:text-sm dshx:pointer-coarse:font-medium dshx:pointer-coarse:text-foreground dshx:[&_svg]:size-3.5"
           {...data}
         >
-          {children}
+          <span className="dshx:inline-flex dshx:pointer-coarse:hidden" data-row-button-icon="">
+            {children}
+          </span>
+          <span className="dshx:hidden dshx:pointer-coarse:inline" data-row-button-text="">
+            {text}
+          </span>
         </Button>
       </TooltipTrigger>
       <TooltipContent side="top">{label}</TooltipContent>
@@ -339,19 +349,20 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                   <div ref={actionsRef} className="dshx:absolute dshx:inset-y-0 dshx:right-[34px] dshx:flex dshx:items-center dshx:gap-0.5 dshx:pointer-coarse:gap-0" data-preset-actions="">
                     {preset.id === presets.builtInId ? (
                       // The built-in All threads is never overwritten (council round 28, item 13): its edits become a new preset.
-                      <RowIconButton label={t('threadSidebarPresetSaveAsNew')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
+                      <RowIconButton label={t('threadSidebarPresetSaveAsNew')} text={t('threadSidebarPresetSaveAsNewShort')} onClick={() => presets.onSaveAs?.()} data-preset-save-as="">
                         <BookmarkPlusIcon />
                       </RowIconButton>
                     ) : (
                       <RowIconButton
                         label={t('threadSidebarPresetSaveChanges', { name: preset.label })}
+                        text={t('threadSidebarPresetSaveShort')}
                         onClick={focusPresetThen(presets.onSaveChanges)}
                         data-preset-save-changes=""
                       >
                         <SaveIcon />
                       </RowIconButton>
                     )}
-                    <RowIconButton label={t('threadSidebarPresetDiscardChanges')} onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
+                    <RowIconButton label={t('threadSidebarPresetDiscardChanges')} text={t('threadSidebarPresetDiscardShort')} onClick={focusPresetThen(presets.onDiscard)} data-preset-discard-changes="">
                       <RotateCcwIcon />
                     </RowIconButton>
                   </div>

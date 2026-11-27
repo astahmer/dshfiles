@@ -630,7 +630,7 @@ describe('Save and Discard in the edited row (round 29, item 6)', () => {
     const discard = within(row).getByRole('button', { name: 'threadSidebarPresetDiscardChanges' })
     for (const button of [save, discard]) {
       expect(button.className).toContain('dshx:size-6')
-      expect(button.className).toContain('dshx:pointer-coarse:size-11')
+      expect(button.className).toContain('dshx:pointer-coarse:h-11')
     }
     fireEvent.click(discard)
     expect(presets.onDiscard).toHaveBeenCalledOnce()
@@ -942,5 +942,34 @@ describe('preset end columns (round 30, item 6)', () => {
 
   it('counts an edited preset by what the list draws, in its row and its name', () => {
     expect(filterControl).toContain('view.id === listThreadView.id && presetEdited ? visibleThreadEntries.length')
+  })
+})
+
+// Council round 29, item 8: on a coarse pointer the edited row's Save and Discard are words, not bare icons.
+describe('labelled Save and Discard on a phone (round 30, item 8)', () => {
+  const edited = (activeId: string) => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    return <ListFilterPanel {...base} presets={{ ...presets, activeId, edited: true, builtInId: 'all', onSaveAs: vi.fn() }} />
+  }
+  it('shows Save and Discard as 13px words in a 44pt seat on a coarse pointer, the icon on a mouse', () => {
+    render(edited('working'))
+    for (const [name, word] of [
+      ['threadSidebarPresetSaveChanges', 'threadSidebarPresetSaveShort'],
+      ['threadSidebarPresetDiscardChanges', 'threadSidebarPresetDiscardShort'],
+    ] as const) {
+      const button = screen.getByRole('button', { name })
+      for (const token of ['dshx:pointer-coarse:h-11', 'dshx:pointer-coarse:w-auto', 'dshx:pointer-coarse:text-sm']) expect(button.className).toContain(token)
+      const text = element(button.querySelector('[data-row-button-text]'))
+      expect(text.textContent).toBe(word)
+      expect(text.className).toContain('dshx:hidden dshx:pointer-coarse:inline')
+      expect(button.querySelector('[data-row-button-icon]')?.className).toContain('dshx:pointer-coarse:hidden')
+    }
+  })
+
+  it('says Save as new… for the built-in preset', () => {
+    render(edited('all'))
+    expect(screen.getByRole('button', { name: 'threadSidebarPresetSaveAsNew' }).querySelector('[data-row-button-text]')?.textContent).toBe('threadSidebarPresetSaveAsNewShort')
   })
 })
