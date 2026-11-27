@@ -827,3 +827,23 @@ describe('focus after Clear, Save and Discard (round 29, item 18)', () => {
     expect(document.activeElement).toBe(screen.getByRole('radio', { name: /^Working, /u }))
   })
 })
+
+// Found on the scratch (round 29, item 2): the Working preset read 4 while the list's Working group, once applied,
+// showed 2; the tally counted subagent rows the list leaves out under Source: All. A preset counts the rows it shows.
+describe('a preset counts the rows the list shows (round 29, item 2)', () => {
+  /** One memo's source: from its declaration to the next declaration in the component. */
+  const memo = (name: string): string => {
+    const start = client.indexOf(`const ${name} = useMemo(`)
+    return client.slice(start, client.indexOf('\n  const ', start + 1))
+  }
+  it('takes its rows and status match from the same helpers as the list', () => {
+    expect(client).toContain('const threadEntriesForSource = ')
+    expect(client).toContain('const matchesListStatus = ')
+    expect(memo('sourceFilteredThreadEntries')).toContain('threadEntriesForSource(threadView.sourceFilter)')
+    expect(memo('visibleThreadEntries')).toContain('matchesListStatus(entry, listView)')
+    const tallies = memo('presetTallies')
+    expect(tallies).toContain('threadEntriesForSource(view.sourceFilter)')
+    expect(tallies).toContain('matchesListStatus(entry, view)')
+    expect(tallies).not.toContain('matchesAttentionView')
+  })
+})

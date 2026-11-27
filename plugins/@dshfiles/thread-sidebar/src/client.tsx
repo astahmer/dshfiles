@@ -4094,13 +4094,18 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       ),
     [finishedAtBySession, mutedThreads, now, sessionState.byId, threadTree, workspaceBySession],
   )
-  const sourceFilteredThreadEntries = useMemo(() => {
-    if (threadView.sourceFilter === 'subagents') {
-      return [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))]
-    }
-    if (threadView.sourceFilter === 'main') return sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'main'))
-    return sectionEntries
-  }, [childThreadEntries, sectionEntries, threadView.sourceFilter])
+  /** The rows a source shows: the list's and each Filter preset's count share it (round 29, item 2). */
+  const threadEntriesForSource = useCallback(
+    (sourceFilter: ThreadSourceFilter) => {
+      if (sourceFilter === 'subagents') {
+        return [...childThreadEntries, ...sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'subagents'))]
+      }
+      if (sourceFilter === 'main') return sectionEntries.filter(entry => ThreadViewModel.matchesSourceFilter(entry.session, 'main'))
+      return sectionEntries
+    },
+    [childThreadEntries, sectionEntries],
+  )
+  const sourceFilteredThreadEntries = useMemo(() => threadEntriesForSource(threadView.sourceFilter), [threadEntriesForSource, threadView.sourceFilter])
   const sourceFilteredThreadIds = useMemo(() => new Set(sourceFilteredThreadEntries.map(entry => entry.session.id)), [sourceFilteredThreadEntries])
   const currentWorkingThreadIds = useMemo(() => workingThreadIds(sectionEntries), [sectionEntries])
   const inactiveThreadIds = useMemo(
@@ -4576,8 +4581,30 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         visibleCount: view.showCount === false ? null : (workingCount ?? (unreadCount > 0 ? unreadCount : null)),
       }
     })
-  // Each preset's rows, and how many of them need you or failed (round 29, item 2): counted only while the Filter panel is
-  // open, since matching every row per preset on each render was the sidebar's hottest loop while a turn streams.
+  /** Whether a row of the list matches a view's statuses: the list's and each Filter preset's count share it. */
+  const matchesListStatus = useCallback(
+    (entry: (typeof sourceFilteredThreadEntries)[number], view: Pick<ThreadViewPreferences, 'statusFilters' | 'sourceFilter'>): boolean =>
+      ThreadViewModel.matchesStatusFilter({
+        filters: view.statusFilters,
+        // A subagent row reports its own state; a root row reports its children's, so a finished child keeps its
+        // parent in the view that names that label.
+        labels: attentionLabelsByRow.get(entry.session.id) ?? [],
+        unread: attention.records.has(entry.session.id),
+        running: view.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
+        inactive: inactiveThreadIds.has(entry.session.id),
+        archived: archivedSessionIds.has(entry.session.id),
+        settled: settledSessionIds.has(entry.session.id),
+        muted: mutedSessionIds.has(entry.session.id),
+      }),
+    [archivedSessionIds, attention.records, attentionLabelsByRow, currentWorkingThreadIds, inactiveThreadIds, mutedSessionIds, settledSessionIds],
+  )
+  const visibleThreadEntries = useMemo(() => {
+    const listView = { statusFilters: threadView.statusFilters, sourceFilter: threadView.sourceFilter }
+    return sourceFilteredThreadEntries.filter(entry => matchesListStatus(entry, listView))
+  }, [matchesListStatus, sourceFilteredThreadEntries, threadView.sourceFilter, threadView.statusFilters])
+  // Each preset's rows, as the list would show them, and how many of them need you or failed (round 29, item 2):
+  // counted only while the Filter panel is open, since matching every row per preset on each render was the sidebar's
+  // hottest loop while a turn streams.
   const presetTallies = useMemo(() => {
     const tallies = new Map<string, { readonly count: number; readonly needsYou: number; readonly failed: number }>()
     if (!filterOpen) return tallies
@@ -4586,46 +4613,21 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       let count = 0
       let needsYou = 0
       let failed = 0
-      for (const entry of threadViewAttentionEntries) {
-        if (!ThreadViewModel.matchesAttentionView(entry, { filters: view.statusFilters, sourceFilter: view.sourceFilter })) continue
+      for (const entry of threadEntriesForSource(view.sourceFilter)) {
+        if (!matchesListStatus(entry, view)) continue
         count += 1
-        const attention = presetAttentionOf((threadStatusById.get(entry.thread.id) ?? childStatusById.get(entry.thread.id))?.status, entry.attentionLabel)
+        const id = entry.session.id
+        const attention = presetAttentionOf(
+          (threadStatusById.get(id) ?? childStatusById.get(id))?.status,
+          ThreadViewModel.mostUrgentAttentionLabel(attentionLabelsByRow.get(id) ?? []),
+        )
         if (attention === 'needs-you') needsYou += 1
         else if (attention === 'failed') failed += 1
       }
       tallies.set(view.id, { count, needsYou, failed })
     }
     return tallies
-  }, [childStatusById, filterOpen, threadStatusById, threadViewAttentionEntries, threadViewSettings.views])
-  const visibleThreadEntries = useMemo(
-    () =>
-      sourceFilteredThreadEntries.filter(entry =>
-        ThreadViewModel.matchesStatusFilter({
-          filters: threadView.statusFilters,
-          // A subagent row reports its own state; a root row reports its children's, so a finished child keeps its
-          // parent in the view that names that label.
-          labels: attentionLabelsByRow.get(entry.session.id) ?? [],
-          unread: attention.records.has(entry.session.id),
-          running: threadView.sourceFilter === 'subagents' ? entry.activity.running : currentWorkingThreadIds.has(entry.session.id),
-          inactive: inactiveThreadIds.has(entry.session.id),
-          archived: archivedSessionIds.has(entry.session.id),
-          settled: settledSessionIds.has(entry.session.id),
-          muted: mutedSessionIds.has(entry.session.id),
-        }),
-      ),
-    [
-      archivedSessionIds,
-      settledSessionIds,
-      attention.records,
-      attentionLabelsByRow,
-      currentWorkingThreadIds,
-      inactiveThreadIds,
-      mutedSessionIds,
-      sourceFilteredThreadEntries,
-      threadView.sourceFilter,
-      threadView.statusFilters,
-    ],
-  )
+  }, [attentionLabelsByRow, childStatusById, filterOpen, matchesListStatus, threadEntriesForSource, threadStatusById, threadViewSettings.views])
   const groupedAttentionRows = useMemo(() => {
     const filterRows = (rows: readonly SessionSummary[], label: ThreadAttentionLabel): SessionSummary[] => {
       if (threadView.groupBy !== 'status' || isBoard) return []
