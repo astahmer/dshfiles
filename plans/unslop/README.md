@@ -510,6 +510,15 @@ round 29 Astra 9.5 / Fable 9 / Opus 8.5, round 30 the same (first round with no 
 the Manual grouping draws a second status vocabulary (blue dot, grey dot, black dot for failed, "(1)" counts).
 Captures `round-29/` match `round-28/` apart from subagent timers.
 
+Round nine, Filters panel finished. Rounds 31–33 (council on the panel alone): Astra 9.5 / Opus 9 / Fable 9, then the
+same, then **9.5 / 9.5 / 9.5**: every deciding seat at the target. Last fixes: the count badge has a visible fill (ink at
+20 %, 1.5:1 light, 1.8:1 dark against the button), "All threads" fits the trigger with the count in the funnel's slot,
+the desktop panel stops 8 px above the status bar, More never scrolls its toggle away, "Mark N shown as read", the
+project picker and nested sheets dim with the kit scrim. Polish toward 10 is queued in
+`.cache/unslop-audit/r5/council/round-33-filter-followups.md`. Upstream `e7a194b1` (Vibe ACP follow-ups, tool-subagent's
+child turn guard, on by default upstream) merged with catalog fixes. Captures `round-31/` match `round-30/` apart from
+timers. Next: the full-set council (round 34) and one combined before/after performance table.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
