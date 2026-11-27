@@ -2,12 +2,15 @@ import { FilePath } from '@dshfiles/plugin-ui/components/code-block'
 import { DiffStat } from '@dshfiles/plugin-ui/components/diff-stat'
 import { ToolCard, type ToolStatus } from '@dshfiles/plugin-ui/components/tool-card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@dshfiles/plugin-ui/components/ui/collapsible'
-import { PatchView } from '@dshfiles/plugin-ui/diff'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useState, type ReactNode } from 'react'
 import { hunkDiffs, hunkTotals, type HunkDiff } from './file-hunk-diff.js'
 import { FileToolModels, type FileHunk, type FileToolCall } from './file-tool-models.js'
+
+/** The renderer and shiki load when a hunk first opens; collapsed rows only count lines. */
+const PatchView = lazyView(() => import('./patch-view.js').then(module => module.PatchView), { label: 'Diff' })
 
 /** The Host conversation labels this card borrows, so a zh profile reads it like the native rows. */
 export type DiffTranslate = (

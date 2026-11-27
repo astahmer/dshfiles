@@ -134,6 +134,10 @@
       "types": "./src/diff.tsx",
       "default": "./src/diff.tsx"
     },
+    "./diff-parse": {
+      "types": "./src/diff-parse.ts",
+      "default": "./src/diff-parse.ts"
+    },
     "./virtual": {
       "types": "./src/virtual.ts",
       "default": "./src/virtual.ts"

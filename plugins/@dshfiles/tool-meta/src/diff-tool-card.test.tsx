@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render } from '@testing-library/react'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { FileToolCall } from './file-tool-models.js'
@@ -43,10 +43,11 @@ describe('DiffToolCard', () => {
     expect(view.container.querySelector('[data-diff-path]')).toBeNull()
   })
 
-  it('renders one collapsible unified diff per hunk, each hunk closing on its own', () => {
+  it('renders one collapsible unified diff per hunk, each hunk closing on its own', async () => {
     const view = render(card(editCall([{ oldText: 'a\nb\nc', newText: 'a\nB\nc' }])))
     fireEvent.click(view.getByRole('button', { name: /Edit/ }))
-    expect(view.container.querySelectorAll('[data-diff-path]')).toHaveLength(1)
+    // The renderer is a lazy chunk: the diff appears once it has loaded.
+    await waitFor(() => expect(view.container.querySelectorAll('[data-diff-path]')).toHaveLength(1))
 
     fireEvent.click(view.getByRole('button', { name: 'Collapse diff' }))
     expect(view.container.querySelector('[data-diff-path]')).toBeNull()
@@ -64,7 +65,7 @@ describe('DiffToolCard', () => {
     expect(render(card(failed, <span>native edit row</span>)).getByText('native edit row')).toBeTruthy()
   })
 
-  it('shows every hunk of an apply_patch call, which has no native row to fall back to', () => {
+  it('shows every hunk of an apply_patch call, which has no native row to fall back to', async () => {
     const patch: FileToolCall = {
       phase: 'result',
       toolName: 'apply_patch',
@@ -87,7 +88,7 @@ describe('DiffToolCard', () => {
     expect(view.getByText('apply_patch')).toBeTruthy()
     expect(view.getAllByText('2 lines added, 2 lines removed').length).toBeGreaterThan(0)
     fireEvent.click(view.getByRole('button', { name: /apply_patch/ }))
-    expect(view.container.querySelectorAll('[data-diff-path]')).toHaveLength(2)
+    await waitFor(() => expect(view.container.querySelectorAll('[data-diff-path]')).toHaveLength(2))
     expect(view.getAllByRole('button', { name: 'Collapse diff' })).toHaveLength(2)
   })
 

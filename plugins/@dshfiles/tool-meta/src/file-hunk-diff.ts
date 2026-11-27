@@ -1,4 +1,4 @@
-import { parseDiffFromFile, type FileDiffMetadata } from '@dshfiles/plugin-ui/diff'
+import { parseDiffFromFile, type FileDiffMetadata } from '@dshfiles/plugin-ui/diff-parse'
 import type { FileHunk } from './file-tool-models.js'
 
 /** One applied hunk, parsed by the diff engine the review surfaces already render. */
