@@ -35,7 +35,8 @@ import { IntegrationMarkerLine } from './integration-marker.js'
 import { useMinuteTick } from './relative-label.js'
 import { followRepositoryChanges } from './repository-change-events.js'
 import { JJ_INTEGRATION_LOCALE_NAMESPACE, jjIntegrationLocale } from './locales.js'
-import { ThreadWorkspacesPanel, threadQueryKeys } from './panel.js'
+import { threadQueryKeys } from './thread-query-keys.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { revisionGraphQueryKey } from './revision-graph-hover-card.js'
 import { createSessionLogDownloadPort, SessionLogDownloadFeedback, type SessionLogDownloadService } from './session-log-download.js'
@@ -62,9 +63,13 @@ import { requestThreadSettle } from './settle-request.js'
 import { requestReplaceThreadTab } from './main-tab-replacement.js'
 import { TurnEndStatusRefreshModel, type TurnEndStatusRefresh } from './turn-end-status-refresh.js'
 import { useProjectBookmark } from './project-bookmark-query.js'
-import { ProjectMainBranchPanel } from './project-main-branch-panel.js'
 import { ProjectSettingsPanels, type ProjectSettingsPanelProps } from '@dshfiles/workspace-folder-picker/project-settings-panels'
 import { NativeAsideOwners } from '@dshfiles/workbench/registry'
+
+/** The Workspaces page and the main-branch panel load when one first opens, not at page boot. */
+const views = () => import('./lazy-views.js')
+const ThreadWorkspacesPanel = lazyView(() => views().then(module => module.ThreadWorkspacesPanel), { label: 'Workspaces' })
+const ProjectMainBranchPanel = lazyView(() => views().then(module => module.ProjectMainBranchPanel), { label: 'Main branch' })
 
 const PANEL_ID = 'jj-integration'
 const RIGHT_PANE_ID = '@dshfiles/jj-integration/thread-workspaces'

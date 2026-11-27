@@ -69,7 +69,7 @@ import {
 } from './thread-integration-state.js'
 import { useToast } from './toast.js'
 import { ProjectBookmarkQuery } from './project-bookmark-query.js'
-import { threadAtQueryKey } from './thread-query-keys.js'
+import { threadQueryKeys } from './thread-query-keys.js'
 import { ThreadRebaseMutation } from './thread-rebase-mutation.js'
 import { workspaceSyncOutcome } from './workspace-sync-outcome.js'
 import { activityLabel, useMinuteTick } from './relative-label.js'
@@ -77,11 +77,7 @@ import { activityLabel, useMinuteTick } from './relative-label.js'
 /** The Land page lists the newest revisions of each thread; the full list of one thread is `threadAt`. */
 const LAND_REVISION_LIMIT = 10
 
-export const threadQueryKeys = {
-  repositories: ['jj-integration', 'repositories'] as const,
-  threadAt: threadAtQueryKey,
-  workspaceSync: ['jj-integration', 'workspace-sync'] as const,
-}
+export { threadQueryKeys }
 
 /** Rows mounted per group before its boundary reveals the next batch. */
 const GROUP_LIMIT = 8
