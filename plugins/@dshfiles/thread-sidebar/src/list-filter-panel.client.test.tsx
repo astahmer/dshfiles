@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import * as FilterPanel from './list-filter-panel.js'
 import { ListFilterPanel, nextStatusFilters, presetMark, type ListFilterPanelProps } from './list-filter-panel.js'
 
 afterEach(cleanup)
@@ -411,5 +412,29 @@ describe('preset rows (round 28, item 13)', () => {
     render(<ListFilterPanel {...panel()} />)
     for (const row of within(screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })).getAllByRole('radio'))
       expect(row.getAttribute('data-spacing')).not.toBe('0')
+  })
+})
+
+// Council round 27, item 14: the panel opened with focus on the preset ⋯; it opens on the preset in force.
+describe('initial focus (round 28, item 14)', () => {
+  it('lands on the checked preset, or the current one while it is edited', () => {
+    const initialFocus = Reflect.get(FilterPanel, 'filterPanelInitialFocus')
+    expect(typeof initialFocus).toBe('function')
+    const { container, unmount } = render(<ListFilterPanel {...panel()} />)
+    expect(initialFocus(container)).toBe(screen.getByRole('radio', { name: 'All threads' }))
+    unmount()
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const edited = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    expect(initialFocus(edited.container)).toBe(screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' }))
+    edited.unmount()
+    // Without presets, the first status chip.
+    const plain = render(<ListFilterPanel {...panel({ presets: undefined })} />)
+    expect(initialFocus(plain.container)).toBe(screen.getByRole('button', { name: 'threadSidebarWorking' }))
+  })
+
+  it('is what the popover focuses when it opens', () => {
+    expect(filterControl).toMatch(/onOpenAutoFocus=\{event => \{[^}]*filterPanelInitialFocus\(/su)
   })
 })

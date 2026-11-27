@@ -94,7 +94,7 @@ import {
   DropdownMenuTrigger,
 } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { ListHeaderExtras } from './list-header-extras.js'
-import { ListFilterPanel, presetMark, type ListFilterAction } from './list-filter-panel.js'
+import { filterPanelInitialFocus, ListFilterPanel, presetMark, type ListFilterAction } from './list-filter-panel.js'
 import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/components/ui/popover'
 import { ThreadListScope } from './list-scope.js'
 import { PresetChips, PresetDeleteDialog, PresetNameDialog, type PresetNamePrompt } from './filter-presets.js'
@@ -6787,6 +6787,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         align="start"
         sideOffset={8}
         collisionPadding={8}
+        // Open on the preset in force, not on the first focusable control, the presets' ⋯ (round 28, item 14).
+        onOpenAutoFocus={event => {
+          const target = event.currentTarget instanceof HTMLElement ? filterPanelInitialFocus(event.currentTarget) : null
+          if (target === null) return
+          event.preventDefault()
+          target.focus()
+        }}
         aria-label={props.tSidebar('threadSidebarFilters')}
         // The phone sheet opens taller than the kit's 72dvh, so both Status rows show with three presets (round 28, item 10).
         className="dshx-root dshx:w-80 dshx:max-w-[calc(100vw-1rem)] dshx:p-0 dshx:phone:max-h-[85dvh]!"

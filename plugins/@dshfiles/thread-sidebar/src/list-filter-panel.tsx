@@ -163,6 +163,20 @@ const isSourceFilter = (value: string): value is ThreadSourceFilter => THREAD_SO
 export const nextStatusFilters = (next: readonly string[]): readonly ThreadStatusFilter[] =>
   THREAD_STATUS_FILTER_OPTIONS.filter((option): option is ThreadStatusFilter => isStatusFilter(option) && next.includes(option))
 
+/**
+ * Where focus lands when the panel opens (council round 27, item 14): the preset in force (checked, or current while
+ * edited), else the first status chip, else the first control; never the presets' ⋯ menu.
+ */
+export const filterPanelInitialFocus = (root: ParentNode): HTMLElement | null => {
+  const panel = root.querySelector('[data-thread-list-filter-panel]') ?? root
+  const target =
+    panel.querySelector('[data-thread-presets] [role="radio"][aria-checked="true"]') ??
+    panel.querySelector('[data-thread-presets] [role="radio"][aria-current="true"]') ??
+    panel.querySelector('[data-thread-status-filters] button') ??
+    panel.querySelector('button:not([disabled])')
+  return target instanceof HTMLElement ? target : null
+}
+
 export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const t = props.t
   const ids = useId()
