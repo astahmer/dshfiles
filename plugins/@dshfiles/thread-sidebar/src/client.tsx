@@ -1849,7 +1849,14 @@ export const ThreadRow = memo((props: ThreadRowProps): JSX.Element => {
         )}
         <div
           className={cn(
-            'dshx:relative dshx:rounded-md dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60 dshx:group-data-[selected=true]/row:text-foreground dshx:pointer-coarse:touch-pan-y',
+            'dshx:relative dshx:rounded-md dshx:group-data-[selected=true]/row:text-foreground dshx:pointer-coarse:touch-pan-y',
+            // Hover deepens an attention row's wash (council round 28, item 10: ink at 3%, 8% in dark, AA held) instead
+            // of trading it for the grey fill; a plain row takes the grey fill.
+            rowWash === undefined && 'dshx:hover:bg-accent/60 dshx:focus-within:bg-accent/60',
+            rowWash === 'needs-you' &&
+              'dshx:hover:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_3%)] dshx:focus-within:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_3%)] dshx:dark:hover:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_8%)] dshx:dark:focus-within:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_8%)]',
+            rowWash === 'failed' &&
+              'dshx:hover:bg-[color-mix(in_oklab,var(--color-wash-failed),var(--color-foreground)_3%)] dshx:focus-within:bg-[color-mix(in_oklab,var(--color-wash-failed),var(--color-foreground)_3%)] dshx:dark:hover:bg-[color-mix(in_oklab,var(--color-wash-failed),var(--color-foreground)_8%)] dshx:dark:focus-within:bg-[color-mix(in_oklab,var(--color-wash-failed),var(--color-foreground)_8%)]',
             // Selection is the quieter cue (round five B3): its low-chroma wash plus the leading accent bar. A Needs-you or
             // Failed row keeps its stronger attention wash when selected and takes only the bar.
             'dshx:group-data-[selected=true]/row:selected-marker',

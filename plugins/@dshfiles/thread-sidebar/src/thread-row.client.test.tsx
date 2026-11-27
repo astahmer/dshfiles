@@ -856,3 +856,20 @@ describe('the hover strip beside the title (round 29, item 1)', () => {
     expect(on).toEqual(on.map((_, index) => index < 2))
   })
 })
+
+// Council round 28, item 10: hovering a tinted row keeps its tint.
+describe('a hovered attention row (round 29, item 10)', () => {
+  it('deepens its wash on hover instead of the grey fill; a plain row keeps the grey fill', async () => {
+    const asking = await renderRow({ workStatus: rowStatus({ status: 'needs-you', verb: 'Answer', detail: 'Asks: ok?' }) })
+    const fill = asking.querySelector<HTMLElement>('[data-row-wash]')?.className ?? ''
+    expect(fill).toContain('dshx:hover:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_3%)]')
+    expect(fill).toContain('dshx:dark:hover:bg-[color-mix(in_oklab,var(--color-wash-needs-you),var(--color-foreground)_8%)]')
+    expect(fill).not.toContain('dshx:hover:bg-accent/60')
+    cleanup()
+    const failed = await renderRow({ workStatus: rowStatus({ status: 'failed', verb: 'Retry', detail: 'Turn failed' }) })
+    expect(failed.querySelector<HTMLElement>('[data-row-wash]')?.className).toContain('var(--color-wash-failed),var(--color-foreground)_3%')
+    cleanup()
+    const idle = await renderRow({ workStatus: rowStatus({ status: 'idle' }) })
+    expect(idle.querySelector<HTMLElement>('article > div')?.className).toContain('dshx:hover:bg-accent/60')
+  })
+})

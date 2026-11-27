@@ -77,3 +77,22 @@ describe.each(schemes)('thread list colour (%s)', scheme => {
     expect(PaletteMath.contrastRatio(ink, p.neutral[1]!)).toBeGreaterThanOrEqual(4.5)
   })
 })
+
+// Council round 28, item 10: hovering a Needs-you or Failed row deepens its wash (ink at 3%, 8% in dark) instead of
+// trading it for the grey hover fill; ink, secondary text and the glyph keep their contrast on the deepened wash.
+describe.each(schemes)('a hovered attention row (%s)', scheme => {
+  const p = PaletteMath.palette({ ...WARM_STONE, scheme })
+  const ink = p.neutral[10]!
+  const secondary = p.neutral[9]!
+  // Light takes 3%: at 5% the secondary text fell to 4.44:1 on the deepened Needs-you wash.
+  const share = scheme === 'dark' ? 0.08 : 0.03
+  it.each([
+    { name: 'needs-you', wash: p.needsYouWash, hue: p.accent.fg },
+    { name: 'failed', wash: p.failedWash, hue: p.danger.fg },
+  ] as const)('keeps AA text and a 3:1 glyph on the hovered $name wash', row => {
+    const hovered = mixOklab(row.wash, ink, share)
+    expect(PaletteMath.contrastRatio(ink, hovered)).toBeGreaterThanOrEqual(4.5)
+    expect(PaletteMath.contrastRatio(secondary, hovered)).toBeGreaterThanOrEqual(4.5)
+    expect(PaletteMath.contrastRatio(row.hue, hovered)).toBeGreaterThanOrEqual(3)
+  })
+})
