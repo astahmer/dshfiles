@@ -23,9 +23,7 @@ it('uses the shared JSON-line transport for Communication requests and responses
   try {
     const client = await connectCommunicationClient({ stateHome: directory, principalId: 'bridge-test' })
     expect(await client.listAgents()).toEqual([])
-    const subscription = await client.subscribe({ topic: 'builds.ready' })
-    expect(subscription.topic).toBe('builds.ready')
-    expect(await client.listTopics()).toMatchObject([{ topic: 'builds.ready', subscribers: 1 }])
+    expect(await client.diagnostics({ limit: 1 })).toMatchObject({ agentCount: 0 })
   } finally {
     await bridge.close()
   }

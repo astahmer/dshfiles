@@ -146,6 +146,19 @@ describe('DestinationShell', () => {
     expect(document.documentElement.hasAttribute('data-shell-phone-nav')).toBe(false)
   })
 
+  it('on a phone, drops the page description and row descriptions in a destination list', () => {
+    setPhone(true)
+    renderShell({
+      collapsed: false,
+      panels: [...panels, { id: 'jj-integration', label: 'Workspaces', order: 1 }, { id: 'diffs-review', label: 'Review', order: 2 }],
+    })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Destinations' })).getByRole('button', { name: 'Land' }))
+    // The top bar already names the destination; the two lines of copy only truncated at 390px.
+    expect(screen.queryByText('Workspaces ready to land, and repository history.')).toBeNull()
+    expect(screen.queryByText('Thread workspaces ready, blocked or behind.')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Workspaces' })).toBeTruthy()
+  })
+
   it('on a phone, starts a thread from the + in the Threads list header and lists Land outside More', () => {
     setPhone(true)
     const shell = renderShell({ collapsed: false })
@@ -311,6 +324,19 @@ describe('phone navigation: drawer', () => {
     view.rerender(shell({ ...closed, collapsed: false, selectedThreadId: 'session-2', stageThreadId: 'session-2', stageSessionId: 'session-2' }))
     expect(drawerState()).toBe('open')
     expect(closed.toggleSidebar).toHaveBeenCalledTimes(1)
+  })
+
+  it('marks the app root inert while the drawer is open and restores it on close', () => {
+    setPhone(true)
+    const appRoot = document.createElement('div')
+    appRoot.id = 'root'
+    document.body.append(appRoot)
+    render(shell({ ...threadProps(), phoneNavigation: 'drawer' }))
+    showThreads()
+    expect(appRoot.hasAttribute('inert')).toBe(true)
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(appRoot.hasAttribute('inert')).toBe(false)
+    appRoot.remove()
   })
 
   it('returns a thread opened from the Inbox page to the Inbox, keeping the sidebar button', () => {

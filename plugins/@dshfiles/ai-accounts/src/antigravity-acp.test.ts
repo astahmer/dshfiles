@@ -3,8 +3,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message, type Model } from '@earendil-works/pi-ai'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { layer as nodeChildProcessSpawnerLayer } from '@effect/platform-node/NodeChildProcessSpawner'
 import { Context, Effect, Layer, Scope } from 'effect'
+import * as Schema from 'effect/Schema'
 import { afterEach, expect, it, vi } from 'vitest'
 import { AntigravityProcesses, AntigravityProcessesPromiseModel } from './antigravity-processes.js'
 import { AccountsPlatformLive } from './platform-layer.js'
@@ -12,6 +14,8 @@ import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
 import { ProviderProfileModel } from './provider-profile.js'
+
+const launchReportSchema = Schema.Struct({ argv: Schema.Array(Schema.String), home: Schema.String, key: Schema.NullOr(Schema.String) })
 
 /**
  * Stands in for `agy acp`: an ACP server over stdio that starts the MCP server `session/new` names, offers two models
@@ -25,6 +29,48 @@ const { readFileSync, writeFileSync } = require('node:fs')
 const { join } = require('node:path')
 const { createInterface } = require('node:readline')
 const out = value => process.stdout.write(JSON.stringify(value) + '\\n')
+if (process.env.FAKE_AGY_RUNS) require('node:fs').appendFileSync(process.env.FAKE_AGY_RUNS, process.argv[2] + '\\n')
+if (process.argv.includes('/usage')) {
+  if ((process.env.HOME && process.env.HOME.includes('signed-out')) || process.env.FAKE_AGY_USAGE_SIGNED_OUT) {
+    process.stdout.write('Authentication required. Please visit the URL to log in:\\n')
+    setInterval(() => {}, 1000)
+    return
+  }
+  out({
+    conversation_id: '',
+    status: 'SUCCESS',
+    duration_seconds: 0,
+    num_turns: 0,
+    command: {
+      name: 'usage',
+      data: {
+        groups: [
+          {
+            name: 'Gemini Models',
+            buckets: [
+              { id: 'gemini-weekly', name: 'Weekly Limit Remaining', window: 'weekly', remaining_fraction: 0.42006, reset_time: '2026-11-28T13:22:19Z' },
+              { id: 'gemini-5h', name: 'Five Hour Limit Remaining', window: '5h', remaining_fraction: 0.7801, reset_time: '2026-11-23T17:36:55Z' },
+            ],
+          },
+          {
+            name: 'Claude and GPT models',
+            buckets: [
+              { id: '3p-weekly', name: 'Weekly Limit Remaining', window: 'weekly', remaining_fraction: 0.4909, reset_time: '2026-11-30T13:48:30Z' },
+              { id: '3p-5h', name: 'Five Hour Limit Remaining', window: '5h', remaining_fraction: 0, reset_time: '2026-11-23T18:48:30Z' },
+            ],
+          },
+          {
+            name: 'Gemini 4 Argon',
+            buckets: [
+              { id: 'gemini-argon-wtu-weekly', name: 'Gemini 4 Argon Weekly Limit', window: 'weekly', remaining_fraction: 1, reset_time: '2026-11-30T14:14:44Z' },
+            ],
+          },
+        ],
+      },
+    },
+  })
+  process.exit(0)
+}
 const update = (sessionId, value) => out({ jsonrpc: '2.0', method: 'session/update', params: { sessionId, update: value } })
 if (process.env.FAKE_AGY_REPORT) writeFileSync(process.env.FAKE_AGY_REPORT, JSON.stringify({ argv: process.argv.slice(2), home: process.env.HOME, key: process.env.GEMINI_API_KEY ?? null }))
 if (process.env.FAKE_AGY_AGENT) writeFileSync(process.env.FAKE_AGY_AGENT, readFileSync(join(process.argv[process.argv.indexOf('--gemini-dir') + 1], 'config', 'agents', 'dsh.md'), 'utf8'))
@@ -64,6 +110,22 @@ createInterface({ input: process.stdin }).on('line', async line => {
   if (message.method === 'session/prompt') {
     const sessionId = message.params.sessionId
     const text = message.params.prompt.map(block => block.text ?? '').join('')
+    if (text.includes('multi-usage')) {
+      update(sessionId, { sessionUpdate: 'usage_update', used: 0, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'usage_update', used: 40000, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_u1', name: 'mcp_dsh_' + tools[0].name, rawInput: { value: 'ping' }, status: 'in_progress' })
+      const answer = await rpc('tools/call', { name: tools[0].name, arguments: { value: 'ping' } })
+      update(sessionId, { sessionUpdate: 'usage_update', used: 45000, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'used ' + answer.result.content.map(block => block.text).join('') } })
+      return reply({ stopReason: 'end_turn', usage: { inputTokens: 800000, outputTokens: 2000, cachedReadTokens: 1500000, cachedWriteTokens: 0 } })
+    }
+    if (text.includes('stale-usage')) {
+      update(sessionId, { sessionUpdate: 'usage_update', used: 40000, size: 1048576 })
+      update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_s1', name: 'mcp_dsh_' + tools[0].name, rawInput: { value: 'ping' }, status: 'in_progress' })
+      const answer = await rpc('tools/call', { name: tools[0].name, arguments: { value: 'ping' } })
+      update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'used ' + answer.result.content.map(block => block.text).join('') } })
+      return reply({ stopReason: 'end_turn', usage: { inputTokens: 800000, outputTokens: 2000, cachedReadTokens: 1500000, cachedWriteTokens: 0 } })
+    }
     if (text.includes('call')) {
       update(sessionId, { sessionUpdate: 'tool_call', toolCallId: 'call_1', name: 'mcp_dsh_' + tools[0].name, rawInput: { value: 'ping', toolSummary: 'Echo ping' }, status: 'in_progress' })
       update(sessionId, { sessionUpdate: 'tool_call_update', toolCallId: 'call_1', name: 'mcp_dsh_' + tools[0].name, status: 'pending' })
@@ -104,6 +166,7 @@ const processes = AntigravityProcessesPromiseModel.facade(Context.get(processesC
 const directories: string[] = []
 const sessions: AntigravityAcpSessions[] = []
 afterEach(async () => {
+  vi.unstubAllEnvs()
   await Promise.all(sessions.splice(0).map(session => session.dispose()))
   for (const directory of directories.splice(0)) rmSync(directory, { recursive: true, force: true })
 })
@@ -234,7 +297,7 @@ it("runs agy with DSH's agent in a private Gemini folder, the account HOME and n
       }),
     )
     expect(textOf(reply)).toMatch(/: hi$/)
-    const launch = JSON.parse(readFileSync(report, 'utf8'))
+    const launch = decodeJson(launchReportSchema, readFileSync(report, 'utf8'))
     const geminiDir = String(launch.argv[2])
     expect(launch).toEqual({
       argv: ['acp', '--gemini-dir', geminiDir, '--agent', 'dsh', '--process-per-session', '--dangerously-skip-permissions', '--disable-telemetry'],
@@ -360,4 +423,179 @@ it('names each account model with the name agy gives it, not its id', () => {
   })
   const names = Object.fromEntries((profile.piProvider?.getModels() ?? []).map(model => [model.id, model.name]))
   expect(names).toEqual({ 'gemini-fast': 'antigravity-work/Gemini Fast', 'gemini-unnamed': 'antigravity-work/gemini-unnamed' })
+})
+
+it('reports per-step usage_update instead of cumulative prompt usage across tool-call steps', async () => {
+  const { cli, model } = setup()
+  const messages: Message[] = [{ role: 'user', content: 'multi-usage test', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', tools: [tool as never], messages })
+  const options = { sessionId: 'session-usage' }
+
+  const first = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(first.stopReason).toBe('toolUse')
+  expect(first.usage.input).toBe(40_000)
+  expect(first.usage.totalTokens).toBe(40_000)
+
+  messages.push(first, {
+    role: 'toolResult',
+    toolCallId: 'call_u1',
+    toolName: 'echo_tool',
+    content: [{ type: 'text', text: 'pong' }],
+    isError: false,
+    timestamp: 2,
+  })
+  const second = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(second.stopReason).toBe('stop')
+  expect(textOf(second)).toBe('used pong')
+  expect(second.usage.input).toBe(45_000)
+  expect(second.usage.cacheRead).toBe(0)
+  expect(second.usage.totalTokens).toBe(45_000)
+})
+
+it('keeps the last per-step usage when the final step of a tool-call prompt gets no usage_update', async () => {
+  const { cli, model } = setup()
+  const messages: Message[] = [{ role: 'user', content: 'stale-usage test', timestamp: 1 }]
+  const context = () => normalizeContext({ systemPrompt: 'You are inside DSH.', tools: [tool as never], messages })
+  const options = { sessionId: 'session-stale-usage' }
+
+  const first = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(first.stopReason).toBe('toolUse')
+  expect(first.usage.input).toBe(40_000)
+
+  messages.push(first, {
+    role: 'toolResult',
+    toolCallId: 'call_s1',
+    toolName: 'echo_tool',
+    content: [{ type: 'text', text: 'pong' }],
+    isError: false,
+    timestamp: 2,
+  })
+  const second = await finished(cli.stream(model('gemini-fast'), context(), options))
+  expect(second.stopReason).toBe('stop')
+  expect(textOf(second)).toBe('used pong')
+  expect(second.usage.input).toBe(40_000)
+  expect(second.usage.cacheRead).toBe(0)
+  expect(second.usage.totalTokens).toBe(40_000)
+})
+
+it('caps a large replayed transcript below the agy prompt limit so the trailing instruction is never truncated', async () => {
+  const { cli, model } = setup()
+  const hugeMiddle = 'x'.repeat(240_000)
+  const messages: Message[] = [
+    { role: 'user', content: 'HEAD_INTENT_MARKER', timestamp: 1 },
+    {
+      role: 'assistant',
+      content: [{ type: 'text', text: `${hugeMiddle}TAIL_CONTEXT_MARKER` }],
+      api: 'antigravity-acp',
+      provider: 'antigravity',
+      model: 'gemini-fast',
+      usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+      stopReason: 'stop',
+      timestamp: 2,
+    },
+    { role: 'user', content: 'COMPACTION_INSTRUCTION_MARKER', timestamp: 3 },
+  ]
+  const reply = await finished(
+    cli.stream(model('gemini-fast'), normalizeContext({ systemPrompt: 'DSH.', messages }), {
+      sessionId: 'session-replay-cap',
+    }),
+  )
+  const echoed = textOf(reply)
+  expect(Buffer.byteLength(echoed, 'utf8')).toBeLessThanOrEqual(161_000)
+  expect(echoed).toContain('HEAD_INTENT_MARKER')
+  expect(echoed).toContain('TAIL_CONTEXT_MARKER')
+  expect(echoed).toContain('bytes omitted to fit Antigravity CLI prompt limit')
+  expect(echoed).toContain('COMPACTION_INSTRUCTION_MARKER')
+})
+
+it('reads live five-hour and weekly quota windows from agy /usage and attaches the account plan', async () => {
+  const executable = fakeAgy()
+  const card = await AntigravityAccountModel.readUsage({
+    describe: () => AntigravityAccountModel.probe({ home: '/synthetic/usage-home', processes, executable }),
+    readQuota: () => AntigravityAccountModel.probeUsage({ home: '/synthetic/usage-home', processes, executable }),
+  })
+  expect(card).toEqual({
+    status: 'ok',
+    message: null,
+    identity: null,
+    plan: 'Google AI Pro',
+    windows: [
+      { label: 'Gemini 5h', percentRemaining: 78, resetsAt: Date.parse('2026-11-23T17:36:55Z') },
+      { label: 'Gemini weekly', percentRemaining: 42, resetsAt: Date.parse('2026-11-28T13:22:19Z') },
+      { label: 'Claude / GPT 5h', percentRemaining: 0, resetsAt: Date.parse('2026-11-23T18:48:30Z') },
+      { label: 'Claude / GPT weekly', percentRemaining: 49.1, resetsAt: Date.parse('2026-11-30T13:48:30Z') },
+      { label: 'Gemini 4 Argon weekly', percentRemaining: 100, resetsAt: Date.parse('2026-11-30T14:14:44Z') },
+    ],
+    bankedResets: 0,
+    bankedResetExpiries: [],
+  })
+})
+
+it('stops agy /usage immediately as unauthenticated instead of waiting on interactive sign-in', async () => {
+  const reading = await AntigravityAccountModel.probeUsage({ home: '/synthetic/signed-out-usage', processes, executable: fakeAgy() })
+  expect(reading).toEqual({
+    status: 'unauthenticated',
+    detail: "Antigravity CLI is not signed in for this account. Run: HOME='/synthetic/signed-out-usage' agy acp --login",
+  })
+})
+
+const runLog = () => {
+  const directory = mkdtempSync(join(tmpdir(), 'agy-runs-'))
+  directories.push(directory)
+  const file = join(directory, 'runs')
+  vi.stubEnv('FAKE_AGY_RUNS', file)
+  return {
+    runs: () =>
+      existsSync(file)
+        ? readFileSync(file, 'utf8')
+            .split('\n')
+            .filter(line => line !== '')
+        : [],
+  }
+}
+
+it('serves every quota read of one home from a single agy /usage run for a minute, and a caller giving up cancels only its own read', async () => {
+  const log = runLog()
+  const executable = fakeAgy()
+  const home = '/synthetic/shared-quota-home'
+  const now = Date.now()
+  const abandoned = new AbortController()
+  const [first, cancelled, second] = await Promise.all([
+    AntigravityAccountModel.readQuota({ home, processes, executable, now }),
+    AntigravityAccountModel.readQuota({ home, processes, executable, now, signal: abandoned.signal }),
+    (async () => {
+      abandoned.abort()
+      return AntigravityAccountModel.readQuota({ home, processes, executable, now })
+    })(),
+  ])
+  expect(first.status).toBe('ok')
+  expect(second).toBe(first)
+  expect(cancelled).toEqual({ status: 'error', detail: 'Antigravity usage read was cancelled.' })
+  expect(log.runs()).toEqual(['-p'])
+  await AntigravityAccountModel.readQuota({ home, processes, executable, now: now + 61_000 })
+  expect(log.runs()).toEqual(['-p', '-p'])
+  AntigravityAccountModel.forget(home)
+})
+
+it('reports a login that /usage finds signed out as unauthenticated, and forgets the signed-in description it contradicts', async () => {
+  const log = runLog()
+  const executable = fakeAgy()
+  const home = '/synthetic/expired-login-home'
+  const describe = () => AntigravityAccountModel.describe({ home, processes, executable })
+  expect((await describe()).signedIn).toBe(true)
+  vi.stubEnv('FAKE_AGY_USAGE_SIGNED_OUT', '1')
+  const onAuthenticated = vi.fn()
+  const card = await AntigravityAccountModel.readUsage({
+    describe,
+    readQuota: () => AntigravityAccountModel.readQuota({ home, processes, executable }),
+    onAuthenticated,
+  })
+  expect(card.status).toBe('unauthenticated')
+  expect(card.message).toBe("Antigravity CLI is not signed in for this account. Run: HOME='/synthetic/expired-login-home' agy acp --login")
+  expect(onAuthenticated).not.toHaveBeenCalled()
+  await vi.waitFor(async () => {
+    await describe()
+    expect(log.runs().filter(run => run === 'acp')).toHaveLength(2)
+  })
+  AntigravityAccountModel.forget(home)
 })

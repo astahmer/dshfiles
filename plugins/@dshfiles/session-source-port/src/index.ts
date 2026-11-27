@@ -154,41 +154,23 @@ export const createSessionSourceRegistry = (): SessionSourceRegistry => {
  * `SessionPayload` Effect decoder fails with.
  */
 export class SessionSourcePayload {
-  static summaries(value: unknown): readonly SessionSummary[] {
-    return SessionPayload.summaries.sync(value)
-  }
+  static readonly summaries = SessionPayload.summaries.sync
 
-  static followFrame(value: unknown): SessionFollowFrame {
-    return SessionPayload.followFrame.sync(value)
-  }
+  static readonly followFrame = SessionPayload.followFrame.sync
 
-  static page(value: unknown): SessionPage {
-    return SessionPayload.page.sync(value)
-  }
+  static readonly page = SessionPayload.page.sync
 
-  static projections(value: unknown): SessionProjectionsValue {
-    return SessionPayload.projections.sync(value)
-  }
+  static readonly projections = SessionPayload.projections.sync
 
-  static prompt(value: unknown): SessionPromptValue {
-    return SessionPayload.prompt.sync(value)
-  }
+  static readonly prompt = SessionPayload.prompt.sync
 
-  static cancel(value: unknown): SessionCancelValue {
-    return SessionPayload.cancel.sync(value)
-  }
+  static readonly cancel = SessionPayload.cancel.sync
 
-  static selectedModel(value: unknown): SessionSelectModelValue {
-    return SessionPayload.selectedModel.sync(value)
-  }
+  static readonly selectedModel = SessionPayload.selectedModel.sync
 
-  static queue(value: unknown): SessionUpdateQueueValue {
-    return SessionPayload.queue.sync(value)
-  }
+  static readonly queue = SessionPayload.queue.sync
 
-  static attachment(value: unknown): SessionAttachmentValue {
-    return SessionPayload.attachment.sync(value)
-  }
+  static readonly attachment = SessionPayload.attachment.sync
 }
 
 declare module '@deepseek-ai/cordis' {

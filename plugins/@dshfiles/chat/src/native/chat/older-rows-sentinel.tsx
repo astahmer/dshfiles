@@ -47,7 +47,10 @@ export function OlderRowsSentinel({ listRef, hidden, firstSeq, onVisible, fillSt
     // Reading upward also counts when the rows cannot scroll yet: a wheel or key toward older rows.
     const onScroll = (): void => {
       const top = list.scrollTop
-      if (lastTop !== null && top < lastTop) upward = true
+      // Rows or a composer shrinking under a reader at the floor clamp it to the new floor: a lower offset that still
+      // sits at the floor is that clamp, not the reader moving toward older rows.
+      const atFloor = list.scrollHeight - top - list.clientHeight <= 1
+      if (lastTop !== null && top < lastTop && !atFloor) upward = true
       lastTop = top
       take()
     }

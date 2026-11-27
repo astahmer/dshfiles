@@ -5,6 +5,8 @@ import { useContract } from '@dshfiles/dshx/client'
 import { errorMessage, useMutation, useQuery } from '@dshfiles/plugin-ui/query'
 import { useState } from 'react'
 import type { FolderInspection, ProjectLifecycleClient } from './project-lifecycle-api.js'
+import { ProjectTone, type ProjectColorChoice } from './project-tone.js'
+import { ProjectTonePicker } from './project-tone-picker.js'
 import { RepositorySetup } from './repository-setup-contract.js'
 
 const repositoryLine = (inspection: FolderInspection): string => {
@@ -22,9 +24,11 @@ const repositoryLine = (inspection: FolderInspection): string => {
 export const ProjectFolderSetup = (props: {
   readonly api: ProjectLifecycleClient
   readonly path: string
-  readonly onAdded: (path: string) => void
+  readonly onAdded: (path: string, choice: ProjectColorChoice) => void
   readonly onClose: () => void
 }): JSX.Element => {
+  const name = ProjectTone.projectFolderName(props.path)
+  const [color, setColor] = useState<ProjectColorChoice>(() => ProjectTone.defaultColor(name))
   const inspection = useQuery({
     queryKey: ['workspace-folder-picker', 'inspect', props.path],
     queryFn: () => props.api.inspect({ path: props.path }),
@@ -34,7 +38,7 @@ export const ProjectFolderSetup = (props: {
   const [error, setError] = useState<string | null>(null)
   const initialize = useMutation({
     mutationFn: () => props.api.initProject({ path: props.path }),
-    onSuccess: project => props.onAdded(project.path),
+    onSuccess: project => props.onAdded(project.path, color),
     onError: cause => setError(errorMessage(cause, 'Could not initialize this folder.')),
   })
   const publish = useMutation({
@@ -52,7 +56,7 @@ export const ProjectFolderSetup = (props: {
     setError(null)
     try {
       await setup.value.enableJujutsu({ path: props.path })
-      props.onAdded(props.path)
+      props.onAdded(props.path, color)
     } catch (cause) {
       setError(errorMessage(cause, 'Could not enable Jujutsu for this folder.'))
     } finally {
@@ -129,13 +133,14 @@ export const ProjectFolderSetup = (props: {
               <AlertDescription>{errorMessage(inspection.error, 'Could not read this folder.')}</AlertDescription>
             </Alert>
           )}
+          <ProjectTonePicker choice={color} name={name} onChange={setColor} />
           <DialogFooter>
             <Button disabled={busy} onClick={props.onClose} type="button" variant="ghost">
               Cancel
             </Button>
             {found?.kind === 'none' ? (
               <>
-                <Button disabled={busy} onClick={() => props.onAdded(props.path)} type="button" variant="outline">
+                <Button disabled={busy} onClick={() => props.onAdded(props.path, color)} type="button" variant="outline">
                   Add without a repository
                 </Button>
                 <Button disabled={busy || found === undefined} onClick={() => initialize.mutate()} type="button">
@@ -144,7 +149,7 @@ export const ProjectFolderSetup = (props: {
               </>
             ) : (
               <>
-                <Button disabled={busy || found === undefined} onClick={() => props.onAdded(props.path)} type="button" variant="outline">
+                <Button disabled={busy || found === undefined} onClick={() => props.onAdded(props.path, color)} type="button" variant="outline">
                   Add project
                 </Button>
                 {canEnable && (

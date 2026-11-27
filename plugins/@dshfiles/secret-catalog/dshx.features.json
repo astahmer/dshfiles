@@ -10,7 +10,7 @@
         "seed rebase-ready-thread",
         "click tab \"Settings\"",
         "click button \"Secrets\"",
-        "click button \"Choose a project folder…\"",
+        "click button \"Choose a project folder\u2026\"",
         "expect dialog \"Choose a project folder\"",
         "click button \"Filter by scope\"",
         "click menuitemradio \"Workspaces\"",
@@ -49,7 +49,7 @@
         }
       ],
       "onboarding": {
-        "firstAction": "Open Settings › Secrets and add a secret.",
+        "firstAction": "Open Settings \u203a Secrets and add a secret.",
         "doneWhen": "The alias is listed in its scope without showing its value.",
         "open": {
           "panel": "secret-catalog"
@@ -116,7 +116,7 @@
       "surfaces": ["client", "host", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Secrets › reveal",
+      "currentSurface": "left-nav: Secrets \u203a reveal",
       "configuration": [
         {
           "key": "revealSeconds",
@@ -206,7 +206,7 @@
       "surfaces": ["client", "host"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Secrets › Add secret",
+      "currentSurface": "left-nav: Secrets \u203a Add secret",
       "configuration": [
         {
           "key": "defaultEnvironment",
@@ -275,7 +275,7 @@
         "click tab \"Settings\"",
         "click button \"Secrets\"",
         "click button \"More ways to add a secret\"",
-        "click menuitem \"Add with details…\"",
+        "click menuitem \"Add with details\u2026\"",
         "click radio \"Enter a value*\"",
         "click button \"Advanced*\"",
         "expect dialog \"Add secret\""
@@ -283,7 +283,7 @@
       "surfaces": ["client", "host", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "left-nav: Secrets › Add with details",
+      "currentSurface": "left-nav: Secrets \u203a Add with details",
       "configuration": [],
       "states": ["editing", "invalid", "creating", "renaming", "removing-alias", "deleting-vault-item", "collision"],
       "failureModes": [
@@ -387,7 +387,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: secret-reference fields › Bind",
+      "currentSurface": "settings: secret-reference fields \u203a Bind",
       "configuration": [],
       "states": ["offered", "editing-masked", "duplicate-detected", "existing-bound", "cancelled", "stored", "bound", "bind-failed"],
       "failureModes": [
@@ -455,7 +455,7 @@
       "surfaces": ["client", "host", "settings", "tool", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: secret-reference fields › repair",
+      "currentSurface": "settings: secret-reference fields \u203a repair",
       "configuration": [],
       "states": [
         "resolved",
@@ -540,19 +540,28 @@
     {
       "id": "metadata-only-agent-tools",
       "title": "Expose safe secret catalog tools to agents",
-      "summary": "List aliases as metadata only and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with confirm: true.",
+      "summary": "List aliases as metadata only, run a command with the workspace's aliases injected through `secret mcp` (output scrubbed by the Host), and retrieve a value only for one explicitly requested alias and environment. secret_reference_status reports why one reference does not resolve without returning its value. secret_remove_alias removes one alias (keeping its vault item) only with confirm: true.",
       "surfaces": ["tool", "host"],
       "surface": "agentToolOnly",
       "destination": "none",
-      "currentSurface": "agent tool: secret_list / secret_get / secret_reference_status / secret_remove_alias",
+      "currentSurface": "agent tool: secret_list / secret_get / secret_run / secret_reference_status / secret_remove_alias",
       "configuration": [],
-      "states": ["metadata-listed", "exact-value-requested", "not-found", "ambiguous", "alias-removed"],
-      "failureModes": ["List never contains secret values.", "Ambiguous aliases and missing scopes fail closed."],
+      "states": ["metadata-listed", "exact-value-requested", "not-found", "ambiguous", "alias-removed", "command-run-with-injected-aliases"],
+      "failureModes": [
+        "List never contains secret values.",
+        "Ambiguous aliases and missing scopes fail closed.",
+        "secret_run never returns a value: the secret CLI replaces exact value bytes with [scrubbed]."
+      ],
       "externalDependencies": [],
       "verification": [
         {
           "kind": "gherkin",
           "id": "secret-catalog.agent-tools",
+          "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
+        },
+        {
+          "kind": "gherkin",
+          "id": "secret-catalog.agent-run",
           "featureFile": "tooling/dshx/e2e/features/secret-catalog.feature"
         }
       ],
@@ -567,11 +576,12 @@
         },
         {
           "kind": "custom",
-          "span": "secret resolve",
-          "file": "plugins/@dshfiles/secret-catalog/src/secret-reference-resolver.test.ts",
-          "testName": "records a secret resolve span with the alias, environment and scope, never the value"
+          "span": "secret mcp run",
+          "file": "plugins/@dshfiles/secret-catalog/src/secret-mcp.test.ts",
+          "testName": "records a secret mcp run span with no alias or value"
         }
-      ]
+      ],
+      "reach": ["seed fake-secret-cli", "click button \"Secrets\"", "expect text \"GITHUB_TOKEN\""]
     },
     {
       "id": "agent-secret-request",
@@ -589,7 +599,7 @@
       "surfaces": ["client", "host", "tool", "integration"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn tail › Secret request",
+      "currentSurface": "transcript: turn tail \u203a Secret request",
       "configuration": [],
       "states": ["pending", "editing-masked", "stored", "declined", "expired", "cancelled", "duplicate-bound"],
       "failureModes": [
@@ -660,7 +670,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "plugins-page: View @dshfiles/backlog › Jev secret",
+      "currentSurface": "plugins-page: View @dshfiles/backlog \u203a Jev secret",
       "configuration": [],
       "states": ["setup-open", "key-stored-global", "reference-bound", "existing-key-replaced"],
       "failureModes": [
@@ -721,7 +731,7 @@
       "surfaces": ["client", "host", "settings", "integration"],
       "surface": "transcriptCard",
       "destination": "transcript",
-      "currentSurface": "transcript: turn tail › Set up missing secrets",
+      "currentSurface": "transcript: turn tail \u203a Set up missing secrets",
       "configuration": [],
       "states": ["disabled-off", "key-needed-offer", "bound-reference-unresolved", "masked-form", "newest-turn-only", "key-stored-global", "reference-bound"],
       "failureModes": [
@@ -791,5 +801,12 @@
       ]
     }
   ],
-  "kind": "bundle"
+  "kind": "bundle",
+  "ioDelegation": [
+    {
+      "file": "src/secret-mcp.ts",
+      "tracedBy": "secret mcp run",
+      "reason": "Child-process client for the `secret mcp` server; the SecretMcp service opens the `secret mcp run` span around every call."
+    }
+  ]
 }

@@ -22,10 +22,10 @@ Host half is the native no-op.
 Provenance and path mappings live in [native-fork.json](native-fork.json). Vendored files stay byte-identical except
 the recorded delta below.
 
-| File                            | Owned delta                                                                                                                                                                                                                                                                                 |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [CordisPanel.tsx](src/native/CordisPanel.tsx) | The panel action tooltip passes `portal`: inside a Workbench pane (`contain: layout paint`) an inline `position: fixed` tooltip lands offset by the pane's origin (b:d5wg). |
-| [index.ts](src/native/index.ts) | The inventory read waits for the page's first connected generation, whose `connection/reset` then needs no reset or reread (later ones still reset and reread). The `cordis-panel` registration states the default `priority: 0` so the dshx build accepts the fork taking that stock cell. |
+| File                                          | Owned delta                                                                                                                                                                                                                                                                                 |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [CordisPanel.tsx](src/native/CordisPanel.tsx) | The panel action tooltip passes `portal`: inside a Workbench pane (`contain: layout paint`) an inline `position: fixed` tooltip lands offset by the pane's origin (b:d5wg).                                                                                                                 |
+| [index.ts](src/native/index.ts)               | The inventory read waits for the page's first connected generation, whose `connection/reset` then needs no reset or reread (later ones still reset and reread). The `cordis-panel` registration states the default `priority: 0` so the dshx build accepts the fork taking that stock cell. |
 
 ```sh
 node scripts/native-fork-diff.mjs cordis-cards

@@ -42,17 +42,21 @@ export interface SecretCliRequest {
 
 const sessionVariable = (name: string) => Config.option(Config.NonEmptyString(name))
 
-/** Only HOME, BW_SESSION and SECRET_SESSION_FILE reach the CLI. */
+/** Only HOME, the backend session variables and SECRET_SESSION_FILE reach the CLI. */
 type SessionEnvironment = Readonly<Record<string, string>>
 
 const sessionEnvironment = Effect.gen(function* (): Effect.fn.Return<SessionEnvironment, Config.ConfigError> {
   const home = yield* sessionVariable('HOME')
   const bitwardenSession = yield* sessionVariable('BW_SESSION')
   const sessionFile = yield* sessionVariable('SECRET_SESSION_FILE')
+  // The 1Password backend shells out to `op`, which authenticates with a service
+  // account token when the desktop app is not integrated.
+  const onePasswordToken = yield* sessionVariable('OP_SERVICE_ACCOUNT_TOKEN')
   return {
     ...Option.match(home, { onNone: () => ({}), onSome: value => ({ HOME: value }) }),
     ...Option.match(bitwardenSession, { onNone: () => ({}), onSome: value => ({ BW_SESSION: value }) }),
     ...Option.match(sessionFile, { onNone: () => ({}), onSome: value => ({ SECRET_SESSION_FILE: value }) }),
+    ...Option.match(onePasswordToken, { onNone: () => ({}), onSome: value => ({ OP_SERVICE_ACCOUNT_TOKEN: value }) }),
   }
 }).pipe(Effect.orElseSucceed((): SessionEnvironment => ({})))
 

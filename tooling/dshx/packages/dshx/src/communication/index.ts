@@ -5,10 +5,8 @@ export type {
   CommunicationActivityInput,
   CommunicationBrowseInput,
   CommunicationInboxInput,
-  CommunicationPublishInput,
   CommunicationSendInput,
   CommunicationServiceOptions,
-  PruneInactiveWorkspaceTopicsInput,
 } from './service.js'
 export {
   communicationActivityEventSchema,
@@ -18,7 +16,6 @@ export {
   communicationDiagnosticAgentSchema,
   communicationDiagnosticMessageSchema,
   communicationDiagnosticRecipientSchema,
-  communicationDiagnosticSubscriptionSchema,
   communicationDiagnosticsSchema,
   communicationInboxSchema,
   communicationMessageBodySchema,
@@ -27,8 +24,6 @@ export {
   communicationMessageSchema,
   communicationPrincipalSchema,
   communicationPrioritySchema,
-  communicationSubscriptionSchema,
-  communicationTopicSchema,
   communicationStateSchema,
 } from './types.js'
 export type {
@@ -39,7 +34,6 @@ export type {
   CommunicationDiagnosticAgent,
   CommunicationDiagnosticMessage,
   CommunicationDiagnosticRecipient,
-  CommunicationDiagnosticSubscription,
   CommunicationDiagnostics,
   CommunicationInbox,
   CommunicationMessage,
@@ -50,6 +44,4 @@ export type {
   CommunicationPriority,
   CommunicationRecipient,
   CommunicationState,
-  CommunicationSubscription,
-  CommunicationTopic,
 } from './types.js'

@@ -99,7 +99,7 @@ backing verb; `host-gap` counts capabilities no verb can reach yet.
 | thread-share                                                                                                | 8                    | 6 (`thread_share_list`, `thread_share_create`, `thread_share_revoke`, `thread_share_export`, `thread_share_publish_status`, `thread_share_publish_stop`); starting a public tunnel is user-only by design                                                                                                                                                            | 0             | 0                                        |
 | Native session / workspace / model                                                                          | 46                   | 15 (partly)                                                                                                                                                                                                                                                                                                                                                          | 31            | 7                                        |
 | Native platform / admin                                                                                     | 40                   | 3                                                                                                                                                                                                                                                                                                                                                                    | 30            | 11                                       |
-| settings-shell, mcp-servers, secret-catalog (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 53                   | 17 (`secret_list`, `secret_get`, `secret_reference_status`, `mcp__*`, `settings_list`, `settings_set`, `settings_unset`, `dsh_release_status`, 9 `mcp_*`)                                                                                                                                                                                                            | 19            | 5                                        |
+| settings-shell, mcp-servers, secret-catalog (+ `plugin-ui`, `shared-runtime`, `shared-streams`: no surface) | 53                   | 18 (`secret_list`, `secret_get`, `secret_run`, `secret_reference_status`, `mcp__*`, `settings_list`, `settings_set`, `settings_unset`, `dsh_release_status`, 9 `mcp_*`)                                                                                                                                                                                              | 19            | 5                                        |
 
 ## Missing tools
 
@@ -325,10 +325,12 @@ checkout; `apply: false` fetches and reports without changing files, and it neve
 pushes). Provisioning never installs fnm itself:
 that is the machine's own setup, reported as a blocked step.
 
-The remote inventory adds no user verb: it renders the `sessions` that
-`multi_host_status`/`runtimeStatus` already returns, and that read already has
-its agent tool. The waiting-on-host banner is presentation over the same
-transcript read (`multi_host_thread_transcript`).
+The remote inventory adds one user verb through the runtime that owns a thread: `threadArchive` and
+`threadUnarchive` (`multi_host_thread_archive`, `multi_host_thread_unarchive`) archive or restore it through the
+Workspace API that runtime's own sidebar uses. The rest of the inventory renders the `sessions` that
+`multi_host_status`/`runtimeStatus` already returns, including that runtime's archived set, and that read already
+has its agent tool. The waiting-on-host banner is presentation over the same transcript read
+(`multi_host_thread_transcript`).
 
 Deliberately untooled, pinned by a test:
 
@@ -343,9 +345,10 @@ Deliberately untooled, pinned by a test:
 | `runtimeUpsert` / `hostUpsert`         | Registration steps `multi_host_save_ssh_host` already performs                                       |
 | `sessionCursor`                        | Internal polling cursor                                                                              |
 
-Replying to and stopping a remote thread now have dedicated methods
-(`threadReply`, `threadStop`) and tools (`multi_host_thread_reply`,
-`multi_host_thread_stop`), so no Agent needs the raw `runtimeCall` for them.
+Replying to, stopping, archiving and restoring a remote thread now have dedicated methods
+(`threadReply`, `threadStop`, `threadArchive`, `threadUnarchive`) and tools
+(`multi_host_thread_reply`, `multi_host_thread_stop`, `multi_host_thread_archive`,
+`multi_host_thread_unarchive`), so no Agent needs the raw `runtimeCall` for them.
 
 ### agent-toolkit
 
@@ -608,6 +611,10 @@ Secret Catalog binds `secret_reference_status` (read-only) to the
 `secret-catalog-setup.referenceStatus` verb its reference repair card uses: why
 one `secret:ALIAS[@env]` does not resolve, as a typed state, without returning
 the value.
+`secret_run` runs a command with the workspace's aliases injected: the Host
+talks to one long-lived `secret mcp` child, and the CLI replaces exact value
+bytes in the child's output with `[scrubbed]`, so an agent can use a credential
+without receiving it.
 `request_secret` asks the user to store a value through the Catalog's masked
 form and returns only its reference; `secret_requests_pending` (read-only)
 lists waiting requests, and `secret_remove_alias` (explicit `confirm: true`) is

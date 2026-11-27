@@ -1,4 +1,4 @@
-import type { AntigravityAccountDescription } from './antigravity-account.js'
+import type { AntigravityAccountDescription, AntigravityQuotaReading } from './antigravity-account.js'
 import { accountRuntime } from './account-runtime.js'
 import type { Context } from '@deepseek-ai/cordis'
 import { readAccountUsage } from './account-usage.js'
@@ -41,9 +41,10 @@ const providerReader =
     resolveCredential: CredentialValueResolver | undefined,
     readCopilotCredential: CopilotCredentialReader,
     describeAntigravity: ((home: string) => Promise<AntigravityAccountDescription>) | undefined,
+    readAntigravityQuota: ((home: string, signal?: AbortSignal) => Promise<AntigravityQuotaReading>) | undefined,
   ): AccountUsageReader =>
   (account, signal) =>
-    readAccountUsage({ account, shadowRoot, signal, resolveCredential, readCopilotCredential, describeAntigravity })
+    readAccountUsage({ account, shadowRoot, signal, resolveCredential, readCopilotCredential, describeAntigravity, readAntigravityQuota })
 
 const facilityOf = (ctx: Context) => ctx.get('storageDomain')
 type Facility = NonNullable<ReturnType<typeof facilityOf>>
@@ -241,6 +242,7 @@ const sweepUsageHistory =
           options.resolveCredential,
           createCopilotCredentialsService(ctx.get('credentials')).read,
           accountRuntime(ctx)?.antigravity?.describe,
+          accountRuntime(ctx)?.antigravity?.readQuota,
         ),
       signal,
     )

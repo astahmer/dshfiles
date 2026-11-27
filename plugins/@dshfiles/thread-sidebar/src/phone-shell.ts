@@ -34,15 +34,19 @@ export interface PhoneStackInput {
 
 /**
  * A tap in the list names its thread before the stage Session follows it (over a slow link that takes seconds): the
- * pick stays pending while the stage still shows what it showed at the pick, and any stage move settles it.
+ * pick stays pending while the stage still shows what it showed at the pick, and any stage move settles it. A page loaded
+ * on a thread link is pending the same way until the stage opens it: the stage meanwhile holds a new-thread draft.
  */
 export const PendingPick = {
   threadId: (input: {
     readonly pickedId: string | undefined
     readonly stageAtPick: string | undefined
     readonly stageSession: string | undefined
-  }): string | undefined =>
-    input.pickedId !== undefined && input.pickedId !== input.stageSession && input.stageAtPick === input.stageSession ? input.pickedId : undefined,
+    readonly linkedId?: string | undefined
+  }): string | undefined => {
+    if (input.pickedId !== undefined && input.pickedId !== input.stageSession && input.stageAtPick === input.stageSession) return input.pickedId
+    return input.linkedId !== undefined && input.linkedId !== input.stageSession ? input.linkedId : undefined
+  },
 } as const
 
 /** A visual viewport this much shorter than the layout viewport means the software keyboard is open. */

@@ -48,7 +48,7 @@ const workingTreeRevision: ThreadRevision = { changeId: WORKING_TREE_CHANGE_ID, 
 /** Field and record separators no commit subject can hold. */
 const FIELD = '\u001f'
 const RECORD = '\u001e'
-const REVISION_FORMAT = `--format=%H${FIELD}%s${RECORD}`
+const REVISION_FORMAT = `--format=%H${FIELD}%s${FIELD}%at${RECORD}`
 
 const threadBranch = (name: string): string => `dsh/${name}`
 const isObjectId = (value: string): boolean => OBJECT_ID.test(value)
@@ -58,8 +58,11 @@ const parseRevisions = (stdout: string): readonly ThreadRevision[] =>
     .split(RECORD)
     .map(record => record.replace(/^\n/u, ''))
     .flatMap(record => {
-      const [commitId = '', description = ''] = record.split(FIELD)
-      return isObjectId(commitId) ? [{ changeId: commitId, commitId, description: description.trim(), conflict: false }] : []
+      const [commitId = '', description = '', authoredAt = ''] = record.split(FIELD)
+      const seconds = Number(authoredAt)
+      if (!isObjectId(commitId)) return []
+      const revision: ThreadRevision = { changeId: commitId, commitId, description: description.trim(), conflict: false }
+      return [Number.isSafeInteger(seconds) ? { ...revision, at: seconds * 1_000 } : revision]
     })
 
 interface WorktreeRecord {

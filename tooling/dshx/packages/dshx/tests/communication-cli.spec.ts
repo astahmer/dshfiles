@@ -9,6 +9,7 @@ import { connectCommunicationClient, startHostCommunicationBridge } from '../src
 import { runCommunicationCommand } from '../src/communication/cli.js'
 import { CommunicationService } from '../src/communication/service.js'
 import { communicationDiagnosticsSchema, type CommunicationPrincipal } from '../src/communication/types.js'
+import { decodeJson } from '../src/json.js'
 
 const temporaryRoots: string[] = []
 
@@ -23,8 +24,7 @@ describe('communication diagnostic CLI', () => {
     const service = new CommunicationService({ statePath: join(root, 'state.json') })
     const recipient: Extract<CommunicationPrincipal, { readonly kind: 'agent' }> = { kind: 'agent', id: 'agent-reader' }
     const sender: Extract<CommunicationPrincipal, { readonly kind: 'agent' }> = { kind: 'agent', id: 'agent-sender' }
-    await service.subscribe(recipient, { topic: 'workspace/demo' })
-    await service.publish({ sender, topic: 'workspace/demo', text: 'never-print-this-body' })
+    await service.send({ sender, toAgentId: recipient.id, text: 'never-print-this-body' })
     await service.recordActivity({
       principal: recipient,
       operation: 'dshx_comm_inbox',
@@ -53,10 +53,10 @@ describe('communication diagnostic CLI', () => {
         connect: options => connectCommunicationClient({ ...options, stateHome: root }),
       })
 
-      const envelope = Schema.decodeUnknownSync(communicationDiagnosticsSchema)(JSON.parse(output).data)
+      const envelope = decodeJson(Schema.Struct({ data: communicationDiagnosticsSchema }), output).data
       expect(exitCode).toBe(0)
       expect(errorOutput).toBe('')
-      expect(envelope).toMatchObject({ agentCount: 1, topicCount: 1, messageCount: 1, activity: { retainedCount: 1 } })
+      expect(envelope).toMatchObject({ agentCount: 1, messageCount: 1, activity: { retainedCount: 1 } })
       expect(output).not.toContain('never-print-this-body')
       expect(envelope.recentMessages[0]).not.toHaveProperty('text')
 

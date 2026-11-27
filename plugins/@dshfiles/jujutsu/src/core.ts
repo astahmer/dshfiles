@@ -28,6 +28,8 @@ export interface PreparedMutation {
   /** The folder `workspace-forget` resolves at preview time, snapshotted before the workspace is unregistered. */
   readonly workspaceRoot?: string
   readonly workspaceParentIdentity?: { readonly device: string; readonly inode: string }
+  /** `operation-undo` binds to the operation it previewed: confirmation refuses once the last operation moved. */
+  readonly operationId?: string
   readonly argv: readonly string[]
   readonly title: string
   readonly summary: string
@@ -141,6 +143,8 @@ const buildMutationArgv = (action: Mutation): Result.Result<readonly string[], M
       case 'restore':
         if (action.paths.length === 0) return yield* refused('split-paths')
         return ['restore', '--changes-in', yield* checkedCommitId(action.commitId), ...(yield* literalFilesets(action.paths))]
+      case 'operation-undo':
+        return ['op', 'undo']
     }
   })
 

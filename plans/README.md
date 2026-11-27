@@ -27,6 +27,7 @@ Checkboxes and receipts in a plan are history, not fresh verification.
 | [Phone UI/UX](phone-ux/README.md) | Research done (competitors, platform, live audit); 33 ranked items across speed, back/navigation, composer, inbox, panels, PWA capabilities; nothing built. |
 | [Phone push notifications](phone-push-notifications/README.md) | Push finished turns and needs-you threads to the phone per category, with duplicate suppression and delivery health; nothing built. |
 | [t3code parity](t3code-parity.md)                 | Remaining t3code gaps (push, MCP Apps, preview recording, PR picker, other forges, OAuth); a closed-rows index maps shipped IDs to their plugin docs.    |
+| [Starwatch](starwatch.md)                         | Design only: poll Starboard's Agent API with a `starredAfter` cursor, gate and optionally triage saved links, digest by default, capture or start a thread only on request. |
 
 ## Testing, research and housekeeping
 

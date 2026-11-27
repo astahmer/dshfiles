@@ -13,6 +13,9 @@ const service = (attach: (input: AttachInput) => boolean): ComposerService => ({
   setText: () => false,
   insert: () => false,
   attach,
+  annotations: () => constant([]),
+  setAnnotationComment: () => false,
+  removeAnnotation: () => false,
   setModel: () => Promise.resolve(false),
   focus: () => false,
 })

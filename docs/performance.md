@@ -119,6 +119,39 @@ list still re-renders on every pick (`display: none` also makes the virtual rows
 puts the cost in layout forced by the virtual rows' `measureElement` and the Workbench's `_scrollTabIntoView`, paid by
 any frame that lays the page out.
 
+### Drawer mode on live (2026-11-25)
+
+The owner runs `phoneNavigation: drawer`, where the list is a drawer over the stage and rows stay hidden until
+`Show threads`. The probe assumed the stack (`Back`); it now opens the drawer when `[data-phone-sidebar]` is present,
+scrolls a virtualized row into view before tapping it, and treats `[data-phone-drawer="open"]` plus visible rows as
+the Back list signal (the top bar keeps naming the thread while the drawer is open). Command unchanged otherwise.
+
+Live main build, emulated phone, one row (the run picked one thread; other rows failed their title match):
+
+| Live drawer probe      | Value                    |
+| ---------------------- | ------------------------ |
+| tap → title            | 265 ms                   |
+| tap → first message    | 1565 ms                  |
+| open long tasks        | 16 / 2369 ms (max 355)   |
+| open requests / calls  | 13 / 21                  |
+| Show threads → list    | 234 ms                   |
+| back long tasks        | 3 / 337 ms               |
+| back requests          | 2                        |
+| throttled load → list  | 10152 ms                 |
+| DOM elements           | 2982                     |
+
+Read: the title target is met (1037 ms before the pending-pick fix, 299–313 in scratch, 265 here), and Back is far
+cheaper than the 1126 ms stack baseline. The first message (1565 ms) is still above the 800 ms P2 goal, with 2.4 s of
+long tasks per open: the remaining cost is rendering the opened transcript, not naming the thread. Single-row sample
+under machine load; treat it as directional.
+
+A second run (two rows, same command and setup) widened the picture: title 297 / 506 ms, first message
+2061 / 2244 ms, long tasks 2951 / 4321 ms (max 602–629), DOM 4759 / 4242 elements, 16 / 10 requests and 28 / 16
+calls per open, Show threads → list 288 / 271 ms. Threads with more mounted history push the first message further
+while the title stays cheap; the probe's JSON summary crashed after these rows on a stale `rows` field (fixed).
+Windowed rendering of the transcript (render the last page first, fill earlier turns on scroll) is the remaining P2
+lever, and it is a product choice: scroll-back completeness versus open latency.
+
 ### Duplicate reads per switch and the auto-archive retry (2026-11-16)
 
 `METHODS=1` on the phone probe expands every batched dshx call by API method. Live, read-only (main build, emulated

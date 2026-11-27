@@ -6,6 +6,7 @@ import { InflightTurns, turnBoundaryFromEvent } from './inflight-turns.js'
 import { RecoveryStore, type RestartRecoveryEntry } from './restart-recovery.js'
 import { SessionEvents } from './session-events.js'
 import type { HostCallFailed, HostCapabilityMissing, RuntimeStateFailed, RuntimeStateInvalid } from './sidebar-errors.js'
+import type { SidebarSettingsWriteFailed } from './sidebar-errors.js'
 import { SidebarHost } from './sidebar-host-promise.js'
 import { SidebarSettings } from './sidebar-settings.js'
 
@@ -60,7 +61,7 @@ export class Recoveries extends Context.Service<
     readonly resume: (
       sessionId: string,
       options?: { readonly automatic?: boolean },
-    ) => Effect.Effect<boolean, StateError | HostCapabilityMissing | HostCallFailed>
+    ) => Effect.Effect<boolean, StateError | HostCapabilityMissing | HostCallFailed | SidebarSettingsWriteFailed>
     readonly dismiss: (sessionId: string) => Effect.Effect<boolean, StateError>
     /** The automatic resume of this Host process, once it ran. */
     readonly lastAutoResume: Effect.Effect<Option.Option<AutoResumeOutcome>>
@@ -72,6 +73,7 @@ export class Recoveries extends Context.Service<
     Effect.gen(function* () {
       const store = yield* RecoveryStore
       const host = yield* SidebarHost
+      const settings = yield* SidebarSettings
       const lastAutoResume = yield* Ref.make(Option.none<AutoResumeOutcome>())
       const entryOf = (sessionId: string) => Effect.map(store.list, entries => entries.find(candidate => candidate.sessionId === sessionId))
       return Recoveries.of({
@@ -83,6 +85,11 @@ export class Recoveries extends Context.Service<
           const entry = yield* entryOf(sessionId)
           if (entry === undefined) return false
           if (!(yield* host.runningSessionIds).includes(sessionId)) {
+            // Resuming is a person (or the opt-in automatic resume) asking this thread to continue, so it lifts the
+            // status that would otherwise reject the step the continuation proposes: a settled thread is unsettled,
+            // an archived one is restored first.
+            yield* settings.setSettled({ sessionId, settled: false })
+            if ((yield* host.archivedSessionIds).includes(sessionId)) yield* host.unarchiveSession(sessionId)
             yield* host.queuePrompt({ requestId: entry.requestId, sessionId, text: resumePromptOf(entry, options?.automatic === true) })
           }
           yield* store.remove(new Set([sessionId]))

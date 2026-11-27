@@ -208,7 +208,10 @@ follows its routed account.
 
 Agents change the same setting with the `ai_accounts_set_extra_usage` tool,
 which runs only when the user asks. It is stored in the accounts file as
-`useExtraUsage` next to the other per-account settings.
+`useExtraUsage` next to the other per-account settings. A quota card carries
+that gate as `useExtraUsage` beside the provider's own reading
+(`usage.extraUsage.enabled`): they are independent, so a provider that keeps
+reporting its extra usage on is not the DSH switch turning itself back on.
 
 Cursor publishes no usage API,
 so the plugin reads the dashboard's own endpoint. If Cursor changes that
@@ -228,8 +231,8 @@ other Mistral subscription path (t3code and Zed run Vibe over ACP instead).
   Vibe login. DSH does not implement Vibe's undocumented browser sign-in or its OIDC client.
 - **Requests.** pi-ai's Mistral transport: `https://api.mistral.ai/v1/chat/completions` with the account's bearer key and
   `x-affinity` set to the conversation for prompt caching.
-- **Models.** pi-ai's Mistral catalog, plus DeepSeek V4.1 Flash 1017 (`deepseek-v4-1-flash-1017`), which Mistral hosts
-  but pi-ai does not list yet, with the limits and price its model page documents. Then the Vibe plan catalog
+- **Models.** pi-ai's Mistral catalog, including DeepSeek V4.1 Flash 1017 (`deepseek-v4-1-flash-1017`), which pi-ai
+  lists since 1.5; an older pi-ai gets it from our own entry, with the limits and price its model page documents. Then the Vibe plan catalog
   (`/v1/model-catalog?surface=vibe-code`, e.g. `mistral-vibe-cli-latest`), falling back to the documented `/v1/models`;
   only tool-capable chat models are offered, each with the context window and image
   input Mistral reports for it. Large 4, GLM 5.3 Flash and DeepSeek V4.1 Flash always offer image input, as their
@@ -263,6 +266,9 @@ run at once. `src/claude-cli.ts` holds the transport; a setup-token or API key k
 ## Google AI plans through the Antigravity CLI
 
 ![Connect an Antigravity account with the official agy sign-in](docs/screenshots/antigravity-accounts.png)
+
+> **Use at your own risk.** Google does not support driving `agy` from another client, so this route depends on the
+> CLI as it ships today and may stop working at any time.
 
 Google serves its individual plans (free, Google AI Pro, Google AI Ultra) to coding agents only through its own
 [Antigravity CLI](https://antigravity.google/docs/cli/acp/), `agy`: Gemini CLI

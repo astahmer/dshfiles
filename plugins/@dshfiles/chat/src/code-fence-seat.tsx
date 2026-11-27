@@ -55,9 +55,11 @@ class FenceBoundary extends Component<FenceBoundaryProps, FenceBoundaryState> {
 
 /** What the native seat draws for a fence when no delegate renders it. */
 const builtInFence = (fence: MarkdownDelegateFenceInfo, labels: MarkdownCodeLabels): ReactNode =>
-  !fence.streaming && fence.lang === 'math'
-    ? <FenceMathBlock code={fence.code} />
-    : <FenceCodeBlock lang={fence.lang} code={fence.code} streaming={fence.streaming} labels={labels} />
+  !fence.streaming && fence.lang === 'math' ? (
+    <FenceMathBlock code={fence.code} />
+  ) : (
+    <FenceCodeBlock lang={fence.lang} code={fence.code} streaming={fence.streaming} labels={labels} />
+  )
 
 /** Renderers by lower-cased language; the first registered renderer of a language wins. */
 const byLanguage = (renderers: readonly CodeFenceRenderer[]): ReadonlyMap<string, CodeFenceRenderer> => {
@@ -121,5 +123,9 @@ export function CodeFenceSeat({ renderers, labels, children }: CodeFenceSeatProp
     }
   }, [claimed, enclosing.renderCode, labels, report])
   if (renderCode === enclosing.renderCode) return children
-  return <MarkdownDelegateProvider {...enclosing} renderCode={renderCode}>{children}</MarkdownDelegateProvider>
+  return (
+    <MarkdownDelegateProvider {...enclosing} renderCode={renderCode}>
+      {children}
+    </MarkdownDelegateProvider>
+  )
 }

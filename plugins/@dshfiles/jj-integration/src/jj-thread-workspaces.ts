@@ -42,9 +42,10 @@ const MAX_WORKSPACES_PER_READ = 128
 /** Workspace scan results kept by working-copy and target commits: a few per thread workspace across recent lands. */
 const MAX_WORKSPACE_HALVES_ENTRIES = 512
 
-const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
+const REVISION_TEMPLATE =
+  'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ author.timestamp().format("%s") ++ "\\t" ++ description.first_line() ++ "\\n"'
 const LAND_REVISION_TEMPLATE =
-  'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ empty ++ "\\t" ++ current_working_copy ++ "\\t" ++ description.first_line() ++ "\\n"'
+  'change_id.short(12) ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ empty ++ "\\t" ++ current_working_copy ++ "\\t" ++ author.timestamp().format("%s") ++ "\\t" ++ description.first_line() ++ "\\n"'
 const MAX_CONFLICT_FILES = 50
 /** How far behind the bookmark a workspace is read; the count is displayed, so an exact value past this is noise. */
 const MAX_BEHIND_REVISIONS = 1_000
@@ -189,10 +190,11 @@ const classifyWorkspaceRevisions = (
 const parseRevisionLines = (revisionLines: readonly string[]): Effect.Effect<readonly ThreadRevision[], JjFailed> => {
   const revisions: ThreadRevision[] = []
   for (const line of revisionLines) {
-    const [changeId = '', commitId = '', conflict = '', ...description] = line.split('\t')
-    if (changeId.length === 0 || !isCommitId(commitId) || (conflict !== 'true' && conflict !== 'false'))
+    const [changeId = '', commitId = '', conflict = '', authoredAt = '', ...description] = line.split('\t')
+    const at = parseAuthoredAt(authoredAt)
+    if (changeId.length === 0 || !isCommitId(commitId) || (conflict !== 'true' && conflict !== 'false') || at === undefined)
       return Effect.fail(jjFailed('JJ returned incomplete revision metadata; refusing to continue.'))
-    revisions.push({ changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() })
+    revisions.push({ changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim(), at })
   }
   return Effect.succeed(revisions)
 }
@@ -207,14 +209,21 @@ interface LandRevision {
 
 const isFlag = (value: string): boolean => value === 'true' || value === 'false'
 
+/** An epoch-seconds field: jj prints author time as a number of seconds. */
+const parseAuthoredAt = (value: string): number | undefined => {
+  const seconds = Number(value)
+  return Number.isSafeInteger(seconds) ? seconds * 1_000 : undefined
+}
+
 const parseLandRevisions = (stdout: string): Effect.Effect<readonly LandRevision[], JjFailed> => {
   const revisions: LandRevision[] = []
   for (const line of lines(stdout)) {
-    const [changeId = '', commitId = '', conflict = '', empty = '', currentWorkingCopy = '', ...description] = line.split('\t')
-    if (changeId.length === 0 || !isCommitId(commitId) || !isFlag(conflict) || !isFlag(empty) || !isFlag(currentWorkingCopy))
+    const [changeId = '', commitId = '', conflict = '', empty = '', currentWorkingCopy = '', authoredAt = '', ...description] = line.split('\t')
+    const at = parseAuthoredAt(authoredAt)
+    if (changeId.length === 0 || !isCommitId(commitId) || !isFlag(conflict) || !isFlag(empty) || !isFlag(currentWorkingCopy) || at === undefined)
       return Effect.fail(jjFailed('JJ returned incomplete landing metadata; refusing to continue.'))
     revisions.push({
-      revision: { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() },
+      revision: { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim(), at },
       empty: empty === 'true',
       currentWorkingCopy: currentWorkingCopy === 'true',
     })

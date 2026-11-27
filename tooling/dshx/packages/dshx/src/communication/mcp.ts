@@ -27,21 +27,11 @@ const runTool = async <Value>(operation: () => Promise<Value>) => {
   }
 }
 
-const topic = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128))
 const messageText = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(12_000))
 const metadataText = Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(128))
 const intent = Schema.Literals(['notice', 'request'])
 const priority = Schema.Literals(['normal', 'urgent'])
 const emptyInput = Schema.Struct({})
-const topicInput = Schema.Struct({ topic })
-const publishInput = Schema.Struct({
-  topic,
-  text: messageText,
-  intent: Schema.optionalKey(intent),
-  priority: Schema.optionalKey(priority),
-  correlationId: Schema.optionalKey(metadataText),
-  dedupeKey: Schema.optionalKey(metadataText),
-})
 const sendInput = Schema.Struct({
   toAgentId: Schema.String.check(Schema.isMinLength(1)).check(Schema.isMaxLength(256)),
   text: messageText,
@@ -51,7 +41,6 @@ const sendInput = Schema.Struct({
   dedupeKey: Schema.optionalKey(metadataText),
 })
 const inboxInput = Schema.Struct({
-  topic: Schema.optionalKey(topic),
   limit: Schema.optionalKey(
     Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(1)).check(Schema.isLessThanOrEqualTo(500)),
   ),
@@ -62,33 +51,22 @@ const messageIdInput = Schema.Struct({
 })
 
 const objectInput = { type: 'object', properties: {}, additionalProperties: false } as const
-const topicJsonSchema = {
-  type: 'object',
-  properties: { topic: { type: 'string', minLength: 1, maxLength: 128 } },
-  required: ['topic'],
-  additionalProperties: false,
-} as const
-const publishJsonSchema = {
+const sendJsonSchema = {
   type: 'object',
   properties: {
-    topic: { type: 'string', minLength: 1, maxLength: 128 },
+    toAgentId: { type: 'string', minLength: 1, maxLength: 256 },
     text: { type: 'string', minLength: 1, maxLength: 12_000 },
     intent: { type: 'string', enum: ['notice', 'request'] },
     priority: { type: 'string', enum: ['normal', 'urgent'] },
     correlationId: { type: 'string', minLength: 1, maxLength: 128 },
     dedupeKey: { type: 'string', minLength: 1, maxLength: 128 },
   },
-  required: ['topic', 'text'],
-  additionalProperties: false,
-} as const
-const sendJsonSchema = {
-  ...publishJsonSchema,
-  properties: { ...publishJsonSchema.properties, toAgentId: { type: 'string', minLength: 1, maxLength: 256 } },
   required: ['toAgentId', 'text'],
+  additionalProperties: false,
 } as const
 const inboxJsonSchema = {
   type: 'object',
-  properties: { topic: { type: 'string', minLength: 1, maxLength: 128 }, limit: { type: 'integer', minimum: 1, maximum: 500 } },
+  properties: { limit: { type: 'integer', minimum: 1, maximum: 500 } },
   additionalProperties: false,
 } as const
 const messageIdJsonSchema = {
@@ -100,23 +78,10 @@ const messageIdJsonSchema = {
 
 const toolDefinitions = [
   { name: 'comm_agents', description: 'List live DSH Agents. Agent ids are DSH Session ids.', inputSchema: objectInput },
-  { name: 'comm_topics', description: 'List topics and subscriber counts.', inputSchema: objectInput },
-  {
-    name: 'comm_subscribe',
-    description: 'Subscribe this external MCP principal to a topic. Messages remain passive and never start or resume an Agent turn.',
-    inputSchema: topicJsonSchema,
-  },
-  { name: 'comm_unsubscribe', description: 'Remove this external MCP principal from a topic.', inputSchema: topicJsonSchema },
-  {
-    name: 'comm_publish',
-    description:
-      'Store an untrusted peer message for current subscribers. Arrival never starts, resumes, or redirects an Agent. intent "request" is descriptive metadata only.',
-    inputSchema: publishJsonSchema,
-  },
   {
     name: 'comm_send',
     description:
-      'Store an untrusted direct message in a DSH Agent inbox. Sending never starts, resumes, or redirects the recipient. intent "request" is descriptive metadata only.',
+      'Store an untrusted direct message in a DSH Agent inbox. A request wakes an idle recipient with a pointer to its inbox; a notice never starts or resumes a turn.',
     inputSchema: sendJsonSchema,
   },
   {
@@ -140,17 +105,6 @@ export const runCommunicationMcp = async (client: CommunicationClient): Promise<
       case 'comm_agents':
         decodeInput(emptyInput, input)
         return runTool(() => client.listAgents())
-      case 'comm_topics':
-        decodeInput(emptyInput, input)
-        return runTool(() => client.listTopics())
-      case 'comm_subscribe':
-        return runTool(() => client.subscribe(decodeInput(topicInput, input)))
-      case 'comm_unsubscribe':
-        return runTool(() => client.unsubscribe(decodeInput(topicInput, input).topic))
-      case 'comm_publish': {
-        const args = decodeInput(publishInput, input)
-        return runTool(() => client.publish(args))
-      }
       case 'comm_send': {
         const args = decodeInput(sendInput, input)
         return runTool(() => client.send(args))

@@ -29,16 +29,19 @@ export const registerWorkspaceFolder = async (page: Page, path: string, open: (p
 export const addWorkspaceFolderThroughDialog = async (page: Page, path: string): Promise<void> => {
   const picker = page.getByRole('dialog', { name: 'Add a project' })
   await expect(picker).toBeVisible()
-  // The picker opens on the Host home and rewrites the path field when that first listing lands.
-  await expect(picker.locator('p').filter({ hasText: /^\// }).first()).toBeVisible()
+  // The add-a-project flow opens on the three-route chooser; pick Add folder when it is shown.
+  const addFolderChoice = picker.getByRole('button', { name: /^Add folder\b/ })
   const pathInput = picker.getByRole('textbox', { name: 'Enter a folder path', exact: true })
+  await expect(addFolderChoice.or(pathInput).first()).toBeVisible()
+  if (await addFolderChoice.isVisible()) await addFolderChoice.click()
+  // The picker opens on the Host home and rewrites the path field when that first listing lands.
+  await expect(picker.getByRole('navigation', { name: 'Folder path', exact: true })).toBeVisible()
+  await expect(pathInput).toBeVisible()
   await expect(async () => {
     await pathInput.fill(path)
     await pathInput.press('Enter')
-    await expect(picker.locator('p').filter({ hasText: path }).first()).toBeVisible({ timeout: 2_000 })
+    await expect(picker).toBeHidden({ timeout: 2_000 })
   }).toPass({ timeout: 20_000 })
-  await picker.getByRole('button', { name: 'Select this folder', exact: true }).click()
-  await expect(picker).toBeHidden()
   await confirmFolderSetupStep(page, path)
 }
 
@@ -105,13 +108,7 @@ export const startThreadWithModel = async (page: Page, input: { readonly project
     const projectItem = page.getByRole('menuitem', { name: input.project, exact: true })
     // Which control opens is only known once one has: a profile with no projects goes straight to Add workspace, one
     // with projects lists them plus an Add workspace row.
-    await expect(
-      addDialog
-        .or(projectPicker)
-        .or(addWorkspace)
-        .or(projectItem)
-        .first(),
-    ).toBeVisible()
+    await expect(addDialog.or(projectPicker).or(addWorkspace).or(projectItem).first()).toBeVisible()
     if (await projectItem.isVisible()) {
       await projectItem.click()
     } else if (await addDialog.isVisible()) {

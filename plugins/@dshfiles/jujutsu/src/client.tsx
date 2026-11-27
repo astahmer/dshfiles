@@ -792,6 +792,8 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
   const graphHasMore = graphPagesQuery.data === undefined ? debouncedSearch.length > 0 || (state?.graphHasMore ?? false) : graphPagesQuery.hasNextPage === true
   const loadedGraphRevisions = (state?.revisions.length ?? 0) + graphPageRevisions.length
   const graphPageLoading = graphPagesQuery.isFetchingNextPage || (graphPagesQuery.isFetching && graphPagesQuery.data === undefined)
+  // The first page draws placeholder rows so the graph list keeps its shape instead of collapsing to a spinner.
+  const graphInitialLoading = graphPagesQuery.data === undefined && graphPagesQuery.isFetching
   const loadMoreGraphRevisions = useCallback((): void => {
     if (repoId === null || !graphOnScreen || stateQuery.isFetching) return
     if (!graphHasMore || graphPageFailed || graphPagesFetching) return
@@ -958,6 +960,7 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
       case 'bookmark-delete':
         return state?.revisions.find(revision => revision.localBookmarks.includes(pendingAction.bookmark))?.commitId ?? null
       case 'workspace-forget':
+      case 'operation-undo':
         return null
       default:
         return pendingAction.commitId
@@ -1879,7 +1882,18 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
               )
             })}
           </div>
-          {graphPageLoading && (
+          {graphInitialLoading && (
+            <div className="dshx:flex dshx:flex-col dshx:gap-1 dshx:px-2 dshx:py-1" role="status" aria-label="Loading revisions">
+              {Array.from({ length: 8 }, (_, index) => (
+                <div key={index} aria-hidden="true" className="dshx:flex dshx:h-9 dshx:items-center dshx:gap-3 dshx:px-2">
+                  <span className="dshx:h-4 dshx:w-1 dshx:shrink-0 dshx:rounded-full dshx:bg-muted" />
+                  <span className="dshx:h-3 dshx:w-20 dshx:shrink-0 dshx:rounded dshx:bg-muted" />
+                  <span className="dshx:h-3 dshx:w-1/3 dshx:rounded dshx:bg-muted" />
+                </div>
+              ))}
+            </div>
+          )}
+          {graphPageLoading && !graphInitialLoading && (
             <div className="dshx:flex dshx:items-center dshx:justify-center dshx:gap-2 dshx:p-3 dshx:text-xs dshx:text-muted-foreground" role="status">
               <Spinner className="dshx:size-3" />
               {debouncedSearch.length > 0 ? 'Searching all revisions…' : 'Loading older revisions…'}
@@ -2042,6 +2056,21 @@ export const JujutsuPanel = (props: JujutsuPanelProps): JSX.Element => {
                 <TooltipContent side="bottom">
                   {selectedBookmark === '' ? 'No local bookmark to push' : `Push ${selectedBookmark} to ${selectedRemote}`}
                 </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    className={TOUCH_HIT_AREA}
+                    disabled={repoId === null || busy}
+                    onClick={() => askForConfirmation({ kind: 'operation-undo' })}
+                    size="sm"
+                    type="button"
+                    variant="outline"
+                  >
+                    Undo
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">Undo the last jujutsu operation (jj op undo)</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>

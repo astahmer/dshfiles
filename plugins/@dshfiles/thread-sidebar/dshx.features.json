@@ -1317,13 +1317,15 @@
       ],
       "failureModes": [
         "Running, blank, pinned, parked, settled, or excluded sessions are never automatically settled.",
-        "A thread with a still-running descendant is never automatically settled, so a child turn cannot be rejected mid-step.",
+        "A thread whose subagent tree still works — a running turn, a pending answer or a running background job below it — is never automatically settled, so no child step and no later subagent wake is rejected mid-flight.",
         "Per-thread enable still respects session and workspace safety exclusions.",
+        "A thread an active reminder will wake is never settled: the reminder lifts the settled status instead.",
         "Per-thread disable does not alter global session exclusions.",
         "A refused settings write leaves the session visible and reports the failure.",
         "A failed Host scan is recorded as the last scan's error and the next interval scans again.",
         "A thread waiting for an answer to a question is never automatically settled.",
-        "A browser on a Host without the auto-settle API keeps scanning on its own; a browser on a Host with it never scans."
+        "A browser on a Host without the auto-settle API keeps scanning on its own; a browser on a Host with it never scans.",
+        "A thread waiting for its resume after a restart or a crash is never settled: the resume lifts the settled status instead."
       ],
       "externalDependencies": [],
       "verification": [
@@ -1422,9 +1424,76 @@
       ]
     },
     {
+      "id": "reminder-wake",
+      "title": "Wake a settled or archived thread for its reminder",
+      "summary": "A reminder is a prompt that comes back to its thread, but a settled thread rejects the step it proposes and the Schedule service refuses an archived target outright, so the reminder would be dropped. The Host never settles a thread holding an active reminder, however far out its next occurrence is, and a separate pass once a minute lifts the status one interval before the reminder is due: settled becomes unsettled, archived is restored, and an occurrence that already passed is delivered at once. The settled pre-step gate is the second line: a schedule-sourced step that still finds a settled owner lifts it and runs. `remindersWakeEnabled` (on by default) switches the behavior off; without the Schedule service the pass reads nothing.",
+      "surfaces": ["host", "settings"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: Thread sidebar › Reminder wake",
+      "configuration": [
+        {
+          "key": "remindersWakeEnabled",
+          "defaultValue": "true",
+          "constraints": "Boolean; off keeps a settled or archived thread stored away and lets its reminder be refused.",
+          "coveredBy": ["thread-sidebar.reminder-wake-unit-host"]
+        }
+      ],
+      "states": ["enabled", "disabled", "reminder-due-soon", "reminder-overdue", "settled-lifted", "archived-restored", "no-schedule-service"],
+      "failureModes": [
+        "A failed wake pass changes nothing and retries on the next pass, one minute later.",
+        "A reminder whose thread the pass woke but whose occurrence already passed is run once; the Schedule service delivery floor still applies.",
+        "A paused or ended task wakes nothing, and a reminder that already advanced to its next occurrence is not delivered twice.",
+        "Without the Schedule service installed the pass reads an empty list and lifts no status.",
+        "A refused settings write or unarchive leaves the thread as it was and retries on the next pass.",
+        "A caught-up occurrence runs through the Schedule service run-now, which does not consume a recurring rule: a later Host restart can deliver that same missed occurrence once more."
+      ],
+      "externalDependencies": [
+        {
+          "id": "@deepseek-ai/dsh-schedule",
+          "boundary": "Host `schedule` service: `catalog()` for the active reminder per target Session, and `run({ id })` to deliver one occurrence that passed while its thread was stored away. Read through `ctx.get`, so a profile without the service reads nothing.",
+          "deterministicFake": "Textbook fake in src/reminder-wake-host.test.ts: the layer answers a fixed reminder list and records the lift and delivery calls."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.reminder-wake-unit-plan",
+          "file": "plugins/@dshfiles/thread-sidebar/src/reminder-wake.test.ts",
+          "testName": "lifts a settled thread only once its reminder is within the wake window"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.reminder-wake-unit-host",
+          "file": "plugins/@dshfiles/thread-sidebar/src/reminder-wake-host.test.ts",
+          "testName": "restores an archived thread whose reminder already passed and runs it again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.reminder-wake-unit-gate",
+          "file": "plugins/@dshfiles/thread-sidebar/src/settled-gate.test.ts",
+          "testName": "a reminder step runs and lifts the settled owners, every other wake waits for an unsettle"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.reminder-wake-unit-scan",
+          "file": "plugins/@dshfiles/thread-sidebar/src/auto-settle-host.test.ts",
+          "testName": "keeps a thread an active reminder will wake, and reports the reminder as the skip reason"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "reminder wake",
+          "file": "plugins/@dshfiles/thread-sidebar/src/reminder-wake-host.test.ts",
+          "testName": "records one reminder wake span with the lifted counts"
+        }
+      ]
+    },
+    {
       "id": "section-order",
       "title": "Group remote threads with each view",
-      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
+      "summary": "Remote threads started from this DSH join the current view’s status, date, or project groups by default, and their rows archive or restore on the runtime that owns them. Users can opt into a separate Remote group, reorder it with local sections, and keep that choice across reloads.",
       "reach": [
         "click button \"Filter: *\"",
         "click menuitemradio \"All threads*\"",
@@ -1454,7 +1523,7 @@
         "Remote grouping is shown by default instead of following the current view.",
         "Empty sections can shift the drag position even though they are not rendered.",
         "A reordered section order or separate-group choice does not survive a reload.",
-        "A remote row offers archive or pin, which only the runtime owning the Session can run."
+        "A remote row offers pin, which only the runtime owning the Session can run."
       ],
       "externalDependencies": [
         {
@@ -1502,7 +1571,7 @@
       "telemetry": [
         {
           "kind": "not-applicable",
-          "reason": "Client-only: Group remote threads with each view renders browser state and starts no Host work of its own."
+          "reason": "Client-only: Group remote threads with each view renders browser state; the archive verb it offers dispatches through multi-host, which records its own API span."
         }
       ]
     },
@@ -2793,7 +2862,7 @@
     {
       "id": "interrupted-turn-threads",
       "title": "See threads a crash interrupted",
-      "summary": "Every turn the Host opens is recorded in a small durable in-flight file and cleared when the turn ends, so the next Host process knows exactly which turns a crash, kill or shutdown timeout left open; it promotes them into the durable recovery store at boot, marked interrupted, and the sidebar lists them under Interrupted with Resume, Resume all and dismiss actions until the thread runs again.",
+      "summary": "Every turn the Host opens is recorded in a small durable in-flight file and cleared when the turn ends, so the next Host process knows exactly which turns a crash, kill or shutdown timeout left open; it promotes them into the durable recovery store at boot, marked interrupted, and the sidebar lists them under Interrupted with Resume, Resume all and dismiss actions until the thread runs again. Resuming unsettles a settled thread and restores an archived one first, so its continuation step is never rejected.",
       "surfaces": ["client", "host", "api", "tool", "storage"],
       "surface": "attentionProvider",
       "destination": "inbox",
@@ -2809,6 +2878,12 @@
       ],
       "externalDependencies": [],
       "verification": [
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.interrupted-turn-threads-unit-resume-lifts-status",
+          "file": "plugins/@dshfiles/thread-sidebar/src/recoveries.test.ts",
+          "testName": "unsettles the thread it resumes, so the continuation step is not rejected"
+        },
         {
           "kind": "unit-test",
           "id": "thread-sidebar.interrupted-turn-threads-unit-boundaries",
@@ -4253,7 +4328,7 @@
     {
       "id": "subagent-live-preview",
       "title": "Live subagent preview in the transcript and above the composer",
-      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer fold into one \"N subagents working\" row, closed by default like the background-jobs dock; opening it lists them, and the choice holds while children start and finish. With subagentRunCards on (the default) a working child whose open turn, route and tool are known becomes a compact run card: current tool, route, elapsed time, step count, Stop behind a confirmation and Open thread. A child with any of those parts missing keeps its one-line row, and the setting's off state is that row.",
+      "summary": "A delegation's row in the transcript reports the child in agent terms (working, finished, interrupted, idle). Opened, it follows the child's current tool and latest answer, and offers its thread, opening it beside the chat, and Stop behind a confirmation. Two or more working children above the composer fold into one \"N subagents working\" row, closed by default like the background-jobs dock; opening it lists them, and the choice holds while children start and finish. With subagentRunCards on (the default) a working child whose open turn, route and tool are known becomes a compact run card: current tool, route, elapsed time, step count, Stop behind a confirmation and Open thread. A chevron in the card header folds that child alone back to its one-line row, which keeps the live clock and expands it again; every row keeps its height, so the dock scrolls instead of squashing cards. A child with any of those parts missing keeps its one-line row, and the setting's off state is that row.",
       "reach": [
         "seed tool-call-thread",
         "fill textbox \"commands, @ files or threads*\" \"[[once call subagent {\\\"description\\\":\\\"Long child\\\",\\\"prompt\\\":\\\"\\\\u005b\\\\u005bonce call bash \\\\u007b\\\\u0022command\\\\u0022:\\\\u0022sleep 300\\\\u0022,\\\\u0022description\\\\u0022:\\\\u0022Busy\\\\u0022\\\\u007d\\\\u005d\\\\u005d\\\"}]]\"",
@@ -4286,7 +4361,8 @@
         "stopping",
         "progress-unavailable",
         "run-card",
-        "run-card-row-fallback"
+        "run-card-row-fallback",
+        "run-card-collapsed"
       ],
       "failureModes": [
         "A child that cannot be opened keeps its row and thread link, and says live progress is unavailable.",
@@ -4352,6 +4428,18 @@
           "id": "thread-sidebar.subagent-run-card-actions",
           "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
           "testName": "stops the child through its interrupt after a confirmation"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-run-card-collapse",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "collapses one run card to its one-line row and back"
+        },
+        {
+          "kind": "unit-test",
+          "id": "thread-sidebar.subagent-dock-rows-keep-height",
+          "file": "plugins/@dshfiles/thread-sidebar/src/subagent-provenance/subagent-preview-dock.client.test.tsx",
+          "testName": "keeps every row a non-shrinking flex item so a tall dock scrolls instead of squashing cards"
         },
         {
           "kind": "unit-test",

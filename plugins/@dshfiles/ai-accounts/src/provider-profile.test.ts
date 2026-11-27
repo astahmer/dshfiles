@@ -5,6 +5,7 @@ import { openaiCodexProvider } from '@earendil-works/pi-ai/providers/openai-code
 import { anthropicProvider } from '@earendil-works/pi-ai/providers/anthropic'
 import { opencodeGoProvider } from '@earendil-works/pi-ai/providers/opencode-go'
 import { githubCopilotProvider } from '@earendil-works/pi-ai/providers/github-copilot'
+import { decodeJson, jsonObjectSchema, type JsonObject } from '@dshfiles/dshx/json'
 import { FastModeService } from './codex-fast-mode.js'
 import { createCommandCodeProvider } from './commandcode-provider.js'
 import { createMistralProvider } from './mistral-provider.js'
@@ -108,7 +109,6 @@ describe('account provider profiles', () => {
     expect(await adapter.resolveModel('codex-emialex', modelId)).toMatchObject({
       inputModalities: ['text', 'image'],
     })
-    expect((await adapter.resolveModel('codex-emialex', 'gpt-5.3-codex-spark')).inputModalities).toEqual(['text'])
     expect((await adapter.resolveModel('codex-emialex', 'gpt-6.1-codex-spark')).inputModalities).toEqual(['text'])
   })
 
@@ -224,17 +224,17 @@ describe('account provider profiles', () => {
       upstream: opencodeGoProvider(),
       provider: 'opencode-go-alex',
       displayName: 'OpenCode Go Alex',
-      additionalModelIds: ['step-5-preview-free'],
+      additionalModelIds: ['step-5-preview'],
       favoriteModelIds: ['minimax-m3'],
     })
     const models = modelsFor(profile)
 
     expect(models.map(model => model.id)).toContain('minimax-m3')
     expect(models.map(model => model.id)).toContain('deepseek-v4.1-flash')
-    expect(models.find(model => model.id === 'step-5-preview-free')).toMatchObject({
+    expect(models.find(model => model.id === 'step-5-preview')).toMatchObject({
       api: 'openai-completions',
-      id: 'step-5-preview-free',
-      name: 'opencode-go-alex/Step 5 Preview Free',
+      id: 'step-5-preview',
+      name: 'opencode-go-alex/Step 5 Preview',
       provider: 'opencode-go-alex',
     })
   })
@@ -469,7 +469,7 @@ describe('OpenCode Go DeepSeek thinking', () => {
     reasoningEffort?: string,
     upstream = opencodeGoProvider(),
     settings: Partial<AccountModelSettings> = {},
-  ): Promise<Record<string, unknown>> => {
+  ): Promise<JsonObject> => {
     const account = { ...AccountDraftModel.newAccountDraft({ kind: 'opencode-go', existing: [] }), ...settings }
     const profile = ProviderProfileModel.buildProfile({
       upstream,
@@ -489,9 +489,9 @@ describe('OpenCode Go DeepSeek thinking', () => {
       { reasoningDefaults: new Map([['opencode-go-test', ProviderProfileModel.reasoningDefaultsForProfile(profile)]]), fastMode: disabledFastMode },
     )
     const originalFetch = globalThis.fetch
-    let body: Record<string, unknown> = {}
+    let body: JsonObject = {}
     globalThis.fetch = async (_input, init) => {
-      body = JSON.parse(String(init?.body))
+      body = decodeJson(jsonObjectSchema, String(init?.body))
       return new Response('{"error":{"message":"stop here"}}', { status: 400 })
     }
     try {
@@ -555,8 +555,8 @@ describe('OpenCode Go DeepSeek thinking', () => {
     const account = {
       ...AccountDraftModel.newAccountDraft({ kind: 'codex', existing: [] }),
       defaultReasoningEffort: 'max',
-      reasoningDefaults: { 'gpt-5.3-codex-spark': 'invented' },
-      hiddenModelIds: ['gpt-5.3-codex-spark'],
+      reasoningDefaults: { 'gpt-5.6-luna': 'invented' },
+      hiddenModelIds: ['gpt-5.6-luna'],
     }
     const customized = ProviderProfileModel.buildProfile({
       upstream: openaiCodexProvider(),
@@ -564,7 +564,7 @@ describe('OpenCode Go DeepSeek thinking', () => {
       displayName: 'Test',
       ...AccountModelSettingsModel.effectiveModelSettings(account),
     })
-    expect(ProviderProfileModel.reasoningDefaultsForProfile(customized)['gpt-5.3-codex-spark']).toBeUndefined()
+    expect(ProviderProfileModel.reasoningDefaultsForProfile(customized)['gpt-5.6-luna']).toBeUndefined()
     const inherited = ProviderProfileModel.buildProfile({
       upstream: openaiCodexProvider(),
       provider: 'test',
@@ -572,13 +572,13 @@ describe('OpenCode Go DeepSeek thinking', () => {
       ...AccountModelSettingsModel.effectiveModelSettings({ ...account, inheritModelSettings: true }),
     })
     expect(ProviderProfileModel.reasoningDefaultsForProfile(inherited)).toEqual({})
-    expect(modelsFor(inherited).some(model => model.id === 'gpt-5.3-codex-spark')).toBe(true)
+    expect(modelsFor(inherited).some(model => model.id === 'gpt-5.6-luna')).toBe(true)
     const invalid = ProviderProfileModel.buildProfile({
       upstream: openaiCodexProvider(),
       provider: 'test',
       displayName: 'Test',
       additionalModelIds: [],
-      reasoningDefaults: { 'gpt-5.3-codex-spark': 'invented' },
+      reasoningDefaults: { 'gpt-5.6-luna': 'invented' },
       defaultReasoningEffort: 'invented',
     })
     expect(ProviderProfileModel.reasoningDefaultsForProfile(invalid)).toEqual({})

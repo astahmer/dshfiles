@@ -19,7 +19,7 @@ const decide = (
   options: {
     readonly archived?: readonly string[]
     readonly running?: boolean | undefined
-    readonly kinds?: readonly ('empty' | 'integrated' | 'merged' | 'secondary' | 'untracked')[]
+    readonly kinds?: readonly ('empty' | 'integrated' | 'merged' | 'stale' | 'secondary' | 'untracked')[]
   } = {},
 ) =>
   WorkspaceCleanupModel.decide({
@@ -52,6 +52,20 @@ describe('WorkspaceCleanupModel.decide', () => {
   it('keeps unlanded work no bookmark holds', () => {
     expect(decide(idleThread({ unlandedCount: 2, integratedInto: [] }))).toMatchObject({ action: 'skip', reason: 'has-work' })
     expect(decide(idleThread({ unlandedCount: 2 }))).toMatchObject({ action: 'skip', reason: 'has-work' })
+  })
+
+  it('offers stale pending work only when the run selected the stale kind', () => {
+    const stale = idleThread({ unlandedCount: 2, stale: true })
+    expect(decide(stale)).toMatchObject({ action: 'skip', reason: 'has-work' })
+    expect(decide(stale, { kinds: ['empty', 'integrated', 'stale'] })).toEqual({ action: 'remove', kind: 'stale', lastUsedAt: now - 10 * HOUR })
+    // Recent work is never eligible, even with the kind selected.
+    expect(decide(idleThread({ unlandedCount: 2 }), { kinds: ['empty', 'stale'] })).toMatchObject({ action: 'skip', reason: 'has-work' })
+    // Work another bookmark already holds is removed as integrated, keeping the work rather than abandoning it.
+    expect(decide(idleThread({ unlandedCount: 2, integratedInto: ['release'], stale: true }), { kinds: ['integrated', 'stale'] })).toEqual({
+      action: 'remove',
+      kind: 'integrated',
+      lastUsedAt: now - 10 * HOUR,
+    })
   })
 
   it('keeps bookmarked work while its Session runs', () => {

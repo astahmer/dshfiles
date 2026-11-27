@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AgentRunStatus } from '../src/components/motion/agent-run-status.js'
 
 afterEach(cleanup)
@@ -50,6 +50,15 @@ describe('AgentRunStatus', () => {
   it('keeps no footer at all without an action', () => {
     render(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} state="running" />)
     expect(screen.queryAllByRole('button')).toHaveLength(0)
+  })
+
+  it('renders the header chevron only when the caller can collapse the card', () => {
+    const onCollapse = vi.fn()
+    const { rerender } = render(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} state="running" onCollapse={onCollapse} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Collapse' }))
+    expect(onCollapse).toHaveBeenCalledOnce()
+    rerender(<AgentRunStatus heading="Review" steps={steps} startedAt={1_000} state="running" />)
+    expect(screen.queryByRole('button', { name: 'Collapse' })).toBeNull()
   })
 
   it('takes the visible strings from its caller', () => {

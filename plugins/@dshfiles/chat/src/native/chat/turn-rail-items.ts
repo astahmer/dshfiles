@@ -118,3 +118,16 @@ export function turnStarts(outline: unknown): readonly { readonly turn: number; 
     })
     .sort((left, right) => left.seq - right.seq)
 }
+
+/**
+ * Where the rail's read boundary falls: the index of the first Turn after the last one the reader has seen, or -1 when
+ * the rail cannot separate seen from unseen content (nothing below it, or every Turn still unseen — the "Since you
+ * left" card carries that case).
+ * @param items - every known Turn, ascending.
+ * @param seenTurn - the highest Turn the reader has reached; null when unknown.
+ */
+export function seenBoundaryIndex(items: readonly TurnRailItem[], seenTurn: number | null): number {
+  if (seenTurn === null) return -1
+  const index = items.findIndex(item => item.turn > seenTurn)
+  return index <= 0 ? -1 : index
+}

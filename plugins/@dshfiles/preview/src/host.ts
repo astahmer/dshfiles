@@ -6,6 +6,8 @@ import { NodeFileSystem, NodePath } from '@effect/platform-node'
 import { previewApi } from './api.js'
 import { previewRenderApi, RenderHtmlLimits } from './render-api.js'
 import { PreviewInactive, PreviewThreadRefused } from './preview-errors.js'
+import { EmbedPolicy } from './embed-policy.js'
+import { PreviewPreflight } from './preview-preflight-promise.js'
 import { PreviewImages } from './preview-images-promise.js'
 import { PreviewPages } from './preview-pages-promise.js'
 import { PreviewDevServers } from './preview-dev-servers-promise.js'
@@ -147,6 +149,12 @@ const previewHandlers = Api.handlers(previewApi, {
       const probe = yield* PreviewDevServers.use(servers => servers.read(false))
       return { supported: probe.supported, servers: probe.servers.filter(server => server.sessionIds.includes(sessionId)) }
     }),
+  probeEmbed: input =>
+    Effect.gen(function* () {
+      const preflight = yield* PreviewPreflight
+      const check = yield* preflight.probe({ url: input.url })
+      return { ...check, verdict: EmbedPolicy.verdict(check) }
+    }),
   stopDevServer: (input, call) =>
     Effect.gen(function* () {
       const sessionId = yield* ownThread(call, input.sessionId)
@@ -170,7 +178,7 @@ export default DshxPlugin.make({
   name: '@dshfiles/preview',
   inject: ['subprocess', 'tools', 'attachments', 'jobs'],
   settings: [previewSettings],
-  layer: Layer.mergeAll(PreviewPages.layer, PreviewDevServers.layer, PreviewImages.layer, PreviewJobs.layer).pipe(
+  layer: Layer.mergeAll(PreviewPages.layer, PreviewPreflight.layer, PreviewDevServers.layer, PreviewImages.layer, PreviewJobs.layer).pipe(
     Layer.provide(NodeFileSystem.layer),
     Layer.provide(NodePath.layer),
     Layer.provide(DshChildProcessSpawner.layer),

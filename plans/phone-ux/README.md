@@ -4,6 +4,155 @@
 each picked item gets its own revision, scratch before/after shots at 390 px, and a real-phone check when
 [real-phone verification](../real-phone-verification/README.md) is set up.
 
+## Progress (2026-11-25)
+
+Audit rerun against the live Host (started 2026-11-23 21:28) at 390×844, Android UA, touch, DPR 2, in headless
+Chromium. Cold first load to usable composer: 20.2 s in this harness (not comparable with the 4×-throttled 7.0 s
+below until the same throttling is applied). Still reproduce:
+
+1. **P5** — picking Inbox in the drawer keeps the drawer open and shows the Inbox section list (Needs you / Waiting
+   threads). Picking a thread does close the drawer, and system Back closes the drawer without leaving the page.
+   Opening a destination straight on its content is still a design choice: which section, and how the other section
+   stays reachable.
+2. **P6** — the composer `+` picker opens a 343×95 dropdown whose listbox background is transparent (rgba(0,0,0,0))
+   with a loading skeleton and no rows in the harness; Escape handling could not be measured because the menu never
+   settled.
+3. **P29** — phone destination lists drew the page description under the top bar (which already names the page) and
+   descriptions on section rows, both truncated at 390 px.
+4. **P31** — the launch log still warned that `mainTabs.newTab` and `commandPalette.newThread` claimed Mod+T together.
+
+Shipped in the `thread-1a2f07` workspace (not on main yet):
+
+1. **P31a** — the workspace segment read `Own workspacefrom main`; the two flex spans now carry a real space, so the
+   composer summary is `Own workspace from main`.
+2. **P31b** — `mainTabs.newTab` no longer claims Mod+T on desktop (kept the web binding), so `newThread` registers.
+3. **P29** — phone lists keep the page heading for assistive tech only, omit the page description, and render rows
+   without descriptions; covered by a focused test.
+4. **P6 (partial)** — the picker now paints the menu surface (it computed to `rgba(0,0,0,0)`), gives rows 44px and
+   18px glyphs on the phone rule, and Escape dismisses it from the document, so a tap on `+` no longer leaves the key
+   unanswered. The kit's existing phone-sheet rule now lists the picker's `[data-menu-material][data-trigger-menu]`
+   surface, so it rises as the app sheet (surface, grabber, scrim, 72dvh cap) instead of a 343×95 dropdown. Still open
+   on P6: 48px rows (waits for the 44→48 decision) and files/threads before skills.
+5. **P28** — the phone shell hides `KeyHint` and the menu shortcut slots under 640px: no keycaps without a keyboard.
+6. **P7 not reproduced** (2026-11-25 live check): the context meter panel opened at x114 y577, 264×159 in a 390×844
+   viewport. Keep it open as a regression check rather than a fix.
+7. **P4 (partial)** — the kit gained `useCloseWatcher` (tested) and the composer picker plus the context meter adopt it, so
+   the system back gesture closes them instead of leaving the thread. Still open: every other popover and sheet.
+8. **P32 (partial)** — the open phone drawer traps Tab through the kit dialog focus hook, returns focus on close, and now
+   marks the app root `inert` so the stage cannot be browsed behind the scrim (22 drawer tests pass). Reduced motion is
+   already covered by the kit's global rule. Still open: large-text check (real phone), and the same inert treatment for
+   the workbench sheet (it lives inside the app root).
+9. **P15** — the phone thread-panel sheet resumes the last real view (3 tests) and its dock now uses Dockview's
+   `onlyWhenVisible` on the phone, so hidden panels unmount instead of running their queries (desktop keeps `always` so
+   editor drafts survive). A header, 44px close, focus trap, back layer and drag were already there.
+10. **P27** — on a coarse pointer the thread row menu offers Keep screen on / Allow screen to sleep: one page-level
+    Screen Wake Lock, re-requested when the page becomes visible while wanted, off when the platform refuses. 4 tests;
+    the real-phone check (does the screen stay on) is still the owner's.
+11. **P20 (partial)** — a coarse pointer gets a key row above the terminal (Esc, Tab, Ctrl+C, arrows) that sends the
+    bytes through xterm and keeps focus; hidden on pointer devices, disabled while not writable. 2 tests. Still open:
+    follow tail / jump to latest / search / copy for logs.
+12. **P19 (partial)** — the context detail slot is now a `renderDetail` function the meter calls only inside its open
+    panel, so the closed meter no longer mounts its providers' queries on every composer render. Request-count proof
+    waits for a working scratch session; hidden right-dock panels also unmount since P15.
+13. **P2 (attempt)** — chat flow items skip style/layout/paint off screen on phones (`content-visibility: auto`, remembered
+    intrinsic size), the transcript render being the remaining open cost. Unverified until a landed build can be
+    measured.
+14. **P17 (partial)** — the JJ graph draws eight placeholder rows while its first revision page loads, and its toolbar now
+    has Undo (`jj op undo`) through the preview/confirm flow: the preview binds to the current op id, so confirmation is
+    refused once another operation lands. Argv test + regenerated API schema; typecheck/build clean. Gestures remain,
+    blocked on P12.
+15. **P16 (partial)** — generated output, vendored code and lockfiles are folded below the changed-file list
+    (`isNoiseFile`, two tests), and below 640px the patch view renders one file at a time, the changed-file list acting
+    as the picker (desktop keeps every file). Still open: explicit wrap toggle and a dedicated file sheet;
+    tap-a-diff-line-to-quote is already possible through line selection and the comment box.
+
+Verification limit: a full `dshx dev up` build of every owned plugin ran the live Host out of resources and it
+restarted at 2026-11-25 11:17. Do not repeat a whole-workspace build plus a second DSH while the live instance runs;
+build only the touched plugin and prefer focused tests, or run the scratch instance with its own plugin subset.
+
+The phone switch probe now understands drawer mode (`Show threads` instead of `Back`): it timed out on hidden rows
+before, so P2/P3 had no fresh measurement in drawer mode. First live numbers are in
+[performance.md](../../docs/performance.md#drawer-mode-on-live-2026-11-25): title 265 ms (target met), first message
+1565 ms (still above the 800 ms goal), Back 234 ms, 2.4 s of long tasks per open. A second two-row run measured title
+297/506 ms, first message 2061/2244 ms and 2.9/4.3 s of long tasks over 4.2–4.8k DOM elements: the remaining P2 lever
+is windowed transcript rendering, a product choice between scroll-back completeness and open latency.
+
+On this machine `pnpm --version` itself was taking ~28 s, so `dshx dev up` failed its 30 s version probe. A PATH shim
+that answers only `--version` instantly and delegates everything else let the scratch instance boot; the scratch phone
+checks below were run that way.
+
+Landing state (2026-11-25): the whole stack was rebased onto the current `main` tip with one `jj rebase -s`, after
+`jj-rewrite-preflight` reported every descendant mutable and conflict-free. `jj_thread_status` now reports `behind:
+false`, 44 unlanded revisions, no conflicts. Nothing was pushed and the `main` bookmark was not advanced.
+
+### Closing reads (2026-11-25)
+
+1. **P19 not reproduced** — opening the Context panel on the scratch phone reached its content with 2 HTTP calls and no
+   WebSocket traffic in the measured window (the earlier 55-request figure predates the lazy detail slot and hidden
+   panel unmounting). Kept as a regression watch rather than a fix.
+2. **P16 wrap toggle** — the installed `@pierre/diffs` 1.5.2 exposes no line-wrap option and renders inside shadow
+   roots, so wrapping needs a renderer change; recorded as an owner decision. The one-file phone view already replaced
+   the need for a file sheet.
+3. **P20 log controls** — the transcript already follows its tail, jumps to latest and has thread find; the remaining
+   per-tool-output search/copy lives in the native tool-output renderer this repo does not own, so its scope is a
+   decision, not an unblocked fix.
+4. **P21–P23** — push actions, share target and manifest shortcuts need real-phone checks and, for shortcuts, a
+   destination URL route; all three are native/real-phone work, not repo-local fixes.
+
+### Verified on a scratch DSH (2026-11-25, this workspace)
+
+Built only the seven touched plugins (`--concurrency=2`), booted `dshx dev up --name phone --skip-build`, drove it with
+Playwright at 390×844 (Android UA, touch):
+
+1. **P6 sheet** — the picker is a viewport sheet: x0, y721, h123, bottom gap 0, width 390, 16px top radius, opaque
+   surface (`oklch(0.945 0.0035 65)`), grabber visible; Escape closes it. Before: a 343×95 transparent dropdown at
+   y581 inside the composer card. Evidence: `phone-fix-audit/b04-picker-plus.png` (before) and
+   `phone-fix-audit/a02-scratch-picker.png` (after).
+2. **P29** — the Inbox page shows the top-bar title, then `Needs you` / `Waiting threads` with no page description and no
+   row descriptions. Evidence: `phone-fix-audit/b02-inbox-after-pick.png` (before) and
+   `phone-fix-audit/a04-scratch-inbox.png` (after).
+3. **P31b** — no `mainTabs.newTab` / `Conflicting shortcut defaults` warning in the scratch console.
+4. P4's back gesture, P28 keycaps and P32 focus were not exercised on the scratch phone (no thread with a menu there);
+   their proofs stay unit-level for now.
+
+Second scratch pass (same day, after a phone-sized failed prompt created a real thread row):
+
+1. **P28 verified** — the thread row menu at 390px shows Pin, Settle and Park with no keycap letters; the keycap spans are
+   present in the DOM but not visible. Evidence: `phone-fix-audit/b12-row-menu.png`.
+2. **P27 verified in UI** — the same menu shows a `Keep screen on` row between Mute thread and @Mention thread; the
+   hardware screen-lock behavior is still the owner's phone check.
+3. The menu also still shows `Open in side panel` / `Open plugin in side panel`; on a phone that opens the workbench
+   sheet, so it is not counted as a leak here.
+4. **P11 (partial, already present)** — a failed turn renders inline in the thread with `Failed`, the provider message, the
+   error code, a Retry button, `Ask to fix`, and `Add or fix credentials`; the composer stays usable below. Evidence:
+   `phone-fix-audit/b13-failed-thread.png`. Not present: automatic resend of a client-side submission failure after
+   reconnect (a policy choice), so P11's remaining scope is that decision rather than missing UI.
+
+### Code sweep (2026-11-25): already present, no work left
+
+A pass over the owners after the restart shows most Tier 2/3 items already shipped by other lanes. Present in code,
+not re-checked on a phone:
+
+1. **P10** — `InputBar.tsx` resolves send, queue, steer and stop modes; `canSteerQueue` and the queue dock's per-row
+   steer exist.
+2. **P13 (except landing preference)** — `ChatView.tsx` has `jumpToTurn`, the Since-you-left card with jump/dismiss and
+   the older-rows sentinel; the first-unread-vs-newest landing stays the owner's decision.
+3. **P14** — `inbox-panel.tsx` has `InboxSwipe` (left Done, right Snooze), Done/snooze views and presets.
+4. **P9 (partial)** — `chat/ApprovalCommand.tsx` renders approvals inline, and `agent-questions` has the parent
+   question path (`parent-questions.test.ts`); subagent requests reaching the parent needs a live check.
+   **P11 (partial)** — a failed turn shows `Failed`, its provider message and code, Retry, Ask to fix and Add or fix
+   credentials inline (scratch-verified); only automatic resend of a client submission failure is left, as a policy choice.
+5. **P30** — the phone thread menu is a labeled bottom sheet with submenus at one level; its only leak was keycaps,
+   which P28 hides.
+6. **P26** — the phone shell sets `viewport-fit=cover` and pads the drawer, top bar, sheet and tab bar with the
+   safe-area insets.
+7. **P25 (partial)** — the transcript owns `overscroll-behavior` (`ChatView.module.css`); the
+   `interactive-widget=resizes-content` half waits for a real-phone keyboard check.
+8. **P15 (partial)** — `PhoneSheet` already has one header, a 44px close, focus trap, back-gesture layer and drag; the
+   chooser default is fixed (see P15 in the shipped list) and the dock now resumes its last real view. Unmounting
+   hidden dock views is still open (Dockview keeps every panel mounted).
+
+
 Goal: DSH on a phone (owner: Redmi, HyperOS, Android Chrome PWA over Tailscale HTTPS, ~393 CSS px, gesture navigation)
 feels as smooth and obvious as the best phone apps, for driving many agent threads: switch, read, steer, approve, land.
 

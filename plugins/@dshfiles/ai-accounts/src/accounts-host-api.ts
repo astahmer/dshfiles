@@ -30,6 +30,7 @@ import {
 } from './api.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { AccountProfilesModel } from './account-store.js'
+import { accountUsageCard } from './account-usage-card.js'
 import type { AccountStorePromise } from './account-store-promise.js'
 import { accountSessionRelatedIds } from './account-session-host.js'
 import { ModelCurationModel } from './model-curation-model.js'
@@ -457,12 +458,18 @@ const readQuotaResetAt = async (ctx: Context, store: AccountStorePromise, accoun
   const account = file.accounts.find(profile => profile.instanceId === accountId)
   if (account === undefined) return null
   return knownQuotaResetAt(
-    await readAccountUsage({
-      account,
-      shadowRoot: file.shadowRoot,
-      resolveCredential: resolveKeyFromContext(ctx),
-      readCopilotCredential: createCopilotCredentialsService(ctx.get('credentials')).read,
-      describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+    await boundedUsageRead({
+      read: signal =>
+        readAccountUsage({
+          account,
+          shadowRoot: file.shadowRoot,
+          resolveCredential: resolveKeyFromContext(ctx),
+          readCopilotCredential: createCopilotCredentialsService(ctx.get('credentials')).read,
+          describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+          readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
+          signal,
+        }),
+      timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
     }),
     Date.now(),
   )
@@ -484,28 +491,27 @@ const readAccountsUsage = async (ctx: Context, store: AccountStorePromise, signa
   const cards = await mapRolling({
     items: file.accounts,
     concurrency: ACCOUNT_USAGE_READ_CONCURRENCY,
-    map: async account => ({
-      instanceId: account.instanceId,
-      displayName: AccountProfilesModel.displayNameOf(account),
-      kind: account.kind,
-      enabled: account.enabled,
-      usage: ProviderUsageModel.stamped(
-        await boundedUsageRead({
-          read: readSignal =>
-            readAccountUsage({
-              account,
-              shadowRoot: file.shadowRoot,
-              resolveCredential,
-              readCopilotCredential,
-              describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
-              signal: readSignal,
-            }),
-          timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
-          signal,
-        }),
-        Date.now(),
-      ),
-    }),
+    map: async account =>
+      accountUsageCard({
+        account,
+        usage: ProviderUsageModel.stamped(
+          await boundedUsageRead({
+            read: readSignal =>
+              readAccountUsage({
+                account,
+                shadowRoot: file.shadowRoot,
+                resolveCredential,
+                readCopilotCredential,
+                describeAntigravity: accountRuntime(ctx)?.antigravity?.describe,
+                readAntigravityQuota: accountRuntime(ctx)?.antigravity?.readQuota,
+                signal: readSignal,
+              }),
+            timeoutMs: ACCOUNT_USAGE_READ_TIMEOUT_MS,
+            signal,
+          }),
+          Date.now(),
+        ),
+      }),
   })
   const usage = { readAt: Date.now(), hostName: hostname(), cards }
   // Every surface polls this sweep, so it is where a spent plan starts keeping requests off an account that may not draw

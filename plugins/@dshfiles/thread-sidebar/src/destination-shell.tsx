@@ -509,7 +509,8 @@ const FolderIndex = (props: {
       >
         <div className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
           <h2 className={cn('dshx:text-sm dshx:font-semibold', props.phone === true && 'dshx:sr-only')}>{folder.label}</h2>
-          <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>
+          {/* Phone pages already name the page in the top bar, and a one-line description only truncates there. */}
+          {props.phone === true ? null : <p className="dshx:text-xs dshx:text-muted-foreground">{folder.description}</p>}
         </div>
         {folderUi === undefined || resolved === undefined || props.phone === true ? null : (
           <FolderMenu folder={resolved} ui={folderUi} onRename={() => setRenaming(true)} />
@@ -527,7 +528,7 @@ const FolderIndex = (props: {
             {settings === null ? null : (
               <SectionButton label="All settings" description="Appearance, models, agents, tools and more." selected={false} onSelect={settings} />
             )}
-            {rows(mapped)}
+            {rows(mapped, props.phone !== true)}
             {folderUi === undefined || resolved === undefined || props.phone === true ? null : <AddPanelButton folder={resolved} ui={folderUi} />}
           </nav>
         )}
@@ -927,7 +928,10 @@ const PhoneNavigation = (
   // Only the Threads list resolves a page loaded on a thread link, and it is unmounted while the stage covers it: a
   // reload inside a thread restored the previous stage (often a New thread) and ignored the link. Show the list first;
   // resolving the link selects the thread, which pushes the stage like a tap.
+  const pageLoadSeen = useRef(false)
   useLayoutEffect(() => {
+    if (pageLoadSeen.current) return
+    pageLoadSeen.current = true
     const linked = pageLoadThreadRoute.pending(window.location.href)
     // The drawer's home is the stage: a page load starts with it closed, its list mounted hidden for a thread link.
     if (drawer) {
@@ -942,7 +946,7 @@ const PhoneNavigation = (
     if (listOpenRef.current) return
     listOpenRef.current = true
     toggleSidebar()
-  }, [])
+  }, [drawer, toggleSidebar, props])
   // A frame reveal (Reset layout, a palette "Go to…", recovery) expands the column: in drawer mode that opens the drawer
   // on the list it chose, and the column folds back. The page-load fold above is not a reveal.
   const revealSeen = useRef(false)

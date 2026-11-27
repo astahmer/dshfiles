@@ -13,8 +13,10 @@
  * header pinned above the scrolling list.
  */
 import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { useCloseWatcher } from '@dshfiles/plugin-ui/hooks/close-watcher'
 import { MenuSurface } from '@deepseek-ai/dsh-client-ui-primitives'
 import { Fragment, memo, useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { ReferenceIconRegular, useAnchoredMaxHeight } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale } from '@deepseek-ai/dsh-client-ui-slots'
@@ -154,7 +156,22 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
   useLayoutEffect(() => {
     updateOverflowHint()
   }, [state, maxHeight, updateOverflowHint])
+  useCloseWatcher(state.open, onDismiss)
   const highlight = state.open ? state.highlight : null
+  // Escape closes the picker wherever focus sits: the + button owns focus after
+  // a tap, so the controller's composer keydown never sees the key there.
+  useEffect(() => {
+    if (!state.open) return
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== 'Escape') return
+      event.preventDefault()
+      onDismiss()
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [state.open, onDismiss])
   // Focus stays in the textarea (combobox pattern), so the browser never
   // scrolls the active option into view on keyboard moves — do it here.
   useEffect(() => {
@@ -178,7 +195,7 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
     }
   }, [state.open, onDismiss])
   if (!state.open) return null
-  return (
+  const surface = (
     // The listbox role sits on the scrolling viewport, not this shell: a
     // breadcrumb header is not an option, and a listbox may not carry one.
     <MenuSurface ref={listRef} className={css.menu} style={{ maxHeight }} data-trigger-menu="" data-overflow-below={hasOverflowBelow || undefined}>
@@ -258,4 +275,8 @@ export function MenuView({ menu, headers, onPick, onCrumb, onHover, onDismiss, t
       </div>
     </MenuSurface>
   )
+  // The phone presents a picker as the app's bottom sheet; the kit rule positions it against the viewport, which
+  // only works once the surface leaves the composer's transformed card. Desktop keeps the anchored dropdown.
+  const phoneShell = typeof document !== 'undefined' && document.documentElement.hasAttribute('data-shell-phone-nav')
+  return phoneShell ? createPortal(surface, document.body) : surface
 }

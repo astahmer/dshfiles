@@ -3,6 +3,7 @@
 // synthetic test values only. Aliases map to vault items, so `unset` drops an alias while `rm` also deletes its item.
 import { existsSync, linkSync, mkdirSync, realpathSync, statSync } from 'node:fs'
 import { readFileSync, writeFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -114,4 +115,53 @@ if (command === 'print') {
   store.rows = store.rows.filter(row => !removed.includes(row))
   for (const row of removed) delete store.vault[row.item]
   save()
+} else if (command === 'mcp') {
+  // Minimal stdio JSON-RPC server: enough for the Host's secret_run path.
+  const send = payload => process.stdout.write(`${JSON.stringify(payload)}\n`)
+  const scrub = (text, secrets) => secrets.reduce((out, secret) => (secret.length === 0 ? out : out.split(secret).join('[scrubbed]')), text)
+  const runTool = arguments_ => {
+    const [executable, ...args] = arguments_.command ?? []
+    if (executable === undefined) return { exitCode: 1, timedOut: false, stdout: '', stderr: 'no command', injectedAliases: [] }
+    const rows = store.rows.filter(row => row.scope === 'global' || row.root === (arguments_.cwd ?? cwd))
+    const environment = arguments_.env ?? 'prod'
+    const injected = rows.filter(row => row.environment === environment)
+    const env = { ...process.env }
+    for (const row of injected) env[row.alias] = store.vault[row.item] ?? ''
+    const result = spawnSync(executable, args, { cwd: arguments_.cwd ?? cwd, env, encoding: 'utf8' })
+    const secrets = injected.map(row => store.vault[row.item] ?? '').filter(value => value.length > 0)
+    return {
+      exitCode: result.status ?? 1,
+      timedOut: false,
+      stdout: scrub(result.stdout ?? '', secrets),
+      stderr: scrub(result.stderr ?? '', secrets),
+      injectedAliases: injected.map(row => row.alias),
+    }
+  }
+  let buffer = ''
+  const handle = line => {
+    let message
+    try {
+      message = JSON.parse(line)
+    } catch {
+      return
+    }
+    if (message.method === 'initialize')
+      return send({ jsonrpc: '2.0', id: message.id, result: { protocolVersion: '2024-11-05', serverInfo: { name: 'secret', version: '2.1.3' } } })
+    if (message.method === 'tools/call') {
+      const tool = message.params?.name
+      const text = tool === 'secret_run' ? JSON.stringify(runTool(message.params?.arguments ?? {})) : JSON.stringify({ error: `unsupported tool ${tool}` })
+      return send({ jsonrpc: '2.0', id: message.id, result: { content: [{ type: 'text', text }] } })
+    }
+  }
+  process.stdin.setEncoding('utf8')
+  process.stdin.on('data', chunk => {
+    buffer += chunk
+    let index = buffer.indexOf('\n')
+    while (index >= 0) {
+      const line = buffer.slice(0, index).trim()
+      buffer = buffer.slice(index + 1)
+      index = buffer.indexOf('\n')
+      if (line.length > 0) handle(line)
+    }
+  })
 } else fail(`unsupported command ${command}`)
