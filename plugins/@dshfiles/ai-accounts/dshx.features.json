@@ -483,7 +483,7 @@
         "click text \"AI Accounts: Accounts\"",
         "click button \"Add account\"",
         "click button \"Vibe CLI account\"",
-        "expect button \"Copy Vibe sign-in command\""
+        "expect button \"Copy CLI sign-in command\""
       ],
       "surfaces": ["client", "host", "storage"],
       "surface": "settingsSection",
