@@ -38,6 +38,8 @@ export interface LazyChunkBuild {
   readonly unsupported: string | undefined
   /** The names the chunk reads from each shared module, by table key. */
   readonly used: ReadonlyMap<string, readonly string[]>
+  /** The chunk's own import() targets, each loaded as a sibling chunk: target id → chunk file. */
+  readonly nested: ReadonlyMap<string, string>
 }
 
 /** A module the entry hands its chunks: an ES module by the names they read, a CommonJS one as its `module.exports`. */
@@ -97,6 +99,35 @@ const exportNames = async (context: Rollup.PluginContext, id: string, seen: Set<
     for (const name of starred) if (name !== 'default') names.add(name)
   }
   return [...names]
+}
+
+/** The chunk an import() target loads from (recorded in `state.fileNames`), or undefined when it stays inlined. */
+const lazyTarget = async (
+  context: Rollup.PluginContext,
+  state: LazyChunkState,
+  root: string,
+  source: string,
+  importer: string,
+): Promise<{ readonly id: string; readonly fileName: string } | undefined> => {
+  const resolved = await context.resolve(source, importer, { skipSelf: true })
+  if (resolved === null || resolved.external !== false || resolved.id.startsWith('\0') || !isAbsolute(resolved.id) || state.inline.has(resolved.id))
+    return undefined
+  let fileName = state.fileNames.get(resolved.id)
+  if (fileName === undefined) {
+    fileName = chunkFileName(root, resolved.id, await chunkHash(root, resolved.id))
+    state.fileNames.set(resolved.id, fileName)
+  }
+  return { id: resolved.id, fileName }
+}
+
+/** Turn each rendered `import("dshxlazy:<file>")` into the factory's `require.async("./<file>")`. */
+const renderLazyImports = (code: string): string => {
+  const requireName = FACTORY_REQUIRE.exec(code)?.[1] ?? 'require'
+  return code.replace(RENDERED_IMPORT, (_match, quote: string, fileName: string) => {
+    const call = `${requireName}.async(`
+    // Pad a minified require name back to the length of `require.async(` so rendered columns stay mapped.
+    return `${call}${' '.repeat(Math.max(0, 'require.async('.length - call.length))}${quote}./${fileName}${quote})`
+  })
 }
 
 /** A stable table key: the module's path from the package root, hashed, so a key never leaks a machine path. */
@@ -224,16 +255,10 @@ export class ClientLazyChunks {
       },
       async resolveDynamicImport(source, importer) {
         if (typeof source !== 'string' || importer === undefined) return null
-        const resolved = await this.resolve(source, importer, { skipSelf: true })
-        if (resolved === null || resolved.external !== false || resolved.id.startsWith('\0') || !isAbsolute(resolved.id) || state.inline.has(resolved.id))
-          return null
-        let fileName = state.fileNames.get(resolved.id)
-        if (fileName === undefined) {
-          fileName = chunkFileName(options.root, resolved.id, await chunkHash(options.root, resolved.id))
-          state.fileNames.set(resolved.id, fileName)
-        }
-        targets.set(resolved.id, fileName)
-        return { id: `${MARKER}${fileName}`, external: true }
+        const target = await lazyTarget(this, state, options.root, source, importer)
+        if (target === undefined) return null
+        targets.set(target.id, target.fileName)
+        return { id: `${MARKER}${target.fileName}`, external: true }
       },
       async generateBundle(_output, bundle) {
         const entry = Object.values(bundle).find((item): item is Rollup.OutputChunk => item.type === 'chunk' && item.isEntry)
@@ -246,6 +271,8 @@ export class ClientLazyChunks {
         const inline = (id: string): void => {
           retry.push(id)
           ClientLazyChunks.release(state, id)
+          // A chunk that loads it as a sibling must be built again with it inlined.
+          for (const [other, cached] of state.cache) if (cached.nested.has(id)) state.cache.delete(other)
         }
         for (const [id, fileName] of targets) {
           let chunk = state.cache.get(id)
@@ -287,6 +314,14 @@ export class ClientLazyChunks {
             for (const name of names) module.used.add(name)
             const bound = state.bound.get(key)
             if (bound === undefined || (!module.commonJs && names.some(name => !bound.has(name)))) rebind.push(id)
+          }
+          // Its own import() targets load as sibling chunks; one it also bundles statically is inlined instead.
+          for (const [nested, nestedFile] of chunk.nested) {
+            if (chunk.modules.includes(nested)) {
+              state.inline.add(nested)
+              state.cache.delete(id)
+              rebind.push(id)
+            } else if (!targets.has(nested)) targets.set(nested, nestedFile)
           }
           built.set(fileName, chunk)
         }
@@ -333,12 +368,7 @@ export class ClientLazyChunks {
           if (options.watch) for (const module of chunk.modules) if (isAbsolute(module)) this.addWatchFile(module)
         }
         state.extraModules = [...built.values()].flatMap(chunk => chunk.modules)
-        const requireName = FACTORY_REQUIRE.exec(entry.code)?.[1] ?? 'require'
-        entry.code = entry.code.replace(RENDERED_IMPORT, (_match, quote: string, fileName: string) => {
-          const call = `${requireName}.async(`
-          // Pad a minified require name back to the length of `require.async(` so rendered columns stay mapped.
-          return `${call}${' '.repeat(Math.max(0, 'require.async('.length - call.length))}${quote}./${fileName}${quote})`
-        })
+        entry.code = renderLazyImports(entry.code)
         if (entry.code.includes(MARKER)) throw new DshxError('DSHX1101', 'A lazy import() target was rendered outside the DSH chunk protocol.')
       },
     }
@@ -349,7 +379,13 @@ export class ClientLazyChunks {
    * names once the owner has run (like the shared runtime's facades); a CommonJS facade re-exports the same
    * `module.exports`, so the chunk's own interop reads it exactly as the entry does.
    */
-  static chunkPlugin(options: { readonly root: string; readonly state: LazyChunkState; readonly packageId: string }): Plugin {
+  static chunkPlugin(options: {
+    readonly root: string
+    readonly state: LazyChunkState
+    readonly packageId: string
+    /** Filled with the chunk's own import() targets. */
+    readonly nested: Map<string, string>
+  }): Plugin {
     const { state } = options
     const keys = new Map([...state.shared].map(([key, module]) => [module.id, key]))
     const missing = (key: string): string =>
@@ -357,6 +393,16 @@ export class ClientLazyChunks {
     return {
       name: 'dshx-client-lazy-shared',
       enforce: 'pre',
+      buildStart() {
+        options.nested.clear()
+      },
+      async resolveDynamicImport(source, importer) {
+        if (typeof source !== 'string' || importer === undefined) return null
+        const target = await lazyTarget(this, state, options.root, source, importer)
+        if (target === undefined) return null
+        options.nested.set(target.id, target.fileName)
+        return { id: `${MARKER}${target.fileName}`, external: true }
+      },
       async resolveId(source, importer, resolveOptions) {
         if (source === OWNER_SPECIFIER) return { id: options.packageId, external: true }
         if (keys.size === 0 || importer === undefined || importer.startsWith(CHUNK_SHARED_PREFIX)) return null
@@ -391,7 +437,7 @@ export class ClientLazyChunks {
   }
 
   /** Reduce one standalone Vite build of an import() target to the chunk the entry loads. */
-  static chunkBuild(output: readonly (Rollup.OutputChunk | Rollup.OutputAsset)[], fileName: string): LazyChunkBuild {
+  static chunkBuild(output: readonly (Rollup.OutputChunk | Rollup.OutputAsset)[], fileName: string, nested: ReadonlyMap<string, string> = new Map()): LazyChunkBuild {
     const chunks = output.filter((item): item is Rollup.OutputChunk => item.type === 'chunk')
     const assets = output.filter((item): item is Rollup.OutputAsset => item.type === 'asset')
     const chunk = chunks.find(item => item.fileName === fileName)
@@ -403,18 +449,22 @@ export class ClientLazyChunks {
       ),
     )
     const unexpected = assets.filter(item => item !== map && !item.fileName.endsWith('.js.map'))
+    const code = renderLazyImports(chunk?.code ?? '')
     const unsupported =
       chunk === undefined || chunks.length !== 1
         ? 'it did not bundle into one chunk'
         : unexpected.length > 0
           ? `it emits ${unexpected.map(item => item.fileName).join(', ')}`
-          : undefined
+          : code.includes(MARKER)
+            ? 'an import() was rendered outside the DSH chunk protocol'
+            : undefined
     return {
-      code: chunk?.code ?? '',
+      code,
       map: map === undefined ? (chunk?.map?.toString() ?? undefined) : typeof map.source === 'string' ? map.source : Buffer.from(map.source).toString('utf8'),
       modules,
       unsupported,
       used,
+      nested: new Map(nested),
     }
   }
 }

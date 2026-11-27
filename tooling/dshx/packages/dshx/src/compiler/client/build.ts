@@ -652,6 +652,8 @@ async function resolveOptions(options: BuildClientOptions) {
 interface LazyChunkTarget {
   readonly input: string
   readonly fileName: string
+  /** Filled with the chunk's own import() targets, which load as sibling chunks. */
+  readonly nested: Map<string, string>
 }
 
 async function clientConfig(
@@ -743,11 +745,12 @@ async function clientConfig(
                   watch,
                   entryId: VIRTUAL_CLIENT_ENTRY,
                   buildChunk: async (chunkInput, fileName) => {
-                    const config = await clientConfig(paths, options, watch, lazyState, runtime, { input: chunkInput, fileName })
+                    const nested = new Map<string, string>()
+                    const config = await clientConfig(paths, options, watch, lazyState, runtime, { input: chunkInput, fileName, nested })
                     const result = await build({ ...config, build: { ...config.build, write: false, watch: null } })
                     const completed = Array.isArray(result) ? result[0] : result
                     if (completed === undefined || !('output' in completed)) throw new DshxError('DSHX1103', `Lazy chunk ${fileName} produced no output.`)
-                    return ClientLazyChunks.chunkBuild(completed.output, fileName)
+                    return ClientLazyChunks.chunkBuild(completed.output, fileName, nested)
                   },
                 }),
               ]
@@ -799,7 +802,7 @@ async function clientConfig(
         ]
       : [
           // First, so it also sees the specifiers the entry plugin resolves to virtual modules (@dshfiles/dshx/client).
-          ClientLazyChunks.chunkPlugin({ root: paths.root, state: lazyState, packageId: options.packageId }),
+          ClientLazyChunks.chunkPlugin({ root: paths.root, state: lazyState, packageId: options.packageId, nested: lazy.nested }),
           clientEntryPlugin(paths, options),
           ClientCompilerGuards.clientGuardPlugin(externals, options.packageId, bundleDependencies),
           ...userPlugins,

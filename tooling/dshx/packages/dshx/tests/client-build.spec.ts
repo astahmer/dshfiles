@@ -1737,6 +1737,29 @@ describe('client lazy chunks', () => {
     await expect(entry.apply()).resolves.toBe('virtual-thing shared')
   })
 
+  it('emits a lazy chunk own import() targets as sibling chunks instead of inlining them', async () => {
+    const root = await temporaryProject()
+    await writeFile(resolve(root, 'src/deeper.ts'), "export const deeper = 'deeper' + 'onlymarker'\n")
+    await writeFile(resolve(root, 'src/heavy.ts'), "export const heavy = () => import('./deeper').then(module => `heavy+${module.deeper}`)\n")
+    await writeFile(resolve(root, 'src/client.tsx'), lazyEntry.replace("import('./heavy').then(module => module.heavy)", "import('./heavy').then(module => module.heavy())"))
+    for (const minify of [false, true]) {
+      const report = await buildClient({ packageId: '@dshx/fixture-plugin', root, entry: 'src/client.tsx', outDir: 'dist', minify })
+      const heavyFile = chunkOf(report)
+      const deeperFile = report.output.find(item => /^client\.deeper\.[0-9a-f]{8}\.js$/u.test(item.fileName))?.fileName
+      expect(heavyFile).toBeDefined()
+      expect(deeperFile).toBeDefined()
+      const heavyCode = await readFile(resolve(root, 'dist', heavyFile!), 'utf8')
+      expect(heavyCode).not.toContain('onlymarker')
+      expect(heavyCode).toMatch(new RegExp(`\\.async\\(\\s*["'\`]\\./${deeperFile!.replaceAll('.', '\\.')}["'\`]\\)`, 'u'))
+      const { entry } = loadChunks({
+        entry: await readFile(resolve(root, 'dist/client.js'), 'utf8'),
+        heavy: heavyCode,
+        deeper: await readFile(resolve(root, 'dist', deeperFile!), 'utf8'),
+      })
+      await expect(entry.apply()).resolves.toBe('heavy+deeperonlymarker')
+    }
+  })
+
   it('shares the dshx client module, which the entry plugin resolves to a virtual module', async () => {
     const root = await temporaryProject()
     await writeFile(resolve(root, 'src/heavy.ts'), "import { defineContract } from '@dshfiles/dshx/client'\nexport const heavy = `${typeof defineContract} lazy` + 'only'\n")
