@@ -289,7 +289,7 @@ export class VibeCliSessions {
     const finishWithExport = (): void => {
       const readExport = (): VibeExport | null => {
         try {
-          const decoded = AiAccountsSchema.decodeResult(exportSchema, JSON.parse(readFileSync(join(outputDir, 'export.json'), 'utf8')))
+          const decoded = AiAccountsSchema.decodeResult(Schema.fromJsonString(exportSchema), readFileSync(join(outputDir, 'export.json'), 'utf8'))
           return decoded._tag === 'Success' ? decoded.success : null
         } catch {
           return null
