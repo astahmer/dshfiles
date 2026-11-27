@@ -3,7 +3,7 @@ import { useContract } from '@dshfiles/dshx/client'
 import { EmptyState } from '@dshfiles/plugin-ui/components/page'
 import { SlidingSegments } from '@dshfiles/plugin-ui/components/motion/sliding-segments'
 import { useSyncExternalStore } from 'react'
-import { accountOf, goToQuota, locationFor, type QuotaLocation } from './quota-location.js'
+import { QuotaLocations, type QuotaLocation } from './quota-location.js'
 
 const VIEW_LABELS = { accounts: 'Accounts', history: 'History', forecast: 'Forecast' } satisfies Record<UsageQuotaView, string>
 
@@ -13,7 +13,7 @@ const VIEW_LABELS = { accounts: 'Accounts', history: 'History', forecast: 'Forec
  */
 const QuotaTab = (props: { readonly panelId?: string | undefined }): JSX.Element => {
   const views = useContract(AccountQuotaViews)
-  const location = locationFor(props.panelId)
+  const location = QuotaLocations.for(props.panelId)
   const current = useSyncExternalStore(location.subscribe, location.get, location.get)
   if (views.status !== 'active')
     return (
@@ -23,7 +23,7 @@ const QuotaTab = (props: { readonly panelId?: string | undefined }): JSX.Element
           : 'Quota comes from the AI accounts plugin, which is not running. Turn it on in Settings › Plugins to see quota here.'}
       </EmptyState>
     )
-  const account = accountOf(current)
+  const account = QuotaLocations.accountOf(current)
   const View = current.view === 'accounts' ? views.value.Accounts : current.view === 'history' ? views.value.History : views.value.Forecast
   return (
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4" data-usage-quota={current.view}>
@@ -43,7 +43,7 @@ const QuotaTab = (props: { readonly panelId?: string | undefined }): JSX.Element
 export class UsageQuota {
   static readonly Tab = QuotaTab
   /** Land on a view (and account) of the Quota tab; the caller selects the Usage page and its Quota tab. */
-  static readonly go = goToQuota
+  static readonly go = QuotaLocations.go
   /** Where the Quota tab stands now. */
-  static readonly current = (panelId?: string): QuotaLocation => locationFor(panelId).get()
+  static readonly current = (panelId?: string): QuotaLocation => QuotaLocations.for(panelId).get()
 }

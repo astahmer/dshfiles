@@ -36,7 +36,7 @@ const createLocation = () => {
   }
 }
 const locations = new Map<string | undefined, ReturnType<typeof createLocation>>()
-export const locationFor = (panelId?: string) => {
+const locationFor = (panelId?: string) => {
   const key = panelId === undefined ? undefined : panelOccurrence({ panelId })
   const existing = locations.get(key)
   if (existing !== undefined) return existing
@@ -46,15 +46,21 @@ export const locationFor = (panelId?: string) => {
 }
 
 /** The account fields that are set, without carrying an explicit `undefined` into the location. */
-export const accountOf = (source: { readonly accountId?: string | undefined; readonly displayName?: string | undefined }): QuotaAccount => {
+const accountOf = (source: { readonly accountId?: string | undefined; readonly displayName?: string | undefined }): QuotaAccount => {
   const { accountId, displayName } = source
   if (accountId === undefined) return displayName === undefined ? {} : { displayName }
   return displayName === undefined ? { accountId } : { accountId, displayName }
 }
 
 /** Land on a view (and account) of the Quota tab; the caller selects the Usage page and its Quota tab. */
-export const goToQuota = (target: UsageQuotaTarget = {}, panelId?: string): void => {
+const goToQuota = (target: UsageQuotaTarget = {}, panelId?: string): void => {
   const location = locationFor(panelId)
   const current = location.get()
   location.set({ view: target.view ?? current.view, ...accountOf(target), visit: current.visit + 1 })
+}
+
+export class QuotaLocations {
+  static readonly for = locationFor
+  static readonly accountOf = accountOf
+  static readonly go = goToQuota
 }
