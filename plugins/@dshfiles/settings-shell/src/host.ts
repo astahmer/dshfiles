@@ -78,6 +78,16 @@ export default DshxPlugin.make({
           }),
         ),
       setPluginEnabled: input => PluginControls.use(controls => controls.setEnabled(input)),
+      bundles: input =>
+        PluginControls.use(controls =>
+          Effect.map(controls.listBundles, items => {
+            const needle = input.query?.trim().toLowerCase() ?? ''
+            return {
+              bundles: items.filter(bundle => needle === '' || `${bundle.name} ${bundle.packageDescription ?? ''}`.toLowerCase().includes(needle)),
+            }
+          }),
+        ),
+      setBundleEnabled: input => PluginControls.use(controls => controls.setBundleEnabled(input)),
     }),
   ],
 })

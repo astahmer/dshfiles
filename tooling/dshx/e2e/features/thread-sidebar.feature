@@ -329,6 +329,12 @@ Feature: Thread sidebar journeys
     And stopping the subagent from the dock takes a confirmation
     And the transcript row opens the subagent's thread
 
+  @scenario:thread-sidebar.all-settings-keeps-tab
+  Scenario: Clicking All settings in the Settings sidebar keeps the Settings tab open
+    Given the isolated plugin composition of "@dshfiles/frame-layout, @dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/settings-shell, @dshfiles/main-tabs" is booted
+    When Settings is opened from the destination rail
+    Then clicking All settings keeps the Settings tab open without switching back to a conversation tab
+
   @scenario:thread-sidebar.subagent-run-cards
   Scenario: Several working subagents each keep a whole row in the dock
     Given the isolated plugin composition of "@dshfiles/thread-sidebar, @dshfiles/session-controller, @dshfiles/rich-composer, @dshfiles/chat, @dshfiles/ai-accounts, @dshfiles/workspace-folder-picker" is booted

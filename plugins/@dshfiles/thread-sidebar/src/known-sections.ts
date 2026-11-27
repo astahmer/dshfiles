@@ -237,6 +237,14 @@ export const KNOWN_SECTIONS: readonly DestinationSection[] = [
     formerLabels: ['Secret Catalog: Secrets', 'Secrets'],
   },
   { panelId: 'plugins', destination: 'settings', label: 'Plugins', description: 'Installed plugins and the marketplace.', order: 4, formerLabels: ['Plugins'] },
+  // settings-shell's Plugins by category: right after Plugins, the list it regroups (ties keep this order).
+  {
+    panelId: 'dshfiles-plugin-list',
+    destination: 'settings',
+    label: 'Plugins by category',
+    description: 'Turn plugins on or off, grouped by area.',
+    order: 5,
+  },
   // capabilities-hub's two pages: beside the managers they open, after them (the plugin declares the same seats).
   {
     panelId: 'dshfiles-plugin-market',

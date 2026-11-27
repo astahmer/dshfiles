@@ -2,7 +2,7 @@ import type { BundleInfo } from '@deepseek-ai/dsh-plugin-manager/types'
 import * as Schema from 'effect/Schema'
 
 /** Literal text, or translations by language id with the English fallback core always fills. */
-const displayTextSchema = Schema.Union([
+export const displayTextSchema = Schema.Union([
   Schema.String,
   Schema.StructWithRest(Schema.Struct({ en: Schema.String }), [Schema.Record(Schema.String, Schema.String)]),
 ])
@@ -12,6 +12,7 @@ export const bundleLabelSchema = Schema.Struct({
   rowId: Schema.String,
   moduleName: Schema.String,
   bundleName: Schema.String,
+  official: Schema.optional(Schema.Boolean),
   title: Schema.optional(displayTextSchema),
   description: Schema.optional(displayTextSchema),
   bundleDescription: Schema.optional(Schema.String),
@@ -56,6 +57,7 @@ export const bundleLabelsOf = (bundles: readonly BundleInfo[]): readonly BundleL
       rowId: row.rowId,
       moduleName: row.moduleName,
       bundleName: bundle.name,
+      official: bundle.official,
       title: row.meta?.title ?? bundle.meta?.title,
       description: row.meta?.description ?? bundle.meta?.description,
       bundleDescription: bundle.description,

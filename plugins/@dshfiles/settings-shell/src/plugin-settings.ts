@@ -1,5 +1,6 @@
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
+import { Origin, type SettingsEntryOrigin } from './origin.js'
 import { SettingsSchemaModel, type JsonValue, type LocalizedTextReader, type SettingField } from './schema-form/schema-model.js'
 
 /** One settings namespace, as `settings.describe` reports it. */
@@ -17,6 +18,8 @@ interface NamespaceDescription {
 export interface NamespaceLabel {
   readonly title: string
   readonly description: string
+  readonly bundleName?: string | undefined
+  readonly official?: boolean | undefined
 }
 
 export interface PluginSettingsPage {
@@ -26,6 +29,9 @@ export interface PluginSettingsPage {
   readonly title: string
   readonly description: string
   readonly group: 'plugins' | 'more'
+  /** From the bundle manifest; absent until the bundle labels load. */
+  readonly origin?: SettingsEntryOrigin | undefined
+  readonly bundleName?: string | undefined
   readonly fields: readonly SettingField[]
   /** Dotted paths of the fields the user layer sets, for the `@modified` search filter. */
   readonly modifiedPaths: readonly string[]
@@ -33,6 +39,9 @@ export interface PluginSettingsPage {
 
 const PAGE_PREFIX = 'plugin:'
 const translationsSchema = Schema.Record(Schema.String, Schema.String)
+
+const originOfLabel = (label: NamespaceLabel | undefined): SettingsEntryOrigin | undefined =>
+  label?.bundleName === undefined || label.bundleName === '' ? undefined : Origin.settingsOfBundle({ name: label.bundleName, official: label.official })
 
 export class SettingsPluginPages {
   static pluginPageId = (ns: string): string => `${PAGE_PREFIX}${ns}`
@@ -54,6 +63,7 @@ export class SettingsPluginPages {
         if (fields.length === 0) return []
         const own = SettingsSchemaModel.namespaceText({ schema: namespace.schema, text: input.text })
         const label = input.labels.get(namespace.ns)
+        const origin = originOfLabel(label)
         return [
           {
             pageId: SettingsPluginPages.pluginPageId(namespace.ns),
@@ -61,6 +71,8 @@ export class SettingsPluginPages {
             title: label?.title || own.title || SettingsSchemaModel.humanizeKey(namespace.ns.replace(/^dshfiles-/u, '')),
             description: own.description || label?.description || '',
             group: namespace.autoGenerate ? ('plugins' as const) : ('more' as const),
+            origin,
+            bundleName: label?.bundleName,
             fields,
             modifiedPaths: fields.filter(field => SettingsSchemaModel.hasValueAt(namespace.user, field.path)).map(field => field.path.join('.')),
           },

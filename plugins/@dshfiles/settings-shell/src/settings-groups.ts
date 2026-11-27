@@ -1,5 +1,9 @@
+import { Origin, type SettingsEntryOrigin } from './origin.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import type { SettingField } from './schema-form/schema-model.js'
+
+/** The Settings section of the second plugin view: every bundle by area, with its switch and a Settings shortcut. */
+export const DSHFILES_PLUGINS_SECTION_ID = 'dshfiles-plugins'
 
 /**
  * The task groups of the one Settings page (plan `docs/ade-ux` §4.6). Settings are grouped by what the user is doing,
@@ -111,11 +115,71 @@ const SECTION_PLACEMENT: Readonly<Record<string, Placement>> = {
   'dshfiles-thread-share': { group: 'hosts', order: 30 },
   'dshfiles-conversation-cleanup': { group: 'security', order: 45 },
   plugins: { group: 'plugins', order: 0 },
+  [DSHFILES_PLUGINS_SECTION_ID]: { group: 'plugins', label: 'Plugins by category', order: 2 },
   // thread-sidebar's Update DSH (fetch, What's new, sync and rebuild, then Restart when idle).
   'dshfiles-update-dsh': { group: 'about', label: 'Update DSH', order: 5 },
   // dshmarket's own settings section: the community catalog, a full page of its own. Unplaced, it landed under "Other".
   market: { group: 'plugins', label: 'Plugin Market', order: 10 },
 }
+
+/** Sections shipped as stock DSH defaults (even when ported or extended by a dshfiles shell). */
+const CORE_SECTIONS: ReadonlySet<string> = new Set(['general', 'account', 'models', 'agent-presets', 'archived-sessions', 'plugins'])
+
+/**
+ * Settings namespaces of stock DSH. They stay DSH defaults when a dshfiles fork now serves them (`agent-loop` from
+ * `@dshfiles/agent-loop`): the category is DSH's, whoever draws it.
+ */
+const CORE_NAMESPACES: ReadonlySet<string> = new Set([
+  'locale',
+  'ui-theme',
+  'ui-settings',
+  'permission',
+  'llm-deepseek',
+  'llm-deepseek-account',
+  'ui-settings-account',
+  'llm-pi-ai',
+  'agent-default-model',
+  'agent-preset-registry',
+  'agent-loop',
+  'subagent',
+  'subagent-model-selection-settings',
+  'web-search-deepseek',
+  'web-deepseek-api',
+  'web',
+  'bash-sandbox',
+  'session-log-deepseek',
+])
+
+/** Known owning bundles for plugin-registered settings sections that do not merge a page carrying bundleName. */
+const SECTION_BUNDLES = new Map<string, string>([
+  ['thread-sidebar', '@dshfiles/thread-sidebar'],
+  ['dshfiles-status-bar', '@dshfiles/frame-layout'],
+  ['thread-notifications', '@dshfiles/thread-sidebar'],
+  ['ai-accounts', '@dshfiles/ai-accounts'],
+  ['dshfiles-mcp-endpoint', '@dshfiles/mcp-endpoint'],
+  ['dshfiles-new-thread', '@dshfiles/workspace-folder-picker'],
+  ['dshfiles-workspace-folder-picker-projects', '@dshfiles/workspace-folder-picker'],
+  ['dshfiles-thread-share', '@dshfiles/thread-share'],
+  ['dshfiles-conversation-cleanup', '@dshfiles/conversation-cleanup'],
+  ['dshfiles-network-access', '@dshfiles/phone-pairing'],
+  [DSHFILES_PLUGINS_SECTION_ID, '@dshfiles/settings-shell'],
+  ['dshfiles-update-dsh', '@dshfiles/thread-sidebar'],
+  ['market', 'dshmarket'],
+])
+
+/** Known owning bundles for stage pages linked from Settings or listed in its Pages group. */
+const LINK_BUNDLES = new Map<string, string>([
+  ['ai-accounts', '@dshfiles/ai-accounts'],
+  ['mcp-servers', '@dshfiles/mcp-servers'],
+  ['secret-catalog', '@dshfiles/secret-catalog'],
+  ['dshfiles-multi-host-hosts', '@dshfiles/multi-host'],
+  ['dshfiles-agents', '@dshfiles/agents'],
+  // The Pages group's rows (`DESTINATION_PAGES`).
+  ['dshfiles-plugin-market', '@dshfiles/capabilities-hub'],
+  ['dshfiles-capabilities-hub', '@dshfiles/capabilities-hub'],
+  ['component-gallery', '@dshfiles/component-gallery'],
+  ['dshfiles-plugin-guide', '@dshfiles/plugin-guide'],
+])
 
 /** Settings namespaces (Loader row ids), including DSH core rows that only have a package name for a title. */
 const NAMESPACE_PLACEMENT: Readonly<Record<string, Placement>> = {
@@ -290,6 +354,8 @@ const SECTIONS_LINKING_THEIR_PAGE: ReadonlySet<string> = new Set(['ai-accounts']
 /** The entry that holds every Jev setting (key, enable, thresholds), wherever the plugin that uses it stores them. */
 export const JEV_ENTRY_ID = 'jev'
 
+export type SettingsOriginFilter = 'all' | SettingsEntryOrigin
+
 /** One row in the Settings navigation: what opens when it is picked. */
 export interface SettingsEntry {
   /** Nav id: a section id, a `plugin:<namespace>` page id, `link:<panelId>`, `jev` or a merged entry (`layout`). */
@@ -297,6 +363,10 @@ export interface SettingsEntry {
   readonly group: SettingsGroupId
   readonly label: string
   readonly order: number
+  /** Whether this category belongs to stock DSH or a DSH plugin. */
+  readonly origin: SettingsEntryOrigin
+  /** Owning plugin bundle name when known (for example `@dshfiles/main-tabs`). */
+  readonly bundleName?: string | undefined
   /** The native or plugin `settings.section` it renders. */
   readonly sectionId?: string
   /** The section's own name, when it is one block of an entry named after a task: drawn as that block's subheading. */
@@ -328,6 +398,19 @@ const placementOfNamespace = (ns: string): Placement => {
 }
 
 const placementOfSection = (id: string): Placement => SECTION_PLACEMENT[id] ?? { group: 'other' }
+
+const originOfSection = (id: string): SettingsEntryOrigin => (CORE_SECTIONS.has(id) ? 'dsh' : 'plugin')
+
+/** DSH core's one-row-per-tool-or-model namespaces, assumed DSH only until the bundle labels name their owner. */
+const CORE_NAMESPACE_PREFIXES = ['tool-', 'agent-'] as const
+
+const originOfPage = (page: PluginSettingsPage): SettingsEntryOrigin => {
+  if (CORE_NAMESPACES.has(page.ns)) return 'dsh'
+  if (page.origin !== undefined) return page.origin
+  return CORE_NAMESPACE_PREFIXES.some(prefix => page.ns.startsWith(prefix)) ? 'dsh' : 'plugin'
+}
+
+const originOfLink = (panelId: string): SettingsEntryOrigin => (panelId === 'plugins' ? 'dsh' : 'plugin')
 
 /** "tool-subagent/model-deepseek" → "Model deepseek"; "dshfiles-main-tabs" → "Main tabs". */
 const humanizeId = (id: string): string => {
@@ -381,6 +464,12 @@ const groupEntries = (input: {
     group: SettingsGroupId
     label: string
     order: number
+    /** DSH's when its section or any block is stock DSH's (a DSH category, whoever draws it), a plugin's otherwise. */
+    origin: SettingsEntryOrigin
+    /** The one bundle behind the entry; unset for a merged entry, whose blocks come from several. */
+    bundleName?: string | undefined
+    /** One task several plugins share (`MERGED_ENTRIES`): no single bundle to name. */
+    merged?: boolean
     sectionId?: string
     sectionLabel?: string
     /** Each page with its place among the entry's blocks. */
@@ -398,30 +487,55 @@ const groupEntries = (input: {
     if (merged === undefined) return undefined
     const existing = entries.get(id)
     if (existing !== undefined) return existing
-    const draft: Draft = { group: merged.group, label: merged.label, order: merged.order, pages: [], hiddenPages: [], keywords: [id] }
+    const draft: Draft = {
+      group: merged.group,
+      label: merged.label,
+      order: merged.order,
+      origin: 'plugin',
+      merged: true,
+      pages: [],
+      hiddenPages: [],
+      keywords: [id, 'plugin'],
+    }
     entries.set(id, draft)
     return draft
   }
   /** What a placement's `entry` names: an entry id, the entry drawing that section, or a merged entry. */
   const entryNamed = (id: string): Draft | undefined => entries.get(id) ?? [...entries.values()].find(entry => entry.sectionId === id) ?? mergedEntry(id)
+  /** A block joins an entry: a merged entry becomes DSH's with its first DSH block; a single-plugin entry learns its bundle. */
+  const join = (target: Draft, origin: SettingsEntryOrigin, bundleName: string | undefined): void => {
+    if (target.merged === true) {
+      if (origin === 'dsh' && target.origin !== 'dsh') {
+        target.origin = 'dsh'
+        target.keywords.push(...Origin.keywords({ origin, bundleName: undefined }))
+      }
+      return
+    }
+    if (target.bundleName === undefined && bundleName !== undefined && target.origin === 'plugin') target.bundleName = bundleName
+  }
   for (const section of input.sections) {
     const placement = placementOfSection(section.id)
+    const origin = originOfSection(section.id)
+    const bundleName = SECTION_BUNDLES.get(section.id)
     const merged = placement.entry === undefined ? undefined : mergedEntry(placement.entry)
     // A merged entry draws one section as a block under the task's name; a second one keeps its own row.
     if (merged !== undefined && merged.sectionId === undefined) {
       merged.sectionId = section.id
       merged.sectionLabel = placement.label ?? section.label
       merged.keywords.push(section.id, section.label)
+      join(merged, origin, bundleName)
       continue
     }
     entries.set(section.id, {
       group: placement.group,
       label: placement.label ?? section.label,
       order: placement.entry === undefined ? (placement.order ?? 100 + section.order) : 100 + section.order,
+      origin,
+      bundleName,
       sectionId: section.id,
       pages: [],
       hiddenPages: [],
-      keywords: [section.id, section.label],
+      keywords: [section.id, section.label, ...Origin.keywords({ origin, bundleName })],
     })
   }
   const jevPages: PluginSettingsPage[] = []
@@ -465,14 +579,18 @@ const groupEntries = (input: {
     pending.push({ page: { ...original, title, fields: rest }, placement: placementOfNamespace(original.ns) })
   }
   const standAlone = (page: PluginSettingsPage, placement: Placement): void => {
+    const origin = originOfPage(page)
+    const bundleName = origin === 'plugin' ? page.bundleName : undefined
     entries.set(page.pageId, {
       group: placement.group,
       label: page.title,
       // A page that meant to join an entry which is not loaded keeps its group but not the block position it had there.
       order: placement.entry === undefined ? (placement.order ?? 200) : 200,
+      origin,
+      bundleName,
       pages: [{ page, order: 0 }],
       hiddenPages: [],
-      keywords: [page.ns, page.title],
+      keywords: [page.ns, page.title, ...Origin.keywords({ origin, bundleName })],
     })
   }
   // Pages with a row of their own come first, so a page joins its entry whatever order the Host listed them in.
@@ -486,15 +604,19 @@ const groupEntries = (input: {
     }
     target.pages.push({ page, order: placement.order ?? 0 })
     target.keywords.push(page.ns, page.title)
+    const origin = originOfPage(page)
+    join(target, origin, origin === 'plugin' ? page.bundleName : undefined)
   }
   if (jevPages.length > 0) {
     entries.set(JEV_ENTRY_ID, {
       group: 'tools',
       label: 'Jev',
       order: 40,
+      origin: 'plugin',
+      bundleName: '@dshfiles/settings-shell',
       pages: jevPages.map(page => ({ page, order: 0 })),
       hiddenPages: [],
-      keywords: ['jev', 'typesafe', 'classifier', ...jevPages.map(page => page.ns)],
+      keywords: ['jev', 'typesafe', 'classifier', 'plugin', ...jevPages.map(page => page.ns)],
     })
   }
   for (const link of PAGE_LINKS) {
@@ -510,16 +632,21 @@ const groupEntries = (input: {
       target.link = link
       target.label = link.label
       target.keywords.push(link.panelId)
+      join(target, originOfLink(link.panelId), LINK_BUNDLES.get(link.panelId))
       continue
     }
+    const origin = originOfLink(link.panelId)
+    const bundleName = origin === 'plugin' ? LINK_BUNDLES.get(link.panelId) : undefined
     entries.set(`link:${link.panelId}`, {
       group: link.group,
       label: link.label,
       order: link.order,
+      origin,
+      bundleName,
       pages: [],
       hiddenPages: [],
       link,
-      keywords: [link.panelId, link.description],
+      keywords: [link.panelId, link.description, ...Origin.keywords({ origin, bundleName })],
     })
   }
   const linked = new Set([...entries.values()].flatMap(entry => (entry.link === undefined ? [] : [entry.link.panelId])))
@@ -527,7 +654,20 @@ const groupEntries = (input: {
   const pageRows: SettingsEntry[] = DESTINATION_PAGES.flatMap((page, index) =>
     !input.panels.has(page.panelId) || linked.has(page.panelId) || named.has(page.label.toLowerCase())
       ? []
-      : [{ id: `page:${page.panelId}`, group: 'pages', label: page.label, order: index, pages: [], hiddenPages: [], opens: page.panelId, keywords: page.panelId }],
+      : [
+          {
+            id: `page:${page.panelId}`,
+            group: 'pages',
+            label: page.label,
+            order: index,
+            origin: originOfLink(page.panelId),
+            bundleName: originOfLink(page.panelId) === 'plugin' ? LINK_BUNDLES.get(page.panelId) : undefined,
+            pages: [],
+            hiddenPages: [],
+            opens: page.panelId,
+            keywords: page.panelId,
+          },
+        ],
   )
   const byGroup = new Map<SettingsGroupId, SettingsEntry[]>(pageRows.length === 0 ? [] : [['pages', pageRows]])
   for (const [id, entry] of entries) {
@@ -536,6 +676,8 @@ const groupEntries = (input: {
       group: entry.group,
       label: entry.label,
       order: entry.order,
+      origin: entry.origin,
+      bundleName: entry.bundleName,
       // Blocks in their placed order; equal orders keep the order the Host listed them in.
       pages: entry.pages.toSorted((left, right) => left.order - right.order).map(block => block.page),
       hiddenPages: entry.hiddenPages,
@@ -588,6 +730,32 @@ const groupOfNamespace = (ns: string): SettingsGroupId =>
 /** The group a `settings.section` is placed in; `other` when nobody placed it. */
 const groupOfSection = (id: string): SettingsGroupId => placementOfSection(id).group
 
+const filterByOrigin = (groups: readonly GroupedEntries[], filter: SettingsOriginFilter): readonly GroupedEntries[] => {
+  if (filter === 'all') return groups
+  return groups.flatMap(group => {
+    const entries = group.entries.filter(entry => entry.origin === filter)
+    return entries.length === 0 ? [] : [{ group: group.group, entries }]
+  })
+}
+
+export interface SettingsOriginCounts {
+  readonly all: number
+  readonly dsh: number
+  readonly plugin: number
+}
+
+const originCounts = (groups: readonly GroupedEntries[]): SettingsOriginCounts => {
+  let dsh = 0
+  let plugin = 0
+  for (const group of groups) {
+    for (const entry of group.entries) {
+      if (entry.origin === 'dsh') dsh += 1
+      else plugin += 1
+    }
+  }
+  return { all: dsh + plugin, dsh, plugin }
+}
+
 export class SettingsGroups {
   static readonly group = groupEntries
   static readonly groupOfNamespace = groupOfNamespace
@@ -595,6 +763,8 @@ export class SettingsGroups {
   static readonly entryFor = entryFor
   static readonly entryForField = entryForField
   static readonly searchablePages = searchablePages
+  static readonly filterByOrigin = filterByOrigin
+  static readonly originCounts = originCounts
   static readonly pageTitle = pageTitle
   static readonly humanizeId = humanizeId
   static readonly isJevField = isJevField

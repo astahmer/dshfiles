@@ -8,6 +8,10 @@
 
 ![Settings grouped by task, with deep links](docs/screenshots/settings-task-groups.png)
 
+![Settings sidebar distinguishing default DSH and plugin categories](docs/screenshots/settings-origin-distinction.png)
+
+![Plugins by category](docs/screenshots/dshfiles-plugins-page.png)
+
 ![Edit plugin settings as JSON](docs/screenshots/settings-json-editor.png)
 
 DSH's Settings, rebuilt as a plugin so it can grow VS Code-style behaviour the native shell has no seat for.
@@ -39,10 +43,23 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
 - **Advanced**: a field marked with schemastery's `.collapse()` (or held by an object marked so) sits under a closed
   **Advanced (n)** control at the end of its page. It opens by itself when one of its settings is modified or
   focused from a link, and search results never fold.
-- **Deep links**: **AI accounts**, **MCP servers**, **Secrets** and **Hosts** are entries that open the page their plugin
+- **Deep links**: **AI accounts**, **MCP servers**, **Secrets**, **Hosts** and **Installed plugins** are entries that open the page their plugin
   owns (_Open MCP servers_); Settings links them instead of copying their UI. AI accounts appears once: its section,
   its plugin settings and the link to the accounts page share one entry. Every Jev setting (enable, key, thresholds) of
   every plugin sits under **Tools & MCP › Jev**; the plugin's own page says so and links there.
+- **DSH defaults and plugins**: every entry is either a category stock DSH ships (_DSH default_) or one a plugin adds
+  (_Plugin_); the page header carries that badge, and so does each page in the search results. An **All / DSH /
+  Plugins** filter beside the search narrows the categories, the side column's list and the search results by source;
+  on a phone it sits above the category list. A stock DSH category stays DSH when a dshfiles fork serves it (Agent
+  loop), and an entry that joins several plugins' settings is DSH's when any of them is (Web search and fetch). Opening
+  an entry of the other source from elsewhere shows every category again.
+- **Plugins by category**: a second view of the installed plugins, beside DSH core's **Plugins** manager (which installs,
+  updates and lists them). It is both **Settings › Plugins › Plugins by category** and a stage panel
+  (`dshfiles-plugin-list`) the sidebar can pin; **Open Plugins manager** goes to the core list. It shows the profile's
+  `@dshfiles/*` bundles grouped by functional area with live search, source (`dshfiles` / `Community` / `All`) and status (`All` / `Enabled` / `Disabled`)
+  filters, quick enable/disable switches backed by `PluginManager.setBundleEnabled`, restart-required and Not installed
+  badges, and direct **Settings** links to jump to each plugin's configuration page. The functional area comes from
+  `src/bundle-categories.ts`; its test fails when a new `plugins/@dshfiles/*` bundle is not placed there.
 - **Scope**: plugin pages say they apply to every project and thread. No setting stores a per-project or per-thread
   value today, so the page shows that as information instead of a scope control it could not honour. Project or
   thread scopes, VS Code's precedence rules, a JSON view of the YAML profile patch, migrating existing YAML or

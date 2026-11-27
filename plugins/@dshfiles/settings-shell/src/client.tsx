@@ -3,6 +3,7 @@ import type {} from '@deepseek-ai/dsh-api-settings-controller/remote'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type { ClientReleaseChange } from '@deepseek-ai/dsh-client-modules/client'
 import type {} from '@deepseek-ai/dsh-plugin-manager/remote'
+import type {} from '@deepseek-ai/dsh-client-ui-plugin-manager/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-client-connection/client'
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 
@@ -30,6 +31,7 @@ import { TabPlaceGlyphs } from '@dshfiles/workbench/tab-status'
 import { createActor } from '@dshfiles/plugin-ui/machine'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
+import { LayoutListIcon } from '@dshfiles/plugin-ui/icons'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
 import type * as Types from 'effect/Types'
@@ -54,12 +56,13 @@ import { bundleLabelsOf, namespaceLabelOf, type BundleLabel } from './bundle-lab
 import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
+import { DshfilesPluginsPage, PluginListLauncher } from './dshfiles-plugins-page.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { SettingsForm } from './schema-form/settings-form.js'
 import { SettingsPluginPages, type NamespaceLabel, type PluginSettingsPage } from './plugin-settings.js'
-import { SettingsGroups, type GroupedEntries } from './settings-groups.js'
+import { DSHFILES_PLUGINS_SECTION_ID, SettingsGroups, type GroupedEntries, type SettingsOriginFilter } from './settings-groups.js'
 import { SettingsNavigationModel } from './navigation-state.js'
 import { SettingsNavigation, type SettingsNavigationService, type SettingsNavigationState } from './settings-navigation.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
@@ -79,6 +82,8 @@ import {
 
 /** The main panel Settings fills when it opens as a tab; main-tabs names the tab "Settings" from this id. */
 const SETTINGS_PANEL_ID = 'dshfiles-settings'
+/** Plugins by category as a stage panel the sidebar can pin. */
+const PLUGIN_LIST_PANEL_ID = 'dshfiles-plugin-list'
 const SETTINGS_NAMESPACE = 'dshfiles-settings-shell'
 const PUBLISH_SETTLE_MS = 250
 const OPEN_SETTINGS_COMMAND = 'settings.open'
@@ -230,10 +235,8 @@ export default defineClient({
     const installLabels = (rows: readonly BundleLabel[]): void => {
       const next = new Map<string, NamespaceLabel>()
       for (const row of rows) {
-        next.set(
-          row.rowId,
-          namespaceLabelOf(row, text => ctx.locale.resolveText(text)),
-        )
+        // The bundle names who ships the namespace (stock DSH or a plugin) for the Settings source filter.
+        next.set(row.rowId, { ...namespaceLabelOf(row, text => ctx.locale.resolveText(text)), bundleName: row.bundleName, official: row.official })
       }
       labels.set(next)
     }
@@ -377,7 +380,14 @@ export default defineClient({
     // Search rows: sections under their entry's name and group, so "Models & accounts" or "AI accounts" find them.
     const searchRows = (grouped: readonly GroupedEntries[]): readonly SectionRow[] =>
       grouped.flatMap(({ group, entries }) =>
-        entries.map(entry => ({ id: entry.id, order: entry.order, label: entry.label, keywords: `${group.label} ${entry.keywords}` })),
+        entries.map(entry => ({
+          id: entry.id,
+          order: entry.order,
+          label: entry.label,
+          origin: entry.origin,
+          bundleName: entry.bundleName,
+          keywords: `${group.label} ${entry.keywords}`,
+        })),
       )
     let shortcutSource: readonly ShortcutCatalogEntry[] | undefined
     let shortcutRows: readonly ShortcutRow[] = []
@@ -491,6 +501,8 @@ export default defineClient({
     const columns = createSnapshotStore(0)
     // With the Workbench, Settings opens as its pane (the hub), which keeps its own category and search.
     const hubShown = createSnapshotStore<SettingsHubShown | undefined>(undefined)
+    // The stage page's All / DSH / Plugins filter: the side column lists the same categories it shows.
+    const originFilter = createSnapshotStore<SettingsOriginFilter>('all')
     let navigationInputs: readonly unknown[] = []
     let navigationLast: SettingsNavigationState | undefined
     const navigationSnapshot = (): SettingsNavigationState => {
@@ -499,10 +511,12 @@ export default defineClient({
       const entries = sectionEntries.getSnapshot()
       const catalog = ctx.shortcuts.catalog.getSnapshot()
       const hub = hubShown.getSnapshot()
+      // The docked hub keeps its own filter, so the column follows only the stage page's.
+      const filter = hub === undefined ? originFilter.getSnapshot() : 'all'
       const open = hub !== undefined || snapshot.matches('tab')
       const sectionId = hub === undefined ? snapshot.context.sectionId : hub.activeId
       const query = hub === undefined ? snapshot.context.query : hub.query
-      const inputs = [grouped, entries, catalog, open, sectionId, query]
+      const inputs = [grouped, entries, catalog, open, sectionId, query, filter]
       if (navigationLast !== undefined && inputs.every((value, index) => value === navigationInputs[index])) return navigationLast
       const counts =
         query.trim() === ''
@@ -515,7 +529,7 @@ export default defineClient({
               shortcuts: shortcutsFor(catalog),
             }).counts
       navigationInputs = inputs
-      navigationLast = SettingsNavigationModel.state({ groups: grouped, open, sectionId, counts })
+      navigationLast = SettingsNavigationModel.state({ groups: SettingsGroups.filterByOrigin(grouped, filter), open, sectionId, counts })
       return navigationLast
     }
     /** While searching, a category with matches scrolls the results to them, as the page's own list did. */
@@ -537,6 +551,7 @@ export default defineClient({
             sectionEntries.subscribe(listener),
             ctx.shortcuts.catalog.subscribe(listener),
             hubShown.subscribe(listener),
+            originFilter.subscribe(listener),
           ]
           return () => disposers.forEach(dispose => dispose())
         },
@@ -621,6 +636,7 @@ export default defineClient({
       }, [])
       const tabsLoaded = useObservable(mainTabsLoaded)
       const columnNavigation = useObservable(columns) > 0
+      const filter = useObservable(originFilter)
       if (!open || host === null) return null
       const view = settingsViewProps({
         renderSlot: props.renderSlot,
@@ -634,7 +650,16 @@ export default defineClient({
         shortcuts: shortcutsFor(catalog),
       })
       // With main-tabs the strip closes the tab; without it the header keeps a way back to the previous view.
-      return <SettingsTab {...view} columnNavigation={columnNavigation} host={host} onClose={tabsLoaded ? undefined : deps.closeSettings} />
+      return (
+        <SettingsTab
+          {...view}
+          columnNavigation={columnNavigation}
+          host={host}
+          onClose={tabsLoaded ? undefined : deps.closeSettings}
+          onOriginFilter={next => originFilter.set(next)}
+          originFilter={filter}
+        />
+      )
     }
 
     // The sidebar.settings entry remains the only settings.section declarer. Panels borrow its renderer; they never
@@ -1030,6 +1055,60 @@ export default defineClient({
         ),
       )
     }
+    // A second view of the installed plugins, beside DSH core's Plugins manager: a Settings section and a stage panel.
+    const PluginsByCategory = (props: { readonly onOpenSettings?: ((sectionId: string) => void) | undefined }): JSX.Element => {
+      const grouped = useObservable(groups)
+      return (
+        <DshfilesPluginsPage
+          groups={grouped}
+          onOpenPluginManager={() => openPanel('plugins')}
+          onOpenSettings={props.onOpenSettings ?? openSettings}
+          resolveLocaleText={text => ctx.locale.resolveText(text)}
+          t={t}
+        />
+      )
+    }
+    ctx.slots.inject('settings.section', () =>
+      ctx.slots.register(
+        {
+          name: 'settings.section',
+          id: DSHFILES_PLUGINS_SECTION_ID,
+          order: 2,
+          label: () => t('pluginsPage.nav'),
+          locale: SHELL_LOCALE_NAMESPACE,
+        },
+        decorate((props: { readonly openSection?: (sectionId: string) => void }) => <PluginsByCategory onOpenSettings={props.openSection} />),
+      ),
+    )
+    ctx.slots.inject('sidebar.panellist', () =>
+      ctx.slots.register(
+        { name: 'sidebar.panellist', id: PLUGIN_LIST_PANEL_ID, order: 90, label: () => t('pluginsPage.nav') },
+        (props: { readonly size?: number }) => <LayoutListIcon aria-hidden size={props.size ?? 18} strokeWidth={1.6} />,
+      ),
+    )
+    ctx.slots.inject('main', () =>
+      ctx.slots.register(
+        { name: 'main', key: PLUGIN_LIST_PANEL_ID },
+        decorate(() => (
+          <section
+            aria-label={t('pluginsPage.nav')}
+            className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:gap-3 dshx:overflow-y-auto dshx:p-4"
+          >
+            <h2 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground">{t('pluginsPage.nav')}</h2>
+            <PluginsByCategory />
+          </section>
+        )),
+      ),
+    )
+    // DSH core's Plugins manager has no banner seat; its first card group (plugins.item) points to this view instead.
+    ctx.slots.inject('plugins.item', () =>
+      ctx.slots.register(
+        { name: 'plugins.item', id: PLUGIN_LIST_PANEL_ID, order: 0, label: () => t('pluginsPage.nav') },
+        decorate((props: { readonly view: 'summary' | 'page' }) => (
+          <PluginListLauncher onOpen={() => openPanel(PLUGIN_LIST_PANEL_ID)} t={t} view={props.view} />
+        )),
+      ),
+    )
     ctx.slots.inject('settings.general.item', () =>
       ctx.slots.register(
         { name: 'settings.general.item', id: 'developer-tools', order: 15, locale: SHELL_LOCALE_NAMESPACE },

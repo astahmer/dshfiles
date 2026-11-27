@@ -1,4 +1,4 @@
-import { act, type ReactNode } from 'react'
+import { act, useState, type ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -327,6 +327,7 @@ describe('settings view: one title per entry', () => {
               group: 'general',
               label: 'Appearance',
               order: 0,
+              origin: 'plugin',
               sectionId: 'appearance',
               pages: [page('theme', 'appearance'), page('fonts', 'Fonts')],
               hiddenPages: [],
@@ -349,7 +350,7 @@ describe('settings view: one title per entry', () => {
     const groups = [
       {
         group: { id: 'general' as const, label: 'General', description: '' },
-        entries: [{ id: page.pageId, group: 'general' as const, label: 'Appearance', order: 0, pages: [page], hiddenPages: [], keywords: '' }],
+        entries: [{ id: page.pageId, group: 'general' as const, label: 'Appearance', order: 0, origin: 'plugin' as const, pages: [page], hiddenPages: [], keywords: '' }],
       },
     ]
     const headings: string[] = []
@@ -586,6 +587,103 @@ describe('settings view: one Settings navigation (council round 4 B1)', () => {
     const view = mount({ activeId: 'general' })
     expect(view.host.querySelector('nav[aria-label="title"]')).not.toBeNull()
     expect(view.host.querySelector('[data-settings-entry="general"] header')?.className).toBe('dshx:sr-only')
+    view.unmount()
+  })
+})
+
+/** What a test drives from outside the mounted Settings view: opening an entry, typing a query. */
+interface HarnessControls {
+  open: (id: string) => void
+  search: (query: string) => void
+}
+
+describe('settings view: origin filter', () => {
+  const mountStateful = (initial: { readonly activeId: string; readonly query?: string }) => {
+    const host = document.createElement('div')
+    const container = document.createElement('div')
+    document.body.append(host, container)
+    const root = createRoot(container)
+    const controls: HarnessControls = { open: () => {}, search: () => {} }
+    const Harness = () => {
+      const [activeId, setActiveId] = useState(initial.activeId)
+      const [query, setQuery] = useState(initial.query ?? '')
+      controls.open = setActiveId
+      controls.search = setQuery
+      return (
+        <SettingsTab
+          activeId={activeId}
+          groups={SettingsGroups.group({ sections: rows, pages: [], panels: new Set(['mcp-servers']) })}
+          host={host}
+          onClose={undefined}
+          onReveal={() => {}}
+          onSearch={setQuery}
+          onSelect={setActiveId}
+          openPanel={() => {}}
+          pluginPages={[]}
+          query={query}
+          renderMatches={() => null}
+          renderPluginPage={() => null}
+          renderSlot={() => null}
+          rows={rows}
+          sectionEntries={sectionEntries}
+          sectionOwner={{ close: () => {} }}
+          sectionTarget={undefined}
+          shortcuts={[{ id: 'settings.open', label: 'Open Settings', aliases: ['preferences'], keys: ['⌘', ','] }]}
+          t={t}
+        />
+      )
+    }
+    act(() => root.render(<Harness />))
+    const pick = (option: 'all' | 'dsh' | 'plugin') =>
+      act(() => host.querySelector<HTMLButtonElement>(`[data-settings-origin-filter] [data-origin-option="${option}"]`)?.click())
+    const navButtons = () => [...host.querySelectorAll('nav button[data-nav-id]')].map(button => button.getAttribute('data-nav-id'))
+    const shownEntry = () => host.querySelector('[data-settings-entry]')?.getAttribute('data-settings-entry')
+    return { host, controls, pick, navButtons, shownEntry, unmount: () => act(() => root.unmount()) }
+  }
+
+  it('narrows the navigation and moves off an entry the filter hides', () => {
+    const view = mountStateful({ activeId: 'general' })
+    expect(view.host.querySelector('[data-origin-badge="dsh"]')).not.toBeNull()
+    expect(view.navButtons()).toEqual(['general', 'link:mcp-servers', 'appearance'])
+    expect(view.host.querySelector('[data-origin-option="dsh"]')?.textContent).toBe('origin.dsh1')
+    expect(view.host.querySelector('[data-origin-option="plugin"]')?.textContent).toBe('origin.plugins2')
+
+    view.pick('dsh')
+    expect(view.navButtons()).toEqual(['general'])
+    expect(view.shownEntry()).toBe('general')
+
+    view.pick('plugin')
+    expect(view.navButtons()).toEqual(['link:mcp-servers', 'appearance'])
+    expect(view.shownEntry()).toBe('link:mcp-servers')
+    expect(view.host.querySelector('[data-origin-badge="plugin"]')).not.toBeNull()
+    view.unmount()
+  })
+
+  it('shows every entry again when an entry of the other origin is opened from elsewhere', () => {
+    const view = mountStateful({ activeId: 'appearance' })
+    view.pick('plugin')
+    act(() => view.controls.open('general'))
+    expect(view.shownEntry()).toBe('general')
+    expect(view.navButtons()).toEqual(['general', 'link:mcp-servers', 'appearance'])
+    expect(view.host.querySelector('[data-origin-option="all"]')?.getAttribute('aria-pressed')).toBe('true')
+
+    act(() => view.host.querySelector<HTMLButtonElement>('nav button[data-nav-id="appearance"]')?.click())
+    expect(view.shownEntry()).toBe('appearance')
+    expect(view.navButtons()).toEqual(['general', 'link:mcp-servers', 'appearance'])
+    expect(view.host.querySelector('[data-origin-option="all"]')?.getAttribute('aria-pressed')).toBe('true')
+    view.unmount()
+  })
+
+  it('searches only the entries of the chosen origin', () => {
+    const view = mountStateful({ activeId: 'general' })
+    act(() => view.controls.search('settings'))
+    expect(view.host.querySelector('[data-settings-shortcut="settings.open"]')).not.toBeNull()
+    view.pick('plugin')
+    expect(view.host.querySelector('[data-settings-shortcut="settings.open"]')).toBeNull()
+    act(() => view.controls.search('dark'))
+    expect(view.host.querySelector('[data-settings-result-entry="theme"]')).not.toBeNull()
+    view.pick('dsh')
+    expect(view.host.querySelector('[data-settings-result-entry="theme"]')).toBeNull()
     view.unmount()
   })
 })

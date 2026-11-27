@@ -8,16 +8,19 @@ import { Kbd } from '@dshfiles/plugin-ui/components/ui/kbd'
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from '@dshfiles/plugin-ui/components/ui/input-group'
 import { ArrowUpRightIcon, ChevronLeftIcon, ChevronRightIcon, ListFilterIcon, SearchIcon, SettingsIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { Fragment, useEffect, useId, useLayoutEffect, useRef, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
+import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactNode, type RefObject, type SyntheticEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { SECTION_TITLE_CLASS } from './section-title.js'
 import type { ShellTranslate } from './native/locales.js'
 import type { ShellRenderSlot } from './native/slots.js'
+import { OriginBadge } from './origin-badge.js'
+import type { SettingsEntryOrigin } from './origin.js'
 import type { PluginSettingsPage } from './plugin-settings.js'
 import { PageViewMemoryProvider } from './plugin-settings-page.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
-import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry } from './settings-groups.js'
+import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry, type SettingsOriginFilter } from './settings-groups.js'
+import { SegmentedFilter } from './segmented-filter.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 import { SettingsNavigationModel } from './navigation-state.js'
 import { SettingsEntryGlyph, SettingsEntryTile } from './settings-icons.js'
@@ -26,6 +29,8 @@ export interface SectionRow {
   readonly id: string
   readonly order: number
   readonly label: string
+  readonly origin?: SettingsEntryOrigin | undefined
+  readonly bundleName?: string | undefined
   /** Words that find the row in search without showing: its group, namespaces, former names. */
   readonly keywords?: string
 }
@@ -92,7 +97,36 @@ export interface SettingsViewProps {
    * only its fields under a Back row, and Back returns to the list by forgetting the category. Absent, Back is not drawn.
    */
   readonly onBack?: (() => void) | undefined
+  /**
+   * The All / DSH / Plugins source filter, when the page shares it with the side column (the column lists the same
+   * filtered categories). Absent, the page keeps its own.
+   */
+  readonly originFilter?: SettingsOriginFilter | undefined
+  readonly onOriginFilter?: ((next: SettingsOriginFilter) => void) | undefined
 }
+
+/** Which categories show: those stock DSH ships, those plugins add, or all of them, each with its count. */
+const OriginFilterBar = (props: {
+  readonly value: SettingsOriginFilter
+  readonly counts: { readonly all: number; readonly dsh: number; readonly plugin: number }
+  readonly t: ShellTranslate
+  readonly onChange: (next: SettingsOriginFilter) => void
+  readonly className?: string
+}): JSX.Element => (
+  <div className={cn('dshx:shrink-0', props.className)} data-settings-origin-filter="">
+    <SegmentedFilter
+      label={props.t('origin.filterLabel')}
+      onChange={props.onChange}
+      optionAttribute="data-origin-option"
+      options={[
+        { id: 'all', label: props.t('origin.all'), count: props.counts.all },
+        { id: 'dsh', label: props.t('origin.dsh'), count: props.counts.dsh },
+        { id: 'plugin', label: props.t('origin.plugins'), count: props.counts.plugin },
+      ]}
+      value={props.value}
+    />
+  </div>
+)
 
 /** A nav entry: name, a mark for a page that opens elsewhere and, while searching, how many matches it holds. */
 const NavCell = (props: {
@@ -104,6 +138,7 @@ const NavCell = (props: {
   <button
     aria-current={props.active ? 'page' : undefined}
     className={cn(navCell, props.active && navCellActive, props.count === 0 && 'dshx:opacity-45')}
+    data-entry-origin={props.entry.origin}
     data-nav-id={props.entry.id}
     onClick={() => props.onSelect(props.entry.id)}
     type="button"
@@ -285,21 +320,25 @@ const SearchResults = (props: SettingsViewProps & { readonly result: SettingsSea
           </ul>
         </section>
       )}
-      {result.pages.map(hit => (
-        <section aria-label={hit.page.title} className="dshx:flex dshx:scroll-mt-4 dshx:flex-col" data-results-page={hit.page.pageId} key={hit.page.pageId}>
-          <button
-            className="dshx:flex dshx:cursor-pointer dshx:items-baseline dshx:gap-2 dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-left"
-            onClick={() => props.onSelect(hit.page.pageId)}
-            type="button"
-          >
-            <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
-              <Highlight query={props.query} text={hit.page.title} />
-            </h3>
-            <span className="dshx:text-xs dshx:text-muted-foreground">{matchesText(t, hit.fields.length)}</span>
-          </button>
-          {props.renderMatches(hit.page, hit.fields, SettingsSearch.highlightText(props.query))}
-        </section>
-      ))}
+      {result.pages.map(hit => {
+        const origin = SettingsGroups.entryFor(props.groups, hit.page.pageId)?.origin
+        return (
+          <section aria-label={hit.page.title} className="dshx:flex dshx:scroll-mt-4 dshx:flex-col" data-results-page={hit.page.pageId} key={hit.page.pageId}>
+            <button
+              className="dshx:flex dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:border-none dshx:bg-transparent dshx:p-0 dshx:text-left"
+              onClick={() => props.onSelect(hit.page.pageId)}
+              type="button"
+            >
+              <h3 className="dshx:m-0 dshx:text-base dshx:font-semibold dshx:text-foreground dshx:hover:underline">
+                <Highlight query={props.query} text={hit.page.title} />
+              </h3>
+              {origin !== undefined && <OriginBadge origin={origin} showBundle={false} t={t} />}
+              <span className="dshx:text-xs dshx:text-muted-foreground">{matchesText(t, hit.fields.length)}</span>
+            </button>
+            {props.renderMatches(hit.page, hit.fields, SettingsSearch.highlightText(props.query))}
+          </section>
+        )
+      })}
     </div>
   )
 }
@@ -365,7 +404,7 @@ const EntryView = (props: SettingsViewProps & { readonly entry: SettingsEntry; r
     return sameTitle(page.title, entry.label) ? 'none' : 'section'
   }
   return (
-    <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id}>
+    <div className="dshx:flex dshx:flex-col dshx:gap-5" data-settings-entry={entry.id} data-entry-origin={entry.origin}>
       {ownHeading && (
         // The page's h1 names the entry (council round 7 B2), and a phone's Back row does: the title is not printed twice.
         <header className="dshx:sr-only">
@@ -451,15 +490,40 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
   const search = useRef<HTMLInputElement>(null)
   useSearchFocusOnShow(search)
   const searching = props.query.trim() !== ''
+  // The source filter (All / DSH / Plugins): the shell's when it shares it with the side column, else the page's own.
+  const [ownOriginFilter, setOwnOriginFilter] = useState<SettingsOriginFilter>('all')
+  const originFilter = props.originFilter ?? ownOriginFilter
+  const setOriginFilter = props.onOriginFilter ?? setOwnOriginFilter
+  const [lastActiveId, setLastActiveId] = useState(props.activeId)
+  const counts = SettingsGroups.originCounts(props.groups)
+  const requested = SettingsGroups.entryFor(props.groups, props.activeId)
+  // An entry of the other source opened from elsewhere (a link, Plugins by category) shows every category again.
+  if (props.activeId !== lastActiveId) {
+    setLastActiveId(props.activeId)
+    if (requested !== undefined && originFilter !== 'all' && requested.origin !== originFilter) setOriginFilter('all')
+  }
+  const groups = SettingsGroups.filterByOrigin(props.groups, originFilter)
+  const filtering = originFilter !== 'all'
+  const visibleIds = new Set(groups.flatMap(group => group.entries.map(entry => entry.id)))
   const result = SettingsSearch.search({
     query: props.query,
-    sections: props.rows,
-    pages: props.pluginPages,
-    entries: props.sectionEntries,
-    shortcuts: props.shortcuts,
+    sections: filtering ? props.rows.filter(row => visibleIds.has(row.id)) : props.rows,
+    pages: filtering ? SettingsGroups.searchablePages(groups) : props.pluginPages,
+    entries: filtering ? props.sectionEntries.filter(entry => SettingsGroups.entryFor(groups, entry.sectionId) !== undefined) : props.sectionEntries,
+    // Key bindings are DSH's own list.
+    shortcuts: originFilter === 'plugin' ? [] : props.shortcuts,
   })
-  const picked = SettingsGroups.entryFor(props.groups, props.activeId)
-  const active = picked ?? props.groups[0]?.entries[0]
+  const picked = SettingsGroups.entryFor(groups, props.activeId)
+  const active = picked ?? groups[0]?.entries[0]
+  // A filter that hides the open category moves to the first one it keeps.
+  const changeOrigin = (next: SettingsOriginFilter): void => {
+    setOriginFilter(next)
+    if (active === undefined || picked === undefined) return
+    const kept = SettingsGroups.filterByOrigin(props.groups, next)
+    if (SettingsGroups.entryFor(kept, active.id) !== undefined) return
+    const first = kept[0]?.entries[0]
+    if (first !== undefined) props.onSelect(first.id)
+  }
   // A narrow pane drills down (round five B6): no category picked shows the grouped list, a picked one only its fields.
   const atRoot = !searching && picked === undefined
   const drilled = !searching && picked !== undefined && props.onBack !== undefined
@@ -536,7 +600,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
                 heading={<span id={props.titleId}>{title}</span>}
                 description={t('description')}
                 mark={<SettingsEntryGlyph group={active.group} label={active.label} className="dshx:size-[18px]" />}
-              />
+              >
+                {/* Who ships the category: stock DSH or a plugin (its package stays in Plugin details and in search). */}
+                <OriginBadge origin={active.origin} showBundle={false} t={t} />
+              </PageHeader>
             )}
           </div>
           {/* One 8px rhythm (council round 6 B2): the search grows, then Modified and the action group, all 32px. */}
@@ -599,6 +666,7 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           >
             {t('search.modified')}
           </Toggle>
+          <OriginFilterBar className="dshx:@max-pane-compact:hidden" counts={counts} onChange={changeOrigin} t={t} value={originFilter} />
           {searching && (
             <span aria-live="polite" className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
               {foundText}
@@ -634,7 +702,8 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             aria-label={t('title')}
             className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
           >
-            {props.groups.map(({ group, entries }) => (
+            {groups.length === 0 && <p className="dshx:m-0 dshx:px-3 dshx:py-4 dshx:text-xs dshx:text-muted-foreground">{t('origin.empty')}</p>}
+            {groups.map(({ group, entries }) => (
               <div aria-label={group.label} className={navGroupBlock} data-settings-group={group.id} key={group.id} role="group">
                 {/* General leads the list and names its first entry: its label would print "General" a third time (B1). */}
                 {group.id !== 'general' && <span className={navGroup}>{group.label}</span>}
@@ -649,7 +718,10 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
             ref={content}
           >
-            {atRoot && <SettingsRootList groups={props.groups} onOpen={openEntry} />}
+            {atRoot && (
+              <OriginFilterBar className="dshx:hidden dshx:pb-3 dshx:@max-pane-compact:block" counts={counts} onChange={changeOrigin} t={t} value={originFilter} />
+            )}
+            {atRoot && <SettingsRootList groups={groups} onOpen={openEntry} />}
             {/* One reading width for every entry: sections, plugin pages and search results share this 680px column, so a
                 value sits near its label (council round 4 B5). */}
             <div className={cn(SETTINGS_COLUMN_WIDTH, atRoot && 'dshx:@max-pane-compact:hidden')} data-settings-column="">
