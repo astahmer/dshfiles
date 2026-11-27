@@ -90,14 +90,17 @@ describe('the Vibe ACP route', () => {
     expect(fake.events().filter(event => event.startsWith('session/new '))).toHaveLength(1)
   })
 
-  it('runs Vibe with the managed agent profile: DSH instructions, read-only builtins and DSH tools listed, the account home', async () => {
+  it('runs Vibe with the managed agent profile: DSH instructions, DSH tools and the builtins the route gates listed, the account home', async () => {
     const { cli, fake, model } = setup('/synthetic/work-home')
     await finished(cli.stream(model(), context([{ role: 'user', content: 'plain answer', timestamp: 1 }]), { sessionId: 'profile' }))
     const profile = managedProfile(fake)
     expect(profile.roots[0]).toContain('dsh-vibe-acp-')
     expect(profile.toml).toContain('instructions = "You are inside DSH."')
-    expect(profile.toml).toContain('enabled_tools = ["mcp_dsh.*","dsh_*","read_file","grep","web_fetch","web_search","todo","search_tool_functions","skill"]')
-    for (const mutation of ['write_file', 'edit', 'bash', 'run_typescript', 'git_bash', 'powershell', 'task', 'ask_user_question'])
+    // Vibe denies a builtin its catalogue lacks before asking the route, so the gated ones must stay listed.
+    expect(profile.toml).toContain(
+      'enabled_tools = ["mcp_dsh.*","dsh_*","read_file","grep","web_fetch","web_search","todo","search_tool_functions","skill","bash","write_file","edit"]',
+    )
+    for (const mutation of ['run_typescript', 'git_bash', 'powershell', 'task', 'ask_user_question'])
       expect(profile.toml).not.toMatch(new RegExp(`"${mutation}"`, 'u'))
     expect(fake.events()).toContain('set_config_option agent=dsh')
   })
@@ -206,6 +209,21 @@ describe('the Vibe ACP route', () => {
     expect(textOf(reply)).toBe(ran ? 'bash ran' : 'tool_denied: Tool execution denied by approval callback')
   })
 
+  it('runs Vibe s own shell and file writes in a subagent of a full-access session whose approvals are off, without asking', async () => {
+    const asks: string[] = []
+    const { cli, fake, model } = setup('/synthetic/vibe-home', { authorizeBuiltin: callingSession({ fileMode: 'danger-full-access', answer: false, asks }) })
+    const bash = await finished(cli.stream(model(), context([{ role: 'user', content: 'BUILTIN_BASH', timestamp: 1 }]), { sessionId: 'child-bash' }))
+    expect(textOf(bash)).toBe('bash ran')
+    const write = await finished(
+      cli.stream(model(), context([{ role: 'user', content: 'BUILTIN_WRITE_FILE /synthetic/elsewhere/vibe-smoke.txt', timestamp: 1 }]), {
+        sessionId: 'child-write',
+      }),
+    )
+    expect(textOf(write)).toBe('write_file ran')
+    expect(fake.events()).not.toContain('denied-by-policy bash')
+    expect(asks).toEqual([])
+  })
+
   it('runs Vibe s read-only builtins without asking, or asks for each one when builtin approvals are set to ask', async () => {
     const quiet: string[] = []
     const following = setup('/synthetic/vibe-home', { authorizeBuiltin: callingSession({ fileMode: 'read-only', answer: false, asks: quiet }) })
@@ -245,7 +263,7 @@ describe('the Vibe ACP route', () => {
     const reply = await finished(cli.stream(model(), context([{ role: 'user', content: 'PERMISSION_READ', timestamp: 1 }]), { sessionId: 'strict' }))
     const profile = managedProfile(fake)
     expect(profile.toml).toContain('enabled_tools = ["mcp_dsh.*","dsh_*"]')
-    expect(textOf(reply)).toBe('builtin denied')
+    expect(textOf(reply)).toBe('tool_denied: Tool execution denied by approval policy')
     expect(asks).toEqual([])
     cli.retainAccounts(new Map())
     expect(cli.processCount).toBe(0)

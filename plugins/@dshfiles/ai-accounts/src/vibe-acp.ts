@@ -35,11 +35,12 @@ import { DEFAULT_VIBE_ACP_SETTINGS, type VibeAcpSettings } from './settings.js'
  * as a `tool_call` before running it, the DSH step ends with `toolUse` while the MCP call is held, and the tool result
  * in DSH's next request releases it, continuing the same ACP prompt.
  *
- * Vibe 3.1.5 publishes a bridged tool as `mcp_dsh.<tool>` in the `tool_call`'s `_meta.tool_name` and ignores an agent
- * profile's `enabled_tools`/`disabled_tools`, so its own `write_file`, `edit`, `bash` and `run_typescript` stay listed.
- * The route therefore runs Vibe in its `ask` mode and answers every `session/request_permission` itself: a bridged call
- * is admitted and then gated by DSH's ordinary tool execution, and a Vibe builtin follows the calling DSH session's
- * file policy and approval policy, as a native tool with the same effect would.
+ * Vibe 3.1.5 publishes a bridged tool as `mcp_dsh.<tool>` in the `tool_call`'s `_meta.tool_name`. It lists its own
+ * `write_file`, `edit`, `bash` and `run_typescript` whatever the agent profile's `enabled_tools` says, but denies a
+ * builtin that list leaves out before asking the client. The route therefore lists the builtins it gates, runs Vibe in
+ * its `ask` mode and answers every `session/request_permission` itself: a bridged call is admitted and then gated by
+ * DSH's ordinary tool execution, and a Vibe builtin follows the calling DSH session's file policy and approval policy,
+ * as a native tool with the same effect would.
  */
 
 export const VIBE_ACP_EXECUTABLE = 'vibe-acp'
@@ -60,6 +61,12 @@ const MAX_PROCESSES = 6
  * (`write_file`, `edit`, `bash`, `run_typescript`, a process or subagent tool) can write outside DSH's sandbox.
  */
 const READ_ONLY_BUILTINS = ['read_file', 'grep', 'web_fetch', 'web_search', 'todo', 'search_tool_functions', 'skill'] as const
+/**
+ * The Vibe builtins that write or execute, which the route answers from the calling session's policy. Vibe 3.1.5 maps a
+ * builtin missing from `enabled_tools` onto its deny mode without asking, so leaving these out would deny them even in a
+ * full-access session.
+ */
+const GATED_BUILTINS = ['bash', 'write_file', 'edit'] as const
 /** The Vibe approval mode that sends every builtin's permission request to the route. */
 const VIBE_ASK_MODE = 'ask'
 /** Vibe's thinking levels, in increasing order, as its `thinking` config option takes them. */
@@ -272,18 +279,18 @@ const declaredArguments = (tool: Tool | undefined, input: ToolArguments): ToolAr
 }
 
 /**
- * The agent profile `session/set_config_option` selects: DSH's instructions, and an `enabled_tools` allowlist holding
- * only read-only Vibe builtins plus the bridged tools. Vibe 3.1.5 carries the instructions but not the allowlist, which
- * stays for a Vibe that honours it; the permission answers are what keep its builtins in line. Vibe reads agent files from `<root>/.vibe/agents` for
+ * The agent profile `session/set_config_option` selects: DSH's instructions, and an `enabled_tools` catalogue holding
+ * the bridged tools plus the Vibe builtins the route answers for (none under `strictTools`). Vibe denies any other
+ * builtin outright; the permission answers keep the listed ones in line. Vibe reads agent files from `<root>/.vibe/agents` for
  * every root in `session/new`'s `additionalDirectories`, so this profile lives in the process's own folder and never
  * touches the account's `VIBE_HOME`.
  */
 const agentFile = (system: string, strictTools: boolean): string =>
   [
     'display_name = "DeepSeek Harness"',
-    'description = "DSH owns this conversation: read-only Vibe tools plus DSH\'s bridged tools."',
+    'description = "DSH owns this conversation: DSH\'s bridged tools plus the Vibe builtins DSH gates."',
     `instructions = ${JSON.stringify(system)}`,
-    `enabled_tools = ${JSON.stringify([`${MCP_EFFECT_PREFIX}*`, `${MCP_TOOL_PREFIX}*`, ...(strictTools ? [] : READ_ONLY_BUILTINS)])}`,
+    `enabled_tools = ${JSON.stringify([`${MCP_EFFECT_PREFIX}*`, `${MCP_TOOL_PREFIX}*`, ...(strictTools ? [] : [...READ_ONLY_BUILTINS, ...GATED_BUILTINS])])}`,
     '',
   ].join('\n')
 
@@ -626,8 +633,7 @@ export class VibeAcpSessions {
 
   /**
    * Vibe asks before it runs a tool the active policy gates, and names only the call id. DSH's own tools are allowed
-   * because DSH is what gates them; a read-only builtin is allowed; anything else is rejected, so a mutating tool that
-   * somehow reached this session still cannot run unattended.
+   * because DSH is what gates them; a builtin gets the calling session's verdict; an unknown call is rejected.
    */
   private async answerPermission(session: Session, method: string, params: AcpJson): Promise<{ readonly result: AcpJson } | undefined> {
     if (method !== 'session/request_permission') return undefined
