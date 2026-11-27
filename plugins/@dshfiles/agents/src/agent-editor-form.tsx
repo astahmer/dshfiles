@@ -23,13 +23,14 @@ const DESCRIPTION_ID = 'dshfiles-agent-field-description'
 const Section = (props: { readonly id: string; readonly title: string; readonly description: string; readonly children: ReactNode }): JSX.Element => (
   <section
     aria-labelledby={`${props.id}-title`}
-    className="dshx:grid dshx:grid-cols-[13rem_minmax(0,1fr)] dshx:gap-x-8 dshx:gap-y-3 dshx:border-b dshx:border-border dshx:py-6 dshx:last:border-b-0 dshx:@max-pane-compact:grid-cols-1"
+    className="dshx:flex dshx:flex-col dshx:gap-3 dshx:border-b dshx:border-border dshx:py-5 dshx:last:border-b-0"
   >
-    <div className="dshx:flex dshx:flex-col dshx:gap-1">
+    {/* One header line above the fields, so the fields get the pane's full width. */}
+    <div className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:items-baseline dshx:gap-x-3 dshx:gap-y-0.5">
       <h3 id={`${props.id}-title`} className="dshx:text-sm dshx:font-semibold">
         {props.title}
       </h3>
-      <p className="dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">{props.description}</p>
+      <p className="dshx:min-w-0 dshx:text-xs dshx:leading-relaxed dshx:text-muted-foreground">{props.description}</p>
     </div>
     <div className="dshx:flex dshx:min-w-0 dshx:flex-col dshx:gap-4">{props.children}</div>
   </section>
