@@ -6,6 +6,7 @@
  * docked Settings pane) the page keeps drawing its own list.
  */
 import { defineContract, type Subscribable } from '@dshfiles/dshx/client'
+import type { ComponentType } from 'react'
 
 /** One row: a category of the Settings page, or a Settings page that opens in the stage. */
 export interface SettingsNavigationItem {
@@ -46,6 +47,11 @@ export interface SettingsNavigationService {
   select(id: string): void
   /** A column that draws this list says so while it shows; the page drops its own list until the release runs. */
   attach(): () => void
+  /**
+   * The All / DSH / Plugins source filter (upstream #290), for the column to draw at the head of the list it narrows;
+   * the page then draws none. Absent on a shell older than the filter.
+   */
+  readonly OriginFilter?: ComponentType | undefined
 }
 
 export const SettingsNavigation = defineContract<SettingsNavigationService>('@dshfiles/settings-shell.navigation', {

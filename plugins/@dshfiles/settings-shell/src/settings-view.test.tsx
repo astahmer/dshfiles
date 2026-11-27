@@ -597,6 +597,22 @@ interface HarnessControls {
   search: (query: string) => void
 }
 
+describe('settings view: where the source filter sits (merge of upstream #290)', () => {
+  it('leaves the filter to the side column beside it, so the toolbar keeps the search its width', () => {
+    const view = mount({ columnNavigation: true, activeId: 'general' })
+    expect(view.host.querySelector('[data-settings-origin-filter]')).toBeNull()
+    view.unmount()
+  })
+
+  it('heads its own category list with the filter when no column draws the list', () => {
+    const view = mount({ activeId: 'general' })
+    expect(view.host.querySelector('[data-settings-toolbar] [data-settings-origin-filter]')).toBeNull()
+    const list = view.host.querySelector('nav[aria-label="title"]')
+    expect(list?.firstElementChild?.hasAttribute('data-settings-origin-filter')).toBe(true)
+    view.unmount()
+  })
+})
+
 describe('settings view: origin filter', () => {
   const mountStateful = (initial: { readonly activeId: string; readonly query?: string }) => {
     const host = document.createElement('div')

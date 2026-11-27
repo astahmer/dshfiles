@@ -305,6 +305,18 @@ describe('DestinationShell', () => {
     expect(general.className).not.toContain('selected-edge')
   })
 
+  it('heads the Settings column with the source filter the Settings page lends it (upstream #290, merged)', () => {
+    setPhone(false)
+    DestinationSelection.set('settings')
+    const OriginFilter = (): JSX.Element => <div role="group" aria-label="Filter categories by source" data-origin-filter-probe="" />
+    renderShell({ activePanelId: 'dshfiles-settings', settingsNavigation: { ...navigationOf(settingsState), OriginFilter } })
+    const column = screen.getByRole('navigation', { name: 'Settings pages' })
+    const filter = within(column).getByRole('group', { name: 'Filter categories by source' })
+    // First in the column, above the first group, so it reads as the list's own control.
+    const first = column.querySelector('[data-settings-group]')
+    expect(first === null ? 0 : filter.compareDocumentPosition(first) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('brings the current Settings row into view at its nearest edge, its group label shown (council round 18 B2.4)', async () => {
     setPhone(false)
     DestinationSelection.set('settings')

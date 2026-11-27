@@ -79,6 +79,7 @@ export interface SettingsHubShown {
 }
 
 const NO_COLUMNS: ObservableSnapshot<number> = { getSnapshot: () => 0, subscribe: () => () => undefined }
+const NO_ORIGIN_FILTER: ObservableSnapshot<SettingsOriginFilter> = { getSnapshot: () => 'all', subscribe: () => () => undefined }
 
 /**
  * The Settings page as a free-docking pane, with navigation and search owned by this pane rather than the shell actor.
@@ -94,6 +95,8 @@ export const createSettingsWorkbenchHub = (sources: {
   readonly columns?: ObservableSnapshot<number> | undefined
   /** The shown pane's category and query, so the column marks and counts what this pane shows; undefined once hidden. */
   readonly report?: ((shown: SettingsHubShown | undefined) => void) | undefined
+  /** The shell's source filter, which the side column also sets; absent, the pane keeps its own. */
+  readonly originFilter?: { readonly observable: ObservableSnapshot<SettingsOriginFilter>; readonly set: (next: SettingsOriginFilter) => void } | undefined
 }): WorkbenchPanelDefinition['component'] =>
   function SettingsWorkbenchHub(props) {
     const groups = useObservable(sources.groups)
@@ -102,8 +105,11 @@ export const createSettingsWorkbenchHub = (sources: {
     const [field, setField] = useState(initial?.field)
     const [target, setTarget] = useState(initial?.target)
     const [query, setQuery] = useState(initial?.query ?? '')
-    // Each pane's own source filter (repeated panes keep their presentation state); the column lists what it keeps.
-    const [originFilter, setOriginFilter] = useState<SettingsOriginFilter>('all')
+    // The shell's source filter when it lends one (the side column sets it too), else the pane's own.
+    const [ownOriginFilter, setOwnOriginFilter] = useState<SettingsOriginFilter>('all')
+    const sharedOriginFilter = useObservable(sources.originFilter?.observable ?? NO_ORIGIN_FILTER)
+    const originFilter = sources.originFilter === undefined ? ownOriginFilter : sharedOriginFilter
+    const setOriginFilter = sources.originFilter?.set ?? setOwnOriginFilter
     const visible = useRef(props.visible !== false)
     visible.current = props.visible !== false
     const [host, setHost] = useState<HTMLDivElement | null>(null)

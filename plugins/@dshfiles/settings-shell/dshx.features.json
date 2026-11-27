@@ -872,14 +872,14 @@
     {
       "id": "settings-origin-distinction",
       "title": "Tell DSH defaults from plugin categories",
-      "summary": "An All / DSH / Plugins filter beside the Settings search narrows the categories, the side column and the search results by who ships them.",
-      "details": "Each category is classified as stock DSH or a plugin from bundle metadata, with core namespace fallbacks before the labels load. A stock DSH category stays DSH when a dshfiles fork serves it (Agent loop); an entry that joins several plugins is DSH when any block is. The page header and each search result carry a DSH default or Plugin badge. On a phone the filter sits above the category list. Opening an entry of the other source from elsewhere shows every category again.",
+      "summary": "An All / DSH / Plugins filter at the head of the Settings category list narrows the categories and the search results by who ships them.",
+      "details": "Each category is classified as stock DSH or a plugin from bundle metadata, with core namespace fallbacks before the labels load. A stock DSH category stays DSH when a dshfiles fork serves it (Agent loop); an entry that joins several plugins is DSH when any block is. The page header and each search result carry a DSH default or Plugin badge. The thread sidebar's Settings column draws the filter the page lends it; without a column the page heads its own list with it, and a phone its category list. Opening an entry of the other source from elsewhere shows every category again.",
       "reach": ["click button \"Open command palette\"", "fill combobox \"Search the command palette\" \"Settings: General\"", "click option \"Settings: General*\"", "expect group \"Filter categories by source\""],
       "reachNarrow": ["click button \"More\"", "click button \"Settings Accounts, tools, secrets and plugins.\"", "expect group \"Filter categories by source\""],
       "surfaces": ["client", "settings"],
       "surface": "settingsSection",
       "destination": "settings",
-      "currentSurface": "settings: source filter beside the search, origin badge in the page header",
+      "currentSurface": "settings: source filter heading the category list, origin badge in the page header",
       "configuration": [],
       "states": ["all", "dsh-only", "plugins-only"],
       "failureModes": [

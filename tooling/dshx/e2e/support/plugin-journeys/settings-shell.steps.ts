@@ -557,11 +557,11 @@ Then('the Subagent page renders the owned fork instead of a placeholder', async 
   await finishJourneyAssertions(page)
 })
 
-// The filter sits beside the search; without the thread sidebar's column the page lists its own categories, where Main
-// tabs is one block of Layout.
+// Without the thread sidebar's column the page lists its own categories, headed by the filter; Main tabs is one block of
+// Layout.
 Then('default DSH and plugin categories are marked and filterable in the sidebar', async ({ page }: { page: Page }) => {
   const nav = settingsView(page).getByRole('navigation', { name: 'Settings', exact: true })
-  const filter = settingsView(page).locator('[data-settings-toolbar] [data-settings-origin-filter]')
+  const filter = nav.locator('[data-settings-origin-filter]')
   await recordAssertion(page, 'settings-shell-origin-distinction', async () => {
     await expect(settingsView(page).locator('[data-origin-badge="dsh"]')).toBeVisible()
     await expect(nav.locator('[data-nav-id="general"]')).toHaveAttribute('data-entry-origin', 'dsh')

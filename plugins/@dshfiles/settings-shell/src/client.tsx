@@ -57,6 +57,7 @@ import { DshReleaseBanner, DshReleaseCheck } from './release-notice.js'
 import { dispatchOpenFile, EDITOR_FILES_PANE_ID } from '@dshfiles/editor/open-file'
 import { OPEN_SETTINGS_EVENT, openSettingsRequestSchema, type OpenSettingsRequest } from './open-settings.js'
 import { DshfilesPluginsPage, PluginListLauncher } from './dshfiles-plugins-page.js'
+import { OriginFilterBar } from './origin-filter-bar.js'
 import { PluginEntryCard } from './plugin-entry-card.js'
 import { PluginSettingsPageView } from './plugin-settings-page.js'
 import type { SettingField } from './schema-form/schema-model.js'
@@ -501,7 +502,7 @@ export default defineClient({
     const columns = createSnapshotStore(0)
     // With the Workbench, Settings opens as its pane (the hub), which keeps its own category and search.
     const hubShown = createSnapshotStore<SettingsHubShown | undefined>(undefined)
-    // The stage page's All / DSH / Plugins filter: the side column lists the same categories it shows.
+    // The All / DSH / Plugins filter the stage page, a docked pane and the side column share: one list, one filter.
     const originFilter = createSnapshotStore<SettingsOriginFilter>('all')
     let navigationInputs: readonly unknown[] = []
     let navigationLast: SettingsNavigationState | undefined
@@ -511,7 +512,7 @@ export default defineClient({
       const entries = sectionEntries.getSnapshot()
       const catalog = ctx.shortcuts.catalog.getSnapshot()
       const hub = hubShown.getSnapshot()
-      // The column lists the categories the shown page keeps: the stage page's filter, or the docked pane's own.
+      // The column lists the categories the shown page keeps; the stage page and a docked pane share the one filter.
       const filter = hub === undefined ? originFilter.getSnapshot() : hub.originFilter
       const open = hub !== undefined || snapshot.matches('tab')
       const sectionId = hub === undefined ? snapshot.context.sectionId : hub.activeId
@@ -541,7 +542,14 @@ export default defineClient({
       found.scrollIntoView({ block: 'start' })
       return true
     }
+    /** The filter at the head of the side column: the shown page, stage or docked, lists what it keeps. */
+    const ColumnOriginFilter = (): JSX.Element => {
+      const grouped = useObservable(groups)
+      const filter = useObservable(originFilter)
+      return <OriginFilterBar counts={SettingsGroups.originCounts(grouped)} onChange={next => originFilter.set(next)} t={t} value={filter} />
+    }
     const navigation: SettingsNavigationService = {
+      OriginFilter: ColumnOriginFilter,
       state: {
         get: navigationSnapshot,
         subscribe: listener => {
@@ -691,6 +699,7 @@ export default defineClient({
               closeSettings: deps.closeSettings,
               columns,
               report: shown => hubShown.set(shown),
+              originFilter: { observable: originFilter, set: next => originFilter.set(next) },
               view: input =>
                 settingsViewProps({
                   ...input,

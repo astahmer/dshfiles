@@ -269,8 +269,9 @@ describe('Settings workbench sources', () => {
         router.open({ sectionId: 'plugin:example' })
       })
       expect(report).toHaveBeenLastCalledWith({ activeId: 'plugin:example', query: '', originFilter: 'all' })
-      // The pane's All / DSH / Plugins filter is its own; the column lists the categories it keeps.
-      await act(async () => host.querySelector<HTMLButtonElement>('[data-settings-toolbar] [data-origin-option="dsh"]')?.click())
+      // Without a shell filter the pane keeps its own; the column lists the categories it keeps.
+      await act(async () => columns.set(0))
+      await act(async () => host.querySelector<HTMLButtonElement>('[data-settings-origin-filter] [data-origin-option="dsh"]')?.click())
       expect(report).toHaveBeenLastCalledWith(expect.objectContaining({ originFilter: 'dsh' }))
       await act(async () => root.render(<Hub panelId="settings-one" visible={false} />))
       expect(report).toHaveBeenLastCalledWith(undefined)

@@ -732,6 +732,8 @@ const SettingsColumnList = (props: {
   readonly addPanel: ReactNode
 }): JSX.Element => {
   const { navigation, folder, folderUi } = props
+  // The Settings page's All / DSH / Plugins filter (upstream #290) heads the list it narrows.
+  const OriginFilter = navigation.OriginFilter
   const state: SettingsNavigationState = useSyncExternalStore(navigation.state.subscribe, navigation.state.get, navigation.state.get)
   useEffect(() => navigation.attach(), [navigation])
   const { groups, rest } = useMemo(() => SettingsColumn.merge({ state, entries: props.entries }), [state, props.entries])
@@ -751,6 +753,11 @@ const SettingsColumnList = (props: {
   }
   return (
     <nav ref={column} aria-label={`${folder.label} pages`} className="dshx:flex dshx:flex-col" data-settings-column="">
+      {OriginFilter === undefined ? null : (
+        <div className="dshx:pb-3" data-settings-column-filter="">
+          <OriginFilter />
+        </div>
+      )}
       {groups.map(group => (
         <div
           key={group.id}

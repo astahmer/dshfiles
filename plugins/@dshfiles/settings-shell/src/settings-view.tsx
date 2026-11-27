@@ -20,7 +20,7 @@ import { PageViewMemoryProvider } from './plugin-settings-page.js'
 import { Highlight } from './schema-form/settings-form.js'
 import type { SettingField } from './schema-form/schema-model.js'
 import { JEV_ENTRY_ID, SHARED_JEV_NAMESPACE, SettingsGroups, type GroupedEntries, type SettingsEntry, type SettingsOriginFilter } from './settings-groups.js'
-import { SegmentedFilter } from './segmented-filter.js'
+import { OriginFilterBar } from './origin-filter-bar.js'
 import { SettingsSearch, type SectionEntryRow, type SettingsSearchResult, type ShortcutRow } from './settings-search.js'
 import { SettingsNavigationModel } from './navigation-state.js'
 import { SettingsEntryGlyph, SettingsEntryTile } from './settings-icons.js'
@@ -104,29 +104,6 @@ export interface SettingsViewProps {
   readonly originFilter?: SettingsOriginFilter | undefined
   readonly onOriginFilter?: ((next: SettingsOriginFilter) => void) | undefined
 }
-
-/** Which categories show: those stock DSH ships, those plugins add, or all of them, each with its count. */
-const OriginFilterBar = (props: {
-  readonly value: SettingsOriginFilter
-  readonly counts: { readonly all: number; readonly dsh: number; readonly plugin: number }
-  readonly t: ShellTranslate
-  readonly onChange: (next: SettingsOriginFilter) => void
-  readonly className?: string
-}): JSX.Element => (
-  <div className={cn('dshx:shrink-0', props.className)} data-settings-origin-filter="">
-    <SegmentedFilter
-      label={props.t('origin.filterLabel')}
-      onChange={props.onChange}
-      optionAttribute="data-origin-option"
-      options={[
-        { id: 'all', label: props.t('origin.all'), count: props.counts.all },
-        { id: 'dsh', label: props.t('origin.dsh'), count: props.counts.dsh },
-        { id: 'plugin', label: props.t('origin.plugins'), count: props.counts.plugin },
-      ]}
-      value={props.value}
-    />
-  </div>
-)
 
 /** A nav entry: name, a mark for a page that opens elsewhere and, while searching, how many matches it holds. */
 const NavCell = (props: {
@@ -666,7 +643,6 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
           >
             {t('search.modified')}
           </Toggle>
-          <OriginFilterBar className="dshx:@max-pane-compact:hidden" counts={counts} onChange={changeOrigin} t={t} value={originFilter} />
           {searching && (
             <span aria-live="polite" className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden" role="status">
               {foundText}
@@ -702,6 +678,8 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             aria-label={t('title')}
             className="dshx:box-border dshx:flex dshx:min-h-0 dshx:w-[208px] dshx:flex-none dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-3 dshx:pt-3 dshx:pb-4 dshx:@max-pane-compact:hidden"
           >
+            {/* The list's own filter heads it (beside a side column, the column carries it). */}
+            <OriginFilterBar className="dshx:mb-3" counts={counts} onChange={changeOrigin} t={t} value={originFilter} />
             {groups.length === 0 && <p className="dshx:m-0 dshx:px-3 dshx:py-4 dshx:text-xs dshx:text-muted-foreground">{t('origin.empty')}</p>}
             {groups.map(({ group, entries }) => (
               <div aria-label={group.label} className={navGroupBlock} data-settings-group={group.id} key={group.id} role="group">
@@ -718,8 +696,9 @@ const SettingsView = (props: SettingsViewProps & { readonly titleId: string }): 
             className="dshx:min-h-0 dshx:min-w-0 dshx:flex-1 dshx:overflow-y-auto dshx:px-6 dshx:pt-5 dshx:pb-6 dshx:@max-pane-compact:px-3 dshx:@max-pane-compact:pt-3"
             ref={content}
           >
+            {/* The phone's category list leads with the filter that narrows it. */}
             {atRoot && (
-              <OriginFilterBar className="dshx:hidden dshx:pb-3 dshx:@max-pane-compact:block" counts={counts} onChange={changeOrigin} t={t} value={originFilter} />
+              <OriginFilterBar className="dshx:hidden dshx:pb-3 dshx:@max-pane-compact:flex" counts={counts} onChange={changeOrigin} t={t} value={originFilter} />
             )}
             {atRoot && <SettingsRootList groups={groups} onOpen={openEntry} />}
             {/* One reading width for every entry: sections, plugin pages and search results share this 680px column, so a

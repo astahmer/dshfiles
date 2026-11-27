@@ -49,8 +49,8 @@ Settings is **one page in the stage** (plan [`docs/ade-ux`](../../../docs/ade-ux
   every plugin sits under **Tools & MCP › Jev**; the plugin's own page says so and links there.
 - **DSH defaults and plugins**: every entry is either a category stock DSH ships (_DSH default_) or one a plugin adds
   (_Plugin_); the page header carries that badge, and so does each page in the search results. An **All / DSH /
-  Plugins** filter beside the search narrows the categories, the side column's list and the search results by source;
-  on a phone it sits above the category list. A stock DSH category stays DSH when a dshfiles fork serves it (Agent
+  Plugins** filter heads the category list it narrows (the thread sidebar's Settings column, the page's own list without
+  one, the phone's category list) and narrows the search results too; the stage page and a docked Settings pane share it. A stock DSH category stays DSH when a dshfiles fork serves it (Agent
   loop), and an entry that joins several plugins' settings is DSH's when any of them is (Web search and fetch). Opening
   an entry of the other source from elsewhere shows every category again.
 - **Plugins by category**: a second view of the installed plugins, beside DSH core's **Plugins** manager (which installs,

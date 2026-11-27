@@ -19,6 +19,8 @@ export const SegmentedFilter = <Id extends string>(props: {
   /** The data attribute each option carries for tests and journeys (`data-origin-option="dsh"`). */
   readonly optionAttribute: `data-${string}`
   readonly fill?: boolean
+  /** 12px labels and tighter items, for a filter heading a narrow list (the Settings column). */
+  readonly dense?: boolean
 }): JSX.Element => (
   <div
     aria-label={props.label}
@@ -34,7 +36,8 @@ export const SegmentedFilter = <Id extends string>(props: {
         <button
           aria-pressed={active}
           className={cn(
-            'dshx:inline-flex dshx:h-full dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:px-2 dshx:text-sm dshx:font-medium dshx:whitespace-nowrap',
+            'dshx:inline-flex dshx:h-full dshx:cursor-pointer dshx:items-center dshx:justify-center dshx:rounded-md dshx:border dshx:border-transparent dshx:font-medium dshx:whitespace-nowrap',
+            props.dense === true ? 'dshx:gap-1 dshx:px-1.5 dshx:text-xs' : 'dshx:gap-1.5 dshx:px-2 dshx:text-sm',
             props.fill === true && 'dshx:min-w-0 dshx:flex-1',
             active
               ? 'dshx:segment-thumb dshx:font-selected dshx:text-foreground'
