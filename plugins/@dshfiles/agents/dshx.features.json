@@ -488,7 +488,7 @@
       "title": "Choose an agent's tools, subagents and projects",
       "summary": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through tool_search), a filter by name or description and an N of M selected count. Each row says whether its state is set on it or inherited from its group, and a reset drops an explicit entry. Collapsed groups render one row and expanded ones a page at a time, and the tree has one tab stop (arrows, Space, P, Delete). Delegation picks which agents subagents may run as and the default one; Default for projects picks the projects this agent is the default of, showing the agent each uses now. One Save sends the agent's changed fields, one setToolAccess batch of sparse edits, subagents and project defaults; threads started afterwards get them.",
       "reach": [
-        "click button \"Agents\"",
+        "click tab \"Agents\"",
         "click button \"New agent\"",
         "fill textbox \"Name\" \"Reviewer\"",
         "click treeitem \"DSH, DSH*\"",
@@ -501,8 +501,8 @@
         "expect text \"2 unsaved*\""
       ],
       "reachNarrow": [
-        "click button \"Open sidebar\"",
-        "click button \"Agents\"",
+        "click button \"More\"",
+        "click button \"Agents*\"",
         "click button \"New agent\"",
         "fill textbox \"Name\" \"Reviewer\"",
         "click treeitem \"DSH, DSH*\"",

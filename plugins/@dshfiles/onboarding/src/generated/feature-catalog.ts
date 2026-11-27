@@ -2628,9 +2628,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "currentSurface": "left-nav: Agents › agent editor › Tools, Delegation, Default for projects",
       "reach": [
         {
-          "text": "click button \"Agents\"",
+          "text": "click tab \"Agents\"",
           "action": "click",
-          "by": "button",
+          "by": "tab",
           "name": "Agents",
           "value": null
         },
@@ -2707,17 +2707,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       ],
       "reachNarrow": [
         {
-          "text": "click button \"Open sidebar\"",
+          "text": "click button \"More\"",
           "action": "click",
           "by": "button",
-          "name": "Open sidebar",
+          "name": "More",
           "value": null
         },
         {
-          "text": "click button \"Agents\"",
+          "text": "click button \"Agents*\"",
           "action": "click",
           "by": "button",
-          "name": "Agents",
+          "name": "Agents*",
           "value": null
         },
         {
