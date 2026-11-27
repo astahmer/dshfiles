@@ -39,6 +39,7 @@ export const bundleDisplayDescription = (
   resolveLocaleText: (text: NonNullable<PluginBundle['description']>) => string,
 ): string => resolveBundleText(bundle.description, resolveLocaleText).trim() || (bundle.packageDescription ?? '').trim()
 
+/** The Settings entry a bundle's Settings button opens: its section's or its page's, else the one named for it. */
 export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bundle: Pick<PluginBundle, 'name' | 'rowIds'>): string | undefined => {
   const rowSet = new Set(bundle.rowIds)
   for (const group of groups) {
@@ -46,7 +47,10 @@ export const settingsEntryIdForBundle = (groups: readonly GroupedEntries[], bund
       if (entry.id === DSHFILES_PLUGINS_SECTION_ID) continue
       if (entry.bundleName === bundle.name) return entry.id
       if (entry.sectionId !== undefined && rowSet.has(entry.sectionId)) return entry.id
-      if (entry.pages.some(page => rowSet.has(page.ns)) || entry.hiddenPages.some(page => rowSet.has(page.ns))) return entry.id
+      // By its page id: a block of a task entry (Layout › Main tabs) opens that entry; a whole-entry page is the entry.
+      const page = entry.pages.find(candidate => rowSet.has(candidate.ns))
+      if (page !== undefined) return page.pageId
+      if (entry.hiddenPages.some(candidate => rowSet.has(candidate.ns))) return entry.id
     }
   }
   return undefined
