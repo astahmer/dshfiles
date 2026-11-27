@@ -175,6 +175,8 @@ export interface SidebarPreferences {
   notificationCategories: ThreadNotificationCategories
   notificationPlacement: ThreadNotificationPlacement
   notificationDurationSeconds: number
+  /** Minutes after which a notification about a thread still waiting for the user plays again; 0 never repeats it. */
+  notificationReminderMinutes: number
   applyActionsToChildThreads: boolean
   /** Continue the threads a stopped Host cut off once it starts again. */
   resumeAfterRestart: boolean
@@ -281,6 +283,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   notificationCategories: DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
   notificationPlacement: 'bottom-center',
   notificationDurationSeconds: 5,
+  notificationReminderMinutes: 0,
   applyActionsToChildThreads: true,
   resumeAfterRestart: false,
   resumeAfterRestartMaxThreads: 5,

@@ -143,6 +143,12 @@ export const threadSidebarSettings = defineSettings({
     notificationCategories: notificationCategories.hidden(),
     notificationPlacement: Schema.union(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement).hidden(),
     notificationDurationSeconds: Schema.natural().max(60).default(DEFAULT_PREFERENCES.notificationDurationSeconds).hidden(),
+    notificationReminderMinutes: Schema.natural()
+      .max(60)
+      .default(DEFAULT_PREFERENCES.notificationReminderMinutes)
+      .description(
+        'Play a thread notification and its sound once more after this many minutes when its thread still waits for you: the question is unanswered, the finished turn unread, or the agent message unseen. Opening the thread cancels it. 0 never repeats.',
+      ),
     resumeAfterRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.resumeAfterRestart)
       .description(

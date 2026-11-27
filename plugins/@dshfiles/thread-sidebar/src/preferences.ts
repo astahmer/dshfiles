@@ -204,6 +204,10 @@ const preferencesInputFields = {
     Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(60)),
     () => DEFAULT_PREFERENCES.notificationDurationSeconds,
   ),
+  notificationReminderMinutes: SchemaHelpers.withDecodedDefault(
+    Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(60)),
+    () => DEFAULT_PREFERENCES.notificationReminderMinutes,
+  ),
   applyActionsToChildThreads: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.applyActionsToChildThreads),
   resumeAfterRestart: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.resumeAfterRestart),
   resumeAfterRestartMaxThreads: SchemaHelpers.withDecodedDefault(
