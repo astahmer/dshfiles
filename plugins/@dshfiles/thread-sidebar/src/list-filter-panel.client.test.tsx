@@ -109,18 +109,13 @@ describe('the Filter panel', () => {
     expect(props.reset.onReset).toHaveBeenCalledOnce()
   })
 
-  it('marks an edited preset instead of checking it, with its save and discard', () => {
+  it('offers save for an edited preset', () => {
     const props = panel()
     const presets = props.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     render(<ListFilterPanel {...props} presets={{ ...presets, activeId: 'working', edited: true }} />)
-    expect(screen.getAllByRole('radio', { checked: true }).map(radio => radio.getAttribute('aria-label'))).not.toContain('Working (2)')
-    expect(screen.getByText('threadSidebarPresetEditedShort')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /threadSidebarPresetSaveChanges/u }))
     expect(presets.onSaveChanges).toHaveBeenCalledOnce()
-    // Picking the edited preset again drops its edits.
-    fireEvent.click(screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' }))
-    expect(presets.onApply).toHaveBeenCalledWith('working')
   })
 
   it('keeps why a thread waits and where it is stored under More, open while one of them is on', () => {
@@ -183,14 +178,13 @@ describe('the More statuses disclosure (round 28, item 2)', () => {
 
 // Council round 27, item 3: an edited preset is announced, not only drawn.
 describe('an edited preset (round 28, item 3)', () => {
-  it('names its row ", edited" and marks it current, while nothing is checked', () => {
+  it('names its row ", edited" and marks it current', () => {
     const base = panel()
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
     const row = screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' })
     expect(row.getAttribute('aria-current')).toBe('true')
-    expect(row.getAttribute('aria-checked')).toBe('false')
     expect(screen.getByRole('radio', { name: 'All threads' }).hasAttribute('aria-current')).toBe(false)
   })
 
@@ -593,5 +587,40 @@ describe('the Done chip at rest (round 29, item 4)', () => {
     const on = screen.getByRole('button', { name: 'threadSidebarSettled' }).querySelector('[data-chip-seat]')
     expect(on?.querySelector('[data-chip-check]')).not.toBeNull()
     expect(on?.querySelector('[data-chip-mark]')).toBeNull()
+  })
+})
+
+// Council round 28, item 5: an edited preset keeps its identity.
+describe('an edited preset keeps its identity (round 29, item 5)', () => {
+  const edited = (): { readonly props: ListFilterPanelProps; readonly onApply: () => void } => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    const onApply = vi.fn()
+    return { props: { ...base, presets: { ...presets, activeId: 'working', edited: true, onApply } }, onApply }
+  }
+
+  it('stays checked, with its check, an edited dot in the same seat and the tag inline after the label', () => {
+    render(<ListFilterPanel {...edited().props} />)
+    const row = screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' })
+    expect(row.getAttribute('aria-checked')).toBe('true')
+    expect(row.getAttribute('data-state')).toBe('on')
+    const seat = row.querySelector('[data-preset-seat]')
+    expect(seat?.querySelector('svg')).not.toBeNull()
+    expect(seat?.querySelector('[data-preset-edited-dot]')).not.toBeNull()
+    const label = row.querySelector('[data-preset-label]')
+    expect(label?.textContent).toBe('Working · threadSidebarPresetEditedShort')
+    const tag = label?.querySelector('[data-preset-edited-tag]')
+    expect(tag?.className).toContain('dshx:text-xs')
+    expect(tag?.className).toContain('dshx:text-muted-foreground')
+  })
+
+  it('does nothing when the current preset is pressed again: Discard is the way to drop edits', () => {
+    const { props, onApply } = edited()
+    render(<ListFilterPanel {...props} />)
+    fireEvent.click(screen.getByRole('radio', { name: 'Working, threadSidebarPresetThreads_other, threadSidebarPresetEditedShort' }))
+    expect(onApply).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('radio', { name: 'All threads' }))
+    expect(onApply).toHaveBeenCalledWith('all')
   })
 })

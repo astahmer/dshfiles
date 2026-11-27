@@ -262,10 +262,10 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
             type="single"
             orientation="vertical"
             aria-label={t('threadSidebarPresets')}
-            // An edited preset is no longer what it saved: nothing is checked, and its row says "edited" instead.
-            value={presets.edited ? '' : presets.activeId}
-            // Picking the checked row again would clear the group; it re-applies the preset instead (dropping edits).
-            onValueChange={value => presets.onApply(value === '' ? presets.activeId : value)}
+            // An edited preset keeps its identity (council round 28, item 5): it stays checked, marked edited.
+            value={presets.activeId}
+            // Pressing the checked row again would clear the group: it is a no-op (Discard, in the row, drops edits).
+            onValueChange={value => (value === '' || value === presets.activeId ? undefined : presets.onApply(value))}
             // Rows that stand apart: with spacing the kit keeps each row's own rounded corners (round 28, item 13).
             spacing={0.5}
             className="dshx:-mx-1.5 dshx:grid dshx:w-auto dshx:gap-0.5"
@@ -283,16 +283,21 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
                   data-preset-active={active ? '' : undefined}
                   className="dshx:h-8 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-1.5 dshx:text-sm dshx:font-normal dshx:text-foreground dshx:hover:bg-accent dshx:hover:text-foreground dshx:data-[state=on]:font-medium dshx:pointer-coarse:h-11"
                 >
-                  {/* The check says which preset the list shows; an edited one keeps its row marked by "edited". */}
-                  <span className="dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true">
-                    {active && !presets.edited ? <CheckIcon className="dshx:size-4" /> : null}
+                  {/* The check says which preset the list shows; an edited one adds a dot at the check's corner. */}
+                  <span className="dshx:relative dshx:inline-flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-preset-seat="">
+                    {active ? <CheckIcon className="dshx:size-4" /> : null}
+                    {active && presets.edited ? (
+                      <span className="dshx:absolute dshx:-top-0.5 dshx:-right-0.5 dshx:size-1.5 dshx:rounded-full dshx:bg-foreground" data-preset-edited-dot="" />
+                    ) : null}
                   </span>
-                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left">{preset.label}</span>
-                  {active && presets.edited ? (
-                    <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground" data-preset-edited-tag="">
-                      {t('threadSidebarPresetEditedShort')}
-                    </span>
-                  ) : null}
+                  <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-left" data-preset-label="">
+                    {preset.label}
+                    {active && presets.edited ? (
+                      <span className="dshx:text-xs dshx:font-normal dshx:text-muted-foreground" data-preset-edited-tag="">
+                        {` · ${t('threadSidebarPresetEditedShort')}`}
+                      </span>
+                    ) : null}
+                  </span>
                   {/* Marked only for rows that need you or failed (the diamond before the cross), never for an unread count. */}
                   {preset.needsYou === 0 ? null : <StatusGlyph status="needs-you" decorative data-testid="thread-view-attention-dot" />}
                   {preset.failed === 0 ? null : <StatusGlyph status="failed" decorative />}

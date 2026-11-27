@@ -67,7 +67,7 @@ const openViews = async (page: Page, scope: Locator): Promise<Locator> => {
   return presets
 }
 
-/** Pick one of the list's presets (All threads, Working, Done, a custom one); picking the active one drops its edits. */
+/** Pick one of the list's presets (All threads, Working, Done, a custom one); the active one again is a no-op (round 29). */
 const selectView = async (page: Page, scope: Locator, name: string): Promise<void> => {
   const presets = await openViews(page, scope)
   await presets.getByRole('radio', { name: viewName(name) }).click()
