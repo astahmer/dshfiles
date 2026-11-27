@@ -280,9 +280,13 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   })
   // Whether more content waits below the fold: the foot fades 16px while it does (council round 30, item 7).
   const [moreBelow, setMoreBelow] = useState(false)
+  // Whether the panel is scrolled: the header's bottom rule shows only then (council round 31, item 4).
+  const [scrolled, setScrolled] = useState(false)
   const measureMoreBelow = (): void => {
     const root = panelRef.current
-    if (root !== null) setMoreBelow(root.scrollTop + root.clientHeight < root.scrollHeight - 1)
+    if (root === null) return
+    setMoreBelow(root.scrollTop + root.clientHeight < root.scrollHeight - 1)
+    setScrolled(root.scrollTop > 0)
   }
   useLayoutEffect(() => {
     measureMoreBelow()
@@ -310,8 +314,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
     <div
       ref={panelRef}
       // One shrinkable column (an `auto` one grows to a row's min-content: council round 29, item 4) and a clipped x axis
-      // as the guard, so the phone sheet never scrolls sideways.
-      className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:grid-cols-[minmax(0,1fr)] dshx:divide-y dshx:divide-border dshx:overflow-x-clip dshx:overflow-y-auto dshx:overscroll-contain dshx:data-[more-below]:[mask-image:linear-gradient(to_bottom,currentcolor_calc(100%-16px),transparent)]"
+      // as the guard, so the phone sheet never scrolls sideways. Its scroll padding keeps a Tab-focused control clear of
+      // the sticky header (44px) and the bottom fade (24px) (council round 31, item 4).
+      className="dshx:grid dshx:min-h-0 dshx:min-w-0 dshx:grid-cols-[minmax(0,1fr)] dshx:divide-y dshx:divide-border dshx:overflow-x-clip dshx:overflow-y-auto dshx:overscroll-contain dshx:scroll-pt-11 dshx:scroll-pb-6 dshx:data-[more-below]:[mask-image:linear-gradient(to_bottom,currentcolor_calc(100%-16px),transparent)]"
       onScroll={measureMoreBelow}
       data-more-below={moreBelow ? '' : undefined}
       data-thread-list-filter-panel=""
@@ -322,7 +327,9 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           Reset"; a phone reads "Reset · Filters · Done", the sheet's own close. One word for the button and the title.
           The panel scrolls, not the sheet, so the grabber's 20px stays above the header. */}
       <div
-        className="dshx:sticky dshx:top-0 dshx:z-10 dshx:flex dshx:items-center dshx:gap-2 dshx:bg-popover dshx:py-1.5 dshx:pr-0.5 dshx:pl-3 dshx:phone:grid dshx:phone:grid-cols-[1fr_auto_1fr] dshx:phone:px-0.5"
+        // Its bottom rule only while the panel is scrolled, so at rest no rule doubles the presets' (round 32, item 4).
+        className="dshx:sticky dshx:top-0 dshx:z-10 dshx:border-b-0! dshx:data-[scrolled]:border-b! dshx:flex dshx:items-center dshx:gap-2 dshx:bg-popover dshx:py-1.5 dshx:pr-0.5 dshx:pl-3 dshx:phone:grid dshx:phone:grid-cols-[1fr_auto_1fr] dshx:phone:px-0.5"
+        data-scrolled={scrolled ? '' : undefined}
         data-thread-filter-header=""
       >
         <h2 className="dshx:min-w-0 dshx:flex-1 dshx:text-sm dshx:font-medium dshx:phone:text-base dshx:phone:font-semibold">{t('threadSidebarFilters')}</h2>
@@ -605,14 +612,15 @@ const StatusChips = (props: {
 }): JSX.Element => {
   const [opened, setOpened] = useState(false)
   const moreId = useId()
-  // Opened by the user: bring what it revealed into view (council round 30, item 8: below the fold on a phone).
+  // Opened by the user: bring what it revealed into view (council round 30, item 8: below the fold on a phone), from its
+  // start, below the header's scroll padding, so its last chip is not under the bottom fade (round 31, item 4).
   const revealRequested = useRef(false)
   useEffect(() => {
     if (!opened || !revealRequested.current) return
     revealRequested.current = false
     const region = document.getElementById(moreId)
     // jsdom (the unit tests) draws no layout and has no scrollIntoView.
-    if (region !== null && 'scrollIntoView' in region) region.scrollIntoView({ block: 'nearest' })
+    if (region !== null && 'scrollIntoView' in region) region.scrollIntoView({ block: 'start' })
   }, [moreId, opened])
   const forced = props.selected.some(filter => !isLeadingStatus(filter))
   // Latched open once forced (council round 29, item 3): turning the last revealed status off never folds the region

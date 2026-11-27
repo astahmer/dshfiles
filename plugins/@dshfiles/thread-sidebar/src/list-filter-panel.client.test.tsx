@@ -1286,7 +1286,7 @@ describe('the desktop panel holds its top (round 31, item 7)', () => {
 
 // Council round 30, item 8: on a phone the revealed statuses opened below the fold; they scroll into view.
 describe('More statuses reveals into view (round 31, item 8)', () => {
-  it('scrolls the revealed region to the nearest edge when More opens it, and not when it folds', () => {
+  it('scrolls the revealed region into view from its start when More opens it, and not when it folds', () => {
     const calls: { readonly target: Element; readonly options: ScrollIntoViewOptions | boolean | undefined }[] = []
     const original = Element.prototype.scrollIntoView
     Element.prototype.scrollIntoView = function (this: Element, options?: ScrollIntoViewOptions | boolean) {
@@ -1297,7 +1297,8 @@ describe('More statuses reveals into view (round 31, item 8)', () => {
       const more = screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' })
       fireEvent.click(more)
       const region = document.getElementById(more.getAttribute('aria-controls') ?? '')
-      expect(calls).toEqual([{ target: region, options: { block: 'nearest' } }])
+      // To the start since round 32 (item 4), so the last revealed chip is not under the bottom fade.
+      expect(calls).toEqual([{ target: region, options: { block: 'start' } }])
       fireEvent.click(more)
       expect(calls).toHaveLength(1)
     } finally {
@@ -1395,5 +1396,31 @@ describe('revealed chips share the grid above (round 32, item 3)', () => {
     const tokens = leading.className.split(/\s+/u)
     for (const group of Array.from(region.querySelectorAll('[data-thread-status-group]')))
       for (const token of group.className.split(/\s+/u)) expect(tokens, token).toContain(token)
+  })
+})
+
+// Council round 31, item 4: scrolling under the sticky header. Its bottom rule shows only while the panel is scrolled; the
+// scroller keeps a focused control clear of the header (44px) and the bottom fade (24px); More reveals to the start.
+describe('scrolling under the header (round 32, item 4)', () => {
+  it('draws the header rule only while the panel is scrolled', () => {
+    const { container } = render(<ListFilterPanel {...panel()} />)
+    const root = element(container.querySelector('[data-thread-list-filter-panel]'))
+    const header = element(root.querySelector('[data-thread-filter-header]'))
+    expect(header.className).toContain('dshx:border-b-0!')
+    expect(header.className).toContain('dshx:data-[scrolled]:border-b!')
+    expect(header.hasAttribute('data-scrolled')).toBe(false)
+    root.scrollTop = 40
+    fireEvent.scroll(root)
+    expect(header.hasAttribute('data-scrolled')).toBe(true)
+    root.scrollTop = 0
+    fireEvent.scroll(root)
+    expect(header.hasAttribute('data-scrolled')).toBe(false)
+  })
+
+  it('pads the scroller 44px at the top and 24px at the foot, so Tab never lands under the header or the fade', () => {
+    const { container } = render(<ListFilterPanel {...panel()} />)
+    const root = element(container.querySelector('[data-thread-list-filter-panel]'))
+    expect(root.className).toContain('dshx:scroll-pt-11')
+    expect(root.className).toContain('dshx:scroll-pb-6')
   })
 })
