@@ -14,6 +14,10 @@ describe('land categories in the shared status vocabulary', () => {
     expect(LandStatusModel.glyph('integrated')).toBe('done')
     expect(LandStatusModel.glyph('no-changes')).toBe('done')
   })
+
+  it('draws cold pending work the bookmark moved past as Stale, not Ready', () => {
+    expect(LandStatusModel.glyph('stale')).toBe('stale')
+  })
 })
 
 describe('land filters', () => {

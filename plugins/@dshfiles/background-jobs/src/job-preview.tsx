@@ -310,7 +310,7 @@ export const JobPreviewDock = (props: JobPreviewBindings & { readonly sessionId:
     <div
       aria-label={props.t('previewDock')}
       role="region"
-      className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-full dshx:flex-none dshx:flex-col dshx:overflow-y-auto"
+      className="dshx-root dshx:mx-auto dshx:flex dshx:max-h-72 dshx:w-[calc(100%-var(--dsh-composer-side-clearance,0px)*2)] dshx:max-w-(--dsh-composer-card-max-width) dshx:flex-none dshx:flex-col dshx:overflow-y-auto"
       data-dshfiles-live-preview-dock="jobs"
     >
       {folded ? (

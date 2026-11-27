@@ -291,11 +291,34 @@
   color: var(--dsw-alias-menu-icon);
 }
 
+/* Phone: the picker is a touch sheet. The kit's phone rule gives it the sheet
+   geometry, surface and grabber once `[data-trigger-menu]` is listed there; this
+   keeps its rows at a comfortable size. */
+@media (max-width: 639.98px) {
+  /* One scroller: the sheet surface clamps at 72dvh and scrolls; the list inside
+     grows instead of nesting a second scrollbar. */
+  .viewport {
+    overflow-y: visible;
+  }
+
+  .item {
+    min-height: 44px;
+    padding: 10px 10px;
+    font-size: 15px;
+  }
+
+  .itemIcon,
+  .itemIcon svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
 /*
- * Touch (unslop phone 3): the composer's other pickers are 44px sheets, so this list matches them while it stays
- * anchored above the composer (focus never leaves the field, so typing still filters and the keyboard stays up).
- * Rows are 44px at the comfortable UI size, every caption reads as meta (13px on a phone, never 10-11px), the Tab
- * key hint goes, and the drill chevron gets a 44px hit area.
+ * Touch (unslop phone 3): the composer's other pickers are 44px sheets, so this list matches them (as the app sheet
+ * on a phone, or anchored above the composer while the keyboard is up; focus never leaves the field, so typing still
+ * filters). Rows are 44px at the comfortable UI size, every caption reads as meta (13px on a phone, never 10-11px),
+ * the Tab key hint goes, and the drill chevron gets a 44px hit area.
  */
 @media (pointer: coarse) {
   .item {
@@ -333,7 +356,8 @@
   }
 }
 
-/* Under the phone shell the list takes the sheet radius (DESIGN.md: 16px phone sheets). */
+/* Under the phone shell, while the keyboard keeps the list anchored above the composer (the kit's sheet rule sets
+   its own top-only radius otherwise), the list takes the sheet radius (DESIGN.md: 16px phone sheets). */
 @media (max-width: 639.98px), (pointer: coarse) and (max-height: 500px) {
   :global(html[data-shell-phone-nav]) .menu {
     border-radius: var(--dsw-radius-panel, 16px);

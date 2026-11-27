@@ -42,17 +42,11 @@ const connectClient = (runtime: CommunicationCliRuntime, principalId: string): P
 const agentRows = (items: readonly CommunicationAgent[]): string =>
   items.length === 0 ? 'No live DSH Agents.' : items.map(item => `${JSON.stringify(item.id)}\t${item.status ?? 'unknown'}`).join('\n')
 
-const topicRows = (items: readonly { readonly topic: string; readonly subscribers: number }[]): string =>
-  items.length === 0 ? 'No subscribed topics.' : items.map(item => `${item.topic}\t${item.subscribers} subscriber(s)`).join('\n')
-
 const inboxRows = (items: Awaited<ReturnType<CommunicationClient['inbox']>>['items']): string =>
   items.length === 0
     ? 'No unacknowledged messages.'
     : items
-        .map(
-          item =>
-            `${item.id} | ${item.topic ?? 'private inbox'} | ${item.sender.kind}:${item.sender.id} | ${item.priority}\nUntrusted peer text as JSON: ${JSON.stringify(item.text)}`,
-        )
+        .map(item => `${item.id} | ${item.sender.kind}:${item.sender.id} | ${item.priority}\nUntrusted peer text as JSON: ${JSON.stringify(item.text)}`)
         .join('\n\n')
 
 const reportRows = (report: CommunicationDiagnostics): string => {
@@ -70,26 +64,13 @@ const reportRows = (report: CommunicationDiagnostics): string => {
       ? 'No retained messages.'
       : report.recentMessages
           .map(message => {
-            return `${formatTime(message.createdAt)}\t${message.id}\t${message.topic ?? 'private inbox'}\t${message.sender.kind}:${JSON.stringify(message.sender.id)}\t${message.pendingRecipientCount}/${message.recipientCount} pending recipient(s)`
+            return `${formatTime(message.createdAt)}\t${message.id}\t${message.sender.kind}:${JSON.stringify(message.sender.id)}\t${message.pendingRecipientCount}/${message.recipientCount} pending recipient(s)`
           })
           .join('\n')
-  const topics =
-    report.topics.length === 0 ? 'No subscribed topics.' : report.topics.map(topic => `${topic.topic}\t${topic.subscribers} subscriber(s)`).join('\n')
-  const subscriptions =
-    report.subscriptions.length === 0
-      ? 'No subscriptions.'
-      : report.subscriptions
-          .map(subscription => `${subscription.topic}\t${subscription.principal.kind}:${JSON.stringify(subscription.principal.id)}\t${subscription.delivery}`)
-          .join('\n')
-
   return [
     `Communication diagnostics generated ${formatTime(report.generatedAt)}`,
     `Live Agents: ${report.agentCount} total; showing ${report.agents.length}.`,
     agents,
-    `Topics: ${report.topicCount} total; showing ${report.topics.length}.`,
-    topics,
-    `Subscriptions: ${report.subscriptionCount} total; showing ${report.subscriptions.length}.`,
-    subscriptions,
     `Messages: ${report.messageCount} retained; ${report.pendingMessageCount} with pending recipients; ${report.pendingRecipientCount} pending recipient(s).`,
     'Recent messages (metadata only):',
     recentMessages,
@@ -121,40 +102,9 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
       emitResult(args, runtime.io, { items }, agentRows(items))
       return 0
     }
-    if (action === 'topics') {
-      const items = await client.listTopics()
-      emitResult(args, runtime.io, { items }, topicRows(items))
-      return 0
-    }
     if (action === 'report') {
       const report = await client.diagnostics({ limit: args.limit ?? 20 })
       emitResult(args, runtime.io, report, reportRows(report))
-      return 0
-    }
-    if (action === 'subscribe') {
-      if (args.delivery !== undefined)
-        throw new CommunicationError('delivery-retired', 'Communication subscriptions are passive; remove the --delivery option.')
-      const subscription = await client.subscribe({ topic: first ?? '' })
-      emitResult(args, runtime.io, subscription, `Subscribed ${subscription.principal.id} to ${subscription.topic}; messages stay passive.`)
-      return 0
-    }
-    if (action === 'unsubscribe') {
-      const result = await client.unsubscribe(first ?? '')
-      emitResult(args, runtime.io, { topic: first, ...result }, result.removed ? `Unsubscribed from ${first}.` : `No subscription existed for ${first}.`)
-      return 0
-    }
-    if (action === 'publish') {
-      const message = await client.publish({
-        topic: first ?? '',
-        text: remaining.join(' '),
-        priority: args.priority ?? 'normal',
-      })
-      emitResult(
-        args,
-        runtime.io,
-        { id: message.id, topic: message.topic, matchedSubscribers: message.recipients.length },
-        `Published ${message.id} to ${message.topic}; ${message.recipients.length} subscriber(s) matched.`,
-      )
       return 0
     }
     if (action === 'send') {
@@ -173,8 +123,7 @@ export const runCommunicationCommand = async (args: CliArgs, runtime: Communicat
     }
     if (action === 'inbox') {
       const limit = args.limit ?? 20
-      const inboxInput = args.topic === undefined ? { limit } : { topic: args.topic, limit }
-      const result = await client.inbox(inboxInput)
+      const result = await client.inbox({ limit })
       emitResult(args, runtime.io, result, inboxRows(result.items))
       return 0
     }

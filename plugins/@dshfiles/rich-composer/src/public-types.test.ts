@@ -1,3 +1,5 @@
+import { decodeJson } from '@dshfiles/dshx/json'
+import { Schema } from 'effect'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -39,7 +41,9 @@ const forkReach = (entry: string): string[] => {
   return offenders
 }
 
-const manifest = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')) as { exports: Record<string, unknown> }
+const manifestSchema = Schema.Struct({ exports: Schema.Record(Schema.String, Schema.Unknown) })
+
+const manifest = decodeJson(manifestSchema, readFileSync(join(root, 'package.json'), 'utf8'))
 const typeEntries = Object.entries(manifest.exports).flatMap(([subpath, target]) =>
   typeof target === 'object' && target !== null && 'types' in target && typeof target.types === 'string' ? [[subpath, target.types] as const] : [],
 )

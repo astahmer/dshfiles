@@ -29,6 +29,7 @@ import {
   QuoteIcon,
   SearchIcon,
   SquareArrowOutUpRightIcon,
+  SunIcon,
   TimerIcon,
   type LucideIcon,
 } from '@dshfiles/plugin-ui/icons'
@@ -96,6 +97,7 @@ const ICONS = {
   mute: BellIcon,
   'mark-unread': MailIcon,
   notify: BellRingIcon,
+  'keep-awake': SunIcon,
   'auto-done': TimerIcon,
   'move-to-group': LayersIcon,
   'referenced-by': QuoteIcon,

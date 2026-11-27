@@ -114,7 +114,7 @@ export const threadWorkspaceName = threadWorkspaceNameEffect
 const cleanupRequestSchema = Schema.Struct({
   path: Schema.optional(Schema.String.check(Schema.isMinLength(1))),
   olderThanHours: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0), Schema.isLessThanOrEqualTo(24 * 90)),
-  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(5)),
+  kinds: Schema.Array(cleanupKindSchema).check(Schema.isMinLength(1), Schema.isMaxLength(6)),
   targets: Schema.optional(Schema.Array(cleanupTargetSchema).check(Schema.isMaxLength(500))),
 })
 
@@ -143,7 +143,7 @@ const cleanupWorkspaceSchema = Schema.Struct({
   repoRoot: Schema.String,
   name: Schema.String,
   path: Schema.String,
-  kind: Schema.Literals(['empty', 'integrated', 'merged', 'secondary']),
+  kind: Schema.Literals(['empty', 'integrated', 'merged', 'stale', 'secondary']),
   lastUsedAt: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
   missing: Schema.Boolean,
   /** Other bookmarks that each hold all of this workspace's work: why a workspace with revisions is removable. */
@@ -328,7 +328,7 @@ export const jjIntegrationApi = defineApi({
       }),
       output: jjRepositoriesEffectSchema,
       description:
-        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
+        'List jj repositories and their thread workspaces: each thread workspace’s name, path, owning Sessions, finished state, pending revisions, how far behind the bookmark it is, whether that work is stale, and whether it can be integrated right now. The view may be stale while a refresh runs; read-only.',
       tool: {
         name: 'jj_thread_repositories',
         readOnly: true,
@@ -342,6 +342,7 @@ export const jjIntegrationApi = defineApi({
                     thread.finished ? 'finished' : undefined,
                     thread.missing ? 'missing workspace' : undefined,
                     thread.canRebase === true ? 'can rebase' : thread.canRebase === false ? 'blocked' : 'activity unknown',
+                    thread.stale === true ? 'stale' : undefined,
                     (thread.unlandedSummary?.total ?? thread.unlanded.length) === 0
                       ? 'no pending revisions'
                       : `${String(thread.unlandedSummary?.total ?? thread.unlanded.length)} pending`,
@@ -584,7 +585,7 @@ export const jjIntegrationApi = defineApi({
       input: Schema.Struct({ ...cleanupRequestSchema.fields, apply: Schema.Boolean }),
       output: cleanupResultSchema,
       description:
-        'Remove idle workspaces, then abandon empty undescribed revisions nothing builds on. A thread workspace qualifies when it is of a listed kind (empty: never landed; integrated: landed, or all its work held by one other local bookmark, named in integratedInto and kept), unused longer than olderThanHours, with no live, waiting or unreadable Session and no queued integration. Secondary JJ checkouts are opt-in: a present one must be idle and clean with no unlanded work, outside the primary checkout and threads directory; a missing one is only forgotten, its path never deleted. untracked removes threads-directory entries no workspace owns. targets limits removal to matching preview rows. Working-copy files are snapshotted first; unlanded work is never forced. apply: false previews; apply: true only when the user asked to clean up.',
+        'Remove idle workspaces, then abandon empty undescribed revisions nothing builds on. A thread workspace qualifies when it is of a listed kind (empty: never landed; integrated: landed, or all its work held by one other local bookmark, named in integratedInto and kept; stale: pending work the bookmark moved past and nobody changed for the stale window, only ever removed when stale is listed), unused longer than olderThanHours, with no live, waiting or unreadable Session and no queued integration. Secondary JJ checkouts are opt-in: a present one must be idle and clean with no unlanded work, outside the primary checkout and threads directory; a missing one is only forgotten, its path never deleted. untracked removes threads-directory entries no workspace owns. targets limits removal to matching preview rows. Working-copy files are snapshotted first; unlanded work is never forced except stale work the stale kind selected. apply: false previews; apply: true only when the user asked to clean up.',
       tool: { name: 'jj_thread_cleanup', render: renderCleanup },
     }),
     startCleanup: method({

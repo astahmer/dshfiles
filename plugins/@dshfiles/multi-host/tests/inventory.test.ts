@@ -36,6 +36,7 @@ const reachable = (input: { runtimeId: string; hostName: string; sessions: reado
     },
     workspaces: [],
     sessions: input.sessions,
+    archivedSessionIds: [],
   } satisfies RuntimeStatus,
 })
 

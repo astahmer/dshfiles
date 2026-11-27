@@ -24,7 +24,7 @@ export const THREAD_MENU_COPY = ['copy-id', 'copy-markdown'] as const
 export const THREAD_MENU_MORE = [
   ['turns'],
   ['mention', 'follow-up'],
-  ['mute', 'mark-unread', 'notify'],
+  ['mute', 'mark-unread', 'notify', 'keep-awake'],
   ['auto-done', 'move-to-group'],
   ['referenced-by', 'turn-into-project', 'sections', 'row-actions', 'native-actions'],
   ['archive'],
@@ -50,6 +50,7 @@ const ARCHIVED_ENTRIES: ReadonlySet<ThreadMenuEntryId> = new Set<ThreadMenuEntry
   'mute',
   'mark-unread',
   'notify',
+  'keep-awake',
   'auto-done',
   'move-to-group',
   'referenced-by',
@@ -104,8 +105,23 @@ const topLevelCount = (menu: ThreadMenuLayout): number =>
  */
 const keyHint = (keys: string | undefined, coarsePointer: boolean): string | undefined => (coarsePointer ? undefined : keys)
 
+/**
+ * Keep screen on (plan phone P27): a phone watching a long run keeps its screen awake from the thread menu. The lock is
+ * the page's, so the entry names what a tap does next; a desktop pointer, or a browser without Screen Wake Lock, gets no
+ * entry rather than a switch that cannot hold.
+ */
+const keepAwakeLabel = (input: {
+  readonly coarsePointer: boolean
+  readonly available: boolean
+  readonly on: boolean
+}): 'threadSidebarKeepScreenOn' | 'threadSidebarAllowScreenSleep' | undefined => {
+  if (!input.coarsePointer || !input.available) return undefined
+  return input.on ? 'threadSidebarAllowScreenSleep' : 'threadSidebarKeepScreenOn'
+}
+
 export class ThreadMenuModel {
   static readonly layout = layout
   static readonly topLevelCount = topLevelCount
   static readonly keyHint = keyHint
+  static readonly keepAwakeLabel = keepAwakeLabel
 }

@@ -59,6 +59,19 @@ describe('the thread menu layout', () => {
     expect(ThreadMenuModel.keyHint('Mod+F', true)).toBeUndefined()
   })
 
+  it('offers Keep screen on only on a touch device with Screen Wake Lock, and names the next tap', () => {
+    expect(ThreadMenuModel.keepAwakeLabel({ coarsePointer: false, available: true, on: false })).toBeUndefined()
+    expect(ThreadMenuModel.keepAwakeLabel({ coarsePointer: true, available: false, on: false })).toBeUndefined()
+    expect(ThreadMenuModel.keepAwakeLabel({ coarsePointer: true, available: true, on: false })).toBe('threadSidebarKeepScreenOn')
+    expect(ThreadMenuModel.keepAwakeLabel({ coarsePointer: true, available: true, on: true })).toBe('threadSidebarAllowScreenSleep')
+    // Offered, it sits with the alert and read-state verbs under More, archived or not.
+    for (const archived of [false, true]) {
+      const menu = ThreadMenuModel.layout({ offered: new Set<ThreadMenuEntryId>(['mute', 'keep-awake']), archived, phone: true })
+      expect(menu.more).toEqual([['mute', 'keep-awake']])
+    }
+    expect(ThreadMenuModel.layout({ offered: new Set<ThreadMenuEntryId>(['mute']), archived: false, phone: true }).more.flat()).not.toContain('keep-awake')
+  })
+
   it('offers an archived thread Restore instead of the lifecycle verbs that no longer apply', () => {
     const menu = ThreadMenuModel.layout({ offered: ROW, archived: true, phone: false })
     expect(menu.top).toEqual(['restore', 'rename', 'copy-link'])

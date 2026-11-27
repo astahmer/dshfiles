@@ -4,8 +4,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { findInLoadedRows, findTextRanges } from '../src/native/chat/find-reveal.ts'
 import { SinceYouLeftRecapModel } from '../src/native/chat/since-you-left.ts'
 import { ThreadFindModel, type FindHit } from '../src/native/chat/thread-find-model.ts'
-import { mergeTurnRailItems, type TurnRailItem } from '../src/native/chat/turn-rail-items.ts'
+import { mergeTurnRailItems, seenBoundaryIndex, type TurnRailItem } from '../src/native/chat/turn-rail-items.ts'
 import { SinceYouLeftModel, ThreadToolsModel } from '../src/thread-tools.ts'
+import { SeenTurns } from '../src/native/seen-turns.ts'
 import { TurnMarksModel, type TurnMark } from '../src/turn-marks.ts'
 
 const mark = (turn: number, seq: number, extra: Partial<TurnMark> = {}): TurnMark => ({
@@ -239,5 +240,62 @@ describe('thread tools handoff', () => {
     SinceYouLeftModel.note({ sessionId: '', firstUnreadSeq: 1, finishedSeq: 2 })
     expect(SinceYouLeftModel.take('session-c', 6)).toEqual({ sessionId: 'session-c', firstUnreadSeq: 12, finishedSeq: 40 })
     expect(SinceYouLeftModel.take('', 6)).toBeNull()
+  })
+})
+
+describe('turn rail read boundary', () => {
+  const memoryStorage = (initial: string | null = null) => {
+    const values = new Map<string, string>()
+    if (initial !== null) values.set('dshfiles-chat:seen-turns', initial)
+    return {
+      values,
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => {
+        values.set(key, value)
+      },
+    }
+  }
+
+  it('remembers the highest Turn reached per Session and never moves the mark back', () => {
+    const storage = memoryStorage()
+    const seen = new SeenTurns(storage)
+    seen.markSeen('a', 12)
+    seen.markSeen('a', 4)
+    expect(seen.read('a')).toBe(12)
+    expect(new SeenTurns(storage).read('a')).toBe(12)
+    expect(seen.read('b')).toBeNull()
+  })
+
+  it('reseeds from the Host unread record, back to a lower Turn or to nothing seen yet', () => {
+    const seen = new SeenTurns(memoryStorage())
+    seen.markSeen('a', 30)
+    seen.reset('a', 11)
+    expect(seen.read('a')).toBe(11)
+    seen.reset('a', null)
+    expect(seen.read('a')).toBeNull()
+  })
+
+  it('drops the least recently reached Sessions beyond its limit and survives corrupt or absent storage', () => {
+    const seen = new SeenTurns(memoryStorage(), 2)
+    seen.markSeen('a', 1)
+    seen.markSeen('b', 1)
+    seen.markSeen('a', 2)
+    seen.markSeen('c', 1)
+    expect(seen.read('b')).toBeNull()
+    expect(seen.read('a')).toBe(2)
+    expect(seen.read('c')).toBe(1)
+    expect(new SeenTurns(memoryStorage('{not json')).read('a')).toBeNull()
+    expect(new SeenTurns(memoryStorage('[["a",-1]]')).read('a')).toBeNull()
+    expect(new SeenTurns(null).read('a')).toBeNull()
+  })
+
+  it('draws the boundary above the first Turn after the seen one, and nowhere at either end', () => {
+    const items = mergeTurnRailItems([], outline(4))
+    expect(seenBoundaryIndex(items, null)).toBe(-1)
+    expect(seenBoundaryIndex(items, 0)).toBe(-1)
+    expect(seenBoundaryIndex(items, 1)).toBe(1)
+    expect(seenBoundaryIndex(items, 2)).toBe(2)
+    expect(seenBoundaryIndex(items, 4)).toBe(-1)
+    expect(seenBoundaryIndex(items, 9)).toBe(-1)
   })
 })

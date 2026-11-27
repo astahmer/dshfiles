@@ -208,12 +208,12 @@ export class RemoteSessions extends Context.Service<
         readonly method: string
         readonly request: unknown
         readonly mutation: boolean
-        readonly decode: (value: unknown) => Effect.Effect<Value, unknown>
+        decodePayload(value: unknown): Effect.Effect<Value, unknown>
       }) =>
         Effect.flatMap(requireRuntime(input.sessionId), runtime =>
           pool.use(
             runtime.id,
-            gateway => Effect.flatMap(gateway.run({ namespace: 'session', method: input.method, args: { request: input.request } }), input.decode),
+            gateway => Effect.flatMap(gateway.run({ namespace: 'session', method: input.method, args: { request: input.request } }), input.decodePayload),
             {
               mutation: input.mutation,
             },
@@ -329,7 +329,7 @@ export class RemoteSessions extends Context.Service<
             hostName: runtime.label,
           })
           if (foreignUpload !== undefined) return yield* new SessionPromptRefused({ reason: foreignUpload })
-          return yield* forward({ sessionId: request.sessionId, method: 'prompt', request, mutation: true, decode: SessionPayload.prompt }).pipe(
+          return yield* forward({ sessionId: request.sessionId, method: 'prompt', request, mutation: true, decodePayload: SessionPayload.prompt }).pipe(
             Effect.mapError(error => {
               if (!(error instanceof RemoteRequestFailed) || error.code !== 'session/attachment-invalid') return error
               // Only a cited file receipt can be missing over there; an inline image the runtime refused names its own
@@ -352,7 +352,7 @@ export class RemoteSessions extends Context.Service<
               request.action.content.map(block => block.text),
             )
           }
-          return yield* forward({ sessionId: request.sessionId, method: 'updateQueue', request, mutation: true, decode: SessionPayload.queue })
+          return yield* forward({ sessionId: request.sessionId, method: 'updateQueue', request, mutation: true, decodePayload: SessionPayload.queue })
         })
 
       const recordUpload = (input: StagedUpload & { readonly receiptId: string }) =>
@@ -395,7 +395,7 @@ export class RemoteSessions extends Context.Service<
       /** A fork of a mirrored thread stays on its host, so this Host records it as that host's thread. */
       const fork = Effect.fn('multi-host remote session fork')(function* (request: SessionForkRequest) {
         const runtime = yield* requireRuntime(request.sessionId)
-        const created = yield* forward({ sessionId: request.sessionId, method: 'fork', request, mutation: true, decode: SessionPayload.forked }).pipe(
+        const created = yield* forward({ sessionId: request.sessionId, method: 'fork', request, mutation: true, decodePayload: SessionPayload.forked }).pipe(
           // The native client reads this code to say why a thread cannot fork yet.
           Effect.mapError(error =>
             error instanceof RemoteRequestFailed && error.code === 'session/fork-unavailable'
@@ -411,7 +411,7 @@ export class RemoteSessions extends Context.Service<
 
       /** A mirrored thread's images live in its runtime's attachment store; this Host's store never saw them. */
       const attachment = Effect.fn('multi-host remote session attachment')(function* (request: SessionAttachmentRequest) {
-        const read = yield* forward({ sessionId: request.sessionId, method: 'attachment', request, mutation: false, decode: SessionPayload.attachment })
+        const read = yield* forward({ sessionId: request.sessionId, method: 'attachment', request, mutation: false, decodePayload: SessionPayload.attachment })
         if (read.attachment.attachmentId !== request.attachment.attachmentId)
           return yield* new RemoteRequestFailed({ code: 'session/attachment-invalid', detail: 'The host answered with a different image.' })
         return read
@@ -434,18 +434,18 @@ export class RemoteSessions extends Context.Service<
             ),
           ).pipe(Stream.mapEffect(SessionPayload.followFrame)),
         page: (request: SessionPageRequest): Effect.Effect<SessionPage, unknown> =>
-          forward({ sessionId: ownedSessionOf(request.address), method: 'page', request, mutation: false, decode: SessionPayload.page }),
+          forward({ sessionId: ownedSessionOf(request.address), method: 'page', request, mutation: false, decodePayload: SessionPayload.page }),
         prompt,
         cancel: (request: SessionCancelRequest): Effect.Effect<SessionCancelValue, unknown> =>
-          forward({ sessionId: request.sessionId, method: 'cancel', request, mutation: true, decode: SessionPayload.cancel }),
+          forward({ sessionId: request.sessionId, method: 'cancel', request, mutation: true, decodePayload: SessionPayload.cancel }),
         updateQueue,
         projections: (request: SessionProjectionsRequest): Effect.Effect<SessionProjectionsValue, unknown> =>
-          forward({ sessionId: request.sessionId, method: 'projections', request, mutation: false, decode: SessionPayload.projections }),
+          forward({ sessionId: request.sessionId, method: 'projections', request, mutation: false, decodePayload: SessionPayload.projections }),
         fork,
         rename: (request: SessionRenameRequest): Effect.Effect<SessionRenameValue, unknown> =>
-          forward({ sessionId: request.sessionId, method: 'rename', request, mutation: true, decode: SessionPayload.renamed }),
+          forward({ sessionId: request.sessionId, method: 'rename', request, mutation: true, decodePayload: SessionPayload.renamed }),
         selectModel: (request: SessionSelectModelRequest): Effect.Effect<SessionSelectModelValue, unknown> =>
-          forward({ sessionId: request.sessionId, method: 'selectModel', request, mutation: true, decode: SessionPayload.selectedModel }),
+          forward({ sessionId: request.sessionId, method: 'selectModel', request, mutation: true, decodePayload: SessionPayload.selectedModel }),
         attachment,
       }
 

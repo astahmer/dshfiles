@@ -29,6 +29,7 @@ import type { ConnectionStateSource } from '@deepseek-ai/dsh-client-connection/c
 import type { FileDragActions, MarkdownDelegateFenceInfo, MarkdownFileMentions, MarkdownLabels } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ContextMenuTriggerProps } from '@deepseek-ai/dsh-client-ui-context-menu/client'
 import type { ChatKey } from '../locale.ts'
+import type { AnnotationMarks, AnnotationQuickComment } from '../../chat-settings.ts'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: the Session-scope access Hook (`useAccess`) the Chat entries read.
 import type {} from '@deepseek-ai/dsh-client-ui-session/client'
@@ -349,6 +350,10 @@ export interface ChatViewInjected {
     unreadLanding: ObservableSnapshot<UnreadLanding>
     /** dshfiles: key of the question or approval this thread waits on; answering it follows the reply (F6). */
     pendingInteraction: ObservableSnapshot<string | null>
+    /** Inline shape of the draft's annotations in the transcript. */
+    annotationMarks: ObservableSnapshot<AnnotationMarks>
+    /** Whether Annotate asks for the comment at the selection. */
+    annotationQuickComment: ObservableSnapshot<AnnotationQuickComment>
   }
   keyedHooks: {
     /** Resolve the stable source for one Chat Node key. */
@@ -378,6 +383,12 @@ export interface ChatViewInjected {
   seenAnswer: {
     read: () => string | null
     markSeen: (anchorKey: string) => void
+  }
+  /** This browser's read position in this Session: the highest Turn reached, for the rail's read boundary. */
+  seenTurns: {
+    read: () => number | null
+    markSeen: (turn: number) => void
+    reset: (turn: number | null) => void
   }
   forkAt: (seq: number) => void
 }

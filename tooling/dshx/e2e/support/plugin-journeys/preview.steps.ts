@@ -94,8 +94,8 @@ Then('the preview page is listed beside the server and its snapshot holds the pa
   })
   await recordAssertion(page, 'preview-snapshot-holds-page-text', async () => {
     await page.keyboard.press('Escape')
-    // The owned Chat fork folds a turn under "Worked for" and lists its rows directly; the native Chat says
-    // "Completed in" and keeps a "Called tools" header over them.
+    // This composition renders the stock Chat, whose settled-turn fold reads "Completed in 7s"; the owned fork
+    // (@dshfiles/chat) reads "Worked for 7s". The step opens whichever transcript is there instead of assuming one.
     await page
       .getByRole('button', { name: /^(Worked for|Completed in) / })
       .last()

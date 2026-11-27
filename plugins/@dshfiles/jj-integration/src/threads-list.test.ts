@@ -93,7 +93,8 @@ const jj = (cwd: string, ...args: string[]): string =>
     env: { ...process.env, JJ_CONFIG: '' },
   })
 
-const REVISION_TEMPLATE = 'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ description.first_line() ++ "\\n"'
+const REVISION_TEMPLATE =
+  'change_id ++ "\\t" ++ commit_id ++ "\\t" ++ conflict ++ "\\t" ++ author.timestamp().format("%s") ++ "\\t" ++ description.first_line() ++ "\\n"'
 
 /** What one workspace's own `jj log` read before every workspace shared one: its unlanded revisions and behind count. */
 const perWorkspaceRead = (repoRoot: string, name: string) => {
@@ -114,8 +115,8 @@ const perWorkspaceRead = (repoRoot: string, name: string) => {
     unlanded: marked
       .filter(line => line.startsWith('U\t'))
       .map(line => {
-        const [changeId = '', commitId = '', conflict = '', ...description] = line.slice(2).split('\t')
-        return { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim() }
+        const [changeId = '', commitId = '', conflict = '', authoredAt = '', ...description] = line.slice(2).split('\t')
+        return { changeId, commitId, conflict: conflict === 'true', description: description.join('\t').trim(), at: Number(authoredAt) * 1_000 }
       }),
     behindCount: marked.filter(line => line.startsWith('B\t')).length,
   }

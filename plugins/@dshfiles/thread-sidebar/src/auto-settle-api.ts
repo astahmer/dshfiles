@@ -30,7 +30,18 @@ const scanSchema = SchemaHelpers.strictStruct(
   }),
 )
 
-const skipSchema = Schema.Literals(['unknown', 'running', 'running-descendant', 'pending-question', 'blank', 'archived', 'pinned', 'opted-out'])
+const skipSchema = Schema.Literals([
+  'unknown',
+  'running',
+  'running-descendant',
+  'pending-question',
+  'blank',
+  'archived',
+  'pinned',
+  'opted-out',
+  'reminder',
+  'interrupted',
+])
 
 export const autoSettleStatusSchema = SchemaHelpers.strictStruct(
   Schema.Struct({
@@ -112,7 +123,7 @@ export const threadSidebarAutoSettleApi = defineApi({
       ),
       output: settleRequestResultSchema,
       description:
-        'Ask the thread sidebar to settle threads for an automatic trigger. Running, waiting, blank, archived, pinned and opted-out threads (and ones with a running subagent) are skipped and reported, never settled.',
+        'Ask the thread sidebar to settle threads for an automatic trigger. Running, waiting, blank, archived, pinned and opted-out threads (and threads whose subagent still works, that hold a reminder, or that wait for a resume) are skipped and reported, never settled.',
     }),
   },
 })

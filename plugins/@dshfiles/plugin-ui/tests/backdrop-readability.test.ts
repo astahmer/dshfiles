@@ -8,7 +8,15 @@ import { DRACULA_THEME } from '../src/theme/dracula.ts'
 import { GALLERY_THEMES } from '../src/theme/gallery.ts'
 import { ReadabilityModel, type Rgb } from '../src/theme/readability.ts'
 import { SCENES } from '../src/theme/scene-catalog.ts'
-import { BUBBLE_RING, GPU_ATTRIBUTE, RAIL_RING, ThemeDefinitionModel, type ReadingVeil, type SchemeTheme, type ThemeDefinition } from '../src/theme/theme-definition.ts'
+import {
+  BUBBLE_RING,
+  GPU_ATTRIBUTE,
+  RAIL_RING,
+  ThemeDefinitionModel,
+  type ReadingVeil,
+  type SchemeTheme,
+  type ThemeDefinition,
+} from '../src/theme/theme-definition.ts'
 import { SAMPLED_SCENES } from './scene-fixture.ts'
 
 const hex = ReadabilityModel.hexToRgb
@@ -62,7 +70,9 @@ describe('every theme reads over its scene', () => {
 
     /** The scene under the glass, each pixel as strong as the glass is at its x: a column can sit anywhere (splits). */
     const glassed = (source?.surround ?? []).map((pixel, index) =>
-      glass === undefined ? pixel : ReadabilityModel.composite(pixel, glass.colour, glass.opacity * ThemeDefinitionModel.glassWeight(((index % 64) + 0.5) / 64)),
+      glass === undefined
+        ? pixel
+        : ReadabilityModel.composite(pixel, glass.colour, glass.opacity * ThemeDefinitionModel.glassWeight(((index % 64) + 0.5) / 64)),
     )
 
     /** The theme's own grey on its plain background: a grey over the scene must read at least that well. */
@@ -120,7 +130,7 @@ describe('the backdrop stack', () => {
     expect(seat).toContain('mask-composite: intersect;')
     // The seat itself drops its transform hint and its plain fade; the mask sits on the pseudo-element only, never on the
     // composer card the seat holds.
-    const own = rules(text).find(rule => rule.endsWith("[data-composer-seat] {\n  will-change: auto;\n  background: none;"))
+    const own = rules(text).find(rule => rule.endsWith('[data-composer-seat] {\n  will-change: auto;\n  background: none;'))
     expect(own).toBeDefined()
   })
 
@@ -132,7 +142,9 @@ describe('the backdrop stack', () => {
     // The turn rail's pill: centred ticks, a soft ring. A plain theme sets none of it, so its rail stays as it was.
     expect(text).toContain(`--dshx-backdrop-rail-ring: ${RAIL_RING};`)
     expect(text).toContain('--dshx-backdrop-rail-origin: center;')
-    expect(ThemeDefinitionModel.css({ id: 'plain', label: 'Plain', dark: { colours: theme.light!.colours } }, { light: 'body', dark: 'body' })).not.toContain('--dshx-backdrop-')
+    expect(ThemeDefinitionModel.css({ id: 'plain', label: 'Plain', dark: { colours: theme.light!.colours } }, { light: 'body', dark: 'body' })).not.toContain(
+      '--dshx-backdrop-',
+    )
     // With no blur the seat continues the scene with its resting picture.
     const seat = rules(text).find(rule => rule.includes('[data-composer-seat]::before {'))
     expect(seat).toMatch(/background-attachment: (scroll, )?fixed;/u)

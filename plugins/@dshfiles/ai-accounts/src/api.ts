@@ -30,6 +30,15 @@ export type CreateSetupAccountInput = typeof createSetupAccountInputSchema.Type
 /** Model-facing text for a structured result the tools below return. */
 const compactJson = <Output>(output: Output): string => JSON.stringify(output)
 
+/**
+ * Model-facing legend for the two independent extra-usage settings every quota card carries. Providers keep reporting
+ * their own setting as on, so an agent that reads only the provider reading mistakes it for DSH's switch turning back on.
+ */
+const QUOTA_READING_LEGEND =
+  'useExtraUsage is DSH’s gate (ai_accounts_set_extra_usage); usage.extraUsage.enabled is the provider’s own setting. They are independent: a provider that keeps reporting its extra usage on does not mean the DSH gate turned back on.\n'
+
+const renderQuotaReading = (output: { readonly cards: readonly unknown[] }): string => `${QUOTA_READING_LEGEND}${compactJson(output)}`
+
 export const accountOrderDirectionSchema = Schema.Literals(['earlier', 'later'])
 
 export const accountReorderSchema = Schema.Struct({
@@ -324,6 +333,12 @@ export const accountsUsageSchema = Schema.Struct({
       displayName: Schema.String.check(Schema.isMaxLength(120)),
       kind: accountKindSchema,
       enabled: Schema.Boolean,
+      /**
+       * Whether DSH may draw this account's provider-reported extra usage, the `ai_accounts_set_extra_usage` switch.
+       * `usage.extraUsage.enabled` is the provider's own setting, which stays on independently: a card reporting
+       * the provider's extra usage on does not mean this gate turned back on. Absent from older Hosts.
+       */
+      useExtraUsage: Schema.optional(Schema.Boolean),
       usage: usageCardSchema,
     }),
   ),
@@ -610,7 +625,7 @@ export const aiAccountsApi = defineApi({
       tool: {
         name: 'ai_accounts_set_extra_usage',
         render: output =>
-          `Extra usage is now ${output.accounts.some(account => account.useExtraUsage === true) ? 'allowed on at least one account' : 'off on every account'} (${String(output.accounts.length)} account(s)).`,
+          `Extra usage is now ${output.accounts.some(account => account.useExtraUsage === true) ? 'allowed on at least one account' : 'off on every account'} in DSH (${String(output.accounts.length)} account(s)). The provider’s own extra-usage setting is unchanged; a quota card keeps reporting it as usage.extraUsage.enabled.`,
       },
     }),
     /**
@@ -761,7 +776,7 @@ export const aiAccountsApi = defineApi({
       output: accountsUsageSchema,
       description:
         'Live subscription quota of every configured AI account (Codex, Copilot, Mistral, OpenCode Go…): used and remaining windows and when each resets. Read-only; cached for a short while.',
-      tool: { name: 'ai_accounts_quota', readOnly: true },
+      tool: { name: 'ai_accounts_quota', readOnly: true, render: renderQuotaReading },
     }),
     /** Native DSH provider rows (DeepSeek, Command Code, …) and whether each is switched on. */
     nativeProviders: method({
@@ -790,7 +805,7 @@ export const aiAccountsApi = defineApi({
       output: accountsUsageSchema,
       description:
         'Read live subscription quota now, bypassing the shared short-lived cache. A card’s own `readAt` says when its provider answered, and `nextReadAt` when reads are held back (Claude shares one reading and backs off after a 429), so check them rather than assuming the reading is new. Call only when the user asked for a fresh reading.',
-      tool: { name: 'ai_accounts_refresh_quota', render: compactJson },
+      tool: { name: 'ai_accounts_refresh_quota', render: renderQuotaReading },
     }),
 
     /** Read now and record, so a fresh chart does not wait for the next poll. */

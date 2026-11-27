@@ -12,6 +12,7 @@ const status = {
     { runtimeId: 'runtime-a', sessionId: 'host-thread', cwd: '/work/Other', title: 'Host thread', running: false, blank: false, updatedAt: 1735689600300 },
     { runtimeId: 'runtime-a', sessionId: 'blank-thread', cwd: '/work/Atlas', running: false, blank: true, updatedAt: 500 },
   ],
+  archivedSessionIds: [],
 } satisfies Awaited<ReturnType<import('@dshfiles/multi-host/destination').MultiHostClient['runtimeStatus']>>
 
 test('polls the thread list every 30 s and runtime status every 60 s, the documented cadence', () => {
@@ -147,6 +148,7 @@ test('remote rows respect settled status and source filters', () => {
       hostName: 'Build host',
       connected: true,
       running: false,
+      archived: false,
       updatedAt: 3,
       workspaceId: 'remote-project:runtime-a:Atlas',
       workspaceTitle: 'Atlas',
@@ -159,7 +161,21 @@ test('remote rows respect settled status and source filters', () => {
       hostName: 'Build host',
       connected: true,
       running: false,
+      archived: false,
       updatedAt: 2,
+      workspaceId: 'remote-project:runtime-a:Atlas',
+      workspaceTitle: 'Atlas',
+    },
+    {
+      runtimeId: 'runtime-a',
+      sessionId: 'archived-thread',
+      title: 'Archived',
+      cwd: '/work/Atlas',
+      hostName: 'Build host',
+      connected: true,
+      running: false,
+      archived: true,
+      updatedAt: 1,
       workspaceId: 'remote-project:runtime-a:Atlas',
       workspaceTitle: 'Atlas',
     },
@@ -170,7 +186,6 @@ test('remote rows respect settled status and source filters', () => {
       threads,
       filters: ['not-running'],
       sourceFilter: 'all',
-      archivedSessionIds: new Set(),
       settledSessionIds: new Set(['settled-thread']),
       mutedSessionIds: new Set(),
     }).map(thread => thread.sessionId),
@@ -178,11 +193,39 @@ test('remote rows respect settled status and source filters', () => {
   expect(
     RemoteThreadInventoryModel.filter({
       threads,
+      filters: ['archived'],
+      sourceFilter: 'all',
+      settledSessionIds: new Set(),
+      mutedSessionIds: new Set(),
+    }).map(thread => thread.sessionId),
+  ).toEqual(['archived-thread'])
+  expect(
+    RemoteThreadInventoryModel.filter({
+      threads,
       filters: [],
       sourceFilter: 'subagents',
-      archivedSessionIds: new Set(),
       settledSessionIds: new Set(),
       mutedSessionIds: new Set(),
     }),
   ).toEqual([])
+})
+
+test('a runtime reports which of its threads are archived, so their rows leave the active list', () => {
+  const startedHere = [
+    {
+      runtimeId: 'runtime-a',
+      sessionId: 'live-thread',
+      cwd: '/work/Atlas',
+      title: 'Stored title',
+      mention: formatSessionReferenceMention({ sessionId: SessionId('live-thread'), label: 'Stored title' }),
+      createdAt: '2025-01-01T00:00:00.000Z',
+      hostName: 'Build host',
+      connected: true,
+    },
+  ]
+  const rows = RemoteThreadInventoryModel.build({
+    startedHere,
+    statuses: [{ runtimeId: 'runtime-a', hostName: 'Build host', status: { ...status, archivedSessionIds: ['live-thread'] } }],
+  })
+  expect(rows).toMatchObject([{ sessionId: 'live-thread', archived: true }])
 })

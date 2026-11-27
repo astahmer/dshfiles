@@ -46,5 +46,6 @@ export const detachedView = (hooks: ChatViewInjected['hooks'], fileDrag: FileDra
   loadImage: Object.assign(async () => '', { peek: () => undefined }),
   chatScroll: { save: noop, read: () => null },
   seenAnswer: { read: () => null, markSeen: noop },
+  seenTurns: { read: () => null, markSeen: noop, reset: noop },
   forkAt: noop,
 })

@@ -16,6 +16,10 @@ vendored from it.
 
 Run `pnpm build`, `pnpm test` and `pnpm typecheck` from this package.
 
+The three tools are declared to every Session instead of hiding behind `@dshfiles/tool-search`'s discovery: the
+plugin publishes a `toolSearchVisibility` declaration while it loads (see that plugin's README). Without
+`@dshfiles/tool-search` the declaration is a no-op and the tools stay registered globally as before.
+
 ## The tool
 
 | Argument | Required | Meaning                                                                                     |

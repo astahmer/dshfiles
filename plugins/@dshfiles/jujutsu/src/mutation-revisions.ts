@@ -26,6 +26,7 @@ export const revisionIdsFor = (action: Mutation): readonly string[] => {
     case 'push':
     case 'workspace-forget':
     case 'bookmark-delete':
+    case 'operation-undo':
       return []
   }
 }

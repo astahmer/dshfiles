@@ -38,6 +38,12 @@ export const jjIntegrationSettings = defineSettings({
       .description(
         'Fallback main branch for projects that set none and whose origin names no default.',
       ),
+    staleAfterDays: Schema.natural()
+      .max(365)
+      .default(7)
+      .description(
+        'Days unchanged after which pending work the bookmark moved past is Stale, on its own tab and out of Ready to land (0 turns it off).',
+      ),
     repositoryBookmarks: Schema.array(
       Schema.object({
         repository: Schema.string().description('Absolute repository root.'),
@@ -86,6 +92,9 @@ export const jjIntegrationSettings = defineSettings({
         Schema.union([
           Schema.const('empty').description('Empty: workspaces that never landed anything.'),
           Schema.const('integrated').description('Landed: workspaces whose work all landed.'),
+          Schema.const('stale').description(
+            'Stale: workspaces whose pending work Land calls Stale (opt-in, because it abandons those unlanded revisions).',
+          ),
           Schema.const('untracked').description('Untracked: threads-directory folders and files no jj workspace owns.'),
         ]),
       )
@@ -116,7 +125,7 @@ export const jjIntegrationSettings = defineSettings({
     }).description(
       [
         'Remove idle thread workspaces automatically, through the same cleanup job as the manual button.',
-        'Protection tiers, strongest first: revisions that are not on the bookmark and not held by another bookmark; a thread that is running, asks a question or cannot be read; an integration queued for the workspace; a secondary checkout with uncommitted or unverifiable state; and any workspace used more recently than the age above.',
+        'Protection tiers, strongest first: revisions that are not on the bookmark and not held by another bookmark (unless the stale kind is selected and Land calls that work Stale); a thread that is running, asks a question or cannot be read; an integration queued for the workspace; a secondary checkout with uncommitted or unverifiable state; and any workspace used more recently than the age above.',
         'Merged pull requests are a manual choice only: they need the pull-request links read, which an automatic run never does.',
       ].join(' '),
     ),

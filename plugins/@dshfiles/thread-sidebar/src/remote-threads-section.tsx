@@ -12,7 +12,16 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/context-menu'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CircleCheckIcon, CirclePauseIcon, CirclePlayIcon, GripVerticalIcon, MonitorIcon, ServerIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ArchiveIcon,
+  ArchiveRestoreIcon,
+  CircleCheckIcon,
+  CirclePauseIcon,
+  CirclePlayIcon,
+  GripVerticalIcon,
+  MonitorIcon,
+  ServerIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { SidebarSection } from './organization.js'
 import type { RemoteSidebarThread } from './remote-thread-inventory.js'
@@ -23,6 +32,8 @@ export interface RemoteThreadRowLabels {
   readonly unsettle: string
   readonly park: string
   readonly unpark: string
+  readonly archive: string
+  readonly restore: string
   readonly moveToSection: string
   readonly copyId: string
   readonly contextMenu: string
@@ -31,29 +42,43 @@ export interface RemoteThreadRowLabels {
 
 /**
  * One remote thread's right-click menu. It carries the verbs this sidebar owns for a mirrored Session — parked and
- * settled are its own preference sets, and a section move applies the same plan a local drop does — and leaves out
- * every verb that runs on the runtime owning the Session (archive, pin, rename, mention, follow-up, continue-in, side
- * panel, references) plus mute, which anchors on a local Session's activity time.
+ * settled are its own preference sets, archive and restore run on the runtime owning the Session through multi-host,
+ * and a section move applies the same plan a local drop does — and leaves out every verb that only that runtime can
+ * run locally (pin, rename, mention, follow-up, continue-in, side panel, references) plus mute, which anchors on a
+ * local Session's activity time.
  */
 export const RemoteThreadMenuItems = (props: {
   readonly running: boolean
   readonly settled: boolean
   readonly parked: boolean
+  readonly archived: boolean
   readonly section: SidebarSection | undefined
   readonly dropSections: readonly SidebarSection[]
   readonly labels: RemoteThreadRowLabels
   readonly onToggleSettled: () => void
   readonly onToggleParked: () => void
+  readonly onSetArchived: (archived: boolean) => void
   readonly onMoveToSection: (section: SidebarSection) => void
   readonly onCopyId: () => void
 }): JSX.Element => (
   <>
-    <ContextMenuItem disabled={props.running} onSelect={props.onToggleSettled}>
-      {props.settled ? props.labels.unsettle : props.labels.settle}
-    </ContextMenuItem>
-    <ContextMenuItem disabled={props.running} onSelect={props.onToggleParked}>
-      {props.parked ? props.labels.unpark : props.labels.park}
-    </ContextMenuItem>
+    {props.archived ? (
+      <ContextMenuItem disabled={props.running} onSelect={() => props.onSetArchived(false)}>
+        {props.labels.restore}
+      </ContextMenuItem>
+    ) : (
+      <>
+        <ContextMenuItem disabled={props.running} onSelect={props.onToggleSettled}>
+          {props.settled ? props.labels.unsettle : props.labels.settle}
+        </ContextMenuItem>
+        <ContextMenuItem disabled={props.running} onSelect={props.onToggleParked}>
+          {props.parked ? props.labels.unpark : props.labels.park}
+        </ContextMenuItem>
+        <ContextMenuItem disabled={props.running} onSelect={() => props.onSetArchived(true)}>
+          {props.labels.archive}
+        </ContextMenuItem>
+      </>
+    )}
     <ContextMenuSeparator />
     <ContextMenuSub>
       <ContextMenuSubTrigger>{props.labels.moveToSection}</ContextMenuSubTrigger>
@@ -72,8 +97,8 @@ export const RemoteThreadMenuItems = (props: {
 
 /**
  * One remote thread, drawn with the local row's shape: a status dot, the title, the age, and one muted meta line naming
- * the host. Only the verbs this sidebar owns for a remote id (Settle, Park, the section move, Copy ID) join the strip
- * and the menu, because archive and pin live on the runtime that owns the Session.
+ * the host. The strip and the menu carry the verbs this sidebar can run for a remote id — Settle, Park, Archive (and
+ * Restore on an archived row) through multi-host, the section move, and Copy ID; pin stays on the owning runtime.
  */
 export const RemoteThreadItem = (props: {
   readonly runtimeId: string
@@ -86,6 +111,7 @@ export const RemoteThreadItem = (props: {
   readonly running: boolean
   readonly settled: boolean
   readonly parked: boolean
+  readonly archived: boolean
   readonly selected: boolean
   readonly compact: boolean
   readonly age: string
@@ -96,6 +122,7 @@ export const RemoteThreadItem = (props: {
   readonly onOpen: () => void
   readonly onToggleSettled: () => void
   readonly onToggleParked: () => void
+  readonly onSetArchived: (archived: boolean) => void
   readonly onMoveToSection: (section: SidebarSection) => void
   readonly onCopyId: () => void
 }): JSX.Element => {
@@ -130,7 +157,7 @@ export const RemoteThreadItem = (props: {
                       className={cn(
                         'dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-foreground',
                         props.compact ? 'dshx:text-sm' : 'dshx:text-base',
-                        props.settled && 'dshx:text-muted-foreground',
+                        (props.settled || props.archived) && 'dshx:text-muted-foreground',
                       )}
                     >
                       {props.label}
@@ -160,40 +187,79 @@ export const RemoteThreadItem = (props: {
                 data-testid="remote-thread-row-actions"
                 className="dshx:pointer-events-none dshx:absolute dshx:top-1 dshx:right-1.5 dshx:flex dshx:gap-0.5 dshx:rounded-md dshx:border dshx:bg-popover dshx:p-0.5 dshx:opacity-0 dshx:shadow-xs dshx:transition-opacity dshx:group-hover/row:pointer-events-auto dshx:group-hover/row:opacity-100 dshx:focus-within:pointer-events-auto dshx:focus-within:opacity-100 dshx:pointer-coarse:pointer-events-auto dshx:pointer-coarse:opacity-100"
               >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className={actionClass}
-                      aria-label={props.settled ? props.labels.unsettle : props.labels.settle}
-                      onClick={event => {
-                        event.stopPropagation()
-                        props.onToggleSettled()
-                      }}
-                    >
-                      {props.settled ? <CirclePlayIcon className="dshx:size-3.5" /> : <CircleCheckIcon className="dshx:size-3.5" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">{props.settled ? props.labels.unsettle : props.labels.settle}</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon-xs"
-                      className={actionClass}
-                      aria-label={props.parked ? props.labels.unpark : props.labels.park}
-                      onClick={event => {
-                        event.stopPropagation()
-                        props.onToggleParked()
-                      }}
-                    >
-                      {props.parked ? <CirclePlayIcon className="dshx:size-3.5" /> : <CirclePauseIcon className="dshx:size-3.5" />}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="bottom">{props.parked ? props.labels.unpark : props.labels.park}</TooltipContent>
-                </Tooltip>
+                {props.archived ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className={actionClass}
+                        aria-label={props.labels.restore}
+                        onClick={event => {
+                          event.stopPropagation()
+                          props.onSetArchived(false)
+                        }}
+                      >
+                        <ArchiveRestoreIcon className="dshx:size-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">{props.labels.restore}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className={actionClass}
+                          aria-label={props.settled ? props.labels.unsettle : props.labels.settle}
+                          onClick={event => {
+                            event.stopPropagation()
+                            props.onToggleSettled()
+                          }}
+                        >
+                          {props.settled ? <CirclePlayIcon className="dshx:size-3.5" /> : <CircleCheckIcon className="dshx:size-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{props.settled ? props.labels.unsettle : props.labels.settle}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className={actionClass}
+                          aria-label={props.parked ? props.labels.unpark : props.labels.park}
+                          onClick={event => {
+                            event.stopPropagation()
+                            props.onToggleParked()
+                          }}
+                        >
+                          {props.parked ? <CirclePlayIcon className="dshx:size-3.5" /> : <CirclePauseIcon className="dshx:size-3.5" />}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{props.parked ? props.labels.unpark : props.labels.park}</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon-xs"
+                          className={actionClass}
+                          aria-label={props.labels.archive}
+                          onClick={event => {
+                            event.stopPropagation()
+                            props.onSetArchived(true)
+                          }}
+                        >
+                          <ArchiveIcon className="dshx:size-3.5" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{props.labels.archive}</TooltipContent>
+                    </Tooltip>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -204,11 +270,13 @@ export const RemoteThreadItem = (props: {
           running={props.running}
           settled={props.settled}
           parked={props.parked}
+          archived={props.archived}
           section={props.section}
           dropSections={props.dropSections}
           labels={props.labels}
           onToggleSettled={props.onToggleSettled}
           onToggleParked={props.onToggleParked}
+          onSetArchived={props.onSetArchived}
           onMoveToSection={props.onMoveToSection}
           onCopyId={props.onCopyId}
         />

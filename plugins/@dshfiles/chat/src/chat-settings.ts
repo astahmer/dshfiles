@@ -87,6 +87,30 @@ export type LinkOpening = 'sidebar' | 'new-tab'
 /** Preserve the built-in browser for users without an explicit preference. */
 export const DEFAULT_LINK_OPENING: LinkOpening = 'sidebar'
 
+/** Available inline annotation shapes: a marker per passage with its comment on click or on hover, a persistent comments column, an inline thread icon, or none. */
+export const ANNOTATION_MARKS = ['popover', 'hover', 'column', 'inline', 'off'] as const
+
+/** Inline annotation shape chosen by the user. */
+export type AnnotationMarks = typeof ANNOTATION_MARKS[number]
+
+/** Field selecting how annotations show inline in the transcript. */
+export const ANNOTATION_MARKS_FIELD = 'annotationMarks'
+
+/** Markers plus a comments column: comments are readable without opening anything. */
+export const DEFAULT_ANNOTATION_MARKS: AnnotationMarks = 'column'
+
+/** What clicking Annotate does: open the comment box at the selection, or attach silently. */
+export const ANNOTATION_QUICK_COMMENTS = ['inline', 'attach'] as const
+
+/** Quick-add preference. */
+export type AnnotationQuickComment = typeof ANNOTATION_QUICK_COMMENTS[number]
+
+/** Field selecting whether Annotate asks for the comment first. */
+export const ANNOTATION_QUICK_COMMENT_FIELD = 'annotationQuickComment'
+
+/** Inline comment first: one step from selecting a passage to a written annotation. */
+export const DEFAULT_ANNOTATION_QUICK_COMMENT: AnnotationQuickComment = 'inline'
+
 /** Durable Chat section shared by the Host schema and browser scope. */
 export interface ChatSettings {
   /** Work-details preference; absence uses the client default, and legacy saved values remain accepted. */
@@ -103,6 +127,10 @@ export interface ChatSettings {
   imageGalleryScope?: ImageGalleryScope
   /** Where a thread with an unseen final answer opens. */
   unreadLanding?: UnreadLanding
+  /** Inline annotation shape; absence uses the client default. */
+  annotationMarks?: AnnotationMarks
+  /** Whether Annotate opens the comment box first; absence uses the client default. */
+  annotationQuickComment?: AnnotationQuickComment
 }
 
 /** Durable Chat schema; also the wire envelope the browser scope validates against. */
@@ -110,6 +138,8 @@ export const ChatSettingsFields = {
   [COLLAPSE_TIMING_FIELD]: z.union([...COLLAPSE_TIMINGS]).default(DEFAULT_COLLAPSE_TIMING),
   [IMAGE_GALLERY_SCOPE_FIELD]: z.union([...IMAGE_GALLERY_SCOPES]).default(DEFAULT_IMAGE_GALLERY_SCOPE),
   [UNREAD_LANDING_FIELD]: z.union([...UNREAD_LANDINGS]).default(DEFAULT_UNREAD_LANDING),
+  [ANNOTATION_MARKS_FIELD]: z.union([...ANNOTATION_MARKS]).default(DEFAULT_ANNOTATION_MARKS),
+  [ANNOTATION_QUICK_COMMENT_FIELD]: z.union([...ANNOTATION_QUICK_COMMENTS]).default(DEFAULT_ANNOTATION_QUICK_COMMENT),
   [FOLDED_REPLIES_FIELD]: z.union([...FOLDED_REPLIES]).default(DEFAULT_FOLDED_REPLIES),
   linkOpening: z.union(['sidebar', 'new-tab']).default(DEFAULT_LINK_OPENING),
   performanceUsage: z.union([...PERFORMANCE_USAGE_MODES]).default(DEFAULT_PERFORMANCE_USAGE),

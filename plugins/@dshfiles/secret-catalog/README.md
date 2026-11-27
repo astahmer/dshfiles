@@ -124,9 +124,17 @@ command deadline expires.
 Edit can rename an alias inside its owning config with `secret mv`; it refuses
 a name that already exists. The Host registers agent tools bound to the
 calling Session's workspace (`session.header.cwd`): `secret_list` returns
-metadata only, `secret_get` returns one plaintext value, so it should be
-called only when the task needs it, and `secret_remove_alias` removes one alias
-(keeping its vault item) only with `confirm: true`. Arrow keys, Home, and End move between
+metadata only, `secret_run` runs a command with the workspace's aliases
+injected through one long-lived `secret mcp` child and returns output whose
+exact value bytes the CLI replaced with `[scrubbed]` (so an agent never holds
+a value), `secret_get` returns one plaintext value and should be called only
+when the task needs it, and `secret_remove_alias` removes one alias (keeping
+its vault item) only with `confirm: true`.
+
+The CLI keeps one `secret mcp` server per Host: the first `secret_run` starts
+it, later calls reuse it, and vault metadata is cached for a second. A backend
+that needs a session (Bitwarden's `BW_SESSION`, 1Password's
+`OP_SERVICE_ACCOUNT_TOKEN`) is forwarded to it, and nothing else is. Arrow keys, Home, and End move between
 table rows; the table header stays visible while rows scroll.
 
 The `secret-catalog` Settings namespace (DSH Settings page) sets the default

@@ -64,7 +64,7 @@ import { SettingsNavigationModel } from './navigation-state.js'
 import { SettingsNavigation, type SettingsNavigationService, type SettingsNavigationState } from './settings-navigation.js'
 import { SettingsSearch, type SectionEntryRow, type ShortcutRow } from './settings-search.js'
 import { SettingsTab, type PluginPageHeading, type SectionRow, type SettingsViewProps } from './settings-view.js'
-import { shellMachine, type FieldTarget } from './shell-machine.js'
+import { shellMachine, type FieldTarget, type ShellEvent } from './shell-machine.js'
 import { TAB_STRIP_SLOTS, tabStripLoaded } from './tab-strip.js'
 import { PORTED_FROM } from './upstream.js'
 import { SettingsIcons } from './settings-icons.js'
@@ -241,11 +241,12 @@ export default defineClient({
     ctx.inject(['remote.pluginManager'], scoped => {
       // The Host caches these labels: core's listBundles reads every plugin's files on each call. A Host started before
       // that method existed is asked the old way.
-      void labelsApi.safe.bundleLabels().then(async cached => {
+      void (async () => {
+        const cached = await labelsApi.safe.bundleLabels()
         if (cached.ok) return installLabels(cached.value)
         const result = await scoped.remote.pluginManager.listBundles()
         if (result.ok) installLabels(bundleLabelsOf(result.value))
-      })
+      })()
     })
 
     const describe = ctx.configForms.describe()
@@ -784,10 +785,12 @@ export default defineClient({
     // A request that still names the retired dialog surface opens the page: there is no other place left.
     const openRequest = (request: OpenSettingsRequest): void => {
       if (request.setting !== undefined && openSettingsTarget(request.setting)) return
-      const openEvent: { type: 'open'; sectionId?: string; target?: string; query?: string } = { type: 'open' }
-      if (request.section !== undefined) openEvent.sectionId = request.section
-      if (request.target !== undefined) openEvent.target = request.target
-      if (request.query !== undefined) openEvent.query = request.query
+      const openEvent: Extract<ShellEvent, { type: 'open' }> = {
+        type: 'open',
+        ...(request.section !== undefined && { sectionId: request.section }),
+        ...(request.target !== undefined && { target: request.target }),
+        ...(request.query !== undefined && { query: request.query }),
+      }
       if (hubRouter.open(openEvent)) return
       actor.send(openEvent)
       if (request.query !== undefined) actor.send({ type: 'search', query: request.query })

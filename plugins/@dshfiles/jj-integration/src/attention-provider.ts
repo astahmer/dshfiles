@@ -118,7 +118,7 @@ export type ReadyFate = 'publish' | 'resolve' | 'keep'
 const readyFateOf = (thread: ThreadView): ReadyFate => {
   if (thread.missing || thread.unlanded.length === 0) return 'resolve'
   const assessment = ThreadIntegrationModel.assess({ thread, running: false, waitingForInput: false, integrationAllowed: thread.canRebase })
-  if (assessment.category === 'conflicts') return 'resolve'
+  if (assessment.category === 'conflicts' || assessment.category === 'stale') return 'resolve'
   if (assessment.category === 'ready' && thread.integrationQueuedAt === undefined) return 'publish'
   return 'keep'
 }

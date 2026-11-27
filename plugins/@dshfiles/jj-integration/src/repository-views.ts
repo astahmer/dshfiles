@@ -5,6 +5,7 @@ import type { HostCallFailed, ThreadWorkspaceError } from './errors.js'
 import { SessionReads, WorkspaceRegistry, type SessionActivityMap } from './host-edges-promise.js'
 import { IntegrationAttribution } from './integration-attribution.js'
 import { IntegrationRequests, IsolatedSessions } from './integration-requests.js'
+import { JjSettings } from './jj-settings.js'
 import { ProjectBookmarks } from './project-bookmarks.js'
 import { SessionActivity } from './session-activity.js'
 import { ThreadIntegrationModel } from './thread-integration-state.js'
@@ -135,6 +136,7 @@ export class RepositoryViews extends Context.Service<
       const activity = yield* SessionActivity
       const requests = yield* IntegrationRequests
       const isolated = yield* IsolatedSessions
+      const settings = yield* JjSettings
       const fileSystem = yield* FileSystem.FileSystem
       const path = yield* Path.Path
       const scans = yield* FiberSet.make<readonly RepositoryView[], ScanError>()
@@ -199,6 +201,12 @@ export class RepositoryViews extends Context.Service<
           fromAgent: caller.fromAgent,
           sessionId: caller.sessionId,
         })
+        const stale = ThreadIntegrationModel.isStale({
+          revisions: status.unlanded,
+          behindBookmark: status.behindCount,
+          now: yield* Clock.currentTimeMillis,
+          afterDays: (yield* settings.get).staleAfterDays,
+        })
         const viewerSessionId = input.viewer?.sessionId
         const forkCutAt = input.viewer?.forkCutAt
         const view: ThreadView = {
@@ -212,7 +220,8 @@ export class RepositoryViews extends Context.Service<
           behindCount: status.behindCount,
           unlanded: [...status.unlanded],
         }
-        const withWorkspaceTitle: ThreadView = input.workspace === undefined ? view : { ...view, workspaceTitle: input.workspace.title }
+        const withStale: ThreadView = stale ? { ...view, stale: true } : view
+        const withWorkspaceTitle: ThreadView = input.workspace === undefined ? withStale : { ...withStale, workspaceTitle: input.workspace.title }
         const withEligibility: ThreadView = canRebase === undefined ? withWorkspaceTitle : { ...withWorkspaceTitle, canRebase }
         const visible = IntegrationAttribution.forSession({ records: yield* requests.history(status.path), sessionId: viewerSessionId, forkCutAt })
         const queuedEntry = yield* requests.get(status.path)

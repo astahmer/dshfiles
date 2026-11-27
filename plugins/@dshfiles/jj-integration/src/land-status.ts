@@ -4,11 +4,13 @@ import type { ThreadIntegrationCategory } from './thread-integration-state.js'
 /**
  * Each land category in the shared status vocabulary (DESIGN.md: six states, colour only for Needs you and Failed).
  * The Land page kept a private tone table before: green for ready, amber for blocked. Ready is the ink dot, a
- * conflict is Failed, a blocked workspace needs you, an unverified one may be out of date, and landed is Done.
+ * conflict is Failed, a blocked workspace needs you, an unverified one may be out of date, work the bookmark left behind
+ * (Land's Stale tab) is Stale, and landed is Done.
  */
 const glyphs = {
   conflicts: 'failed',
   ready: 'ready',
+  stale: 'stale',
   blocked: 'needs-you',
   unknown: 'stale',
   integrating: 'working',

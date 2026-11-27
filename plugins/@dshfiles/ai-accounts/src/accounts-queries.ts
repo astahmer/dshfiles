@@ -115,6 +115,8 @@ const tolerantUsageSchema = Schema.Struct({
         Schema.catchDecoding(() => Effect.succeed(Option.some(true))),
         Schema.withDecodingDefaultKey(Effect.succeed(true)),
       ),
+      /** The Host's extra-usage gate; absent from Hosts that predate it. */
+      useExtraUsage: Schema.optional(Schema.Boolean).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some(undefined)))),
       usage: usageCardSchema,
     }),
   ),

@@ -1,6 +1,9 @@
 const stepSelector = '[data-chat-flow-kind="assistant-step"]'
 const blockSelector = 'p, li, blockquote, h1, h2, h3, h4, h5, h6, td, th, pre'
 
+/** The paragraph-level elements an annotation can point at inside one Assistant step. */
+export const ANNOTATION_BLOCK_SELECTOR = blockSelector
+
 export interface AssistantSelection {
   readonly text: string
   readonly rect: DOMRect
@@ -35,6 +38,61 @@ export class SelectionAnnotation {
     const source = new URLSearchParams({ step: step.getAttribute('data-chat-flow-key') ?? '', block: String(block) }).toString()
     const rect = range.getBoundingClientRect()
     return { text, rect, end: [...range.getClientRects()].at(-1) ?? rect, source }
+  }
+
+  /**
+   * The text nodes of `block` and the offset each starts at, for mapping an offset back to a Range boundary.
+   * @param block - element whose text the annotation quotes.
+   * @returns its text-tree nodes in document order.
+   */
+  static textNodes = (block: Element): { readonly node: Text; readonly start: number }[] => {
+    const walker = block.ownerDocument.createTreeWalker(block, NodeFilter.SHOW_TEXT)
+    const nodes: { node: Text; start: number }[] = []
+    let start = 0
+    for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+      if (!(node instanceof Text)) continue
+      nodes.push({ node, start })
+      start += node.data.length
+    }
+    return nodes
+  }
+
+  /**
+   * The range the quoted text covers inside one block, ignoring whitespace differences between the selection and
+   * rendered markup (line breaks, collapsed spaces).
+   * @param input - the block that holds the text and the quoted text.
+   * @returns the range, or undefined when the block does not hold that text.
+   */
+  static rangeOf = (input: { readonly block: Element; readonly text: string }): Range | undefined => {
+    const needle = squash(input.text)
+    if (needle === '') return undefined
+    const nodes = SelectionAnnotation.textNodes(input.block)
+    let flat = ''
+    const offsets: number[] = []
+    for (const { node, start } of nodes) {
+      for (let index = 0; index < node.data.length; index += 1) {
+        const character = node.data[index] ?? ''
+        if (/\s/u.test(character)) continue
+        offsets.push(start + index)
+        flat += character
+      }
+    }
+    const at = flat.indexOf(needle)
+    if (at < 0) return undefined
+    const locate = (offset: number): { readonly node: Text; readonly offset: number } | undefined => {
+      const found = nodes.findLast(entry => entry.start <= offset)
+      return found === undefined ? undefined : { node: found.node, offset: offset - found.start }
+    }
+    const start = offsets[at]
+    const end = offsets[at + needle.length - 1]
+    if (start === undefined || end === undefined) return undefined
+    const from = locate(start)
+    const to = locate(end + 1)
+    if (from === undefined || to === undefined) return undefined
+    const range = input.block.ownerDocument.createRange()
+    range.setStart(from.node, from.offset)
+    range.setEnd(to.node, to.offset)
+    return range
   }
 
   /**

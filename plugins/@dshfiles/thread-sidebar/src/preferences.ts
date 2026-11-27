@@ -74,6 +74,7 @@ const preferencesInputFields = {
     Schema.Number.check(Schema.isFinite()).check(Schema.isInt()).check(Schema.isGreaterThanOrEqualTo(0)).check(Schema.isLessThanOrEqualTo(720)),
     () => DEFAULT_PREFERENCES.subagentSettleHours,
   ),
+  remindersWakeEnabled: SchemaHelpers.withDecodedDefault(Schema.Boolean, () => DEFAULT_PREFERENCES.remindersWakeEnabled),
   scanIntervalMinutes: Schema.Number.check(Schema.isFinite())
     .check(Schema.isInt())
     .check(Schema.isGreaterThanOrEqualTo(1))

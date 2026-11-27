@@ -3,14 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { normalizeContext, type AssistantMessage, type AssistantMessageEventStream, type Message, type Model } from '@earendil-works/pi-ai'
 import { recordSpans } from '@dshfiles/dshx/tracing'
+import { decodeJson } from '@dshfiles/dshx/json'
 import { layer as nodeChildProcessSpawnerLayer } from '@effect/platform-node/NodeChildProcessSpawner'
 import { Context, Effect, Layer, Scope } from 'effect'
+import * as Schema from 'effect/Schema'
 import { afterEach, expect, it, vi } from 'vitest'
 import { AntigravityProcesses, AntigravityProcessesPromiseModel } from './antigravity-processes.js'
 import { AccountsPlatformLive } from './platform-layer.js'
 import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
+
+const launchReportSchema = Schema.Struct({ argv: Schema.Array(Schema.String), home: Schema.String, key: Schema.NullOr(Schema.String) })
 
 /**
  * Stands in for `agy acp`: an ACP server over stdio that starts the MCP server `session/new` names, offers two models
@@ -292,7 +296,7 @@ it("runs agy with DSH's agent in a private Gemini folder, the account HOME and n
       }),
     )
     expect(textOf(reply)).toMatch(/: hi$/)
-    const launch = JSON.parse(readFileSync(report, 'utf8'))
+    const launch = decodeJson(launchReportSchema, readFileSync(report, 'utf8'))
     const geminiDir = String(launch.argv[2])
     expect(launch).toEqual({
       argv: ['acp', '--gemini-dir', geminiDir, '--agent', 'dsh', '--process-per-session', '--dangerously-skip-permissions', '--disable-telemetry'],

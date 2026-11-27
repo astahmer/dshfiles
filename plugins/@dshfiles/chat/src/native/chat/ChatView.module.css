@@ -538,6 +538,9 @@
   position: absolute;
   /* Remain below the sticky composer while scroll placement catches up. */
   z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   visibility: hidden;
   margin: 0;
   width: max-content;
@@ -564,8 +567,6 @@
 }
 
 .column > .textInteraction[data-touch] {
-  display: flex;
-  align-items: center;
   gap: 8px;
 }
 
@@ -579,5 +580,14 @@
   :global(html[data-shell-phone-nav]) .scroll {
     padding-inline: calc(var(--dsh-composer-side-clearance) + 12px);
     padding-bottom: 32px;
+  }
+}
+
+/* Phone: an off-screen row skips style, layout and paint; the flow item is already the
+   settled mount/measure unit, so containment changes no wrapper and keeps the column gap. */
+@media (max-width: 639.98px) {
+  .flowItem {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 96px;
   }
 }

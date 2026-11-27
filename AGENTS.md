@@ -192,6 +192,15 @@ stop the renderer.
    the dispatch mention, not a link.
 5. Other URLs and repository files: Markdown links.
 
+## Visual answers
+
+A comparison, a flow, a state machine or a design is a picture, not a paragraph.
+Publish it with `html_render` (find it with `tool_search`, then `tool_call`) so it
+renders as an inline, expandable card; use `html_preview` for a generated `.html`
+file. When the answer is a choice, prefer `ask_user_question` with a fenced
+````html preview. Prose stays for what the picture cannot say. The
+`render-visuals` skill owns the page rules.
+
 ## Version control
 
 Detect the checkout's VCS metadata first. Upstream uses

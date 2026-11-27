@@ -124,7 +124,9 @@ With a host chosen:
   muted **started on host** badge and are titled by their folder. A row opens the
   thread in this client like any other. Status is polled only while that list is
   open. An offline host shows one muted "unavailable" line and still lists the
-  threads started here.
+  threads started here. A row's own menu and hover strip archive or restore it
+  through this plugin on the runtime that owns the Session, and the runtime's
+  archived set decides whether the row sits in an active group or Archived.
 - While a thread is open here, a question its remote agent asks opens in this
   client's own question card, with the same countdown, **Take time** and plan
   review, and the answer goes to the runtime that owns the thread. A question

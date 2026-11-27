@@ -21,9 +21,8 @@ describe('Host communication service', () => {
     const service = new CommunicationService({ statePath: await statePath(), now: () => 1_800_000_000_000 })
     const sender = { kind: 'agent' as const, id: 'agent-sender' }
     const recipient = { kind: 'agent' as const, id: 'agent-recipient' }
-    await service.subscribe(recipient, { topic: 'workspace/demo', delivery: 'steer', allowSteerFrom: [sender.id] })
 
-    const message = await service.publish({ sender, topic: 'workspace/demo', text: 'Review the deployment plan.', priority: 'urgent' })
+    const message = await service.send({ sender, toAgentId: recipient.id, text: 'Review the deployment plan.', priority: 'urgent' })
     expect(message.recipients).toEqual([{ principal: recipient, delivery: 'passive', readAt: null }])
     await expect(service.inbox({ principal: { kind: 'external', id: 'cli' } })).resolves.toEqual([])
 
@@ -46,14 +45,13 @@ describe('Host communication service', () => {
     await expect(service.acknowledge(sender, message.id)).rejects.toMatchObject({ code: 'message-not-found' })
   })
 
-  it('maps legacy delivery values to passive delivery instead of requesting Agent execution', async () => {
+  it('refuses a direct message to itself and keeps request intent on delivery', async () => {
     const service = new CommunicationService({ statePath: await statePath() })
+    const sender = { kind: 'agent' as const, id: 'agent-sender' }
 
-    await expect(service.subscribe({ kind: 'external', id: 'cli' }, { topic: 'workspace/demo', delivery: 'steer' })).resolves.toMatchObject({
-      delivery: 'passive',
+    await expect(service.send({ sender, toAgentId: sender.id, text: 'hello' })).rejects.toMatchObject({ code: 'self-message' })
+    await expect(service.send({ sender, toAgentId: 'agent-recipient', text: 'Please review.', intent: 'request' })).resolves.toMatchObject({
+      intent: 'request',
     })
-    await expect(
-      service.subscribe({ kind: 'agent', id: 'agent-recipient' }, { topic: 'workspace/demo', delivery: 'queue', allowSteerFrom: ['agent-sender'] }),
-    ).resolves.toMatchObject({ delivery: 'passive' })
   })
 })

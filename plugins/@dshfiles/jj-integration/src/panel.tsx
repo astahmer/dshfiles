@@ -90,10 +90,10 @@ const GROUP_LIMIT = 8
 const ROW_GRID =
   'dshx:grid dshx:grid-cols-[1.25rem_minmax(10rem,1.6fr)_minmax(4.5rem,0.5fr)_minmax(7rem,0.8fr)_minmax(10rem,1.1fr)_auto] dshx:items-center dshx:gap-x-3'
 
-type IntegrationFilter = 'attention' | 'all' | 'ready' | 'blocked' | 'conflicts' | 'integrating' | 'completed'
+type IntegrationFilter = 'attention' | 'all' | 'ready' | 'stale' | 'blocked' | 'conflicts' | 'integrating' | 'completed'
 type LifecycleFilter = 'any' | 'active' | 'idle' | 'finished' | 'missing'
 type ThreadLifecycle = 'active' | 'waiting-input' | 'idle' | 'finished' | 'missing'
-type RowGroup = 'conflicts' | 'ready' | 'blocked' | 'integrating' | 'completed'
+type RowGroup = 'conflicts' | 'ready' | 'stale' | 'blocked' | 'integrating' | 'completed'
 
 const GroupLoadMoreSentinel = (props: { readonly enabled: boolean; readonly resetKey: number; readonly onLoadMore: () => void }): JSX.Element | null => {
   const sentinel = useLoadMore({ enabled: props.enabled, resetKey: props.resetKey, onLoadMore: props.onLoadMore, rootMargin: '0px 0px 500px 0px' })
@@ -214,6 +214,7 @@ const userMessagesLabel = (t: JjIntegrationTranslate, count: number): string => 
 
 const integrationStatusLabel = (t: JjIntegrationTranslate, assessment: ThreadIntegrationAssessment): string => {
   if (assessment.category === 'ready') return t('readyToIntegrate')
+  if (assessment.category === 'stale') return t('staleStatus')
   if (assessment.category === 'conflicts') return t('conflict')
   if (assessment.category === 'blocked') return t('blockedStatus')
   if (assessment.category === 'unknown') return t('unknownStatus')
@@ -246,6 +247,7 @@ const blockerMessage = (t: JjIntegrationTranslate, blocker: ThreadIntegrationBlo
 
 /** A non-blocking note: a stale base is not work to integrate, so it must not read like one. */
 const advisoryMessage = (t: JjIntegrationTranslate, assessment: ThreadIntegrationAssessment, bookmark: string): string | undefined => {
+  if (assessment.category === 'stale') return t('staleAdvisory')
   if (assessment.pendingRevisions > 0) return undefined
   if (assessment.category === 'integrated') return t('alreadyIntegrated')
   if (assessment.behindBookmark > 0) return t('advisoryBehind', { count: assessment.behindBookmark, bookmark })
@@ -271,6 +273,7 @@ const lifecycleOf = (thread: ThreadView, running: boolean, waitingForInput: bool
 const rowGroupOf = (category: ThreadIntegrationCategory): RowGroup => {
   if (category === 'conflicts') return 'conflicts'
   if (category === 'ready') return 'ready'
+  if (category === 'stale') return 'stale'
   if (category === 'integrating') return 'integrating'
   if (category === 'integrated' || category === 'no-changes') return 'completed'
   return 'blocked'
@@ -586,7 +589,7 @@ const ThreadRow = (props: {
           className="dshx:flex dshx:items-center dshx:justify-end dshx:gap-1 dshx:@max-pane-compact:col-span-3 dshx:@max-pane-compact:col-start-1 dshx:@max-pane-compact:row-start-5 dshx:@max-pane-compact:flex-wrap dshx:@max-pane-compact:justify-start"
           onClick={event => event.stopPropagation()}
         >
-          {assessment.category === 'ready' ? (
+          {assessment.category === 'ready' || assessment.category === 'stale' ? (
             <>
               <Combobox
                 label={t('integrationTarget')}
@@ -596,7 +599,7 @@ const ThreadRow = (props: {
                 onValueChange={setIntegrationBookmark}
               />
               <Button size="sm" variant="outline" disabled={props.busy || props.job !== undefined} onClick={() => props.onIntegrate(integrationBookmark)}>
-                {t('integrate')}
+                {t(assessment.category === 'stale' ? 'landAnyway' : 'integrate')}
               </Button>
             </>
           ) : null}
@@ -759,6 +762,7 @@ export const ThreadWorkspacesPanel = (props: {
   const toast = useToast()
   const settings = useSettings(jjIntegrationSettings)
   const autoIntegrationScope = settings.value?.autoIntegrationScope ?? defaultJjIntegrationSettings.autoIntegrationScope
+  const staleAfterDays = settings.value?.staleAfterDays ?? defaultJjIntegrationSettings.staleAfterDays
   const excludedRepositoryRoots = settings.value?.autoIntegrationExcludedRepositories ?? defaultJjIntegrationSettings.autoIntegrationExcludedRepositories
   const autoIntegrationApplies = autoIntegrationScope !== 'none'
   const setRepositoryExclusion = async (repositoryRoot: string, excluded: boolean): Promise<void> => {
@@ -958,10 +962,11 @@ export const ThreadWorkspacesPanel = (props: {
     all: lifecycleEntries.length,
     attention: lifecycleEntries.filter(entry => entry.assessment.needsAttention).length,
     ready: lifecycleEntries.filter(entry => entry.assessment.category === 'ready').length,
+    stale: lifecycleEntries.filter(entry => entry.assessment.category === 'stale').length,
     blocked: lifecycleEntries.filter(entry => entry.assessment.category === 'blocked' || entry.assessment.category === 'unknown').length,
     conflicts: lifecycleEntries.filter(entry => entry.assessment.category === 'conflicts').length,
     integrating: lifecycleEntries.filter(entry => entry.assessment.category === 'integrating').length,
-    completed: lifecycleEntries.filter(entry => !entry.assessment.needsAttention).length,
+    completed: lifecycleEntries.filter(entry => entry.assessment.category === 'integrated' || entry.assessment.category === 'no-changes').length,
   }
   const eligibleEntries = lifecycleEntries.filter(entry => entry.assessment.category === 'ready')
   const selectedEligiblePaths = eligibleEntries.filter(entry => selectedPaths.has(entry.thread.path)).map(entry => entry.thread.path)
@@ -1000,10 +1005,11 @@ export const ThreadWorkspacesPanel = (props: {
     // A row this page just integrated keeps its outcome on screen instead of leaving the attention view immediately.
     if (filter === 'attention') return entry.assessment.needsAttention || integrationJobs.has(entry.thread.path)
     if (filter === 'ready') return entry.assessment.category === 'ready'
+    if (filter === 'stale') return entry.assessment.category === 'stale'
     if (filter === 'conflicts') return entry.assessment.category === 'conflicts'
     if (filter === 'integrating') return entry.assessment.category === 'integrating'
     if (filter === 'blocked') return entry.assessment.category === 'blocked' || entry.assessment.category === 'unknown'
-    return !entry.assessment.needsAttention
+    return entry.assessment.category === 'integrated' || entry.assessment.category === 'no-changes'
   })
   useEffect(() => {
     const priority = new Set<string>()
@@ -1039,6 +1045,12 @@ export const ThreadWorkspacesPanel = (props: {
       tone: 'ready',
     },
     {
+      id: 'stale',
+      title: t('staleHeading'),
+      description: t('staleDescription', { days: staleAfterDays }),
+      tone: 'stale',
+    },
+    {
       id: 'blocked',
       title: t('blockedHeading'),
       description: t('blockedDescription', { bookmark: panelBookmark }),
@@ -1060,6 +1072,7 @@ export const ThreadWorkspacesPanel = (props: {
   const allTabs: readonly { readonly id: IntegrationFilter; readonly label: string; readonly category: ThreadIntegrationCategory | undefined }[] = [
     { id: 'attention', label: t('attentionFilter'), category: undefined },
     { id: 'ready', label: t('readyToIntegrate'), category: 'ready' },
+    { id: 'stale', label: t('staleHeading'), category: 'stale' },
     { id: 'blocked', label: t('blockedHeading'), category: 'blocked' },
     { id: 'conflicts', label: t('conflictsHeading'), category: 'conflicts' },
     { id: 'integrating', label: t('integratingHeading'), category: 'integrating' },

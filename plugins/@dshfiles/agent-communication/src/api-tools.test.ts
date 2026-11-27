@@ -11,8 +11,6 @@ describe('agent-communication tool exposure', () => {
       'postMessage',
       'messageRecipients',
       'revealMessageBody',
-      'setSubscription',
-      'unsubscribe',
       'acknowledge',
     ])
   })

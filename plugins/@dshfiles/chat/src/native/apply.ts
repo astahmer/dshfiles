@@ -34,6 +34,7 @@ import { ApprovalCommand } from './chat/ApprovalCommand.tsx'
 import { sessionFilePath } from './file-path.ts'
 import { ChatView } from './chat/ChatView.tsx'
 import { openChatExternalLink } from './chat/external-link-opening.ts'
+import { LinkEmbedPort } from '../link-embed-port.ts'
 import { sessionSidebar } from './chat/session-sidebar.ts'
 import { ChatFlow } from './chat/ChatFlow.tsx'
 import { detachedFlow, detachedView } from '../detached-injected.ts'
@@ -56,7 +57,11 @@ import { UnreadLandingRow, type UnreadLandingRowInjected } from './settings/Unre
 import { PerformanceUsageRow, type PerformanceUsageRowInjected } from './settings/PerformanceUsageRow.tsx'
 import { PerformanceUsagePolicy } from './performance-usage.ts'
 import { ImageGalleryScopePolicy } from './image-gallery-scope.ts'
+import { AnnotationMarksPolicy, AnnotationQuickCommentPolicy } from './annotation-preferences.ts'
+import { AnnotationMarksRow, type AnnotationMarksRowInjected } from './settings/AnnotationMarksRow.tsx'
+import { AnnotationQuickCommentRow, type AnnotationQuickCommentRowInjected } from './settings/AnnotationQuickCommentRow.tsx'
 import { SeenAnswers, UnreadLandingPolicy } from './unread-landing.ts'
+import { SeenTurns } from './seen-turns.ts'
 import { useTurnDataValue } from './chat/use-turn-data.ts'
 import { bindDisclosure } from './chat/use-disclosure.ts'
 import { useFlowHidden, useMotionHidden } from './chat/flow-motion.ts'
@@ -150,6 +155,7 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
   const chatStore = createChatStore()
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
   const seenAnswers = new SeenAnswers(typeof localStorage === 'undefined' ? null : localStorage)
+  const seenTurns = new SeenTurns(typeof localStorage === 'undefined' ? null : localStorage)
   const chatSettings = ctx.configForms.get<ChatSettings>(CHAT_SETTINGS_NAMESPACE)
   const linkOpening = createSnapshotStore(chatSettings.getSnapshot().value?.linkOpening ?? DEFAULT_LINK_OPENING)
   ctx.effect(() => chatSettings.subscribe(() => {
@@ -187,7 +193,16 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
   const performancePolicy = new PerformanceUsagePolicy(chatSettings)
   const imageGalleryScope = new ImageGalleryScopePolicy(chatSettings)
   const unreadLanding = new UnreadLandingPolicy(chatSettings)
-  ctx.effect(() => () => { transcriptView.dispose(); performancePolicy.dispose(); imageGalleryScope.dispose(); unreadLanding.dispose() })
+  const annotationMarks = new AnnotationMarksPolicy(chatSettings)
+  const annotationQuickComment = new AnnotationQuickCommentPolicy(chatSettings)
+  ctx.effect(() => () => {
+    transcriptView.dispose()
+    performancePolicy.dispose()
+    imageGalleryScope.dispose()
+    unreadLanding.dispose()
+    annotationMarks.dispose()
+    annotationQuickComment.dispose()
+  })
   const performanceUsage = performancePolicy.mode
   registerChatNodeRenderers(ctx, performanceUsage, presentation, decorate)
   ctx.slots.registerFactory({
@@ -216,6 +231,28 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
       setUnreadLanding: landing => { unreadLanding.setLanding(landing) },
     }),
   }, UnreadLandingRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'annotation-marks',
+    order: 20,
+    locale: NS,
+    inject: (): AnnotationMarksRowInjected => ({
+      hooks: { annotationMarks: annotationMarks.marks },
+      setAnnotationMarks: marks => { annotationMarks.setMarks(marks) },
+    }),
+  }, AnnotationMarksRow))
+
+  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
+    name: 'settings.general.item',
+    id: 'annotation-quick-comment',
+    order: 21,
+    locale: NS,
+    inject: (): AnnotationQuickCommentRowInjected => ({
+      hooks: { annotationQuickComment: annotationQuickComment.quickComment },
+      setAnnotationQuickComment: choice => { annotationQuickComment.setQuickComment(choice) },
+    }),
+  }, AnnotationQuickCommentRow))
 
   ctx.slots.inject('settings.general.item', () => ctx.slots.register({
     name: 'settings.general.item',
@@ -298,6 +335,8 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
             getSnapshot: () => ctx.uiSession.sessionStatus.getSnapshot().get(sessionId)?.pendingInteraction?.key ?? null,
             subscribe: (listener: () => void) => ctx.uiSession.sessionStatus.subscribe(listener),
           },
+          annotationMarks: annotationMarks.marks,
+          annotationQuickComment: annotationQuickComment.quickComment,
         }
         if (binding === undefined) return detachedView(hooks, ctx.fileDrag.actions)
         const session = binding.session
@@ -333,12 +372,18 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           resolveFilePath: sessionFilePath(ctx, sessionId),
           openExternalLink: (href) => {
             const url = new URL(href)
+            LinkEmbedPort.warm(url.href)
             openChatExternalLink({
               url,
               currentOrigin: window.location.origin,
               linkOpening: linkOpening.getSnapshot(),
               browserAvailable: ctx.get('sidebarRightTabs')?.get('browser') !== undefined,
-              openInSidebar: sidebarUrl => sessionSidebar(ctx.sidebarRight, sessionId).openTab('browser', { params: { url: sidebarUrl } }),
+              paneRefused: href => LinkEmbedPort.refused(href),
+              openInSidebar: sidebarUrl => {
+                sessionSidebar(ctx.sidebarRight, sessionId).openTab('browser', { params: { url: sidebarUrl } })
+                // The pane cannot report a framing refusal, so say it once the Host has answered.
+                LinkEmbedPort.sayIfRefused(sidebarUrl)
+              },
               openInNewTab: newTabUrl => { window.open(newTabUrl, '_blank', 'noopener,noreferrer') },
             })
           },
@@ -359,6 +404,11 @@ export function apply(ctx: Context, decorate: <Component>(component: Component) 
           seenAnswer: {
             read: () => seenAnswers.read(sessionId),
             markSeen: (anchorKey) => { seenAnswers.markSeen(sessionId, anchorKey) },
+          },
+          seenTurns: {
+            read: () => seenTurns.read(sessionId),
+            markSeen: (turn) => { seenTurns.markSeen(sessionId, turn) },
+            reset: (turn) => { seenTurns.reset(sessionId, turn) },
           },
           forkAt: (seq) => {
             const turn = [...chat.getSnapshot().timeline.turns.values()].find(turn => turn.end?.seq === seq)

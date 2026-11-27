@@ -964,8 +964,8 @@ Then("the remote row offers the sidebar's own verbs and no Host verb", async ({ 
     await expect(page.getByRole('menuitem', { name: 'Done', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Snooze', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: 'Copy thread ID', exact: true })).toBeVisible()
-    // Archive, pin and rename run on the runtime that owns the Session, so a mirrored row never offers them.
-    await expect(menu.getByRole('menuitem', { name: 'Archive', exact: true })).toHaveCount(0)
+    // Archive runs on the runtime that owns the Session through multi-host; pin and rename stay only there.
+    await expect(menu.getByRole('menuitem', { name: 'Archive', exact: true })).toBeVisible()
     await expect(menu.getByRole('menuitem', { name: /Pin/u })).toHaveCount(0)
     await expect(menu.getByRole('menuitem', { name: 'Rename thread', exact: true })).toHaveCount(0)
     await pressRemoteRowMenuItem(page, 'Done')
@@ -3086,6 +3086,70 @@ Then("the transcript row opens the subagent's thread", async ({ page }: { page: 
     await row.getByRole('button', { name: 'Open thread', exact: true }).click()
     // A child keeps the parent's address; its own first message is what proves the navigation.
     await expect(page.getByText('Your parent agent id is', { exact: false })).toBeVisible({ timeout: 30_000 })
+  })
+  await finishJourneyAssertions(page)
+})
+
+// Three children at once is the shape that squashed: one card per child in a 288 px dock, each a flex item whose
+// overflow-hidden wrapper had no automatic minimum height, so every card clipped to a sliver under the next one. Each
+// child sleeps on its own command, because the fake provider runs a `[[once call ...]]` directive only once per process.
+const childSleepDirective = (seconds: number): string =>
+  `\\u005b\\u005bonce call bash \\u007b\\u0022command\\u0022:\\u0022sleep ${String(seconds)}\\u0022,\\u0022description\\u0022:\\u0022Keep the child busy\\u0022\\u007d\\u005d\\u005d`
+const threeSubagentCalls = [240, 241, 242]
+  .map((seconds, index) => `[[once call subagent {"description":"Long child ${String.fromCharCode(65 + index)}","prompt":"${childSleepDirective(seconds)}"}]]`)
+  .join('')
+
+const dockRows = (page: Page): Locator => page.locator('[data-dshfiles-live-preview="agent"][data-dshfiles-live-preview-seat="dock"]')
+const dockRunCards = (page: Page): Locator => dockRows(page).locator('section[aria-label^="Agent run:"]')
+const rowBoxes = (rows: Locator): Promise<readonly { readonly top: number; readonly bottom: number; readonly height: number }[]> =>
+  rows.evaluateAll(elements =>
+    elements.map(element => {
+      const box = element.getBoundingClientRect()
+      return { top: box.top, bottom: box.bottom, height: box.height }
+    }),
+  )
+
+When('a thread delegates a long command to three subagents', async ({ page }: { page: Page }) => {
+  const root = await createScratchDirectory('dshx-thread-sidebar-subagent-cards-')
+  const workspace = join(root, 'subagent-cards-project')
+  await mkdir(workspace)
+  await page
+    .getByRole('button', { name: /^New (thread|session)$/ })
+    .first()
+    .click()
+  await registerWorkspaceFolder(page, workspace, openNewThreadAddWorkspace)
+  await startThreadWithModel(page, { project: 'subagent-cards-project', model: 'commandcode_work/gpt-6-luna' })
+  const composer = page.getByRole('textbox', { name: /(Describe what you want to build|Message or run a task), \/ commands, @ files or (?:threads|sessions)/ })
+  await expect(composer).toBeEnabled({ timeout: 45_000 })
+  await composer.fill(threeSubagentCalls)
+  await composer.press('Enter')
+})
+
+Then('the dock lists three working subagent cards without squashing one into another', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-subagent-run-cards-layout', async () => {
+    const fold = page.getByRole('button', { name: '3 subagents working', exact: true })
+    await expect(fold).toBeVisible({ timeout: 60_000 })
+    await fold.click()
+    await expect(dockRows(page)).toHaveCount(3, { timeout: 30_000 })
+    await expect(dockRunCards(page)).toHaveCount(3, { timeout: 45_000 })
+    const boxes = await rowBoxes(dockRows(page))
+    for (const box of boxes) expect(box.height).toBeGreaterThanOrEqual(120)
+    for (const [index, box] of boxes.entries()) if (index > 0) expect(box.top).toBeGreaterThanOrEqual(boxes[index - 1]!.bottom - 1)
+  })
+})
+
+Then('one working subagent folds to its own row and back without collapsing the others', async ({ page }: { page: Page }) => {
+  await recordAssertion(page, 'thread-sidebar-subagent-run-card-collapse', async () => {
+    await dockRunCards(page)
+      .first()
+      .getByRole('button', { name: /^Collapse / })
+      .click()
+    await expect(dockRunCards(page)).toHaveCount(2)
+    // The folded child keeps its own one-line row, live clock included, and expands in place without touching its siblings.
+    const compact = dockRows(page).first()
+    expect(await compact.evaluate(row => row.getBoundingClientRect().height)).toBeLessThan(48)
+    await compact.getByRole('button', { name: /^Expand / }).click()
+    await expect(dockRunCards(page)).toHaveCount(3)
   })
   await finishJourneyAssertions(page)
 })

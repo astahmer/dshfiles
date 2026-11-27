@@ -87,4 +87,19 @@ describe('status snapshots', () => {
       }),
     ),
   )
+
+  it.effect('patches one cached snapshot in place without changing its freshness', () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const cache = yield* snapshots
+        yield* cache.refresh('runtime-a', Effect.succeed({ ok: true, value: 'live' }))
+        yield* settle
+        yield* cache.update('runtime-a', status => ({ ...status, value: `${status.value}+patched` }))
+        expect(yield* cache.read('runtime-a')).toEqual({ status: { ok: true, value: 'live+patched' }, stale: false, refreshing: false })
+        // A runtime with no cached snapshot has nothing to patch, and the next read still asks for a refresh.
+        yield* cache.update('runtime-b', status => status)
+        expect(yield* cache.read('runtime-b')).toEqual({ status: undefined, stale: true, refreshing: false })
+      }),
+    ),
+  )
 })

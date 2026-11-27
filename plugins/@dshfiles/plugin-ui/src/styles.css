@@ -1020,7 +1020,8 @@ svg [class*='_spinnerArc_'] {
       > [data-slot='select-content'],
       > [data-slot='popover-content']
     ),
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'],
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu] {
     position: fixed !important;
     top: auto !important;
     right: 0 !important;
@@ -1044,7 +1045,8 @@ svg [class*='_spinnerArc_'] {
       [data-slot='select-content'],
       [data-slot='popover-content']
     ),
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'] {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu'],
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu] {
     position: relative;
     box-sizing: border-box;
     width: 100% !important;
@@ -1092,7 +1094,8 @@ svg [class*='_spinnerArc_'] {
       [data-slot='select-content'],
       [data-slot='popover-content']
     )::before,
-  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu']::before {
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][role='menu']::before,
+  html[data-shell-phone-nav]:not([data-phone-keyboard]) [data-menu-material][data-trigger-menu]::before {
     content: '';
     position: absolute;
     top: 8px;
@@ -1285,4 +1288,16 @@ html[data-phone-stack-motion='pop']::view-transition-new(root) {
  */
 :where([data-slot^='conversation.']) :is(ol, ul) {
   list-style: revert;
+}
+
+/*
+ * Phone: no keycaps. The shell has no hardware keyboard (plan phone rules), so a
+ * shortcut hint costs a row of width and names keys that cannot be pressed; the
+ * phone sheet keeps the labels and actions.
+ */
+@media (max-width: 639.98px) {
+  html[data-shell-phone-nav]
+    :is([data-slot='key-hint'], [data-slot='dropdown-menu-shortcut'], [data-slot='context-menu-shortcut'], [data-slot='command-shortcut']) {
+    display: none;
+  }
 }

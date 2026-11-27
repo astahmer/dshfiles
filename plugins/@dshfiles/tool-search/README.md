@@ -44,6 +44,27 @@ When the global tool set changes after an agent attached (an MCP server connects
 
 In `cache-safe` mode the declared list is fixed at attachment: a tool that appears later is never declared, even when it matches `alwaysVisible`; it is searchable with `tool_search` and callable with `tool_call`. Removing a declared tool still removes it from the list, since a request cannot declare a tool that no longer exists.
 
+## Owner-declared visibility
+
+A tool's owner can put it in the declared list without a profile edit. The Host provides a
+`toolSearchVisibility` service; the owning plugin calls it once while it loads:
+
+```ts
+import { declareVisibleTools } from '@dshfiles/tool-search/tool-visibility'
+
+declareVisibleTools(ctx, {
+  owner: '@dshfiles/html-render',
+  tools: ['html_render', 'html_preview', 'html_screenshot'],
+  reason: 'a rendered answer is cheaper than prose',
+})
+```
+
+Declarations are additive with `alwaysVisible`, take exact names (no wildcards), and the first owner of a name
+keeps it. A declaration must happen before the Session attaches, which holds when both plugins load before the
+agents they serve; a late declaration applies to the next Session. A Host without this plugin provides no service,
+so `declareVisibleTools` returns `false` and the tools stay searchable. Today `@dshfiles/html-render` declares its
+three tools.
+
 ## Behavior and safety
 
 Every live agent gets a scope-local `tool_search` tool. Initial visibility is limited to `alwaysVisible`; other eligible global tools can be found by exact name, name fragments, or BM25-ranked name/description matches. A selection updates only this plugin's per-agent `tools.restrict({ deny })` contribution, which names the deferred global tools. Tools an agent gets from its own scope or an agent preset's scope (`bash`, `read`, `write`, … in a stock profile) are not global, are never deferred and stay visible: a restriction filters everything an agent inherits, so an allow list of global names would hide them. DSH's tool registry still intersects other restrictions and policies; selected-but-denied tools are reported as `unavailable`. Scoped tools remain governed by DSH's scoped registry rules.

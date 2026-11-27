@@ -3,7 +3,7 @@ import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { detachedFlow, detachedView } from './detached-injected.ts'
 import type { ChatPresentationPolicy } from './native/presentation-policy.ts'
-import type { ImageGalleryScope, UnreadLanding } from './chat-settings.ts'
+import type { AnnotationMarks, AnnotationQuickComment, ImageGalleryScope, UnreadLanding } from './chat-settings.ts'
 
 const policy: ChatPresentationPolicy = {
   mode: 'standard',
@@ -30,6 +30,16 @@ const unreadLanding: ObservableSnapshot<UnreadLanding> = {
   subscribe: () => () => {},
 }
 
+const annotationMarks: ObservableSnapshot<AnnotationMarks> = {
+  getSnapshot: () => 'column',
+  subscribe: () => () => {},
+}
+
+const annotationQuickComment: ObservableSnapshot<AnnotationQuickComment> = {
+  getSnapshot: () => 'inline',
+  subscribe: () => () => {},
+}
+
 const connectionState = { getSnapshot: () => undefined, subscribe: () => () => {} }
 const interactionIds: ObservableSnapshot<readonly string[]> = { getSnapshot: () => [], subscribe: () => () => {} }
 const pendingInteraction: ObservableSnapshot<string | null> = { getSnapshot: () => null, subscribe: () => () => {} }
@@ -45,7 +55,10 @@ describe('detached Chat injection', () => {
   })
 
   it('keeps every view action inert so a gap renders nothing and never throws', async () => {
-    const view = detachedView({ presentation, interactionIds, imageGalleryScope, unreadLanding, pendingInteraction }, fileDrag)
+    const view = detachedView(
+      { presentation, interactionIds, imageGalleryScope, unreadLanding, pendingInteraction, annotationMarks, annotationQuickComment },
+      fileDrag,
+    )
     expect(() => {
       view.openExternalLink('https://example.invalid')
       view.loadOlder()

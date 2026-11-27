@@ -26,6 +26,17 @@ describe('PendingPick', () => {
     expect(PendingPick.threadId({ pickedId: 'session-a', stageAtPick: 'session-a', stageSession: 'session-a' })).toBeUndefined()
     expect(PendingPick.threadId({ pickedId: undefined, stageAtPick: 'session-a', stageSession: 'session-a' })).toBeUndefined()
   })
+
+  it('names a page-load thread link until the stage opens it, over the new-thread draft the stage holds meanwhile', () => {
+    expect(PendingPick.threadId({ pickedId: undefined, stageAtPick: undefined, stageSession: 'session-draft', linkedId: 'session-linked' })).toBe(
+      'session-linked',
+    )
+    expect(PendingPick.threadId({ pickedId: undefined, stageAtPick: undefined, stageSession: 'session-linked', linkedId: 'session-linked' })).toBeUndefined()
+    // A tap after the page loaded wins over the link.
+    expect(PendingPick.threadId({ pickedId: 'session-b', stageAtPick: 'session-draft', stageSession: 'session-draft', linkedId: 'session-linked' })).toBe(
+      'session-b',
+    )
+  })
 })
 
 describe('PhoneTopBarModel', () => {

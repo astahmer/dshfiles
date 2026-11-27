@@ -100,7 +100,10 @@ export class LinkStore extends Context.Service<
     Effect.gen(function* () {
       const paths = yield* MultiHostPaths
       const file = paths.dataPath('links.json')
-      const services = yield* Effect.context<FileSystem.FileSystem | Path.Path>()
+      const fileSystem = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const provided = <A, E>(effect: Effect.Effect<A, E, FileSystem.FileSystem | Path.Path>) =>
+        effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem), Effect.provideService(Path.Path, path))
       const lock = yield* Semaphore.make(1)
       const changed = yield* PubSub.unbounded<void>()
       const offers = yield* Ref.make<readonly Offer[]>([])
@@ -113,16 +116,15 @@ export class LinkStore extends Context.Service<
         return current
       }
 
-      const read = Effect.gen(function* () {
-        const secured = yield* PrivateFile.secure(file)
-        if (secured === 'invalid') return yield* new LinkStoreFailed({})
-        const text = yield* PrivateFile.readIfPresent(file)
-        if (text === undefined) return remember(emptyLinkFile)
-        return remember(yield* decodeLinkFile(text))
-      }).pipe(
-        Effect.provide(services),
-        Effect.mapError(cause => (cause instanceof LinkStoreFailed ? cause : new LinkStoreFailed({ cause }))),
-      )
+      const read = provided(
+        Effect.gen(function* () {
+          const secured = yield* PrivateFile.secure(file)
+          if (secured === 'invalid') return yield* new LinkStoreFailed({})
+          const text = yield* PrivateFile.readIfPresent(file)
+          if (text === undefined) return remember(emptyLinkFile)
+          return remember(yield* decodeLinkFile(text))
+        }),
+      ).pipe(Effect.mapError(cause => (cause instanceof LinkStoreFailed ? cause : new LinkStoreFailed({ cause }))))
 
       const update = <A, E>(change: (current: LinkFile) => Effect.Effect<{ readonly next: LinkFile; readonly result: A }, E>) =>
         lock.withPermits(1)(
@@ -130,10 +132,7 @@ export class LinkStore extends Context.Service<
             const current = yield* read
             const { next, result } = yield* change(current)
             const body = yield* encodeLinkFile(next).pipe(Effect.mapError(cause => new LinkStoreFailed({ cause })))
-            yield* PrivateFile.write({ path: file, body, commit: 'rename' }).pipe(
-              Effect.provide(services),
-              Effect.mapError(cause => new LinkStoreFailed({ cause })),
-            )
+            yield* provided(PrivateFile.write({ path: file, body, commit: 'rename' })).pipe(Effect.mapError(cause => new LinkStoreFailed({ cause })))
             remember(next)
             yield* PubSub.publish(changed, undefined)
             return result

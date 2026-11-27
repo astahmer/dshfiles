@@ -10,15 +10,19 @@ afterEach(async () => {
 })
 
 describe('installed Chromium launch options', () => {
-  it('keeps Playwright bundled Chromium as the default', async () => {
-    expect(await chromiumLaunchOptions({})).toEqual({})
+  it('keeps Playwright bundled Chromium in English as the default', async () => {
+    expect(await chromiumLaunchOptions({})).toEqual({ locale: 'en-US' })
+  })
+
+  it('follows an explicit DSHX_LOCALE', async () => {
+    expect(await chromiumLaunchOptions({ DSHX_LOCALE: 'fr-FR' })).toEqual({ locale: 'fr-FR' })
   })
 
   it.each(['', 'google-chrome', '~/bin/chrome', './chrome'])('rejects a non-absolute override instead of silently falling back: %j', async value => {
     await expect(chromiumLaunchOptions({ DSHX_CHROMIUM_EXECUTABLE: value })).rejects.toThrow('DSHX_CHROMIUM_EXECUTABLE must name an absolute executable file')
   })
 
-  it('requires an existing executable file and exposes only Playwright executablePath', async () => {
+  it('requires an existing executable file and exposes it as Playwright executablePath', async () => {
     const root = await mkdtemp(join(tmpdir(), 'dshx-chromium-options-'))
     roots.push(root)
     const file = join(root, 'installed-chrome')
@@ -28,6 +32,6 @@ describe('installed Chromium launch options', () => {
     await expect(chromiumLaunchOptions({ DSHX_CHROMIUM_EXECUTABLE: root })).rejects.toThrow('existing executable file')
     await expect(chromiumLaunchOptions({ DSHX_CHROMIUM_EXECUTABLE: file })).rejects.toThrow('execute permission')
     await chmod(file, 0o700)
-    expect(await chromiumLaunchOptions({ DSHX_CHROMIUM_EXECUTABLE: file })).toEqual({ executablePath: file })
+    expect(await chromiumLaunchOptions({ DSHX_CHROMIUM_EXECUTABLE: file })).toEqual({ executablePath: file, locale: 'en-US' })
   })
 })

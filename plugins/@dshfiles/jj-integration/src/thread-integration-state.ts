@@ -1,15 +1,18 @@
 import type { ThreadView } from './api.js'
 import type { IntegrationJobPhase } from './integration-queue-machine.js'
+import type { ThreadRevision } from './thread-workspace-types.js'
+
+const DAY_MS = 86_400_000
 
 /** Placeholder descriptions the Host refuses to integrate, shared so the badge and the guard agree. */
 const PLACEHOLDER_DESCRIPTIONS = new Set(['', 'wip'])
 
 /**
- * What the integration control center shows. Eligibility (`ready`, `blocked`, `conflicts`, `unknown`) is separate
+ * What the integration control center shows. Eligibility (`ready`, `stale`, `blocked`, `conflicts`, `unknown`) is separate
  * from lifecycle: a finished thread with pending work is still ready, and a workspace that only sits behind the
  * bookmark without pending revisions is `no-changes`, never a blocker.
  */
-export type ThreadIntegrationCategory = 'conflicts' | 'ready' | 'blocked' | 'integrating' | 'integrated' | 'no-changes' | 'unknown'
+export type ThreadIntegrationCategory = 'conflicts' | 'ready' | 'stale' | 'blocked' | 'integrating' | 'integrated' | 'no-changes' | 'unknown'
 
 export type ThreadIntegrationBlocker = 'conflict' | 'missing' | 'question' | 'active' | 'description' | 'activity-unknown'
 
@@ -23,6 +26,8 @@ export interface ThreadIntegrationAssessment {
   readonly undescribedRevisions: number
   /** Commits the bookmark has that the workspace lacks; advisory, never a blocker on its own. */
   readonly behindBookmark: number
+  /** Described, conflict-free pending work the bookmark moved past and nobody changed for the stale window. */
+  readonly stale: boolean
   /** Pending work that still needs a user decision or an integration attempt. */
   readonly needsAttention: boolean
 }
@@ -47,8 +52,12 @@ const liveCategoryOf = (props: {
   readonly blockers: readonly ThreadIntegrationBlocker[]
   readonly missing: boolean
   readonly rebasedAt: number | undefined
+  readonly stale: boolean
 }): ThreadIntegrationCategory => {
-  if (props.hasPendingWork) return props.blockers.length === 0 ? 'ready' : blockedCategory(props.blockers)
+  if (props.hasPendingWork) {
+    if (props.blockers.length > 0) return blockedCategory(props.blockers)
+    return props.stale ? 'stale' : 'ready'
+  }
   if (props.missing) return 'unknown'
   if (props.rebasedAt === undefined) return 'no-changes'
   return 'integrated'
@@ -61,6 +70,30 @@ const liveCategoryOf = (props: {
  */
 export class ThreadIntegrationModel {
   static readonly isPlaceholderRevisionDescription = (description: string): boolean => PLACEHOLDER_DESCRIPTIONS.has(description.trim().toLowerCase())
+
+  /** The newest author time among revisions, epoch ms: when the work itself last changed. */
+  static readonly newestRevisionAt = (revisions: readonly Pick<ThreadRevision, 'at'>[]): number | undefined =>
+    revisions.reduce<number | undefined>((newest, revision) => {
+      if (revision.at === undefined) return newest
+      return newest === undefined || revision.at > newest ? revision.at : newest
+    }, undefined)
+
+  /**
+   * Work has gone cold when the bookmark moved past it and no revision was authored for `afterDays`: landing would
+   * rebase abandoned work, so it leaves Ready and the inbox while staying landable one workspace at a time.
+   * `afterDays` of 0 disables the rule; a Host that reports no author time never marks work stale.
+   */
+  static readonly isStale = (input: {
+    readonly revisions: readonly Pick<ThreadRevision, 'at'>[]
+    readonly behindBookmark: number
+    readonly now: number
+    readonly afterDays: number
+  }): boolean => {
+    if (input.afterDays <= 0 || input.behindBookmark <= 0) return false
+    const newest = ThreadIntegrationModel.newestRevisionAt(input.revisions)
+    if (newest === undefined) return false
+    return input.now - newest >= input.afterDays * DAY_MS
+  }
 
   /** Totals over every unlanded revision, whether `unlanded` is the full list or only its newest (`unlandedSummary`). */
   static readonly unlandedTotals = (
@@ -121,7 +154,8 @@ export class ThreadIntegrationModel {
       if (undescribedRevisions > 0) blockers.push('description')
     }
 
-    const liveCategory = liveCategoryOf({ hasPendingWork, blockers, missing: thread.missing, rebasedAt: thread.rebasedAt })
+    const stale = thread.stale === true
+    const liveCategory = liveCategoryOf({ hasPendingWork, blockers, missing: thread.missing, rebasedAt: thread.rebasedAt, stale })
 
     const category = input.jobPhase === undefined ? liveCategory : categoryForJob(input.jobPhase)
     const assessment: ThreadIntegrationAssessment = {
@@ -132,7 +166,8 @@ export class ThreadIntegrationModel {
       conflictedRevisions,
       undescribedRevisions,
       behindBookmark,
-      needsAttention: category !== 'integrated' && category !== 'no-changes',
+      stale: thread.stale === true,
+      needsAttention: category !== 'integrated' && category !== 'no-changes' && category !== 'stale',
     }
     return assessment
   }

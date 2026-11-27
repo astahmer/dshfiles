@@ -34,7 +34,7 @@ import { projectLifecycleApi } from '@dshfiles/workspace-folder-picker/project-l
 import { GroupChevron, groupCountStatusOf, ThreadGroupHeader } from './thread-group-header.js'
 import { formatAge } from './relative-age.js'
 import { RemoteThreadItem, RemoteThreadsSection, type RemoteThreadRowLabels } from './remote-threads-section.js'
-import { RemoteThreadInventoryModel, useRemoteSidebarThreads, type RemoteSidebarThread } from './remote-thread-inventory.js'
+import { RemoteThreadInventoryModel, useRemoteSidebarThreads, useRemoteThreadArchive, type RemoteSidebarThread } from './remote-thread-inventory.js'
 import { StableValueModel, useStableValue } from './stable-value.js'
 import { createThreadChildRowCache, type ThreadChildRowCache } from './thread-child-rows.js'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
@@ -219,6 +219,7 @@ import { UsageLimitSection, type UsageLimitSnooze } from './usage-limit-section.
 import { groupThreadChildren, launchOrdered, partitionFinishedChildren, shouldOpenChildThreadList, threadActionTargetIds, visibleChildren } from './thread-children.js'
 import { buildThreadUrl, clearThreadUrl, pageLoadThreadRoute, readThreadUrl } from './thread-url.js'
 import { PHONE_HISTORY_SELF_POP_EVENT } from '@dshfiles/workbench/phone-history'
+import { ScreenWakeLock, useScreenWakeLock } from './wake-lock.js'
 import { ThreadListNavigationModel } from './thread-list-navigation.js'
 import {
   EMPTY_THREAD_SELECTION,
@@ -1242,6 +1243,8 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
   const { session, unread, archived, pinned, parked, settled, notifyTarget } = props
   const t = props.actions.translate
   const openAside = useAsideOpen()
+  const wakeLockOn = useScreenWakeLock()
+  const keepAwakeLabel = ThreadMenuModel.keepAwakeLabel({ coarsePointer: coarsePointer(), available: ScreenWakeLock.available, on: wakeLockOn })
   const registry = workbenchPanels()
   useSyncExternalStore(registry.subscribe, registry.list, registry.list)
   const sidePanelDefinitions = registry.listContextMenuPanels()
@@ -1347,6 +1350,10 @@ const ThreadMenuBody = (props: ThreadContextMenuProps): JSX.Element => {
       ),
     },
     'mark-unread': { kind: 'item', label: t('threadSidebarMarkUnread'), keys: 'U', disabled: unread, onSelect: () => props.actions.markUnread(session.id) },
+    // Keep screen on (plan phone P27): one page-level Screen Wake Lock, offered only on a touch device that has it.
+    ...(keepAwakeLabel === undefined
+      ? undefined
+      : { 'keep-awake': { kind: 'item', label: t(keepAwakeLabel), onSelect: () => void ScreenWakeLock.toggle() } }),
     ...(notifyTarget === undefined
       ? undefined
       : {
@@ -2524,8 +2531,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     [threadDirectories, workspaceItems],
   )
   const remoteThreads = useRemoteSidebarThreads(props.wide !== false, localProjectsForRemoteThreads)
+  const remoteThreadArchive = useRemoteThreadArchive()
   const remoteRunningSessionIds = useMemo(
     () => new Set(remoteThreads.filter(thread => thread.running).map(thread => SessionId(thread.sessionId))),
+    [remoteThreads],
+  )
+  /** The archived set comes from each owning runtime: a remote Session is never a member of this Host's registry. */
+  const remoteArchivedSessionIds = useMemo(
+    () => new Set(remoteThreads.filter(thread => thread.archived).map(thread => SessionId(thread.sessionId))),
     [remoteThreads],
   )
   const [now, setNow] = useState(() => Date.now())
@@ -3150,10 +3163,15 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
    */
   const openThread = (sessionId: SessionSummary['id'], options: { readonly linked?: boolean } = {}): void => {
     if (archivedSessionIds.has(sessionId)) {
-      void props.unarchiveSession(sessionId).then(
-        () => selectThread(sessionId, options),
-        () => setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') }),
-      )
+      void (async () => {
+        try {
+          await props.unarchiveSession(sessionId)
+        } catch {
+          setNotice({ tone: 'danger', message: props.tSidebar('threadSidebarActionFailure') })
+          return
+        }
+        selectThread(sessionId, options)
+      })()
       return
     }
     selectThread(sessionId, options)
@@ -3416,9 +3434,9 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   const batchMutate = (operation: RowOperation): void => {
     const targetIds = batchSelectionIds()
     if (targetIds.length === 0) return
-    void mutateThreads(targetIds, operation).then(succeeded => {
-      if (succeeded) setThreadSelection(EMPTY_THREAD_SELECTION)
-    })
+    void (async () => {
+      if (await mutateThreads(targetIds, operation)) setThreadSelection(EMPTY_THREAD_SELECTION)
+    })()
   }
 
   const batchSetParked = (park: boolean): void => {
@@ -3772,17 +3790,36 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   }
 
   /**
-   * Drop a remote row into another status section. A mirrored Session answers the preference half of the same plan a
-   * local drop uses — parked, settled and the idle override key by Session id — while pin, unpin and archive stay on
-   * the runtime that owns it, which is why only the sections that plan reaches are offered.
+   * Archive or restore one mirrored thread on the runtime that owns it. The reply carries that runtime's new archived
+   * set, so the cached row moves at once; a runtime that refuses a running thread says why.
+   */
+  const setRemoteThreadArchived = (thread: RemoteSidebarThread, archived: boolean): void => {
+    if (thread.running) {
+      setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
+      return
+    }
+    void (async () => {
+      const outcome = await remoteThreadArchive({ runtimeId: thread.runtimeId, sessionId: thread.sessionId, archived })
+      setNotice(outcome.ok ? null : { tone: 'danger', message: outcome.message })
+    })()
+  }
+
+  /**
+   * Drop a remote row into another status section. A mirrored Session answers the whole plan a local drop uses:
+   * parked, settled and the idle override key by Session id here, and archive or restore runs through multi-host on
+   * the runtime that owns the Session. Pin stays a Host verb the sidebar only mirrors, so Pinned is not offered.
    */
   const moveRemoteThreadToSection = (sessionId: SessionSummary['id'], section: SidebarSection): void => {
     const plan = SidebarOrganization.remoteSectionDropPlan(section)
     if (plan === null) return
-    if ((plan.park || plan.settle) && remoteRunningSessionIds.has(sessionId)) {
+    const thread = remoteThreads.find(candidate => candidate.sessionId === sessionId)
+    if (thread === undefined) return
+    if ((plan.archive || plan.park || plan.settle) && remoteRunningSessionIds.has(sessionId)) {
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarRunningNotice') })
       return
     }
+    if (plan.archive) setRemoteThreadArchived(thread, true)
+    if (plan.unarchive && thread.archived) setRemoteThreadArchived(thread, false)
     const nextParked = new Set(preferences.parkedSessionIds)
     if (plan.park) nextParked.add(sessionId)
     if (plan.unpark) nextParked.delete(sessionId)
@@ -4130,10 +4167,14 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     // Keep the browser copy until the Host stored it, so a failed write is retried on the next load.
     if (entries.length === 0) legacyNotificationPreferences.remove()
     else
-      void attention.migrate(entries).then(
-        () => legacyNotificationPreferences.remove(),
-        () => undefined,
-      )
+      void (async () => {
+        try {
+          await attention.migrate(entries)
+        } catch {
+          return
+        }
+        legacyNotificationPreferences.remove()
+      })()
   }, [
     attention,
     isPrimarySurface,
@@ -4793,11 +4834,10 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         threads: remoteThreads,
         filters: threadView.statusFilters,
         sourceFilter: threadView.sourceFilter,
-        archivedSessionIds,
         settledSessionIds,
         mutedSessionIds,
       }),
-    [archivedSessionIds, mutedSessionIds, remoteThreads, settledSessionIds, threadView.sourceFilter, threadView.statusFilters],
+    [mutedSessionIds, remoteThreads, settledSessionIds, threadView.sourceFilter, threadView.statusFilters],
   )
   const visibleRemoteThreads = useMemo(() => (separatesRemoteThreads ? [] : filteredRemoteThreads), [filteredRemoteThreads, separatesRemoteThreads])
   const remoteRowsBySection = useMemo(() => {
@@ -4805,7 +4845,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     for (const thread of visibleRemoteThreads) {
       const section = SidebarOrganization.sectionForSession({
         session: { id: SessionId(thread.sessionId), running: thread.running, updatedAt: thread.updatedAt },
-        archivedSessionIds,
+        archivedSessionIds: remoteArchivedSessionIds,
         pinnedSessionIds,
         parkedSessionIds,
         settledSessionIds,
@@ -4818,12 +4858,12 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     for (const entries of rows.values()) entries.sort((left, right) => right.updatedAt - left.updatedAt)
     return rows
   }, [
-    archivedSessionIds,
     now,
     parkedSessionIds,
     pinnedSessionIds,
     preferences.idleMinutes,
     preferences.idleSectionOverrides,
+    remoteArchivedSessionIds,
     settledSessionIds,
     visibleRemoteThreads,
   ])
@@ -6339,6 +6379,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       unsettle: tSidebar('threadSidebarUnsettle'),
       park: tSidebar('threadSidebarPark'),
       unpark: tSidebar('threadSidebarUnpark'),
+      archive: tSidebar('threadSidebarArchive'),
+      restore: tSidebar('threadSidebarRestore'),
       moveToSection: tSidebar('threadSidebarMoveToSection'),
       copyId: tSidebar('threadSidebarCopyId'),
       contextMenu: tSidebar('threadSidebarContextMenu'),
@@ -6368,6 +6410,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         running={thread.running}
         settled={settledSessionIds.has(sessionId)}
         parked={parkedSessionIds.has(sessionId)}
+        archived={thread.archived}
         selected={selectedSession?.id === sessionId}
         compact={rowStyle.density === 'compact'}
         age={formatAge(thread.updatedAt)}
@@ -6378,6 +6421,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
         onOpen={() => (props.openRemoteSession === undefined ? props.openRemoteThreads?.() : props.openRemoteSession(thread.sessionId))}
         onToggleSettled={() => toggleRemoteSettled(sessionId)}
         onToggleParked={() => toggleParked(sessionId)}
+        onSetArchived={archived => setRemoteThreadArchived(thread, archived)}
         onMoveToSection={next => moveRemoteThreadToSection(sessionId, next)}
         // The copied id names the Session on its own runtime; a link built here would point at this origin and drop the host.
         onCopyId={() => void rowActions.copy(thread.sessionId, props.tSidebar('threadSidebarIdCopied'))}

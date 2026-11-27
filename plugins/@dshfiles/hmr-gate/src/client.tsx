@@ -202,9 +202,13 @@ export default defineClient({
     }
 
     const api = createApiClient(ctx, hmrGateApi, metadata?.packageId)
-    void api.safe.status({}).then(result => {
+    const readApplyUpdates = async (): Promise<void> => {
+      const result = await api.safe.status({})
       if (result.ok && result.value.applyUpdates !== undefined) applyUpdates = result.value.applyUpdates
       flush()
+    }
+    void readApplyUpdates().catch((error: unknown) => {
+      ctx.logger.warn(error)
     })
 
     ctx.effect(() => {

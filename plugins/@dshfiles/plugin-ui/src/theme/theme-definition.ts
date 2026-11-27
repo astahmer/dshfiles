@@ -7,6 +7,7 @@
  * (read from its background and accent), then the definition pins the eleven steps, the accent and status colours and
  * the Shiki tokens it gives. A scheme the definition leaves out keeps the generated palette.
  */
+import type * as Schema from 'effect/Schema'
 import { IdentityDerivation } from './identity-derivation.ts'
 import { COOL_ORDER, IDENTITY_SLOT_COUNT } from './identity-palette.ts'
 import { PaletteMath, type PaletteInput, type Scheme } from './palette.ts'
@@ -113,7 +114,7 @@ const FORBIDDEN = /url\s*\(|@import|expression\s*\(|javascript:|<\/?style/iu
 
 /** A JSON object from settings or a tool call, before its fields are checked. */
 interface UntrustedObject {
-  readonly [key: string]: unknown
+  readonly [key: string]: Schema.Json | undefined
 }
 const isRecord = (value: unknown): value is UntrustedObject => typeof value === 'object' && value !== null && !Array.isArray(value)
 

@@ -35,7 +35,6 @@ const communicationMessageEvent = Schema.Struct({
     senderId: requiredText(256),
     recipientCount: timestamp,
     intent: Schema.Literals(['notice', 'request']),
-    topic: Schema.NullOr(boundedText(128)),
     correlationId: Schema.optional(boundedText(128)),
     sessionId: Schema.optional(Schema.NullOr(boundedText(256))),
   }),
