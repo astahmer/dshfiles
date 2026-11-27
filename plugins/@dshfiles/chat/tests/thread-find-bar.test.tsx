@@ -88,6 +88,46 @@ describe('ThreadFindBar filters', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 
+  it('shows Searching instead of the previous filter matches while a new filter loads', async () => {
+    const corpus = [
+      { seq: 2, type: 'user/message', snippet: 'quartz prompt' },
+      { seq: 10, type: 'assistant/message', snippet: 'quartz answer' },
+    ]
+    const pending: (() => void)[] = []
+    ThreadFindPort.set(input => {
+      const matches = input.types === undefined ? corpus : corpus.filter(hit => input.types?.includes(hit.type))
+      const reply = { ownsService: true, matches, hasMore: false }
+      if (input.types === undefined) return Promise.resolve(reply)
+      return new Promise(resolve => pending.push(() => resolve(reply)))
+    })
+
+    render(
+      <ThreadFindBar
+        sessionId="session-pending"
+        focusRequest={1}
+        onClose={() => {}}
+        list={() => null}
+        anchors={[{ turn: 1, seq: 1 }]}
+        rowFor={() => null}
+        revealTurn={() => {}}
+        readerSeq={() => null}
+        t={t}
+      />,
+    )
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Find in thread' }), { target: { value: 'quartz' } })
+    await waitFor(() => expect(screen.getByText('1 of 2')).toBeTruthy())
+
+    fireEvent.click(screen.getByRole('button', { name: 'Agent' }))
+    await waitFor(() => expect(pending).toHaveLength(1))
+    expect(screen.getByText('Searching…')).toBeTruthy()
+    expect(screen.queryByText('1 of 2')).toBeNull()
+    expect(screen.getByRole('button', { name: 'Older match' }).hasAttribute('disabled')).toBe(true)
+
+    pending[0]?.()
+    await waitFor(() => expect(screen.getByText('1 of 1')).toBeTruthy())
+  })
+
   it('filters the newest matches here and says so when the Host refuses event types', async () => {
     const corpus = [
       { seq: 2, type: 'user/message', snippet: 'quartz prompt' },

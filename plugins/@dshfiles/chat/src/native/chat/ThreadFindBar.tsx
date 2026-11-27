@@ -58,11 +58,14 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
   const search = useQuery({
     queryKey: ['chat', 'thread-find', sessionId, query, filterKey],
     enabled: query !== null,
-    queryFn: ({ signal }) =>
-      ThreadFindPort.search(
+    // The answer carries the filter it was asked with: a placeholder kept from another filter is not shown as its answer.
+    queryFn: async ({ signal }) => ({
+      filterKey,
+      answer: await ThreadFindPort.search(
         eventTypes === undefined ? { sessionId, query: query ?? '' } : { sessionId, query: query ?? '', types: eventTypes },
         signal,
       ),
+    }),
     retry: false,
     staleTime: 10_000,
     placeholderData: keepPreviousData,
@@ -70,7 +73,7 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
   // The loaded-window fallback reads the DOM, so it runs after commit for the query it answers.
   const [loaded, setLoaded] = useState<{ readonly query: string; readonly filterKey: string; readonly hits: readonly FindHit[] } | null>(null)
   const unavailable = search.error instanceof ThreadFindUnavailable && search.error.missing
-  const degraded = search.data !== undefined && search.data.state !== 'ready'
+  const degraded = search.data !== undefined && search.data.answer.state !== 'ready'
   const needsLoaded = query !== null && (unavailable || (degraded && !search.isPlaceholderData))
   useEffect(() => {
     if (!needsLoaded) return
@@ -90,9 +93,10 @@ function FindBar({ sessionId, focusRequest, onClose, list, anchors, rowFor, reve
       return { kind: 'hits', source: 'loaded', hits: loaded.hits, total: loaded.hits.length, note }
     }
     if (search.isError) return { kind: 'error', message: search.error instanceof Error ? search.error.message : String(search.error) }
-    if (search.data === undefined) return { kind: 'searching' }
-    const note = search.data.filteredHere ? t('chat.find.filterNeedsUpdate', { limit: String(THREAD_FIND_LIMIT) }) : null
-    return { kind: 'hits', source: 'index', hits: search.data.hits, total: search.data.total, note }
+    if (search.data === undefined || search.data.filterKey !== filterKey) return { kind: 'searching' }
+    const found = search.data.answer
+    const note = found.filteredHere ? t('chat.find.filterNeedsUpdate', { limit: String(THREAD_FIND_LIMIT) }) : null
+    return { kind: 'hits', source: 'index', hits: found.hits, total: found.total, note }
   }, [query, needsLoaded, loaded, debounced, filterKey, unavailable, search.isError, search.error, search.data, t])
 
   const hits = answer.kind === 'hits' ? answer.hits : null
