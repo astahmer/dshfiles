@@ -152,7 +152,7 @@ export class ProviderProfileModel {
       // Command Code knows each model's own efforts and modalities; a neighbour's would be wrong.
       const described = 'describeModel' in params.upstream ? params.upstream.describeModel(id, discovered.get(id)) : undefined
       if (described !== undefined) {
-        models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, id) })
+        models.push({ ...described, provider: params.provider, name: AccountsRules.accountModelName(params.provider, described.name) })
         continue
       }
       const api = id.startsWith('anthropic/') || id.startsWith('claude-') ? 'anthropic-messages' : 'openai-completions'
