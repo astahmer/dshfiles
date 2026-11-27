@@ -1,3 +1,4 @@
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-controller/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
@@ -8,8 +9,10 @@ import { createApiClient, defineClient } from '@dshfiles/dshx/client'
 import { LayersIcon } from '@dshfiles/plugin-ui/icons'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { resourcePacksApi } from './api.js'
-import { ResourcesPanel } from './panel.js'
 import type { ResourceRef } from './model.js'
+
+/** The Resources page and its table load when the page first opens, not at page boot. */
+const ResourcesPanel = lazyView(() => import('./panel.js').then(module => module.ResourcesPanel), { label: 'Resources' })
 
 const PANEL_ID = 'dshfiles-resources'
 
