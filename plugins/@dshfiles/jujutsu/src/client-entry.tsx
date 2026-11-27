@@ -28,7 +28,8 @@ import { ChatReferenceLinks } from './chat-reference-links.js'
 import { ChatReferenceOverlay } from './chat-reference-overlay.js'
 import { ChatReferenceTitleStore } from './chat-reference-titles.js'
 import { sessionProjectPath } from './session-project-path.js'
-import { JujutsuPanel } from './client.js'
+import type { JujutsuPanel as JujutsuPanelView } from './client.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { HistoryPage } from './history-page.js'
 import type {} from '@dshfiles/rich-composer/conversation-contract'
 import {
@@ -49,6 +50,9 @@ import { JujutsuPanelSession } from './use-jujutsu-api.js'
 import { OwnerRouting, type OwnerPort } from './owner-routed-api.js'
 import { LandLabels } from './land-labels.js'
 import './client.css'
+
+/** The graph, Source control and their diff renderer load when one of them first opens, not at page boot. */
+const JujutsuPanel = lazyView(() => import('./client.js').then(module => module.JujutsuPanel), { label: 'History' })
 
 const PANEL_ID = 'dshfiles-jujutsu'
 const SOURCE_CONTROL_PANEL_ID = 'dshfiles-jujutsu-source-control'
@@ -536,7 +540,7 @@ const useRegisteredProjects = (workspaces: IWorkspaces | undefined): readonly Re
   )
 }
 
-const ProjectsBoundPanel = (props: Omit<Parameters<typeof JujutsuPanel>[0], 'projects'> & { readonly workspaces: IWorkspaces | undefined }): JSX.Element => {
+const ProjectsBoundPanel = (props: Omit<Parameters<typeof JujutsuPanelView>[0], 'projects'> & { readonly workspaces: IWorkspaces | undefined }): JSX.Element => {
   const { workspaces, ...panelProps } = props
   return <JujutsuPanel {...panelProps} projects={useRegisteredProjects(workspaces)} />
 }
