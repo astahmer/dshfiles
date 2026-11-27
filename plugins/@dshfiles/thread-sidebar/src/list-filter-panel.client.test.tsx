@@ -207,7 +207,7 @@ describe('the status sub-groups (round 28, item 4)', () => {
   it('puts each status group in its own labelled group, and every chip in one', () => {
     render(<ListFilterPanel {...panel()} />)
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
-    const status = screen.getByRole('group', { name: 'threadSidebarFilterStatus' })
+    const status = screen.getByRole('region', { name: 'threadSidebarFilterStatus' })
     const groups = within(status).getAllByRole('group')
     expect(groups.map(group => group.getAttribute('aria-label') ?? document.getElementById(group.getAttribute('aria-labelledby') ?? '')?.textContent)).toEqual([
       'threadSidebarFilterGroupActivity',
@@ -332,7 +332,7 @@ describe('Source and Group by (round 28, item 8)', () => {
     expect(manual.textContent).toBe('Manual')
     // Its own top-level block, so the panel's hairline divides it from the filters; the filters hold no grouping.
     expect(display.parentElement?.hasAttribute('data-thread-list-filter-panel')).toBe(true)
-    expect(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }).closest('section')?.contains(group)).toBe(false)
+    expect(screen.getByRole('region', { name: 'threadSidebarFilterStatus' }).closest('section')?.contains(group)).toBe(false)
   })
 
   it('names Reset for what it covers', () => {
@@ -671,7 +671,7 @@ describe('chip widths (round 29, item 9)', () => {
   it('wraps every status chip label in a segment label that reserves the selected weight', () => {
     render(<ListFilterPanel {...panel()} />)
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
-    const chips = within(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }))
+    const chips = within(screen.getByRole('region', { name: 'threadSidebarFilterStatus' }))
       .getAllByRole('button')
       .filter(chip => !chip.hasAttribute('data-thread-status-more'))
     expect(chips.length).toBeGreaterThan(10)
@@ -982,7 +982,8 @@ describe('roles and announcements (round 30, item 13)', () => {
   it('groups the status chips as a labelled group, not a toolbar of several Tab stops', () => {
     render(<ListFilterPanel {...panel()} />)
     expect(screen.queryByRole('toolbar')).toBeNull()
-    expect(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }).hasAttribute('data-thread-status-filters')).toBe(true)
+    // Named by its section since round 31 (item 11), its groups labelled one by one.
+    expect(screen.getByRole('region', { name: 'threadSidebarFilterStatus' }).querySelector('[data-thread-status-filters]')).not.toBeNull()
   })
 
   it('keeps Save and Discard outside the radiogroup', () => {
@@ -1061,7 +1062,7 @@ describe('the Source section (round 30, item 9)', () => {
     const source = element(screen.getByRole('radiogroup', { name: 'threadSidebarFilterSource' }).closest('section'))
     expect(source.parentElement).toBe(root)
     expect(source.hasAttribute('data-thread-filter-source')).toBe(true)
-    expect(source.contains(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }))).toBe(false)
+    expect(source.contains(screen.getByRole('region', { name: 'threadSidebarFilterStatus' }))).toBe(false)
   })
 })
 
@@ -1333,5 +1334,26 @@ describe('status chips align (round 31, item 10)', () => {
     const chip = screen.getByRole('button', { name: 'threadSidebarApprovalNeeded' })
     expect(chip.className).toContain('dshx:w-full')
     expect(chip.className).toContain('dshx:justify-start')
+  })
+})
+
+// Council round 30, item 11: Reset disables itself as it acts, so focus fell to the page; it hands focus to the active
+// preset as Clear, Save and Discard do. And the status chips lose their outer group: the section is already named Status,
+// so a screen reader heard "Status" twice.
+describe('Reset keeps focus, Status is named once (round 31, item 11)', () => {
+  it('moves focus to the active preset as Reset acts', () => {
+    const onReset = vi.fn()
+    render(<ListFilterPanel {...panel({ reset: { disabled: false, onReset } })} />)
+    const reset = screen.getByRole('button', { name: 'threadSidebarFilterResetLabel' })
+    reset.focus()
+    fireEvent.click(reset)
+    expect(onReset).toHaveBeenCalledOnce()
+    expect(document.activeElement).toBe(screen.getByRole('radio', { name: 'All threads' }))
+  })
+
+  it('names Status once: the section, with no group around the chips repeating it', () => {
+    render(<ListFilterPanel {...panel()} />)
+    expect(screen.getAllByRole('region', { name: 'threadSidebarFilterStatus' })).toHaveLength(1)
+    expect(screen.queryByRole('group', { name: 'threadSidebarFilterStatus' })).toBeNull()
   })
 })

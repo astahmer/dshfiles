@@ -76,7 +76,7 @@ When('saved thread views are created, edited, reordered, disabled, and removed',
   await sidebarSettings(page).getByRole('checkbox', { name: 'Show filter button', exact: true }).click()
   const filter = await ThreadListFilter.open(sidebar)
   await expect(filter.getByRole('radiogroup', { name: 'Group by', exact: true })).toHaveCount(0)
-  await expect(filter.getByRole('group', { name: 'Status', exact: true })).toHaveCount(0)
+  await expect(filter.getByRole('region', { name: 'Status', exact: true })).toHaveCount(0)
   await ThreadListFilter.close(page)
 })
 
@@ -93,7 +93,7 @@ Then('the custom tabs and hidden controls survive reload', async ({ page }: { pa
     await expect(tabs.getByRole('radio').nth(1)).toContainText('Everything')
     await expect(tabs.getByRole('radio', { name: /^Working/ })).toHaveCount(0)
     await expect(ThreadListFilter.panel(page).getByRole('radiogroup', { name: 'Group by', exact: true })).toHaveCount(0)
-    await expect(ThreadListFilter.panel(page).getByRole('group', { name: 'Status', exact: true })).toHaveCount(0)
+    await expect(ThreadListFilter.panel(page).getByRole('region', { name: 'Status', exact: true })).toHaveCount(0)
     await ThreadListFilter.close(page)
 
     await openSidebarSettings(page)

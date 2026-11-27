@@ -334,10 +334,11 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           aria-label={t('threadSidebarFilterResetLabel')}
           aria-describedby={`${ids}-reset-scope`}
           disabled={props.reset.disabled}
-          onClick={() => {
+          // Reset disables itself as it acts: focus moves to the active preset first (council round 30, item 11).
+          onClick={focusPresetThen(() => {
             setChange(t('threadSidebarFilterChangeReset'))
             props.reset.onReset()
-          }}
+          })}
           data-thread-filter-reset=""
           className="dshx:phone:order-first dshx:phone:justify-self-start"
         >
@@ -664,7 +665,7 @@ const StatusChips = (props: {
           </Button>
         )}
       </div>
-      <div className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2" role="group" aria-labelledby={props.headingId} data-thread-status-filters="">
+      <div className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2" data-thread-status-filters="">
         <ToggleGroup
           type="multiple"
           // One labelled group per status group (round 28, item 4), so a screen reader hears which "Done" a chip is.
