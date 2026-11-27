@@ -1442,7 +1442,8 @@
     {
       "id": "reminder-wake",
       "title": "Wake a settled or archived thread for its reminder",
-      "summary": "A reminder is a prompt that comes back to its thread, but a settled thread rejects the step it proposes and the Schedule service refuses an archived target outright, so the reminder would be dropped. The Host never settles a thread holding an active reminder, however far out its next occurrence is, and a separate pass once a minute lifts the status one interval before the reminder is due: settled becomes unsettled, archived is restored, and an occurrence that already passed is delivered at once. The settled pre-step gate is the second line: a schedule-sourced step that still finds a settled owner lifts it and runs. `remindersWakeEnabled` (on by default) switches the behavior off; without the Schedule service the pass reads nothing.",
+      "summary": "A settled or archived thread with an active reminder wakes before the reminder is due, so the reminder is never dropped.",
+      "details": "A reminder is a prompt that comes back to its thread, but a settled thread rejects the step it proposes and the Schedule service refuses an archived target outright, so the reminder would be dropped. The Host never settles a thread holding an active reminder, however far out its next occurrence is, and a separate pass once a minute lifts the status one interval before the reminder is due: settled becomes unsettled, archived is restored, and an occurrence that already passed is delivered at once. The settled pre-step gate is the second line: a schedule-sourced step that still finds a settled owner lifts it and runs. `remindersWakeEnabled` (on by default) switches the behavior off; without the Schedule service the pass reads nothing.",
       "surfaces": ["host", "settings"],
       "surface": "settingsSection",
       "destination": "settings",

@@ -664,7 +664,8 @@
     {
       "id": "sent-annotations",
       "title": "Keep sent annotations across browsers",
-      "summary": "An accepted message's annotations move into a Host-stored per-session review history, so markers and comments stay on the passage after sending and come back in any browser. Edits and removals follow the same record, and the Composer contract exposes draft and sent annotations together to Chat's inline markers.",
+      "summary": "Sent annotations live in a Host-stored review history per thread, so their markers and comments come back in any browser.",
+      "details": "An accepted message's annotations move into a Host-stored per-session review history, so markers and comments stay on the passage after sending and come back in any browser. Edits and removals follow the same record, and the Composer contract exposes draft and sent annotations together to Chat's inline markers.",
       "surfaces": ["client", "host", "api"],
       "surface": "infrastructure",
       "destination": "none",
