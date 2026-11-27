@@ -36,10 +36,12 @@ function sessionSeqCursor(value: number): SessionSeqCursor {
 /**
  * Projection columns the list surface itself consumes: `title` and
  * `sessionListMetadata` build each row, while the sidebar's lineage and the jj
- * panel read prompted-turn counts, questions, subagent facts and token totals
- * from `projectionValues`. Everything else (turn outlines, cost estimates, image
- * limits, model selection, todos, goal, inbox) is read from the opened Session's
- * baseline: `turnOutline` alone was 45 % of the listed bytes, for a count.
+ * panel read prompted-turn counts, questions and subagent facts from
+ * `projectionValues`. Everything else (turn outlines, token totals, cost
+ * estimates, image limits, model selection, todos, goal, inbox) is read from the
+ * opened Session's baseline: `turnOutline` alone was 45 % of the listed bytes,
+ * for a count, and `tokenUsage` 21 % for the stock ui-subagent lineage, which
+ * thread-sidebar's lineage shadows (it shows no token totals).
  */
 const LIST_PROJECTIONS = [
   'title',
@@ -49,7 +51,6 @@ const LIST_PROJECTIONS = [
   'subagentTiming',
   'threadSidebarModelRoute',
   'subagent',
-  'tokenUsage',
 ] as const
 
 /**
