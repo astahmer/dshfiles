@@ -348,6 +348,12 @@ export const PAGE_LINKS: readonly PageLink[] = [
   { panelId: 'dshfiles-agents', group: 'agents', label: 'Agent definitions', description: 'Configured agents, their instructions and routes.', order: 0 },
 ]
 
+/**
+ * Sections that draw the same view as a stage page of their own (Plugins by category is both): with that page loaded,
+ * the entry stands for the page and holds no settings, so the side column lists it once, with no settings row under it.
+ */
+const SECTIONS_REPEATING_PAGE: ReadonlyMap<string, string> = new Map([[DSHFILES_PLUGINS_SECTION_ID, 'dshfiles-plugin-list']])
+
 /** Sections that already draw a button to their plugin's stage page. */
 const SECTIONS_LINKING_THEIR_PAGE: ReadonlySet<string> = new Set(['ai-accounts'])
 
@@ -379,6 +385,8 @@ export interface SettingsEntry {
   readonly link?: PageLink
   /** The stage page this entry stands for: its link's, or the one its section links itself (AI accounts). */
   readonly page?: string
+  /** The section only repeats the stage page `page` names (`SECTIONS_REPEATING_PAGE`): no settings of its own. */
+  readonly repeatsPage?: boolean
   /** A row of the Pages group: picking it opens this stage page instead of a Settings entry. */
   readonly opens?: string
   /** Words that find it in search without showing: namespaces, former names. */
@@ -686,8 +694,10 @@ const groupEntries = (input: {
     const withSection: SettingsEntry = entry.sectionId === undefined ? row : { ...row, sectionId: entry.sectionId }
     const withSectionLabel: SettingsEntry = entry.sectionLabel === undefined ? withSection : { ...withSection, sectionLabel: entry.sectionLabel }
     const linked: SettingsEntry = entry.link === undefined ? withSectionLabel : { ...withSectionLabel, link: entry.link }
-    const page = entry.link?.panelId ?? entry.page
-    const finished: SettingsEntry = page === undefined ? linked : { ...linked, page }
+    const repeated = entry.sectionId === undefined ? undefined : SECTIONS_REPEATING_PAGE.get(entry.sectionId)
+    const repeats = repeated !== undefined && input.panels.has(repeated) && entry.pages.length === 0
+    const page = entry.link?.panelId ?? entry.page ?? (repeats ? repeated : undefined)
+    const finished: SettingsEntry = page === undefined ? linked : repeats ? { ...linked, page, repeatsPage: true } : { ...linked, page }
     const list = byGroup.get(entry.group) ?? []
     list.push(finished)
     byGroup.set(entry.group, list)

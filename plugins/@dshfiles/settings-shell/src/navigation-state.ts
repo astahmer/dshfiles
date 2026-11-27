@@ -12,7 +12,7 @@ const itemOf = (entry: SettingsEntry, counts: ReadonlyMap<string, number> | unde
   label: entry.label,
   opens: entry.opens,
   page: entry.page,
-  linkOnly: entry.link !== undefined && entry.sectionId === undefined && entry.pages.length === 0 ? true : undefined,
+  linkOnly: (entry.link !== undefined && entry.sectionId === undefined && entry.pages.length === 0) || entry.repeatsPage === true ? true : undefined,
   count: counts === undefined ? undefined : matchCount(entry, counts),
 })
 

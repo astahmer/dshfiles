@@ -28,6 +28,19 @@ describe('settings navigation state (council round 4 B1)', () => {
     expect(mcp?.linkOnly).toBe(true)
   })
 
+  it('lists Plugins by category once, as its stage page, when that page is loaded (merge of upstream #290)', () => {
+    const withPage = (panels: ReadonlySet<string>) =>
+      SettingsNavigationModel.state({
+        groups: SettingsGroups.group({ sections: [{ id: 'dshfiles-plugins', order: 2, label: 'Plugins by category' }], pages: [], panels }),
+        open: true,
+        sectionId: undefined,
+        counts: undefined,
+      }).groups.flatMap(group => group.items)
+    // The section draws the same view as the panel: no "Plugins by category settings" row under the page's row.
+    expect(withPage(new Set(['dshfiles-plugin-list']))).toEqual([{ id: 'dshfiles-plugins', label: 'Plugins by category', page: 'dshfiles-plugin-list', linkOnly: true }])
+    expect(withPage(new Set())).toEqual([{ id: 'dshfiles-plugins', label: 'Plugins by category' }])
+  })
+
   it('marks the category the page shows only while it shows, and none while searching', () => {
     expect(SettingsNavigationModel.state({ groups, open: true, sectionId: undefined, counts: undefined }).activeId).toBe('general')
     expect(SettingsNavigationModel.state({ groups, open: true, sectionId: 'ai-accounts', counts: undefined }).activeId).toBe('ai-accounts')
