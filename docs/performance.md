@@ -3,6 +3,48 @@
 How to measure: the [`live-performance-audit`](../.agents/skills/live-performance-audit/SKILL.md) skill. Budget:
 250 ms per interaction and per request, on a Host whose event loop is not stalled.
 
+## Client JavaScript parsed at page boot (2026-11-27)
+
+Complaint: the phone over Tailscale was "very very slow"; the live page parsed ~25 MB of decoded client JavaScript
+at every load and the phone probe was CPU-bound (RTT 100 and 250 ms gave the same numbers).
+
+**Cause.** The shell loads every plugin's `client.js` in two concatenated boot bundles. DSH's module loader already
+serves per-plugin lazy chunks (`require.async("./client.<name>.<hash>.js")`, fetched alone and cached immutable), and
+dshx emitted them for `import()` targets, but only for a target that shared no module with its entry; every real view
+shares the dshx client runtime, an API contract or a kit component, so it was silently inlined. On top, the kit
+(`@dshfiles/plugin-ui`) was copied into each bundle (button 56 times, 1.6 MB of copies), and tool-meta parsed the diff
+renderer and shiki for edit cards that start collapsed.
+
+**Fix.** dshx: a chunk reads the modules it shares with its entry from the entry's `__dshxLazyShared` table through
+`require(<owner id>)` (one instance; the table binds only the names chunks read, so the entry stays tree-shaken); a
+chunk's own `import()` targets become sibling chunks unless they share that chunk's modules. The kit's
+`lazyView(() => import(...), { label })` shows nothing for 150 ms, then one quiet loading line, and LoadError with
+Retry when a chunk fails. 18 plugins moved pages, facets and dialogs a page load does not show behind it (each pinned
+by a `bootImports` test); the shared runtime serves the 90 kit modules that two or more boot bundles copied (dshx
+names TypeScript-source modules from its own build and routes the kit's relative imports to the shared copy);
+tool-meta counts lines with the parse-only `diff-parse` and loads the renderer when a hunk opens; component-gallery
+left the `profiles/web` seed.
+
+Same seeded scratch (capture.mjs data), same probes, base `3e5a3324` vs this change:
+
+| Measure | Before | After |
+| --- | --- | --- |
+| Decoded JS at boot | 25.43 MB | 18.07 MB (−29 %) |
+| Transferred (gzip) JS at boot | 7.9 MB | 5.55 MB (−30 %) |
+| Page heap after load | 141–150 MB | 104–111 MB |
+| Boot long tasks, desktop | 9 / 1,912 ms (max 856) | 7 / 1,532 ms (max 596) |
+| Boot long tasks, phone 4× CPU | 28 / 10,354 ms (max 4,309) | 16 / 7,576 ms (max 2,732) |
+| Phone load (RTT 100, 4× CPU) | 13.3 s | 11.9 s |
+| Phone open: title / first message p50 | 1,646 / 2,699 ms | 1,392 / 2,468 ms |
+| Phone open long tasks p50 | 3,460 ms | 3,183 ms |
+| Phone Back: list p50 / long tasks p50 | 2,032 / 2,790 ms | 1,813 / 2,155 ms |
+
+The remaining boot JS: native DSH clients and the shell (~5.7 MB), the shared runtime (2.2 MB: effect, zod, radix,
+the kit), ui-styles' sheet (0.6 MB) and the boot UI of thread-sidebar, rich-composer, chat and workbench. Still
+inlined: schedule and settings-models, whose pages import CSS modules (dshx keeps a chunk that emits CSS in the entry).
+A kit component change now reaches an open page after a refresh: the shared runtime reloads, but consumers keep the
+copies they read from it (class-only changes still hot-reload through ui-styles).
+
 ## Backdrop scenes (2026-11-15)
 
 Complaint: an animated theme (Snow Pines and others) drove the CPU very high.
