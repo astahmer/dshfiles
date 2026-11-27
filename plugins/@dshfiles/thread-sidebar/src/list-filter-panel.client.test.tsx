@@ -1357,3 +1357,11 @@ describe('Reset keeps focus, Status is named once (round 31, item 11)', () => {
     expect(screen.queryByRole('group', { name: 'threadSidebarFilterStatus' })).toBeNull()
   })
 })
+
+// Council round 30, item 12: copy. Muted, Done and Archived are threads set aside, not storage; the manual grouping is
+// \"Custom\" on its segment, still named Arrange manually.
+it('names the third status group Set aside and the manual grouping Custom (round 31, item 12)', () => {
+  expect(english).toContain("threadSidebarFilterGroupStorage: 'Set aside',")
+  expect(english).toContain("threadSidebarGroupManualShort: 'Custom',")
+  expect(english).toContain("threadSidebarGroupStatus: 'Arrange manually',")
+})
