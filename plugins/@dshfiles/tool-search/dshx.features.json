@@ -137,7 +137,8 @@
     {
       "id": "agent-tool-access",
       "title": "Tools per agent: enabled and pinned",
-      "summary": "The thread's agent decides which tools reach it. tool-search declares the @dshfiles/tool-search/access contract (the dshfilesToolAccess Cordis service, provided by @dshfiles/agents): every tool is on by default, a disabled tool or group is never declared, searched, proxied or called, a pinned one is declared from the first request, and a per-thread override applies from the next request. tool_search_access shows the calling thread's agent and effective access.",
+      "summary": "Tools an agent turns off never reach its threads, and the tools it pins are there from the first request.",
+      "details": "The thread's agent decides which tools reach it. tool-search declares the @dshfiles/tool-search/access contract (the dshfilesToolAccess Cordis service, provided by @dshfiles/agents): every tool is on by default, a disabled tool or group is never declared, searched, proxied or called, a pinned one is declared from the first request, and a per-thread override applies from the next request. tool_search_access shows the calling thread's agent and effective access.",
       "surfaces": ["host", "integration"],
       "surface": "infrastructure",
       "destination": "none",

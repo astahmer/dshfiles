@@ -432,7 +432,8 @@
     {
       "id": "agent-tool-access",
       "title": "An agent decides its threads' tools",
-      "summary": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
+      "summary": "Each agent says which tools its threads get, and a thread takes its own agent, its parent's, its project's default or @dsh.",
+      "details": "Each agent stores which tools and tool groups (an MCP server, a plugin, DSH's own) are disabled or pinned, and which agents its subagents may run as (applied by the subagent tool, see subagent-agents). Every thread gets an agent once, when it attaches: the agent that dispatched it, its parent's agent for a subagent, the project's default agent, else @dsh. The agents plugin provides @dshfiles/tool-search/access with it, and a thread can be overridden with another agent's tools or every tool from its next request. Agent and project-default edits reach threads started afterwards.",
       "surfaces": [
         "host",
         "integration"
@@ -518,7 +519,8 @@
     {
       "id": "subagent-agents",
       "title": "A subagent starts as a configured agent",
-      "summary": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own agent); unknown, disabled or unlisted handles are refused with the handles involved and agents_subagents_set. The child gets the agent's route, preset and a bounded preamble, and its Session is recorded as the agent's explicit thread before it exists, so tool-search applies that agent's tools from its first request. list_subagent_models lists the agents a caller may start.",
+      "summary": "A subagent can start as a configured agent, limited to the agents its caller allows.",
+      "details": "The agents plugin provides @dshfiles/tool-subagent/agent-resolver: the subagent tool's agent argument, else the calling agent's subagents.default, names the agent a fresh child starts as. The calling agent's subagents.allowed must list it (or be any, or name the caller's own agent); unknown, disabled or unlisted handles are refused with the handles involved and agents_subagents_set. The child gets the agent's route, preset and a bounded preamble, and its Session is recorded as the agent's explicit thread before it exists, so tool-search applies that agent's tools from its first request. list_subagent_models lists the agents a caller may start.",
       "surfaces": [
         "host",
         "integration"
@@ -574,7 +576,8 @@
     {
       "id": "agent-tools-tree",
       "title": "Choose an agent's tools, subagents and projects",
-      "summary": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through tool_search), a filter by name or description and an N of M selected count. Each row says whether its state is set on it or inherited from its group, and a reset drops an explicit entry. Collapsed groups render one row and expanded ones a page at a time, and the tree has one tab stop (arrows, Space, P, Delete). Delegation picks which agents subagents may run as and the default one; Default for projects picks the projects this agent is the default of, showing the agent each uses now. One Save sends the agent's changed fields, one setToolAccess batch of sparse edits, subagents and project defaults; threads started afterwards get them.",
+      "summary": "Pick the tools an agent's threads get and pin the ones they need from the start, like VS Code's Configure Tools.",
+      "details": "The agent editor's Tools section works like VS Code's Configure Tools: a collapsible group per MCP server, plugin or DSH with a tri-state checkbox, a checkbox and a pin per tool (pinned tools are in the tool list from the first request; other selected tools are found through tool_search), a filter by name or description and an N of M selected count. Each row says whether its state is set on it or inherited from its group, and a reset drops an explicit entry. Collapsed groups render one row and expanded ones a page at a time, and the tree has one tab stop (arrows, Space, P, Delete). Delegation picks which agents subagents may run as and the default one; Default for projects picks the projects this agent is the default of, showing the agent each uses now. One Save sends the agent's changed fields, one setToolAccess batch of sparse edits, subagents and project defaults; threads started afterwards get them.",
       "reach": [
         "click tab \"Agents\"",
         "click button \"New agent\"",
@@ -674,7 +677,8 @@
     {
       "id": "composer-agent",
       "title": "Start a new thread as the project's default agent",
-      "summary": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the person picked a model for the draft), the recorded thread agent and an opening message with its instructions ahead of the text as typed. The chip's menu switches this one thread to another agent or @dsh, and makes the shown agent the project's default or stops it being one; a message that starts with an @agent mention runs as that agent instead.",
+      "summary": "A new thread starts as its project's default agent, and the chip beside the composer's tools switches or sets it.",
+      "details": "A new thread's composer shows the agent it starts as (\"as @reviewer\"): the project's default agent, a thread workspace counting for its project, or @dsh. Sending the first message starts it as that agent the way a dispatch does: its Agent preset, its model route (unless the person picked a model for the draft), the recorded thread agent and an opening message with its instructions ahead of the text as typed. The chip's menu switches this one thread to another agent or @dsh, and makes the shown agent the project's default or stops it being one; a message that starts with an @agent mention runs as that agent instead.",
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -760,7 +764,8 @@
     {
       "id": "thread-tools",
       "title": "See and switch a running thread's tools",
-      "summary": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread's next request, the same agents_thread_override_set the Agent has.",
+      "summary": "A running thread shows which agent decides its tools and can switch to another agent's tools or to every tool.",
+      "details": "A running thread's composer shows a Tools control with the thread's agent and how it was decided (agent, project default, override or default). Its menu switches this thread to another agent's tool set or to every tool, and resets the override; the change applies from the thread's next request, the same agents_thread_override_set the Agent has.",
       "surfaces": ["client", "host", "tool"],
       "surface": "composerContribution",
       "destination": "composer",

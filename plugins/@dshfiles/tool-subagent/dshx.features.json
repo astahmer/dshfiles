@@ -52,7 +52,8 @@
     {
       "id": "subagent-agent-argument",
       "title": "subagent starts a child as a configured agent",
-      "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's route (explicit provider/model win and stay under the Session policy; the agent's own route is admitted because the user configured it), its preset (explicit agent_preset wins) and a bounded preamble before the task; the tool reserves the child's Session id and records its agent before starting it, so the child's first request has that agent's tools. subagent_fork takes no agent. list_subagent_models without arguments also lists the agents the caller may start.",
+      "summary": "The subagent tool takes an agent handle, so a child starts with that agent's model, preset, instructions and tools.",
+      "details": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's route (explicit provider/model win and stay under the Session policy; the agent's own route is admitted because the user configured it), its preset (explicit agent_preset wins) and a bounded preamble before the task; the tool reserves the child's Session id and records its agent before starting it, so the child's first request has that agent's tools. subagent_fork takes no agent. list_subagent_models without arguments also lists the agents the caller may start.",
       "surfaces": [
         "host"
       ],
