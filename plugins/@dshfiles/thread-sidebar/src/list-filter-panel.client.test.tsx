@@ -1446,9 +1446,10 @@ describe('Discard is the quiet action (round 32, item 5)', () => {
     render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
     const discard = element(document.querySelector('[data-preset-discard-changes]'))
     const save = element(document.querySelector('[data-preset-save-changes]'))
-    for (const token of ['dshx:pointer-coarse:font-normal', 'dshx:pointer-coarse:text-muted-foreground']) expect(discard.className).toContain(token)
-    for (const token of ['dshx:pointer-coarse:font-semibold', 'dshx:pointer-coarse:text-foreground']) expect(save.className).toContain(token)
-    expect(discard.className).not.toContain('dshx:pointer-coarse:text-foreground')
+    // The ink colours apply on every pointer since round 33 (item 6); the weights are the coarse pointer's.
+    for (const token of ['dshx:pointer-coarse:font-normal', 'dshx:text-muted-foreground']) expect(discard.className).toContain(token)
+    for (const token of ['dshx:pointer-coarse:font-semibold', 'dshx:text-foreground']) expect(save.className).toContain(token)
+    expect(discard.className.split(/\s+/u)).not.toContain('dshx:text-foreground')
   })
 
   it('names Discard by its preset: "Discard changes to “Working”"', () => {
@@ -1551,5 +1552,22 @@ describe('phone chip hit box (round 33, item 5)', () => {
     const selectors = block.slice(block.lastIndexOf('}') + 1)
     expect(selectors).toContain("[data-slot='toggle-group-item']")
     expect(selectors).toContain('::after')
+  })
+})
+
+// Council round 32, item 6: on a mouse Save and Discard were the same secondary icon; Save draws in the ink.
+describe('desktop Save stands out (round 33, item 6)', () => {
+  it('draws the Save icon in the ink and keeps Discard secondary on a fine pointer', () => {
+    const base = panel()
+    const presets = base.presets
+    if (presets === undefined) throw new Error('The fixture has presets.')
+    render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
+    const tokens = (selector: string): string[] => element(document.querySelector(selector)).className.split(/\s+/u)
+    const save = tokens('[data-preset-save-changes]')
+    const discard = tokens('[data-preset-discard-changes]')
+    expect(save).toContain('dshx:text-foreground')
+    expect(save).not.toContain('dshx:text-muted-foreground')
+    expect(discard).toContain('dshx:text-muted-foreground')
+    expect(discard).not.toContain('dshx:text-foreground')
   })
 })

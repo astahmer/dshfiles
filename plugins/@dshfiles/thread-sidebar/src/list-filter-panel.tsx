@@ -207,9 +207,12 @@ const RowIconButton = (
           aria-label={label}
           onClick={onClick}
           className={cn(
-            'dshx:size-6 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-auto dshx:pointer-coarse:px-2 dshx:pointer-coarse:text-sm dshx:[&_svg]:size-3.5',
-            // Discard is the quiet action beside Save (council round 31, item 5).
-            tone === 'quiet' ? 'dshx:pointer-coarse:font-normal dshx:pointer-coarse:text-muted-foreground' : 'dshx:pointer-coarse:font-semibold dshx:pointer-coarse:text-foreground',
+            'dshx:size-6 dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-auto dshx:pointer-coarse:px-2 dshx:pointer-coarse:text-sm dshx:[&_svg]:size-3.5',
+            // Discard is the quiet action beside Save: secondary at 400 as a word (council round 31, item 5), and as an
+            // icon on a mouse Save draws in the ink while Discard stays secondary (council round 32, item 6).
+            tone === 'quiet'
+              ? 'dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:font-normal'
+              : 'dshx:text-foreground dshx:pointer-coarse:font-semibold',
           )}
           {...data}
         >
