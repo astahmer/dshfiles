@@ -70,9 +70,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "ai-accounts",
-      "description": "Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
+      "description": "Per-account Codex, Claude, Antigravity, Mistral Vibe CLI, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 21
+      "features": 22
     },
     {
       "name": "annotations",
@@ -498,7 +498,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "session-search",
       "description": "Owns the sessionQuery search backend: an off-thread FTS5 index fed incrementally from session logs, so a content search is a pure read that never blocks the Host event loop.",
       "ui": false,
-      "features": 3
+      "features": 4
     },
     {
       "name": "session-source-port",
@@ -3381,6 +3381,47 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Copy Antigravity sign-in command",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#vibe-cli-route",
+      "plugin": "ai-accounts",
+      "id": "vibe-cli-route",
+      "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
+      "summary": "A Vibe account publishes a route that runs the official `vibe` CLI (`--prompt-file`, `--output streaming`, `--output-dir`) with the account's signed-in VIBE_HOME, so a thread draws the Vibe & Studio allowance only the CLI reaches instead of the API credit every plain API-key req…",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Vibe CLI",
+      "reach": [
+        {
+          "text": "click text \"AI Accounts: Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts: Accounts",
+          "value": null
+        },
+        {
+          "text": "click button \"Add account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add account",
+          "value": null
+        },
+        {
+          "text": "click button \"Vibe CLI account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Vibe CLI account",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy Vibe sign-in command\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy Vibe sign-in command",
           "value": null
         }
       ],
@@ -11146,8 +11187,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "chat#focus-from-plugin",
       "plugin": "chat",
       "id": "focus-from-plugin",
-      "title": "Scroll to a turn, step or tool call on request",
-      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the fo…",
+      "title": "Scroll to a turn, step, tool call or message on request",
+      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step, tool call or message (by event sequence): through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps throug…",
       "destination": "none",
       "currentSurface": "client: chat focus contract",
       "reach": [
@@ -22078,6 +22119,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Suba…",
       "destination": "none",
       "currentSurface": "host: session-search promptHistory API (read by @dshfiles/prompt-stash)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "session-search#message-search",
+      "plugin": "session-search",
+      "id": "message-search",
+      "title": "Search user and assistant messages across threads",
+      "summary": "Search current-surface user/message and assistant/message documents across top-level threads, optionally narrowed by role (all, user, assistant), leaving out user messages a plugin or agent sent, routing through conversation_documents once backfilled and returning each hit's ses…",
+      "destination": "none",
+      "currentSurface": "host: session-search searchMessages API (read by @dshfiles/command-palette) and session_search_messages tool",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

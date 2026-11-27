@@ -834,8 +834,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "key": "module:@dshfiles/chat/chat-focus",
       "kind": "module",
       "title": "@dshfiles/chat/chat-focus",
-      "summary": "How another plugin asks the owned Chat fork to scroll to and highlight one Turn, Step or tool call. Published as its own contract module (`@dshfiles/chat/chat-focus`). Two routes, both carrying a {@link ChatFocus}: - Inside a thread, a Conversation View calls the native `openView(ChatFocusModel.viewId, ChatFocusModel.…",
-      "publicSymbol": "ChatFocus, ChatFocusModel, ChatTurnTailExtras, ChatTurnActionExtras",
+      "summary": "How another plugin asks the owned Chat fork to scroll to and highlight one Turn, Step, tool call or message. Published as its own contract module (`@dshfiles/chat/chat-focus`). Two routes, both carrying a {@link ChatFocusTarget}: a {@link ChatFocus} (Turn, Step, tool call) or a {@link ChatMessageFocus} (a message's ev…",
+      "publicSymbol": "ChatFocus, ChatMessageFocus, ChatFocusTarget, ChatFocusModel, ChatTurnTailExtras, ChatTurnActionExtras",
       "importFrom": "@dshfiles/chat/chat-focus",
       "owner": "@dshfiles/chat",
       "scope": "client or host",
@@ -2372,7 +2372,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "sessionSearchApi",
       "importFrom": "@dshfiles/session-search/search-api",
       "owner": "@dshfiles/session-search",
-      "source": "plugins/@dshfiles/session-search/src/api.ts:42",
+      "source": "plugins/@dshfiles/session-search/src/api.ts:62",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/session-search:session-search",
@@ -2385,8 +2385,8 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "risk": "additive",
       "riskNote": "Calling is additive; @dshfiles/session-search owns the handlers. Treat isApiOwnerMissing(error) as \"feature absent\".",
       "details": [
-        "Methods: health, findInThread, promptHistory",
-        "Agent tools: session_search_health (read-only), session_find_in_thread (read-only)"
+        "Methods: health, findInThread, promptHistory, searchMessages",
+        "Agent tools: session_search_health (read-only), session_find_in_thread (read-only), session_search_messages (read-only)"
       ],
       "docs": "tooling/dshx/docs/guides/api.md",
       "command": null
@@ -2501,7 +2501,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "threadActionsApi",
       "importFrom": "@dshfiles/thread-sidebar/thread-actions-api",
       "owner": "@dshfiles/thread-sidebar",
-      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:66",
+      "source": "plugins/@dshfiles/thread-sidebar/src/thread-actions-api.ts:75",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/thread-sidebar:thread-actions",
@@ -3740,7 +3740,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/ai-accounts › antigravity-accounts"
       ],
       "details": [
-        "Used by 67 catalog feature(s)",
+        "Used by 68 catalog feature(s)",
         "Destinations in use: settings"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
@@ -3852,7 +3852,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
         "@dshfiles/agent-telemetry › agent-turn-spans"
       ],
       "details": [
-        "Used by 138 catalog feature(s)",
+        "Used by 139 catalog feature(s)",
         "Destinations in use: none"
       ],
       "source": "tooling/dshx/packages/dshx/src/project/features.ts",
