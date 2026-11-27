@@ -11,7 +11,7 @@ import type {} from './sidebar-footer-slot.js'
 import { defineClientPlugin } from '@dshfiles/dshx/client'
 import { PluginQueryProvider } from '@dshfiles/plugin-ui/query'
 import { createWorkspacePickerPorts, type WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
-import { AccountsPanel } from './accounts-panel.js'
+import { lazyView } from '@dshfiles/plugin-ui/components/lazy-view'
 import { createAccountSetupController } from './account-setup-controller.js'
 import { AccountSetupOverlay } from './account-setup-dialog.js'
 import { useServingAccount, type UseServingAccountSessions } from './use-serving-account.js'
@@ -20,14 +20,10 @@ import { QuotaStrip } from './quota-footer.js'
 import { QuotaStatusItem } from './quota-status-item.js'
 import { QuotaStatusLine } from './quota-status-line.js'
 import { ThreadAccountSurface } from './thread-account-dialog.js'
-import { UsageHistoryPanel } from './usage-history-panel.js'
-import { QuotaForecastPanel } from './quota-forecast-panel.js'
-import { QuotaAccountsView } from './quota-accounts-view.js'
 import { AccountQuotaViews, UsageNavigation, type QuotaViewProps, type UsageQuotaTarget, type UsageQuotaView } from './quota-views.js'
 import { useEffect } from 'react'
 import { useContract } from '@dshfiles/dshx/client'
 import { EdgeUsageWidget } from './edge-usage.js'
-import { ModelsPageAccounts } from './models-page-accounts.js'
 import { SessionCostDockEntry, SessionUsageCost } from './session-cost.js'
 import { IdleCacheWarningDockEntry } from './idle-cache-warning.js'
 import { SessionId } from '@deepseek-ai/dsh-session/types'
@@ -41,7 +37,6 @@ import type { SessionUsageCostOwnerProps } from '@dshfiles/chat/session-usage-co
 import { QuotaAutoResumeToggle } from './quota-auto-resume-toggle.js'
 import { QuotaRetryMessage } from './quota-retry-message.js'
 import { StalledStreamMessage } from './stalled-stream-message.js'
-import { AiAccountsSettingsSection } from './settings-section.js'
 import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
 
 /**
@@ -49,6 +44,15 @@ import { AI_ACCOUNTS_LOCALE_NAMESPACE, aiAccountsLocale } from './locales.js'
  * provider panels use, so it sits directly below Plugins instead of adding a
  * second place to look for account settings.
  */
+/** The account pages load when one first opens (a page, the Models footer, the Settings section), not at page boot. */
+const views = () => import('./lazy-views.js')
+const AccountsPanel = lazyView(() => views().then(module => module.AccountsPanel), { label: 'AI accounts' })
+const UsageHistoryPanel = lazyView(() => views().then(module => module.UsageHistoryPanel), { label: 'Usage history' })
+const QuotaForecastPanel = lazyView(() => views().then(module => module.QuotaForecastPanel), { label: 'Quota forecast' })
+const QuotaAccountsView = lazyView(() => views().then(module => module.QuotaAccountsView), { label: 'Accounts' })
+const ModelsPageAccounts = lazyView(() => views().then(module => module.ModelsPageAccounts), { label: 'Accounts' })
+const AiAccountsSettingsSection = lazyView(() => views().then(module => module.AiAccountsSettingsSection), { label: 'AI accounts' })
+
 const PANEL_ID = 'ai-accounts'
 const USAGE_PANEL_ID = 'ai-accounts-usage'
 const FORECAST_PANEL_ID = 'ai-accounts-forecast'
