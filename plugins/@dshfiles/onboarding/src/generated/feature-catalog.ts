@@ -28583,7 +28583,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "plugin": "tool-subagent",
       "id": "child-turn-guard",
       "title": "Keep a delegated child working when its turn hands the task back",
-      "summary": "A subagent that stops early and hands its task back is asked to keep working, a bounded number of times.",
+      "summary": "A subagent that hands its task back before doing real work is asked to keep working, a bounded number of times.",
       "destination": "none",
       "currentSurface": "host: delegated child turns",
       "reach": [],

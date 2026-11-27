@@ -3295,7 +3295,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "TabPlaceGlyphs",
       "importFrom": "@dshfiles/workbench/tab-status",
       "owner": "@dshfiles/workbench",
-      "source": "plugins/@dshfiles/workbench/src/tab-status.tsx:74",
+      "source": "plugins/@dshfiles/workbench/src/tab-status.tsx:82",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "registry:@dshfiles/workbench.tab-place-glyph",
