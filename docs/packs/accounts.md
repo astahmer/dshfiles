@@ -8,7 +8,7 @@ Pack id `accounts`. Back to [all packs](README.md).
 
 ## Plugins
 
-1. [`@dshfiles/ai-accounts`](../../plugins/@dshfiles/ai-accounts/README.md) — Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.
+1. [`@dshfiles/ai-accounts`](../../plugins/@dshfiles/ai-accounts/README.md) — Per-account Codex, Claude, Antigravity, Mistral Vibe CLI, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.
 2. [`@dshfiles/secret-catalog`](../../plugins/@dshfiles/secret-catalog/README.md) — Browse and manage secret CLI aliases for the selected project, without values crossing to the Client.
 3. [`@dshfiles/usage`](../../plugins/@dshfiles/usage/README.md) — Request log and cost, token, cache and latency charts built from DSH session logs, indexed incrementally into SQLite.
 4. [`@dshfiles/context-compaction`](../../plugins/@dshfiles/context-compaction/README.md) — Chunked compaction backend that keeps summary requests within the model context window.
@@ -24,7 +24,7 @@ Pack id `accounts`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 47 features, the 33 curated ones first.
+From the onboarding feature catalog: 49 features, the 35 curated ones first.
 
 ### Curated
 
@@ -33,34 +33,36 @@ From the onboarding feature catalog: 47 features, the 33 curated ones first.
 3. **Edit and remove accounts** (`ai-accounts`, settings) — Edit an account's settings or remove it, and a new account is saved only once it signs in.
 4. **Manage account Models, Settings and Usage** (`ai-accounts`, settings) — Each account has Models, Settings and Usage tabs, with rename and sign-out.
 5. **Use a Google AI plan through the Antigravity CLI** (`ai-accounts`, settings) — Use Gemini and the other models of a Google AI plan through the official Antigravity CLI.
-6. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.
-7. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
-8. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
-9. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
-10. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
-11. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
-12. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
-13. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
-14. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
-15. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
-16. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
-17. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
-18. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
-19. **Browse secrets by scope and environment** (`secret-catalog`, settings) — Search your secrets across project, global and local scopes, without seeing their values.
-20. **Reveal on click and copy without revealing** (`secret-catalog`, settings) — Click a masked secret to reveal it for a short time, or copy it without revealing it.
-21. **Add a secret inline under the list** (`secret-catalog`, settings) — Add a secret in a new row under the list with a name and a value, or generate one.
-22. **Create, edit, rename and remove secrets** (`secret-catalog`, settings) — Add, edit, rename or remove a secret, and delete its stored value only when you ask.
-23. **Create and bind from a secret-reference field** (`secret-catalog`, settings) — A secret field can create a new secret in place and keep only a reference to it.
-24. **Repair a secret reference that does not resolve** (`secret-catalog`, settings) — A secret reference that does not work says why and offers the fix, such as setting its value.
-25. **Let an agent ask the user to store a secret** (`secret-catalog`, transcript) — The agent can ask you to store a secret, and only gets a reference to it back.
-26. **Add a Jev key from the Backlog setting** (`secret-catalog`, settings) — Add a Jev key from the Backlog setting, stored as a secret.
-27. **Set up a Jev key from chat** (`secret-catalog`, transcript) — When Jev has no key, the latest turn offers a short form to add one.
-28. **Request log** (`usage`, observe) — The Requests tab lists every model request with its tokens, cost, time and status.
-29. **Usage charts** (`usage`, observe) — The Overview tab charts cost, tokens and requests over time, against the previous period.
-30. **Jev API usage card** (`usage`, observe) — See how many Jev calls Backlog and Memory made and what they cost this month.
-31. **Tool and skill analytics** (`usage`, observe) — The Tools tab charts how often each tool and skill runs and how long it takes.
-32. **Quota in the Usage page** (`usage`, observe) — The Quota tab of Usage shows each account's limits, their history and a forecast.
-33. **Cost tab in the thread panel** (`usage`, thread-panel) — The thread panel's Cost tab shows what each turn of this thread cost.
+6. **Spend the Vibe & Studio allowance through the Vibe CLI** (`ai-accounts`, settings) — Use the Vibe and Studio allowance of a signed-in Mistral Vibe login by running the official Vibe CLI for a thread.
+7. **Run Vibe with DSH's tools through its ACP server** (`ai-accounts`, settings) — Let a Vibe thread call DSH tools, so its edits and commands go through DSH approvals, diffs and undo.
+8. **Curate models and choose account routes** (`ai-accounts`, settings) — Choose the models each provider offers, their context windows, and how requests spread across accounts with the same model.
+9. **Read provider quota and usage status** (`ai-accounts`, observe) — See each account's quota, when it resets and when it was last read, with Refresh and Retry.
+10. **Short names in the sidebar usage strip** (`ai-accounts`, settings) — Show or hide the short name beside each meter in the usage strip, and set each account's short name.
+11. **Review usage history and cost forecasts** (`ai-accounts`, observe) — Chart past usage and cost, set your own prices, and see what a draft or a turn costs.
+12. **Forecast when each account runs out** (`ai-accounts`, observe) — See when each account will run out at the current pace and which account to use next.
+13. **Route exhausted Luna accounts through Reserve** (`ai-accounts`, settings) — Once the weekly Luna limit is spent, requests move to the separate Reserve model and its own limit.
+14. **Recover failed account requests per failure kind** (`ai-accounts`, settings) — Choose what happens when a request fails: retry, switch account, wait, or stop.
+15. **Retry exhausted quota when its reset arrives** (`ai-accounts`, inbox) — A thread stopped by a usage limit resumes on its own when the limit resets, or now on another account.
+16. **Open credential setup from failed turns** (`ai-accounts`, transcript) — A turn that failed on missing or rejected credentials links straight to AI Accounts.
+17. **Explain turns stopped by a stalled model stream** (`ai-accounts`, transcript) — A turn whose model went silent says for how long and offers Resume or another model.
+18. **Turn on the fallback chain for stalled streams** (`ai-accounts`, settings) — Let a stalled model fall back to the thread's next model.
+19. **Quota-blocked threads in the Inbox, resumable in place** (`ai-accounts`, inbox) — A thread stopped by a usage limit shows in the Inbox with when it resets and a Resume button.
+20. **Warn before re-sending an idle thread past its prompt-cache lifetime** (`ai-accounts`, composer) — After a long pause, a chip warns that the next message costs more because the prompt cache expired.
+21. **Browse secrets by scope and environment** (`secret-catalog`, settings) — Search your secrets across project, global and local scopes, without seeing their values.
+22. **Reveal on click and copy without revealing** (`secret-catalog`, settings) — Click a masked secret to reveal it for a short time, or copy it without revealing it.
+23. **Add a secret inline under the list** (`secret-catalog`, settings) — Add a secret in a new row under the list with a name and a value, or generate one.
+24. **Create, edit, rename and remove secrets** (`secret-catalog`, settings) — Add, edit, rename or remove a secret, and delete its stored value only when you ask.
+25. **Create and bind from a secret-reference field** (`secret-catalog`, settings) — A secret field can create a new secret in place and keep only a reference to it.
+26. **Repair a secret reference that does not resolve** (`secret-catalog`, settings) — A secret reference that does not work says why and offers the fix, such as setting its value.
+27. **Let an agent ask the user to store a secret** (`secret-catalog`, transcript) — The agent can ask you to store a secret, and only gets a reference to it back.
+28. **Add a Jev key from the Backlog setting** (`secret-catalog`, settings) — Add a Jev key from the Backlog setting, stored as a secret.
+29. **Set up a Jev key from chat** (`secret-catalog`, transcript) — When Jev has no key, the latest turn offers a short form to add one.
+30. **Request log** (`usage`, observe) — The Requests tab lists every model request with its tokens, cost, time and status.
+31. **Usage charts** (`usage`, observe) — The Overview tab charts cost, tokens and requests over time, against the previous period.
+32. **Jev API usage card** (`usage`, observe) — See how many Jev calls Backlog and Memory made and what they cost this month.
+33. **Tool and skill analytics** (`usage`, observe) — The Tools tab charts how often each tool and skill runs and how long it takes.
+34. **Quota in the Usage page** (`usage`, observe) — The Quota tab of Usage shows each account's limits, their history and a forecast.
+35. **Cost tab in the thread panel** (`usage`, thread-panel) — The thread panel's Cost tab shows what each turn of this thread cost.
 
 ### More
 

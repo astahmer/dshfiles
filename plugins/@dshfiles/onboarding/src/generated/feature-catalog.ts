@@ -70,9 +70,9 @@ export const FEATURE_CATALOG: FeatureCatalog = {
     },
     {
       "name": "ai-accounts",
-      "description": "Per-account Codex, Claude, Antigravity, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
+      "description": "Per-account Codex, Claude, Antigravity, Mistral Vibe CLI, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 21
+      "features": 23
     },
     {
       "name": "annotations",
@@ -3557,6 +3557,59 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#vibe-cli-route",
+      "plugin": "ai-accounts",
+      "id": "vibe-cli-route",
+      "title": "Spend the Vibe & Studio allowance through the Vibe CLI",
+      "summary": "Use the Vibe and Studio allowance of a signed-in Mistral Vibe login by running the official Vibe CLI for a thread.",
+      "destination": "settings",
+      "currentSurface": "dialog: Add AI account › Vibe CLI",
+      "reach": [
+        {
+          "text": "click text \"AI Accounts: Accounts\"",
+          "action": "click",
+          "by": "text",
+          "name": "AI Accounts: Accounts",
+          "value": null
+        },
+        {
+          "text": "click button \"Add account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Add account",
+          "value": null
+        },
+        {
+          "text": "click button \"Vibe CLI account\"",
+          "action": "click",
+          "by": "button",
+          "name": "Vibe CLI account",
+          "value": null
+        },
+        {
+          "text": "expect button \"Copy CLI sign-in command\"",
+          "action": "expect",
+          "by": "button",
+          "name": "Copy CLI sign-in command",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#vibe-acp-bridge",
+      "plugin": "ai-accounts",
+      "id": "vibe-acp-bridge",
+      "title": "Run Vibe with DSH's tools through its ACP server",
+      "summary": "Let a Vibe thread call DSH tools, so its edits and commands go through DSH approvals, diffs and undo.",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › account editor › Runtime paths › Bridge",
+      "reach": [],
       "reachNarrow": null,
       "onboarding": null
     },

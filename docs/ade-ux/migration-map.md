@@ -6,7 +6,7 @@ Where every catalog feature lands in the unified shell of [the ADE plan](README.
 classification is the `surface`, `destination` and `currentSurface` fields of each feature in
 `plugins/@dshfiles/*/dshx.features.json`; `features:check` validates them. Fix a row there, then regenerate.
 
-585 features from 121 plugins.
+587 features from 121 plugins.
 
 ## Counts
 
@@ -19,7 +19,7 @@ classification is the `surface`, `destination` and `currentSurface` fields of ea
 | Agents |  |  |  |  | 6 |  | 1 |  |  |  |  |  |  |  | 7 |
 | Observe |  |  |  |  | 23 | 2 |  |  | 3 |  |  | 1 |  |  | 29 |
 | Knowledge |  |  |  |  | 7 | 4 | 1 |  | 2 |  |  |  |  |  | 14 |
-| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 67 |  |  |  | 71 |
+| Settings |  |  |  |  | 3 |  |  |  | 1 |  | 69 |  |  |  | 73 |
 | Thread panel |  |  |  |  |  |  |  |  |  |  |  |  | 32 |  | 32 |
 | Composer |  |  |  | 72 |  |  |  |  |  |  |  |  |  |  | 72 |
 | Transcript |  |  |  |  |  |  |  |  |  |  |  |  |  | 44 | 44 |
@@ -89,7 +89,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | conversation composer seat of a mirrored thread | 1 | Composer 1 |
 | conversation-view | 1 | Thread panel 1 |
 | conversation.chat.assistant-actions | 1 | Work 1 |
-| dialog | 4 | Settings 2, No place of its own 1, Thread panel 1 |
+| dialog | 5 | Settings 3, No place of its own 1, Thread panel 1 |
 | empty thread view (first run); palette | 1 | Threads 1 |
 | host | 76 | No place of its own 76 |
 | host and client | 1 | No place of its own 1 |
@@ -110,7 +110,7 @@ Features grouped by the region they occupy today (the prefix of `currentSurface`
 | rail | 13 | Knowledge 6, Settings 4, No place of its own 1, Threads 1, Work 1 |
 | right sidebar | 1 | Threads 1 |
 | right-pane | 10 | Thread panel 8, No place of its own 2 |
-| settings | 40 | Settings 37, No place of its own 3 |
+| settings | 41 | Settings 38, No place of its own 3 |
 | Settings | 1 | Settings 1 |
 | Settings › General › Appearance; agent tools theme_get / theme_set | 1 | Settings 1 |
 | Settings › General › Status bar | 1 | Settings 1 |
@@ -352,7 +352,7 @@ rail destination; 14 features.
 
 ### Settings
 
-rail destination (bottom); 71 features.
+rail destination (bottom); 73 features.
 
 | Feature | Surface | Today |
 | --- | --- | --- |
@@ -369,6 +369,8 @@ rail destination (bottom); 71 features.
 | ai-accounts/reference-dashboard: Manage account Models, Settings and Usage | settingsSection | left-nav: AI Accounts: Accounts › Models / Settings / Usage tabs |
 | ai-accounts/stalled-stream-fallback-setting: Turn on the fallback chain for stalled streams | settingsSection | settings: AI Accounts › Failure recovery › Fall back on stalled streams |
 | ai-accounts/strip-short-names: Short names in the sidebar usage strip | settingsSection | settings: AI Accounts › strip short names |
+| ai-accounts/vibe-acp-bridge: Run Vibe with DSH's tools through its ACP server | settingsSection | settings: AI Accounts › account editor › Runtime paths › Bridge |
+| ai-accounts/vibe-cli-route: Spend the Vibe & Studio allowance through the Vibe CLI | settingsSection | dialog: Add AI account › Vibe CLI |
 | backlog/export-backlog: Export the backlog to a file | settingsSection | left-nav: Backlog › Backlog settings › Export |
 | backlog/jev-settings: Configure Jev from the Backlog panel | settingsSection | left-nav: Backlog › Backlog settings |
 | backlog/peer-hosts: Share one backlog across hosts | settingsSection | left-nav: Backlog › Backlog settings › Hosts |
