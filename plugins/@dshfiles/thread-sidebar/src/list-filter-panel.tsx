@@ -405,27 +405,28 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
           })()}
         </section>
       )}
-      {props.status === undefined && props.source === undefined ? null : (
-        <div className="dshx:grid dshx:gap-3 dshx:px-3 dshx:pt-2.5 dshx:pb-3">
-          {props.status === undefined ? null : <StatusChips t={t} headingId={`${ids}-status`} {...props.status} onNote={setChange} />}
-          {props.source === undefined ? null : (
-            <section className="dshx:grid dshx:gap-1.5" aria-labelledby={`${ids}-source`}>
-              <h3 id={`${ids}-source`} className={HEADING}>
-                {t('threadSidebarFilterSource')}
-              </h3>
-              <Segmented
-                labelledBy={`${ids}-source`}
-                value={props.source.value}
-                options={THREAD_SOURCE_FILTER_OPTIONS.map(option => ({ value: option, ...props.sourceLabels[option] }))}
-                onChange={(value, name) => {
-                  if (!isSourceFilter(value)) return
-                  setChange(name)
-                  props.source?.onChange(value)
-                }}
-              />
-            </section>
-          )}
+      {props.status === undefined ? null : (
+        <div className="dshx:px-3 dshx:pt-2.5 dshx:pb-3">
+          <StatusChips t={t} headingId={`${ids}-status`} {...props.status} onNote={setChange} />
         </div>
+      )}
+      {props.source === undefined ? null : (
+        // Source under its own hairline, as Group by (council round 29, item 9).
+        <section className="dshx:grid dshx:gap-1.5 dshx:px-3 dshx:pt-2.5 dshx:pb-3" aria-labelledby={`${ids}-source`} data-thread-filter-source="">
+          <h3 id={`${ids}-source`} className={HEADING}>
+            {t('threadSidebarFilterSource')}
+          </h3>
+          <Segmented
+            labelledBy={`${ids}-source`}
+            value={props.source.value}
+            options={THREAD_SOURCE_FILTER_OPTIONS.map(option => ({ value: option, ...props.sourceLabels[option] }))}
+            onChange={(value, name) => {
+              if (!isSourceFilter(value)) return
+              setChange(name)
+              props.source?.onChange(value)
+            }}
+          />
+        </section>
       )}
       {props.group === undefined ? null : (
         // Group by, under its own hairline: how the list is drawn, which Reset above does not cover (its description

@@ -1043,3 +1043,15 @@ describe('phone chip hit areas (round 30, item 5)', () => {
     expect(rule.slice(rule.lastIndexOf(':where(')).includes("[data-slot='toggle-group-item']") || rule.includes("[data-slot='toggle-group-item']")).toBe(true)
   })
 })
+
+// Council round 29, item 9: Source gets its own hairline section, as Group by has.
+describe('the Source section (round 30, item 9)', () => {
+  it('is its own top-level section of the panel, so the panel hairline divides it from Status', () => {
+    const { container } = render(<ListFilterPanel {...panel()} />)
+    const root = element(container.querySelector('[data-thread-list-filter-panel]'))
+    const source = element(screen.getByRole('radiogroup', { name: 'threadSidebarFilterSource' }).closest('section'))
+    expect(source.parentElement).toBe(root)
+    expect(source.hasAttribute('data-thread-filter-source')).toBe(true)
+    expect(source.contains(screen.getByRole('group', { name: 'threadSidebarFilterStatus' }))).toBe(false)
+  })
+})
