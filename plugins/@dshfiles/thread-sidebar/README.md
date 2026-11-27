@@ -541,7 +541,7 @@ and keeps the rest for Back and Forward.
 
 ![An acknowledged recent idle thread remains in the date-grouped Done view.](docs/screenshots/thread-list-views-done.png)
 
-**The Filters panel** (round nine, refined in rounds 28 to 32). The Filter
+**The Filters panel** (round nine, refined in rounds 28 to 33). The Filter
 button opens one panel beside the list, not a menu of submenus: every value
 shows where it sits and applies at once, so the rows it filters stay in view,
 and a polite live region says each change once with the count it leads to
@@ -549,9 +549,10 @@ and a polite live region says each change once with the count it leads to
 It opens on the preset in force; closed, the button names the preset in full,
 and while filters are on a desktop draws their count in the funnel's place, a
 16px badge before the name (`2 All threads`, named "Filter: All threads, 2
-filters on"); a phone reads `Filters 2`. On a desktop the panel keeps its top under
-the button, no taller than the room below it, its foot fading while more waits
-below. The panel scrolls under its sticky header, **Filters … Reset**, whose
+filters on", which is also its tooltip); a phone reads `Filters 2`, the word in
+the ink. Both badges fill with the ink at 20%, so they read as a shape on the
+button. On a desktop the panel keeps its top under the button and ends 8px
+above the status bar, its foot fading while more waits below. The panel scrolls under its sticky header, **Filters … Reset**, whose
 rule shows only while it is scrolled, and keeps a focused control clear of the
 header and the fading foot; on a phone it is
 the kit's bottom sheet (85dvh, the popover fill) with **Reset · Filters · Done**
@@ -561,9 +562,9 @@ presets (each ending on one 20px count column, the count of its rows, empty at
 width reserved; no status on means any, and **Clear** sits in the heading;
 **More statuses**, right under the first row, is a
 disclosure for Thread state and Set aside, one labelled group each, that
-scrolls them into view and reads **Fewer statuses** while open; while one of
-those is on it stays open, with "Clear the statuses below to fold" on its own
-line under it), and **Source**, under its own hairline, as a segmented control (All /
+scrolls them into view without moving the toggle out of sight and reads
+**Fewer statuses** while open; while one of those is on it stays open, with a
+line under it naming them: "Archived is on. Turn it off to fold."), and **Source**, under its own hairline, as a segmented control (All /
 Main / Subagents). **Reset filters** covers those: back to All threads with no
 filter on, the grouping kept. Under its own hairline, **Group by** (Status / Project / Date / Custom /
 None, a segmented control; Custom is named "Custom, arrange manually"), and the foot Board, Thread list settings and
@@ -576,10 +577,11 @@ status or source filter afterwards never rewrites the preset: the change is a
 Host-synced `threadViews.draft`, the button reads `Filter: Needs you (edited)`,
 and the preset stays checked as `Needs you · edited`, counting what the list
 draws now, with **Discard changes** and **Save changes to “Needs you”**: two
-icons before its count on a mouse, and on a phone the words Discard (quiet, in
+icons before its count on a mouse (Save in the ink, Discard secondary), and on a phone the words Discard (quiet, in
 the secondary ink) and Save (in the ink at 600) on the row's own second line, so its name, never "edited", is what truncates. The
 built-in All threads offers **Save as new preset…** instead, and its ⋯ menu (a
-fixed 256px, inside the panel) shows no Rename, Save changes or Delete, only the
+fixed 256px, inside the panel; on a phone a sheet sharing the Filters sheet's
+20px content edge) shows no Rename, Save changes or Delete, only the
 caption "Built in. Save changes as a new preset."
 Pressing the edited preset again does nothing, and changing the filters back
 drops the draft. **Save as new preset…** (first in the presets' ⋯ menu) names a
@@ -589,8 +591,10 @@ grouping, filters and the current project scope (`projectFilter`: an id, `''` fo
 Unassigned, `null` for All projects), and applies it. **Preset options** (the ⋯
 beside the Presets heading) holds
 **Rename…**, **Save changes to “‹preset›”**, **Delete…** (a confirmation, then an
-Undo notice that puts the preset back where it was), Mark all read / unread and
-**Manage presets…** (the view manager, where a built-in can be hidden). A built-in
+Undo notice that puts the preset back where it was), **Manage presets…** (the
+view manager, where a built-in can be hidden) and, last after a separator,
+**Mark 5 shown as read** / **unread** for the rows the list draws (unread only
+while one of them is read). A built-in
 names no project scope, so applying it leaves the project picker alone. ⌘K lists
 one **Filter: ‹preset›** row per preset; in the thread list `[` and `]` step to the
 previous and next preset, wrapping (`1`–`9` answer in the peek and `G` starts the
