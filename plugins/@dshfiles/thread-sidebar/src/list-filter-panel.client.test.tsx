@@ -5,10 +5,15 @@ import { fileURLToPath } from 'node:url'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { PaletteMath, WARM_STONE, type Oklch } from '@dshfiles/plugin-ui/theme/palette'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import * as FilterPanel from './list-filter-panel.js'
-import { ListFilterPanel, nextStatusFilters, presetMark, type ListFilterPanelProps } from './list-filter-panel.js'
+import { filterPanelInitialFocus, ListFilterPanel, nextStatusFilters, presetMark, type ListFilterPanelProps } from './list-filter-panel.js'
 
 afterEach(cleanup)
+
+/** The element a query found, or a failure that names what was missing. */
+const element = (found: Element | null | undefined): HTMLElement => {
+  if (!(found instanceof HTMLElement)) throw new Error('The element the test reads is not on the page.')
+  return found
+}
 
 // A path, not a URL: under jsdom `URL` is the window's, which Node's fs does not take.
 const client = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'client.tsx'), 'utf8')
@@ -196,7 +201,7 @@ describe('the More statuses disclosure (round 28, item 2)', () => {
     expect(document.activeElement).toBe(more)
     expect(more.getAttribute('aria-expanded')).toBe('true')
     expect(more.querySelector('svg')?.getAttribute('class')).toContain('dshx:rotate-180')
-    expect(within(region as HTMLElement).getByRole('button', { name: 'threadSidebarArchived' })).toBeTruthy()
+    expect(within(element(region)).getByRole('button', { name: 'threadSidebarArchived' })).toBeTruthy()
     fireEvent.click(more)
     expect(more.getAttribute('aria-expanded')).toBe('false')
     expect(screen.queryByRole('button', { name: 'threadSidebarArchived' })).toBeNull()
@@ -245,7 +250,7 @@ describe('the status sub-groups (round 28, item 4)', () => {
     // No label is hidden from assistive tech, and the stored Done chip sits in the Storage group.
     // A chip's seat is decoration beside its label; nothing else in the toolbar is hidden.
     expect(Array.from(status.querySelectorAll('[aria-hidden="true"]')).filter(element => element.closest('[data-chip-seat]') === null)).toEqual([])
-    expect(within(groups[2] as HTMLElement).getByRole('button', { name: 'threadSidebarSettled' })).toBeTruthy()
+    expect(within(element(groups[2])).getByRole('button', { name: 'threadSidebarSettled' })).toBeTruthy()
     const chips = within(status).getAllByRole('button')
     expect(chips.every(chip => chip.closest('[role="group"]') !== null)).toBe(true)
   })
@@ -283,11 +288,16 @@ describe('the selected state (round 28, item 6)', () => {
 
   it.each(['light', 'dark'] as const)('holds AA for the labels and 3:1 for the edge on every surface a chip sits on (%s)', scheme => {
     const p = PaletteMath.palette({ ...WARM_STONE, scheme })
-    const ink = p.neutral[10] as Oklch
-    const secondary = p.neutral[9] as Oklch
+    const step = (index: number): Oklch => {
+      const tone = p.neutral[index]
+      if (tone === undefined) throw new Error(`The palette has no neutral step ${String(index)}.`)
+      return tone
+    }
+    const ink = step(10)
+    const secondary = step(9)
     // The desktop popover and the phone sheet: paper in light (raised before round 28's item 7), the dialog step in dark.
-    const surfaces = scheme === 'light' ? [p.neutral[0], p.neutral[2]] : [p.neutral[2]]
-    for (const surface of surfaces as Oklch[]) {
+    const surfaces = scheme === 'light' ? [step(0), step(2)] : [step(2)]
+    for (const surface of surfaces) {
       expect(PaletteMath.contrastRatio(secondary, paint(surface, p.triggerFill))).toBeGreaterThanOrEqual(4.5)
       // WCAG 1.4.11: the selected chip's edge against the surface around it.
       expect(PaletteMath.contrastRatio(p.fieldBorder, surface)).toBeGreaterThanOrEqual(3)
@@ -375,13 +385,13 @@ describe('the phone sheet (round 28, item 10)', () => {
     // On the phone sheet it sticks over the sheet's 20px grabber padding, so no row shows above it.
     expect(header?.className).toContain('dshx:phone:-top-5')
     expect(header?.className).toContain('dshx:bg-popover')
-    const done = within(header as HTMLElement).getByRole('button', { name: 'threadSidebarDone' })
+    const done = within(element(header)).getByRole('button', { name: 'threadSidebarDone' })
     expect(done.className).toContain('dshx:hidden')
     expect(done.className).toContain('dshx:phone:inline-flex')
     fireEvent.click(done)
     expect(onDone).toHaveBeenCalledOnce()
     // Reset leads on a phone, before the title.
-    expect(within(header as HTMLElement).getByRole('button', { name: 'threadSidebarFilterResetLabel' }).className).toContain('dshx:phone:order-first')
+    expect(within(element(header)).getByRole('button', { name: 'threadSidebarFilterResetLabel' }).className).toContain('dshx:phone:order-first')
   })
 
   it('moves "Save current filters as preset…" out of the panel, keeping Save and Discard in view while edited', () => {
@@ -418,20 +428,18 @@ describe('preset rows (round 28, item 13)', () => {
 // Council round 27, item 14: the panel opened with focus on the preset ⋯; it opens on the preset in force.
 describe('initial focus (round 28, item 14)', () => {
   it('lands on the checked preset, or the current one while it is edited', () => {
-    const initialFocus = Reflect.get(FilterPanel, 'filterPanelInitialFocus')
-    expect(typeof initialFocus).toBe('function')
     const { container, unmount } = render(<ListFilterPanel {...panel()} />)
-    expect(initialFocus(container)).toBe(screen.getByRole('radio', { name: 'All threads' }))
+    expect(filterPanelInitialFocus(container)).toBe(screen.getByRole('radio', { name: 'All threads' }))
     unmount()
     const base = panel()
     const presets = base.presets
     if (presets === undefined) throw new Error('The fixture has presets.')
     const edited = render(<ListFilterPanel {...base} presets={{ ...presets, activeId: 'working', edited: true }} />)
-    expect(initialFocus(edited.container)).toBe(screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' }))
+    expect(filterPanelInitialFocus(edited.container)).toBe(screen.getByRole('radio', { name: 'Working (2), threadSidebarPresetEditedShort' }))
     edited.unmount()
     // Without presets, the first status chip.
     const plain = render(<ListFilterPanel {...panel({ presets: undefined })} />)
-    expect(initialFocus(plain.container)).toBe(screen.getByRole('button', { name: 'threadSidebarWorking' }))
+    expect(filterPanelInitialFocus(plain.container)).toBe(screen.getByRole('button', { name: 'threadSidebarWorking' }))
   })
 
   it('is what the popover focuses when it opens', () => {
