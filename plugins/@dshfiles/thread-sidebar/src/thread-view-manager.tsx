@@ -65,7 +65,8 @@ export const threadStatusFilterLabelKeys = {
   'input-needed': 'threadSidebarInputNeeded',
   'turn-finished': 'threadSidebarTurnFinished',
   'needs-resume': 'threadSidebarNeedsResume',
-  interrupted: 'threadSidebarInterrupted',
+  // The filter's own word (council round 28, item 17): the row keeps "Failed · interrupted".
+  interrupted: 'threadSidebarFilterInterrupted',
   inactive: 'threadSidebarInactive',
   muted: 'threadSidebarFilterMuted',
   settled: 'threadSidebarSettled',

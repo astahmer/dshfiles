@@ -103,10 +103,13 @@ const selectGroup = async (page: Page, scope: Locator, name: string): Promise<vo
   await settled(page)
 }
 
+/** The panel names the Subagents segment by its label (round 29, item 17); the Board's menu keeps "Subagent threads". */
+const panelSourceName = (name: string): string => (name === 'Subagent threads' ? 'Subagents' : name)
+
 /** Pick a source; in the panel the chips read All / Main / Subagents and keep the full names ("Main threads"). */
 const selectSource = async (page: Page, scope: Locator, triggerName: string, name: string): Promise<void> => {
   if (await hasMenu(scope)) {
-    await (await open(scope)).getByRole('radiogroup', { name: 'Source', exact: true }).getByRole('radio', { name, exact: true }).click()
+    await (await open(scope)).getByRole('radiogroup', { name: 'Source', exact: true }).getByRole('radio', { name: panelSourceName(name), exact: true }).click()
     await close(page)
     return
   }
@@ -157,7 +160,7 @@ const expectStatus = async (page: Page, scope: Locator, label: string): Promise<
 /** The source `name` ("Main threads") is the one checked in the open panel. */
 const expectSource = async (page: Page, scope: Locator, name: string): Promise<void> => {
   const source = (await open(scope)).getByRole('radiogroup', { name: 'Source', exact: true })
-  await expect(source.getByRole('radio', { name, exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(source.getByRole('radio', { name: panelSourceName(name), exact: true })).toHaveAttribute('aria-checked', 'true')
   await close(page)
 }
 

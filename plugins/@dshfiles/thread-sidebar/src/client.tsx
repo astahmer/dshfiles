@@ -6842,7 +6842,8 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           sourceLabels={{
             all: { short: props.tSidebar('threadSidebarAllShort'), name: props.tSidebar(threadSourceFilterLabelKeys.all) },
             main: { short: props.tSidebar('threadSidebarFilterMainShort'), name: props.tSidebar(threadSourceFilterLabelKeys.main) },
-            subagents: { short: props.tSidebar('threadSidebarFilterSubagentsShort'), name: props.tSidebar(threadSourceFilterLabelKeys.subagents) },
+            // Label in name (council round 28, item 17): the visible "Subagents" is its name.
+            subagents: { short: props.tSidebar('threadSidebarFilterSubagentsShort'), name: props.tSidebar('threadSidebarFilterSubagentsShort') },
           }}
           group={
             showGroupControl

@@ -288,7 +288,7 @@ describe('status chips (round 28, item 9)', () => {
     expect(mark('threadSidebarFilterAttention')).toBe('needs-you')
     expect(mark('threadSidebarApprovalNeeded')).toBe('needs-you')
     expect(mark('threadSidebarTurnFinished')).toBe('ready')
-    expect(mark('threadSidebarInterrupted')).toBe('failed')
+    expect(mark('threadSidebarFilterInterrupted')).toBe('failed')
     expect(mark('threadSidebarSettled')).toBe('done')
     expect(mark('threadSidebarArchived')).toBe('archived')
   })
@@ -789,5 +789,18 @@ describe('footer rows (round 29, item 16)', () => {
     const row = screen.getByRole('button', { name: 'Thread list settings' })
     expect(row.className).toContain('dshx:text-muted-foreground')
     expect(row.className).toContain('dshx:hover:text-foreground')
+  })
+})
+
+// Council round 28, item 17: the chip says "Interrupted"; the visible "Subagents" is the segment's name (label in name).
+describe('chip and segment names (round 29, item 17)', () => {
+  it('labels the interrupted filter Interrupted, keeping the row label as it was', () => {
+    expect(english).toContain("threadSidebarFilterInterrupted: 'Interrupted',")
+    const manager = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'thread-view-manager.tsx'), 'utf8')
+    expect(manager).toContain("interrupted: 'threadSidebarFilterInterrupted',")
+  })
+
+  it('names the Subagents segment by its visible label', () => {
+    expect(filterControl).toContain("subagents: { short: props.tSidebar('threadSidebarFilterSubagentsShort'), name: props.tSidebar('threadSidebarFilterSubagentsShort') }")
   })
 })
