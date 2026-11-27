@@ -8,7 +8,7 @@
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { StatusGlyph, type WorkStatus } from '@dshfiles/plugin-ui/components/work-status'
 import { ToggleGroup, ToggleGroupItem } from '@dshfiles/plugin-ui/components/ui/toggle-group'
-import { BookmarkPlusIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
+import { ArchiveIcon, BellOffIcon, BookmarkPlusIcon, CheckIcon, ChevronDownIcon, RotateCcwIcon, SaveIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useId, useState, type ReactNode } from 'react'
 import type { ThreadAttentionLabel } from './attention-presentation.js'
@@ -105,10 +105,45 @@ export interface ListFilterPanelProps {
 const CHIP =
   'dshx:h-7 dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-transparent dshx:bg-trigger-fill dshx:px-2.5 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:shadow-none dshx:hover:text-foreground dshx:data-[state=on]:border-field-border dshx:data-[state=on]:bg-(--dshx-segment-thumb) dshx:data-[state=on]:font-selected dshx:data-[state=on]:text-foreground dshx:pointer-coarse:h-9 dshx:pointer-coarse:px-3 dshx:pointer-coarse:text-sm'
 
-/** A multi-select chip's leading 12px seat: a check while it is on, so the row reads as checkboxes, not radios. */
-const ChipSeat = (props: { readonly on: boolean }): JSX.Element => (
+/** What a status chip's seat draws at rest: the glyph the list draws for that state (council round 27, item 9). */
+type ChipMark = WorkStatus | 'unread' | 'muted' | 'archived'
+const STATUS_CHIP_MARK = {
+  working: 'working',
+  'not-running': 'idle',
+  attention: 'needs-you',
+  unread: 'unread',
+  'approval-needed': 'needs-you',
+  'input-needed': 'needs-you',
+  'turn-finished': 'ready',
+  'needs-resume': 'failed',
+  interrupted: 'failed',
+  inactive: 'idle',
+  muted: 'muted',
+  settled: 'done',
+  archived: 'archived',
+} as const satisfies Record<ThreadStatusFilter, ChipMark>
+
+const ChipMarkGlyph = (props: { readonly mark: ChipMark }): JSX.Element => {
+  switch (props.mark) {
+    case 'unread':
+      return <span className="dshx:size-1.5 dshx:rounded-full dshx:bg-foreground" data-chip-mark="unread" />
+    case 'muted':
+      return <BellOffIcon className="dshx:size-3" data-chip-mark="muted" />
+    case 'archived':
+      return <ArchiveIcon className="dshx:size-3" strokeWidth={1.5} data-chip-mark="archived" />
+    default:
+      // The list's glyph at the count-chip size; a filter is not a live state, so the working ring holds still.
+      return <StatusGlyph status={props.mark} size="small" decorative data-chip-mark={props.mark} className="dshx:[&_[data-glyph-spinner]]:animate-none" />
+  }
+}
+
+/**
+ * A status chip's leading 12px seat: its status glyph at rest, a check while it is on, so the multi-select reads as
+ * checkboxes, not radios (council round 27, items 6 and 9). The seat never changes width, so toggling moves nothing.
+ */
+const ChipSeat = (props: { readonly on: boolean; readonly filter: ThreadStatusFilter }): JSX.Element => (
   <span className="dshx:inline-flex dshx:size-3 dshx:shrink-0 dshx:items-center dshx:justify-center" aria-hidden="true" data-chip-seat="">
-    {props.on ? <CheckIcon className="dshx:size-3" strokeWidth={2.5} data-chip-check="" /> : null}
+    {props.on ? <CheckIcon className="dshx:size-3" strokeWidth={2.5} data-chip-check="" /> : <ChipMarkGlyph mark={STATUS_CHIP_MARK[props.filter]} />}
   </span>
 )
 
@@ -116,22 +151,15 @@ const SECTION = 'dshx:grid dshx:gap-1.5 dshx:px-3 dshx:py-2.5'
 /** A quiet verb row in a section, its glyph on the preset rows' check column. */
 const QUIET_ROW = 'dshx:-mx-1.5 dshx:justify-start dshx:justify-self-stretch dshx:px-1.5 dshx:font-normal dshx:text-muted-foreground dshx:pointer-coarse:h-11'
 const HEADING = 'dshx:text-xs dshx:font-medium dshx:text-muted-foreground'
-const ALL_STATUSES = 'all'
 /** One status group's chips: a wrapping row. */
 const STATUS_ROW = 'dshx:flex dshx:w-full dshx:flex-wrap dshx:gap-1 dshx:pointer-coarse:gap-2'
 
-const isStatusFilter = (value: string): value is ThreadStatusFilter =>
-  value !== ALL_STATUSES && THREAD_STATUS_FILTER_OPTIONS.some(option => option === value)
+const isStatusFilter = (value: string): value is ThreadStatusFilter => value !== 'all' && THREAD_STATUS_FILTER_OPTIONS.some(option => option === value)
 const isSourceFilter = (value: string): value is ThreadSourceFilter => THREAD_SOURCE_FILTER_OPTIONS.some(option => option === value)
 
-/**
- * The status chips' next selection: "Any" (no filter) clears the others, and any status chip clears "Any". Kept in
- * menu order, the order the list's summary and presets already use.
- */
-export const nextStatusFilters = (previous: readonly ThreadStatusFilter[], next: readonly string[]): readonly ThreadStatusFilter[] => {
-  if (next.includes(ALL_STATUSES) && previous.length > 0) return []
-  return THREAD_STATUS_FILTER_OPTIONS.filter((option): option is ThreadStatusFilter => isStatusFilter(option) && next.includes(option))
-}
+/** The status chips' next selection, kept in menu order (the order the list's summary and presets already use). */
+export const nextStatusFilters = (next: readonly string[]): readonly ThreadStatusFilter[] =>
+  THREAD_STATUS_FILTER_OPTIONS.filter((option): option is ThreadStatusFilter => isStatusFilter(option) && next.includes(option))
 
 export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const t = props.t
@@ -321,26 +349,31 @@ const StatusChips = (props: {
   const expanded = opened || forced
   return (
     <section className="dshx:grid dshx:gap-1.5" aria-labelledby={props.headingId}>
-      <h3 id={props.headingId} className={HEADING}>
-        {props.t('threadSidebarFilterStatus')}
-      </h3>
+      {/* No status on means any (no Any chip); a ghost Clear stands in the heading while one is on. */}
+      <div className="dshx:flex dshx:h-6 dshx:items-center dshx:justify-between dshx:gap-2" data-thread-status-heading="">
+        <h3 id={props.headingId} className={HEADING}>
+          {props.t('threadSidebarFilterStatus')}
+        </h3>
+        {props.selected.length === 0 ? null : (
+          <Button type="button" variant="ghost" size="xs" className="dshx:-mr-2 dshx:font-normal dshx:text-muted-foreground" onClick={() => props.onChange([])}>
+            {props.t('threadSidebarFilterClear')}
+          </Button>
+        )}
+      </div>
       <ToggleGroup
         type="multiple"
         aria-labelledby={props.headingId}
-        value={props.selected.length === 0 ? [ALL_STATUSES] : [...props.selected]}
-        onValueChange={next => props.onChange(nextStatusFilters(props.selected, next))}
+        value={[...props.selected]}
+        onValueChange={next => props.onChange(nextStatusFilters(next))}
         spacing={1}
         // One labelled group per status group (round 28, item 4), so a screen reader hears which "Done" a chip is.
         className="dshx:grid dshx:w-full dshx:gap-1.5 dshx:pointer-coarse:gap-2"
         data-thread-status-filters=""
       >
         <div role="group" aria-label={props.t(threadStatusFilterGroupLabelKeys[LEADING_STATUS_GROUP.id])} className={STATUS_ROW} data-thread-status-group="">
-          <ToggleGroupItem value={ALL_STATUSES} className={CHIP}>
-            {props.t('threadSidebarFilterNone')}
-          </ToggleGroupItem>
           {LEADING_STATUS_GROUP.filters.map(filter => (
             <ToggleGroupItem key={filter} value={filter} className={CHIP}>
-              <ChipSeat on={props.selected.includes(filter)} />
+              <ChipSeat on={props.selected.includes(filter)} filter={filter} />
               {props.t(threadStatusFilterLabelKeys[filter])}
             </ToggleGroupItem>
           ))}
@@ -356,7 +389,7 @@ const StatusChips = (props: {
                   </span>
                   {group.filters.map(filter => (
                     <ToggleGroupItem key={filter} value={filter} className={CHIP}>
-                      <ChipSeat on={props.selected.includes(filter)} />
+                      <ChipSeat on={props.selected.includes(filter)} filter={filter} />
                       {props.t(threadStatusFilterLabelKeys[filter])}
                     </ToggleGroupItem>
                   ))}

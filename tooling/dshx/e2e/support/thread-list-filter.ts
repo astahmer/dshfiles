@@ -4,7 +4,7 @@ import { expect, type Locator, type Page } from '@playwright/test'
  * Productivity pass Q5 (T5.3): above the first thread row the list keeps the project picker and one Filter control. Since
  * filter presets (b:xpvk) its trigger names the active preset, "Filter: <preset>[ (edited)]". Since round nine it opens
  * one panel (a dialog named Filter; a bottom sheet on a phone) instead of a menu of submenus: the presets are radios,
- * Status is a row of toggle chips (the rarer ones under More statuses), Source and Group by are radio chips, and Board,
+ * Status is a row of toggle chips with no Any chip (the rarer ones under More statuses, a Clear in its heading), Source and Group by are radio chips, and Board,
  * Thread list settings and Sidebar settings are buttons at its foot. The active preset's own verbs (Rename…, Delete…,
  * Mark all as read…) stay in a small "Preset options" menu beside the Presets heading. The Board page keeps its inline
  * Group and Filter buttons, so each helper uses a direct button first when the scope still has one.
@@ -115,9 +115,9 @@ const selectSource = async (page: Page, scope: Locator, triggerName: string, nam
   await settled(page)
 }
 
-/** A status chip of the open panel, opening More statuses when it sits there; "All threads" is the Any chip. */
+/** A status chip of the open panel, opening More statuses when it sits there. */
 const statusChip = async (filter: Locator, label: string): Promise<Locator> => {
-  const chip = filter.getByRole('button', { name: label === 'All threads' ? 'Any' : label, exact: true })
+  const chip = filter.getByRole('button', { name: label, exact: true })
   if ((await chip.count()) === 0) await filter.getByRole('button', { name: 'More statuses', exact: true }).click()
   return chip
 }
@@ -126,9 +126,10 @@ const statusChip = async (filter: Locator, label: string): Promise<Locator> => {
 const setStatus = async (page: Page, scope: Locator, triggerName: string, labels: readonly string[], selected: readonly string[]): Promise<void> => {
   if (await hasMenu(scope)) {
     const filter = await open(scope)
-    for (const label of labels) {
+    // No status on means All threads (round 28: there is no Any chip), so only the named statuses are toggled.
+    for (const label of labels.filter(candidate => candidate !== 'All threads')) {
       const chip = await statusChip(filter, label)
-      const shouldBeOn = label === 'All threads' ? selected.length === 0 : selected.includes(label)
+      const shouldBeOn = selected.includes(label)
       if ((await chip.getAttribute('aria-pressed')) === String(shouldBeOn)) continue
       await chip.click()
     }

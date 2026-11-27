@@ -69,7 +69,6 @@ describe('the Filter panel', () => {
     const presets = screen.getByRole('radiogroup', { name: 'threadSidebarPresets' })
     expect(within(presets).getByRole('radio', { name: 'All threads' }).getAttribute('aria-checked')).toBe('true')
     expect(within(presets).getByRole('radio', { name: 'Done (1), threadSidebarTurnFinished' }).getAttribute('aria-checked')).toBe('false')
-    expect(screen.getByRole('button', { name: 'threadSidebarFilterNone', pressed: true })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: false })).toBeTruthy()
     expect(screen.getByRole('radio', { name: 'All sources' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('radio', { name: 'Status' }).getAttribute('aria-checked')).toBe('true')
@@ -89,11 +88,11 @@ describe('the Filter panel', () => {
     expect(props.group?.onChange).toHaveBeenCalledWith('project')
   })
 
-  it('offers a reset while a filter is on, and Any clears the statuses', () => {
+  it('offers a reset while a filter is on, and Clear clears the statuses', () => {
     const props = panel({ status: { selected: ['working', 'unread'], onChange: vi.fn() }, reset: { disabled: false, onReset: vi.fn() } })
     render(<ListFilterPanel {...props} />)
     expect(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true })).toBeTruthy()
-    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterNone' }))
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterClear' }))
     expect(props.status?.onChange).toHaveBeenCalledWith([])
     fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterReset' }))
     expect(props.reset.onReset).toHaveBeenCalledOnce()
@@ -132,10 +131,9 @@ describe('the Filter panel', () => {
 })
 
 describe('nextStatusFilters', () => {
-  it('keeps the menu order, clears with Any and leaves Any with a status', () => {
-    expect(nextStatusFilters([], ['all', 'unread', 'working'])).toEqual(['working', 'unread'])
-    expect(nextStatusFilters(['working'], ['working', 'all'])).toEqual([])
-    expect(nextStatusFilters(['working'], [])).toEqual([])
+  it('keeps the menu order and drops anything that is not a status', () => {
+    expect(nextStatusFilters(['all', 'unread', 'working'])).toEqual(['working', 'unread'])
+    expect(nextStatusFilters([])).toEqual([])
   })
 })
 
@@ -239,7 +237,8 @@ describe('the status sub-groups (round 28, item 4)', () => {
       'threadSidebarFilterGroupStorage',
     ])
     // No label is hidden from assistive tech, and the stored Done chip sits in the Storage group.
-    expect(status.querySelector('[aria-hidden="true"]:not(svg):not([data-slot="status-glyph"]):not([data-chip-seat])')).toBeNull()
+    // A chip's seat is decoration beside its label; nothing else in the toolbar is hidden.
+    expect(Array.from(status.querySelectorAll('[aria-hidden="true"]')).filter(element => element.closest('[data-chip-seat]') === null)).toEqual([])
     expect(within(groups[2] as HTMLElement).getByRole('button', { name: 'threadSidebarSettled' })).toBeTruthy()
     const chips = within(status).getAllByRole('button')
     expect(chips.every(chip => chip.closest('[role="group"]') !== null)).toBe(true)
@@ -288,5 +287,40 @@ describe('the selected state (round 28, item 6)', () => {
       expect(PaletteMath.contrastRatio(p.fieldBorder, surface)).toBeGreaterThanOrEqual(3)
     }
     expect(PaletteMath.contrastRatio(ink, p.segmentThumb)).toBeGreaterThanOrEqual(4.5)
+  })
+})
+
+// Council round 27, item 9: status chips carry their status glyph; no "Any" chip (no status on means any), and a
+// ghost Clear in the Status heading while one is on.
+describe('status chips (round 28, item 9)', () => {
+  it('carries each status its glyph in the 12px seat beside its label', () => {
+    render(<ListFilterPanel {...panel()} />)
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarFilterMoreStatuses' }))
+    const mark = (name: string): string | null | undefined =>
+      screen.getByRole('button', { name }).querySelector('[data-chip-seat] [data-chip-mark]')?.getAttribute('data-chip-mark')
+    expect(mark('threadSidebarWorking')).toBe('working')
+    expect(mark('threadSidebarFilterNotRunning')).toBe('idle')
+    expect(mark('threadSidebarFilterAttention')).toBe('needs-you')
+    expect(mark('threadSidebarApprovalNeeded')).toBe('needs-you')
+    expect(mark('threadSidebarTurnFinished')).toBe('ready')
+    expect(mark('threadSidebarInterrupted')).toBe('failed')
+    expect(mark('threadSidebarSettled')).toBe('done')
+    expect(mark('threadSidebarArchived')).toBe('archived')
+  })
+
+  it('has no Any chip, and offers Clear in the heading only while a status is on', () => {
+    const { unmount } = render(<ListFilterPanel {...panel()} />)
+    expect(screen.queryByRole('button', { name: 'threadSidebarFilterNone' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'threadSidebarFilterClear' })).toBeNull()
+    unmount()
+    const onChange = vi.fn()
+    render(<ListFilterPanel {...panel({ status: { selected: ['working', 'unread'], onChange } })} />)
+    const clear = screen.getByRole('button', { name: 'threadSidebarFilterClear' })
+    expect(clear.closest('[data-thread-status-heading]')).not.toBeNull()
+    fireEvent.click(clear)
+    expect(onChange).toHaveBeenCalledWith([])
+    // A chip toggles itself off; the others stay.
+    fireEvent.click(screen.getByRole('button', { name: 'threadSidebarWorking', pressed: true }))
+    expect(onChange).toHaveBeenLastCalledWith(['unread'])
   })
 })
