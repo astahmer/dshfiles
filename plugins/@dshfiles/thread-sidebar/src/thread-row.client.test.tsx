@@ -3,6 +3,7 @@ import { SessionId, SessionSeq } from '@deepseek-ai/dsh-session/types'
 import { cleanup, fireEvent, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PREFERENCES } from './organization.js'
+import { HoverStripFit, STRIP_SEAT_ON } from './hover-strip-fit.js'
 import { renderRow, rowProps, rowSession, rowStatus, VisibleObserver } from './thread-row.test-support.js'
 
 beforeEach(() => {
@@ -54,28 +55,12 @@ describe('a working thread row', () => {
 const stripLabels = (row: HTMLElement): (string | null)[] =>
   Array.from(row.querySelectorAll('[data-testid="thread-row-actions"] button')).map(button => button.getAttribute('aria-label'))
 
-const remPx = (rem: string | undefined): number => Number.parseFloat(rem ?? 'NaN') * 16
-
-/** What line 1 gives the hover strip at a row width, read from its classes the way the stylesheet resolves them. */
-const reservedPx = (head: HTMLElement, width: number): number => {
-  const strip = remPx(head.style.getPropertyValue('--thread-row-strip'))
-  const capped = 'min(var(--thread-row-strip),var(--strip-fit))'
-  if (!head.className.includes(`pr-[${capped}]`) && !head.className.includes(`transparent_0_${capped}`)) return strip
-  let fit = remPx(/(?:^|\s)dshx:\[--strip-fit:([\d.]+)rem\]/u.exec(head.className)?.[1])
-  for (const [, min, value] of head.className.matchAll(/dshx:@min-\[([\d.]+)rem\]\/rowbox:\[--strip-fit:([\d.]+)rem\]/gu))
-    if (width >= remPx(min)) fit = Math.max(fit, remPx(value))
-  return Math.min(strip, fit)
-}
-
 describe('the hover actions of a thread row', () => {
   it('shows one verb and the row menu by default, and keeps the title readable beside them', async () => {
     const row = await renderRow()
     expect(stripLabels(row)).toEqual(['threadSidebarSettle', 'threadSidebarContextMenu'])
     // The two seats lie over the time slot and the title's end fades under them (round 28, item 11); the time keeps its
     // place, hidden, so line 1 never reflows.
-    const head = row.querySelector<HTMLElement>('[data-thread-head]')
-    expect(head?.style.getPropertyValue('--thread-row-strip')).toBe('3.5rem')
-    expect(head?.className).toContain('transparent_0_min(var(--thread-row-strip),var(--strip-fit))')
     expect(row.querySelector('[data-thread-time]')?.className).toContain('dshx:not-pointer-coarse:group-hover/row:invisible')
     expect(row.querySelector('[data-testid="thread-row-actions"]')?.className).not.toContain('dshx:bg-popover')
   })
@@ -90,32 +75,6 @@ describe('the hover actions of a thread row', () => {
       'threadSidebarSettle',
       'threadSidebarContextMenu',
     ])
-  })
-
-  // Round nine (owner report): with every hover action on, the strip took the title's place under the pointer, so a
-  // click at the title's middle pinned or snoozed the thread instead of opening it. The strip now shows only the seats
-  // that fit in the time slot and a quarter of the title; the rest wait in the row menu, which holds every row verb.
-  it('never takes more than a quarter of the title, whatever the row width and however many actions are on', async () => {
-    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder, needsResume: true })
-    const strip = row.querySelector<HTMLElement>('[data-row-strip]')
-    const head = row.querySelector<HTMLElement>('[data-thread-head]')
-    if (strip === null || head === null) throw new Error('The row has no strip or no first line.')
-    const seats = Array.from(strip.children)
-    for (let width = 160; width <= 1_000; width += 2) {
-      const shown = seats.filter(seat => {
-        const rule = /dshx:@max-\[([\d.]+)rem\]\/rowbox:hidden/u.exec(seat.className)
-        return rule === null || width >= remPx(rule[1])
-      })
-      // The row menu always shows, and the actions that give way are the last ones, beside it.
-      expect(shown.at(-1)?.querySelector('button')?.getAttribute('aria-label')).toBe('threadSidebarContextMenu')
-      expect(shown).toEqual([...seats.slice(0, shown.length - 1), seats.at(-1)])
-      // Each seat is a 24px button and a 2px gap; the strip ends 6px inside the row.
-      const stripPx = shown.length * 26 - 2
-      const reserve = reservedPx(head, width)
-      expect(stripPx + 6, `strip at ${width}px`).toBeLessThanOrEqual(reserve)
-      // The time slot it replaces, plus a quarter of what the title has (the row less its padding, glyph and gaps).
-      expect(reserve, `reserve at ${width}px`).toBeLessThanOrEqual(32 + (width - 88) / 4)
-    }
   })
 
   it('opens the row menu from the strip', async () => {
@@ -839,19 +798,61 @@ describe('the hover strip without reflow (round 28, item 11)', () => {
     expect(time?.className).not.toContain('group-hover/row:hidden')
   })
 
-  it("fades the title's end under the strip with a mask as wide as the strip's capped reserve", async () => {
-    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
-    const head = row.querySelector<HTMLElement>('[data-thread-head]')
-    expect(head?.className).toContain(
-      'dshx:not-pointer-coarse:group-hover/row:[mask-image:linear-gradient(to_left,transparent_0_min(var(--thread-row-strip),var(--strip-fit)),currentcolor_calc(min(var(--thread-row-strip),var(--strip-fit))+16px))]',
-    )
-  })
-
   it('fades the strip in on hover only, so it leaves no ghost over the time on mouse-out', async () => {
     const row = await renderRow()
     const strip = row.querySelector<HTMLElement>('[data-row-strip]')
     expect(strip?.className).toContain('dshx:transition-none')
     expect(strip?.className).toContain('dshx:group-hover/row:transition-opacity')
     expect(strip?.className).not.toMatch(/(?:^|\s)dshx:transition-opacity(?:\s|$)/u)
+  })
+})
+
+// Council round 28, item 1: the strip never overlaps a resting title glyph. `⋯` keeps the time slot; a further action
+// shows only when its whole button starts 8px clear of the title's last glyph; the rest stay in `⋯`.
+describe('the hover strip beside the title (round 29, item 1)', () => {
+  it('fits an action only when its button starts clear of the last glyph, so a click on the title opens the row', () => {
+    // A 300px row whose strip ends at 294: a 9px title leaves room for three actions, a 169px one for none.
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 120, actions: 5 })).toBe(5)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 200, actions: 5 })).toBe(2)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 240, actions: 5 })).toBe(0)
+    expect(HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: 260, actions: 1 })).toBe(0)
+    for (let glyph = 40; glyph <= 270; glyph += 1) {
+      const fit = HoverStripFit.seatsThatFit({ stripRight: 294, glyphRight: glyph, actions: 8 })
+      const left = 294 - (fit + 1) * 24 - fit * 2
+      if (fit > 0) expect(left, `title ending at ${glyph}`).toBeGreaterThanOrEqual(glyph + 8)
+    }
+  })
+
+  it('keeps every action hidden until the row is measured, and the time slot one seat wide so ⋯ never meets the title', async () => {
+    const row = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const seats = Array.from(row.querySelectorAll<HTMLElement>('[data-row-strip] > [data-strip-seat]'))
+    expect(seats.length).toBeGreaterThan(1)
+    for (const seat of seats) expect(seat.className).toContain('dshx:hidden dshx:data-[strip-on]:contents')
+    expect(row.querySelector('[data-row-strip] > :last-child button')?.getAttribute('aria-label')).toBe('threadSidebarContextMenu')
+    expect(row.querySelector('[data-thread-time]')?.className).toContain('dshx:not-pointer-coarse:min-w-6')
+    // No budget classes and no mask: nothing on line 1 changes on hover.
+    expect(row.innerHTML).not.toContain('rowbox')
+    expect(row.querySelector('[data-thread-head]')?.className).not.toContain('mask-image')
+  })
+
+  it('measures the row as the pointer enters it and shows only the seats that fit', async () => {
+    const container = await renderRow({ rowActions: DEFAULT_PREFERENCES.rowActionOrder })
+    const article = container.querySelector<HTMLElement>('article')
+    const strip = container.querySelector<HTMLElement>('[data-row-strip]')
+    const title = container.querySelector<HTMLElement>('[data-thread-title]')
+    if (article === null || strip === null || title === null) throw new Error('The row has no strip or no title.')
+    strip.getBoundingClientRect = () => new DOMRect(0, 0, 294, 24)
+    title.getBoundingClientRect = () => new DOMRect(30, 0, 170, 18)
+    // jsdom draws no text: the title's text range reports its glyphs ending at 210.
+    const createRange = document.createRange.bind(document)
+    // SAFETY: the code under test only spreads the list (`Array.from`), which an array satisfies.
+    const rects = [new DOMRect(30, 0, 180, 18)] as unknown as DOMRectList
+    document.createRange = () => Object.assign(createRange(), { getClientRects: () => rects })
+    fireEvent.mouseEnter(article)
+    document.createRange = createRange
+    const on = Array.from(container.querySelectorAll('[data-strip-seat]')).map(seat => seat.hasAttribute(STRIP_SEAT_ON))
+    expect(on.length).toBeGreaterThan(2)
+    // 294 - 3 seats (24) - 2 gaps = 218 ≥ 210 + 8: two actions and ⋯.
+    expect(on).toEqual(on.map((_, index) => index < 2))
   })
 })
