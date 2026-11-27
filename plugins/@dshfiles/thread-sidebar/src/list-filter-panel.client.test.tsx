@@ -438,3 +438,20 @@ describe('initial focus (round 28, item 14)', () => {
     expect(filterControl).toMatch(/onOpenAutoFocus=\{event => \{[^}]*filterPanelInitialFocus\(/su)
   })
 })
+
+// Council round 27, item 15: a change applies at once to a list the screen reader user cannot see; say what it shows.
+describe('the shown count (round 28, item 15)', () => {
+  it('announces the visible thread count politely after a filter change, not on opening', () => {
+    const { rerender } = render(<ListFilterPanel {...panel({ shown: '8 threads shown' })} />)
+    const status = screen.getByRole('status')
+    expect(status.getAttribute('aria-live')).toBe('polite')
+    expect(status.className).toContain('dshx:sr-only')
+    expect(status.textContent).toBe('')
+    rerender(<ListFilterPanel {...panel({ shown: '2 threads shown' })} />)
+    expect(screen.getByRole('status').textContent).toBe('2 threads shown')
+  })
+
+  it('counts what the list shows, through the shared plural table', () => {
+    expect(filterControl).toMatch(/shown=\{plural\(props\.tSidebar, 'threadSidebarFilterShown', visibleThreadEntries\.length\)\}/u)
+  })
+})

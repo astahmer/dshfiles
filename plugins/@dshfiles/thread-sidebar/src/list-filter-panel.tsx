@@ -97,6 +97,23 @@ export interface ListFilterPanelProps {
   readonly actions: readonly ListFilterAction[]
   /** Close the panel: the phone sheet's Done. */
   readonly onDone?: (() => void) | undefined
+  /** What the list shows now ("2 threads shown"), announced politely after a change (round 28, item 15). */
+  readonly shown?: string | undefined
+}
+
+/**
+ * A polite live region for the list's count (council round 27, item 15): a filter applies at once to rows a screen
+ * reader user is not looking at, so the count is said after a change. Empty on opening, so opening says nothing extra.
+ */
+const ShownAnnouncer = (props: { readonly shown: string | undefined }): JSX.Element => {
+  const [opening] = useState(props.shown)
+  const [changed, setChanged] = useState(false)
+  if (!changed && props.shown !== opening) setChanged(true)
+  return (
+    <p role="status" aria-live="polite" className="dshx:sr-only" data-thread-filter-shown="">
+      {changed || props.shown !== opening ? props.shown : ''}
+    </p>
+  )
 }
 
 /**
@@ -183,6 +200,7 @@ export const ListFilterPanel = (props: ListFilterPanelProps): JSX.Element => {
   const presets = props.presets
   return (
     <div className="dshx:grid dshx:min-w-0 dshx:divide-y dshx:divide-border" data-thread-list-filter-panel="">
+      <ShownAnnouncer shown={props.shown} />
       {/* Sticky, so Reset and Done stay in reach while the sheet scrolls (round 28, item 10). A desktop reads "Filters …
           Reset"; a phone reads "Reset · Filters · Done", the sheet's own close. One word for the button and the title.
           The phone sheet keeps 20px of its own top padding for the grabber; the header sticks over it (-20px), so no row

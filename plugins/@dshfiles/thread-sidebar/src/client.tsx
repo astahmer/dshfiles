@@ -6878,6 +6878,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           }
           reset={{ disabled: resetDisabled, onReset: resetListFilters }}
           onDone={() => setFilterOpen(false)}
+          shown={plural(props.tSidebar, 'threadSidebarFilterShown', visibleThreadEntries.length)}
           actions={filterActions}
         />
       </PopoverContent>
