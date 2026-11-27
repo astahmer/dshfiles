@@ -85,6 +85,7 @@ import { SidebarOrganization, type OrderedSidebarEntry, type SidebarPreferences,
 import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory, type NavigationLocation } from './navigation-history.js'
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
+import { usePaletteActions } from './palette-registration.js'
 import { FAN_OUT_REQUEST_EVENT, fanOutRoutesOf } from './fan-out-request.js'
 import { registerWorkbenchPaletteActions } from './workbench-palette.js'
 import { threadActionsApi } from './thread-actions-api.js'
@@ -1206,7 +1207,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   // With the actions on the rail, nothing pending forces the row under the list back (b:kgcc).
   const footerHidden = !preferences.showFooter && (railActionsShown || (restartPendingLabel === null && reloadPendingLabel === null))
 
-  useEffect(() => PaletteBridge.addActions(paletteActions), [paletteActions])
+  // By content, not identity (performance P1): a thread switch rebuilt these rows and re-added every one of them.
+  usePaletteActions(paletteActions, PaletteBridge.addActions)
   useEffect(() => {
     const registry = workbenchPanels()
     const existingMainPanelIds = new Set(orderedHeaderEntries.flatMap(entry => (entry.kind === 'panel' && entry.panelId !== undefined ? [entry.panelId] : [])))
