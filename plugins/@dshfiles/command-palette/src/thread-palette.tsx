@@ -4,11 +4,24 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@dshfiles/plugin-ui/components/ui/dialog'
 import { Tabs, TabsList, TabsTrigger } from '@dshfiles/plugin-ui/components/ui/tabs'
 import { Kbd, KbdGroup, KeyHint } from '@dshfiles/plugin-ui/components/ui/kbd'
-import { ArrowLeftIcon, CheckIcon, CommandIcon, FileIcon, FileSearchIcon, HashIcon, ListOrderedIcon, MessageSquareIcon } from '@dshfiles/plugin-ui/icons'
+import {
+  ArrowLeftIcon,
+  BotIcon,
+  CheckIcon,
+  CommandIcon,
+  FileIcon,
+  FileSearchIcon,
+  HashIcon,
+  ListOrderedIcon,
+  MessageSquareIcon,
+  UserIcon,
+} from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore, type KeyboardEvent } from 'react'
 import { useContentSearch, type ContentSearch } from './content-search-machine.js'
+import { useMessageSearch } from './message-search-machine.js'
+import type { MessageSearch, MessageSearchRole } from './message-search-source.js'
 import { PaletteFrecency, paletteFrecency } from './frecency.js'
 import { paletteNavigationMachine } from './palette-navigation-machine.js'
 import { useWorkspaceFiles } from './workspace-files-machine.js'
@@ -29,6 +42,19 @@ export interface ThreadPaletteCopy {
   readonly backlogUnavailable: string
   readonly recent: string
   readonly threads: string
+  readonly messages: string
+  readonly messagesPlaceholder: string
+  readonly messagesFilterLabel: string
+  readonly messagesRoleAll: string
+  readonly messagesRoleAssistant: string
+  readonly messagesRoleUser: string
+  readonly messagesEmptyPrompt: string
+  readonly messagesSearching: string
+  readonly messagesTooShort: string
+  readonly messagesUnavailable: string
+  readonly messagesNotOwner: string
+  readonly messagesFailed: string
+  readonly messagesMore: string
   readonly destinations: string
   readonly commands: string
   readonly files: string
@@ -89,6 +115,13 @@ export interface ThreadPaletteCopy {
 
 type PaletteActionOption = Omit<PaletteAction, 'label' | 'heading'> & { readonly label: string; readonly heading?: string }
 
+export interface MessageSelection {
+  readonly sessionId: string
+  readonly seq: number
+  readonly role: 'user' | 'assistant'
+  readonly query: string
+}
+
 interface ThreadPaletteProps {
   readonly mode: PaletteMode
   readonly threads: readonly ThreadCandidate[]
@@ -102,7 +135,9 @@ interface ThreadPaletteProps {
   readonly hostKeys?: (shortcutId: string) => readonly string[] | undefined
   readonly copy: ThreadPaletteCopy
   readonly searchContent: ContentSearch | null
+  readonly searchMessages?: MessageSearch | null
   readonly onOpenThread: (sessionId: string) => void
+  readonly onSelectMessage?: (selection: MessageSelection) => void
   /** Send one Ask DSH question and open the thread it creates; a rejection keeps the palette open. */
   readonly onAsk: (question: string) => Promise<void>
   readonly onBacklogCapture: (text: string) => boolean
@@ -120,12 +155,28 @@ type PaletteRow =
       readonly live?: boolean | undefined
       readonly persisted?: boolean | undefined
     }
+  | {
+      readonly kind: 'message'
+      readonly thread: ThreadCandidate
+      readonly seq: number
+      readonly role: 'user' | 'assistant'
+      readonly time: number
+      readonly snippet: string
+    }
   | { readonly kind: 'line'; readonly line: number }
   | { readonly kind: 'help'; readonly prefix: PalettePrefix | ''; readonly label: string }
   | { readonly kind: 'ask'; readonly question: string }
   | { readonly kind: 'backlog'; readonly text: string }
 
 const RESULT_LIMIT = 50
+
+/** The Messages tab's sender filters, in chip order; Alt+1–3 picks one without leaving the search field. */
+const MESSAGE_ROLES = [
+  { value: 'all', code: 'Digit1', copy: 'messagesRoleAll' },
+  { value: 'assistant', code: 'Digit2', copy: 'messagesRoleAssistant' },
+  { value: 'user', code: 'Digit3', copy: 'messagesRoleUser' },
+] as const satisfies readonly { readonly value: MessageSearchRole; readonly code: string; readonly copy: keyof ThreadPaletteCopy }[]
+const MESSAGE_ROLE_BY_CODE: ReadonlyMap<string, MessageSearchRole> = new Map(MESSAGE_ROLES.map(role => [role.code, role.value]))
 const COMMAND_LIMIT = 30
 const FRECENT_COMMANDS_ON_EMPTY = 5
 const GO_TO_FILE_ID = 'action:go-to-file'
@@ -175,6 +226,7 @@ const rememberPaletteUse = (id: string): void => {
 const rowValue = (row: PaletteRow): string => {
   if (row.kind === 'thread') return `thread:${row.thread.id}`
   if (row.kind === 'content') return `content:${row.thread.id}`
+  if (row.kind === 'message') return `message:${row.thread.id}:${String(row.seq)}`
   if (row.kind === 'file') return `file:${row.path}`
   if (row.kind === 'line') return `line:${row.line}`
   if (row.kind === 'help') return `help:${row.prefix}`
@@ -311,6 +363,21 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const missingSessionId =
     (view === 'all' || view === 'threads') && exactSearchId !== undefined && !threadIndex.entries.some(entry => entry.id === exactSearchId)
 
+  const [messageRole, setMessageRole] = useState<MessageSearchRole>('all')
+  const messages = useMessageSearch({
+    active: view === 'messages',
+    query: deferredQuery,
+    role: messageRole,
+    search: props.searchMessages ?? null,
+  })
+  const messageRows = useMemo(() => {
+    if (view !== 'messages') return []
+    const threadsById = new Map(props.threads.map(thread => [thread.id, thread]))
+    return messages.hits.flatMap(hit => {
+      const thread = threadsById.get(hit.sessionId)
+      return thread === undefined ? [] : [{ thread, seq: hit.seq, role: hit.role, time: hit.time, snippet: hit.snippet }]
+    })
+  }, [messages.hits, props.threads, view])
   const content = useContentSearch(view === 'content' ? deferredQuery : '', props.searchContent, props.threads)
   const contentRows = useMemo(() => {
     if (view !== 'content') return []
@@ -415,13 +482,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       ...helpRows.map((help): PaletteRow => ({ kind: 'help', ...help })),
       ...(line === null ? [] : [{ kind: 'line', line } satisfies PaletteRow]),
       ...contentRows.map((hit): PaletteRow => ({ kind: 'content', ...hit })),
+      ...messageRows.map((hit): PaletteRow => ({ kind: 'message', ...hit })),
       ...threadActionRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...destinationRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...commandRows.map((destination): PaletteRow => ({ kind: 'destination', destination })),
       ...fileRows.map((path): PaletteRow => ({ kind: 'file', path })),
       ...threadRows.map((thread): PaletteRow => ({ kind: 'thread', thread })),
     ],
-    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, threadActionRows, threadRows],
+    [askRows, backlogRows, commandRows, contentRows, destinationRows, fileRows, helpRows, line, messageRows, threadActionRows, threadRows],
   )
   const numbered = rows.slice(0, 9)
   // Until the pointer or arrows pick a row, the first match is active, so Enter runs it right after typing.
@@ -456,6 +524,15 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
       sendNavigation({ type: 'files.navigate' })
       return
     }
+    if (row.kind === 'message') {
+      props.onClose()
+      if (props.onSelectMessage !== undefined) {
+        props.onSelectMessage({ sessionId: row.thread.id, seq: row.seq, role: row.role, query: searchText.trim() })
+      } else {
+        props.onOpenThread(row.thread.id)
+      }
+      return
+    }
     if (row.kind === 'thread' || row.kind === 'content') {
       props.onClose()
       props.onOpenThread(row.thread.id)
@@ -482,6 +559,13 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>): void => {
+    const roleShortcut = view === 'messages' && event.altKey && !event.metaKey && !event.ctrlKey ? MESSAGE_ROLE_BY_CODE.get(event.code) : undefined
+    if (roleShortcut !== undefined) {
+      event.preventDefault()
+      event.stopPropagation()
+      setMessageRole(roleShortcut)
+      return
+    }
     // Tab on an empty search toggles the Ask DSH bar, as Linear's palette does for Ask Linear.
     if (event.key === 'Tab' && !event.shiftKey && !subview && query.length === 0) {
       event.preventDefault()
@@ -528,6 +612,7 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   const viewCopy = {
     all: { chip: props.copy.viewAll, placeholder: props.copy.allPlaceholder },
     threads: { chip: props.copy.threads, placeholder: props.copy.threadsPlaceholder },
+    messages: { chip: props.copy.messages, placeholder: props.copy.messagesPlaceholder },
     files: { chip: props.copy.files, placeholder: props.copy.filesPlaceholder },
     backlog: { chip: props.copy.backlog, placeholder: props.copy.backlogPlaceholder },
     commands: { chip: props.copy.viewCommands, placeholder: props.copy.commandsPlaceholder },
@@ -558,6 +643,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
   let contentStatus: string | null = null
   if (view === 'content' && (props.searchContent === null || content.status === 'failed')) contentStatus = props.copy.contentUnavailable
   else if (view === 'content' && content.status === 'searching') contentStatus = props.copy.contentSearching
+  let messagesStatus: string | null = null
+  if (view === 'messages') {
+    if (messages.status === 'unavailable') messagesStatus = messages.unavailable === 'not-owner' ? props.copy.messagesNotOwner : props.copy.messagesUnavailable
+    else if (messages.status === 'failed') messagesStatus = props.copy.messagesFailed
+    else if (emptyQuery) messagesStatus = props.copy.messagesEmptyPrompt
+    else if (messages.status === 'too-short') messagesStatus = props.copy.messagesTooShort
+    else if (messages.status === 'searching') messagesStatus = props.copy.messagesSearching
+  }
   let filesStatus: string | null = null
   if (view === 'files' && workspaceFiles.status === 'unavailable') filesStatus = props.copy.filesUnavailable
   else if (view === 'files' && workspaceFiles.status === 'no-session') filesStatus = props.copy.filesNoSession
@@ -633,13 +726,14 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
               <Tabs
                 value={mode}
                 onValueChange={(value: string) => {
-                  if (value !== 'all' && value !== 'threads' && value !== 'files' && value !== 'backlog') return
+                  if (value !== 'all' && value !== 'threads' && value !== 'messages' && value !== 'files' && value !== 'backlog') return
                   sendNavigation({ type: 'mode.change', mode: value })
                 }}
               >
                 <TabsList aria-label={props.copy.searchIn}>
                   <TabsTrigger value="all">{props.copy.viewAll}</TabsTrigger>
                   <TabsTrigger value="threads">{props.copy.threads}</TabsTrigger>
+                  <TabsTrigger value="messages">{props.copy.messages}</TabsTrigger>
                   <TabsTrigger value="files">{props.copy.files}</TabsTrigger>
                   <TabsTrigger value="backlog">{props.copy.backlog}</TabsTrigger>
                 </TabsList>
@@ -648,13 +742,36 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
             {ask || subview ? <Badge variant="secondary">{viewCopy[view].chip}</Badge> : null}
             <span className="dshx:truncate">{notice ?? (actionSnapshot.matches('failed') && !ask ? props.copy.actionFailed : askStatus)}</span>
           </div>
+          {view === 'messages' ? (
+            <div
+              role="group"
+              aria-label={props.copy.messagesFilterLabel}
+              className="dshx:flex dshx:items-center dshx:gap-1.5 dshx:border-b dshx:px-3 dshx:py-1.5"
+            >
+              {MESSAGE_ROLES.map((option, index) => (
+                <Button
+                  key={option.value}
+                  type="button"
+                  size="xs"
+                  variant={messageRole === option.value ? 'secondary' : 'ghost'}
+                  aria-pressed={messageRole === option.value}
+                  aria-keyshortcuts={`Alt+${String(index + 1)}`}
+                  className="dshx:pointer-coarse:min-h-11 dshx:pointer-coarse:px-3"
+                  onMouseDown={event => event.preventDefault()}
+                  onClick={() => setMessageRole(option.value)}
+                >
+                  {props.copy[option.copy]}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           <CommandList className="dshx:max-h-[min(60vh,440px)] dshx:p-1">
             <CommandEmpty className="dshx:py-6 dshx:text-center dshx:text-sm dshx:text-muted-foreground">
               {ask && emptyQuery
                 ? props.copy.askEmpty
                 : missingSessionId && threadSearch.exactId !== undefined
                   ? props.copy.sessionNotFound.replace('{id}', threadSearch.exactId)
-                  : (filesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
+                  : (filesStatus ?? messagesStatus ?? contentStatus ?? (view === 'line' ? props.copy.linePlaceholder : props.copy.empty))}
             </CommandEmpty>
             {backlogRows.length > 0 ? (
               <CommandGroup heading={props.copy.backlog}>
@@ -737,6 +854,41 @@ export const ThreadPalette = (props: ThreadPaletteProps): JSX.Element => {
                     </CommandItem>
                   )
                 })}
+              </CommandGroup>
+            ) : null}
+            {messageRows.length > 0 ? (
+              <CommandGroup heading={props.copy.messages}>
+                {messageRows.map(hit => {
+                  const row: PaletteRow = { kind: 'message', ...hit }
+                  const date = contentDate(hit.time)
+                  const project = hit.thread.project.length === 0 ? props.copy.unassigned : projectLabel(hit.thread.project)
+                  const roleLabel = hit.role === 'assistant' ? props.copy.messagesRoleAssistant : props.copy.messagesRoleUser
+                  return (
+                    <CommandItem key={`${hit.thread.id}:${String(hit.seq)}`} value={rowValue(row)} className={itemClass} onSelect={() => void activate(row)}>
+                      <span
+                        className="dshx:inline-flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-muted dshx:text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        {hit.role === 'assistant' ? <BotIcon className="dshx:size-4" /> : <UserIcon className="dshx:size-4" />}
+                      </span>
+                      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
+                        <span className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:overflow-hidden">
+                          <Badge variant={hit.role === 'assistant' ? 'secondary' : 'outline'} className="dshx:shrink-0">
+                            {roleLabel}
+                          </Badge>
+                          <span className="dshx:truncate dshx:text-sm dshx:font-medium">{hit.thread.title}</span>
+                          <Badge variant="secondary" className="dshx:max-w-32 dshx:shrink-0 dshx:truncate">
+                            {project}
+                          </Badge>
+                          {date === undefined ? null : <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{date}</span>}
+                        </span>
+                        {hit.snippet.length === 0 ? null : <span className="dshx:line-clamp-2 dshx:text-xs dshx:text-muted-foreground">{hit.snippet}</span>}
+                      </span>
+                      {shortcut(row)}
+                    </CommandItem>
+                  )
+                })}
+                {messages.hasMore ? <p className="dshx:px-2.5 dshx:py-1.5 dshx:text-xs dshx:text-muted-foreground">{props.copy.messagesMore}</p> : null}
               </CommandGroup>
             ) : null}
             {threadActionRows.length > 0 ? (

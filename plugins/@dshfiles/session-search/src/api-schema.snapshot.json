@@ -404,6 +404,199 @@
         ],
         "additionalProperties": false
       }
+    },
+    {
+      "name": "searchMessages",
+      "description": "Search user and assistant messages across every top-level DSH thread (Session) whose indexed text contains all words of `text` (the last word may be a prefix), at most 3 per thread, best match first. Each match has its sessionId, event seq, role, time, snippet and cwd. Tool calls, tool results, thinking, subagent threads and user messages a plugin or agent sent are left out; `role` narrows to `user`, `assistant`, or `all` (default); `limit` defaults to 25. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.",
+      "tool": {
+        "name": "session_search_messages",
+        "readOnly": true
+      },
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "all",
+                  "user",
+                  "assistant"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ownsService": {
+            "type": "boolean"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "time": {
+                  "type": "number"
+                },
+                "snippet": {
+                  "type": "string"
+                },
+                "cwd": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "sessionId",
+                "seq",
+                "role",
+                "time",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ownsService",
+          "matches",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      },
+      "toolInput": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "all",
+              "user",
+              "assistant"
+            ]
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      },
+      "toolOutput": {
+        "type": "object",
+        "properties": {
+          "ownsService": {
+            "type": "boolean"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "sessionId": {
+                  "type": "string"
+                },
+                "seq": {
+                  "type": "integer"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ]
+                },
+                "time": {
+                  "type": "number"
+                },
+                "snippet": {
+                  "type": "string"
+                },
+                "cwd": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "sessionId",
+                "seq",
+                "role",
+                "time",
+                "snippet"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ownsService",
+          "matches",
+          "hasMore"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }

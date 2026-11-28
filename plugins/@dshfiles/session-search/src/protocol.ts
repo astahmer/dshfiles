@@ -1,7 +1,15 @@
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 
-import { FIND_LIMIT_MAX, findMatchSchema, indexHealthSchema, promptHistoryRequestSchema, promptHistoryResultSchema } from './api-schemas.js'
+import {
+  FIND_LIMIT_MAX,
+  findMatchSchema,
+  indexHealthSchema,
+  messageSearchRequestSchema,
+  messageSearchResultSchema,
+  promptHistoryRequestSchema,
+  promptHistoryResultSchema,
+} from './api-schemas.js'
 
 /** A JSON value as a session log stores it. */
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
@@ -118,6 +126,7 @@ export class SearchWorkerRpcs extends RpcGroup.make(
   Rpc.make('SearchSessions', { payload: sessionSearchRequestSchema, success: searchSessionsResultSchema, error: SearchWorkerFailed }),
   Rpc.make('SearchEvents', { payload: sessionEventSearchRequestSchema, success: searchEventsResultSchema, error: SearchWorkerFailed }),
   Rpc.make('FindInSession', { payload: findInSessionRequestSchema, success: findInSessionResultSchema, error: SearchWorkerFailed }),
+  Rpc.make('SearchMessages', { payload: messageSearchRequestSchema, success: messageSearchResultSchema, error: SearchWorkerFailed }),
   Rpc.make('PromptHistory', { payload: promptHistoryRequestSchema, success: promptHistoryResultSchema, error: SearchWorkerFailed }),
   Rpc.make('StartIngest', { payload: { root: Schema.String.check(Schema.isMinLength(1)) }, success: indexHealthSchema, error: SearchWorkerFailed }),
   Rpc.make('SetArchived', { payload: { archivedSessionIds: Schema.Array(Schema.String) }, success: indexHealthSchema, error: SearchWorkerFailed }),

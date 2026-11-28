@@ -20,7 +20,7 @@ export interface PaletteThread {
   readonly archived: boolean
 }
 
-export type PaletteMode = 'all' | 'threads' | 'files' | 'backlog'
+export type PaletteMode = 'all' | 'threads' | 'messages' | 'files' | 'backlog'
 export type PaletteThemePreference = 'light' | 'dark' | 'system'
 
 /** Read-only snapshot of where the user is; it holds no Service objects. */

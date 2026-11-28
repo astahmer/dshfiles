@@ -3,23 +3,26 @@ import type { ConversationViewRequest } from '@deepseek-ai/dsh-client-ui-convers
 import { assign, createActor, fromCallback, setup } from '@dshfiles/plugin-ui/machine'
 import * as Option from 'effect/Option'
 import * as Schema from 'effect/Schema'
-import { ChatFocusModel, type ChatFocus, type ChatTurnTailExtras } from './chat-focus.ts'
+import { ChatFocusModel, type ChatFocus, type ChatFocusTarget, type ChatMessageFocus, type ChatTurnTailExtras } from './chat-focus.ts'
+import { CHAT_FOCUS_ATTRIBUTE, clearFindHighlight, revealFindHit, type FindRevealOutcome, type FindRevealTarget } from './native/chat/find-reveal.ts'
+import { ThreadFindModel } from './native/chat/thread-find-model.ts'
 import type { TurnRailItem } from './native/chat/turn-rail-items.ts'
+
+export { CHAT_FOCUS_ATTRIBUTE }
 
 const focusEventDetailSchema = Schema.Struct({ sessionId: Schema.String })
 
 const REVEAL_TIMEOUT_MS = 4_000
 const HIGHLIGHT_MS = 4_000
 
-/** Marks the row a focus landed on; ChatView.module.css outlines it until the attribute is removed. Tool rows carry the native `data-chat-call-id`. */
-export const CHAT_FOCUS_ATTRIBUTE = 'data-chat-focus'
-
 /** The thread's native Conversation View opener, handed by ChatView to the Turn-tail seats it renders. */
 export const ConversationViewOpenerContext = createContext<ChatTurnTailExtras['openView']>(undefined)
 
+const isMessageFocus = (focus: ChatFocusTarget): focus is ChatMessageFocus => 'seq' in focus
+
 const turnSelector = (turn: number): string => `[data-chat-turn="${String(turn)}"]`
 
-const targetOf = (list: HTMLElement, focus: ChatFocus): HTMLElement | null => {
+const turnTargetOf = (list: HTMLElement, focus: ChatFocus): HTMLElement | null => {
   if (focus.toolCallId !== undefined) {
     return [...list.querySelectorAll<HTMLElement>('[data-chat-call-id]')].find(row => row.dataset.chatCallId === focus.toolCallId) ?? null
   }
@@ -34,7 +37,11 @@ export interface ChatFocusRevealPorts {
   /** @returns the transcript list, or null while the view is detached. */
   list: () => HTMLElement | null
   /** Jump the request's Turn into the page through rail navigation. */
-  navigate: (focus: ChatFocus) => void
+  navigate: (focus: ChatFocusTarget) => void
+  /** Map a message-sequence focus to its Turn number once rail anchors are loaded. */
+  resolveTurn?: (focus: ChatMessageFocus) => number | null
+  /** Map a message-sequence focus to its rendered row key once the Turn's Nodes are loaded. */
+  resolveRow?: (focus: ChatMessageFocus, turn: number | null) => string | null
 }
 
 interface RevealTiming {
@@ -45,16 +52,70 @@ interface RevealTiming {
 }
 
 interface RevealActorInput extends RevealTiming {
-  readonly list: HTMLElement | null
-  readonly focus: ChatFocus | null
+  readonly ports: ChatFocusRevealPorts
+  readonly focus: ChatFocusTarget | null
 }
 
-const revealActor = fromCallback<{ type: 'landed'; target: HTMLElement } | { type: 'missed' }, RevealActorInput>(({ input, sendBack }) => {
-  const { list, focus } = input
-  if (list === null || focus === null) {
+/** A row the reveal landed on; `centered` when the find reveal already scrolled it, `text` when it set a text highlight. */
+type RevealLanding = { readonly type: 'landed'; readonly target: HTMLElement; readonly centered?: boolean; readonly text?: boolean }
+type RevealOutcome = RevealLanding | { readonly type: 'missed' }
+
+const landingOf = (outcome: FindRevealOutcome): RevealOutcome => {
+  if (outcome.kind === 'missed') return { type: 'missed' }
+  if (outcome.kind === 'row') return { type: 'landed', target: outcome.element, centered: true }
+  const textParent = outcome.range.startContainer.parentElement
+  const row = textParent?.closest<HTMLElement>('[data-chat-node-key]') ?? textParent
+  return row === null || row === undefined ? { type: 'missed' } : { type: 'landed', target: row, centered: true, text: true }
+}
+
+/**
+ * A message focus waits for the rail to place its sequence in a Turn (a cold thread's outline arrives after the view
+ * mounts), pages that Turn in, then hands the row to the find reveal: it opens "Worked for…" process rows, folded
+ * groups, long prompts and closed tool rows, and highlights the matched words when the focus carries a query.
+ */
+const revealMessage = (input: {
+  readonly ports: ChatFocusRevealPorts
+  readonly focus: ChatMessageFocus
+  readonly waitMs: number
+  readonly sendBack: (outcome: RevealOutcome) => void
+}): (() => void) => {
+  const { ports, focus } = input
+  const deadline = performance.now() + input.waitMs
+  let frame = 0
+  let cancelFind: (() => void) | null = null
+  const tick = (): void => {
+    const list = ports.list()
+    const turn = list === null ? null : (ports.resolveTurn?.(focus) ?? null)
+    if (list === null || turn === null) {
+      if (performance.now() > deadline) input.sendBack({ type: 'missed' })
+      else frame = requestAnimationFrame(tick)
+      return
+    }
+    ports.navigate(focus)
+    const base: FindRevealTarget = {
+      list: ports.list,
+      turn,
+      row: () => ports.resolveRow?.(focus, turn) ?? null,
+      terms: focus.query === undefined ? [] : ThreadFindModel.terms(focus.query),
+    }
+    const prefer = ThreadFindModel.rowKindOf(focus.type)
+    const target: FindRevealTarget = prefer === undefined ? base : { ...base, prefer }
+    cancelFind = revealFindHit(target, outcome => input.sendBack(landingOf(outcome)))
+  }
+  frame = requestAnimationFrame(tick)
+  return () => {
+    cancelAnimationFrame(frame)
+    cancelFind?.()
+  }
+}
+
+const revealActor = fromCallback<RevealOutcome, RevealActorInput>(({ input, sendBack }) => {
+  const { ports, focus } = input
+  if (focus === null) {
     sendBack({ type: 'missed' })
     return
   }
+  if (isMessageFocus(focus)) return revealMessage({ ports, focus, waitMs: input.retryMs, sendBack })
   const deadline = performance.now() + input.retryMs
   const revealed = new WeakSet<Element>()
   let frame = 0
@@ -64,8 +125,17 @@ const revealActor = fromCallback<{ type: 'landed'; target: HTMLElement } | { typ
     element.dispatchEvent(new Event('beforematch'))
   }
   const tick = (): void => {
+    const list = ports.list()
+    if (list === null) {
+      if (performance.now() > deadline) {
+        sendBack({ type: 'missed' })
+        return
+      }
+      frame = requestAnimationFrame(tick)
+      return
+    }
     const turnRows = [...list.querySelectorAll<HTMLElement>(turnSelector(focus.turn))]
-    const target = targetOf(list, focus)
+    const target = turnTargetOf(list, focus)
     const hidden = target === null ? null : hiddenAncestor(target)
     if (target !== null && hidden === null) {
       sendBack({ type: 'landed', target })
@@ -94,16 +164,15 @@ const revealActor = fromCallback<{ type: 'landed'; target: HTMLElement } | { typ
 interface ChatFocusRevealContext extends RevealTiming {
   readonly ports: ChatFocusRevealPorts
   readonly ready: boolean
-  readonly focus: ChatFocus | null
-  readonly landed: HTMLElement | null
+  readonly focus: ChatFocusTarget | null
+  readonly landed: RevealLanding | null
 }
 
 type ChatFocusRevealEvent =
-  | { readonly type: 'request'; readonly focus: ChatFocus }
+  | { readonly type: 'request'; readonly focus: ChatFocusTarget }
   | { readonly type: 'ready'; readonly ready: boolean }
   | { readonly type: 'cancel' }
-  | { readonly type: 'landed'; readonly target: HTMLElement }
-  | { readonly type: 'missed' }
+  | RevealOutcome
 
 interface ChatFocusRevealInput extends RevealTiming {
   readonly ports: ChatFocusRevealPorts
@@ -128,13 +197,14 @@ export const createChatFocusRevealMachine = (timing: RevealTiming) =>
     actors: { reveal: revealActor },
     actions: {
       highlight: ({ context }) => {
-        const target = context.landed
-        if (target === null) return
-        target.scrollIntoView({ block: 'center' })
-        target.setAttribute(CHAT_FOCUS_ATTRIBUTE, '')
+        const landed = context.landed
+        if (landed === null) return
+        if (landed.centered !== true) landed.target.scrollIntoView({ block: 'center' })
+        landed.target.setAttribute(CHAT_FOCUS_ATTRIBUTE, '')
       },
       clearHighlight: ({ context }) => {
-        context.landed?.removeAttribute(CHAT_FOCUS_ATTRIBUTE)
+        context.landed?.target.removeAttribute(CHAT_FOCUS_ATTRIBUTE)
+        if (context.landed?.text === true) clearFindHighlight()
       },
     },
   }).createMachine({
@@ -168,19 +238,19 @@ export const createChatFocusRevealMachine = (timing: RevealTiming) =>
       },
       revealing: {
         entry: ({ context }) => {
-          if (context.focus !== null) context.ports.navigate(context.focus)
+          if (context.focus !== null && !isMessageFocus(context.focus)) context.ports.navigate(context.focus)
         },
         invoke: {
           src: 'reveal',
           input: ({ context }) => ({
             retryMs: context.retryMs,
             highlightMs: context.highlightMs,
-            list: context.ports.list(),
+            ports: context.ports,
             focus: context.focus,
           }),
         },
         on: {
-          landed: { target: 'highlighted', actions: assign({ landed: ({ event }) => event.target }) },
+          landed: { target: 'highlighted', actions: assign({ landed: ({ event }) => event }) },
           missed: { target: 'idle', actions: assign({ focus: null }) },
           cancel: { target: 'idle', actions: assign({ focus: null }) },
           request: { target: 'revealing', reenter: true, actions: assign({ focus: ({ event }) => event.focus }) },
@@ -211,13 +281,25 @@ const chatFocusRevealMachine = createChatFocusRevealMachine({ retryMs: REVEAL_TI
  * page loads) or the timeout lands on the Turn row instead.
  * @returns a cancel function that stops retrying and clears the highlight.
  */
-export const revealChatFocus = (input: { readonly list: HTMLElement; readonly focus: ChatFocus }): (() => void) => {
+export const revealChatFocus = (input: {
+  readonly list: HTMLElement
+  readonly focus: ChatFocusTarget
+  readonly resolveTurn?: (focus: ChatMessageFocus) => number | null
+  readonly resolveRow?: (focus: ChatMessageFocus, turn: number | null) => string | null
+  readonly navigate?: (focus: ChatFocusTarget) => void
+}): (() => void) => {
+  const ports: ChatFocusRevealPorts = {
+    list: () => input.list,
+    navigate: input.navigate ?? (() => {}),
+  }
+  if (input.resolveTurn !== undefined) ports.resolveTurn = input.resolveTurn
+  if (input.resolveRow !== undefined) ports.resolveRow = input.resolveRow
   const actor = createActor(chatFocusRevealMachine, {
     input: {
       ready: true,
       retryMs: REVEAL_TIMEOUT_MS,
       highlightMs: HIGHLIGHT_MS,
-      ports: { list: () => input.list, navigate: () => {} },
+      ports,
     },
   })
   actor.start()
@@ -239,9 +321,11 @@ export const useChatFocus = (input: {
   readonly ready: boolean
   readonly railItems: readonly TurnRailItem[]
   readonly navigateToTurn: (item: TurnRailItem) => void
+  readonly jumpToTurn?: (turn: number) => void
+  readonly rowFor?: (turn: number, seq: number, type: string | undefined) => string | null
   readonly listRef: RefObject<HTMLDivElement>
 }): void => {
-  const { viewRequest, completeViewRequest, sessionId, ready, railItems, navigateToTurn, listRef } = input
+  const { viewRequest, completeViewRequest, sessionId, ready, railItems, navigateToTurn, jumpToTurn, rowFor, listRef } = input
   const ports = useRef<ChatFocusRevealPorts>({ list: () => null, navigate: () => {} })
   const [reveal] = useState(() =>
     createActor(chatFocusRevealMachine, {
@@ -250,7 +334,21 @@ export const useChatFocus = (input: {
   )
   useLayoutEffect(() => {
     ports.current.list = () => listRef.current
-    ports.current.navigate = (focus: ChatFocus) => {
+    ports.current.resolveTurn = (focus: ChatMessageFocus) => ThreadFindModel.turnOf(railItems, focus.seq)
+    ports.current.resolveRow = (focus: ChatMessageFocus, turn: number | null) =>
+      turn === null || rowFor === undefined ? null : rowFor(turn, focus.seq, focus.type)
+    ports.current.navigate = (focus: ChatFocusTarget) => {
+      if (isMessageFocus(focus)) {
+        const turn = ThreadFindModel.turnOf(railItems, focus.seq)
+        if (turn === null) return
+        if (jumpToTurn !== undefined) {
+          jumpToTurn(turn)
+          return
+        }
+        const item = railItems.find(candidate => candidate.turn === turn)
+        if (item !== undefined) navigateToTurn(item)
+        return
+      }
       const item = railItems.find(candidate => candidate.turn === focus.turn)
       if (item !== undefined) navigateToTurn(item)
     }

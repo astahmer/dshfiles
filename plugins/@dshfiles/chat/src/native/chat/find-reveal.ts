@@ -7,7 +7,8 @@
  * sends (each fold's own reveal runs), then highlight the matching text with the CSS Custom Highlight API, which
  * styles a Range without touching React's DOM.
  */
-import { CHAT_FOCUS_ATTRIBUTE } from '../../chat-focus-reveal.ts'
+/** Marks the row a focus landed on; ChatView.module.css outlines it until the attribute is removed. Tool rows carry the native `data-chat-call-id`. */
+export const CHAT_FOCUS_ATTRIBUTE = 'data-chat-focus'
 
 /** Highlight registry names; ChatView.module.css styles `::highlight()` of both. */
 export const FIND_CURRENT_HIGHLIGHT = 'dshfiles-find-current'

@@ -182,16 +182,17 @@
     },
     {
       "id": "focus-from-plugin",
-      "title": "Scroll to a turn, step or tool call on request",
-      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the folded process group with the beforematch event browser find uses, and outlines the row; Turn-footer entries get the thread's View opener.",
+      "title": "Scroll to a turn, step, tool call or message on request",
+      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step, tool call or message (by event sequence): through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the folded process group with the beforematch event browser find uses, and outlines the row; a message focus goes through the find reveal, which also opens a finished turn's Worked-for row and a folded long prompt and highlights the searched words. Turn-footer entries get the thread's View opener.",
       "surfaces": ["client"],
       "surface": "infrastructure",
       "destination": "none",
       "currentSurface": "client: chat focus contract",
       "configuration": [],
-      "states": ["focus-requested", "turn-landed", "tool-call-revealed", "fallback-to-turn"],
+      "states": ["focus-requested", "turn-landed", "tool-call-revealed", "message-revealed", "fallback-to-turn"],
       "failureModes": [
         "A tool call or step that never appears within 4 s lands on its turn.",
+        "A message whose sequence the turn rail cannot place within 4 s is dropped; one the find reveal cannot reach within 6 s lands on its turn.",
         "A cross-thread request expires after 30 s when the thread never shows Chat."
       ],
       "externalDependencies": [],
@@ -216,6 +217,30 @@
           "id": "chat.focus-reveal",
           "file": "plugins/@dshfiles/chat/tests/chat-focus.test.ts",
           "testName": "opens a folded group with beforematch, then scrolls to and highlights the tool call it mounts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.focus-message-contract",
+          "file": "plugins/@dshfiles/chat/tests/chat-focus.test.ts",
+          "testName": "round-trips a message-sequence focus and refuses invalid shapes"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.focus-message-prompt-fold",
+          "file": "plugins/@dshfiles/chat/tests/chat-focus.test.ts",
+          "testName": "opens the folded prompt bubble inside the row before landing on the matched message"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.focus-message-worked-for",
+          "file": "plugins/@dshfiles/chat/tests/chat-focus.test.ts",
+          "testName": "opens a finished Turn’s “Worked for” row to reach an agent message folded inside it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.focus-message-cold-thread",
+          "file": "plugins/@dshfiles/chat/tests/chat-focus.test.ts",
+          "testName": "waits for a cold thread’s rail to place the sequence, navigates once, and gives up without it"
         },
         {
           "kind": "gherkin",

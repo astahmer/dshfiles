@@ -63,3 +63,37 @@ export type HistoryPrompt = typeof historyPromptSchema.Type
 
 export const promptHistoryResultSchema = Schema.Struct({ prompts: Schema.Array(historyPromptSchema) })
 export type PromptHistoryResult = typeof promptHistoryResultSchema.Type
+
+/** Most matches one cross-thread message search returns; more report `hasMore`. */
+export const MESSAGE_SEARCH_LIMIT_MAX = 100
+
+export const messageRoleFilterSchema = Schema.Literals(['all', 'user', 'assistant'])
+export type MessageRoleFilter = typeof messageRoleFilterSchema.Type
+
+export const messageRoleSchema = Schema.Literals(['user', 'assistant'])
+export type MessageRole = typeof messageRoleSchema.Type
+
+export const messageSearchRequestSchema = Schema.Struct({
+  /** An FTS5 expression from `findExpression`. */
+  query: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(4_096)),
+  role: messageRoleFilterSchema,
+  limit: boundedInt(MESSAGE_SEARCH_LIMIT_MAX),
+})
+export type MessageSearchRequest = typeof messageSearchRequestSchema.Type
+
+/** One matching user or assistant message across top-level threads. */
+export const messageSearchMatchSchema = Schema.Struct({
+  sessionId: Schema.String,
+  seq: countSchema,
+  role: messageRoleSchema,
+  time: Schema.Number.check(Schema.isFinite()),
+  snippet: Schema.String,
+  cwd: Schema.optional(Schema.String),
+})
+export type MessageSearchMatch = typeof messageSearchMatchSchema.Type
+
+export const messageSearchResultSchema = Schema.Struct({
+  matches: Schema.Array(messageSearchMatchSchema),
+  hasMore: Schema.Boolean,
+})
+export type MessageSearchResult = typeof messageSearchResultSchema.Type

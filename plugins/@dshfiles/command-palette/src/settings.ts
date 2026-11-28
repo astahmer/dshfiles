@@ -9,6 +9,12 @@ export const paletteSettings = defineSettings({
       .description(
         'Threads the Threads tab lists: the current project’s (its thread workspaces included), or every project’s. Without a current project it lists them all.',
       ),
+    messageSelectBehavior: Schema.union([
+      Schema.const('reveal').description('Open thread and scroll to message'),
+      Schema.const('open').description('Open thread only'),
+    ])
+      .default('reveal')
+      .description('What happens when you pick a match in the Messages tab: open the thread and scroll to the matched message, or only open the thread.'),
   }),
   applies: 'live',
 })

@@ -498,7 +498,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "session-search",
       "description": "Owns the sessionQuery search backend: an off-thread FTS5 index fed incrementally from session logs, so a content search is a pure read that never blocks the Host event loop.",
       "ui": false,
-      "features": 3
+      "features": 4
     },
     {
       "name": "session-source-port",
@@ -648,7 +648,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "tool-subagent",
       "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
       "ui": false,
-      "features": 2
+      "features": 3
     },
     {
       "name": "traces",
@@ -11214,8 +11214,8 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "key": "chat#focus-from-plugin",
       "plugin": "chat",
       "id": "focus-from-plugin",
-      "title": "Scroll to a turn, step or tool call on request",
-      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step or tool call: through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps through the turn rail, opens the fo…",
+      "title": "Scroll to a turn, step, tool call or message on request",
+      "summary": "Another plugin asks Chat to scroll to and highlight one turn, step, tool call or message (by event sequence): through the native Conversation View focus request inside the thread, or a pending request right after it opens the thread (@dshfiles/chat/chat-focus). Chat jumps throug…",
       "destination": "none",
       "currentSurface": "client: chat focus contract",
       "reach": [
@@ -22151,6 +22151,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "onboarding": null
     },
     {
+      "key": "session-search#message-search",
+      "plugin": "session-search",
+      "id": "message-search",
+      "title": "Search user and assistant messages across threads",
+      "summary": "Search current-surface user/message and assistant/message documents across top-level threads, optionally narrowed by role (all, user, assistant), leaving out user messages a plugin or agent sent, routing through conversation_documents once backfilled and returning each hit's ses…",
+      "destination": "none",
+      "currentSurface": "host: session-search searchMessages API (read by @dshfiles/command-palette) and session_search_messages tool",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
       "key": "session-source-port#session-source-registry",
       "plugin": "session-source-port",
       "id": "session-source-registry",
@@ -27380,6 +27392,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's…",
       "destination": "none",
       "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#child-turn-guard",
+      "plugin": "tool-subagent",
+      "id": "child-turn-guard",
+      "title": "Keep a delegated child working when its turn hands the task back",
+      "summary": "A delegated child that ends a turn as completed while its closing text hands the task back (reassign, cannot complete, no implementation, unfinished, remains unverified, do not land, not implemented, hand back, take over) receives one continuing message at the loop's turn-stoppi…",
+      "destination": "none",
+      "currentSurface": "host: delegated child turns",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

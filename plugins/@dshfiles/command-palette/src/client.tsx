@@ -9,11 +9,14 @@ import type { ThemeSnapshot } from '@deepseek-ai/dsh-client-ui-theme/client'
 import type { SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsLocale, PropsRuntime, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WorkspaceBrowserProps } from '@deepseek-ai/dsh-client-ui-workspace/client'
+import { ChatFocusModel } from '@dshfiles/chat/chat-focus'
+import { sessionSearchApi } from '@dshfiles/session-search/search-api'
 import { dshxRegistryApi } from '@dshfiles/dshx/api'
 import { Command, createApiClient, createRegisteredApiClient, defineClient, useSettings } from '@dshfiles/dshx/client'
 import { PaletteRules } from './palette.js'
 import { paletteSettings, type PaletteSettings } from './settings.js'
 import { askDsh } from './ask-dsh.js'
+import { MessageSearchSource, type MessageSearch } from './message-search-source.js'
 import { createThreadContentSearch } from './thread-content-source.js'
 import { useCallback, useMemo, useSyncExternalStore } from 'react'
 import { EntityLabels } from '@dshfiles/plugin-ui/hooks/entity-labels'
@@ -47,6 +50,7 @@ interface PaletteOverlayProps extends PropsRuntime<'shell.overlay'>, PropsLocale
   readonly useWorkspaces: WorkspaceBrowserProps['useWorkspaces']
   readonly themeStore: SnapshotStore<ThemeSnapshot>
   readonly searchContent: (query: string, signal: AbortSignal) => Promise<readonly { readonly sessionId: string; readonly snippet: string }[]>
+  readonly searchMessages: MessageSearch
   readonly openSession: (sessionId: SessionSummary['id']) => void
   readonly openWorkspace: (workspaceId: WorkspaceView['workspaceId']) => Promise<void>
   /** Create a fresh thread for one Ask DSH question, send it, then open the thread. */
@@ -196,7 +200,9 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
     [archivedSessionIds, projectTitleOf, sessions, sessionsById, workspaceBySession, workspacePathById],
   )
   const threads = useMemo(() => threadEntries.map(entry => entry.thread), [threadEntries])
-  const threadsScope = (useSettings(paletteSettings).value ?? defaultSettings).threadsScope
+  const paletteConfig = useSettings(paletteSettings).value
+  const threadsScope = paletteConfig?.threadsScope ?? defaultSettings.threadsScope
+  const messageSelectBehavior = paletteConfig?.messageSelectBehavior ?? defaultSettings.messageSelectBehavior
   const currentRepository = threadsScope === 'project' ? repositoryOf(askWorkspaceId) : undefined
   const projectThreads = useMemo(
     () => (currentRepository === undefined ? undefined : threadEntries.filter(entry => entry.repository === currentRepository).map(entry => entry.thread)),
@@ -239,6 +245,19 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         backlogUnavailable: props.translate('commandPaletteBacklogUnavailable'),
         recent: props.translate('commandPaletteRecent'),
         threads: props.translate('commandPaletteThreads'),
+        messages: props.translate('commandPaletteMessages'),
+        messagesPlaceholder: props.translate('commandPaletteMessagesPlaceholder'),
+        messagesFilterLabel: props.translate('commandPaletteMessagesFilterLabel'),
+        messagesRoleAll: props.translate('commandPaletteMessagesRoleAll'),
+        messagesRoleAssistant: props.translate('commandPaletteMessagesRoleAssistant'),
+        messagesRoleUser: props.translate('commandPaletteMessagesRoleUser'),
+        messagesEmptyPrompt: props.translate('commandPaletteMessagesEmptyPrompt'),
+        messagesSearching: props.translate('commandPaletteMessagesSearching'),
+        messagesTooShort: props.translate('commandPaletteMessagesTooShort'),
+        messagesUnavailable: props.translate('commandPaletteMessagesUnavailable'),
+        messagesNotOwner: props.translate('commandPaletteMessagesNotOwner'),
+        messagesFailed: props.translate('commandPaletteMessagesFailed'),
+        messagesMore: props.translate('commandPaletteMessagesMore'),
         destinations: props.translate('commandPaletteDestinations'),
         commands: props.translate('commandPaletteCommands'),
         files: props.translate('commandPaletteFiles'),
@@ -294,6 +313,7 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
         actionFailed: props.translate('commandPaletteActionFailed'),
       }}
       searchContent={props.searchContent}
+      searchMessages={props.searchMessages}
       onAsk={question => props.askDsh({ question, workspaceId: askWorkspaceId })}
       onBacklogCapture={text => {
         const event = new CustomEvent('dshfiles:backlog-capture', { detail: { text }, cancelable: true })
@@ -302,6 +322,19 @@ const PaletteCatalog = (props: PaletteCatalogProps): JSX.Element => {
       onOpenThread={sessionId => {
         const session = sessions.find(candidate => candidate.id === sessionId)
         if (session !== undefined) props.openSession(session.id)
+      }}
+      onSelectMessage={selection => {
+        const session = sessions.find(candidate => candidate.id === selection.sessionId)
+        if (session === undefined) return
+        MessageSearchSource.applySelection({
+          behavior: messageSelectBehavior,
+          sessionId: session.id,
+          seq: selection.seq,
+          role: selection.role,
+          query: selection.query,
+          openSession: () => props.openSession(session.id),
+          requestFocus: focus => ChatFocusModel.request({ sessionId: session.id, focus }),
+        })
       }}
       onClose={PaletteApi.close}
     />
@@ -365,6 +398,8 @@ export default defineClient({
         return result.value.items.map(item => ({ sessionId: item.sessionId, snippet: item.snippet }))
       },
     })
+    const sessionSearch = createApiClient(ctx, sessionSearchApi)
+    const searchMessages = MessageSearchSource.create({ call: (input, signal) => sessionSearch.searchMessages(input, { signal }) })
     ctx.effect(
       () =>
         ctx.slots.inject('shell.overlay', () =>
@@ -383,6 +418,7 @@ export default defineClient({
                 useWorkspaces={props.useWorkspaces}
                 themeStore={themeStore}
                 searchContent={searchContent}
+                searchMessages={searchMessages}
                 openSession={sessionId => ctx.uiWorkspace.openSession(sessionId)}
                 openWorkspace={workspaceId => ctx.uiWorkspace.openWorkspace(workspaceId)}
                 askDsh={async ({ question, workspaceId }) => {

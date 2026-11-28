@@ -6,6 +6,9 @@ import {
   findMatchSchema,
   historyPromptSchema,
   indexHealthSchema,
+  MESSAGE_SEARCH_LIMIT_MAX,
+  messageRoleFilterSchema,
+  messageSearchMatchSchema,
   PROMPT_HISTORY_CHARS_MAX,
   PROMPT_HISTORY_LIMIT_MAX,
   PROMPT_HISTORY_WINDOW_MAX,
@@ -20,6 +23,23 @@ const renderFind = (output: { readonly ownsService: boolean; readonly matches: r
   if (output.matches.length === 0) return 'No event of that thread matches.'
   const lines = output.matches.map(match => `seq ${String(match.seq)} · ${match.type} · ${match.snippet}`)
   return [...lines, ...(output.hasMore ? ['More matches exist: raise `limit` or narrow `text`.'] : [])].join('\n')
+}
+
+/** What `searchMessages` answers; Clients decode it with this schema instead of restating it. */
+export const searchMessagesOutputSchema = Schema.Struct({
+  ownsService: Schema.Boolean,
+  matches: Schema.Array(messageSearchMatchSchema),
+  hasMore: Schema.Boolean,
+})
+export type SearchMessagesOutput = typeof searchMessagesOutputSchema.Type
+/** The sender filter `searchMessages` takes in `role`. */
+export type SearchMessagesRole = typeof messageRoleFilterSchema.Type
+
+const renderMessages = (output: SearchMessagesOutput): string => {
+  if (!output.ownsService) return 'The owned session-search index does not serve this profile, so messages cannot be searched.'
+  if (output.matches.length === 0) return 'No user or assistant message matches.'
+  const lines = output.matches.map(match => `${match.sessionId} · seq ${String(match.seq)} · ${match.role} · ${match.snippet}`)
+  return [...lines, ...(output.hasMore ? ['More matches exist: raise `limit`, narrow `text` or set `role`.'] : [])].join('\n')
 }
 
 const method = <const Input extends Schema.ConstraintDecoder<unknown>, const Output extends Schema.ConstraintDecoder<unknown>>(
@@ -75,6 +95,18 @@ export const sessionSearchApi = defineApi({
       description:
         'The prompts people sent across every top-level thread, newest first, each text once: only the newest `window` prompts no longer than `maxChars` characters, narrowed to those containing every word of `text` when given. Subagent threads and messages sent by a plugin or agent are left out. Read-only.',
       readOnly: true,
+    }),
+    // Added after promptHistory: a Host started before it answers with an unknown-endpoint error.
+    searchMessages: method({
+      input: Schema.Struct({
+        text: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(512)),
+        role: Schema.optional(messageRoleFilterSchema),
+        limit: Schema.optional(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(MESSAGE_SEARCH_LIMIT_MAX))),
+      }),
+      output: searchMessagesOutputSchema,
+      description:
+        'Search user and assistant messages across every top-level DSH thread (Session) whose indexed text contains all words of `text` (the last word may be a prefix), at most 3 per thread, best match first. Each match has its sessionId, event seq, role, time, snippet and cwd. Tool calls, tool results, thinking, subagent threads and user messages a plugin or agent sent are left out; `role` narrows to `user`, `assistant`, or `all` (default); `limit` defaults to 25. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.',
+      tool: { name: 'session_search_messages', readOnly: true, render: renderMessages },
     }),
   },
 })

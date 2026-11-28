@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { PaletteApi } from './palette-api.js'
 import type { PaletteActionContext } from './palette-contract.js'
+import type { MessageSearch } from './message-search-source.js'
 import { ThreadPalette, type ThreadPaletteCopy } from './thread-palette.js'
 
 const copy: ThreadPaletteCopy = {
@@ -16,6 +17,19 @@ const copy: ThreadPaletteCopy = {
   backlogUnavailable: 'Install Backlog to capture this draft.',
   recent: 'Recent',
   threads: 'Threads',
+  messages: 'Messages',
+  messagesPlaceholder: 'Search user and agent messages across threads…',
+  messagesFilterLabel: 'Filter messages by sender',
+  messagesRoleAll: 'All',
+  messagesRoleAssistant: 'Agent',
+  messagesRoleUser: 'User',
+  messagesEmptyPrompt: 'Type to search user and agent messages across threads.',
+  messagesSearching: 'Searching messages…',
+  messagesTooShort: 'Type at least 2 characters to search messages.',
+  messagesUnavailable: 'Message search needs @dshfiles/session-search.',
+  messagesNotOwner: 'Another plugin owns thread search.',
+  messagesFailed: 'Message search failed.',
+  messagesMore: 'Showing the best matches only.',
   destinations: 'Destinations',
   commands: 'Commands',
   files: 'Files',
@@ -536,5 +550,164 @@ describe('ThreadPalette thread actions and keycaps', () => {
     const newThread = options.find(option => option.textContent?.includes('New thread'))
     expect(newThread?.textContent).toContain('⌘⇧O')
     for (const dispose of disposers) dispose()
+  })
+})
+
+describe('ThreadPalette Messages tab', () => {
+  const thread = {
+    id: 'session-quartz',
+    title: 'Quartz rollout',
+    project: 'dshfiles',
+    cwd: '/repo/dshfiles',
+    updatedAt: 1_700_000_000_000,
+    running: false,
+  }
+
+  it('searches user and agent messages across threads, narrows by sender filter, and reports the selected message', async () => {
+    const searchMessages = vi.fn(async ({ query, role }: { readonly query: string; readonly role: 'all' | 'user' | 'assistant' }) => {
+      const allHits = [
+        { sessionId: 'session-quartz', seq: 4, role: 'user' as const, time: 1_700_000_000_000, snippet: `User asked about ${query}` },
+        { sessionId: 'session-quartz', seq: 9, role: 'assistant' as const, time: 1_700_000_050_000, snippet: `Agent answered ${query}` },
+        { sessionId: 'session-archived', seq: 2, role: 'assistant' as const, time: 1_700_000_060_000, snippet: `Archived ${query}` },
+      ]
+      return {
+        kind: 'ready' as const,
+        hasMore: false,
+        hits: role === 'all' ? allHits : allHits.filter(hit => hit.role === role),
+      }
+    })
+    const onSelectMessage = vi.fn()
+    const onClose = vi.fn()
+
+    render(
+      <ThreadPalette
+        mode="all"
+        threads={[thread]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        searchMessages={searchMessages}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onSelectMessage={onSelectMessage}
+        onClose={onClose}
+      />,
+    )
+
+    const messagesTab = screen.getByRole('tab', { name: 'Messages' })
+    fireEvent.mouseDown(messagesTab, { button: 0 })
+    fireEvent.click(messagesTab)
+    expect(messagesTab.getAttribute('aria-selected')).toBe('true')
+    expect(await screen.findByText('Type to search user and agent messages across threads.')).toBeTruthy()
+
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: 'quartz' } })
+
+    expect(await screen.findByText('User asked about quartz')).toBeTruthy()
+    expect(screen.getByText('Agent answered quartz')).toBeTruthy()
+    expect(screen.queryByText('Archived quartz')).toBeNull()
+
+    const agentFilter = screen.getByRole('button', { name: 'Agent' })
+    fireEvent.click(agentFilter)
+    expect(agentFilter.getAttribute('aria-pressed')).toBe('true')
+    await waitFor(() => expect(screen.queryByText('User asked about quartz')).toBeNull())
+    expect(screen.getByText('Agent answered quartz')).toBeTruthy()
+
+    const userFilter = screen.getByRole('button', { name: 'User' })
+    fireEvent.click(userFilter)
+    expect(userFilter.getAttribute('aria-pressed')).toBe('true')
+    await waitFor(() => expect(screen.queryByText('Agent answered quartz')).toBeNull())
+    const userOption = await screen.findByRole('option', { name: /User asked about quartz/ })
+    fireEvent.click(userOption)
+
+    expect(onClose).toHaveBeenCalledTimes(1)
+    expect(onSelectMessage).toHaveBeenCalledWith({
+      sessionId: 'session-quartz',
+      seq: 4,
+      role: 'user',
+      query: 'quartz',
+    })
+  })
+
+  const renderMessages = (searchMessages: MessageSearch | null) =>
+    render(
+      <ThreadPalette
+        mode="messages"
+        threads={[thread]}
+        context={context}
+        additionalActions={[]}
+        recentLimit={6}
+        mac
+        copy={copy}
+        searchContent={null}
+        searchMessages={searchMessages}
+        onAsk={vi.fn(async () => {})}
+        onBacklogCapture={vi.fn(() => true)}
+        onOpenThread={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+  const expectStatus = async (searchMessages: MessageSearch | null, expected: string): Promise<void> => {
+    renderMessages(searchMessages)
+    fireEvent.change(screen.getByRole<HTMLInputElement>('combobox'), { target: { value: 'quartz' } })
+    expect(await screen.findByText(expected)).toBeTruthy()
+  }
+
+  it('says what to do with no or an outdated session-search', async () => {
+    await expectStatus(null, copy.messagesUnavailable)
+    cleanup()
+    await expectStatus(async () => ({ kind: 'unavailable', reason: 'missing' }), copy.messagesUnavailable)
+  })
+
+  it('says what to do with another search owner', async () => {
+    await expectStatus(async () => ({ kind: 'unavailable', reason: 'not-owner' }), copy.messagesNotOwner)
+  })
+
+  it('says what to do with a failed call', async () => {
+    await expectStatus(async () => {
+      throw new Error('worker timed out')
+    }, copy.messagesFailed)
+  })
+
+  it('asks for two characters, says it is searching instead of “no results” while typing, and shows when more matches exist', async () => {
+    const answer: MessageSearch = async ({ query }) => ({
+      kind: 'ready',
+      hasMore: true,
+      hits: [{ sessionId: 'session-quartz', seq: 4, role: 'user', time: 1_700_000_000_000, snippet: `Asked about ${query}` }],
+    })
+    const searchMessages = vi.fn(answer)
+    renderMessages(searchMessages)
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+
+    fireEvent.change(input, { target: { value: 'q' } })
+    expect(await screen.findByText(copy.messagesTooShort)).toBeTruthy()
+    fireEvent.change(input, { target: { value: 'qu' } })
+    expect(await screen.findByText(copy.messagesSearching)).toBeTruthy()
+    expect(screen.queryByText(copy.empty)).toBeNull()
+    expect(await screen.findByText('Asked about qu')).toBeTruthy()
+    expect(screen.getByText(copy.messagesMore)).toBeTruthy()
+    expect(searchMessages).toHaveBeenCalledTimes(1)
+    expect(searchMessages).toHaveBeenCalledWith({ query: 'qu', role: 'all' }, expect.anything())
+  })
+
+  it('switches the sender filter with Alt+1–3 without leaving the search field', async () => {
+    const answer: MessageSearch = async () => ({ kind: 'ready', hasMore: false, hits: [] })
+    const searchMessages = vi.fn(answer)
+    renderMessages(searchMessages)
+    const input = screen.getByRole<HTMLInputElement>('combobox')
+    fireEvent.change(input, { target: { value: 'quartz' } })
+    await waitFor(() => expect(searchMessages).toHaveBeenCalledWith({ query: 'quartz', role: 'all' }, expect.anything()))
+
+    fireEvent.keyDown(input, { key: '™', code: 'Digit2', altKey: true })
+    expect(screen.getByRole('button', { name: 'Agent' }).getAttribute('aria-pressed')).toBe('true')
+    await waitFor(() => expect(searchMessages).toHaveBeenLastCalledWith({ query: 'quartz', role: 'assistant' }, expect.anything()))
+    fireEvent.keyDown(input, { key: '£', code: 'Digit3', altKey: true })
+    expect(screen.getByRole('button', { name: 'User' }).getAttribute('aria-pressed')).toBe('true')
+    expect(document.activeElement).toBe(input)
   })
 })

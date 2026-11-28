@@ -37,6 +37,8 @@ const NUDGE_DEBOUNCE = '500 millis'
 
 /** Matches a find returns when the caller names no limit: a long thread's common word, not its whole history. */
 const FIND_DEFAULT_LIMIT = 200
+/** Matches a cross-thread message search returns when the caller names no limit. */
+const MESSAGE_SEARCH_DEFAULT_LIMIT = 25
 
 /** Projection checkpoint upkeep starts after the boot burst, and the rebuild pauses this long between logs. */
 const CHECKPOINT_UPKEEP_DELAY = '2 minutes'
@@ -160,6 +162,24 @@ export default DshxPlugin.make({
           yield* Effect.annotateCurrentSpan({ 'dshx.prompt_history.rows': found.prompts.length, 'dshx.prompt_history.filtered': query !== null })
           return { ownsService: true, prompts: found.prompts }
         }).pipe(Effect.withSpan('session search prompt history')),
+      searchMessages: input =>
+        Effect.gen(function* () {
+          const role = input.role ?? 'all'
+          if (!(yield* (yield* SessionQueryOwnership).owned)) return { ownsService: false, matches: [], hasMore: false }
+          const query = findExpression(input.text)
+          if (query === null) return { ownsService: true, matches: [], hasMore: false }
+          const found = yield* (yield* SearchWorker).searchMessages({
+            query,
+            role,
+            limit: input.limit ?? MESSAGE_SEARCH_DEFAULT_LIMIT,
+          })
+          yield* Effect.annotateCurrentSpan({
+            'dshx.message_search.role': role,
+            'dshx.message_search.matches': found.matches.length,
+            'dshx.message_search.has_more': found.hasMore,
+          })
+          return { ownsService: true, matches: found.matches, hasMore: found.hasMore }
+        }).pipe(Effect.withSpan('session search messages')),
     }),
   ],
 })

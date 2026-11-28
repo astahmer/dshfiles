@@ -87,6 +87,24 @@ thread, newest first, each text once. `@dshfiles/prompt-stash` calls it for its 
   migration backfills from `session_documents` once, in the worker.
 - Reindexing or forgetting (archiving) a thread drops its rows with its documents.
 
+## Cross-thread message search
+
+The `searchMessages` method of the `session-search` API (agent tool `session_search_messages`, read-only) searches
+`user/message` and `assistant/message` documents on the current surface across every top-level thread, leaving out tool
+calls, tool results, thinking and subagent threads. `@dshfiles/command-palette` calls it for its **Messages** tab and
+decodes the answer with the `searchMessagesOutputSchema` the `@dshfiles/session-search/search-api` module exports.
+
+- `role` narrows the lookup to `user`, `assistant`, or `all` (default).
+- A user message a plugin or agent sent (`user_prompts.human = 0`: a scheduled prompt, a relay from another thread)
+  is left out; on a real index those outnumber typed prompts about ten to one. Rows indexed before the flag existed
+  stay in until their thread is reindexed, as in the prompt history.
+- Measured on a 237 000-message index: 1-character queries take 0.7–1 s, common words 0.1–0.3 s, rare words under
+  10 ms, so the palette waits for 2 characters.
+- Searches route through `conversation_documents` once backfilled (falling back to `session_documents` before backfill),
+  keep up to 3 top-ranked matches per thread so one busy thread cannot drown out the rest, and return each match's
+  `sessionId`, event `seq`, `role`, timestamp, snippet and optional `cwd`.
+- `ownsService: false` means another plugin owns `sessionQuery` and this index is not built.
+
 ## Measured
 
 Bench: `pnpm bench:owned` (gated on `OWNED_BENCH=1`; it copies a byte-bounded subset of the newest logs the stock index
