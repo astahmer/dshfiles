@@ -66,6 +66,47 @@ const FastModeIndicator = ({
   return null
 }
 
+/** Round 5 U12: the search's wordings, longest first. */
+export const SEARCH_PLACEHOLDERS = ['Search models or accounts…', 'Models or accounts…', 'Search…'] as const
+
+/** The first wording whose text fits the field's content box, measured in the field's font, rechecked on resize. */
+const usePlaceholderThatFits = (input: { readonly current: HTMLInputElement | null }, wordings: readonly string[], open: boolean): string => {
+  const [index, setIndex] = useState(0)
+  useEffect(() => {
+    if (!open || typeof ResizeObserver === 'undefined') return
+    let observer: ResizeObserver | undefined
+    // The popover mounts its field in the same commit; wait a frame so it is laid out.
+    const frame = requestAnimationFrame(() => {
+      const element = input.current
+      const context = document.createElement('canvas').getContext('2d')
+      if (element === null || context === null) return
+      const measure = (): void => {
+        const style = getComputedStyle(element)
+        context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`
+        const room = element.clientWidth - Number.parseFloat(style.paddingLeft) - Number.parseFloat(style.paddingRight)
+        setIndex(PlaceholderFit.pick({ room, widths: wordings.map(wording => context.measureText(wording).width) }))
+      }
+      measure()
+      observer = new ResizeObserver(measure)
+      observer.observe(element)
+    })
+    return () => {
+      cancelAnimationFrame(frame)
+      observer?.disconnect()
+    }
+    // Each opening mounts a new field, so measure again then.
+  }, [input, wordings, open])
+  return wordings[index] ?? wordings[0] ?? ''
+}
+
+export class PlaceholderFit {
+  /** The index of the first width that fits the room; the last one when none does. */
+  static pick(input: { readonly room: number; readonly widths: readonly number[] }): number {
+    const fit = input.widths.findIndex(width => width <= input.room)
+    return fit < 0 ? Math.max(0, input.widths.length - 1) : fit
+  }
+}
+
 export const ModelEffortPicker = ({ locked, available, directory, load, select, sessionId, openAccounts, t: seat }: Props) => {
   const t: ModelPickerTranslate = seat === undefined ? englishModelPicker : (key, params) => seat(key, params)
   const [open, setOpen] = useState(false)
@@ -99,6 +140,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const detailsRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const listTitleRef = useRef<HTMLHeadingElement>(null)
+  const placeholder = usePlaceholderThatFits(searchInputRef, SEARCH_PLACEHOLDERS, open)
   const state = useSyncExternalStore(
     onStoreChange => directory.subscribe(onStoreChange),
     () => directory.getSnapshot(),
@@ -483,7 +525,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       aria-expanded={open}
                       aria-label="Search models and accounts"
                       autoComplete="off"
-                      className="dshx:w-full dshx:has-[input:focus-visible]:border-transparent dshx:[&_input]:pr-8 dshx:pointer-coarse:[&_input]:pr-11"
+                      // Round 5 U12: room for Clear search only while there is a query to clear.
+                      className={cn(
+                        'dshx:w-full dshx:has-[input:focus-visible]:border-transparent',
+                        query !== '' && 'dshx:[&_input]:pr-8 dshx:pointer-coarse:[&_input]:pr-11',
+                      )}
                       data-model-picker-search
                       disabled={catalogEmpty}
                       onChange={event => setQuery(event.currentTarget.value)}
@@ -507,7 +553,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         }
                       }}
                       role="combobox"
-                      placeholder="Search models…"
+                      // Round 5 U12: the search finds accounts too; a narrow field takes the shortest wording that fits.
+                      placeholder={placeholder}
                       ref={searchInputRef}
                       value={query}
                     />
