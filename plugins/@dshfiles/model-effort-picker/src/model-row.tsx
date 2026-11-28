@@ -64,7 +64,8 @@ export const ModelRow = (props: {
 
   // Round 3 R10: the option is the model; the chevron beside it is its own control ("Details for <model>"), so VoiceOver
   // can reach details without the Right key. The row only draws them as one line.
-  const optionName = `${selectMode ? '' : 'Use '}${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`
+  // Round 4 T12: the option is named by what it is, "gpt-6-luna, Command Code 1" (the account names its service).
+  const optionName = `${name}, ${props.group.name}`
   return (
     <div
       className={cn(

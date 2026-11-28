@@ -31,8 +31,8 @@ describe('names come before labels in the list (council picker round 3, R3)', ()
     expect(tag?.[1]).toBe('CC1')
     expect(tag?.[0]).toMatch(/dshx:text-xs dshx:text-muted-foreground/u)
     expect(html).not.toContain('data-model-provider-label')
-    // The service stays in the option's accessible name.
-    expect(/<div[^>]*role="option"[^>]*>/u.exec(html)?.[0]).toContain('via Command Code')
+    // Round 4 T12: the account (which names its service) is in the option's accessible name.
+    expect(/<div[^>]*role="option"[^>]*>/u.exec(html)?.[0]).toContain('aria-label="mistral-large-3-instruct-2512-extended-context-preview, Command Code 1"')
   })
 
   it('lets the name take the room first, at 13 px', () => {

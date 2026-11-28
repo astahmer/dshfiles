@@ -51,7 +51,8 @@ describe('details are reachable without the Right key (council picker round 3, R
   })
 
   it('names select-mode options without "Use", since a tap there chooses, not uses', () => {
-    expect(/<div[^>]*role="option"[^>]*>/u.exec(row(true))?.[0]).toContain('aria-label="gemini-3.8-flash via Command Code (Command Code 1)"')
-    expect(/<div[^>]*role="option"[^>]*>/u.exec(row(false))?.[0]).toContain('aria-label="Use gemini-3.8-flash via Command Code (Command Code 1)"')
+    expect(/<div[^>]*role="option"[^>]*>/u.exec(row(true))?.[0]).toContain('aria-label="gemini-3.8-flash, Command Code 1"')
+    // Round 4 T12: the same short name outside select mode.
+    expect(/<div[^>]*role="option"[^>]*>/u.exec(row(false))?.[0]).toContain('aria-label="gemini-3.8-flash, Command Code 1"')
   })
 })

@@ -306,7 +306,7 @@ When('two Command Code accounts offer the same model in a new thread', async ({ 
   const list = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   const search = page.getByRole('textbox', { name: 'Search models and accounts', exact: true })
   await search.fill('gpt-6-luna')
-  const firstAccount = list.getByRole('option', { name: /^Use gpt-6-luna via Command Code \(Command Code 1\)$/u })
+  const firstAccount = list.getByRole('option', { name: /^gpt-6-luna, Command Code 1$/u })
   await firstAccount.click()
   const selectedModel = page.locator('[data-model-picker-text]')
   await expect(selectedModel).toHaveText('gpt-6-luna')

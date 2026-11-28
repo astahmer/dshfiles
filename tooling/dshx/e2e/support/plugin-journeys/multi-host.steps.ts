@@ -562,7 +562,7 @@ When('the remote model picker selects its model', async ({ page }: { readonly pa
   // The picker lists one row per model and account; its Use button names both.
   const models = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   await expect(models).toBeVisible()
-  const model = models.getByRole('option', { name: 'Use gpt-6-luna (Command Code 1)', exact: true })
+  const model = models.getByRole('option', { name: 'gpt-6-luna, Command Code 1', exact: true })
   await expect(model).toBeVisible()
   await model.click()
   await expect(page.locator('[data-model-picker-text]')).toHaveText('gpt-6-luna')

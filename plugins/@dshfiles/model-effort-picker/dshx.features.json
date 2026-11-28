@@ -232,8 +232,8 @@
       "reach": [
         "seed tool-call-thread",
         "click button \", reasoning *\"",
-        "shiftclick option \"Use gpt-6-luna*\"",
-        "shiftclick option \"Use claude-sonnet-5-5*\"",
+        "shiftclick option \"gpt-6-luna, *\"",
+        "shiftclick option \"claude-sonnet-5-5, *\"",
         "expect text \"2 selected · up to 6\"",
         "click button \"Continue\u2026\"",
         "expect dialog \"Send to several models\""
