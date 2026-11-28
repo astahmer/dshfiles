@@ -13,7 +13,7 @@ import {
 } from '@dshfiles/plugin-ui/components/ui/alert-dialog'
 import { FileViewer, useRegistry } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { EyeIcon, ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { EyeIcon, ExternalLinkIcon, FileQuestionIcon, FolderOpenIcon, FolderTreeIcon, RefreshCwIcon, SaveIcon, SearchIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { useMachine } from '@dshfiles/plugin-ui/machine'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
@@ -24,6 +24,7 @@ import { editorEngineLoaderMachine } from './editor-engine-machine.js'
 import { FileTree } from './file-tree.js'
 import { useEditorSaveMachine } from './use-editor-save-machine.js'
 import { StatusDot } from '@dshfiles/plugin-ui/components/ui/status-dot'
+import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 
 export interface EditorPanelProps {
   readonly store: EditorStore
@@ -170,6 +171,21 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
   const editable = active?.status === 'ready' && active.content.kind === 'text'
   const viewers = useRegistry(FileViewer)
   const viewer = editable ? viewers.find(candidate => candidate.matches(active.path)) : undefined
+  
+  // File search filter state
+  const [fileFilter, setFileFilter] = useState('')
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  /** Focus the file search input */
+  const focusFileSearch = useCallback(() => {
+    searchInputRef.current?.focus()
+  }, [])
+  /** Open Monaco find widget if a file is open */
+  const triggerSearch = useCallback(() => {
+    if (editable) {
+      handleRef.current?.triggerFind()
+    }
+  }, [editable])
+  
   const [viewedDocuments, setViewedDocuments] = useState<ReadonlySet<string>>(new Set())
   const viewing = viewer !== undefined && active !== undefined && viewedDocuments.has(active.id)
   const toggleViewer = (documentId: string): void =>
@@ -265,9 +281,19 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
     <div
       className="dshx-root dshx:flex dshx:h-full dshx:min-h-0 dshx:flex-col dshx:bg-background dshx:text-foreground"
       onKeyDownCapture={event => {
-        if (event.key !== 's' || !(event.metaKey || event.ctrlKey)) return
-        event.preventDefault()
-        requestSaveRef.current()
+        const isMod = event.metaKey || event.ctrlKey
+        if (event.key === 's' && isMod) {
+          event.preventDefault()
+          requestSaveRef.current()
+          return
+        }
+        // Ctrl+F / Cmd+F: trigger Monaco's find widget
+        if (event.key === 'f' && isMod && !event.shiftKey && editable) {
+          event.preventDefault()
+          handleRef.current?.triggerFind()
+          return
+        }
+        // Note: Search is available via the command palette (Mod+Shift+P) or the search button/input
       }}
     >
       <div className="dshx:flex dshx:h-8 dshx:flex-none dshx:items-center dshx:gap-1 dshx:border-b dshx:px-1">
@@ -316,6 +342,16 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           </Button>
         )}
         <Button
+          aria-label="Find in file"
+          disabled={!editable}
+          onClick={triggerSearch}
+          size="icon-xs"
+          title="Find in file (⌘F)"
+          variant="ghost"
+        >
+          <SearchIcon />
+        </Button>
+        <Button
           aria-label="Save"
           disabled={!editable || savePending || saveSnapshot.matches('approval') || saveSnapshot.matches('conflict')}
           onClick={() => requestSaveRef.current()}
@@ -326,22 +362,6 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           <SaveIcon />
         </Button>
       </div>
-      {showTree && (
-        <div className="dshx:max-h-[40%] dshx:min-h-24 dshx:flex-none dshx:overflow-auto dshx:border-b">
-          <div className="dshx:flex dshx:items-center dshx:justify-between dshx:px-2 dshx:pt-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">
-            Files
-            <Button
-              aria-label="Refresh files"
-              onClick={() => void queryClient.invalidateQueries({ queryKey: ['dshfiles-editor', 'list', sessionId] })}
-              size="icon-xs"
-              variant="ghost"
-            >
-              <RefreshCwIcon />
-            </Button>
-          </div>
-          <FileTree activePath={active?.path ?? null} onOpen={path => props.store.open(sessionId, { path })} remote={props.remote} sessionId={sessionId} />
-        </div>
-      )}
       {active?.diskChanged === true && (
         <div className="dshx:flex dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-b dshx:bg-warning/10 dshx:px-2 dshx:py-1 dshx:text-xs" role="status">
           <span className="dshx:min-w-0 dshx:flex-1">Changed on disk while you were editing.</span>
@@ -353,18 +373,45 @@ export const EditorPanel = (props: EditorPanelProps): JSX.Element => {
           </Button>
         </div>
       )}
-      <div className="dshx:relative dshx:min-h-0 dshx:flex-1">
-        <div className={cn('dshx:absolute dshx:inset-0', !editable && 'dshx:invisible')} data-editor-surface="" ref={containerRef} />
-        {active?.status === 'ready' && <FilePreview document={active} remote={props.remote} />}
-        {viewing && (
-          <div className="dshx:absolute dshx:inset-0 dshx:overflow-auto dshx:bg-background dshx:p-4" data-file-viewer={viewer.id}>
-            <viewer.component sessionId={sessionId} path={active.path} text={handleRef.current?.snapshot(active.id)?.text ?? active.text} />
+      <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-row">
+        {showTree && (
+          <div className="dshx:flex dshx:w-60 dshx:flex-none dshx:flex-col dshx:overflow-auto dshx:border-r">
+            <div className="dshx:flex dshx:items-center dshx:justify-between dshx:px-2 dshx:pt-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wide dshx:text-muted-foreground dshx:uppercase">
+              Files
+              <Button
+                aria-label="Refresh files"
+                onClick={() => void queryClient.invalidateQueries({ queryKey: ['dshfiles-editor', 'list', sessionId] })}
+                size="icon-xs"
+                variant="ghost"
+              >
+                <RefreshCwIcon />
+              </Button>
+            </div>
+            <div className="dshx:px-2 dshx:py-1">
+              <SearchInput
+                ref={searchInputRef}
+                className="dshx:h-7"
+                placeholder="Search files…"
+                value={fileFilter}
+                onChange={e => setFileFilter(e.target.value)}
+              />
+            </div>
+            <FileTree activePath={active?.path ?? null} filter={fileFilter} onOpen={path => props.store.open(sessionId, { path })} remote={props.remote} sessionId={sessionId} />
           </div>
         )}
-        {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}
-        {active?.status === 'loading' && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Loading {active.name}…</p>}
-        {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
-        {engineError && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">The editor could not start.</p>}
+        <div className="dshx:relative dshx:min-h-0 dshx:min-w-0 dshx:flex-1">
+          <div className={cn('dshx:absolute dshx:inset-0', !editable && 'dshx:invisible')} data-editor-surface="" ref={containerRef} />
+          {active?.status === 'ready' && <FilePreview document={active} remote={props.remote} />}
+          {viewing && (
+            <div className="dshx:absolute dshx:inset-0 dshx:overflow-auto dshx:bg-background dshx:p-4" data-file-viewer={viewer.id}>
+              <viewer.component sessionId={sessionId} path={active.path} text={handleRef.current?.snapshot(active.id)?.text ?? active.text} />
+            </div>
+          )}
+          {active === undefined && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Pick a file in the tree, or open one from another panel.</p>}
+          {active?.status === 'loading' && <p className="dshx:p-3 dshx:text-xs dshx:text-muted-foreground">Loading {active.name}…</p>}
+          {active?.status === 'error' && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">{active.error}</p>}
+          {engineError && <p className="dshx:p-3 dshx:text-xs dshx:text-destructive">The editor could not start.</p>}
+        </div>
       </div>
       <div className="dshx:flex dshx:h-6 dshx:flex-none dshx:items-center dshx:gap-2 dshx:border-t dshx:px-2 dshx:text-2xs dshx:text-muted-foreground">
         <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate" title={active?.path}>
