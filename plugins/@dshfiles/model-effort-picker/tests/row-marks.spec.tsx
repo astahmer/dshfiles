@@ -15,7 +15,6 @@ const row = (input: { readonly highlighted?: boolean; readonly inspected?: boole
         fanOutSelected={false}
         group={{ id: 'cc1', name: 'Command Code 1', models: [] }}
         highlighted={input.highlighted ?? false}
-        inspected={input.inspected ?? false}
         model={{ id: 'gpt-6-luna', name: 'gpt-6-luna', description: '' }}
         onFanOut={() => undefined}
         onInspect={() => undefined}
@@ -36,12 +35,13 @@ describe('the active and the inspected rows are marked (council picker round 3, 
     expect(rowTag(row({ highlighted: true }))).not.toMatch(/outline-1/u)
   })
 
-  it('marks the inspected row with a neutral 2 px leading bar, apart from the check of the model in use', () => {
-    const tag = rowTag(row({ inspected: true }))
-    expect(tag).toContain('data-model-inspected="true"')
-    expect(tag).toMatch(/dshx:before:w-0\.5[^"]*dshx:before:bg-muted-foreground/u)
-    expect(row({ inspected: true })).not.toContain('data-model-current-check')
-    expect(rowTag(row({}))).not.toContain('data-model-inspected')
+  it('draws no inspected bar: the details header names the inspected model (round 5 U4)', () => {
+    const tag = rowTag(row({}))
+    expect(tag).not.toContain('data-model-inspected')
+    expect(tag).not.toMatch(/before:w-0\.5/u)
+    expect(readFileSync(new URL('../src/model-effort-picker.tsx', import.meta.url), 'utf8')).not.toContain(
+      'inspected={inspected !== null && inspected.model === model.id}',
+    )
   })
 
   it('says "In use" in the details header of the thread own model, opposite the draft caption', () => {

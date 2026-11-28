@@ -25,10 +25,9 @@ describe('hover is not selection in the account rows (council picker round 3, R1
     expect(other).not.toMatch(/dshx:hover:bg-muted|dshx:hover:bg-selected-wash/u)
   })
 
-  it('draws the chosen account as the selected wash with its 1 px edge, unchanged on hover', () => {
+  it('draws the chosen account with its 1 px edge and weight, no wash (round 5 U4)', () => {
     const [chosen] = radios()
-    expect(chosen).toMatch(/dshx:bg-selected-wash/u)
     expect(chosen).toMatch(/dshx:selected-edge/u)
-    expect(chosen).toMatch(/dshx:hover:bg-selected-wash/u)
+    expect(chosen).not.toMatch(/bg-selected-wash/u)
   })
 })

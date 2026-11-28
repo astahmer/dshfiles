@@ -30,8 +30,6 @@ export const ModelRow = (props: {
   readonly highlighted?: boolean
   /** The active option was reached with the keyboard: a 1 px inset neutral outline (≥ 3:1) joins the wash. */
   readonly keyboard?: boolean
-  /** Round 3 R11: the model the details pane shows; a neutral 2 px leading bar marks it (the check stays for the model in use). */
-  readonly inspected?: boolean
   /** Fast mode is on for this route (C2): a static ink bolt, not a switch. Amber stays for low quota. */
   readonly fastOn?: boolean
   readonly quota: ModelQuota | undefined
@@ -72,18 +70,13 @@ export const ModelRow = (props: {
     <div
       className={cn(
         'dshx:group/row dshx:relative dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pr-0.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
-        // Round 4 T1: the list is not a radio group, so the model in use carries no wash or edge, only its check and 600
-        // weight; a fan-out choice keeps the wash beside its checkbox.
-        props.fanOutSelected && 'dshx:bg-selected-wash',
-        // Round 3 R11: the search's active option (what Enter uses) shows the hover wash; the focus ring stays on the search.
+        // Round 4 T1, round 5 U4: a row's wash means one thing, what Enter does. The model in use is its check and 600
+        // weight, a collected route its checkbox, and the inspected model is named by the details header (no bar).
         props.highlighted === true && 'dshx:bg-foreground/12 dshx:hover:bg-foreground/12',
         props.highlighted === true && props.keyboard === true && 'dshx:outline-1 dshx:-outline-offset-1 dshx:outline-foreground/50 dshx:outline-solid',
-        props.inspected === true &&
-          'dshx:before:absolute dshx:before:inset-y-1.5 dshx:before:left-0 dshx:before:w-0.5 dshx:before:rounded-full dshx:before:bg-muted-foreground',
       )}
       data-active-visible={props.highlighted === true || undefined}
       data-fan-out-selected={props.fanOutSelected || undefined}
-      data-model-inspected={props.inspected === true || undefined}
       data-model-picker-row
       onPointerMove={props.onHover}
       role="presentation"

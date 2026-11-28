@@ -65,8 +65,9 @@ export const AccountRows = (props: {
                 aria-label={account.name}
                 className={cn(
                   'dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-xs dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
-                  // Round 3 R14: hover is a lighter wash; the chosen account is the selected wash with its 1 px edge.
-                  checked && 'dshx:bg-selected-wash dshx:font-selected dshx:selected-edge dshx:hover:bg-selected-wash',
+                  // Round 3 R14, round 5 U4: hover is a light wash; the chosen account is its 1 px edge, check and 600 weight, no wash,
+                // so it never reads as the list's keyboard row.
+                  checked && 'dshx:font-selected dshx:selected-edge',
                 )}
                 data-model-account
                 key={account.id}

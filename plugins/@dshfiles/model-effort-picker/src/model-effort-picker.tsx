@@ -559,7 +559,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         busy={busy}
                         highlighted={index === activeIndex}
                         keyboard={keyboardRow}
-                        inspected={inspected !== null && inspected.model === model.id}
                         id={`${listboxId}-${String(index)}`}
                         onHover={() => {
                           setActiveIndex(index)
