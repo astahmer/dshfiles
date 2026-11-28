@@ -164,14 +164,19 @@ describe('the desktop live work dock (round six C2)', () => {
   })
 
   // Council round 34 B8: six working subagents grew the desktop dock to 231px (it scrolled only past 288px, eight rows).
-  it('scrolls the working subagents inside four rows under their fold plate, and still shows an open row whole', () => {
+  // Council round 35 P6 (Fable): at four rows and 8px the rows past them had no cue; the fifth now peeks, half shown.
+  it('scrolls the working subagents inside four and a half rows under their fold plate, and still shows an open row whole', () => {
     const SUBAGENTS = `:global(html:not([data-shell-phone-nav])) .composerStack > ${DOCK} > :global([data-dshfiles-live-preview-dock='subagents'])`
     const frame = rule(SUBAGENTS)
     expect(frame).toMatch(/--dshfiles-dock-row: 32px;/)
-    expect(frame).toMatch(/max-height: calc\(1px \+ var\(--dshfiles-dock-row\) \+ 4 \* \(var\(--dshfiles-dock-row\) \+ 1px\) \+ 8px\);/)
-    // 1px edge + the 32px plate + four 33px rows + 8px of the next row's divider and padding, where the edge fades (so the
-    // fade never sits on the fourth row's words).
-    expect(1 + 32 + 4 * (32 + 1) + 8).toBe(173)
+    expect(frame).toMatch(/max-height: calc\(1px \+ var\(--dshfiles-dock-row\) \+ 4\.5 \* \(var\(--dshfiles-dock-row\) \+ 1px\)\);/)
+    // 1px edge + the 32px plate + four whole 33px rows (each keeps the divider under it) + half the fifth, which peeks.
+    expect(1 + 32 + 4.5 * (32 + 1)).toBe(181.5)
+    // The bottom fade has no solid band, so the fifth row's words show through it: a gradient from the dock's fill at the
+    // edge to clear 16px up.
+    const fade = rule(`${SUBAGENTS}::after`)
+    expect(fade).toMatch(/background: linear-gradient\(0deg, var\(--dsw-specific-input-major\), color-mix/)
+    expect(fade).not.toMatch(/input-major\) \d+px/)
     const touch = blocks().find(block => block.selector === SUBAGENTS && block.context === '@media (pointer: coarse)')
     expect(touch?.body).toMatch(/--dshfiles-dock-row: 44px;/)
     // An open row's feed and Stop are never cut: the frame grows to at least that row, under the plate when there is one.

@@ -804,13 +804,14 @@ button.crumbEditable {
 
 /* Council round 34 B8: the working subagents scroll inside four rows under their fold plate, as the phone's frame shows
    two; the dock grew to 288px (eight rows) before it scrolled. The frame is the top edge, the 32px plate, four 33px
-   rows (32px and the hairline above each) and 8px of the next row's divider and padding, never text, where the edge
-   fades (as the phone's frame); a touch screen's rows are 44px. An open row (its feed and Stop) is taller:
+   rows (32px and the hairline above each) and half the fifth, which peeks through the edge's fade so the rows past the
+   fourth have a cue (council round 35 P6: at 8px of the next row they had none); a touch screen's rows are 44px. An
+   open row (its feed and Stop) is taller:
    the frame grows to at least that row and the plate, so its actions are never cut (thread-sidebar sets
    --dshfiles-dock-open-row, one row open at a time). The plate stays on top and an edge with more rows past it fades. */
 :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents']) {
   --dshfiles-dock-row: 32px;
-  max-height: calc(1px + var(--dshfiles-dock-row) + 4 * (var(--dshfiles-dock-row) + 1px) + 8px);
+  max-height: calc(1px + var(--dshfiles-dock-row) + 4.5 * (var(--dshfiles-dock-row) + 1px));
   min-height: calc(1px + var(--dshfiles-dock-open-row, 0px));
 }
 
@@ -850,7 +851,8 @@ button.crumbEditable {
 :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'])::after {
   bottom: 0;
   margin-top: -16px;
-  background: linear-gradient(0deg, var(--dsw-specific-input-major) 8px, color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
+  /* No solid band: the peeking fifth row's words show through, fading out toward the edge (council round 35 P6). */
+  background: linear-gradient(0deg, var(--dsw-specific-input-major), color-mix(in srgb, var(--dsw-specific-input-major) 0%, transparent));
 }
 
 :global(html:not([data-shell-phone-nav])) .composerStack > :global([data-slot='conversation.input.dock']) > :global([data-dshfiles-live-preview-dock='subagents'][data-more-above])::before,
