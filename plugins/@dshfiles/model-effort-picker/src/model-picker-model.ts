@@ -3,6 +3,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/typ
 import type { AccountsUsage } from '@dshfiles/ai-accounts/api'
 import type { FallbackRoute } from '@dshfiles/ai-accounts/model-fallback-api'
 import { UsageOverviewModel } from '@dshfiles/ai-accounts/usage-overview-model'
+import { modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
 import type { BrandKey } from './brand-marks.js'
 
 type ModelGroup = ModelDirectoryState['groups'][number]
@@ -173,9 +174,14 @@ export class ModelPickerModel {
     return { percent: binding.percentRemaining, label: binding.windowLabel, onReserve: binding.onReserve }
   }
 
-  /** Account providers prefix every model name with their instance id; under its provider the prefix says nothing. */
-  static displayName = ({ group, model }: { readonly group: Pick<ModelGroup, 'id'>; readonly model: Pick<CatalogModel, 'name'> }): string =>
-    model.name.startsWith(`${group.id}/`) ? model.name.slice(group.id.length + 1) : model.name
+  /**
+   * Council picker round 1, N1: one naming everywhere, the kit's (`modelIdentity`, as every subagent surface names a
+   * route): read from the model id, so one model reads the same on every account and in one case; an account's
+   * `<instance>/` prefix and a vendor prefix that names the same family drop (`google/gemini-3.8-flash` →
+   * `gemini-3.8-flash`). The full id stays in the tooltip.
+   */
+  static displayName = ({ group, model }: { readonly group: Pick<ModelGroup, 'id'>; readonly model: Pick<CatalogModel, 'id' | 'name'> }): string =>
+    modelIdentity(group.id, model.id)?.name ?? model.name
 
   /**
    * The account tag drops a leading service name so the provider label can name the service without repeating it.

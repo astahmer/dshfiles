@@ -76,7 +76,7 @@ describe('effort glyphs', () => {
 })
 
 describe('fallback labels', () => {
-  it('names a stored rung with its catalog name rather than the account-prefixed id', () => {
+  it('names a stored rung with the kit display name rather than the account-prefixed id', () => {
     const groups = [
       {
         id: 'opencode-go-alex',
@@ -86,7 +86,7 @@ describe('fallback labels', () => {
     ]
     expect(ModelPickerModel.fallbackLabel(groups, { model: 'deepseek-v4', provider: 'opencode-go-alex' })).toEqual({
       effort: undefined,
-      model: 'DeepSeek V4',
+      model: 'deepseek-v4',
       provider: 'OpenCode Go Alex',
     })
     expect(ModelPickerModel.fallbackLabel(groups, { model: 'gone', provider: 'gone-provider' })).toEqual({

@@ -7,7 +7,7 @@ import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountRows } from './account-rows.js'
 import { ModelPickerModel, type InspectedRoute, type ModelQuota } from './model-picker-model.js'
 import { EffortControl } from './effort-control.js'
-import { BrandMark, ProviderLabel } from './picker-atoms.js'
+import { BrandMark } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 
@@ -106,12 +106,13 @@ export const ModelDetails = (props: {
         ) : (
           <>
             <BrandMark brand={ModelPickerModel.brandFor({ model })} className="dshx:size-[18px]" name={name} />
+            {/* N1: the model on its own line (15 px (text-heading) / 600, up to two lines), the service and account below it. */}
             <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
-              <span className="dshx:flex dshx:min-w-0 dshx:items-baseline dshx:gap-1 dshx:overflow-hidden">
-                <h2 className="dshx:min-w-0 dshx:truncate dshx:text-sm dshx:font-semibold dshx:leading-none" data-model-picker-current>
-                  {name}
-                </h2>
-                {providerLabel === undefined ? null : <ProviderLabel className="dshx:max-w-[6.5rem]" label={providerLabel} />}
+              <h2 className="dshx:line-clamp-2 dshx:text-heading dshx:leading-tight dshx:font-semibold dshx:break-words" data-model-picker-current>
+                {name}
+              </h2>
+              <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" data-model-details-route>
+                {[providerLabel, group.name].filter(Boolean).join(' · ')}
               </span>
               {draft ? (
                 <span className="dshx:text-2xs dshx:text-muted-foreground" data-model-details-draft-caption>

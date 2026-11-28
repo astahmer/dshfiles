@@ -57,7 +57,7 @@ export const ModelRow = (props: {
       aria-label={`Use ${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`}
       aria-selected={selectMode ? undefined : props.active}
       className={cn(
-        'dshx:group/row dshx:flex dshx:h-7 dshx:cursor-default dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
+        'dshx:group/row dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
         (props.active || props.fanOutSelected) && 'dshx:bg-selected-wash',
         props.active && 'dshx:selected-edge',
         props.highlighted === true && 'dshx:outline-2 dshx:outline-offset-1 dshx:outline-[var(--dsw-alias-state-business-primary)] dshx:outline-solid',
@@ -101,13 +101,13 @@ export const ModelRow = (props: {
         <Tooltip>
           <TooltipTrigger asChild>
             <span
-              className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-2xs dshx:font-medium', props.active && 'dshx:font-selected')}
+              className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
               data-model-picker-name
             >
               {name}
             </span>
           </TooltipTrigger>
-          <TooltipContent side="top">{name}</TooltipContent>
+          <TooltipContent side="top">{props.model.id}</TooltipContent>
         </Tooltip>
         {props.providerLabel === undefined ? null : <ProviderLabel className="dshx:max-w-[7rem]" label={props.providerLabel} />}
       </span>
