@@ -64,8 +64,15 @@ describe('the provider default is a real option, and arrowing commits only where
     }
   })
 
-  it('lays eight segments out four to a row on touch, so none drops under 44 px', () => {
-    expect(/<div[^>]*role="radiogroup"[^>]*>/u.exec(render('low'))?.[0]).toContain('dshx:pointer-coarse:grid-cols-4')
+  it('wraps on touch without a hole: one row up to seven segments on a 324 px track, else four to a row (round 4 T8)', () => {
+    expect(/<div[^>]*role="radiogroup"[^>]*>/u.exec(render('low'))?.[0]).toContain('dshx:pointer-coarse:flex dshx:pointer-coarse:flex-wrap')
+    const seven = radios(render('low', levels.slice(0, 6)))
+    expect(seven).toHaveLength(7)
+    for (const option of seven) {
+      expect(option).toMatch(/dshx:pointer-coarse:min-w-11 dshx:pointer-coarse:flex-1/u)
+      expect(option).toMatch(/dshx:pointer-coarse:basis-0 dshx:@max-\[20\.25rem\]\/effort:pointer-coarse:basis-\[calc\(25%-0\.125rem\)\]/u)
+    }
+    for (const option of radios(render('low'))) expect(option).toMatch(/dshx:pointer-coarse:basis-\[calc\(25%-0\.125rem\)\]/u)
   })
 
   it('applies only the level arrowing settles on, at once on Enter, Space, a click or leaving the group', () => {

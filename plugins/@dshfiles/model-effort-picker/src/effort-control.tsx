@@ -122,7 +122,7 @@ export const EffortControl = (props: {
   }
 
   return (
-    <section aria-label="Reasoning effort" className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1.5" data-model-effort>
+    <section aria-label="Reasoning effort" className="dshx:@container/effort dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1.5" data-model-effort>
       <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
         <h3 className="dshx:truncate dshx:text-xs dshx:font-medium" id={headingId}>
           Reasoning effort · <span className="dshx:font-normal dshx:text-muted-foreground">{heading}</span>
@@ -134,7 +134,9 @@ export const EffortControl = (props: {
         aria-label="Reasoning effort"
         className={cn(
           'dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(2rem,1fr))] dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.5',
-          segments.length > 6 ? 'dshx:pointer-coarse:grid-cols-4' : 'dshx:pointer-coarse:grid-cols-[repeat(auto-fit,minmax(2.75rem,1fr))]',
+          // Round 4 T8: on touch a wrapping row with no empty cell. Up to seven segments share one row while the track is
+          // 324 px or wider (each at least 44 pt); eight, or a narrower track, wrap four to a row and the last row stretches.
+          'dshx:pointer-coarse:flex dshx:pointer-coarse:flex-wrap',
         )}
         data-model-effort-options
         onBlur={event => {
@@ -151,6 +153,10 @@ export const EffortControl = (props: {
               aria-label={segment.name}
               className={cn(
                 'dshx:h-7 dshx:min-w-0 dshx:rounded-md dshx:px-1 dshx:text-xs dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
+                'dshx:pointer-coarse:min-w-11 dshx:pointer-coarse:flex-1',
+                segments.length > 7
+                  ? 'dshx:pointer-coarse:basis-[calc(25%-0.125rem)]'
+                  : 'dshx:pointer-coarse:basis-0 dshx:@max-[20.25rem]/effort:pointer-coarse:basis-[calc(25%-0.125rem)]',
                 checked && 'dshx:segment-thumb dshx:font-selected dshx:text-foreground',
               )}
               data-model-effort-default={segment.id === undefined || undefined}
