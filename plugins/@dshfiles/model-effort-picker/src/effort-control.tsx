@@ -94,13 +94,14 @@ export const EffortControl = (props: {
   if (props.efforts.length === 0) return null
 
   const segments: readonly Segment[] = [
-    { id: undefined, label: 'Auto', name: 'Provider default' },
+    // Round 4 T4: the accessible name contains the visible word (WCAG 2.5.3).
+    { id: undefined, label: 'Auto', name: 'Auto, provider default' },
     ...props.efforts.map(effort => ({ id: effort.id, label: ModelPickerModel.effortShortLabel(effort), name: effort.name })),
   ]
   const shown = preview === null ? props.selected : preview.value
   const found = segments.findIndex(segment => segment.id === shown)
   const checkedIndex = found < 0 ? 0 : found
-  const heading = segments[checkedIndex]?.name ?? 'Provider default'
+  const heading = checkedIndex === 0 ? 'Provider default' : (segments[checkedIndex]?.name ?? 'Provider default')
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
     if (event.key === 'Enter' || event.key === ' ') {
@@ -129,7 +130,8 @@ export const EffortControl = (props: {
         <InfoHint description="Higher effort lets the model think for longer before it answers." label="About reasoning effort" />
       </div>
       <div
-        aria-labelledby={headingId}
+        // Round 4 T4: a stable group name; the chosen value is in the heading and on the checked radio.
+        aria-label="Reasoning effort"
         className={cn(
           'dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(2rem,1fr))] dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.5',
           segments.length > 6 ? 'dshx:pointer-coarse:grid-cols-4' : 'dshx:pointer-coarse:grid-cols-[repeat(auto-fit,minmax(2.75rem,1fr))]',

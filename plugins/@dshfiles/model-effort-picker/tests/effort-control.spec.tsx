@@ -49,7 +49,7 @@ describe('reasoning effort is a discrete, truthful choice (council picker C1)', 
 describe('the provider default is a real option, and arrowing commits only where it rests (council picker round 3, R6)', () => {
   it('makes "Auto" the first radio, named "Provider default", checked when the thread leaves effort to the provider', () => {
     const options = radios(render(undefined))
-    expect(options[0]).toContain('aria-label="Provider default"')
+    expect(options[0]).toContain('aria-label="Auto, provider default"')
     expect(options[0]).toContain('>Auto<')
     expect(options[0]).toContain('aria-checked="true"')
     expect(options.filter(option => option.includes('aria-checked="true"'))).toHaveLength(1)
@@ -98,5 +98,16 @@ describe('the provider default is a real option, and arrowing commits only where
     committer.flush()
     committer.flush()
     expect(commits).toEqual(['high', 'max', undefined])
+  })
+
+  it('names each radio with its visible word inside, and the group by its subject (round 4 T4)', () => {
+    const html = render('medium')
+    for (const option of radios(html)) {
+      const label = /aria-label="([^"]*)"/u.exec(option)?.[1] ?? ''
+      const visible = option.replace(/<[^>]+>/gu, '')
+      expect([visible, label.toLowerCase().includes(visible.toLowerCase())]).toEqual([visible, true])
+    }
+    expect(/<div[^>]*role="radiogroup"[^>]*>/u.exec(html)?.[0]).toContain('aria-label="Reasoning effort"')
+    expect(/<div[^>]*role="radiogroup"[^>]*>/u.exec(html)?.[0]).not.toContain('aria-labelledby')
   })
 })
