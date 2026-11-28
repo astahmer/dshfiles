@@ -54,6 +54,7 @@ export const ModelRow = (props: {
   useEffect(() => cancelPress, [])
   const name = ModelPickerModel.displayName({ group: props.group, model: props.model })
   const brand = ModelPickerModel.brandFor({ model: props.model })
+  const shownName = ModelPickerModel.middleTruncate(name)
   const selectMode = props.selectSeveral === true
   const quotaId = props.id === undefined ? undefined : `${props.id}-quota`
 
@@ -135,12 +136,12 @@ export const ModelRow = (props: {
         {/* Round 3 R3: the name comes first and truncates last. The account tag is short and fixed, so nothing beside the
           name takes its room while it still fits. */}
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
-          <TruncatedTooltip content={props.model.id}>
+          <TruncatedTooltip content={props.model.id} shortened={shownName !== name}>
             <span
               className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-semibold')}
               data-model-picker-name
             >
-              {name}
+              {shownName}
             </span>
           </TruncatedTooltip>
           {props.accountTag === undefined ? null : (

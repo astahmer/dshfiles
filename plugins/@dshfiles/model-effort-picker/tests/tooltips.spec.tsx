@@ -17,7 +17,7 @@ describe('tooltips only when they add something (council picker N3)', () => {
   })
 
   it('wraps the row name and the service label in the truncation-only tooltip, placed below so the search stays clear', () => {
-    expect(source('model-row.tsx')).toMatch(/<TruncatedTooltip content=\{props\.model\.id\}>/u)
+    expect(source('model-row.tsx')).toMatch(/<TruncatedTooltip content=\{props\.model\.id\}( shortened=\{[^}]*\})?>/u)
     expect(source('model-row.tsx')).not.toMatch(/<Tooltip>/u)
     const atoms = source('picker-atoms.tsx')
     expect(atoms.slice(atoms.indexOf('export const ProviderLabel'))).toMatch(/^[^]*?<TruncatedTooltip/u)

@@ -62,7 +62,16 @@ export const isTruncated = (element: { readonly scrollWidth: number; readonly cl
  * Council picker round 1, N3: a tooltip only when it adds something. It opens (after the provider's 500 ms) only when
  * the text it wraps is truncated, below the text, so it never covers the search above the list or the row itself.
  */
-export const TruncatedTooltip = ({ children, content }: { readonly children: ReactElement; readonly content: string }) => {
+export const TruncatedTooltip = ({
+  children,
+  content,
+  shortened = false,
+}: {
+  readonly children: ReactElement
+  readonly content: string
+  /** The text was shortened before it was drawn (a middle cut, round 4 T5), so the tooltip has something to add. */
+  readonly shortened?: boolean
+}) => {
   const [open, setOpen] = useState(false)
   return (
     <Tooltip
@@ -73,8 +82,8 @@ export const TruncatedTooltip = ({ children, content }: { readonly children: Rea
     >
       <TooltipTrigger
         asChild
-        onFocus={event => setOpen(isTruncated(event.currentTarget))}
-        onPointerEnter={event => setOpen(isTruncated(event.currentTarget))}
+        onFocus={event => setOpen(shortened || isTruncated(event.currentTarget))}
+        onPointerEnter={event => setOpen(shortened || isTruncated(event.currentTarget))}
         onPointerLeave={() => setOpen(false)}
       >
         {children}

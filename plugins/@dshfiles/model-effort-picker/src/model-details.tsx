@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -19,6 +19,41 @@ export interface FastSlotInput {
   readonly provider: string
   readonly model: string
   readonly draft: { readonly value: boolean | undefined; readonly onChange: (enabled: boolean) => void } | null
+}
+
+/**
+ * "Use ‹model›" (round 3 R1), or "Use this model" when the full label does not fit (round 4 T5): the full name is always
+ * its accessible name. The button spans the sheet at 44 pt on touch.
+ */
+export const UseButton = (props: { readonly name: string; readonly busy: boolean; readonly onUse: () => void }) => {
+  const label = useRef<HTMLSpanElement>(null)
+  const [fits, setFits] = useState(true)
+  useLayoutEffect(() => {
+    const element = label.current
+    if (element === null) return
+    const measure = (): void => setFits(fitting => (fitting ? element.scrollWidth <= element.clientWidth + 1 : fitting))
+    measure()
+    const observer = new ResizeObserver(() => {
+      setFits(true)
+      requestAnimationFrame(measure)
+    })
+    observer.observe(element.parentElement ?? element)
+    return () => observer.disconnect()
+  }, [props.name])
+  return (
+    <Button
+      aria-label={`Use ${props.name}`}
+      className="dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-full"
+      data-model-use-fits={fits || undefined}
+      disabled={props.busy}
+      onClick={props.onUse}
+      type="button"
+    >
+      <span className="dshx:min-w-0 dshx:truncate" ref={label}>
+        {fits ? `Use ${props.name}` : 'Use this model'}
+      </span>
+    </Button>
+  )
 }
 
 export const ModelDetails = (props: {
@@ -178,15 +213,7 @@ export const ModelDetails = (props: {
         <footer className="dshx:mt-2 dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:justify-end" data-model-details-use>
           {/* Round 3 R1: the button never leaves the sheet. It truncates a long name (the full name is its accessible
               name) and spans the sheet at 44 pt on touch. */}
-          <Button
-            aria-label={`Use ${name}`}
-            className="dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-full"
-            disabled={props.busy}
-            onClick={use}
-            type="button"
-          >
-            <span className="dshx:min-w-0 dshx:truncate">Use {name}</span>
-          </Button>
+          <UseButton busy={props.busy} name={name} onUse={use} />
         </footer>
       ) : null}
     </section>

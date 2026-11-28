@@ -146,6 +146,13 @@ export class ModelPickerModel {
     return 'no-models'
   }
 
+  /**
+   * Round 4 T5: a long model name cut in the middle (its first 18 and last 14 characters), so the suffix that tells
+   * models apart ("…context-preview", "…-2512") survives where the row has no room. Short names pass through.
+   */
+  static middleTruncate = (name: string, head = 18, tail = 14): string =>
+    name.length <= head + tail + 1 ? name : `${name.slice(0, head)}…${name.slice(-tail)}`
+
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return groups
