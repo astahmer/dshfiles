@@ -9,7 +9,7 @@ import { ChevronRightIcon, PlusIcon, Undo2Icon, XIcon } from '@dshfiles/plugin-u
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
-import { BrandMark, InfoHint } from './picker-atoms.js'
+import { BrandMark, InfoHint, quotaTone } from './picker-atoms.js'
 
 const RETURN_LABELS = {
   stay: 'stay on it',
@@ -27,9 +27,6 @@ export interface FallbackRow {
   readonly quota: ModelQuota | undefined
   readonly serving: boolean
 }
-
-const quotaTone = (percent: number): string =>
-  Math.round(percent) <= 0 ? 'dshx:text-destructive' : percent <= 15 ? 'dshx:text-warning' : 'dshx:text-muted-foreground'
 
 /**
  * Council picker round 1, N5: the fallback chain, collapsed to "Fallbacks · 2 routes ›". Expanded it is one numbered list

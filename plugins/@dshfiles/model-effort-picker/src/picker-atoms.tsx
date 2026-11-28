@@ -130,9 +130,12 @@ export const AccountBadge = ({
   </Tooltip>
 )
 
-/** The quota convention every surface shares (ai-accounts `quotaTone`): muted while healthy, amber at 15% left or less, red once spent. */
-const quotaTone = (percent: number): string =>
-  Math.round(percent) <= 0 ? 'dshx:text-destructive' : percent <= 15 ? 'dshx:text-warning' : 'dshx:text-muted-foreground/60'
+/**
+ * The quota convention every surface shares (ai-accounts `quotaTone`): secondary ink while healthy, amber at 15% left or
+ * less, red once spent. Round 3 R5: no opacity on the healthy ink, which at 60 % fell under 4.5:1 on the rows.
+ */
+export const quotaTone = (percent: number): string =>
+  Math.round(percent) <= 0 ? 'dshx:text-destructive' : percent <= 15 ? 'dshx:text-warning' : 'dshx:text-muted-foreground'
 
 /** Remaining quota as a bare number, for a control that already has its own tooltip (the detail panel's account chips). */
 export const QuotaPercent = ({ percent, onReserve, className }: { readonly percent: number; readonly onReserve: boolean; readonly className?: string }) => (

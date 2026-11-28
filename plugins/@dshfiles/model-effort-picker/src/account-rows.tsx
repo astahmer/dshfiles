@@ -3,15 +3,12 @@ import { CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
+import { quotaTone } from './picker-atoms.js'
 
 interface Account {
   readonly id: string
   readonly name: string
 }
-
-/** The quota convention every surface shares (ai-accounts `quotaTone`): muted while healthy, amber at 15 % or less, red once spent. */
-const quotaTone = (percent: number): string =>
-  Math.round(percent) <= 0 ? 'dshx:text-destructive' : percent <= 15 ? 'dshx:text-warning' : 'dshx:text-muted-foreground'
 
 /**
  * Council picker round 1, C3: the accounts that offer the inspected model, as full-width radio rows: the account's dot
