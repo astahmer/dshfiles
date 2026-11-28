@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { useApi, useApiQuery, useResource, useSettings } from '@dshfiles/dshx/client'
@@ -37,28 +37,6 @@ type FastModeRoute = { readonly sessionId: string; readonly provider: string; re
 
 const fastModeRouteKey = ({ sessionId, provider, model }: FastModeRoute): string => JSON.stringify([sessionId, provider, model])
 
-/** The popover never narrows below the side-by-side tier (`pane-compact`, 42rem) nor grows past this many rem. */
-const POPOVER_MIN_REM = 42
-const POPOVER_MAX_REM = 64
-
-/**
- * How many pixels the list must grow so its longest model name shows in full (negative when every name has room to
- * spare). Measured on the rendered rows, because the provider and account columns beside a name vary per row.
- */
-const nameWidthShortfall = (list: HTMLElement): number | undefined => {
-  const range = document.createRange()
-  let shortfall: number | undefined
-  for (const name of list.querySelectorAll<HTMLElement>('[data-model-picker-name]')) {
-    range.selectNodeContents(name)
-    // Client rects carry the popover's zoom-in animation transform; offset sizes do not. Undo the scale.
-    const box = name.getBoundingClientRect().width
-    if (box === 0) continue
-    const missing = Math.ceil((range.getBoundingClientRect().width * name.offsetWidth) / box) - name.offsetWidth
-    shortfall = shortfall === undefined ? missing : Math.max(shortfall, missing)
-  }
-  return shortfall
-}
-
 /** The picker's own shortcut: focus the search field while it is open. */
 const MOD_KEY = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl'
 
@@ -80,16 +58,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const [fastModeOverride, setFastModeOverride] = useState<{ readonly routeKey: string; readonly enabled: boolean } | null>(null)
   const [inspected, setInspected] = useState<InspectedRoute | null>(null)
   const [narrowDetails, setNarrowDetails] = useState(false)
-  const [popoverWidth, setPopoverWidth] = useState<number | null>(null)
   const [fanOut, setFanOut] = useState<readonly ModelSelection[]>([])
   // b:ysaj: Select several makes a click collect routes, so fan-out is not a shift-click secret (and works on touch).
   const [several, setSeveral] = useState(false)
   const modelListRef = useRef<HTMLDivElement | null>(null)
-  // The popover's Portal mounts its content one render after `open`, so the fit below waits for the list node itself.
-  const [listNode, setListNode] = useState<HTMLDivElement | null>(null)
   const attachModelList = useCallback((node: HTMLDivElement | null) => {
     modelListRef.current = node
-    setListNode(node)
   }, [])
   const detailsRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -156,23 +130,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
       setSelectionError(null)
       setInspected(null)
       setNarrowDetails(false)
-      setPopoverWidth(null)
     }
   }, [open, available, load])
-
-  // Fit the popover to the longest model name, between the side-by-side minimum and a cap, before it paints. Sized on
-  // the full list only, so typing a search never resizes it under the cursor.
-  useLayoutEffect(() => {
-    if (!open || query !== '' || rows.length === 0) return
-    const popover = listNode?.closest<HTMLElement>('[data-slot=popover-content]') ?? null
-    if (popover === null || listNode === null) return
-    const shortfall = nameWidthShortfall(listNode)
-    if (shortfall === undefined || Math.abs(shortfall) < 1) return
-    const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
-    const max = Math.min(POPOVER_MAX_REM * rem, window.innerWidth - rem)
-    const next = Math.min(max, Math.max(POPOVER_MIN_REM * rem, popover.offsetWidth + shortfall))
-    setPopoverWidth(width => (width !== null && Math.abs(width - next) < 1 ? width : next))
-  }, [open, query, rows, listNode])
 
   // The chip's name, its account tag (b:4qjm) and its accessible name all come from the catalog: read it as soon as the
   // picker is available, not only once its menu opens.
@@ -338,8 +297,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="dshx-root dshx:w-[min(50rem,calc(100vw-1rem))] dshx:border-0 dshx:bg-transparent dshx:p-0 dshx:shadow-none"
-            style={popoverWidth === null ? undefined : { width: popoverWidth }}
+            className="dshx-root dshx:@container dshx:w-[min(42.5625rem,calc(100vw-1.5rem))] dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-0 dshx:shadow-lg"
+            collisionPadding={12}
             onOpenAutoFocus={event => {
               event.preventDefault()
               // On a touch screen a focused search raises the on-screen keyboard over the sheet: start on the model in
@@ -361,7 +320,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             sideOffset={8}
           >
             <div
-              className="dshx:@container dshx:flex dshx:items-start dshx:gap-2.5"
+              className="dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch"
+              data-model-picker-surface
               onKeyDownCapture={event => {
                 if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
                   event.preventDefault()
@@ -372,7 +332,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               <section
                 aria-label="Choose a model"
                 className={cn(
-                  'dshx:flex dshx:max-h-[min(26rem,var(--radix-popover-content-available-height))] dshx:min-h-[18rem] dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-1.5 dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-1.5 dshx:shadow-lg',
+                  'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
                   'dshx:@max-pane-compact:w-full',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
@@ -407,7 +367,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     {MOD_KEY} K
                   </Kbd>
                 </label>
-                <ScrollArea className="dshx:min-h-0 dshx:flex-1 dshx:[&_[data-slot=scroll-area-viewport]>div]:block!">
+                <ScrollArea
+                  className="dshx:min-h-0 dshx:flex-1 dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block!"
+                  data-model-picker-scroll
+                >
                   <div
                     aria-label="Models and accounts"
                     className="dshx:flex dshx:flex-col dshx:gap-px dshx:pr-1"
@@ -491,17 +454,14 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
 
               <div
                 className={cn(
-                  'dshx:relative dshx:flex dshx:max-h-[min(26rem,var(--radix-popover-content-available-height))] dshx:w-72 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-2.5 dshx:shadow-lg dshx:outline-none',
-                  'dshx:@max-pane-compact:w-full',
+                  'dshx:flex dshx:w-80 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:border-l dshx:border-border dshx:p-2.5 dshx:outline-none',
+                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0',
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
+                data-model-inspector
                 ref={detailsRef}
                 tabIndex={-1}
               >
-                <span
-                  aria-hidden="true"
-                  className="dshx:absolute dshx:-left-1 dshx:top-7 dshx:size-2 dshx:rotate-45 dshx:rounded-xs dshx:border-b dshx:border-l dshx:border-border dshx:bg-popover"
-                />
                 <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
                   <ModelDetails
                     accountAccents={accountAccents}
