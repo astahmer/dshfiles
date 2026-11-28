@@ -37,10 +37,12 @@ describe('Fast mode is one visible, labelled control (council picker C2)', () =>
     expect(control).toMatch(/dshx:h-4 dshx:w-7/u)
     // The visible label names the switch; no tooltip trigger sits on it to overwrite its state.
     expect(control).not.toContain('tooltip-trigger')
-    expect(html).toMatch(/<label[^>]*for="[^"]+"/u)
-    // The switch is not inside its label: WebKit re-dispatched a tap on it through the label and toggled it twice.
-    expect(html).not.toMatch(/<label[^>]*>(?:(?!<\/label>).)*role="switch"/u)
-    expect(html).toMatch(/dshx:min-h-8 [^"]*dshx:pointer-coarse:min-h-11/u)
+    // The switch is named by the visible label text.
+    expect(control).toMatch(/aria-labelledby="[^"]+"/u)
+    // No <label>: WebKit re-dispatched a tap through a label onto the switch and toggled it twice.
+    expect(html).not.toContain('<label')
+    // The whole row is the one 44 px target (C6).
+    expect(/<div[^>]*data-model-fast-row[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:min-h-8 [^"]*dshx:pointer-coarse:min-h-11/u)
   })
 
   it('drops the per-row hover switch; a route with Fast mode on shows a static ink bolt', () => {

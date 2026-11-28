@@ -32,6 +32,8 @@ describe('every touch target is 44 pt (council picker C6)', () => {
 
   it('lets the whole Fast mode row toggle the switch', () => {
     const fast = sources.find(source => source.name === 'fast-mode-section.tsx')?.text ?? ''
-    expect(fast).toMatch(/<label\s+className="[^"]*dshx:min-h-8[^"]*dshx:flex-1[^"]*dshx:pointer-coarse:min-h-11/u)
+    expect(fast).toMatch(/className="dshx:flex dshx:min-h-8 [^"]*dshx:pointer-coarse:min-h-11"\s+data-model-fast-row\s+onClick=/u)
+    // The row is the only target: the switch keeps no 34 px hit area of its own beside it, its clicks stay single.
+    expect(fast).toContain('event.target.closest(\'[role="switch"]\') !== null')
   })
 })

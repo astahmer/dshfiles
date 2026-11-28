@@ -24,27 +24,30 @@ export const FastModeRow = (props: {
   readonly error: string | null
   readonly onChange: (enabled: boolean) => void
 }) => {
-  const id = useId()
+  const labelId = useId()
   return (
     <div className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-fast-mode>
-      {/* The label fills the row up to the switch, so a tap anywhere on it toggles the switch (C6: a real 44 px target). It
-          sits beside the switch, not around it: WebKit re-dispatched a tap on a switch inside its label, toggling twice. */}
-      <div className="dshx:flex dshx:items-center dshx:gap-2">
-        <label
-          className="dshx:flex dshx:min-h-8 dshx:min-w-0 dshx:flex-1 dshx:cursor-pointer dshx:items-center dshx:text-xs dshx:font-medium dshx:pointer-coarse:min-h-11"
-          htmlFor={id}
-        >
-          <span className="dshx:min-w-0">
-            Fast mode <span className="dshx:font-normal dshx:text-muted-foreground">· may cost more</span>
-          </span>
-        </label>
+      {/* The whole row is the one target (C6): a tap anywhere on it toggles Fast mode once, so no 34 px switch hit area sits
+          beside a 44 px label that does the same. The switch keeps its own click (and the keyboard); a tap that lands on it
+          is not counted twice. No <label>: WebKit re-dispatched a tap through a label onto the switch, toggling twice. */}
+      <div
+        className="dshx:flex dshx:min-h-8 dshx:cursor-pointer dshx:items-center dshx:gap-2 dshx:pointer-coarse:min-h-11"
+        data-model-fast-row
+        onClick={event => {
+          if (props.disabled || (event.target instanceof Element && event.target.closest('[role="switch"]') !== null)) return
+          props.onChange(!props.enabled)
+        }}
+      >
+        <span className="dshx:min-w-0 dshx:flex-1 dshx:text-xs dshx:font-medium" id={labelId}>
+          Fast mode <span className="dshx:font-normal dshx:text-muted-foreground">· may cost more</span>
+        </span>
         <Switch
+          aria-labelledby={labelId}
           checked={props.enabled}
-          className="dshx:h-4 dshx:w-7 dshx:pointer-coarse:mr-2"
+          className="dshx:h-4 dshx:w-7"
           data-model-fast-mode-toggle
           data-touch-row
           disabled={props.disabled}
-          id={id}
           onCheckedChange={props.onChange}
           size="sm"
         />
