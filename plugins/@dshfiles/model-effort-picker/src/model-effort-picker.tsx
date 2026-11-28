@@ -531,7 +531,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     // search never widens); "Cancel" leaves it and drops the selection, always available. The label says the
                     // state, so no aria-pressed; on, it takes the selected wash and edge.
                     <Button
-                      className={cn('dshx:h-8 dshx:shrink-0 dshx:px-2.5 dshx:pointer-coarse:h-11', several && 'dshx:bg-selected-wash dshx:selected-edge')}
+                      className="dshx:h-8 dshx:shrink-0 dshx:px-2.5 dshx:pointer-coarse:h-11"
                       data-model-select-several
                       data-on={several || undefined}
                       disabled={!several && rows.length === 0}
@@ -541,7 +541,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       }}
                       size="sm"
                       type="button"
-                      variant="ghost"
+                      // Round 5 U8: Cancel is a plain outline button, not a pressed state.
+                      variant={several ? 'outline' : 'ghost'}
                     >
                       {several ? t('cancel') : t('select')}
                     </Button>

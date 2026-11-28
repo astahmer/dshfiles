@@ -109,7 +109,9 @@ describe('select mode keeps the list and turns details into a tray (council pick
     )
     expect(control).not.toContain('aria-pressed')
     expect(control).toMatch(/dshx:pointer-coarse:h-11/u)
-    expect(control).toContain("several && 'dshx:bg-selected-wash dshx:selected-edge'")
+    // Round 5 U8: Cancel is a plain outline button, not the pressed wash.
+    expect(control).toContain("variant={several ? 'outline' : 'ghost'}")
+    expect(control).not.toContain('selected-wash')
     expect(control).toContain("{several ? t('cancel') : t('select')}")
     // Cancel is always available; Select waits only while nothing matches.
     expect(control).toContain('disabled={!several && rows.length === 0}')

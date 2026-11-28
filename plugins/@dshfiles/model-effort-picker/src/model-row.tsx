@@ -185,9 +185,12 @@ export const ModelRow = (props: {
             </>
           )}
         </span>
-        <span className="dshx:flex dshx:w-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center" data-model-row-check-slot>
-          {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground dshx:shrink-0" data-model-current-check /> : null}
-        </span>
+        {/* Round 5 U8: select mode has no check column, so the quota sits 8 px from the row's edge. */}
+        {selectMode ? null : (
+          <span className="dshx:flex dshx:w-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center" data-model-row-check-slot>
+            {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground dshx:shrink-0" data-model-current-check /> : null}
+          </span>
+        )}
       </div>
       {selectMode ? null : (
         <button

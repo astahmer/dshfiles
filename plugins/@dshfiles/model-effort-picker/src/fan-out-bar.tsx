@@ -72,11 +72,12 @@ export const FanOutSelection = (props: {
         data-model-picker-fan-out="bar"
         role="group"
       >
+        {/* Round 5 U8: the reason above the buttons, as in the tray. */}
+        {reasonLine}
         <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
           {summary}
           {actions}
         </div>
-        {reasonLine}
       </div>
     )
 
