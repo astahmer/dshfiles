@@ -481,6 +481,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         onInspect={() => showDetails({ model: model.id, provider: group.id })}
                         onSelect={choose}
                         providerLabel={providerLabels.get(group.id)}
+                        accountTag={accountBadges.get(group.id) ?? ModelPickerModel.accountTag({ name: group.name })}
                         fastOn={knownFast.get(fastModeRouteKey({ sessionId: '', provider: group.id, model: model.id })) === true}
                         quota={quotas.get(group.id)}
                       />

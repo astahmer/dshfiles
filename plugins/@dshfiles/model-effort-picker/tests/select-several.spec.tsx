@@ -46,7 +46,8 @@ describe('select several is a mode with checkboxes and an action bar (council pi
   it('puts a 16 px checkbox in the mark column, with no chevron, in select mode', () => {
     const checked = row(true)
     expect(/<span[^>]*data-model-fan-out-check[^>]*>/u.exec(checked)?.[0]).toMatch(/dshx:size-4/u)
-    expect(checked).not.toContain('data-model-mark')
+    // Round 3 R3: the brand mark stays, after the checkbox.
+    expect(checked.indexOf('data-model-mark')).toBeGreaterThan(checked.indexOf('data-model-fan-out-check'))
     expect(checked).not.toContain('data-model-details-trigger')
     expect(/<div[^>]*role="option"[^>]*>/u.exec(checked)?.[0]).toContain('aria-checked="true"')
   })

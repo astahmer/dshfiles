@@ -4,7 +4,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/typ
 import { CheckIcon, ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
-import { BrandMark, ProviderLabel, QuotaText, TruncatedTooltip } from './picker-atoms.js'
+import { BrandMark, QuotaText, TruncatedTooltip } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = CatalogGroup['models'][number]
@@ -27,6 +27,8 @@ export const ModelRow = (props: {
   readonly fastOn?: boolean
   readonly quota: ModelQuota | undefined
   readonly providerLabel: string | undefined
+  /** Round 3 R3: the row's account as its short tag ("CC1"), muted, instead of the service name on every row. */
+  readonly accountTag?: string | undefined
   readonly current: ModelSelection | null
   readonly fanOutSelected: boolean
   readonly onSelect: (selection: ModelSelection) => void
@@ -95,7 +97,8 @@ export const ModelRow = (props: {
       onPointerUp={cancelPress}
       role="option"
     >
-      {/* N6: in select mode the mark column holds a 16 px checkbox (the option itself carries aria-checked). */}
+      {/* N6: in select mode the mark column holds a 16 px checkbox (the option itself carries aria-checked); round 3 R3:
+          the brand mark stays after it. */}
       {selectMode ? (
         <span
           aria-hidden="true"
@@ -107,19 +110,24 @@ export const ModelRow = (props: {
         >
           {props.fanOutSelected ? <CheckIcon className="dshx:size-3" /> : null}
         </span>
-      ) : (
-        <BrandMark brand={brand} className="dshx:size-4" name={name} />
-      )}
+      ) : null}
+      <BrandMark brand={brand} className="dshx:size-4" name={name} />
+      {/* Round 3 R3: the name comes first and truncates last. The account tag is short and fixed, so nothing beside the
+          name takes its room while it still fits. */}
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
         <TruncatedTooltip content={props.model.id}>
           <span
-            className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
+            className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
             data-model-picker-name
           >
             {name}
           </span>
         </TruncatedTooltip>
-        {props.providerLabel === undefined ? null : <ProviderLabel className="dshx:max-w-[7rem]" label={props.providerLabel} />}
+        {props.accountTag === undefined ? null : (
+          <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" data-model-row-account>
+            {props.accountTag}
+          </span>
+        )}
       </span>
       {/* b:16yr: one row per model, so no account badge or per-row effort glyph: the account and the reasoning effort are
           chosen in the detail panel. What stays is what is left on the account a click would use, quiet unless low. */}
@@ -133,12 +141,11 @@ export const ModelRow = (props: {
           </>
         )}
       </span>
-      <span className="dshx:flex dshx:w-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center">
-        {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground" data-model-current-check /> : null}
-      </span>
-      <span className="dshx:flex dshx:w-4 dshx:shrink-0 dshx:items-center dshx:justify-center">
-        {props.fastOn === true ? <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground" data-model-fast-on role="img" /> : null}
-      </span>
+      {/* Round 3 R3: the check and the bolt take room only on the rows that show them. */}
+      {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground dshx:shrink-0" data-model-current-check /> : null}
+      {props.fastOn === true ? (
+        <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground dshx:shrink-0" data-model-fast-on role="img" />
+      ) : null}
       {selectMode ? null : (
         <>
           {/* Pointer and touch only: the keyboard opens details with Right, so this is no second tab stop inside the option. */}

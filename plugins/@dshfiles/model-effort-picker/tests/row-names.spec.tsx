@@ -1,0 +1,53 @@
+import { renderToStaticMarkup } from 'react-dom/server'
+import { describe, expect, it } from 'vitest'
+import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
+import { ModelRow } from '../src/model-row.js'
+
+const row = (input: { readonly active?: boolean; readonly selectSeveral?: boolean; readonly fastOn?: boolean }): string =>
+  renderToStaticMarkup(
+    <TooltipProvider>
+      <ModelRow
+        accountTag="CC1"
+        active={input.active ?? false}
+        busy={false}
+        current={null}
+        fanOutSelected={false}
+        fastOn={input.fastOn ?? false}
+        group={{ id: 'cc1', name: 'Command Code 1', models: [] }}
+        model={{ id: 'mistral-large-3-instruct-2512-extended-context-preview', name: 'mistral', description: '' }}
+        onFanOut={() => undefined}
+        onInspect={() => undefined}
+        onSelect={() => undefined}
+        providerLabel="Command Code"
+        quota={{ percent: 62, label: 'Weekly limit', onReserve: false }}
+        selectSeveral={input.selectSeveral ?? false}
+      />
+    </TooltipProvider>,
+  )
+describe('names come before labels in the list (council picker round 3, R3)', () => {
+  it('labels a row with its short account tag, muted and fixed, never the service name on every row', () => {
+    const html = row({})
+    const tag = /<span[^>]*data-model-row-account[^>]*>([^<]*)</u.exec(html)
+    expect(tag?.[1]).toBe('CC1')
+    expect(tag?.[0]).toMatch(/dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground/u)
+    expect(html).not.toContain('data-model-provider-label')
+    // The service stays in the option's accessible name.
+    expect(/<div[^>]*role="option"[^>]*>/u.exec(html)?.[0]).toContain('via Command Code')
+  })
+
+  it('lets the name take the room first, at 13 px', () => {
+    expect(/<span[^>]*data-model-picker-name[^>]*>/u.exec(row({}))?.[0]).toMatch(/dshx:min-w-0 dshx:flex-\[1_1_auto\] dshx:truncate dshx:text-sm/u)
+  })
+
+  it('keeps no empty check or bolt slot on a row that shows neither', () => {
+    const plain = row({})
+    expect(plain).not.toMatch(/<span class="dshx:flex dshx:w-3\.5 dshx:shrink-0|<span class="dshx:flex dshx:w-4 dshx:shrink-0/u)
+    expect(row({ active: true, fastOn: true })).toMatch(/data-model-current-check[\s\S]*data-model-fast-on/u)
+  })
+
+  it('keeps the brand mark after the checkbox in select mode', () => {
+    const html = row({ selectSeveral: true })
+    expect(html.indexOf('data-model-fan-out-check')).toBeGreaterThan(-1)
+    expect(html.indexOf('data-model-mark')).toBeGreaterThan(html.indexOf('data-model-fan-out-check'))
+  })
+})
