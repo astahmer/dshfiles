@@ -571,6 +571,26 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "command": null
     },
     {
+      "key": "module:@dshfiles/ai-accounts/account-color",
+      "kind": "module",
+      "title": "@dshfiles/ai-accounts/account-color",
+      "summary": "Account dots (council picker round 3, R9; shared from ai-accounts since round 5 so the fan-out chips draw them too). A dot tells accounts apart, so within one service the dots sit at least 60° apart in hue, and each holds 3:1 against the selected wash in both schemes. No single colour reaches 3:1 on both the light was…",
+      "publicSymbol": "AccountAccent, AccountColor, AccountDot",
+      "importFrom": "@dshfiles/ai-accounts/account-color",
+      "owner": "@dshfiles/ai-accounts",
+      "scope": "client",
+      "mode": "shared types and helpers",
+      "registration": "import",
+      "risk": "additive",
+      "riskNote": "Importing it adds a dependency on its owner; it registers nothing by itself.",
+      "occupancy": "unavailable",
+      "occupants": [],
+      "details": [],
+      "source": "plugins/@dshfiles/ai-accounts/src/account-color.tsx",
+      "docs": "docs/plugin-boundaries.md",
+      "command": null
+    },
+    {
       "publicSymbol": "threadAccountApi",
       "importFrom": "@dshfiles/ai-accounts/thread-account-api",
       "owner": "@dshfiles/ai-accounts",
