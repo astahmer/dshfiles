@@ -223,7 +223,7 @@
       "id": "model-fan-out-gesture",
       "title": "Select several models to fan out",
       "summary": "Select several models in the picker to send the same prompt to each in its own thread.",
-      "details": "Turn on Select several beside the search (or shift-click, or long-press on touch) so a model row collects it for fan-out instead of switching this thread's model; rows show checkboxes and the bar counts the selection and Fan out\u2026 opens thread-sidebar's fan-out dialog with those routes preselected once two are collected. Scratch has one advertised model, so the reach covers the gesture and the counted bar; the two-route handoff and the dialog are exercised by unit tests and thread-sidebar's own fan-out journey.",
+      "details": "Turn on Select beside the search (or shift-click, or long-press on touch) so a model row collects it for fan-out instead of switching this thread's model; rows show checkboxes and the bar counts the selection and Fan out\u2026 opens thread-sidebar's fan-out dialog with those routes preselected once two are collected. Scratch has one advertised model, so the reach covers the gesture and the counted bar; the two-route handoff and the dialog are exercised by unit tests and thread-sidebar's own fan-out journey.",
       "surfaces": ["client", "integration"],
       "surface": "composerContribution",
       "destination": "composer",
@@ -234,7 +234,7 @@
         "click button \", reasoning *\"",
         "shiftclick option \"Use gpt-6-luna*\"",
         "shiftclick option \"Use claude-sonnet-5-5*\"",
-        "expect text \"2 of 6 selected\"",
+        "expect text \"2 selected · up to 6\"",
         "click button \"Fan out\u2026\"",
         "expect dialog \"Send to several models\""
       ],

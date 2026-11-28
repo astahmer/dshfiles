@@ -9,13 +9,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, ListChecksIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountAccents, accountColor } from './account-color.js'
 import { AccountDot } from './account-dot.js'
 import { ListEmptyState } from './empty-state.js'
-import { FanOutBar } from './fan-out-bar.js'
+import { FanOutSelection } from './fan-out-bar.js'
 import { FallbacksSection } from './fallbacks-section.js'
 import { FastModeSection } from './fast-mode-section.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
@@ -118,6 +118,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   )
   // N2: a distinct dot per account within one service, and the account's own short tag ("CC2").
   const accountAccentMap = useMemo(() => accountAccents(profiles.data?.accounts ?? []), [profiles.data])
+  const fanOutTagOf = (provider: string): string =>
+    accountBadges.get(provider) ?? ModelPickerModel.accountTag({ name: state.groups.find(group => group.id === provider)?.name ?? provider })
   const accountBadges = useMemo(
     () =>
       new Map(
@@ -411,7 +413,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 aria-label="Choose a model"
                 className={cn(
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
-                  (catalogEmpty || several) && 'dshx:w-full',
+                  catalogEmpty && 'dshx:w-full',
                   'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:px-2',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
@@ -450,26 +452,21 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     value={query}
                   />
                   {rows.length === 0 ? null : (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          aria-label={t('selectSeveral')}
-                          aria-pressed={several}
-                          className="dshx:size-8 dshx:shrink-0 dshx:pointer-coarse:size-11"
-                          data-model-select-several
-                          onClick={() => {
-                            setSeveral(!several)
-                            if (several) setFanOut([])
-                          }}
-                          size="icon"
-                          type="button"
-                          variant="ghost"
-                        >
-                          <ListChecksIcon aria-hidden="true" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom">{t('selectSeveral')}</TooltipContent>
-                    </Tooltip>
+                    // Round 3 R12: a visible "Select" / "Done" label at 44 pt on touch, pressed while the mode is on.
+                    <Button
+                      aria-pressed={several}
+                      className="dshx:h-8 dshx:shrink-0 dshx:px-2.5 dshx:pointer-coarse:h-11"
+                      data-model-select-several
+                      onClick={() => {
+                        setSeveral(!several)
+                        if (several) setFanOut([])
+                      }}
+                      size="sm"
+                      type="button"
+                      variant={several ? 'secondary' : 'ghost'}
+                    >
+                      {several ? t('done') : t('select')}
+                    </Button>
                   )}
                 </div>
                 <ScrollArea
@@ -530,7 +527,18 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   </div>
                 </ScrollArea>
                 {several ? (
-                  <FanOutBar count={fanOut.length} limit={ModelPickerModel.fanOutLimit} onClear={() => setFanOut([])} onFanOut={startFanOut} t={t} />
+                  <FanOutSelection
+                    accountTagOf={fanOutTagOf}
+                    className="dshx:hidden dshx:@max-pane-compact:flex"
+                    groups={state.groups}
+                    limit={ModelPickerModel.fanOutLimit}
+                    onClear={() => setFanOut([])}
+                    onFanOut={startFanOut}
+                    onRemove={toggleFanOut}
+                    routes={fanOut}
+                    t={t}
+                    variant="bar"
+                  />
                 ) : null}
                 {state.failures.length > 0 && (
                   <p className="dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
@@ -545,7 +553,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   'dshx:flex dshx:w-80 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:border-l dshx:border-border dshx:p-2.5 dshx:outline-none',
                   'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:px-2',
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
-                  (catalogEmpty || several) && 'dshx:hidden',
+                  catalogEmpty && 'dshx:hidden',
+                  several && 'dshx:@max-pane-compact:hidden',
                 )}
                 data-model-inspector
                 onKeyDown={event => {
@@ -558,50 +567,64 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 ref={detailsRef}
                 tabIndex={-1}
               >
-                <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
-                  <ModelDetails
-                    accountAccents={accountAccentMap}
-                    busy={busy}
-                    current={current}
-                    error={selectionError ?? state.error}
-                    fallbacks={
-                      <FallbacksSection
-                        accountAccents={accountAccentMap}
-                        accountBadges={accountBadges}
-                        busy={busy}
-                        current={current}
-                        groups={state.groups}
-                        providerLabels={providerLabels}
-                        sessionId={sessionId}
-                      />
-                    }
-                    fast={({ provider, model, draft }) => (
-                      <FastModeSection
-                        disabled={busy}
-                        draft={draft}
-                        key={`${sessionId}:${provider}:${model}`}
-                        model={model}
-                        onEnabledChange={enabled => {
-                          rememberFast({ provider, model }, enabled)
-                          setFastModeOverride({ enabled, routeKey: fastModeRouteKey({ model, provider, sessionId }) })
-                        }}
-                        onStatus={enabled => rememberFast({ provider, model }, enabled)}
-                        provider={provider}
-                        sessionId={sessionId}
-                      />
-                    )}
+                {several ? (
+                  <FanOutSelection
+                    accountTagOf={fanOutTagOf}
                     groups={state.groups}
-                    inspected={inspectedRoute}
-                    onBack={backToList}
-                    onClose={() => setOpen(false)}
-                    onInspect={setInspected}
-                    onRetry={load}
-                    onSelect={choose}
-                    onUse={(selection, fast) => void useDraft(selection, fast)}
-                    providerLabels={providerLabels}
-                    quotas={quotas}
+                    limit={ModelPickerModel.fanOutLimit}
+                    onClear={() => setFanOut([])}
+                    onFanOut={startFanOut}
+                    onRemove={toggleFanOut}
+                    routes={fanOut}
+                    t={t}
+                    variant="tray"
                   />
-                </div>
+                ) : (
+                  <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
+                    <ModelDetails
+                      accountAccents={accountAccentMap}
+                      busy={busy}
+                      current={current}
+                      error={selectionError ?? state.error}
+                      fallbacks={
+                        <FallbacksSection
+                          accountAccents={accountAccentMap}
+                          accountBadges={accountBadges}
+                          busy={busy}
+                          current={current}
+                          groups={state.groups}
+                          providerLabels={providerLabels}
+                          sessionId={sessionId}
+                        />
+                      }
+                      fast={({ provider, model, draft }) => (
+                        <FastModeSection
+                          disabled={busy}
+                          draft={draft}
+                          key={`${sessionId}:${provider}:${model}`}
+                          model={model}
+                          onEnabledChange={enabled => {
+                            rememberFast({ provider, model }, enabled)
+                            setFastModeOverride({ enabled, routeKey: fastModeRouteKey({ model, provider, sessionId }) })
+                          }}
+                          onStatus={enabled => rememberFast({ provider, model }, enabled)}
+                          provider={provider}
+                          sessionId={sessionId}
+                        />
+                      )}
+                      groups={state.groups}
+                      inspected={inspectedRoute}
+                      onBack={backToList}
+                      onClose={() => setOpen(false)}
+                      onInspect={setInspected}
+                      onRetry={load}
+                      onSelect={choose}
+                      onUse={(selection, fast) => void useDraft(selection, fast)}
+                      providerLabels={providerLabels}
+                      quotas={quotas}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           </PopoverContent>
