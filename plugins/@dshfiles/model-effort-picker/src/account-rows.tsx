@@ -1,7 +1,8 @@
 import { useId, useRef, type KeyboardEvent } from 'react'
 import { CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountColor } from './account-color.js'
+import { accountColor, type AccountAccent } from './account-color.js'
+import { AccountDot } from './account-dot.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { quotaTone } from './picker-atoms.js'
 
@@ -19,7 +20,7 @@ export const AccountRows = (props: {
   readonly accounts: readonly Account[]
   readonly selected: string | undefined
   readonly quotas: ReadonlyMap<string, ModelQuota>
-  readonly accents: ReadonlyMap<string, string>
+  readonly accents: ReadonlyMap<string, AccountAccent>
   readonly onChoose: (accountId: string) => void
 }) => {
   const headingId = useId()
@@ -68,11 +69,7 @@ export const AccountRows = (props: {
               tabIndex={checked || (selectedIndex < 0 && index === 0) ? 0 : -1}
               type="button"
             >
-              <i
-                aria-hidden="true"
-                className="dshx:size-2 dshx:shrink-0 dshx:rounded-full"
-                style={{ backgroundColor: props.accents.get(account.id) ?? accountColor({ instanceId: account.id }) }}
-              />
+              <AccountDot accent={props.accents.get(account.id) ?? accountColor({ instanceId: account.id })} className="dshx:size-2" />
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{account.name}</span>
               <span
                 className={cn(

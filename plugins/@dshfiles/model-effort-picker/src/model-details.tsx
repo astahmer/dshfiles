@@ -4,6 +4,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/typ
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArrowLeftIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import type { AccountAccent } from './account-color.js'
 import { AccountRows } from './account-rows.js'
 import { ModelPickerModel, type InspectedRoute, type ModelQuota } from './model-picker-model.js'
 import { EffortControl } from './effort-control.js'
@@ -26,7 +27,7 @@ export const ModelDetails = (props: {
   readonly current: ModelSelection | null
   readonly busy: boolean
   readonly error: string | null
-  readonly accountAccents: ReadonlyMap<string, string>
+  readonly accountAccents: ReadonlyMap<string, AccountAccent>
   readonly providerLabels: ReadonlyMap<string, string>
   /** What is left on each account (b:16yr): the list shows one row per model, so the account is chosen here. */
   readonly quotas: ReadonlyMap<string, ModelQuota>

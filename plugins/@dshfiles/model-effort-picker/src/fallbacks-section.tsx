@@ -7,7 +7,8 @@ import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ChevronRightIcon, PlusIcon, Undo2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountColor } from './account-color.js'
+import { accountColor, type AccountAccent } from './account-color.js'
+import { AccountDot } from './account-dot.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { BrandMark, InfoHint, quotaTone } from './picker-atoms.js'
 
@@ -23,7 +24,7 @@ export interface FallbackRow {
   readonly brand: ReturnType<typeof ModelPickerModel.brandFor>
   readonly account: string
   readonly tag: string
-  readonly color: string
+  readonly color: AccountAccent
   readonly quota: ModelQuota | undefined
   readonly serving: boolean
 }
@@ -115,7 +116,7 @@ export const FallbackList = (props: {
                   <BrandMark brand={row.brand} className="dshx:size-4" name={row.model} />
                   <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.model}</span>
                   <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground" data-model-fallback-account>
-                    <i aria-hidden="true" className="dshx:size-1.5 dshx:rounded-full" style={{ backgroundColor: row.color }} />
+                    <AccountDot accent={row.color} className="dshx:size-1.5" />
                     {row.tag}
                   </span>
                   <span
@@ -202,7 +203,7 @@ export const FallbacksSection = (props: {
   readonly groups: ModelDirectoryState['groups']
   readonly current: ModelSelection | null
   readonly busy: boolean
-  readonly accountAccents: ReadonlyMap<string, string>
+  readonly accountAccents: ReadonlyMap<string, AccountAccent>
   /** N2: each account's short tag ("CC2"), the one the status bar and AI Accounts show. */
   readonly accountBadges?: ReadonlyMap<string, string>
   readonly providerLabels: ReadonlyMap<string, string>

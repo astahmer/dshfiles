@@ -13,6 +13,7 @@ import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, ListChecksIcon, LoaderCir
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountAccents, accountColor } from './account-color.js'
+import { AccountDot } from './account-dot.js'
 import { ListEmptyState } from './empty-state.js'
 import { FanOutBar } from './fan-out-bar.js'
 import { FallbacksSection } from './fallbacks-section.js'
@@ -316,12 +317,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       >
                         {/* Round 3 R8: the default account reads muted at 500; another account in ink at 600 after its dot. */}
                         {shortLabel.offDefault === true ? (
-                          <i
-                            aria-hidden="true"
-                            className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full"
-                            data-model-picker-account-dot
-                            style={{ backgroundColor: accountAccentMap.get(current.provider) ?? accountColor({ instanceId: current.provider }) }}
-                          />
+                          <span className="dshx:flex" data-model-picker-account-dot>
+                            <AccountDot
+                              accent={accountAccentMap.get(current.provider) ?? accountColor({ instanceId: current.provider })}
+                              className="dshx:size-1.5"
+                            />
+                          </span>
                         ) : null}
                         <span
                           className={cn(

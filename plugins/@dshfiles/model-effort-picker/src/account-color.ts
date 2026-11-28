@@ -1,45 +1,90 @@
 /**
- * Hues an account falls back to when it carries no usable accent: the kit's categorical tokens (DESIGN.md › Colors),
- * distinct from each other in both themes and retuned with them.
+ * Account dots (council picker round 3, R9). A dot tells accounts apart, so within one service the dots sit at least 60°
+ * apart in hue, and each holds 3:1 against the selected wash in both schemes. No single colour reaches 3:1 on both the
+ * light wash (OKLCH L 0.935) and the dark one (L 0.30), so a dot has a light and a dark value, swapped by the kit's
+ * dark variant through two custom properties (`AccountDot`).
  */
-export const ACCOUNT_HUES = [
-  'var(--dshx-kit-graph-1)',
-  'var(--dshx-kit-graph-2)',
-  'var(--dshx-kit-graph-3)',
-  'var(--dshx-kit-graph-4)',
-  'var(--dshx-kit-graph-5)',
-  'var(--dshx-kit-graph-6)',
-  'var(--dshx-kit-teal)',
-  'var(--dshx-kit-violet)',
-] as const
+export interface AccountAccent {
+  readonly light: string
+  readonly dark: string
+  /** The dot's hue in degrees (OKLCH), for tests and the trigger. */
+  readonly hue: number
+}
+
+/** Lightness and chroma per scheme: 4.5:1+ on the light wash, 6:1+ on the dark one (tests/account-identity.spec.ts). */
+export const DOT_LIGHT = { l: 0.52, c: 0.12 } as const
+export const DOT_DARK = { l: 0.76, c: 0.11 } as const
+
+/** Hue steps for a service's accounts, in order: any two of the first six are at least 60° apart. */
+export const HUE_STEPS = [0, 120, 240, 60, 180, 300] as const
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/iu
 
-/** The dot that identifies an account everywhere in the picker: its own accent, else a stable hue. */
-export const accountColor = ({ instanceId, accentColor }: { readonly instanceId: string; readonly accentColor?: string | undefined }): string => {
-  if (accentColor !== undefined && HEX_COLOR.test(accentColor)) return accentColor
-  let hash = 0
-  for (const character of instanceId) hash = (hash * 31 + character.charCodeAt(0)) % 997
-  return ACCOUNT_HUES[hash % ACCOUNT_HUES.length] ?? ACCOUNT_HUES[0]
+const toLinear = (channel: number): number => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+
+/** OKLCH hue of an sRGB hex colour. */
+export const hueOfHex = (hex: string): number => {
+  const [r, g, b] = [1, 3, 5].map(at => toLinear(Number.parseInt(hex.slice(at, at + 2), 16) / 255)) as [number, number, number]
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s
+  const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
+  return ((Math.atan2(bb, a) * 180) / Math.PI + 360) % 360
 }
 
+/** Relative luminance (WCAG) of an OKLCH colour, clipped into sRGB as the browser draws it. */
+export const luminanceOfOklch = (input: { readonly l: number; readonly c: number; readonly h: number }): number => {
+  const rad = (input.h * Math.PI) / 180
+  const a = input.c * Math.cos(rad)
+  const b = input.c * Math.sin(rad)
+  const l = (input.l + 0.3963377774 * a + 0.2158037573 * b) ** 3
+  const m = (input.l - 0.1055613458 * a - 0.0638541728 * b) ** 3
+  const s = (input.l - 0.0894841775 * a - 1.291485548 * b) ** 3
+  const clamp = (value: number): number => Math.min(1, Math.max(0, value))
+  const r = clamp(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s)
+  const g = clamp(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s)
+  const bl = clamp(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s)
+  return 0.2126 * r + 0.7152 * g + 0.0722 * bl
+}
+
+const hashHue = (key: string): number => {
+  let hash = 0
+  for (const character of key) hash = (hash * 31 + character.charCodeAt(0)) % 997
+  return (hash * 37) % 360
+}
+
+const accentAt = (hue: number): AccountAccent => {
+  const h = Math.round(((hue % 360) + 360) % 360)
+  return {
+    light: `oklch(${String(DOT_LIGHT.l)} ${String(DOT_LIGHT.c)} ${String(h)})`,
+    dark: `oklch(${String(DOT_DARK.l)} ${String(DOT_DARK.c)} ${String(h)})`,
+    hue: h,
+  }
+}
+
+/** The dot of an account the picker has no profile for: a stable hue from its id. */
+export const accountColor = ({ instanceId, accentColor }: { readonly instanceId: string; readonly accentColor?: string | undefined }): AccountAccent =>
+  accentAt(accentColor !== undefined && HEX_COLOR.test(accentColor) ? hueOfHex(accentColor) : hashHue(instanceId))
+
 /**
- * Council picker round 1, N2: accounts of one service never share a dot. Every account of a kind starts from the same
- * kind accent (AI Accounts' `KIND_ACCENT`), so the first account keeps it and each later one that would repeat a dot of
- * its service takes the next hue its service does not use yet.
+ * Every account's dot. A service's first account keeps its accent's hue (AI Accounts' kind accent, or the user's), and
+ * each later account of that service steps round the wheel (HUE_STEPS), so no two accounts of one service look alike.
  */
 export const accountAccents = (
   profiles: readonly { readonly instanceId: string; readonly kind: string; readonly accentColor?: string | undefined }[],
-): ReadonlyMap<string, string> => {
-  const accents = new Map<string, string>()
-  const usedByKind = new Map<string, Set<string>>()
+): ReadonlyMap<string, AccountAccent> => {
+  const accents = new Map<string, AccountAccent>()
+  const byKind = new Map<string, { readonly base: number; count: number }>()
   for (const profile of profiles) {
-    const used = usedByKind.get(profile.kind) ?? new Set<string>()
-    usedByKind.set(profile.kind, used)
-    let color = accountColor(profile)
-    if (used.has(color)) color = ACCOUNT_HUES.find(hue => !used.has(hue)) ?? color
-    used.add(color)
-    accents.set(profile.instanceId, color)
+    let kind = byKind.get(profile.kind)
+    if (kind === undefined) {
+      kind = { base: accountColor({ instanceId: profile.kind, accentColor: profile.accentColor }).hue, count: 0 }
+      byKind.set(profile.kind, kind)
+    }
+    const step = HUE_STEPS[kind.count % HUE_STEPS.length] ?? 0
+    kind.count += 1
+    accents.set(profile.instanceId, accentAt(kind.base + step + 30 * Math.floor((kind.count - 1) / HUE_STEPS.length)))
   }
   return accents
 }

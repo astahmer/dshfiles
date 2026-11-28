@@ -1,20 +1,42 @@
 import { describe, expect, it } from 'vitest'
-import { ACCOUNT_HUES, accountAccents } from '../src/account-color.js'
+import { accountAccents, accountColor, DOT_DARK, DOT_LIGHT, hueOfHex, luminanceOfOklch } from '../src/account-color.js'
 import { ModelPickerModel } from '../src/model-picker-model.js'
 
 describe('accounts are told apart (council picker N2)', () => {
-  it('gives each account of one service its own dot, keeping the first account on the service accent', () => {
+  it('gives each account of one service its own dot, at least 60° apart in hue (round 3 R9)', () => {
     const accents = accountAccents([
       { instanceId: 'codex_work', kind: 'codex', accentColor: '#10A37F' },
       { instanceId: 'cc1', kind: 'commandcode', accentColor: '#0E7490' },
       { instanceId: 'cc2', kind: 'commandcode', accentColor: '#0E7490' },
       { instanceId: 'cc3', kind: 'commandcode', accentColor: '#0E7490' },
     ])
-    expect(accents.get('codex_work')).toBe('#10A37F')
-    expect(accents.get('cc1')).toBe('#0E7490')
-    const commandCode = ['cc1', 'cc2', 'cc3'].map(id => accents.get(id))
-    expect(new Set(commandCode).size).toBe(3)
-    expect(ACCOUNT_HUES).toContain(accents.get('cc2'))
+    const hue = (id: string): number => accents.get(id)?.hue ?? Number.NaN
+    // The first account keeps its accent's hue.
+    expect(Math.abs(hue('cc1') - Math.round(hueOfHex('#0E7490')))).toBeLessThanOrEqual(1)
+    const gap = (x: number, y: number): number => Math.min(Math.abs(x - y), 360 - Math.abs(x - y))
+    for (const [x, y] of [
+      ['cc1', 'cc2'],
+      ['cc1', 'cc3'],
+      ['cc2', 'cc3'],
+    ] as const)
+      expect(gap(hue(x), hue(y))).toBeGreaterThanOrEqual(60)
+    // Six accounts of one service: every pair still 60° apart.
+    const six = accountAccents(['a', 'b', 'c', 'd', 'e', 'f'].map(id => ({ instanceId: id, kind: 'k', accentColor: '#0E7490' })))
+    const hues = [...six.values()].map(accent => accent.hue)
+    for (const [i, x] of hues.entries()) for (const y of hues.slice(i + 1)) expect(gap(x, y)).toBeGreaterThanOrEqual(60)
+  })
+
+  it('holds every dot at 3:1 or more on the selected wash in both schemes, at any hue', () => {
+    const contrast = (x: number, y: number): number => (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+    const lightWash = luminanceOfOklch({ l: 0.935, c: 0.004, h: 80 })
+    const darkWash = luminanceOfOklch({ l: 0.3, c: 0.006, h: 60 })
+    for (let h = 0; h < 360; h += 5) {
+      expect([h, contrast(luminanceOfOklch({ ...DOT_LIGHT, h }), lightWash) >= 3]).toEqual([h, true])
+      expect([h, contrast(luminanceOfOklch({ ...DOT_DARK, h }), darkWash) >= 3]).toEqual([h, true])
+    }
+    const accent = accountColor({ instanceId: 'x' })
+    expect(accent.light).toMatch(/^oklch\(0\.52 0\.12 \d+\)$/u)
+    expect(accent.dark).toMatch(/^oklch\(0\.76 0\.11 \d+\)$/u)
   })
 
   it('tags every account the same short way everywhere: its badge, else its initials with the number kept', () => {

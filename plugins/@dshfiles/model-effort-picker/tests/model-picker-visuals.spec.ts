@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { ACCOUNT_HUES, accountColor } from '../src/account-color.js'
+import { accountColor, hueOfHex } from '../src/account-color.js'
 import { EFFORT_BAR_COUNT, effortGlyph } from '../src/effort-levels.js'
 import { ModelPickerModel } from '../src/model-picker-model.js'
 
@@ -42,10 +42,10 @@ describe('composer model chip mark', () => {
 
 describe('account colours', () => {
   it('uses the account accent when it is a full hex colour and a stable hue otherwise', () => {
-    expect(accountColor({ accentColor: '#10A37F', instanceId: 'codex_alex' })).toBe('#10A37F')
-    expect(accountColor({ accentColor: '', instanceId: 'codex_alex' })).toBe(accountColor({ instanceId: 'codex_alex' }))
-    expect(ACCOUNT_HUES).toContain(accountColor({ instanceId: 'commandcode_work_1' }))
-    expect(accountColor({ instanceId: 'codex_alex1' })).not.toBe(accountColor({ instanceId: 'codex_alex2' }))
+    // Round 3 R9: the accent sets the dot's hue; the dot's lightness is the picker's, for contrast in both schemes.
+    expect(accountColor({ accentColor: '#10A37F', instanceId: 'codex_alex' }).hue).toBe(Math.round(hueOfHex('#10A37F')))
+    expect(accountColor({ accentColor: '', instanceId: 'codex_alex' })).toEqual(accountColor({ instanceId: 'codex_alex' }))
+    expect(accountColor({ instanceId: 'codex_alex1' })).not.toEqual(accountColor({ instanceId: 'codex_alex2' }))
   })
 })
 
