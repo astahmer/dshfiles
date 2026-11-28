@@ -41,7 +41,7 @@ describe('long names: one ellipsis, by width (council picker round 5, U1)', () =
       </>,
     )
     expect(across).toBe(
-      'ab<span class="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-2" data-model-match="true">c</span>|<span class="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-2" data-model-match="true">-pre</span>view',
+      'ab<span class="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-3 dshx:[text-decoration-skip-ink:none]" data-model-match="true">c</span>|<span class="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-3 dshx:[text-decoration-skip-ink:none]" data-model-match="true">-pre</span>view',
     )
   })
 

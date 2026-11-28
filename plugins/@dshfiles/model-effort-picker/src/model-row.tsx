@@ -253,8 +253,9 @@ export const MatchedName = ({
   return (
     <>
       {name.slice(from, start)}
-      {/* Round 5 U14: an underline, not 600, so a match never reads as the model in use. */}
-      <span className="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-2" data-model-match>
+      {/* Round 5 U14: an underline, not 600, so a match never reads as the model in use. Round 6 V13: unbroken and 3 px
+          down, so a column of matches does not read as links. */}
+      <span className="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-3 dshx:[text-decoration-skip-ink:none]" data-model-match>
         {name.slice(start, end)}
       </span>
       {name.slice(end, to)}
