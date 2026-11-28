@@ -37,17 +37,13 @@
      15px phone prose step (and the bubble); inherit the root's size and leading instead.
    - Soft breaks: the native renderer already joins them; upstream's `white-space: pre-wrap` here never matched the
      hashed class, so it is gone rather than kept as a dead rule.
-   - Measure: prose stops at 34em (about 75 Geist characters; `ch` would allow about 96). Code, tables, cards and
-     images keep the whole column.
+   - Measure: prose spans the whole column, like code, tables, cards and images. A 34em cap (about 75 Geist
+     characters) left replies in a narrow strip next to full-width code blocks on a wide desktop window.
    - Rhythm: 12px between paragraphs and lists, 4px between list items, headings 17/24, 16/24 and 14/22 at 600 with
      24px above and 8px below (h1 takes the chat's top step instead of a page title's 21px). */
 .body :global([data-dsh-markdown]) {
   font-size: inherit;
   line-height: inherit;
-}
-
-.body :global([data-dsh-markdown]) > :where(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6, details) {
-  max-inline-size: 34em;
 }
 
 .body :global([data-dsh-markdown]) :where(p, ul, ol) {
