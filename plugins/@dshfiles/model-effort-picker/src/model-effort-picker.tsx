@@ -28,7 +28,9 @@ import { englishModelPicker, type ModelPickerTranslate } from './locales.js'
 import { modelEffortPickerSettings } from './settings.js'
 import { selectionFailureNotice } from './session-presence.js'
 
-type Props = Omit<ModelSelectInjected, 'resolveText'> & {
+type Props = Omit<ModelSelectInjected, 'resolveText' | 'load'> & {
+  /** Reads the catalog; `fresh` (opening the picker) reads past the 30 s cache, keeping the list on screen. */
+  readonly load: (options?: { readonly fresh?: boolean }) => void
   readonly locked: boolean
   readonly sessionId: string
   /** Opens AI accounts (N4: the way forward when no account offers a model). */
@@ -158,7 +160,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const triggerBrand = ModelPickerModel.triggerBrand({ groups: state.groups, current })
 
   useEffect(() => {
-    if (open && available) load()
+    if (open && available) load({ fresh: true })
     if (!open) {
       setQuery('')
       setSelectionError(null)

@@ -80,9 +80,9 @@ export default defineClientPlugin({
               window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail: { section: 'ai-accounts' }, cancelable: true }))
             },
             directory: remoteDirectory.store,
-            load: () => {
+            load: (options?: { readonly fresh?: boolean }) => {
               if (!available) return
-              void remoteDirectory.load()
+              void remoteDirectory.load(options)
             },
             select: (selection: Parameters<typeof directory.select>[0]) => {
               if (!available) return Promise.resolve(undefined)
