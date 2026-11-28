@@ -5,8 +5,9 @@ import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { aiAccountsModelFallbackApi, FALLBACK_RETURN_POLICIES, type FallbackRoute, type ModelFallbackSnapshot } from '@dshfiles/ai-accounts/model-fallback-api'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@dshfiles/plugin-ui/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
-import { ChevronRightIcon, PlusIcon, Undo2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronRightIcon, EllipsisIcon, PlusIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { AccountColor, type AccountAccent } from './account-color.js'
 import { AccountDot } from './account-dot.js'
@@ -55,11 +56,19 @@ export const FallbackList = (props: {
   const listId = useId()
   const count = props.rows.length
   const summary = count === 0 ? 'none' : count === 1 ? '1 route' : `${String(count)} routes`
+  // Round 5 U5: a move from the keyboard or the actions menu says where the route went.
+  const [moved, setMoved] = useState('')
+  const moveTo = (from: number, to: number): void => {
+    const row = props.rows[from]
+    props.onMove(from, to)
+    if (row !== undefined) setMoved(`${row.model} on ${row.account} is now fallback ${String(to + 1)}`)
+  }
+
   const move = (event: KeyboardEvent<HTMLLIElement>, index: number): void => {
     if (!event.altKey || (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return
     event.preventDefault()
     const to = index + (event.key === 'ArrowUp' ? -1 : 1)
-    if (to >= 0 && to < count && !props.disabled) props.onMove(index, to)
+    if (to >= 0 && to < count && !props.disabled) moveTo(index, to)
   }
 
   // Round 4 T10: opening the chain brings its heading to the top of the details body, so the routes show.
@@ -122,6 +131,9 @@ export const FallbackList = (props: {
             </div>
           )}
 
+          <span aria-live="polite" className="dshx:sr-only" data-model-fallback-announcer>
+            {moved}
+          </span>
           {count === 0 ? null : (
             <ol aria-label="Fallback order" className="dshx:flex dshx:flex-col dshx:gap-px">
               {props.rows.map((row, index) => (
@@ -141,7 +153,11 @@ export const FallbackList = (props: {
                   </span>
                   <BrandMark brand={row.brand} className="dshx:size-4" name={row.model} />
                   <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{row.model}</span>
-                  <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground" data-model-fallback-account>
+                  {/* Round 5 U5: the account in a fixed left-aligned slot, so the dots line up as in the list. */}
+                  <span
+                    className="dshx:flex dshx:w-12 dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-2xs dshx:text-muted-foreground"
+                    data-model-fallback-account
+                  >
                     <AccountDot accent={row.color} className="dshx:size-1.5" />
                     {row.tag}
                   </span>
@@ -154,16 +170,28 @@ export const FallbackList = (props: {
                   >
                     {row.quota === undefined ? '—' : `${String(Math.round(row.quota.percent))}%`}
                   </span>
-                  <Button
-                    aria-label={`Remove ${row.model} on ${row.account}`}
-                    className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:size-11"
-                    disabled={props.disabled}
-                    onClick={() => props.onRemove(index)}
-                    size="icon-xs"
-                    variant="ghost"
-                  >
-                    <XIcon aria-hidden="true" className="dshx:size-3.5" />
-                  </Button>
+                  {/* Round 5 U5: one actions button per route (44 pt on touch), so the order changes without Alt+Arrow. */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        aria-label={`Actions for fallback ${String(index + 1)}`}
+                        className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:size-11"
+                        data-model-fallback-actions
+                        disabled={props.disabled}
+                        size="icon-xs"
+                        variant="ghost"
+                      >
+                        <EllipsisIcon aria-hidden="true" className="dshx:size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {index === 0 ? null : <DropdownMenuItem onSelect={() => moveTo(index, index - 1)}>Move up</DropdownMenuItem>}
+                      {index === count - 1 ? null : <DropdownMenuItem onSelect={() => moveTo(index, index + 1)}>Move down</DropdownMenuItem>}
+                      <DropdownMenuItem onSelect={() => props.onRemove(index)} variant="destructive">
+                        Remove
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </li>
               ))}
             </ol>
