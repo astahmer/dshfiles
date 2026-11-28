@@ -61,6 +61,8 @@ export class SidebarSettings extends Context.Service<
     readonly subscriptionDelivery: Effect.Effect<SubscriptionDeliveryMode>
     /** Whether a settled or archived thread is lifted before one of its reminders is due. */
     readonly remindersWake: Effect.Effect<boolean>
+    /** Whether `notify_user` sends count against the per-thread and total limits. */
+    readonly notifyUserRateLimit: Effect.Effect<boolean>
     /** Settle several threads in one write, keeping the first settle instant of each and dropping their parked mark. */
     readonly settle: (sessionIds: ReadonlyArray<string>) => Effect.Effect<void, SidebarSettingsWriteFailed>
     /** Drop the settled status of several threads in one write, for a reminder that needs its thread awake. */
@@ -115,6 +117,7 @@ export class SidebarSettings extends Context.Service<
         subscriptionNoticeLevel: Effect.map(settings.get, value => value.subscriptionNoticeLevel),
         subscriptionDelivery: Effect.map(settings.get, value => value.subscriptionDelivery),
         remindersWake: Effect.map(settings.get, value => value.remindersWakeEnabled),
+        notifyUserRateLimit: Effect.map(settings.get, value => value.notifyUserRateLimit),
         settle: Effect.fn('settled threads settle')(function* (sessionIds) {
           yield* write((value, now) => settleAndUnpark(value, sessionIds, now))
         }),

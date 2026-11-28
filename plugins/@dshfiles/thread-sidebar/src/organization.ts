@@ -175,6 +175,8 @@ export interface SidebarPreferences {
   notificationCategories: ThreadNotificationCategories
   notificationPlacement: ThreadNotificationPlacement
   notificationDurationSeconds: number
+  /** Minutes after which a notification about a thread still waiting for the user plays again; 0 never repeats it. */
+  notificationReminderMinutes: number
   applyActionsToChildThreads: boolean
   /** Continue the threads a stopped Host cut off once it starts again. */
   resumeAfterRestart: boolean
@@ -190,6 +192,8 @@ export interface SidebarPreferences {
   subscriptionNoticeLevel: SubscriptionNoticeLevel
   /** How a running subscriber hears a notice: steered into its live turn, or queued behind it. */
   subscriptionDelivery: SubscriptionDeliveryMode
+  /** Whether `notify_user` is limited per thread and in total; the Host reads it, the sidebar only shows it. */
+  notifyUserRateLimit: boolean
   /** Child threads listed under a parent before the "N more…" line. */
   maxChildren: number
   finishedSubagents: FinishedSubagentsMode
@@ -279,6 +283,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   notificationCategories: DEFAULT_THREAD_NOTIFICATION_CATEGORIES,
   notificationPlacement: 'bottom-center',
   notificationDurationSeconds: 5,
+  notificationReminderMinutes: 0,
   applyActionsToChildThreads: true,
   resumeAfterRestart: false,
   resumeAfterRestartMaxThreads: 5,
@@ -287,6 +292,7 @@ export const DEFAULT_PREFERENCES: SidebarPreferences = {
   autoRestartQuietSeconds: 60,
   subscriptionNoticeLevel: 'all',
   subscriptionDelivery: 'steer',
+  notifyUserRateLimit: true,
   maxChildren: 3,
   finishedSubagents: 'collapse',
   subagentRunCards: true,

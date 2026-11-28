@@ -11,6 +11,7 @@ import {
   type UserNotificationSendOutput,
   type UserNotificationSkipReason,
 } from './user-notification-api.js'
+import { SidebarSettings } from './sidebar-settings.js'
 
 type SentLog = ReadonlyMap<string, readonly number[]>
 
@@ -62,7 +63,13 @@ interface Pending {
   readonly shown: Deferred.Deferred<void>
 }
 
-const make = Effect.fnUntraced(function* (publish: (notification: UserNotification) => Effect.Effect<void>) {
+interface UserNotificationsOptions {
+  readonly publish: (notification: UserNotification) => Effect.Effect<void>
+  /** Read on every send, so turning the limit off in Settings applies to the next call. */
+  readonly rateLimited: Effect.Effect<boolean>
+}
+
+const make = Effect.fnUntraced(function* (options: UserNotificationsOptions) {
   const sent = yield* Ref.make<SentLog>(new Map())
   const pending = new Map<string, Pending>()
 
@@ -82,10 +89,12 @@ const make = Effect.fnUntraced(function* (publish: (notification: UserNotificati
     const callerSessionId = caller.kind === 'agent' ? caller.sessionId : undefined
     const sessionId = input.sessionId === undefined ? (callerSessionId ?? null) : input.sessionId
     const now = yield* Clock.currentTimeMillis
-    const decision = yield* Ref.modify(sent, current => {
-      const next = UserNotificationRateLimit.decide({ sent: current, key: callerSessionId ?? sessionId ?? 'user', now })
-      return [next, next.allowed ? next.sent : current] as const
-    })
+    const decision: RateDecision = (yield* options.rateLimited)
+      ? yield* Ref.modify(sent, current => {
+          const next = UserNotificationRateLimit.decide({ sent: current, key: callerSessionId ?? sessionId ?? 'user', now })
+          return [next, next.allowed ? next.sent : current] as const
+        })
+      : { allowed: true, sent: new Map() }
     yield* Effect.annotateCurrentSpan({
       'dshx.notification.status': decision.allowed ? 'sent' : 'rate-limited',
       'dshx.notification.thread': sessionId !== null,
@@ -104,7 +113,7 @@ const make = Effect.fnUntraced(function* (publish: (notification: UserNotificati
     const entry: Pending = { outcomes: [], shown: yield* Deferred.make<void>() }
     pending.set(id, entry)
     const settled = yield* Effect.gen(function* () {
-      yield* publish({ id, title: input.title, body: input.body ?? '', sessionId })
+      yield* options.publish({ id, title: input.title, body: input.body ?? '', sessionId })
       yield* Deferred.await(entry.shown).pipe(Effect.timeoutOption(USER_NOTIFICATION_ACK_WAIT))
       return settleDelivery(entry.outcomes)
     }).pipe(Effect.ensuring(Effect.sync(() => pending.delete(id))))
@@ -123,7 +132,7 @@ const make = Effect.fnUntraced(function* (publish: (notification: UserNotificati
   return { send, acknowledge }
 })
 
-/** Sends `notify_user` notifications to every open page, rate-limited per thread and in total. */
+/** Sends `notify_user` notifications to every open page, rate-limited per thread and in total unless Settings turn that off. */
 export class UserNotifications extends Context.Service<UserNotifications, Effect.Success<ReturnType<typeof make>>>()(
   '@dshfiles/thread-sidebar/UserNotifications',
 ) {
@@ -131,15 +140,19 @@ export class UserNotifications extends Context.Service<UserNotifications, Effect
     UserNotifications,
     Effect.gen(function* () {
       const host = yield* HostContext
-      return yield* make(payload =>
-        // No open page means nobody to show it to: the event is not queued, and the tool still reports it as sent.
-        Api.publish({ contract: userNotificationApi, event: 'sent', payload }).pipe(
-          Effect.provideService(HostContext, host),
-          Effect.catch(() => Effect.logDebug('thread-sidebar: the user notification event was not published')),
-        ),
-      )
+      const settings = yield* SidebarSettings
+      return yield* make({
+        publish: payload =>
+          // No open page means nobody to show it to: the event is not queued, and the tool still reports it as sent.
+          Api.publish({ contract: userNotificationApi, event: 'sent', payload }).pipe(
+            Effect.provideService(HostContext, host),
+            Effect.catch(() => Effect.logDebug('thread-sidebar: the user notification event was not published')),
+          ),
+        rateLimited: settings.notifyUserRateLimit,
+      })
     }),
   )
 
-  static readonly layerWith = (publish: (notification: UserNotification) => Effect.Effect<void>) => Layer.effect(UserNotifications, make(publish))
+  static readonly layerWith = (input: { readonly publish: UserNotificationsOptions['publish']; readonly rateLimited?: Effect.Effect<boolean> }) =>
+    Layer.effect(UserNotifications, make({ publish: input.publish, rateLimited: input.rateLimited ?? Effect.succeed(true) }))
 }

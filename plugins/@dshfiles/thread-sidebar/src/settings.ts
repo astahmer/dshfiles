@@ -143,6 +143,12 @@ export const threadSidebarSettings = defineSettings({
     notificationCategories: notificationCategories.hidden(),
     notificationPlacement: Schema.union(THREAD_NOTIFICATION_PLACEMENTS).default(DEFAULT_PREFERENCES.notificationPlacement).hidden(),
     notificationDurationSeconds: Schema.natural().max(60).default(DEFAULT_PREFERENCES.notificationDurationSeconds).hidden(),
+    notificationReminderMinutes: Schema.natural()
+      .max(60)
+      .default(DEFAULT_PREFERENCES.notificationReminderMinutes)
+      .description(
+        'Play a thread notification and its sound once more after this many minutes when its thread still waits for you: the question is unanswered, the finished turn unread, or the agent message unseen. Opening the thread cancels it. 0 never repeats.',
+      ),
     resumeAfterRestart: Schema.boolean()
       .default(DEFAULT_PREFERENCES.resumeAfterRestart)
       .description(
@@ -177,6 +183,9 @@ export const threadSidebarSettings = defineSettings({
       .description(
         'How a notice reaches a watching thread that is running: steer it into the live turn at its next step, or queue it for after that turn. Notices that arrive together merge into one either way.',
       ),
+    notifyUserRateLimit: Schema.boolean()
+      .default(DEFAULT_PREFERENCES.notifyUserRateLimit)
+      .description('Limit agent notifications (notify_user) to 3 per thread and 12 in total within 10 minutes. Off: every notify_user call is delivered.'),
     applyActionsToChildThreads: Schema.boolean()
       .default(DEFAULT_PREFERENCES.applyActionsToChildThreads)
       .description('Apply manual pin, park, archive, and restore actions to all child threads.'),

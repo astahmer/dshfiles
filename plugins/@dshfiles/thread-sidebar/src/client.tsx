@@ -244,6 +244,7 @@ import {
 } from './thread-notifications.js'
 import { userNotificationApi, type UserNotificationPageOutcome } from './user-notification-api.js'
 import { ViewedThreadModel } from './viewed-thread.js'
+import { NotificationReminderModel, threadNotificationEventIds, type PendingNotificationReminder } from './notification-reminders.js'
 import { ThreadNotificationAudioModel } from './thread-notification-audio.js'
 import { createNotificationSoundPaletteAction, createNotificationSnoozePaletteAction } from './notification-sound-palette-action.js'
 import { useThreadAttention } from './attention-client.js'
@@ -3111,6 +3112,13 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     }
   }
 
+  const notificationReminders = useRef(
+    new Map<
+      string,
+      { readonly reminder: PendingNotificationReminder; readonly sessionId: SessionSummary['id'] | null; readonly timer: ReturnType<typeof setTimeout> }
+    >(),
+  )
+
   const notifyThread = (
     category: ThreadNotificationCategory,
     eventId: string,
@@ -3118,6 +3126,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     title: string,
     fallbackBody: string,
     message?: string,
+    options?: { readonly reminder?: boolean },
   ): UserNotificationPageOutcome => {
     const categoryPreferences = preferences.notificationCategories[category]
     if (storedNotificationsMuted.get() === true) return 'snoozed'
@@ -3151,8 +3160,59 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     if (route.system && !plugin.notifications.notify({ title, body: fallbackBody, ...(open !== undefined && { onClick: open }) }))
       setNotice({ tone: 'warning', message: props.tSidebar('threadSidebarNotificationsUnavailable') })
     if (categoryPreferences.sound) ThreadNotificationAudioModel.play(categoryPreferences.soundPreset, categoryPreferences.volume)
+    if (options?.reminder !== true && preferences.notificationReminderMinutes > 0) {
+      const timer = setTimeout(() => latestRowActions.current.remindThread(eventId), preferences.notificationReminderMinutes * 60_000)
+      notificationReminders.current.set(eventId, { reminder: { category, eventId, sessionId, title, fallbackBody, message }, sessionId, timer })
+    }
     return 'shown'
   }
+
+  const remindThread = (eventId: string): void => {
+    const entry = notificationReminders.current.get(eventId)
+    if (entry === undefined) return
+    notificationReminders.current.delete(eventId)
+    if (preferences.notificationReminderMinutes === 0) return
+    const state =
+      entry.sessionId === null
+        ? { pendingInteractionKey: undefined, unreadFinishedSeq: undefined }
+        : {
+            pendingInteractionKey: sessionStatus.get(entry.sessionId)?.pendingInteraction?.key,
+            unreadFinishedSeq: attention.records.get(entry.sessionId)?.finishedSeq,
+          }
+    if (!NotificationReminderModel.stillWaiting(entry.reminder, state)) return
+    const reminder = entry.reminder
+    notifyThread(reminder.category, threadNotificationEventIds.reminder(eventId), entry.sessionId, reminder.title, reminder.fallbackBody, reminder.message, {
+      reminder: true,
+    })
+  }
+
+  // Opening the thread, or looking at DSH for a reminder about no thread, answers a pending reminder.
+  useEffect(() => {
+    const cancelSeen = (): void => {
+      const windowAttention = ViewedThreadModel.windowAttention()
+      if (!windowAttention.visible || !windowAttention.focused) return
+      for (const [eventId, entry] of notificationReminders.current) {
+        if (!NotificationReminderModel.seenWhileViewing(entry.reminder, selectedSessionId)) continue
+        clearTimeout(entry.timer)
+        notificationReminders.current.delete(eventId)
+      }
+    }
+    cancelSeen()
+    window.addEventListener('focus', cancelSeen)
+    document.addEventListener('visibilitychange', cancelSeen)
+    return () => {
+      window.removeEventListener('focus', cancelSeen)
+      document.removeEventListener('visibilitychange', cancelSeen)
+    }
+  }, [selectedSessionId])
+
+  useEffect(() => {
+    const reminders = notificationReminders.current
+    return () => {
+      for (const entry of reminders.values()) clearTimeout(entry.timer)
+      reminders.clear()
+    }
+  }, [])
 
   const toggleParked = (sessionId: SessionSummary['id']): void => {
     const shouldPark = !parkedSessionIds.has(sessionId)
@@ -4847,6 +4907,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     continueThreadIn,
     turnThreadIntoProject,
     notifyThread,
+    remindThread,
     setNotify: (target: ThreadNotifyTarget, choice: ThreadNotifyChoice) =>
       subscriptions.setNotify({ subscriberSessionId: target.subscriberSessionId, targetSessionIds: [target.targetSessionId], choice }),
     batchNotifySubscriber: () => (subscriptions.available && selectedSession !== undefined ? { title: selectedSession.displayTitle } : undefined),
@@ -4890,6 +4951,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     continueThreadIn,
     turnThreadIntoProject,
     notifyThread,
+    remindThread,
     setNotify: (target: ThreadNotifyTarget, choice: ThreadNotifyChoice) =>
       subscriptions.setNotify({ subscriberSessionId: target.subscriberSessionId, targetSessionIds: [target.targetSessionId], choice }),
     batchNotifySubscriber: () => (subscriptions.available && selectedSession !== undefined ? { title: selectedSession.displayTitle } : undefined),
@@ -5813,7 +5875,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       if (interactionKey === undefined) continue
       latestRowActions.current.notifyThread(
         'approval-needed',
-        `approval:${sessionId}:${interactionKey}`,
+        threadNotificationEventIds.approval({ sessionId, interactionKey }),
         sessionId,
         tSidebar('threadSidebarApprovalNotificationTitle'),
         tSidebar('threadSidebarApprovalNotificationBody'),
@@ -5824,7 +5886,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       if (interactionKey === undefined) continue
       latestRowActions.current.notifyThread(
         'input-needed',
-        `input:${sessionId}:${interactionKey}`,
+        threadNotificationEventIds.input({ sessionId, interactionKey }),
         sessionId,
         tSidebar('threadSidebarInputNotificationTitle'),
         tSidebar('threadSidebarInputNotificationBody'),
@@ -5847,7 +5909,7 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
       const messageKeys = finishNotificationMessageKeys[category]
       latestRowActions.current.notifyThread(
         category,
-        `finish:${sessionId}:${record.finishedSeq}`,
+        threadNotificationEventIds.finish({ sessionId, finishedSeq: record.finishedSeq }),
         session.id,
         tSidebar(messageKeys.title),
         tSidebar(messageKeys.body),

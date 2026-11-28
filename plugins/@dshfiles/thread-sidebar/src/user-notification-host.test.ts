@@ -14,11 +14,12 @@ const answeringLayer = (answers: readonly ((id: string) => Effect.Effect<unknown
     UserNotifications,
     Effect.gen(function* () {
       const self = yield* Deferred.make<Context.Service.Shape<typeof UserNotifications>>()
-      const service = yield* UserNotifications.layerWith(notification =>
-        Effect.flatMap(Deferred.await(self), resolved =>
-          Effect.forEach(answers, answer => answer(notification.id).pipe(Effect.provideService(UserNotifications, resolved)), { discard: true }),
-        ),
-      ).pipe(
+      const service = yield* UserNotifications.layerWith({
+        publish: notification =>
+          Effect.flatMap(Deferred.await(self), resolved =>
+            Effect.forEach(answers, answer => answer(notification.id).pipe(Effect.provideService(UserNotifications, resolved)), { discard: true }),
+          ),
+      }).pipe(
         Layer.build,
         Effect.map(context => Context.get(context, UserNotifications)),
       )
@@ -81,7 +82,7 @@ describe('UserNotifications.send', () => {
         { id: unlinked.id, title: 'Backup done', body: '', sessionId: null },
       ])
       expect(recorder.span('thread-sidebar user notification send').attributes['dshx.notification.status']).toBe('sent')
-    }).pipe(Effect.provide(UserNotifications.layerWith(notification => Effect.sync(() => published.push(notification)))))
+    }).pipe(Effect.provide(UserNotifications.layerWith({ publish: notification => Effect.sync(() => published.push(notification)) })))
   })
 
   it.effect('reports delivered once a page showed it, without waiting out the acknowledgement window', () =>
@@ -116,7 +117,7 @@ describe('UserNotifications.send', () => {
     Effect.gen(function* () {
       const output = yield* sendWith({ title: 'Done' }, agent('session-a'))
       expect(output).toMatchObject({ delivered: false, reason: 'no-open-page', recovery: 'No DSH page is open to show it.' })
-    }).pipe(Effect.provide(UserNotifications.layerWith(() => Effect.void))),
+    }).pipe(Effect.provide(UserNotifications.layerWith({ publish: () => Effect.void }))),
   )
 
   it.effect('refuses a fourth notification from one thread without publishing it, then allows it after the window', () => {
@@ -128,6 +129,18 @@ describe('UserNotifications.send', () => {
       expect(published.map(notification => notification.title)).toEqual(['one', 'two', 'three'])
       yield* TestClock.adjust('10 minutes')
       expect((yield* sendWith({ title: 'later' }, agent('busy'))).status).toBe('sent')
-    }).pipe(Effect.provide(UserNotifications.layerWith(notification => Effect.sync(() => published.push(notification)))))
+    }).pipe(Effect.provide(UserNotifications.layerWith({ publish: notification => Effect.sync(() => published.push(notification)) })))
+  })
+
+  it.effect('delivers every notification from one thread when the limit is off', () => {
+    const published: UserNotification[] = []
+    return Effect.gen(function* () {
+      for (const title of ['one', 'two', 'three', 'four', 'five']) expect((yield* sendWith({ title }, agent('busy'))).status).toBe('sent')
+      expect(published).toHaveLength(5)
+    }).pipe(
+      Effect.provide(
+        UserNotifications.layerWith({ publish: notification => Effect.sync(() => published.push(notification)), rateLimited: Effect.succeed(false) }),
+      ),
+    )
   })
 })
