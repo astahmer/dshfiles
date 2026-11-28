@@ -44,7 +44,9 @@ export const FastModeRow = (props: {
         <Switch
           aria-labelledby={labelId}
           checked={props.enabled}
-          className="dshx:h-4 dshx:w-7"
+          // The row is the touch target, so the kit's 44 px hit area (an ::after 10 px past a 24 px switch) is off: it
+          // pushed the details body 10 px wider than the sheet (round 3 R1).
+          className="dshx:h-4 dshx:w-7 dshx:after:hidden"
           data-model-fast-mode-toggle
           data-touch-row
           disabled={props.disabled}

@@ -132,7 +132,10 @@ export const ModelDetails = (props: {
         </button>
       </header>
 
-      <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]" data-model-details-body>
+      <div
+        className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]"
+        data-model-details-body
+      >
         {model === undefined ? null : (
           <AccountRows
             accents={props.accountAccents}
@@ -168,9 +171,17 @@ export const ModelDetails = (props: {
       </div>
 
       {draft && name !== undefined ? (
-        <footer className="dshx:mt-2 dshx:flex dshx:shrink-0 dshx:justify-end" data-model-details-use>
-          <Button className="dshx:h-8 dshx:pointer-coarse:h-11" disabled={props.busy} onClick={use} type="button">
-            Use {name}
+        <footer className="dshx:mt-2 dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:justify-end" data-model-details-use>
+          {/* Round 3 R1: the button never leaves the sheet. It truncates a long name (the full name is its accessible
+              name) and spans the sheet at 44 pt on touch. */}
+          <Button
+            aria-label={`Use ${name}`}
+            className="dshx:h-8 dshx:min-w-0 dshx:max-w-full dshx:pointer-coarse:h-11 dshx:pointer-coarse:w-full"
+            disabled={props.busy}
+            onClick={use}
+            type="button"
+          >
+            <span className="dshx:min-w-0 dshx:truncate">Use {name}</span>
           </Button>
         </footer>
       ) : null}

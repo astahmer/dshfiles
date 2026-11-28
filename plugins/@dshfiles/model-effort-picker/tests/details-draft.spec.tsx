@@ -89,7 +89,7 @@ describe('inspecting a model never changes the thread (council picker S1)', () =
   it('shows a draft with its caption and a Use button, and no fallback chain', () => {
     const html = render({ provider: 'cc2', model: 'gemini-3.8-flash' })
     expect(html).toContain('Inspecting · not in use')
-    expect(html).toMatch(/<button[^>]*>Use gemini-3\.8-flash<\/button>/u)
+    expect(html).toMatch(/<button[^>]*aria-label="Use gemini-3\.8-flash"[^>]*><span[^>]*>Use gemini-3\.8-flash<\/span><\/button>/u)
     expect(html).not.toContain('FALLBACKS')
     expect(html).toContain('aria-label="Back to the model in use"')
   })
