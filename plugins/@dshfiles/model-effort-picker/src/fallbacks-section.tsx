@@ -83,9 +83,11 @@ export const FallbackList = (props: {
     const element = section.current
     const body = element?.closest('[data-model-details-body]')
     if (element === null || element === undefined || !(body instanceof HTMLElement)) return
-    const top = element.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    body.scrollTo({ top, behavior: still ? 'auto' : 'smooth' })
+    // Round 6 V2: scroll only as far as needed (\"nearest\") to show what opening revealed: the first route, or Add
+    // fallback's whole 44 pt target.
+    const target = element.querySelector('[data-model-fallback-rung]') ?? element.querySelector('[data-model-fallback-add]')
+    const top = FallbackReveal.scrollTop({ body: body.getBoundingClientRect(), scrollTop: body.scrollTop, target: (target ?? element).getBoundingClientRect() })
+    if (top !== body.scrollTop) body.scrollTo({ top, behavior: 'auto' })
   }, [props.expanded])
 
   return (
@@ -120,8 +122,8 @@ export const FallbackList = (props: {
       {props.expanded ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-1" id={listId}>
           {/* Round 5 U11: on touch the help icon is hidden, so the chain says what it is. */}
-          <p className="dshx:hidden dshx:text-xs dshx:text-muted-foreground dshx:pointer-coarse:block" data-model-fallbacks-help>
-            Priority distribution tries these routes in order if the request fails.
+          <p className="dshx:hidden dshx:text-xs dshx:text-pretty dshx:text-muted-foreground dshx:pointer-coarse:block" data-model-fallbacks-help>
+            If this model fails, DSH tries these in order.
           </p>
           {props.serving === null ? null : (
             <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
@@ -269,6 +271,14 @@ export const FallbackList = (props: {
  * The ordered routes the Host walks when this thread's model request fails under Priority distribution. The Host
  * owns the chain (AI Accounts runs the fail-over), so every edit is a Host write and the list renders what it stored.
  */
+/** Where to scroll the details body so what opening Fallbacks revealed shows (round 6 V2): the nearest position. */
+export class FallbackReveal {
+  static scrollTop(input: { readonly body: { readonly bottom: number }; readonly scrollTop: number; readonly target: { readonly bottom: number } }): number {
+    const below = input.target.bottom - input.body.bottom
+    return below <= 0 ? input.scrollTop : input.scrollTop + below
+  }
+}
+
 export const FallbacksSection = (props: {
   readonly sessionId: string
   readonly groups: ModelDirectoryState['groups']

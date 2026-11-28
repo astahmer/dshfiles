@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const source = (name: string): string => readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const tagOf = (text: string, marker: string): string => {
-  const at = text.indexOf(marker)
+  // The attribute line, not a selector naming it.
+  const at = text.search(new RegExp(`\\n\\s+${marker}[\\s>=]`, 'u'))
   return text.slice(text.lastIndexOf('<', at), text.indexOf('>\n', at))
 }
 
@@ -18,7 +19,7 @@ describe('details body under its header (council picker round 4, T10)', () => {
     const fallbacks = source('fallbacks-section.tsx')
     expect(fallbacks).toMatch(/if \(!props\.expanded\) opening\.current = true/u)
     expect(fallbacks.match(/onClick=\{toggle\}/gu) ?? []).toHaveLength(2)
-    expect(fallbacks).toMatch(/body\.scrollTo\(\{ top, behavior: still \? 'auto' : 'smooth' \}\)/u)
+    expect(fallbacks).toContain("if (top !== body.scrollTop) body.scrollTo({ top, behavior: 'auto' })")
   })
 
   it('starts the heading, Add fallback and the rank numbers on one left edge, the help icon beside the label', () => {
