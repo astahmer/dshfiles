@@ -493,7 +493,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               <section
                 aria-label="Choose a model"
                 className={cn(
-                  'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
+                  // Round 6 V9: 8 px on desktop, so the search ring clears the popover border and the field starts with the rows.
+                  'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-2 dshx:@max-pane-compact:pb-1.5',
                   catalogEmpty && 'dshx:w-full',
                   // Round 4 T2: on the phone the panes start at the sheet's top, so their 44 pt header line meets Close's.
                   // Round 5 U13, round 6 V4: the section has no right inset on the phone; the search row, the list and the
@@ -617,7 +618,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     aria-multiselectable={several || undefined}
                     // On touch the rows end clear of the list's 10 px overlay scrollbar, which took the last 4 px of each
                     // row's 44 pt details chevron (round 3 touch probe).
-                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1 dshx:@max-pane-compact:pr-2"
+                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:py-1 dshx:pr-1 dshx:@max-pane-compact:pl-1 dshx:@max-pane-compact:pr-2"
                     id={listboxId}
                     ref={attachModelList}
                     role="listbox"
