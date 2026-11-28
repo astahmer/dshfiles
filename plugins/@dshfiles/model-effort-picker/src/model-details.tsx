@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ArrowLeftIcon, CheckIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { AccountAccent } from './account-color.js'
 import { AccountRows } from './account-rows.js'
@@ -32,7 +32,8 @@ export const ModelDetails = (props: {
   /** What is left on each account (b:16yr): the list shows one row per model, so the account is chosen here. */
   readonly quotas: ReadonlyMap<string, ModelQuota>
   readonly onBack: () => void
-  readonly onClose: () => void
+  /** Unused since round 3 R17: the picker draws one Close for the whole surface, last in the Tab order. */
+  readonly onClose?: () => void
   readonly onRetry: () => void
   readonly onInspect: (route: InspectedRoute) => void
   /** Applies a change to the thread's own model in place. */
@@ -89,7 +90,10 @@ export const ModelDetails = (props: {
       className="dshx:flex dshx:min-h-0 dshx:w-full dshx:min-w-0 dshx:flex-1 dshx:flex-col"
       data-model-details-draft={draft || undefined}
     >
-      <header className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:@max-pane-compact:min-h-12" data-model-details-header>
+      <header
+        className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:pr-7 dshx:pointer-coarse:pr-12 dshx:@max-pane-compact:min-h-12"
+        data-model-details-header
+      >
         <button
           aria-label={draft ? 'Back to the model in use' : 'Back to models'}
           className={cn(
@@ -130,14 +134,6 @@ export const ModelDetails = (props: {
             </span>
           </>
         )}
-        <button
-          aria-label="Close model picker"
-          className="dshx:flex dshx:size-5 dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
-          onClick={props.onClose}
-          type="button"
-        >
-          <XIcon aria-hidden="true" className="dshx:size-4" />
-        </button>
       </header>
 
       <div

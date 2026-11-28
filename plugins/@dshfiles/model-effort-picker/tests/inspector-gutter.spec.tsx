@@ -38,6 +38,6 @@ describe('one inspector gutter (council picker round 3, R13)', () => {
     expect(header).toMatch(/dshx:items-start/u)
     expect(header).not.toMatch(/items-center/u)
     expect(tagOf(source('model-details.tsx'), 'data-model-details-back')).toMatch(/dshx:pointer-coarse:size-11/u)
-    expect(tagOf(source('model-details.tsx'), 'aria-label="Close model picker"')).toMatch(/dshx:pointer-coarse:size-11/u)
+    expect(tagOf(source('model-effort-picker.tsx'), 'aria-label="Close model picker"')).toMatch(/dshx:pointer-coarse:size-11/u)
   })
 })

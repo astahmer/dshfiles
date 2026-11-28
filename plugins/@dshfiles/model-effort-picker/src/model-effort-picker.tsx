@@ -9,7 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, XIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountAccents, accountColor } from './account-color.js'
@@ -406,7 +406,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             sideOffset={8}
           >
             <div
-              className="dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch dshx:overflow-clip dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]"
+              className="dshx:relative dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch dshx:overflow-clip dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]"
               data-model-picker-surface
             >
               <section
@@ -615,7 +615,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       groups={state.groups}
                       inspected={inspectedRoute}
                       onBack={backToList}
-                      onClose={() => setOpen(false)}
                       onInspect={setInspected}
                       onRetry={load}
                       onSelect={choose}
@@ -626,6 +625,17 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   </div>
                 )}
               </div>
+              {/* Round 3 R17: one Close for the whole picker, last in the DOM so it ends the Tab cycle; drawn at the top right
+                  (beside the details title on desktop, the sheet header on a phone). */}
+              <button
+                aria-label="Close model picker"
+                className="dshx:absolute dshx:top-2.5 dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11 dshx:@max-pane-compact:top-0.5 dshx:@max-pane-compact:right-0"
+                data-model-picker-close
+                onClick={() => setOpen(false)}
+                type="button"
+              >
+                <XIcon aria-hidden="true" className="dshx:size-4" />
+              </button>
             </div>
           </PopoverContent>
         </Popover>

@@ -82,7 +82,7 @@ export const FanOutSelection = (props: {
       className={cn('dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-2', props.className)}
       data-model-picker-fan-out="tray"
     >
-      <header className="dshx:flex dshx:min-h-8 dshx:items-center">{summary}</header>
+      <header className="dshx:flex dshx:min-h-8 dshx:items-center dshx:pr-7 dshx:pointer-coarse:pr-12">{summary}</header>
       <ul className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-1 dshx:overflow-y-auto" data-model-fan-out-chips>
         {props.routes.map(route => {
           const group = props.groups.find(candidate => candidate.id === route.provider)

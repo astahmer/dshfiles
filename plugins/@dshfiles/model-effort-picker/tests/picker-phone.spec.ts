@@ -19,7 +19,7 @@ describe('phone picker is one sheet, list then details in place (council picker 
     // The kit's coarse hit area (`::after`, inset to 44 px) only grows a control smaller than 44 px; at the scroller's edge
     // that growth was the 3 px (list) and 12 px (details) sideways scroll measured in round 1.
     expect(tagOf(row, 'data-model-details-trigger')).toMatch(/dshx:pointer-coarse:size-11/u)
-    expect(tagOf(details, 'aria-label="Close model picker"')).toMatch(/dshx:pointer-coarse:size-11/u)
+    expect(tagOf(picker, 'aria-label="Close model picker"')).toMatch(/dshx:pointer-coarse:size-11/u)
     expect(tagOf(details, 'data-model-details-back')).toMatch(/dshx:pointer-coarse:size-11/u)
     expect(tagOf(picker, 'data-model-picker-scroll')).toContain('[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!')
     expect(tagOf(details, 'data-model-details-body')).toMatch(/dshx:\[overflow-x:clip\]/u)
