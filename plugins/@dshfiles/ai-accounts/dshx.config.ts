@@ -11,6 +11,8 @@ export default defineConfig({
     'model-fallback-api': 'src/model-fallback-api.ts',
     'model-fast-mode-api': 'src/model-fast-mode-api.ts',
     'usage-overview-model': 'src/usage-overview-model.ts',
+    // The account dot rule the model picker and the fan-out dialog share (round 5 U2).
+    'account-color': 'src/account-color.tsx',
     'thread-account-api': 'src/thread-account-api.ts',
     'account-usage-view': 'src/account-usage-view.tsx',
     'codex-credential': 'src/codex-credential.ts',
