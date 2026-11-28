@@ -10,6 +10,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
@@ -22,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import {
   AppWindowIcon,
   BellOffIcon,
+  ChevronRightIcon,
   CircleDashedIcon,
   DownloadIcon,
   EllipsisIcon,
@@ -456,6 +458,8 @@ export const HeaderThreadActions = ({
   }
   const togglePinned = (): void => void updateThreadOperation(pinned ? 'unpin' : 'pin')
   const moreLabel = t('threadSidebarMoreThreadActions')
+  // On a phone this control is a row of the thread's ⋯ sheet (council round 35 P2): a labelled row, never a bare ⋯ there.
+  const phone = PhoneLayout.matches()
   const archiveDisabled = !archived && targetIds.some(targetId => sessionState.byId[targetId]?.running === true)
 
   return (
@@ -466,14 +470,36 @@ export const HeaderThreadActions = ({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button type="button" variant="ghost" size="icon-sm" aria-label={moreLabel}>
-                  <EllipsisIcon aria-hidden="true" />
-                </Button>
+                {phone ? (
+                  // The sheet's row (rich-composer's ⋯ sheet tool rows): 44px, the full width, 8px in, a 20px glyph in the
+                  // ink, the label, and a chevron because it opens the thread menu's sheet.
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    aria-label={moreLabel}
+                    data-phone-sheet-row=""
+                    className="dshx:h-auto dshx:min-h-11 dshx:w-full dshx:justify-start dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:has-[>svg]:px-2 dshx:text-sm dshx:font-normal dshx:text-foreground"
+                  >
+                    <EllipsisIcon aria-hidden="true" className="dshx:size-5" />
+                    <span className="dshx:min-w-0 dshx:truncate">{moreLabel}</span>
+                    <ChevronRightIcon aria-hidden="true" className="dshx:ml-auto dshx:size-4 dshx:text-(--dsw-alias-label-tertiary)" />
+                  </Button>
+                ) : (
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={moreLabel}>
+                    <EllipsisIcon aria-hidden="true" />
+                  </Button>
+                )}
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent side="bottom">{moreLabel}</TooltipContent>
           </Tooltip>
           <DropdownMenuContent align="end" className="dshx-root dshx:min-w-48" aria-label={moreLabel}>
+            {phone ? (
+              // The row menu's sheet names its thread (council round 34, B9); so does this one, opened from the ⋯ sheet.
+              <DropdownMenuLabel className="dshx:line-clamp-2 dshx:pt-1 dshx:pb-2 dshx:font-semibold dshx:break-words" data-thread-menu-title="">
+                {session.displayTitle}
+              </DropdownMenuLabel>
+            ) : null}
             <HeaderMenuBody
               sessionId={sessionId}
               t={t}

@@ -537,6 +537,74 @@ describe('fixed Conversation content factory composition', () => {
     expect(document.body.querySelector('[data-conversation-phone-sheet]')).toBeNull()
   })
 
+  // Council round 35 P2 (Opus, Fable): the ⋯ sheet names its thread, and a tool row may carry a 20px icon in the ink, a
+  // trailing detail in the tertiary ink and a chevron when it opens another surface. All three are optional: a tool that
+  // sets none renders as before, a bare label.
+  it('names the thread at the top of the ⋯ sheet and draws a tool\'s icon, detail and chevron only when it sets them', async () => {
+    const releaseHost = ThreadViewsModel.host()
+    dispose.push(releaseHost)
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: true, media: query, addEventListener() {}, removeEventListener() {} }))
+    document.documentElement.setAttribute('data-shell-phone-nav', '')
+    dispose.push(() => {
+      document.documentElement.removeAttribute('data-shell-phone-nav')
+      vi.unstubAllGlobals()
+    })
+    const menu = createPhoneThreadMenu()
+    const client = await createTestClient()
+    await client.mount(defineClientPlugin({ id: 'phone-menu', uses: ['ui'], setup: api => void api.provide(PhoneThreadMenu, menu) }), {
+      packageId: '@dshfiles/rich-composer',
+    })
+    dispose.push(() => {
+      void client.dispose()
+    })
+    const Scope = menu.scope.Provider
+    const Plain = () => <button {...usePhoneThreadTool({ id: 'test/plain', label: 'Show usage and cost', open: vi.fn() }).triggerProps}>Usage</button>
+    const Full = () => (
+      <button {...usePhoneThreadTool({ id: 'test/tools', label: 'Tools', detail: '@dsh', opens: true, icon: <svg data-test-icon="" />, open: vi.fn() }).triggerProps}>
+        Tools
+      </button>
+    )
+    const a = fixture('Fix invoice tax rounding')
+    const element = document.createElement('div')
+    document.body.append(element)
+    const root = createRoot(element)
+    dispose.push(() => act(() => root.unmount()))
+    await act(async () =>
+      root.render(
+        <Scope value="phone-rows-reader">
+          <ConversationSessionHeader {...a.header} />
+          <Plain />
+          <Full />
+        </Scope>,
+      ),
+    )
+    act(() => document.body.querySelector<HTMLButtonElement>('[data-conversation-phone-bar] button[aria-label="session.menu"]')?.click())
+    const sheet = document.body.querySelector('[data-conversation-phone-sheet]')
+    // The thread's title heads the sheet, as the row menu's sheet does (council round 34, B9).
+    const title = sheet?.querySelector('[data-phone-sheet-title]')
+    expect(title?.textContent).toBe('Fix invoice tax rounding')
+    expect(sheet?.querySelector('[data-phone-sheet-title]')).toBe(sheet?.children[1])
+    const rows = [...(sheet?.querySelectorAll<HTMLButtonElement>('[data-phone-thread-tool-proxy]') ?? [])]
+    const plain = rows.find(row => row.textContent === 'Show usage and cost')
+    expect(plain).toBeDefined()
+    expect(plain?.querySelector('[data-phone-sheet-tool-icon]')).toBeNull()
+    expect(plain?.querySelector('[data-phone-sheet-tool-detail]')).toBeNull()
+    expect(plain?.querySelector('[data-phone-sheet-tool-chevron]')).toBeNull()
+    const full = rows.find(row => row.querySelector('[data-test-icon]') !== null)
+    expect(full?.querySelector('[data-phone-sheet-tool-icon] [data-test-icon]')).not.toBeNull()
+    expect(full?.querySelector('[data-phone-sheet-tool-icon]')?.getAttribute('aria-hidden')).toBe('true')
+    expect(full?.querySelector('[data-phone-sheet-tool-detail]')?.textContent).toBe('@dsh')
+    // The detail and the chevron end the row, in that order.
+    const chevron = full?.querySelector('[data-phone-sheet-tool-chevron]')
+    expect(chevron).not.toBeNull()
+    expect(full?.lastElementChild).toBe(chevron)
+    expect(chevron?.previousElementSibling?.hasAttribute('data-phone-sheet-tool-detail')).toBe(true)
+    // Its name says the tool and the detail, with a pause between them; a bare label names itself.
+    expect(full?.textContent).toBe('Tools@dsh')
+    expect(full?.getAttribute('aria-label')).toBe('Tools, @dsh')
+    expect(plain?.hasAttribute('aria-label')).toBe(false)
+  })
+
   // Council round 13 C5 hides the passive meter line on a phone; its readings (activity, tokens, cost) must stay
   // reachable. The thread bar's ⋯ sheet lists them, and picking that row lays the line out expanded, focus on its toggle.
   it('reaches the hidden meter line\'s readings from the phone thread sheet, by touch or keyboard', async () => {

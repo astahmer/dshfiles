@@ -218,7 +218,7 @@ view switch.
 The typed dshx module [`phone-thread-menu`](src/phone-thread-menu.tsx) (upstream #76) owns the reader/tool contract
 and its open state ([`phone-thread-menu-service.ts`](src/phone-thread-menu-service.ts)). In this fork the sheet is its
 reader and, while its bar is on screen, its launcher: composer plugins that call
-`usePhoneThreadTool({ id, label, open, active, available })` (side question, saved prompts, annotations) hide their
+`usePhoneThreadTool({ id, label, open, active, available, icon?, detail?, opens? })` (the optional three draw the sheet row's 20px glyph, a right-aligned tertiary detail and a chevron for a row that opens something; council round 35 P2) (side question, saved prompts, annotations) hide their
 control in place and appear as 44 px rows in the sheet; a pick closes the sheet and calls the owner's real `open`.
 Without the contract the sheet keeps its own open state and every control stays where it is. Opening focuses the
 sheet; Tab stays within it, Escape and the scrim close it and return focus to the opener. Upstream's top drop-down menu

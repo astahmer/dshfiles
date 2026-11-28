@@ -311,3 +311,43 @@ describe('HeaderThreadActions', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Could not update thread')
   })
 })
+
+// Council round 35 P2 (Opus, Fable; lead's choice a): on a phone these actions live in the thread's ⋯ sheet, where an icon
+// ⋯ inside the ⋯ sheet read as a nested menu. There the control is a labelled row that ends in a chevron, and the menu it
+// opens is the row menu's sheet, headed by the thread's title as the list's row menu is (council round 34, B9).
+describe('HeaderThreadActions on a phone', () => {
+  const phoneScreen = (): void => {
+    vi.stubGlobal('matchMedia', (query: string) => ({ matches: !query.includes('hover: hover'), media: query, addEventListener() {}, removeEventListener() {} }))
+  }
+
+  it('is a "More thread actions" row with an ellipsis glyph and a chevron, not a bare ⋯', () => {
+    phoneScreen()
+    mount()
+    const row = screen.getByRole('button', { name: 'More thread actions' })
+    expect(row.textContent).toBe('More thread actions')
+    expect(row.hasAttribute('data-phone-sheet-row')).toBe(true)
+    expect(row.querySelector('svg.lucide-ellipsis')?.getAttribute('class')).toContain('dshx:size-5')
+    expect(row.lastElementChild?.getAttribute('class')).toContain('lucide-chevron-right')
+    // The row's own type, like the sheet's tool rows: 44px, the full width, 8px in, the label in the ink.
+    for (const token of ['dshx:min-h-11', 'dshx:w-full', 'dshx:justify-start', 'dshx:px-2', 'dshx:text-foreground']) expect(row.className).toContain(token)
+  })
+
+  it('opens the row menu sheet headed by the thread title', () => {
+    phoneScreen()
+    mount()
+    openMoreMenu()
+    const title = document.querySelector('[data-slot="dropdown-menu-content"] [data-thread-menu-title]')
+    expect(title?.textContent).toBe('Thread')
+    for (const token of ['dshx:line-clamp-2', 'dshx:font-semibold']) expect(title?.className).toContain(token)
+    expect(screen.getAllByRole('menuitem', { name: 'Pin' })).toHaveLength(1)
+  })
+
+  it('keeps the bare ⋯ and no title off a phone', () => {
+    mount()
+    const button = screen.getByRole('button', { name: 'More thread actions' })
+    expect(button.textContent).toBe('')
+    expect(button.hasAttribute('data-phone-sheet-row')).toBe(false)
+    openMoreMenu()
+    expect(document.querySelector('[data-thread-menu-title]')).toBeNull()
+  })
+})

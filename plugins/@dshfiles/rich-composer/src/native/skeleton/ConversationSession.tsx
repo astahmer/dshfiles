@@ -16,6 +16,7 @@ import { DefaultConversationViews } from './DefaultConversationViews.tsx'
 import { phoneMenuScope, usePhoneMenuReader, usePhoneThreadMenu } from '../../phone-thread-menu.tsx'
 import css from './ConversationRoot.module.css'
 import { PHONE_SHELL_QUERY } from '@dshfiles/plugin-ui/lib/phone-shell'
+import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
 
 /** Full props composed from the strict session body contract. */
 export type ConversationSessionProps = ConversationSessionSlotProps
@@ -218,6 +219,7 @@ export function ConversationSessionHeader({
   usePhoneMenuReader(readerId === null ? null : { id: readerId, sessionId })
   const phoneToolsOpen = readerId !== null && phoneMenuState.openReader === readerId
   const phoneTools = phoneMenuState.tools.filter(tool => tool.readerId === readerId)
+  const sheetTitle = ancestry.at(-1)?.displayTitle
   const phoneMenuRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     if (!phone || !phoneToolsOpen) return
@@ -458,9 +460,15 @@ export function ConversationSessionHeader({
         {/* dshfiles: data-dshx-sheet hands the sheet to the shared drag gesture (@dshfiles/plugin-ui hooks/sheet-drag). */}
         <div className={css.phoneSheet} role="dialog" aria-label={t('session.menu')} data-conversation-phone-sheet="" data-dshx-sheet="" ref={phoneMenuRef} tabIndex={-1}>
           <span className={css.phoneGrabber} aria-hidden />
+          {/* dshfiles (council round 35 P2): the sheet names its thread, as the row menu's sheet does (round 34, B9). */}
+          {sheetTitle === undefined ? null : <p className={css.phoneSheetTitle} data-phone-sheet-title="">{sheetTitle}</p>}
           {views}
+          {/* The header's chips (the subagent count, dev servers), then its utilities as rows: the thread's place ("In the
+              project ›") and every thread verb behind one "More thread actions ›" row, never a bare nested ⋯. */}
           <div className={css.phoneSheetActions}>
             {renderSlot('conversation.session.header.actions', {})}
+          </div>
+          <div className={css.phoneSheetRows} data-phone-sheet-rows="">
             {renderSlot('conversation.session.header.utilities', {})}
           </div>
           {phoneTools.length > 0 && (
@@ -470,10 +478,21 @@ export function ConversationSessionHeader({
                   key={tool.id}
                   type="button"
                   className={css.phoneSheetTool}
+                  // The label and its detail are separate spans: the name keeps a pause between them ("Tools, @dsh").
+                  aria-label={tool.detail === undefined ? undefined : `${tool.label}, ${tool.detail}`}
                   data-phone-thread-tool-proxy=""
                   onClick={() => { phoneMenu?.pick(tool) }}
                 >
-                  {tool.label}
+                  {tool.icon === undefined ? null : (
+                    <span className={css.phoneSheetToolIcon} aria-hidden="true" data-phone-sheet-tool-icon="">{tool.icon}</span>
+                  )}
+                  <span className={css.phoneSheetToolLabel}>{tool.label}</span>
+                  {tool.detail === undefined ? null : (
+                    <span className={css.phoneSheetToolDetail} data-phone-sheet-tool-detail="">{tool.detail}</span>
+                  )}
+                  {tool.opens === true ? (
+                    <ChevronRightIcon aria-hidden="true" className={css.phoneSheetToolChevron} data-phone-sheet-tool-chevron="" />
+                  ) : null}
                 </button>
               ))}
             </div>

@@ -39,6 +39,7 @@ import { attachmentErrorText, imageSizeText } from '../image-labels.ts'
 import { parsePastedComposerText } from '../../paste-references.ts'
 import { LargePasteModel } from '../../large-paste.ts'
 import { usePhoneThreadTool } from '../../phone-thread-menu.tsx'
+import { GaugeIcon } from '@dshfiles/plugin-ui/icons'
 import { RpcFailure } from '../../rpc-failure.ts'
 import { useTriggerMenuRoom } from '../../trigger-menu-room.ts'
 import { SendWhenUploaded, settleHeldSend, uploadGate, type HeldDraft, type HeldSend, type UploadGate } from '../../held-send.ts'
@@ -188,6 +189,7 @@ export const InputBar = memo(function InputBar({
   usePhoneThreadTool({
     id: '@dshfiles/rich-composer/thread-details',
     label: t('runRow.moreDetails'),
+    icon: <GaugeIcon />,
     open: () => {
       focusMeterMore.current = true
       setMetaExpanded(true)

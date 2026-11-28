@@ -154,7 +154,10 @@ describe('the running thread Tools control', () => {
       const Scope = menu.scope.Provider
       const container = await render(<Scope value="reader">{control(access(null))}</Scope>)
       const tool = menu.state.get().tools.find(item => item.id === '@dshfiles/agents/tools')
-      expect(tool?.label).toBe('Tools · @reviewer')
+      // The sheet row: "Tools" with the agent right-aligned as its detail (council round 35 P2).
+      expect(tool?.label).toBe('Tools')
+      expect(tool?.detail).toBe('@reviewer')
+      expect(tool?.opens).toBe(true)
       // The sheet is the launcher while it is on screen, so the bar's wrench hides in place.
       expect(container.querySelector('button[data-thread-tools]')?.hasAttribute('data-phone-thread-tool-hidden')).toBe(true)
       menu.toggle('reader')
@@ -180,7 +183,7 @@ describe('the running thread Tools control', () => {
     try {
       const Scope = menu.scope.Provider
       await render(<Scope value="reader">{control(access({ kind: 'all' }))}</Scope>)
-      expect(menu.state.get().tools.find(item => item.id === '@dshfiles/agents/tools')?.label).toBe('Tools · All tools (changed)')
+      expect(menu.state.get().tools.find(item => item.id === '@dshfiles/agents/tools')?.detail).toBe('All tools (changed)')
     } finally {
       await client.dispose()
     }

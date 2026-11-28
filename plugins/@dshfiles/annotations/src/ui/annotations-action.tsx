@@ -67,7 +67,7 @@ export const AnnotationsAction = (props: ComposerToolProps): JSX.Element => {
   const owner = useId()
   const ui = useAnnotationsUi()
   const [open, setOpen] = useState(false)
-  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/annotations/picker', label: 'Annotations', open: () => setOpen(true), active: open })
+  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/annotations/picker', label: 'Annotations', icon: <CrosshairIcon />, opens: true, open: () => setOpen(true), active: open })
   const [previewOpen, setPreviewOpen] = useState(false)
   const [pairing, sendPairing] = useMachine(pairingMachine)
   const [rowAction, dispatchRowAction] = useReducer(rowActionReducer, noRowAction)

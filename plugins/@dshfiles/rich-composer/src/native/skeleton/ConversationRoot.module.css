@@ -467,14 +467,23 @@ button.crumbEditable {
   color: var(--dsw-alias-label-primary);
 }
 
+/* The kit's scrim token (plugin-ui color-roles.css, council round 30, item 3): this sheet and the row menu's dim alike. */
 .phoneScrim {
   position: fixed;
   inset: 0;
   z-index: 1040;
   border: none;
-  background: color-mix(in oklch, var(--dshx-tone-text, var(--dsw-alias-label-primary)) 30%, transparent);
+  background: var(--dshx-scrim);
 }
 
+/* A kit sheet opened over this one (More thread actions, In the project, the subagent list) draws the one scrim, over the
+   page and this sheet, which reads as the layer below (council round 34 A5's rule for kit sheets). */
+:global(body:has([data-slot='dropdown-menu-content'], [data-slot='popover-content'], [data-slot='context-menu-content'], [data-slot='select-content'])) .phoneScrim {
+  background: transparent;
+}
+
+/* Council round 35 P2 (Opus, Fable): the kit sheet's surface, edge and insets, so the thread ⋯ sheet and the row menu's
+   sheet (plugin-ui styles.css, "Phone: every menu and picker is a bottom sheet") are one material. */
 .phoneSheet {
   position: fixed;
   right: 0;
@@ -483,13 +492,14 @@ button.crumbEditable {
   z-index: 1041;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   max-height: 80vh;
-  padding: 8px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
+  border-top: 1px solid var(--dsw-alias-border-l2);
   border-top-left-radius: var(--dsw-radius-panel, 16px);
   border-top-right-radius: var(--dsw-radius-panel, 16px);
-  background: var(--dshx-tone-raised, var(--dsw-alias-bg-layer-2));
+  background: var(--dsw-alias-bg-layer-2);
   box-shadow: var(--dshx-elevation-3);
   color: var(--dsw-alias-label-primary);
 }
@@ -501,10 +511,27 @@ button.crumbEditable {
 
 .phoneGrabber {
   align-self: center;
+  flex: none;
   width: 36px;
   height: 4px;
+  margin-bottom: 4px;
   border-radius: 999px;
   background: var(--dshx-tone-border-strong, var(--dsw-alias-border-l3));
+}
+
+/* The thread it acts on, as the row menu's sheet names its row (council round 34, B9): 14px semibold at the rows' text
+   edge, up to two lines. */
+.phoneSheetTitle {
+  display: -webkit-box;
+  margin: 0;
+  padding: 4px 8px 8px;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 /* In the sheet the view switch spans the width with 44pt segments. */
@@ -519,11 +546,68 @@ button.crumbEditable {
   font-size: 15px;
 }
 
+/* The header's chips (the subagent count, dev servers), at the rows' text edge. */
 .phoneSheetActions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  padding-inline: 8px;
+}
+
+.phoneSheetActions:not(:has(*)) {
+  display: none;
+}
+
+/* The header's utilities as rows (council round 35 P2): each control takes the sheet's width. */
+.phoneSheetRows {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.phoneSheetRows :global([data-header-live-slot]:empty) {
+  display: none;
+}
+
+.phoneSheetRows > :global([data-slot]) > :global(*) {
+  width: 100%;
+}
+
+/* "In the project": jj-integration's place chip read as a pill beside a bare ⋯; here it is a row like the tools, its
+   glyph at 20px in the ink, the label at the row's size, and its menu chevron turned to point onward at the end. */
+.phoneSheetRows :global([data-workspace-place]) {
+  width: 100%;
+  max-width: none;
+  min-height: 44px;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--dsw-radius-md);
+  background: transparent;
+  box-shadow: none;
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dshx-density-text-ui, 15px);
+  font-weight: 400;
+}
+
+.phoneSheetRows :global([data-workspace-place]) > :global(span) {
+  font-size: inherit;
+}
+
+.phoneSheetRows :global([data-workspace-place]) > :global(svg:first-child) {
+  width: 20px;
+  height: 20px;
+}
+
+.phoneSheetRows :global([data-workspace-place]) > :global(svg:last-child) {
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  rotate: -90deg;
+  opacity: 1;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 /* Composer tools listed by the PhoneThreadMenu contract: one 44px row each, picked from the sheet. */
@@ -534,28 +618,73 @@ button.crumbEditable {
   padding-top: 6px;
 }
 
+/* The row menu's sheet row (the kit's 44px menu row, 8px in): a 20px glyph in the ink, the label, then a right-aligned
+   detail in the tertiary ink and a chevron on a row that opens something (council round 35 P2). */
 .phoneSheetTool {
-  display: block;
+  display: flex;
+  align-items: center;
+  /* The kit menu row's 8px gap, so the labels start on the row menu sheet's text column plus the larger glyph. */
+  gap: 8px;
   min-height: 44px;
-  padding: 0 10px;
+  padding: 0 8px;
   border: none;
   border-radius: var(--dsw-radius-md);
   background: transparent;
   font: inherit;
-  font-size: var(--dsh-content-font-size, 15px);
-  line-height: 44px;
+  /* The kit menu row's type (text-sm, the density's UI size: 15px on a phone). */
+  font-size: var(--dshx-density-text-ui, 15px);
+  line-height: 20px;
   text-align: left;
   color: var(--dsw-alias-label-primary);
-  /* A full-width row keeps its label on one line; a label longer than the row ends in an ellipsis. */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   cursor: pointer;
 }
 
 .phoneSheetTool:active,
 .phoneSheetTool:focus-visible {
-  background: var(--dsw-alias-bg-layer-2);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.phoneSheetToolIcon {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.phoneSheetToolIcon > :global(svg) {
+  width: 20px;
+  height: 20px;
+}
+
+/* A full-width row keeps its label on one line; a label longer than the row ends in an ellipsis. */
+.phoneSheetToolLabel {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.phoneSheetToolDetail {
+  flex: none;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+  white-space: nowrap;
+}
+
+.phoneSheetToolChevron {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-left: auto;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.phoneSheetToolDetail + .phoneSheetToolChevron {
+  margin-left: 0;
 }
 
 /* The More launcher centers its 22px box on the tab's 16px text line. */

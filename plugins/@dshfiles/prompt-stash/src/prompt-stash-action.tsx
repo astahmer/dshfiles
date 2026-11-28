@@ -131,7 +131,7 @@ const PromptStashAction = (
     }
   }, [])
 
-  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/prompt-stash/prompts', label: 'Saved prompts', open: () => openLibrary(), active: isOpen })
+  const phoneTool = usePhoneThreadTool({ id: '@dshfiles/prompt-stash/prompts', label: 'Saved prompts', icon: <BookmarkIcon />, opens: true, open: () => openLibrary(), active: isOpen })
 
   const closeLibrary = (): void => send({ type: 'close' })
 

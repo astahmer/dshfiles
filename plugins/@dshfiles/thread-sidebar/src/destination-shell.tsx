@@ -1706,7 +1706,7 @@ const PhoneNavigation = (
   const panelsOffered = stageBar.thread && togglePanels !== null
   useLayoutEffect(() => {
     if (!panelsOffered || threadMenu === undefined || menuReader === null) return
-    return threadMenu.registerTool({ id: 'thread-sidebar.thread-panels', readerId: menuReader, label: 'Thread panels', open: () => togglePanelsLatest.current?.() })
+    return threadMenu.registerTool({ id: 'thread-sidebar.thread-panels', readerId: menuReader, label: 'Thread panels', icon: <PanelBottomOpenIcon />, opens: true, open: () => togglePanelsLatest.current?.() })
   }, [panelsOffered, threadMenu, menuReader])
   // The thread panel from the right edge (opt-in); an open sheet is modal, so the swipe never closes it again.
   useEdgeSwipe({ side: 'right', enabled: inThread && props.edgeSwipePanels === true && togglePanels !== null, onSwipe: () => togglePanels?.() })

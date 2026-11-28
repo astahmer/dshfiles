@@ -1,5 +1,5 @@
 import { defineContract, useContract, type Subscribable } from '@dshfiles/dshx/client'
-import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore, type Context } from 'react'
+import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore, type Context, type ReactNode } from 'react'
 
 export { createPhoneThreadMenu } from './phone-thread-menu-service.js'
 
@@ -8,7 +8,17 @@ export interface PhoneMenuReader {
   readonly sessionId: string
 }
 
-export interface PhoneMenuTool {
+/** How a tool's row reads in the ⋯ sheet (council round 35 P2). Each part is optional: a tool that sets none is a bare label. */
+export interface PhoneMenuToolLook {
+  /** A leading glyph, drawn at 20px in the ink. */
+  readonly icon?: ReactNode
+  /** A short value after the label, right-aligned in the tertiary ink ("@dsh" after Tools). */
+  readonly detail?: string
+  /** Picking the row opens another surface (a sheet, a panel): the row ends in a chevron. */
+  readonly opens?: boolean
+}
+
+export interface PhoneMenuTool extends PhoneMenuToolLook {
   readonly id: string
   readonly readerId: string
   readonly label: string
@@ -34,6 +44,9 @@ export interface PhoneThreadMenuService {
   close(): void
   pick(tool: PhoneMenuTool): void
 }
+
+/** A tool registration being assembled: its optional look is added only when set (exactOptionalPropertyTypes). */
+type PhoneMenuToolDraft = { -readonly [Key in keyof PhoneMenuTool]: PhoneMenuTool[Key] }
 
 export const PhoneThreadMenu = defineContract<PhoneThreadMenuService>('@dshfiles/rich-composer.phone-thread-menu', { owner: '@dshfiles/rich-composer' })
 
@@ -61,22 +74,32 @@ export const usePhoneMenuReader = (reader: PhoneMenuReader | null): void => {
   }, [service, id, sessionId])
 }
 
-export const usePhoneThreadTool = (input: {
-  readonly id: string
-  readonly label: string
-  readonly open: () => void
-  readonly active?: boolean
-  readonly available?: boolean
-}) => {
+export const usePhoneThreadTool = (
+  input: PhoneMenuToolLook & {
+    readonly id: string
+    readonly label: string
+    readonly open: () => void
+    readonly active?: boolean
+    readonly available?: boolean
+  },
+) => {
   const { service, snapshot } = usePhoneThreadMenu()
   const readerId = useContext(service?.scope ?? phoneMenuScope())
   const open = useRef(input.open)
   open.current = input.open
+  // A tool's glyph is a new element each render: the registration reads the latest, and a new one alone never re-registers.
+  const icon = useRef(input.icon)
+  icon.current = input.icon
   const available = input.available !== false
+  const { detail, opens } = input
   useLayoutEffect(() => {
     if (readerId === null || !available) return
-    return service?.registerTool({ id: input.id, label: input.label, readerId, open: () => open.current() })
-  }, [service, readerId, input.id, input.label, available])
+    const tool: PhoneMenuToolDraft = { id: input.id, label: input.label, readerId, open: () => open.current() }
+    if (icon.current !== undefined) tool.icon = icon.current
+    if (detail !== undefined) tool.detail = detail
+    if (opens !== undefined) tool.opens = opens
+    return service?.registerTool(tool)
+  }, [service, readerId, input.id, input.label, available, detail, opens])
   const managed = readerId !== null && snapshot.launcherReader === readerId && snapshot.readers.some(reader => reader.id === readerId)
   return {
     triggerProps: {

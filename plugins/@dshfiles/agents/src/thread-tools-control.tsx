@@ -66,7 +66,10 @@ export const ThreadToolsControl = (props: ThreadToolsControlProps): ReactNode =>
   // Annotations do, and comes back in place while its menu is open.
   const phoneTool = usePhoneThreadTool({
     id: '@dshfiles/agents/tools',
-    label: `Tools · ${shown}${state?.overridden === true ? ' (changed)' : ''}`,
+    label: 'Tools',
+    detail: `${shown}${state?.overridden === true ? ' (changed)' : ''}`,
+    icon: <WrenchIcon />,
+    opens: true,
     open: () => menu.onOpenChange(true),
     active: menu.open,
     available: state !== undefined,
