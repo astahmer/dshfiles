@@ -360,8 +360,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="dshx-root dshx:@container dshx:w-[min(42.5625rem,calc(100vw-1.5rem))] dshx:overflow-hidden dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-0 dshx:shadow-lg"
+            className="dshx-root dshx:@container dshx:w-[min(42.5625rem,calc(100vw-1.5rem))] dshx:overflow-clip! dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-0 dshx:shadow-lg"
             collisionPadding={12}
+            // Round 3 R4: the root never scrolls (only the list and the details body do). overflow: hidden still let
+            // scrollIntoView scroll it, which sheared the picker by 12–404 px; `clip` cannot scroll, and its !important
+            // (a layered utility) outranks the kit phone sheet's overflow-y: auto !important.
             onOpenAutoFocus={event => {
               event.preventDefault()
               // On a touch screen a focused search raises the on-screen keyboard over the sheet: nothing takes focus, and the
@@ -380,7 +383,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             sideOffset={8}
           >
             <div
-              className="dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]"
+              className="dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch dshx:overflow-clip dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]"
               data-model-picker-surface
             >
               <section

@@ -46,4 +46,11 @@ describe('desktop picker is one bounded surface (council picker S2)', () => {
       'mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)',
     )
   })
+
+  it('never scrolls the popover root or the surface, only the list and the details body (round 3 R4)', () => {
+    const content = classesOf(picker, '<PopoverContent')
+    expect(content).toContain('dshx:overflow-clip!')
+    expect(content).not.toMatch(/dshx:overflow-hidden/u)
+    expect(classesOf(picker, 'data-model-picker-surface')).toMatch(/dshx:overflow-clip/u)
+  })
 })
