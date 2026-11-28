@@ -122,9 +122,81 @@ export class AttachmentSaveFailed extends Schema.TaggedError<AttachmentSaveFaile
   }
 }
 
-export class AgentRequired extends Schema.TaggedError<AgentRequired>()('AgentRequired', {}, { dshxWireCode: 'agent-required' }) {
+export class AgentRequired extends Schema.TaggedError<AgentRequired>()(
+  'AgentRequired',
+  { tool: Schema.optional(Schema.Literals(['tweet_context', 'animation_frames'])) },
+  { dshxWireCode: 'agent-required' },
+) {
   override get message(): string {
-    return 'tweet_context runs only on behalf of an Agent.'
+    return `${this.tool ?? 'tweet_context'} runs only on behalf of an Agent.`
+  }
+}
+
+const sourceProblems = {
+  'not-found': (path: string) => `No file at ${path}. Check the path; a relative path resolves from the thread's folder.`,
+  inaccessible: (path: string) => `The DSH Host cannot open ${path}. Check that the Host user may read the file and its folders, then retry.`,
+  'not-a-file': (path: string) => `${path} is not a regular file. Pass a video or GIF file, not a folder.`,
+  'too-large': (path: string) =>
+    `${path} is over the 100 MB limit. Trim it first, for example \`ffmpeg -ss <start> -t <seconds> -i <input> -c copy clip.mp4\`, then pass the clip.`,
+  unreadable: (path: string) => `ffmpeg could not read ${path} as a video or GIF. Export it as MP4, WebM, MOV or GIF and retry.`,
+  'no-video': (path: string) => `${path} has no video stream. Pass a screen recording, a video or an animated GIF.`,
+  'no-working-directory': () => 'The thread has no usable folder to resolve a relative path. Pass an absolute path, or set the thread folder and retry.',
+} as const
+
+/** The reference file cannot be used as given; the message says what to pass instead. */
+export class AnimationSourceUnavailable extends Schema.TaggedError<AnimationSourceUnavailable>()(
+  'AnimationSourceUnavailable',
+  {
+    reason: Schema.Literals(['not-found', 'inaccessible', 'not-a-file', 'too-large', 'unreadable', 'no-video', 'no-working-directory']),
+    path: Schema.String,
+    cause: Schema.optional(Schema.Defect()),
+  },
+  { dshxWireCode: 'animation-source-unavailable' },
+) {
+  override get message(): string {
+    return sourceProblems[this.reason](JSON.stringify(this.path))
+  }
+}
+
+const windowProblems = {
+  negative: 'startSeconds and endSeconds count from the start of the clip; use 0 or more.',
+  'start-after-end': 'endSeconds must be after startSeconds.',
+  'start-outside-clip': 'startSeconds is at or past the end of the clip; pick a start inside it.',
+  'too-long': 'The window is longer than 60 seconds; narrow startSeconds/endSeconds to the animation you want.',
+} as const
+
+export class InvalidAnimationWindow extends Schema.TaggedError<InvalidAnimationWindow>()(
+  'InvalidAnimationWindow',
+  { reason: Schema.Literals(['negative', 'start-after-end', 'start-outside-clip', 'too-long']), durationSeconds: Schema.optional(Schema.Number) },
+  { dshxWireCode: 'invalid-animation-window' },
+) {
+  override get message(): string {
+    const duration = this.durationSeconds === undefined ? '' : ` The clip lasts ${String(this.durationSeconds)} s.`
+    return `${windowProblems[this.reason]}${duration}`
+  }
+}
+
+const animationSamplingProblems = {
+  'ffmpeg-missing':
+    'ffmpeg must be on the DSH Host PATH to read animations. Install it (for example `brew install ffmpeg` or `apt install ffmpeg`), then retry.',
+  'probe-failed': 'ffmpeg could not inspect this file within its time limit. Retry, or export a shorter clip.',
+  'scan-failed': 'ffmpeg could not scan this window within its time and memory limits. Narrow startSeconds/endSeconds, or export a smaller clip.',
+  'decode-failed': 'ffmpeg could not extract the key frames within its limits. Narrow startSeconds/endSeconds or lower maxFrames, then retry.',
+  'no-frames': 'ffmpeg decoded no frames in this window. Check startSeconds/endSeconds against the clip duration.',
+  'frames-unreadable':
+    'The extracted frames could not be read from the Host temporary folder. Retry; if it persists, check free space in the temporary folder.',
+} as const
+
+export class AnimationSamplingFailed extends Schema.TaggedError<AnimationSamplingFailed>()(
+  'AnimationSamplingFailed',
+  {
+    reason: Schema.Literals(['ffmpeg-missing', 'probe-failed', 'scan-failed', 'decode-failed', 'no-frames', 'frames-unreadable']),
+    cause: Schema.optional(Schema.Defect()),
+  },
+  { dshxWireCode: 'animation-sampling-failed' },
+) {
+  override get message(): string {
+    return animationSamplingProblems[this.reason]
   }
 }
 

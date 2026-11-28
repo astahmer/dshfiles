@@ -90,7 +90,7 @@ type FxVideoFormat = typeof videoFormatSchema.Type
 const imageMediaType = Schema.Literals(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 export const imageMediaTypeSchema = imageMediaType
 const integer = Schema.Number.check(Schema.isInt())
-const attachmentSchema = Schema.Struct({
+export const attachmentSchema = Schema.Struct({
   attachmentId: Schema.String,
   mediaType: imageMediaType,
   bytes: integer,
@@ -276,7 +276,7 @@ const selectInformativeFrames = (frames: ReadonlyArray<ScanFrame>, maxFrames: nu
   return selected.toSorted((left, right) => left.index - right.index)
 }
 
-const imageReference = (attachment: TweetAttachment): ImageAttachmentRef => {
+export const imageReference = (attachment: TweetAttachment): ImageAttachmentRef => {
   const reference: ImageAttachmentRef = {
     attachmentId: AttachmentId(attachment.attachmentId),
     mediaType: attachment.mediaType,
