@@ -5,6 +5,7 @@ import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { aiAccountsModelFallbackApi, FALLBACK_RETURN_POLICIES, type FallbackRoute, type ModelFallbackSnapshot } from '@dshfiles/ai-accounts/model-fallback-api'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ChevronRightIcon, PlusIcon, Undo2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor, type AccountAccent } from './account-color.js'
@@ -47,7 +48,7 @@ export const FallbackList = (props: {
   readonly onAdd: () => void
   readonly onRemove: (index: number) => void
   readonly onMove: (from: number, to: number) => void
-  readonly onTogglePolicy: () => void
+  readonly onPolicyChange: (policy: ModelFallbackSnapshot['returnPolicy']) => void
   readonly onUseDefault: () => void
   readonly onReturn: () => void
 }) => {
@@ -146,16 +147,31 @@ export const FallbackList = (props: {
           {count === 0 ? null : (
             <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-model-fallback-policy>
               <span>After a fallback answers:</span>
-              <Button
-                aria-label={`After a fallback answers: ${RETURN_LABELS[props.returnPolicy]}. Change it.`}
-                className="dshx:h-7 dshx:px-1.5 dshx:text-xs dshx:font-medium dshx:pointer-coarse:h-11"
+              {/* Round 3 R15: a visible small select (with its chevron), not a word that changes when clicked. */}
+              <Select
                 disabled={props.disabled}
-                onClick={props.onTogglePolicy}
-                size="xs"
-                variant="ghost"
+                onValueChange={value => {
+                  const policy = FALLBACK_RETURN_POLICIES.find(candidate => candidate === value)
+                  if (policy !== undefined) props.onPolicyChange(policy)
+                }}
+                value={props.returnPolicy}
               >
-                {RETURN_LABELS[props.returnPolicy]}
-              </Button>
+                <SelectTrigger
+                  aria-label="After a fallback answers"
+                  className="dshx:h-7 dshx:gap-1 dshx:px-2 dshx:text-xs dshx:pointer-coarse:h-11"
+                  data-model-fallback-policy-select
+                  size="sm"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {FALLBACK_RETURN_POLICIES.map(policy => (
+                    <SelectItem key={policy} value={policy}>
+                      {RETURN_LABELS[policy]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 
@@ -180,7 +196,7 @@ export const FallbackList = (props: {
                 size="xs"
                 variant="ghost"
               >
-                Use default
+                Reset to default chain
               </Button>
             ) : null}
           </div>
@@ -221,9 +237,6 @@ export const FallbacksSection = (props: {
 
   const chain = snapshot.threadChain ?? snapshot.defaultChain
   const disabled = props.busy || pending
-  const policyIndex = FALLBACK_RETURN_POLICIES.indexOf(snapshot.returnPolicy)
-  const nextPolicy: ModelFallbackSnapshot['returnPolicy'] =
-    FALLBACK_RETURN_POLICIES[(policyIndex + 1) % FALLBACK_RETURN_POLICIES.length] ?? snapshot.returnPolicy
 
   const write = async (call: () => Promise<ModelFallbackSnapshot>): Promise<void> => {
     setPending(true)
@@ -270,7 +283,7 @@ export const FallbacksSection = (props: {
       onMove={(from, to) => save(ModelPickerModel.reorderedFallback(chain, from, to))}
       onRemove={index => save(ModelPickerModel.withoutFallback(chain, index))}
       onReturn={() => void write(() => api.returnToSelection({ sessionId: props.sessionId }))}
-      onTogglePolicy={() => void write(() => api.setReturnPolicy({ returnPolicy: nextPolicy }))}
+      onPolicyChange={returnPolicy => void write(() => api.setReturnPolicy({ returnPolicy }))}
       onUseDefault={() => void write(() => api.setChain({ sessionId: props.sessionId, chain: null }))}
       returnPolicy={snapshot.returnPolicy}
       rows={rows}

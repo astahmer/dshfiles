@@ -32,7 +32,7 @@ const render = (input: { readonly rows?: readonly FallbackRow[]; readonly expand
         onMove={noop}
         onRemove={noop}
         onReturn={noop}
-        onTogglePolicy={noop}
+        onPolicyChange={noop}
         onUseDefault={noop}
         returnPolicy="stay"
         rows={input.rows ?? rows}
@@ -64,7 +64,8 @@ describe('fallbacks collapse to one line (council picker N5)', () => {
 
   it('puts the return policy under the list and Add fallback always last', () => {
     const html = render({ expanded: true })
-    expect(text(html)).toContain('After a fallback answers:stay on it')
+    expect(text(html)).toContain('After a fallback answers:')
+    expect(html).toContain('data-model-fallback-policy-select')
     expect(html.indexOf('data-model-fallback-policy')).toBeGreaterThan(html.indexOf('</ol>'))
     expect(html.indexOf('data-model-fallback-add')).toBeGreaterThan(html.indexOf('data-model-fallback-policy'))
   })
@@ -74,5 +75,15 @@ describe('fallbacks collapse to one line (council picker N5)', () => {
     expect(text(html)).toContain('Fallbacks · none')
     expect(html).not.toContain('data-model-fallback-policy')
     expect(html).toContain('data-model-fallback-add')
+  })
+
+  it('offers the return policy as a visible small select and names the reset for what it does (round 3 R15)', () => {
+    const html = render({ expanded: true })
+    const trigger = /<button[^>]*data-model-fallback-policy-select[^>]*>.*?<\/button>/u.exec(html)?.[0] ?? ''
+    expect(trigger).toContain('role="combobox"')
+    expect(trigger).toContain('aria-label="After a fallback answers"')
+    expect(trigger).toMatch(/<svg[^>]*lucide-chevron-down/u)
+    expect(text(html)).toContain('Reset to default chain')
+    expect(text(html)).not.toContain('Use default')
   })
 })
