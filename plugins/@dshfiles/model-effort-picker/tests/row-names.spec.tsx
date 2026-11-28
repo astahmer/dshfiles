@@ -27,9 +27,9 @@ const row = (input: { readonly active?: boolean; readonly selectSeveral?: boolea
 describe('names come before labels in the list (council picker round 3, R3)', () => {
   it('labels a row with its short account tag, muted and fixed, never the service name on every row', () => {
     const html = row({})
-    const tag = /<span[^>]*data-model-row-account[^>]*>([^<]*)</u.exec(html)
+    const tag = /<span[^>]*data-model-row-account(?!-)[^>]*>([^<]*)</u.exec(html)
     expect(tag?.[1]).toBe('CC1')
-    expect(tag?.[0]).toMatch(/dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground/u)
+    expect(tag?.[0]).toMatch(/dshx:text-xs dshx:text-muted-foreground/u)
     expect(html).not.toContain('data-model-provider-label')
     // The service stays in the option's accessible name.
     expect(/<div[^>]*role="option"[^>]*>/u.exec(html)?.[0]).toContain('via Command Code')
@@ -39,10 +39,10 @@ describe('names come before labels in the list (council picker round 3, R3)', ()
     expect(/<span[^>]*data-model-picker-name[^>]*>/u.exec(row({}))?.[0]).toMatch(/dshx:min-w-0 dshx:flex-\[1_1_auto\] dshx:truncate dshx:text-sm/u)
   })
 
-  it('keeps no empty check or bolt slot on a row that shows neither', () => {
-    const plain = row({})
-    expect(plain).not.toMatch(/<span class="dshx:flex dshx:w-3\.5 dshx:shrink-0|<span class="dshx:flex dshx:w-4 dshx:shrink-0/u)
-    expect(row({ active: true, fastOn: true })).toMatch(/data-model-current-check[\s\S]*data-model-fast-on/u)
+  it('reserves the check slot on every row and puts the bolt next to the name (round 4 T7 supersedes round 3)', () => {
+    expect(row({})).toContain('data-model-row-check-slot')
+    const html = row({ active: true, fastOn: true })
+    expect(html.indexOf('data-model-fast-on')).toBeLessThan(html.indexOf('data-model-row-account-slot'))
   })
 
   it('keeps the brand mark after the checkbox in select mode', () => {

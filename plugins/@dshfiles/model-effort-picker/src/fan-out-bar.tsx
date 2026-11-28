@@ -4,6 +4,8 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/typ
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import type { AccountAccent } from './account-color.js'
+import { AccountDot } from './account-dot.js'
 import type { ModelPickerTranslate } from './locales.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { BrandMark } from './picker-atoms.js'
@@ -21,6 +23,8 @@ export const FanOutSelection = (props: {
   readonly routes: readonly ModelSelection[]
   readonly groups: readonly CatalogGroup[]
   readonly accountTagOf: (provider: string) => string
+  /** Round 4 T7: each chip's account dot before its tag. */
+  readonly accountAccentOf?: (provider: string) => AccountAccent | undefined
   readonly limit: number
   readonly t: ModelPickerTranslate
   readonly onRemove: (route: ModelSelection) => void
@@ -96,7 +100,13 @@ export const FanOutSelection = (props: {
             >
               <BrandMark brand={model === undefined ? undefined : ModelPickerModel.brandFor({ model })} className="dshx:size-4" name={name} />
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{name}</span>
-              <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{props.accountTagOf(route.provider)}</span>
+              <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
+                {(() => {
+                  const accent = props.accountAccentOf?.(route.provider)
+                  return accent === undefined ? null : <AccountDot accent={accent} className="dshx:size-1.5" />
+                })()}
+                {props.accountTagOf(route.provider)}
+              </span>
               <Button
                 aria-label={props.t('remove', { model: name })}
                 className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:size-11"

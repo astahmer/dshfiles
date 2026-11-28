@@ -3,6 +3,8 @@ import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selec
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { CheckIcon, ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
+import type { AccountAccent } from './account-color.js'
+import { AccountDot } from './account-dot.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { BrandMark, QuotaText, TruncatedTooltip } from './picker-atoms.js'
 
@@ -36,6 +38,8 @@ export const ModelRow = (props: {
   readonly providerLabel: string | undefined
   /** Round 3 R3: the row's account as its short tag ("CC1"), muted, instead of the service name on every row. */
   readonly accountTag?: string | undefined
+  /** Round 4 T7: the account's dot before its tag, as on the trigger and in the fallbacks. */
+  readonly accountAccent?: AccountAccent | undefined
   readonly current: ModelSelection | null
   readonly fanOutSelected: boolean
   readonly onSelect: (selection: ModelSelection) => void
@@ -144,10 +148,20 @@ export const ModelRow = (props: {
               {shownName}
             </span>
           </TruncatedTooltip>
+          {/* Round 4 T7: the bolt sits next to the name, so it never moves the trailing columns. */}
+          {props.fastOn === true ? (
+            <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground dshx:shrink-0 dshx:self-center" data-model-fast-on role="img" />
+          ) : null}
+        </span>
+        {/* Round 4 T7: fixed trailing columns (account, quota, check), so they line up on every row. */}
+        <span className="dshx:flex dshx:w-12 dshx:shrink-0 dshx:items-center dshx:gap-1" data-model-row-account-slot>
           {props.accountTag === undefined ? null : (
-            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" data-model-row-account>
-              {props.accountTag}
-            </span>
+            <>
+              {props.accountAccent === undefined ? null : <AccountDot accent={props.accountAccent} className="dshx:size-1.5" />}
+              <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" data-model-row-account>
+                {props.accountTag}
+              </span>
+            </>
           )}
         </span>
         {/* b:16yr: one row per model, so no account badge or per-row effort glyph: the account and the reasoning effort are
@@ -162,11 +176,9 @@ export const ModelRow = (props: {
             </>
           )}
         </span>
-        {/* Round 3 R3: the check and the bolt take room only on the rows that show them. */}
-        {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground dshx:shrink-0" data-model-current-check /> : null}
-        {props.fastOn === true ? (
-          <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground dshx:shrink-0" data-model-fast-on role="img" />
-        ) : null}
+        <span className="dshx:flex dshx:w-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center" data-model-row-check-slot>
+          {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground dshx:shrink-0" data-model-current-check /> : null}
+        </span>
       </div>
       {selectMode ? null : (
         <button

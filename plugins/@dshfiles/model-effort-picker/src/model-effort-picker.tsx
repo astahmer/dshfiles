@@ -286,17 +286,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               size="sm"
               variant="ghost"
             >
-              {busy ? (
-                <LoaderCircleIcon aria-hidden="true" className="dshx:size-4 dshx:animate-spin dshx:text-muted-foreground" />
-              ) : current === null ? null : (
-                <FastModeIndicator
-                  enabledOverride={fastModeOverride?.routeKey === currentFastModeRouteKey ? fastModeOverride.enabled : undefined}
-                  model={current.model}
-                  onKnown={enabled => rememberFast(current, enabled)}
-                  provider={current.provider}
-                  sessionId={sessionId}
-                />
-              )}
               {/* A bar too narrow for even the name (the composer row's data-model-icon, b:gyk7) shows the model as an icon;
                   its name stays in the tooltip and the accessible name. */}
               <Tooltip>
@@ -378,6 +367,18 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   </>
                 )}
               </span>
+              {/* Round 4 T7: the trigger reads mark, account, name, then the Fast bolt (or the busy spinner). */}
+              {busy ? (
+                <LoaderCircleIcon aria-hidden="true" className="dshx:size-4 dshx:animate-spin dshx:text-muted-foreground" />
+              ) : current === null ? null : (
+                <FastModeIndicator
+                  enabledOverride={fastModeOverride?.routeKey === currentFastModeRouteKey ? fastModeOverride.enabled : undefined}
+                  model={current.model}
+                  onKnown={enabled => rememberFast(current, enabled)}
+                  provider={current.provider}
+                  sessionId={sessionId}
+                />
+              )}
               <ChevronDownIcon
                 aria-hidden="true"
                 className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground dshx:opacity-60 dshx:in-data-model-icon:hidden"
@@ -548,6 +549,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         onInspect={() => showDetails({ model: model.id, provider: group.id })}
                         onSelect={choose}
                         providerLabel={providerLabels.get(group.id)}
+                        accountAccent={accountAccentMap.get(group.id)}
                         accountTag={accountBadges.get(group.id) ?? ModelPickerModel.accountTag({ name: group.name })}
                         fastOn={knownFast.get(fastModeRouteKey({ sessionId: '', provider: group.id, model: model.id })) === true}
                         quota={quotas.get(group.id)}
@@ -576,6 +578,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 )}
                 {several ? (
                   <FanOutSelection
+                    accountAccentOf={provider => accountAccentMap.get(provider)}
                     accountTagOf={fanOutTagOf}
                     className="dshx:hidden dshx:@max-pane-compact:flex"
                     groups={state.groups}
@@ -617,6 +620,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               >
                 {several ? (
                   <FanOutSelection
+                    accountAccentOf={provider => accountAccentMap.get(provider)}
                     accountTagOf={fanOutTagOf}
                     groups={state.groups}
                     limit={ModelPickerModel.fanOutLimit}
