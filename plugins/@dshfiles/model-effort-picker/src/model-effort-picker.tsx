@@ -418,6 +418,14 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
               >
+                {/* Round 3 R16: on a phone the list has the same 48 pt header as details (the title here; Close is the
+                    picker's one Close at the top right). There is nothing to go back to from the list, so no Back. */}
+                <header
+                  className="dshx:hidden dshx:min-h-12 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex"
+                  data-model-picker-list-header
+                >
+                  <h2 className="dshx:text-heading dshx:font-semibold">Choose a model</h2>
+                </header>
                 <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
                   <SearchInput
                     aria-activedescendant={activeIndex < 0 ? undefined : `${listboxId}-${String(activeIndex)}`}
