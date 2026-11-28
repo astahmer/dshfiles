@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
-import { useApiQuery, useResource, useSettings } from '@dshfiles/dshx/client'
+import { useApi, useApiQuery, useResource, useSettings } from '@dshfiles/dshx/client'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
 import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
@@ -14,6 +14,8 @@ import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, SearchI
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountColor } from './account-color.js'
+import { FallbacksSection } from './fallbacks-section.js'
+import { FastModeSection } from './fast-mode-section.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
 import { ModelPickerModel } from './model-picker-model.js'
 import { ModelRow } from './model-row.js'
@@ -188,6 +190,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     return () => cancelAnimationFrame(frame)
   }, [open, query, rows.length, selectedGroup?.id, selectedModel?.id])
 
+  const fastApi = useApi(aiAccountsFastModeApi)
+
   const submitSelection = async (selection: ModelSelection): Promise<void> => {
     setSelectionError(null)
     try {
@@ -201,6 +205,19 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const choose = (selection: ModelSelection): void => {
     setInspected({ model: selection.model, provider: selection.provider })
     void submitSelection(selection)
+  }
+
+  /** S1: "Use ‹model›" commits a draft, then the Fast mode it staged (a per-thread route setting). */
+  const useDraft = async (selection: ModelSelection, fast: boolean | undefined): Promise<void> => {
+    setInspected({ model: selection.model, provider: selection.provider })
+    await submitSelection(selection)
+    if (fast === undefined) return
+    try {
+      const updated = await fastApi.setFast({ sessionId, provider: selection.provider, model: selection.model, enabled: fast })
+      setFastModeOverride({ enabled: updated.enabled, routeKey: fastModeRouteKey({ sessionId, provider: selection.provider, model: selection.model }) })
+    } catch (error) {
+      setSelectionError(selectionFailureNotice(error instanceof Error ? error.message : String(error)))
+    }
   }
 
   /** Shift-click collects routes for one fan-out request instead of switching this thread's model. */
@@ -485,32 +502,50 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   aria-hidden="true"
                   className="dshx:absolute dshx:-left-1 dshx:top-7 dshx:size-2 dshx:rotate-45 dshx:rounded-xs dshx:border-b dshx:border-l dshx:border-border dshx:bg-popover"
                 />
-                <div className="dshx:min-h-0 dshx:overflow-y-auto">
+                <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
                   <ModelDetails
                     accountAccents={accountAccents}
                     busy={busy}
                     current={current}
                     error={selectionError ?? state.error}
+                    fallbacks={
+                      <FallbacksSection
+                        accountAccents={accountAccents}
+                        busy={busy}
+                        current={current}
+                        groups={state.groups}
+                        providerLabels={providerLabels}
+                        sessionId={sessionId}
+                      />
+                    }
+                    fast={({ provider, model, draft }) => (
+                      <FastModeSection
+                        disabled={busy}
+                        draft={draft}
+                        key={`${sessionId}:${provider}:${model}`}
+                        model={model}
+                        onEnabledChange={enabled =>
+                          setFastModeOverride({ enabled, routeKey: fastModeRouteKey({ model, provider, sessionId }) })
+                        }
+                        provider={provider}
+                        sessionId={sessionId}
+                      />
+                    )}
                     groups={state.groups}
                     inspected={inspectedRoute}
                     onBack={() => {
+                      // A draft's Back discards it; on a narrow screen Back also returns to the list.
+                      setInspected(null)
                       setNarrowDetails(false)
                       requestAnimationFrame(() => searchInputRef.current?.focus())
                     }}
                     onClose={() => setOpen(false)}
-                    onFastModeChange={enabled =>
-                      setFastModeOverride(
-                        inspectedRoute === null
-                          ? null
-                          : { enabled, routeKey: fastModeRouteKey({ model: inspectedRoute.model, provider: inspectedRoute.provider, sessionId }) },
-                      )
-                    }
                     onInspect={setInspected}
                     onRetry={load}
                     onSelect={choose}
+                    onUse={(selection, fast) => void useDraft(selection, fast)}
                     providerLabels={providerLabels}
                     quotas={quotas}
-                    sessionId={sessionId}
                   />
                 </div>
               </div>

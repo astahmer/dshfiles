@@ -35,6 +35,17 @@ const brandOfToken = (token: string): BrandKey | undefined => {
   return BRAND_TOKENS.find(entry => entry.tokens.some(candidate => token === candidate || token.startsWith(candidate)))?.brand
 }
 
+/** A route the details pane shows: the model, and the account it would run on. */
+export interface InspectedRoute {
+  readonly provider: string
+  readonly model: string
+}
+
+/** What the details pane does with a change: stage it on a draft, or apply it to the thread at once. */
+export type DetailsChange =
+  | { readonly kind: 'stage' }
+  | { readonly kind: 'apply'; readonly selection: ModelSelection }
+
 /** A fallback rung named for display: catalog names when the catalog still lists the route, its ids otherwise. */
 interface FallbackLabel {
   readonly provider: string
@@ -43,6 +54,40 @@ interface FallbackLabel {
 }
 
 export class ModelPickerModel {
+  /**
+   * Council picker round 1, S1: details of a model the thread does not use are a draft. Inspecting, choosing its account,
+   * effort or Fast mode never moves the thread; only "Use ‹model›" does. The thread's own model (on any of its accounts)
+   * applies in place.
+   */
+  static isDraft = (input: { readonly inspected: InspectedRoute | null; readonly current: ModelSelection | null }): boolean =>
+    input.inspected !== null && input.current?.model !== input.inspected.model
+
+  /** A change in the details pane: staged on a draft, applied to the thread on its own model. */
+  static detailsChange = (input: {
+    readonly inspected: InspectedRoute
+    readonly current: ModelSelection | null
+    readonly change: { readonly provider: string } | { readonly reasoningEffort: string | undefined }
+  }): DetailsChange => {
+    if (ModelPickerModel.isDraft(input)) return { kind: 'stage' }
+    const base = { provider: input.inspected.provider, model: input.inspected.model }
+    if ('provider' in input.change) {
+      const effort = input.current?.reasoningEffort
+      return { kind: 'apply', selection: { ...base, provider: input.change.provider, ...(effort !== undefined && { reasoningEffort: effort }) } }
+    }
+    const effort = input.change.reasoningEffort
+    return { kind: 'apply', selection: { ...base, ...(effort !== undefined && { reasoningEffort: effort }) } }
+  }
+
+  /** The selection "Use ‹model›" commits: the staged account and effort, else the model's own default effort. */
+  static draftSelection = (input: {
+    readonly inspected: InspectedRoute
+    readonly model: CatalogModel
+    readonly stagedEffort: { readonly value: string | undefined } | null
+  }): ModelSelection => {
+    const effort = input.stagedEffort === null ? input.model.reasoning?.defaultEffort : input.stagedEffort.value
+    return { provider: input.inspected.provider, model: input.inspected.model, ...(effort !== undefined && { reasoningEffort: effort }) }
+  }
+
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return groups

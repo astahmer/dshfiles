@@ -13,10 +13,12 @@ type Props = {
   readonly model: string
   readonly disabled: boolean
   readonly onEnabledChange: (enabled: boolean) => void
+  /** On a draft (S1) the switch stages its value; "Use ‹model›" applies it. */
+  readonly draft?: { readonly value: boolean | undefined; readonly onChange: (enabled: boolean) => void } | null
 }
 
 /** Fast mode for the inspected route: the same switch the composer shows, next to the model it applies to. */
-export const FastModeSection = ({ sessionId, provider, model, disabled, onEnabledChange }: Props) => {
+export const FastModeSection = ({ sessionId, provider, model, disabled, onEnabledChange, draft = null }: Props) => {
   const input = { sessionId, provider, model }
   const api = useApi(aiAccountsFastModeApi)
   const state = useApiQuery(aiAccountsFastModeApi, 'status', { input })
@@ -27,6 +29,10 @@ export const FastModeSection = ({ sessionId, provider, model, disabled, onEnable
   if (!status.available) return null
 
   const update = async (enabled: boolean): Promise<void> => {
+    if (draft !== null) {
+      draft.onChange(enabled)
+      return
+    }
     setPending(true)
     setError(null)
     try {
@@ -40,22 +46,23 @@ export const FastModeSection = ({ sessionId, provider, model, disabled, onEnable
     }
   }
 
+  const enabled = draft?.value ?? status.enabled
   return (
     <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1" data-model-fast-mode>
-      <ZapIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0', status.enabled ? 'dshx:text-warning' : 'dshx:text-muted-foreground')} />
+      <ZapIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0', enabled ? 'dshx:text-warning' : 'dshx:text-muted-foreground')} />
       <Tooltip>
         <TooltipTrigger asChild>
           <Switch
             aria-label="Fast mode; may cost more"
-            checked={status.enabled}
+            checked={enabled}
             className="dshx:data-[size=sm]:h-3.5 dshx:data-[size=sm]:w-6 dshx:data-[state=unchecked]:bg-muted-foreground/35"
             data-model-fast-mode-toggle
-            disabled={disabled || pending}
+            disabled={(disabled && draft === null) || pending}
             onCheckedChange={(enabled: boolean) => void update(enabled)}
             size="sm"
           />
         </TooltipTrigger>
-        <TooltipContent side="top">Fast mode {status.enabled ? 'on' : 'off'}; may cost more</TooltipContent>
+        <TooltipContent side="top">Fast mode {enabled ? 'on' : 'off'}; may cost more</TooltipContent>
       </Tooltip>
       {error === null ? null : (
         <Tooltip>
