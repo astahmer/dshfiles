@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { FanOutChosen, accountTagOf, fanOutSendState } from './fan-out-dialog-parts.js'
+import { FanOutChosen, accountTagOf, fanOutModelName, fanOutSendState } from './fan-out-dialog-parts.js'
 
 const text = (html: string): string => html.replace(/<!-- -->/gu, '').replace(/<[^>]+>/gu, '')
 
@@ -32,6 +32,12 @@ describe('fan-out dialog (council picker round 1, N7)', () => {
     expect(fanOutSendState({ count: 2, prompt: '  ', pending: false })).toEqual({ count: 2, disabled: true, reason: 'needs-prompt' })
     expect(fanOutSendState({ count: 2, prompt: 'Compare', pending: false })).toEqual({ count: 2, disabled: false, reason: null })
     expect(accountTagOf('Command Code 2')).toBe('CC2')
+  })
+
+  it('names catalog rows the way the chips and the picker do', () => {
+    expect(fanOutModelName('codex_work_1', 'gpt-6-luna', 'GPT-6 Luna')).toBe('gpt-6-luna')
+    expect(fanOutModelName('cc1', 'google/gemini-3.8-flash', 'Gemini 3.8 Flash')).toBe('gemini-3.8-flash')
+    expect(readFileSync(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')).toContain('{fanOutModelName(group.id, model.id, model.name)}')
   })
 
   it('labels the prompt, puts the chips before it, and opens as a bottom sheet on the phone', () => {

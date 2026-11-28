@@ -61,3 +61,6 @@ export const accountTagOf = (name: string): string =>
     .join('')
     .slice(0, 3)
     .toUpperCase() || name
+
+/** One naming (council picker N1): the kit's display name for a route, the catalog name only when the kit has none. */
+export const fanOutModelName = (provider: string, model: string, catalogName: string): string => modelIdentity(provider, model)?.name ?? catalogName

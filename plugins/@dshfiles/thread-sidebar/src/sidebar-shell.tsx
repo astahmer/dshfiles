@@ -86,7 +86,7 @@ import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory,
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
 import { usePaletteActions } from './palette-registration.js'
-import { FanOutChosen, accountTagOf, fanOutSendState } from './fan-out-dialog-parts.js'
+import { FanOutChosen, accountTagOf, fanOutModelName, fanOutSendState } from './fan-out-dialog-parts.js'
 import { FAN_OUT_REQUEST_EVENT, fanOutRoutesOf } from './fan-out-request.js'
 import { registerWorkbenchPaletteActions } from './workbench-palette.js'
 import { threadActionsApi } from './thread-actions-api.js'
@@ -2080,8 +2080,8 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                         disabled={!checked && fanOutModels.length >= 6}
                         onCheckedChange={() => toggleFanOutModel(group.id, model.id, model.reasoning?.defaultEffort)}
                       />
-                      {/* b:ysaj: the model's name, not its account-prefixed route (the picker's displayName rule). */}
-                      <span>{model.name.startsWith(`${group.id}/`) ? model.name.slice(group.id.length + 1) : model.name}</span>
+                      {/* b:ysaj, council picker N1: the kit's display name, as the chips above and the picker name it. */}
+                      <span>{fanOutModelName(group.id, model.id, model.name)}</span>
                     </label>
                   )
                 })}
