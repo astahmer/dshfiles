@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /><title>Editor 137 synthetic fixture</title
+  ><style>
+    body {
+      margin: 12px;
+      font-family: sans-serif;
+    }
+    button {
+      min-height: 44px;
+    }
+    #container {
+      height: 600px;
+      max-height: 75vh;
+    }
+  </style>
+  <body>
+    <button id="first">sample.ts</button> <button id="second" disabled>second.ts</button> <button id="reveal" disabled>Line 40</button>
+    <button id="save" disabled>Save</button>
+    <div id="container"></div>
+    <script type="importmap">
+      { "imports": { "modern-monaco/editor-core": "/modern/editor-core.mjs", "modern-monaco/lsp": "/modern/lsp/index.mjs" } }
+    </script>
+    <script type="module" src="/bench.mjs"></script>
+  </body>
+</html>
