@@ -67,7 +67,7 @@ export const FallbackList = (props: {
         <button
           aria-controls={listId}
           aria-expanded={props.expanded}
-          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-xs dshx:font-medium dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11"
+          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:px-0 dshx:text-left dshx:text-xs dshx:font-medium dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11"
           data-model-fallbacks-toggle
           onClick={() => props.onExpandedChange(!props.expanded)}
           type="button"
@@ -144,7 +144,7 @@ export const FallbackList = (props: {
           )}
 
           {count === 0 ? null : (
-            <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:px-2 dshx:text-xs dshx:text-muted-foreground" data-model-fallback-policy>
+            <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground" data-model-fallback-policy>
               <span>After a fallback answers:</span>
               <Button
                 aria-label={`After a fallback answers: ${RETURN_LABELS[props.returnPolicy]}. Change it.`}

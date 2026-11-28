@@ -89,7 +89,7 @@ export const ModelDetails = (props: {
       className="dshx:flex dshx:min-h-0 dshx:w-full dshx:min-w-0 dshx:flex-1 dshx:flex-col"
       data-model-details-draft={draft || undefined}
     >
-      <header className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:@max-pane-compact:min-h-12 dshx:@max-pane-compact:items-center">
+      <header className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:@max-pane-compact:min-h-12" data-model-details-header>
         <button
           aria-label={draft ? 'Back to the model in use' : 'Back to models'}
           className={cn(
@@ -106,9 +106,10 @@ export const ModelDetails = (props: {
           <p className="dshx:flex-1 dshx:text-sm dshx:font-medium dshx:text-muted-foreground">Pick a model</p>
         ) : (
           <>
-            <BrandMark brand={ModelPickerModel.brandFor({ model })} className="dshx:size-[18px]" name={name} />
+            <BrandMark brand={ModelPickerModel.brandFor({ model })} className="dshx:size-[18px] dshx:pointer-coarse:mt-[13px]" name={name} />
             {/* N1: the model on its own line (15 px (text-heading) / 600, up to two lines), the service and account below it. */}
-            <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5">
+            {/* Round 3 R13: on touch the title first line centres on the 44 pt Back and Close boxes beside it. */}
+            <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5 dshx:pointer-coarse:pt-3">
               <h2 className="dshx:line-clamp-2 dshx:text-heading dshx:leading-tight dshx:font-semibold dshx:break-words" data-model-picker-current>
                 {name}
               </h2>

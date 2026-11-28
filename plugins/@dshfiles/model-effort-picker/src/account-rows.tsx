@@ -41,7 +41,7 @@ export const AccountRows = (props: {
 
   return (
     <section aria-labelledby={headingId} className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-accounts>
-      <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:px-2">
+      <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:pr-7.5" data-model-accounts-heading>
         <h3 className="dshx:text-xs dshx:font-medium" id={headingId}>
           Account
         </h3>
