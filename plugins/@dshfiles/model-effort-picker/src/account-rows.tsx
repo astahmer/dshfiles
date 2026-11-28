@@ -42,7 +42,7 @@ export const AccountRows = (props: {
 
   return (
     <section aria-labelledby={headingId} className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-accounts>
-      <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:pr-7.5" data-model-accounts-heading>
+      <div className="dshx:flex dshx:items-baseline dshx:justify-between dshx:gap-2 dshx:pr-7.5 dshx:pointer-fine:pr-7.25" data-model-accounts-heading>
         <h3 className="dshx:text-xs dshx:font-medium" id={headingId}>
           Account
         </h3>
@@ -68,7 +68,8 @@ export const AccountRows = (props: {
                   quotaShown: heading !== undefined,
                 })}
                 className={cn(
-                  'dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-xs dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
+                  // Round 6 V11: 7 px on the right with a mouse, so the check centres on Close's glyph line.
+                  'dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:pointer-fine:pr-1.75 dshx:text-left dshx:text-xs dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
                   // Round 3 R14, round 5 U4: hover is a light wash; the chosen account is its 1 px edge, check and 600 weight, no wash,
                   // so it never reads as the list's keyboard row.
                   checked && 'dshx:font-selected dshx:selected-edge',
@@ -118,7 +119,7 @@ export const AccountRows = (props: {
 const SingleAccount = (props: { readonly account: Account; readonly accent: AccountAccent | undefined; readonly quota: ModelQuota | undefined }) => {
   const percent = props.quota === undefined ? undefined : Math.round(props.quota.percent)
   return (
-    <div className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:text-xs dshx:pointer-coarse:h-11" data-model-account-single>
+    <div className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:px-2 dshx:pointer-fine:pr-1.75 dshx:text-xs dshx:pointer-coarse:h-11" data-model-account-single>
       <AccountDot accent={props.accent ?? AccountColor.of({ instanceId: props.account.id })} className="dshx:size-2" />
       <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{props.account.name}</span>
       {/* Round 5 U9: the value in the rows' 48 px right-aligned column and the check slot after it, so it ends under

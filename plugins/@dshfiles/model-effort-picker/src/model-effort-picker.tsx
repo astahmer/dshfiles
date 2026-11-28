@@ -785,7 +785,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   catalogEmpty
                     ? 'dshx:top-3 dshx:pointer-coarse:top-0 dshx:pointer-coarse:right-0'
                     : 'dshx:top-2.5 dshx:@max-pane-compact:top-0 dshx:@max-pane-compact:right-0',
-                  'dshx:absolute dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11',
+                  // Round 6 V11: on desktop Close's glyph shares one line with the account check, the fallback Actions and
+                  // the Fallbacks chevron.
+                  'dshx:absolute dshx:right-3.25 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11',
                 )}
                 data-model-picker-close
                 onClick={() => setOpen(false)}

@@ -129,7 +129,7 @@ export const FallbackList = (props: {
             carries the state for assistive tech and the keyboard. */}
         <span
           aria-hidden="true"
-          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-end dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:pr-1.5"
+          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-end dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pr-1.75 dshx:pointer-coarse:pr-1.5"
           data-model-fallbacks-chevron
           onClick={toggle}
         >
@@ -190,7 +190,8 @@ export const FallbackList = (props: {
                   </span>
                   <span
                     className={cn(
-                      'dshx:w-9 dshx:shrink-0 dshx:text-right dshx:tabular-nums',
+                      // Round 6 V11: with a mouse the quota ends where the account quotas end, 7 px past the gap.
+                      'dshx:w-9 dshx:shrink-0 dshx:text-right dshx:tabular-nums dshx:pointer-fine:-mr-1.75',
                       row.quota === undefined ? 'dshx:text-muted-foreground' : quotaTone(row.quota.percent),
                     )}
                     data-model-fallback-quota
