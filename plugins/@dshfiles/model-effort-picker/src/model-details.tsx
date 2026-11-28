@@ -149,7 +149,13 @@ export const ModelDetails = (props: {
           <p className="dshx:flex-1 dshx:text-sm dshx:font-medium dshx:text-muted-foreground">Pick a model</p>
         ) : (
           <>
-            <BrandMark brand={ModelPickerModel.brandFor({ model })} className="dshx:size-[18px] dshx:pointer-coarse:mt-[13px]" name={name} />
+            {/* Round 6 V5: on the phone the mark sits 16 px into Back's 44 pt box (taps pass through it to Back), so it
+                follows the arrow 11 px later instead of after the whole box. */}
+            <BrandMark
+              brand={ModelPickerModel.brandFor({ model })}
+              className="dshx:pointer-events-none dshx:size-[18px] dshx:pointer-coarse:mt-[13px] dshx:pointer-coarse:@max-pane-compact:-ml-4"
+              name={name}
+            />
             {/* N1: the model on its own line (15 px (text-heading) / 600, up to two lines), the service and account below it. */}
             {/* Round 3 R13: on touch the title first line centres on the 44 pt Back and Close boxes beside it. */}
             <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5 dshx:pointer-coarse:pt-[13.5px]">
