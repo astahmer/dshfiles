@@ -508,7 +508,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   <div
                     aria-label="Models and accounts"
                     aria-multiselectable={several || undefined}
-                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1"
+                    // On touch the rows end clear of the list's 10 px overlay scrollbar, which took the last 4 px of each
+                    // row's 44 pt details chevron (round 3 touch probe).
+                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1 dshx:pointer-coarse:pr-3"
                     id={listboxId}
                     ref={attachModelList}
                     role="listbox"

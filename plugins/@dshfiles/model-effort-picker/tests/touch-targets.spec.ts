@@ -36,4 +36,11 @@ describe('every touch target is 44 pt (council picker C6)', () => {
     // The row is the only target: the switch keeps no 34 px hit area of its own beside it, its clicks stay single.
     expect(fast).toContain('event.target.closest(\'[role="switch"]\') !== null')
   })
+
+  it("keeps the rows' details chevrons clear of the list's overlay scrollbar on touch", () => {
+    const picker = sources.find(source => source.name === 'model-effort-picker.tsx')?.text ?? ''
+    const listbox = picker.slice(picker.lastIndexOf('<div', picker.indexOf('aria-label="Models and accounts"')), picker.indexOf('role="listbox"'))
+    // The kit scrollbar is 10 px wide (w-2.5): 12 px of padding keeps the 44 pt chevron whole.
+    expect(listbox).toMatch(/dshx:pointer-coarse:pr-3/u)
+  })
 })
