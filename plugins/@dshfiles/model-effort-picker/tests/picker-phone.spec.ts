@@ -54,6 +54,12 @@ describe('phone picker is one sheet, list then details in place (council picker 
     expect(header).toMatch(/dshx:hidden dshx:min-h-11[^"]*dshx:@max-pane-compact:flex/u)
     expect(header).toMatch(/dshx:pr-12/u)
     expect(picker.indexOf('data-model-picker-list-header')).toBeLessThan(picker.indexOf('<SearchInput'))
-    expect(picker).toMatch(/data-model-picker-list-header\s*>\s*<h2[^>]*>\{several \? t\('selectModels'\) : 'Choose a model'\}<\/h2>/u)
+    expect(picker).toMatch(/data-model-picker-list-header\s*>\s*<h2[^>]*>\s*\{several \? t\('selectModels'\) : 'Choose a model'\}\s*<\/h2>/u)
+  })
+
+  it('lands focus on the sheet title on touch, never behind the sheet, and keeps the keyboard down (round 4 T14)', () => {
+    expect(picker).toMatch(/if \(window\.matchMedia\('\(pointer: coarse\)'\)\.matches\) focusSheetTitle\(event\.currentTarget\)/u)
+    expect(picker).toMatch(/<h2[^>]*ref=\{listTitleRef\}\s+tabIndex=\{-1\}\s*>/u)
+    expect(picker).toMatch(/title\.focus\(\{ preventScroll: true \}\)[\s\S]{0,120}content\.focus\(\{ preventScroll: true \}\)/u)
   })
 })

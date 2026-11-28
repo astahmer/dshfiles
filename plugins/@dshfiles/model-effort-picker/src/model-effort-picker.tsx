@@ -96,6 +96,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   }, [])
   const detailsRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
+  const listTitleRef = useRef<HTMLHeadingElement>(null)
   const state = useSyncExternalStore(
     onStoreChange => directory.subscribe(onStoreChange),
     () => directory.getSnapshot(),
@@ -261,7 +262,19 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const backToList = (): void => {
     setInspected(null)
     setNarrowDetails(false)
-    requestAnimationFrame(() => searchInputRef.current?.focus())
+    // On touch, the list's title rather than the search, which would raise the keyboard (round 4 T14).
+    requestAnimationFrame(() =>
+      window.matchMedia('(pointer: coarse)').matches
+        ? focusSheetTitle(listTitleRef.current?.closest('[data-slot="popover-content"]') ?? null)
+        : searchInputRef.current?.focus(),
+    )
+  }
+
+  /** The sheet's title when it shows (the phone list header), else the picker itself: never something behind the sheet. */
+  const focusSheetTitle = (content: EventTarget | null): void => {
+    const title = listTitleRef.current
+    if (title !== null && title.offsetParent !== null) title.focus({ preventScroll: true })
+    else if (content instanceof HTMLElement) content.focus({ preventScroll: true })
   }
 
   const useRow = (index: number, collect: boolean): void => {
@@ -403,10 +416,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             // (a layered utility) outranks the kit phone sheet's overflow-y: auto !important.
             onOpenAutoFocus={event => {
               event.preventDefault()
-              // On a touch screen a focused search raises the on-screen keyboard over the sheet: nothing takes focus, and the
-              // search keyboard comes up only when the user taps the field.
-              if (window.matchMedia('(pointer: coarse)').matches) return
-              searchInputRef.current?.focus()
+              // On a touch screen a focused search raises the on-screen keyboard over the sheet, so focus lands on the
+              // sheet's title (round 4 T14; before, it stayed on the trigger behind the sheet); the keyboard comes up only
+              // when the user taps the field.
+              if (window.matchMedia('(pointer: coarse)').matches) focusSheetTitle(event.currentTarget)
+              else searchInputRef.current?.focus()
             }}
             onEscapeKeyDown={(event: KeyboardEvent) => {
               // Escape walks back one level (C5): details → the list, then the list → the trigger (Radix closes).
@@ -438,7 +452,13 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   className="dshx:hidden dshx:min-h-11 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex"
                   data-model-picker-list-header
                 >
-                  <h2 className="dshx:text-heading dshx:font-semibold">{several ? t('selectModels') : 'Choose a model'}</h2>
+                  <h2
+                    className="dshx:text-heading dshx:font-semibold dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+                    ref={listTitleRef}
+                    tabIndex={-1}
+                  >
+                    {several ? t('selectModels') : 'Choose a model'}
+                  </h2>
                 </header>
                 <div
                   className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1', catalogEmpty && 'dshx:pr-8 dshx:@max-pane-compact:pr-0')}
