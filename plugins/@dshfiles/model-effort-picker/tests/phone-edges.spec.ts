@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const source = (name: string): string => readFileSync(new URL(`../src/${name}`, import.meta.url), 'utf8')
 const tagOf = (text: string, marker: string): string => {
-  const at = text.indexOf(marker)
+  // The attribute line, not a selector naming it.
+  const at = text.search(new RegExp(`\\n\\s+${marker}[\\s>=]`, 'u'))
   return text.slice(text.lastIndexOf('<', at), text.indexOf('>\n', at))
 }
 

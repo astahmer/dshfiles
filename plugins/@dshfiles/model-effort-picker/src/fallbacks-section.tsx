@@ -57,6 +57,24 @@ export const FallbackList = (props: {
   const summary = count === 0 ? 'none' : count === 1 ? '1 route' : `${String(count)} routes`
   // Round 5 U5: a move from the keyboard or the actions menu says where the route went.
   const [moved, setMoved] = useState('')
+  // Round 6 V7: a removed route's Actions button is gone, so focus moves to the route now at its rank (or the one above,
+  // or Add fallback when none is left) once the chain updates, and the removal is announced.
+  const focusAfterRemove = useRef<number | null>(null)
+  const removeAt = (index: number): void => {
+    const row = props.rows[index]
+    focusAfterRemove.current = index
+    if (row !== undefined) setMoved(`${row.model} on ${row.account} removed`)
+    props.onRemove(index)
+  }
+  useEffect(() => {
+    const index = focusAfterRemove.current
+    const element = section.current
+    if (index === null || element === null) return
+    focusAfterRemove.current = null
+    const remaining = [...element.querySelectorAll<HTMLElement>('[data-model-fallback-actions]')]
+    const target = remaining[FallbackFocus.afterRemove({ index, count: remaining.length })] ?? element.querySelector<HTMLElement>('[data-model-fallback-add]')
+    target?.focus()
+  }, [props.rows.length])
   const moveTo = (from: number, to: number): void => {
     const row = props.rows[from]
     props.onMove(from, to)
@@ -188,10 +206,16 @@ export const FallbackList = (props: {
                         <EllipsisIcon aria-hidden="true" className="dshx:size-3.5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent
+                      align="end"
+                      // The trigger leaves with its route on Remove; the effect above places focus instead.
+                      onCloseAutoFocus={event => {
+                        if (focusAfterRemove.current !== null) event.preventDefault()
+                      }}
+                    >
                       {index === 0 ? null : <DropdownMenuItem onSelect={() => moveTo(index, index - 1)}>Move up</DropdownMenuItem>}
                       {index === count - 1 ? null : <DropdownMenuItem onSelect={() => moveTo(index, index + 1)}>Move down</DropdownMenuItem>}
-                      <DropdownMenuItem onSelect={() => props.onRemove(index)} variant="destructive">
+                      <DropdownMenuItem onSelect={() => removeAt(index)} variant="destructive">
                         Remove
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -271,6 +295,13 @@ export const FallbackList = (props: {
  * The ordered routes the Host walks when this thread's model request fails under Priority distribution. The Host
  * owns the chain (AI Accounts runs the fail-over), so every edit is a Host write and the list renders what it stored.
  */
+/** Which route's Actions button takes focus after a removal (round 6 V7): the one now at its rank, else the last. */
+export class FallbackFocus {
+  static afterRemove(input: { readonly index: number; readonly count: number }): number {
+    return input.count === 0 ? -1 : Math.min(input.index, input.count - 1)
+  }
+}
+
 /** Where to scroll the details body so what opening Fallbacks revealed shows (round 6 V2): the nearest position. */
 export class FallbackReveal {
   static scrollTop(input: { readonly body: { readonly bottom: number }; readonly scrollTop: number; readonly target: { readonly bottom: number } }): number {

@@ -3,7 +3,8 @@ import { describe, expect, it } from 'vitest'
 
 const source = readFileSync(new URL('../src/fallbacks-section.tsx', import.meta.url), 'utf8')
 const tagOf = (marker: string): string => {
-  const at = source.indexOf(marker)
+  // The attribute line, not a selector naming it.
+  const at = source.search(new RegExp(`\\n\\s+${marker}[\\s>=]`, 'u'))
   return source.slice(source.lastIndexOf('<', at), source.indexOf('>\n', at))
 }
 
@@ -20,7 +21,7 @@ describe('fallback order is editable by touch (council picker round 5, U5)', () 
     expect(source).toMatch(
       /\{index === count - 1 \? null : <DropdownMenuItem onSelect=\{\(\) => moveTo\(index, index \+ 1\)\}>Move down<\/DropdownMenuItem>\}/u,
     )
-    expect(source).toMatch(/onSelect=\{\(\) => props\.onRemove\(index\)\}[^>]*>\s*Remove/u)
+    expect(source).toMatch(/onSelect=\{\(\) => removeAt\(index\)\}[^>]*>\s*Remove/u)
   })
 
   it('announces the new rank for the menu and Alt+Arrow alike, and keeps the account in a fixed slot', () => {
