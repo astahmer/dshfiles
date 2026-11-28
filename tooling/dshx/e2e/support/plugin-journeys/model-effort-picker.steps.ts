@@ -210,7 +210,7 @@ When('a supported legacy Codex model is selected without validating a new connec
   await expect(trigger).toHaveText('GPT-6 Luna')
   await expect(page.getByRole('dialog').getByRole('button', { name: 'Codex 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
 
-  const fastMode = page.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })
+  const fastMode = page.getByRole('switch', { name: 'Fast mode · may cost more', exact: true })
   const dialog = page.getByRole('dialog')
   if (!(await dialog.isVisible())) await trigger.click()
   await expect(dialog).toBeVisible()
@@ -236,7 +236,7 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
 
   const trigger = page.locator('[data-model-picker-text]')
   const dialog = page.getByRole('dialog')
-  const fastMode = page.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })
+  const fastMode = page.getByRole('switch', { name: 'Fast mode · may cost more', exact: true })
   await recordAssertion(page, 'fast-mode-is-limited-to-supported-codex-models', async () => {
     if (!(await dialog.isVisible())) await trigger.click()
     await expect(dialog).toBeVisible()
@@ -262,7 +262,7 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
     await spark.click()
     await modelList.getByRole('button', { name: /Details for.*Spark/u }).click()
     if ((await dialog.count()) === 0) await trigger.click()
-    await expect(dialog.getByRole('switch', { name: 'Fast mode; may cost more', exact: true })).toHaveCount(0)
+    await expect(dialog.getByRole('switch', { name: 'Fast mode · may cost more', exact: true })).toHaveCount(0)
     await expect(page.locator('[data-model-fast-mode-enabled]')).toHaveCount(0)
   })
   await finishJourneyAssertions(page)

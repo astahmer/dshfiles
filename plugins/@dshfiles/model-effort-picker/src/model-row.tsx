@@ -1,11 +1,8 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
-import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
-import { useApi, useApiQuery } from '@dshfiles/dshx/client'
-import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ChevronRightIcon } from '@dshfiles/plugin-ui/icons'
+import { ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { BrandMark, ProviderLabel, QuotaText } from './picker-atoms.js'
@@ -13,68 +10,13 @@ import { BrandMark, ProviderLabel, QuotaText } from './picker-atoms.js'
 type CatalogGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = CatalogGroup['models'][number]
 
-type FastModeRoute = { readonly sessionId: string; readonly provider: string; readonly model: string }
-
-/**
- * Reads its route once the row is pointed at or focused, and keeps the answer while the row stays mounted: a big
- * catalog would otherwise ask the Host about every model on open, though only a few routes support Fast mode.
- */
-const FastModeToggle = ({
-  input,
-  modelName,
-  busy,
-  revealed,
-}: {
-  readonly input: FastModeRoute
-  readonly modelName: string
-  readonly busy: boolean
-  readonly revealed: boolean
-}) => {
-  const state = useApiQuery(aiAccountsFastModeApi, 'status', { enabled: revealed, input })
-  const api = useApi(aiAccountsFastModeApi)
-  const [pending, setPending] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  if (state.data === undefined || !state.data.available) return null
-  const enabled = state.data.enabled
-  return (
-    <span
-      className={cn(
-        'dshx:flex dshx:items-center dshx:justify-center',
-        !enabled && 'dshx:opacity-0 dshx:group-hover/row:opacity-100 dshx:focus-within:opacity-100',
-      )}
-    >
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Switch
-            aria-label={`Fast mode for ${modelName}`}
-            checked={enabled}
-            className="dshx:data-[size=sm]:h-3.5 dshx:data-[size=sm]:w-6 dshx:data-[state=unchecked]:bg-muted-foreground/35"
-            data-model-fast-mode-inline
-            disabled={busy || pending}
-            onCheckedChange={(next: boolean) => {
-              setPending(true)
-              setError(null)
-              void api
-                .setFast({ ...input, enabled: next })
-                .then(() => state.refetch())
-                .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)))
-                .finally(() => setPending(false))
-            }}
-            size="sm"
-          />
-        </TooltipTrigger>
-        <TooltipContent side="top">{error ?? (enabled ? 'Fast mode on' : 'Fast mode off')}</TooltipContent>
-      </Tooltip>
-    </span>
-  )
-}
-
 export const ModelRow = (props: {
   readonly group: CatalogGroup
   readonly model: CatalogModel
   readonly active: boolean
   readonly busy: boolean
-  readonly sessionId: string
+  /** Fast mode is on for this route (C2): a static ink bolt, not a switch. Amber stays for low quota. */
+  readonly fastOn?: boolean
   readonly quota: ModelQuota | undefined
   readonly providerLabel: string | undefined
   readonly current: ModelSelection | null
@@ -85,7 +27,6 @@ export const ModelRow = (props: {
   /** Select several is on: a click collects the route for a fan-out instead of switching the model. */
   readonly selectSeveral?: boolean
 }) => {
-  const [revealed, setRevealed] = useState(false)
   // A long press on touch collects the route (b:ysaj), and the click it ends with is swallowed.
   const press = useRef<{ timer: ReturnType<typeof setTimeout> | undefined; fired: boolean }>({ timer: undefined, fired: false })
   const cancelPress = (): void => {
@@ -105,8 +46,6 @@ export const ModelRow = (props: {
       )}
       data-fan-out-selected={props.fanOutSelected || undefined}
       data-model-picker-row
-      onFocus={() => setRevealed(true)}
-      onPointerEnter={() => setRevealed(true)}
     >
       <button
         aria-label={`Use ${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`}
@@ -166,17 +105,10 @@ export const ModelRow = (props: {
       <span className="dshx:flex dshx:w-8 dshx:shrink-0 dshx:justify-end" data-model-picker-quota>
         {props.quota === undefined ? null : <QuotaText label={props.quota.label} onReserve={props.quota.onReserve} percent={props.quota.percent} />}
       </span>
-      <span
-        className="dshx:flex dshx:min-w-6 dshx:shrink-0 dshx:items-center dshx:justify-center"
-        onClick={event => event.stopPropagation()}
-        onPointerDown={event => event.stopPropagation()}
-      >
-        <FastModeToggle
-          busy={props.busy}
-          input={{ sessionId: props.sessionId, model: props.model.id, provider: props.group.id }}
-          modelName={name}
-          revealed={revealed}
-        />
+      <span className="dshx:flex dshx:w-4 dshx:shrink-0 dshx:items-center dshx:justify-center">
+        {props.fastOn === true ? (
+          <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground" data-model-fast-on role="img" />
+        ) : null}
       </span>
       <button
         aria-label={`Details for ${name}`}

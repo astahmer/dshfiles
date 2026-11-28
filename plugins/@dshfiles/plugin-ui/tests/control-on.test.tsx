@@ -21,7 +21,7 @@ describe('control on state', () => {
   it('fills a checked switch track with control-on and keeps a full-size background knob in dark', () => {
     const view = render(<Switch checked onCheckedChange={() => undefined} aria-label="On" />)
     const track = classes(view.container.querySelector('[data-slot="switch"]'))
-    expect(track).toContain('dshx:data-[state=checked]:bg-control-on')
+    expect(track).toContain('dshx:aria-checked:bg-control-on')
     expect(track.join(' ')).not.toMatch(/checked\]:bg-primary\b/)
     // Only the colours and the knob move, in the 120ms fade, never `transition-all` (layout would animate too).
     expect(track).not.toContain('dshx:transition-all')

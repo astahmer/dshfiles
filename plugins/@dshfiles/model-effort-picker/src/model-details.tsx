@@ -118,9 +118,6 @@ export const ModelDetails = (props: {
             </span>
           </>
         )}
-        {group !== undefined && model !== undefined && props.fast !== undefined
-          ? props.fast({ provider: group.id, model: model.id, draft: draft ? { value: stagedFast, onChange: setStagedFast } : null })
-          : null}
         <button
           aria-label="Close model picker"
           className="dshx:flex dshx:size-5 dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
@@ -185,6 +182,10 @@ export const ModelDetails = (props: {
         {model === undefined || props.inspected === null ? null : (
           <EffortControl efforts={efforts} onChange={changeEffort} selected={selectedEffort} />
         )}
+
+        {group !== undefined && model !== undefined && props.fast !== undefined
+          ? props.fast({ provider: group.id, model: model.id, draft: draft ? { value: stagedFast, onChange: setStagedFast } : null })
+          : null}
 
         {draft ? null : props.fallbacks}
       </div>

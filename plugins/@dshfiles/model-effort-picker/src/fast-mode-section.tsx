@@ -1,11 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { aiAccountsFastModeApi } from '@dshfiles/ai-accounts/model-fast-mode-api'
 import { useApi, useApiQuery } from '@dshfiles/dshx/client'
 import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { CircleAlertIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { errorMessage } from '@dshfiles/plugin-ui/query'
-import { cn } from '@dshfiles/plugin-ui/lib/utils'
 
 type Props = {
   readonly sessionId: string
@@ -17,16 +14,57 @@ type Props = {
   readonly draft?: { readonly value: boolean | undefined; readonly onChange: (enabled: boolean) => void } | null
 }
 
-/** Fast mode for the inspected route: the same switch the composer shows, next to the model it applies to. */
-export const FastModeSection = ({ sessionId, provider, model, disabled, onEnabledChange, draft = null }: Props) => {
+/**
+ * Council picker round 1, C2: Fast mode is one visible, labelled row in details, the kit Switch at its end (28×16 drawn,
+ * a 44 px row on touch). The label says what it does and what it costs, so no tooltip is needed.
+ */
+export const FastModeRow = (props: {
+  readonly enabled: boolean
+  readonly disabled: boolean
+  readonly error: string | null
+  readonly onChange: (enabled: boolean) => void
+}) => {
+  const id = useId()
+  return (
+    <div className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-fast-mode>
+      <div className="dshx:flex dshx:min-h-8 dshx:items-center dshx:justify-between dshx:gap-2 dshx:pointer-coarse:min-h-11">
+        <label className="dshx:min-w-0 dshx:text-xs dshx:font-medium" htmlFor={id}>
+          Fast mode <span className="dshx:font-normal dshx:text-muted-foreground">· may cost more</span>
+        </label>
+        <Switch
+          checked={props.enabled}
+          className="dshx:h-4 dshx:w-7"
+          data-model-fast-mode-toggle
+          disabled={props.disabled}
+          id={id}
+          onCheckedChange={props.onChange}
+          size="sm"
+        />
+      </div>
+      {props.error === null ? null : (
+        <p className="dshx:text-2xs dshx:text-destructive" data-model-fast-mode-error>
+          {props.error} Try the switch again, or reopen the picker.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** Fast mode for the inspected route: hidden unless AI Accounts says the route supports it. */
+export const FastModeSection = ({ sessionId, provider, model, disabled, onEnabledChange, draft = null, onStatus }: Props & {
+  /** Reports the route's stored state once it is known, so the list can mark the routes where Fast mode is on. */
+  readonly onStatus?: (enabled: boolean) => void
+}) => {
   const input = { sessionId, provider, model }
   const api = useApi(aiAccountsFastModeApi)
   const state = useApiQuery(aiAccountsFastModeApi, 'status', { input })
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const status = state.data
-  if (status === undefined) return <span className="dshx:h-5 dshx:w-10 dshx:shrink-0" />
-  if (!status.available) return null
+  useEffect(() => {
+    if (status !== undefined && status.available) onStatus?.(status.enabled)
+  }, [status, onStatus])
+  if (status === undefined || !status.available) return null
 
   const update = async (enabled: boolean): Promise<void> => {
     if (draft !== null) {
@@ -46,36 +84,12 @@ export const FastModeSection = ({ sessionId, provider, model, disabled, onEnable
     }
   }
 
-  const enabled = draft?.value ?? status.enabled
   return (
-    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1" data-model-fast-mode>
-      <ZapIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0', enabled ? 'dshx:text-warning' : 'dshx:text-muted-foreground')} />
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Switch
-            aria-label="Fast mode; may cost more"
-            checked={enabled}
-            className="dshx:data-[size=sm]:h-3.5 dshx:data-[size=sm]:w-6 dshx:data-[state=unchecked]:bg-muted-foreground/35"
-            data-model-fast-mode-toggle
-            disabled={(disabled && draft === null) || pending}
-            onCheckedChange={(enabled: boolean) => void update(enabled)}
-            size="sm"
-          />
-        </TooltipTrigger>
-        <TooltipContent side="top">Fast mode {enabled ? 'on' : 'off'}; may cost more</TooltipContent>
-      </Tooltip>
-      {error === null ? null : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button aria-label={error} className="dshx:flex dshx:size-4 dshx:items-center dshx:justify-center dshx:text-destructive" type="button">
-              <CircleAlertIcon aria-hidden="true" className="dshx:size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent className="dshx:max-w-56 dshx:text-pretty" side="top">
-            {error}
-          </TooltipContent>
-        </Tooltip>
-      )}
-    </div>
+    <FastModeRow
+      disabled={(disabled && draft === null) || pending}
+      enabled={draft?.value ?? status.enabled}
+      error={error}
+      onChange={enabled => void update(enabled)}
+    />
   )
 }

@@ -22,7 +22,7 @@ beforeAll(async () => {
   compiler = await node.compile(readFileSync(join(process.cwd(), 'src/styles.css'), 'utf8'), { base: join(process.cwd(), 'src'), onDependency: () => undefined })
 })
 
-const OFF_EDGE = 'dshx:enabled:data-[state=unchecked]:border-field-border'
+const OFF_EDGE = 'dshx:enabled:aria-[checked=false]:border-field-border'
 const track = (element: Element | null): readonly string[] => (element?.getAttribute('class') ?? '').split(/\s+/)
 
 describe('switch off state (council round 8 A3)', () => {
@@ -39,7 +39,7 @@ describe('switch off state (council round 8 A3)', () => {
     const at = sheet.indexOf(':enabled')
     expect(at).toBeGreaterThan(-1)
     const rule = sheet.slice(sheet.lastIndexOf('.', at), sheet.indexOf('}', at))
-    expect(rule).toContain('[data-state="unchecked"]')
+    expect(rule).toContain('[aria-checked="false"]')
     expect(rule).toMatch(/border-color: var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\)|border-color: var\(--color-field-border\)/u)
   })
 })

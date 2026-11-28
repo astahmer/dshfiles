@@ -40,13 +40,24 @@ const fastModeRouteKey = ({ sessionId, provider, model }: FastModeRoute): string
 /** The picker's own shortcut: focus the search field while it is open. */
 const MOD_KEY = typeof navigator !== 'undefined' && /mac|iphone|ipad/iu.test(navigator.userAgent) ? '⌘' : 'Ctrl'
 
-const FastModeIndicator = ({ sessionId, provider, model, enabledOverride }: FastModeRoute & { readonly enabledOverride: boolean | undefined }) => {
+const FastModeIndicator = ({
+  sessionId,
+  provider,
+  model,
+  enabledOverride,
+  onKnown,
+}: FastModeRoute & { readonly enabledOverride: boolean | undefined; readonly onKnown: (enabled: boolean) => void }) => {
   // Every picker showing this Session mounts its indicator within the same landing; the page-wide resource reads the
   // route once for all of them (5 s covers the later mounts, a toggle shows through `enabledOverride` meanwhile).
   const state = useResource(aiAccountsFastModeApi, 'status', { sessionId, provider, model }, { staleTime: 5_000 })
-  // Composer redesign (b:v9yh): the chip is plain text; only a live state (Fast mode on) earns a glyph.
+  const known = state.data?.available === true ? state.data.enabled : undefined
+  useEffect(() => {
+    if (known !== undefined) onKnown(known)
+  }, [known, onKnown])
+  // Composer redesign (b:v9yh): the chip is plain text; only a live state (Fast mode on) earns a glyph, in ink (C2: amber
+  // means low quota).
   if (enabledOverride ?? state.data?.enabled ?? false)
-    return <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-warning" data-model-fast-mode-enabled />
+    return <ZapIcon aria-hidden="true" className="dshx:size-4 dshx:shrink-0 dshx:text-foreground" data-model-fast-mode-enabled />
   return null
 }
 
@@ -59,6 +70,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const [inspected, setInspected] = useState<InspectedRoute | null>(null)
   const [narrowDetails, setNarrowDetails] = useState(false)
   const [fanOut, setFanOut] = useState<readonly ModelSelection[]>([])
+  // Routes whose Fast mode state is known (the trigger's route, each inspected route): the list marks those that are on.
+  const [knownFast, setKnownFast] = useState<ReadonlyMap<string, boolean>>(new Map())
+  const rememberFast = useCallback((route: { readonly provider: string; readonly model: string }, enabled: boolean) => {
+    const key = fastModeRouteKey({ sessionId: '', ...route })
+    setKnownFast(previous => (previous.get(key) === enabled ? previous : new Map(previous).set(key, enabled)))
+  }, [])
   // b:ysaj: Select several makes a click collect routes, so fan-out is not a shift-click secret (and works on touch).
   const [several, setSeveral] = useState(false)
   const modelListRef = useRef<HTMLDivElement | null>(null)
@@ -174,6 +191,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     try {
       const updated = await fastApi.setFast({ sessionId, provider: selection.provider, model: selection.model, enabled: fast })
       setFastModeOverride({ enabled: updated.enabled, routeKey: fastModeRouteKey({ sessionId, provider: selection.provider, model: selection.model }) })
+      rememberFast(selection, updated.enabled)
     } catch (error) {
       setSelectionError(selectionFailureNotice(error instanceof Error ? error.message : String(error)))
     }
@@ -224,6 +242,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 <FastModeIndicator
                   enabledOverride={fastModeOverride?.routeKey === currentFastModeRouteKey ? fastModeOverride.enabled : undefined}
                   model={current.model}
+                  onKnown={enabled => rememberFast(current, enabled)}
                   provider={current.provider}
                   sessionId={sessionId}
                 />
@@ -401,8 +420,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         onInspect={() => showDetails({ model: model.id, provider: group.id })}
                         onSelect={choose}
                         providerLabel={providerLabels.get(group.id)}
+                        fastOn={knownFast.get(fastModeRouteKey({ sessionId: '', provider: group.id, model: model.id })) === true}
                         quota={quotas.get(group.id)}
-                        sessionId={sessionId}
                       />
                     ))}
                     {rows.length === 0 && (
@@ -484,9 +503,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         draft={draft}
                         key={`${sessionId}:${provider}:${model}`}
                         model={model}
-                        onEnabledChange={enabled =>
+                        onEnabledChange={enabled => {
+                          rememberFast({ provider, model }, enabled)
                           setFastModeOverride({ enabled, routeKey: fastModeRouteKey({ model, provider, sessionId }) })
-                        }
+                        }}
+                        onStatus={enabled => rememberFast({ provider, model }, enabled)}
                         provider={provider}
                         sessionId={sessionId}
                       />
