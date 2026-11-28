@@ -177,7 +177,7 @@ export const FallbackList = (props: {
                     <DropdownMenuTrigger asChild>
                       <Button
                         aria-label={`Actions for fallback ${String(index + 1)}`}
-                        className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:-mr-2 dshx:pointer-coarse:size-11"
+                        className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:size-11 dshx:pointer-coarse:justify-end dshx:pointer-coarse:pr-0.5"
                         data-model-fallback-actions
                         disabled={props.disabled}
                         size="icon-xs"

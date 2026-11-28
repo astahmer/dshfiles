@@ -15,7 +15,9 @@ describe('phone edges on one line (council picker round 5, U13)', () => {
   it("ends the Fallbacks chevron and the fallback actions on Close's glyph edge, and the select bar without an inset", () => {
     const fallbacks = source('fallbacks-section.tsx')
     expect(tagOf(fallbacks, 'data-model-fallbacks-chevron')).toContain('dshx:pointer-coarse:pr-1.5')
-    expect(tagOf(fallbacks, 'data-model-fallback-actions')).toContain('dshx:pointer-coarse:-mr-2')
+    // Inside the row (a negative margin overflowed the details body): the glyph sits 2 px in, on Close's glyph edge.
+    expect(tagOf(fallbacks, 'data-model-fallback-actions')).toContain('dshx:pointer-coarse:justify-end dshx:pointer-coarse:pr-0.5')
+    expect(tagOf(fallbacks, 'data-model-fallback-actions')).not.toMatch(/-mr-/u)
     expect(source('fan-out-bar.tsx')).toContain('dshx:border-t dshx:border-border dshx:px-0 dshx:pt-1.5')
   })
 
