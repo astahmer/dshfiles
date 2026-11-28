@@ -136,7 +136,7 @@ export const ModelDetails = (props: {
         <button
           aria-label={draft ? 'Back to the model in use' : 'Back to models'}
           className={cn(
-            'dshx:hidden dshx:size-6 dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:@max-pane-compact:flex',
+            'dshx:hidden dshx:size-6 dshx:pointer-coarse:size-11 dshx:pointer-coarse:-ml-3.5 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:@max-pane-compact:flex',
             draft && 'dshx:flex',
           )}
           data-model-details-back

@@ -109,7 +109,7 @@ export const FallbackList = (props: {
         {/* The rest of the row opens it too, for the pointer; the labelled toggle carries the state for assistive tech. */}
         <button
           aria-hidden="true"
-          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-end dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11"
+          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-end dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11 dshx:pointer-coarse:pr-1.5"
           data-model-fallbacks-chevron
           onClick={toggle}
           tabIndex={-1}
@@ -179,7 +179,7 @@ export const FallbackList = (props: {
                     <DropdownMenuTrigger asChild>
                       <Button
                         aria-label={`Actions for fallback ${String(index + 1)}`}
-                        className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:size-11"
+                        className="dshx:size-7 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:-mr-2 dshx:pointer-coarse:size-11"
                         data-model-fallback-actions
                         disabled={props.disabled}
                         size="icon-xs"

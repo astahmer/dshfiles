@@ -68,7 +68,7 @@ export const FanOutSelection = (props: {
     return (
       <div
         aria-label="Fan-out selection"
-        className={cn('dshx:shrink-0 dshx:flex-col dshx:gap-0.5 dshx:border-t dshx:border-border dshx:px-1 dshx:pt-1.5', props.className)}
+        className={cn('dshx:shrink-0 dshx:flex-col dshx:gap-0.5 dshx:border-t dshx:border-border dshx:px-0 dshx:pt-1.5', props.className)}
         data-model-picker-fan-out="bar"
         role="group"
       >

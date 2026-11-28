@@ -492,7 +492,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
                   catalogEmpty && 'dshx:w-full',
                   // Round 4 T2: on the phone the panes start at the sheet's top, so their 44 pt header line meets Close's.
-                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:px-2 dshx:@max-pane-compact:pt-0',
+                  // Round 5 U13: no right inset on the phone, so Select, the rows and their chevrons end on Close's edge.
+                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:pl-2 dshx:@max-pane-compact:pr-0 dshx:@max-pane-compact:pt-0',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
               >
@@ -596,7 +597,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   )}
                 </div>
                 <ScrollArea
-                  className="dshx:min-h-0 dshx:flex-1 dshx:data-[empty]:hidden dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block! dshx:[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!"
+                  className="dshx:min-h-0 dshx:flex-1 dshx:data-[empty]:hidden dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block! dshx:[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]! dshx:pointer-coarse:[&_[data-slot=scroll-area-scrollbar]]:pointer-events-none"
                   data-empty={emptyState === null ? undefined : ''}
                   data-model-picker-scroll
                 >
@@ -605,7 +606,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     aria-multiselectable={several || undefined}
                     // On touch the rows end clear of the list's 10 px overlay scrollbar, which took the last 4 px of each
                     // row's 44 pt details chevron (round 3 touch probe).
-                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1 dshx:pointer-coarse:pr-3"
+                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1 dshx:pointer-coarse:pr-0"
                     id={listboxId}
                     ref={attachModelList}
                     role="listbox"
