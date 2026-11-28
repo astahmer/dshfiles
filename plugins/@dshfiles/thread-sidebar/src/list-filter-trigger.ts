@@ -4,7 +4,7 @@
  * the preset's name when the trigger cuts it. It never opens on the focus the panel gives back as it closes: from the
  * moment the panel opens it stays quiet until the pointer leaves the trigger or focus leaves it.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 export interface FilterTriggerTipInput {
   /** The count badge's number, or null with no filter on. */
@@ -56,39 +56,4 @@ export const useFilterTriggerTip = (props: {
       if (!panelOpen.current) quiet.current = false
     },
   }
-}
-
-/**
- * Show the trigger's "· edited" only while the preset's name fits beside it (council round 34, A4, lead's rule): the
- * suffix gives way first, the name truncates only after it is gone, and the count badge always shows. The badge, the
- * tooltip and the accessible name already say edited, so the suffix is the part that may go.
- * @returns whether the suffix shows.
- */
-const fitEditedSuffix = (name: HTMLElement | null, suffix: HTMLElement | null): boolean => {
-  if (name === null || suffix === null) return false
-  suffix.style.display = ''
-  const fits = !textTruncated(name)
-  suffix.style.display = fits ? '' : 'none'
-  return fits
-}
-
-/**
- * Keep the suffix measured: after every render, and whenever the row holding the trigger changes width (the sidebar is
- * resized). The row's width never depends on the suffix, so the observer never feeds itself.
- */
-export const useEditedSuffixFit = (refs: {
-  readonly trigger: RefObject<HTMLElement | null>
-  readonly name: RefObject<HTMLElement | null>
-  readonly suffix: RefObject<HTMLElement | null>
-}, active: boolean): void => {
-  useLayoutEffect(() => {
-    if (active) fitEditedSuffix(refs.name.current, refs.suffix.current)
-  })
-  useLayoutEffect(() => {
-    const row = refs.trigger.current?.parentElement
-    if (!active || row === null || row === undefined || globalThis.ResizeObserver === undefined) return
-    const observer = new ResizeObserver(() => fitEditedSuffix(refs.name.current, refs.suffix.current))
-    observer.observe(row)
-    return () => observer.disconnect()
-  }, [active, refs])
 }

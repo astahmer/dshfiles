@@ -226,7 +226,7 @@ import { HeldUpdatesPill } from './held-updates-pill.js'
 import { RunningJobsModel } from './running-jobs.js'
 import type { ThreadWorkStatus } from './thread-status-client.js'
 import { threadWorkStatusStore } from './thread-work-status-store.js'
-import { filterTriggerTipAdds, textTruncated, useEditedSuffixFit, useFilterTriggerTip } from './list-filter-trigger.js'
+import { filterTriggerTipAdds, textTruncated, useFilterTriggerTip } from './list-filter-trigger.js'
 import { markShownCounts } from './mark-shown.js'
 import { PresetOptionsMenu } from './preset-options-menu.js'
 import { indexRebasedThreadSessions, type RebasedSessionState } from './rebased-threads.js'
@@ -2535,9 +2535,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
   // (More open) scrolls inside instead of Radix shifting the panel up off its trigger; measured on open and on resize.
   const filterTriggerRef = useRef<HTMLButtonElement | null>(null)
   const filterTriggerNameRef = useRef<HTMLSpanElement | null>(null)
-  const filterTriggerSuffixRef = useRef<HTMLSpanElement | null>(null)
-  // One object for the suffix fit's observer, so it is set up once, not on every render.
-  const filterTriggerParts = useMemo(() => ({ trigger: filterTriggerRef, name: filterTriggerNameRef, suffix: filterTriggerSuffixRef }), [])
   const [filterPanelRoom, setFilterPanelRoom] = useState<number | null>(null)
   useLayoutEffect(() => {
     if (!filterOpen) return
@@ -6703,7 +6700,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
     enabled: scopeSlot === null && !coarsePointer(),
     adds: () => filterTriggerTipAdds({ count: scopeCount, edited: presetEdited, truncated: textTruncated(filterTriggerNameRef.current) }),
   })
-  useEditedSuffixFit(filterTriggerParts, scopeSlot === null && presetEdited)
   const filterMenu = (
     <Popover open={filterOpen} onOpenChange={setFilterOpen}>
       {/* The desktop trigger's tooltip says its whole name; the phone scope button shows no tooltip. */}
@@ -6769,15 +6765,6 @@ const ThreadSidebarContent = (props: ThreadSidebarProps): JSX.Element => {
           <span ref={filterTriggerNameRef} className={cn('dshx:truncate', scopeCount !== null && 'dshx:text-foreground')}>
             {scopeSlot === null ? (presetsOn ? activePresetLabel : activeFilterSummary) : ThreadListScope.label(scopeInput)}
           </span>
-          {scopeSlot === null && presetEdited ? (
-            // "All threads · edited" (council round 34, A4): the badge beside it then reads as filters on, not a result
-            // count. Whole while the name truncates; the accessible name already says "(edited)". The secondary ink, as on
-            // the panel's edited row: the tertiary step sat 4.47:1 on the light trigger fill, under AA.
-            // It shows only while the name fits beside it (useEditedSuffixFit): it goes before the name is cut.
-            <span ref={filterTriggerSuffixRef} aria-hidden="true" className="dshx:shrink-0 dshx:font-normal dshx:whitespace-pre dshx:text-muted-foreground" data-filter-trigger-edited="">
-              {`· ${props.tSidebar('threadSidebarPresetEditedShort')}`}
-            </span>
-          ) : null}
           {scopeSlot !== null && scopeCount !== null ? (
             // The phone's "Filters 2" (council round 11 B2): a neutral pill after the word (council round 29, item 11).
             <Badge
