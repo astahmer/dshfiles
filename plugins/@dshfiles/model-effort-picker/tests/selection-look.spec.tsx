@@ -28,13 +28,11 @@ const row = (active: boolean, fanOutSelected = false): string =>
 const rowClasses = (html: string): string => /<div[^>]*class="([^"]*)"[^>]*data-model-picker-row/u.exec(html)?.[1] ?? ''
 
 describe('selection is neutral, never indigo (council picker C4)', () => {
-  it('marks the current row with the selected wash, the 1 px selected edge, the name at 550 and a 14 px ink check', () => {
+  it('marks the model in use with its 14 px ink check and the name at 600 only, no wash or edge (round 4 T1)', () => {
     const html = row(true)
     const classes = rowClasses(html)
-    expect(classes).toContain('dshx:bg-selected-wash')
-    expect(classes).toContain('dshx:selected-edge')
-    expect(classes).not.toMatch(/info|ring-1/u)
-    expect(/<span[^>]*data-model-picker-name[^>]*>/u.exec(html)?.[0]).toContain('dshx:font-selected')
+    expect(classes).not.toMatch(/bg-selected-wash|selected-edge|info|ring-1/u)
+    expect(/<span[^>]*data-model-picker-name[^>]*>/u.exec(html)?.[0]).toContain('dshx:font-semibold')
     expect(/<svg[^>]*data-model-current-check[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:size-3\.5 dshx:text-foreground/u)
   })
 

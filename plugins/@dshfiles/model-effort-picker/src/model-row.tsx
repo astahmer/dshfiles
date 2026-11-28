@@ -21,8 +21,13 @@ export const ModelRow = (props: {
   readonly model: CatalogModel
   readonly active: boolean
   readonly busy: boolean
-  /** The keyboard's current row: it draws the kit focus ring (2 px, 1 px offset). */
+  /**
+   * The search's active option, what Enter uses (round 4 T1): the strongest row state, the selected wash at 12 % ink
+   * (≥ 1.25:1 on the popover in both schemes). The focus ring stays on the search.
+   */
   readonly highlighted?: boolean
+  /** The active option was reached with the keyboard: a 1 px inset neutral outline (≥ 3:1) joins the wash. */
+  readonly keyboard?: boolean
   /** Round 3 R11: the model the details pane shows; a neutral 2 px leading bar marks it (the check stays for the model in use). */
   readonly inspected?: boolean
   /** Fast mode is on for this route (C2): a static ink bolt, not a switch. Amber stays for low quota. */
@@ -59,10 +64,12 @@ export const ModelRow = (props: {
     <div
       className={cn(
         'dshx:group/row dshx:relative dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pr-0.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
-        (props.active || props.fanOutSelected) && 'dshx:bg-selected-wash',
-        props.active && 'dshx:selected-edge',
+        // Round 4 T1: the list is not a radio group, so the model in use carries no wash or edge, only its check and 600
+        // weight; a fan-out choice keeps the wash beside its checkbox.
+        props.fanOutSelected && 'dshx:bg-selected-wash',
         // Round 3 R11: the search's active option (what Enter uses) shows the hover wash; the focus ring stays on the search.
-        props.highlighted === true && !(props.active || props.fanOutSelected) && 'dshx:bg-accent/60',
+        props.highlighted === true && 'dshx:bg-foreground/12 dshx:hover:bg-foreground/12',
+        props.highlighted === true && props.keyboard === true && 'dshx:outline-1 dshx:-outline-offset-1 dshx:outline-foreground/50 dshx:outline-solid',
         props.inspected === true &&
           'dshx:before:absolute dshx:before:inset-y-1.5 dshx:before:left-0 dshx:before:w-0.5 dshx:before:rounded-full dshx:before:bg-muted-foreground',
       )}
@@ -130,7 +137,7 @@ export const ModelRow = (props: {
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
           <TruncatedTooltip content={props.model.id}>
             <span
-              className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
+              className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-semibold')}
               data-model-picker-name
             >
               {name}

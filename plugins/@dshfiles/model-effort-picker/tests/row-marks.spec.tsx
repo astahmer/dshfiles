@@ -31,8 +31,9 @@ describe('the active and the inspected rows are marked (council picker round 3, 
   it('washes the active option (what Enter uses) whenever the search points at it, not only after an arrow key', () => {
     const picker = readFileSync(new URL('../src/model-effort-picker.tsx', import.meta.url), 'utf8')
     expect(picker).toContain('highlighted={index === activeIndex}')
-    expect(rowTag(row({ highlighted: true }))).toMatch(/dshx:bg-accent\/60/u)
-    expect(rowTag(row({ highlighted: true }))).not.toMatch(/outline/u)
+    expect(rowTag(row({ highlighted: true }))).toMatch(/dshx:bg-foreground\/12/u)
+    // Pointer hover: no outline; the keyboard adds one (round 4 T1).
+    expect(rowTag(row({ highlighted: true }))).not.toMatch(/outline-1/u)
   })
 
   it('marks the inspected row with a neutral 2 px leading bar, apart from the check of the model in use', () => {
