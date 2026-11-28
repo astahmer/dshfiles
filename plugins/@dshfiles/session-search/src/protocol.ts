@@ -1,7 +1,14 @@
 import { Schema } from 'effect'
 import { Rpc, RpcGroup } from 'effect/rpc'
 
-import { FIND_LIMIT_MAX, findMatchSchema, indexHealthSchema, promptHistoryRequestSchema, promptHistoryResultSchema } from './api-schemas.js'
+import {
+  FIND_LIMIT_MAX,
+  findEventTypesSchema,
+  findMatchSchema,
+  indexHealthSchema,
+  promptHistoryRequestSchema,
+  promptHistoryResultSchema,
+} from './api-schemas.js'
 
 /** A JSON value as a session log stores it. */
 export type JsonValue = string | number | boolean | null | readonly JsonValue[] | { readonly [key: string]: JsonValue }
@@ -61,6 +68,8 @@ const findInSessionRequestSchema = Schema.Struct({
   limit: Schema.Number.check(Schema.isFinite(), Schema.isInt(), Schema.isGreaterThanOrEqualTo(1), Schema.isLessThanOrEqualTo(FIND_LIMIT_MAX)),
   /** The newest `limit` matches instead of the oldest, still handed back in seq order. */
   newest: Schema.optional(Schema.Boolean),
+  /** Optional event types to keep (ORed); absent matches every indexed event type. */
+  types: Schema.optional(findEventTypesSchema),
 })
 export type FindInSessionRequest = typeof findInSessionRequestSchema.Type
 

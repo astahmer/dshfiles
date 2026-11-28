@@ -106,6 +106,27 @@ Every other vendored file is byte-identical to the pinned revision.
 | `src/native/unread-landing.ts`, `src/native/settings/UnreadLandingRow.tsx`, `chat-settings.ts` (also), `host.ts` (also), `apply.ts` (also), `slots.ts` (also), `ChatNodeSeat.tsx` (also), `use-chat-viewport.ts` (also), `use-chat-scroll.ts` (also), `ChatView.tsx` (also), `ChatView.module.css` (also), `locale.ts` (also) | new: open an unread thread at its final answer (below): the `unreadLanding` volatile setting and its General row, a per-browser seen-answer memory, `data-chat-final-answer` on the latest settled answer row, and the first-open landing with its New divider |
 | `src/native/chat/MessageIconActions.tsx` (also) | the copy, branch and `⋯` tooltips pass `portal`: inside a Workbench pane (`contain: layout paint`) an inline `position: fixed` tooltip lands offset by the pane's origin (b:d5wg) |
 | `src/turn-admission-panel.tsx`, `src/client-entry.tsx` (also) | new: the Settings › General **Running threads limit** row and the composer's **Waits to start** notice for `@dshfiles/session-controller`'s running-thread limit (see its README) |
+| `src/native/chat/ThreadFindBar.tsx` (also), `ThreadFindBar.module.css` (also), `thread-find-model.ts` (also), `find-reveal.ts` (also), `src/thread-find-port.ts` (also), `src/native/locale.ts` (also) | the find bar's **All / Agent / User / Tools** filter chips (below): `types` on session-search's `findInThread`, the same filter on the loaded-window fallback by `data-chat-flow-kind`, and a browser-side filter with a note when the Host predates `types` |
+
+### Find in thread
+
+⌘F in a thread (or **Find in thread** in its `⋯` menu on a phone) opens a find bar over the transcript. It asks
+`@dshfiles/session-search`'s `findInThread` for the newest 500 matches in the whole thread, counts them from the
+newest ("3 of 12", "500+" past the cap), steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the fold
+that hides a match and highlights it. Esc closes it from the field or any of its buttons.
+
+The chips under the field narrow the matches: **All** (default) searches every indexed event, **Agent** assistant
+replies, **User** prompts, **Tools** tool calls and results. Agent, User and Tools combine; selecting all three is the
+same as All. The filter runs in the index before the 500-match cap, so tool output no longer crowds out what the agent
+wrote.
+
+- Without session-search (or before a thread is indexed) the bar searches the loaded Turns, chips included, and says
+  so.
+- A session-search Host started before the filters existed refuses `types`. The bar then asks without them, filters the
+  newest 500 matches in the browser and says that older filtered matches may be missing: update
+  `@dshfiles/session-search` and restart DSH to filter the whole thread.
+
+The filter lives in the open bar only: closing it resets to All.
 
 ### Open an unread thread at its final answer
 

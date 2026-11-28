@@ -103,9 +103,43 @@
 }
 
 .button:focus-visible,
+.filter:focus-visible,
 .retry:focus-visible {
   outline: 2px solid var(--dsw-focus-ring-color, var(--dsw-alias-state-business-primary));
   outline-offset: -2px;
+}
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 4px 2px 26px;
+}
+
+.filter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: var(--dsw-radius-sm);
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.filter:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.filter[data-active] {
+  border-color: var(--dsw-alias-state-business-primary);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dshx-tone-accent-bg, var(--dsw-alias-interactive-bg-hover-solid));
 }
 
 .status {
@@ -157,6 +191,16 @@
   .button {
     width: 36px;
     height: 36px;
+  }
+
+  .filters {
+    padding-left: 4px;
+  }
+
+  .filter {
+    min-width: 44px;
+    height: 44px;
+    padding: 0 12px;
   }
 }
 

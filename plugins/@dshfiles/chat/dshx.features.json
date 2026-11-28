@@ -414,16 +414,17 @@
     {
       "id": "find-in-thread",
       "title": "Find text anywhere in a long thread",
-      "summary": "⌘F in a thread (or Find in thread in its ⋯ menu, the phone's way in) opens a find bar: it asks session-search's index for every match in the whole thread, shows \"n of N\" counted from the newest, steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the Worked for fold, folded prompt or closed tool row that hides the match and highlights it. A second ⌘F while its field has focus is the browser's find. Without the index (not installed, thread not indexed yet) it searches the loaded Turns and says so; a failed search shows the reason and Retry.",
+      "summary": "⌘F in a thread (or Find in thread in its ⋯ menu, the phone's way in) opens a find bar: it asks session-search's index for every match in the whole thread, shows \"n of N\" counted from the newest, steps with ↵ (older) and ⇧↵ (newer), pages an unloaded Turn in, opens the Worked for fold, folded prompt or closed tool row that hides the match and highlights it. All / Agent / User / Tools chips narrow the matches to assistant replies, prompts or tool calls and results before the 500-match cap. A second ⌘F while its field has focus is the browser's find. Without the index (not installed, thread not indexed yet) it searches the loaded Turns and says so; a session-search Host older than the filters gets them applied to the newest matches in the browser, with a note to update it; a failed search shows the reason and Retry.",
       "surfaces": ["client"],
       "surface": "transcriptCard",
       "destination": "transcript",
       "currentSurface": "transcript: find bar over the thread",
       "configuration": [],
-      "states": ["closed", "searching", "matches", "no-match", "loaded-only", "failed"],
+      "states": ["closed", "searching", "matches", "no-match", "loaded-only", "filtered-here", "failed"],
       "failureModes": [
         "A thread whose newest events have not reached the index yet (about half a second behind) finds them only after the index catches up.",
-        "A match inside a tool row's output that the row does not render lands on the row with an outline instead of a text highlight."
+        "A match inside a tool row's output that the row does not render lands on the row with an outline instead of a text highlight.",
+        "With a session-search Host older than the filters, a filter covers only the newest 500 matches until session-search is updated and DSH restarted."
       ],
       "externalDependencies": [],
       "reach": [
@@ -459,6 +460,42 @@
           "id": "chat.find-loaded-rows",
           "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
           "testName": "counts loaded-window matches per innermost row, including rows inside folds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-filters-map",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "toggles event-type filters and maps them to index types and DOM row kinds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-filters-loaded-rows",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "filters loaded-window matches by chat flow kind when a filter is active"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-filters-index",
+          "file": "plugins/@dshfiles/chat/tests/thread-find-bar.test.tsx",
+          "testName": "passes selected event-type filters to ThreadFindPort and omits types for All"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-filters-old-host",
+          "file": "plugins/@dshfiles/chat/tests/thread-find-bar.test.tsx",
+          "testName": "filters the newest matches here and says so when the Host refuses event types"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-filters-pending",
+          "file": "plugins/@dshfiles/chat/tests/thread-find-bar.test.tsx",
+          "testName": "shows Searching instead of the previous filter matches while a new filter loads"
+        },
+        {
+          "kind": "unit-test",
+          "id": "chat.find-filters-reveal",
+          "file": "plugins/@dshfiles/chat/tests/long-threads.test.ts",
+          "testName": "lands inside the rows the active filter keeps when it scans a Turn"
         },
         {
           "kind": "gherkin",

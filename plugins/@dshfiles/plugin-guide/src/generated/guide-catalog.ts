@@ -2372,7 +2372,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "sessionSearchApi",
       "importFrom": "@dshfiles/session-search/search-api",
       "owner": "@dshfiles/session-search",
-      "source": "plugins/@dshfiles/session-search/src/api.ts:42",
+      "source": "plugins/@dshfiles/session-search/src/api.ts:43",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "api:@dshfiles/session-search:session-search",

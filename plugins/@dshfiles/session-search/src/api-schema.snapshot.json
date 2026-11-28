@@ -158,7 +158,7 @@
     },
     {
       "name": "findInThread",
-      "description": "Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200; with `newest: true` the newest `limit` matches are returned (still in transcript order), which is what a find bar starting from the tail reads. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.",
+      "description": "Find every event of one DSH thread (Session) whose text contains all words of `text` (the last word may be a prefix), in transcript order: the whole stored transcript, older turns and tool calls and results included (model thinking is not indexed). Pass `types` (e.g. `[\"assistant/message\"]`, `[\"user/message\"]`, `[\"tool/call\", \"tool/result\"]`) to narrow matches to specific event types (full `area/name` event types, not bare words like `assistant`). Each match has its event seq, type, time and a short snippet. `limit` defaults to 200; with `newest: true` the newest `limit` matches are returned (still in transcript order), which is what a find bar starting from the tail reads. `ownsService` is false when another plugin owns the sessionQuery service and this index is not built. Read-only.",
       "tool": {
         "name": "session_find_in_thread",
         "readOnly": true
@@ -193,6 +193,23 @@
             "anyOf": [
               {
                 "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "types": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                },
+                "minItems": 1,
+                "maxItems": 16
               },
               {
                 "type": "null"
@@ -267,6 +284,12 @@
           },
           "newest": {
             "type": "boolean"
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "required": [

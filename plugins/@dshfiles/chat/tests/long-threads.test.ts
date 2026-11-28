@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { SessionSeq } from '@deepseek-ai/dsh-session/types'
-import { afterEach, describe, expect, it } from 'vitest'
-import { findInLoadedRows, findTextRanges } from '../src/native/chat/find-reveal.ts'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { findInLoadedRows, findTextRanges, revealFindHit, type FindRevealOutcome } from '../src/native/chat/find-reveal.ts'
 import { SinceYouLeftRecapModel } from '../src/native/chat/since-you-left.ts'
 import { ThreadFindModel, type FindHit } from '../src/native/chat/thread-find-model.ts'
 import { mergeTurnRailItems, seenBoundaryIndex, type TurnRailItem } from '../src/native/chat/turn-rail-items.ts'
@@ -131,6 +131,54 @@ describe('find model', () => {
     expect(ThreadFindModel.rowFor(rows, 110)).toBe('answer')
     expect(ThreadFindModel.rowFor(rows, 99)).toBeNull()
   })
+
+  it('toggles event-type filters and maps them to index types and DOM row kinds', () => {
+    expect(ThreadFindModel.eventTypesFor([])).toBeUndefined()
+    expect(ThreadFindModel.flowKindsFor([])).toBeUndefined()
+
+    const agent = ThreadFindModel.toggleFilter([], 'assistant')
+    expect(agent).toEqual(['assistant'])
+    expect(ThreadFindModel.eventTypesFor(agent)).toEqual(['assistant/message'])
+    expect([...(ThreadFindModel.flowKindsFor(agent) ?? [])]).toEqual(['assistant-step'])
+
+    const conversation = ThreadFindModel.toggleFilter(agent, 'user')
+    expect(conversation).toEqual(['assistant', 'user'])
+    expect(ThreadFindModel.eventTypesFor(conversation)).toEqual(['assistant/message', 'user/message'])
+    expect([...(ThreadFindModel.flowKindsFor(conversation) ?? [])]).toEqual(['assistant-step', 'user', 'steering', 'turn-trigger'])
+
+    // Selecting the remaining category collapses back to All.
+    expect(ThreadFindModel.toggleFilter(conversation, 'tools')).toEqual([])
+    expect(ThreadFindModel.toggleFilter(agent, 'assistant')).toEqual([])
+  })
+})
+
+describe('find reveal', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+  // jsdom has no CSS namespace; the reveal escapes row keys with CSS.escape.
+  const stubCss = () => vi.stubGlobal('CSS', { escape: (value: string) => value.replace(/[^\w-]/g, character => `\\${character}`) })
+  const revealIn = (allowed: ReadonlySet<string> | undefined) => {
+    stubCss()
+    document.body.innerHTML = [
+      '<div id="list"><div data-chat-turn="1">',
+      '<div data-chat-node-key="process" data-chat-flow-kind="turn-process">Worked for 3s</div>',
+      '<div data-chat-node-key="tool" data-chat-flow-kind="tool-call">quartzite tool output</div>',
+      '<div data-chat-node-key="agent" data-chat-flow-kind="assistant-step">quartzite agent reply</div>',
+      '</div></div>',
+    ].join('')
+    const target = { list: () => document.getElementById('list'), turn: 1, row: () => 'process', terms: ['quartzite'] }
+    return new Promise<FindRevealOutcome>(resolve => {
+      revealFindHit(allowed === undefined ? target : { ...target, allowed }, resolve)
+    })
+  }
+  const landedRow = (outcome: FindRevealOutcome) =>
+    outcome.kind === 'text' ? outcome.range.startContainer.parentElement?.closest<HTMLElement>('[data-chat-node-key]')?.dataset.chatNodeKey : outcome.kind
+
+  it('lands inside the rows the active filter keeps when it scans a Turn', async () => {
+    expect(landedRow(await revealIn(undefined))).toBe('tool')
+    expect(landedRow(await revealIn(ThreadFindModel.flowKindsFor(['assistant'])))).toBe('agent')
+  })
 })
 
 describe('find in the rendered rows', () => {
@@ -157,6 +205,21 @@ describe('find in the rendered rows', () => {
       ['b', 0],
       ['b', 1],
     ])
+  })
+
+  it('filters loaded-window matches by chat flow kind when a filter is active', () => {
+    document.body.innerHTML = [
+      '<div id="list">',
+      '<div data-chat-node-key="u1" data-chat-flow-kind="user">quartzite prompt</div>',
+      '<div data-chat-node-key="t1" data-chat-flow-kind="tool-call">quartzite tool output</div>',
+      '<div data-chat-node-key="a1" data-chat-flow-kind="assistant-step">quartzite agent reply</div>',
+      '</div>',
+    ].join('')
+    const list = document.getElementById('list')
+    if (list === null) throw new Error('fixture')
+    expect(findInLoadedRows(list, ['quartzite'], ThreadFindModel.flowKindsFor(['assistant'])).map(hit => hit.nodeKey)).toEqual(['a1'])
+    expect(findInLoadedRows(list, ['quartzite'], ThreadFindModel.flowKindsFor(['tools'])).map(hit => hit.nodeKey)).toEqual(['t1'])
+    expect(findInLoadedRows(list, ['quartzite'], ThreadFindModel.flowKindsFor(['assistant', 'user'])).map(hit => hit.nodeKey)).toEqual(['u1', 'a1'])
   })
 })
 

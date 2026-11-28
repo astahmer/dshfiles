@@ -35,6 +35,15 @@ export type FindMatch = typeof findMatchSchema.Type
 /** Most matches one find returns; a thread with more reports `hasMore`. */
 export const FIND_LIMIT_MAX = 1_000
 
+/**
+ * Optional event-type filter for `findInThread` (e.g. `assistant/message`, `user/message`, `tool/call`, `tool/result`).
+ * The indexed types are whatever core's text extraction returns text for (`todo/write` and `turn/end` too), so the set
+ * stays open; the shape check rejects a bare `assistant` or `tool` that would otherwise match nothing in silence.
+ */
+export const findEventTypesSchema = Schema.Array(
+  Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(64), Schema.isPattern(/^[a-z][\w.-]*\/[\w./-]+$/)),
+).check(Schema.isMinLength(1), Schema.isMaxLength(16))
+
 /** Bounds of a prompt-history read: rows returned, newest prompts searched, and the longest prompt kept. */
 export const PROMPT_HISTORY_LIMIT_MAX = 200
 export const PROMPT_HISTORY_WINDOW_MAX = 50_000

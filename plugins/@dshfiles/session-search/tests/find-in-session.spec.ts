@@ -2,6 +2,8 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import * as Schema from 'effect/Schema'
+import { findEventTypesSchema } from '../src/api-schemas.js'
 import { findExpression } from '../src/find-query.js'
 import type { SearchIndex } from '../src/index-db.js'
 import { runWithIndex } from './index-harness.js'
@@ -36,6 +38,16 @@ describe('findExpression', () => {
   it('refuses text without a searchable word', () => {
     expect(findExpression('')).toBeNull()
     expect(findExpression(' - * " ')).toBeNull()
+  })
+})
+
+describe('findEventTypesSchema', () => {
+  it('keeps the set of event types open but refuses a bare word that would match nothing', () => {
+    const accepts = (types: readonly string[]) => Schema.decodeUnknownResult(findEventTypesSchema)(types)._tag === 'Success'
+    expect(accepts(['assistant/message', 'tool/call', 'todo/write'])).toBe(true)
+    expect(accepts(['assistant'])).toBe(false)
+    expect(accepts(['Tool/call'])).toBe(false)
+    expect(accepts([])).toBe(false)
   })
 })
 
@@ -79,5 +91,85 @@ describe('SearchIndex.findInSession', () => {
     expect(outcome.page.matches.map(match => match.seq)).toEqual([0, 1, 2])
     expect(outcome.page.hasMore).toBe(true)
     expect(outcome.unrelated.matches).toEqual([])
+  })
+
+  it('filters matches by event type without tool calls crowding out assistant replies', async () => {
+    const path = await openIndex()
+    const outcome = await runWithIndex(path, function* (index) {
+      yield* commit(index, 'session-a', [
+        { type: 'user/message', surface: 'current', text: 'check quartz config' },
+        { type: 'assistant/message', surface: 'current', text: 'quartz first reply' },
+        { type: 'tool/call', surface: 'current', text: 'grep quartz src/' },
+        { type: 'tool/result', surface: 'current', text: 'quartz match in tool output' },
+        { type: 'assistant/message', surface: 'current', text: 'quartz final reply' },
+        { type: 'tool/result', surface: 'current', text: 'trailing quartz tool result' },
+      ])
+      const assistantOnly = yield* index.findInSession({
+        sessionId: 'session-a',
+        query: findExpression('quartz') ?? '',
+        limit: 1,
+        newest: true,
+        types: ['assistant/message'],
+      })
+      const toolsOnly = yield* index.findInSession({
+        sessionId: 'session-a',
+        query: findExpression('quartz') ?? '',
+        limit: 10,
+        types: ['tool/call', 'tool/result'],
+      })
+      const conversation = yield* index.findInSession({
+        sessionId: 'session-a',
+        query: findExpression('quartz') ?? '',
+        limit: 10,
+        types: ['user/message', 'assistant/message'],
+      })
+      return { assistantOnly, toolsOnly, conversation }
+    })
+
+    expect(outcome.assistantOnly.matches.map(match => [match.seq, match.type])).toEqual([[4, 'assistant/message']])
+    expect(outcome.assistantOnly.hasMore).toBe(true)
+    expect(outcome.toolsOnly.matches.map(match => [match.seq, match.type])).toEqual([
+      [2, 'tool/call'],
+      [3, 'tool/result'],
+      [5, 'tool/result'],
+    ])
+    expect(outcome.conversation.matches.map(match => [match.seq, match.type])).toEqual([
+      [0, 'user/message'],
+      [1, 'assistant/message'],
+      [4, 'assistant/message'],
+    ])
+  })
+
+  it('reads the conversation table for message filters once it is backfilled, current surface only', async () => {
+    const path = await openIndex()
+    const outcome = await runWithIndex(path, function* (index) {
+      yield* commit(index, 'session-a', [
+        { type: 'user/message', surface: 'current', text: 'quartz question' },
+        { type: 'assistant/message', surface: 'shadowed', text: 'quartz rewound reply' },
+        { type: 'tool/result', surface: 'current', text: 'quartz tool output' },
+        { type: 'assistant/message', surface: 'current', text: 'quartz answer' },
+      ])
+      yield* commit(index, 'session-b', [{ type: 'assistant/message', surface: 'current', text: 'quartz elsewhere' }])
+      while (!(yield* index.backfillConversation(100))) {}
+      const query = findExpression('quartz') ?? ''
+      return {
+        ready: yield* index.conversationReady(),
+        assistant: yield* index.findInSession({ sessionId: 'session-a', query, limit: 10, types: ['assistant/message'] }),
+        messages: yield* index.findInSession({
+          sessionId: 'session-a',
+          query,
+          limit: 1,
+          newest: true,
+          types: ['assistant/message', 'user/message', 'user/message'],
+        }),
+        mixed: yield* index.findInSession({ sessionId: 'session-a', query, limit: 10, types: ['assistant/message', 'tool/result'] }),
+      }
+    })
+
+    expect(outcome.ready).toBe(true)
+    expect(outcome.assistant.matches.map(match => match.seq)).toEqual([3])
+    expect(outcome.messages.matches.map(match => match.seq)).toEqual([3])
+    expect(outcome.messages.hasMore).toBe(true)
+    expect(outcome.mixed.matches.map(match => match.seq)).toEqual([2, 3])
   })
 })
