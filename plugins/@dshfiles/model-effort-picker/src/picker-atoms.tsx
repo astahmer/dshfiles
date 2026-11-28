@@ -1,3 +1,4 @@
+import { useState, type ReactElement } from 'react'
 import { CircleHelpIcon } from '@dshfiles/plugin-ui/icons'
 import { ModelMark, modelFamily } from '@dshfiles/plugin-ui/components/model-mark'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
@@ -46,16 +47,45 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
   )
 }
 
+/** Whether a text element is cut short by its ellipsis. */
+export const isTruncated = (element: { readonly scrollWidth: number; readonly clientWidth: number } | null): boolean =>
+  element !== null && element.scrollWidth > element.clientWidth + 1
+
+/**
+ * Council picker round 1, N3: a tooltip only when it adds something. It opens (after the provider's 500 ms) only when
+ * the text it wraps is truncated, below the text, so it never covers the search above the list or the row itself.
+ */
+export const TruncatedTooltip = ({ children, content }: { readonly children: ReactElement; readonly content: string }) => {
+  const [open, setOpen] = useState(false)
+  return (
+    <Tooltip
+      onOpenChange={next => {
+        if (!next) setOpen(false)
+      }}
+      open={open}
+    >
+      <TooltipTrigger
+        asChild
+        onFocus={event => setOpen(isTruncated(event.currentTarget))}
+        onPointerEnter={event => setOpen(isTruncated(event.currentTarget))}
+        onPointerLeave={() => setOpen(false)}
+      >
+        {children}
+      </TooltipTrigger>
+      <TooltipContent align="start" data-model-truncated-tooltip side="bottom">
+        {content}
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** The service name a route is offered through, shown after the model name. */
 export const ProviderLabel = ({ label, className }: { readonly label: string; readonly className?: string }) => (
-  <Tooltip>
-    <TooltipTrigger asChild>
-      <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-2xs dshx:leading-none dshx:text-muted-foreground/80', className)} data-model-provider-label>
-        {label}
-      </span>
-    </TooltipTrigger>
-    <TooltipContent side="top">{label}</TooltipContent>
-  </Tooltip>
+  <TruncatedTooltip content={label}>
+    <span className={cn('dshx:min-w-0 dshx:truncate dshx:text-xs dshx:leading-none dshx:text-muted-foreground', className)} data-model-provider-label>
+      {label}
+    </span>
+  </TruncatedTooltip>
 )
 
 /** The model's effort glyph: six bars fill in as effort rises, with the hue shifting from neutral to amber. */

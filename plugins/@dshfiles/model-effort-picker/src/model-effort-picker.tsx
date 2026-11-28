@@ -258,7 +258,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   if (!available) return null
 
   return (
-    <TooltipProvider>
+    <TooltipProvider delayDuration={500}>
       <div className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-0.5">
         <Popover onOpenChange={setOpen} open={open}>
           <PopoverTrigger asChild>

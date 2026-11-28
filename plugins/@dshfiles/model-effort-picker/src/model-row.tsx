@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { CheckIcon, ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
-import { BrandMark, ProviderLabel, QuotaText } from './picker-atoms.js'
+import { BrandMark, ProviderLabel, QuotaText, TruncatedTooltip } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 type CatalogModel = CatalogGroup['models'][number]
@@ -98,17 +97,14 @@ export const ModelRow = (props: {
     >
       <BrandMark brand={brand} className="dshx:size-4" name={name} />
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span
-              className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
-              data-model-picker-name
-            >
-              {name}
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top">{props.model.id}</TooltipContent>
-        </Tooltip>
+        <TruncatedTooltip content={props.model.id}>
+          <span
+            className={cn('dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
+            data-model-picker-name
+          >
+            {name}
+          </span>
+        </TruncatedTooltip>
         {props.providerLabel === undefined ? null : <ProviderLabel className="dshx:max-w-[7rem]" label={props.providerLabel} />}
       </span>
       {/* b:16yr: one row per model, so no account badge or per-row effort glyph: the account and the reasoning effort are
