@@ -519,6 +519,27 @@ project picker and nested sheets dim with the kit scrim. Polish toward 10 is que
 child turn guard, on by default upstream) merged with catalog fixes. Captures `round-31/` match `round-30/` apart from
 timers. Next: the full-set council (round 34) and one combined before/after performance table.
 
+Round nine, full set. Council round 34 on everything: Astra 9 / Opus 9 / Fable 9 (round 24: 9.5 ×3). Holding it back:
+the phone composer (Send/Stop 8 px off the row since the upstream Tools control), the phone project picker (sideways
+overflow, mismatched project marks), and smaller items. Round 35 lanes (`round-34-fixes.md`): K (neutral chip for an
+unknown model family, Usage's dark segment track, the turn rail from three turns on a neutral track, one scrim for nested
+phone sheets), C (the picker sheet fits 390 px with the list's project marks, Send/Stop back on the row, Tools in the
+phone ⋯ sheet, the desktop dock capped at 4 rows, a child thread's footer names its project), S (Filters trigger and
+tooltip, forced More statuses as one label, one counting form per row, the tab seat's Idle ring, the phone row menu
+names its thread, Mark N counts what changes, the Custom grouping on the standard rows). Settings' \"new sessions\" is
+DSH core copy (host gap 113).
+
+Performance, combined on one build (`docs/performance.md`, Round nine combined). The first combined run found a
+regression: every desktop thread switch re-registered all palette actions (546 palette rebuilds per click, about +220 ms),
+caused by the settled-store move making `updatePreferences` unstable. Lane S fixed it (stable callback, palette rows
+keyed by content, a dshx batch publish). Final, `3e5a3324` vs `8dd06c5c`, five matched pairs: boot JS 25.43 → 18.23 MB
+decoded, 7.93 → 5.60 MB sent; API at load 956 → 553 KB; desktop switch level (−14 ms); phone title −861 ms, first
+message −748 ms, Back −659 ms, page load −2.35 s. Nothing slower at matched load.
+
+Model picker (owner request 2026-11-27 23:18): baseline council Astra 6 / Opus 6 / Fable 5.5 on 20 states; fix list
+`.cache/unslop-audit/r5/council/picker-1-fixes.md` (inspect never switches the thread, one surface, segmented effort,
+a visible Fast switch with the kit tooltip-state bug fixed, neutral selection, a one-stop keyboard list) in progress.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
