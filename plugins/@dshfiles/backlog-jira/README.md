@@ -11,8 +11,8 @@ this plugin loaded, that section offers **Add Jira connection**.
 1. Create an [API token](https://id.atlassian.com/manage-profile/security/api-tokens) for the Atlassian account the
    backlog should act as, and store it in the Secret Catalog.
 2. In **Backlog settings › Remote sync**, add a Jira connection: its key is the token's `secret:ALIAS` reference
-   (empty falls back to the Host's `JIRA_API_TOKEN`), its API base URL your site, `https://<site>.atlassian.net`
-   (https is required; plain http is accepted only on loopback, for tests), and its **Account email** the account's
+   (empty falls back to the Host's `JIRA_API_TOKEN`), its **Site URL** your site, `https://<site>.atlassian.net`
+   (required; https only, plain http is accepted only on loopback, for tests), and its **Account email** the account's
    email (empty falls back to `JIRA_EMAIL`). **Test** names the account and lists every project it can browse.
 3. Add a binding. Its container is a project key (`ENG`), or empty for the only project the account sees. The binding's
    provider settings:

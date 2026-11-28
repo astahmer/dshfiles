@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "gitea-provider",
+      "title": "Sync backlog items with a Gitea or Forgejo repository",
+      "summary": "Serves the backlog's backlog-provider Host API as the gitea kind: a connection (Instance URL, access token reference) names the account (or notes a token without read:user) and discovers the repositories with issues it can see through repository search; a binding to an owner/repo pulls issues changed since an updated_at checkpoint with the inclusive since= filter, every page of 50, skipping pull requests, and maps the title, the markdown body, open/closed (open stands for inbox, todo and doing; closed for done and dropped), labels as tags (missing labels created unless the binding says no) and issue dependencies as depends-on/blocks both ways; comments flow both ways; deleting a linked item closes its issue. 429 and 503 wait for Retry-After up to three times.",
+      "surfaces": ["host", "integration"],
+      "surface": "infrastructure",
+      "destination": "none",
+      "currentSurface": "Backlog settings › Remote sync › Add Gitea connection (rendered by @dshfiles/backlog)",
+      "configuration": [
+        {
+          "key": "connection.credential",
+          "defaultValue": "",
+          "constraints": "A secret:ALIAS reference to a Gitea/Forgejo access token with write:issue and write:repository, resolved on the Host; empty falls back to GITEA_TOKEN, then FORGEJO_TOKEN.",
+          "coveredBy": ["backlog-gitea.identity", "backlog-gitea.refused-token"]
+        },
+        {
+          "key": "connection.baseUrl",
+          "defaultValue": "",
+          "constraints": "The Instance URL, the instance web root such as https://gitea.example.com (a trailing /api/v1 is accepted, a bare host reads as https); required: the connection form names the field, waits for it before Test and Save, and the Host refuses to save a connection without it; https, or plain http only for loopback, private or CGNAT addresses and .internal/.local/.lan/.home.arpa/.ts.net names.",
+          "coveredBy": ["backlog-gitea.preflight", "backlog-gitea.instance-url", "backlog-gitea.private-hosts", "backlog-gitea.connect-bind-import-close"]
+        },
+        {
+          "key": "binding.container",
+          "defaultValue": "",
+          "constraints": "owner/repo, or empty for the only repository with issues the token sees.",
+          "coveredBy": ["backlog-gitea.preflight", "backlog-gitea.pull-checkpoint", "backlog-gitea.create"]
+        },
+        {
+          "key": "binding.options.createLabels",
+          "defaultValue": "yes",
+          "constraints": "no, false, off or 0 only attaches labels that already exist in the repository.",
+          "coveredBy": ["backlog-gitea.fields"]
+        }
+      ],
+      "states": ["discovering", "pulling", "pushing", "creating", "rate-limited", "failed"],
+      "failureModes": [
+        "A refused token (401/403) fails the call with its recovery: check the key, its write:issue and write:repository scopes and the repository access; the token never appears in the message.",
+        "A missing or public plain-http Instance URL or an invalid owner/repo fails before any request with target-missing, naming what to set; the connection form keeps Test and Save disabled while the Instance URL is empty and says what to enter.",
+        "A reference on another host, a pull request or a malformed key fails with not-found before or instead of a write.",
+        "A repository with issue dependencies turned off reads no relations and syncs the other fields.",
+        "Still rate-limited after three Retry-After waits fails the call with a 429; the next pass retries from the same checkpoint."
+      ],
+      "externalDependencies": [
+        {
+          "id": "gitea-rest-api",
+          "boundary": "HTTP(S) requests to the connection's instance under /api/v1 with Authorization: token: user, repos/search, repos/{owner}/{repo}/issues, issues/{n}, issues/{n}/comments, issues/{n}/labels, issues/{n}/dependencies, issues/{n}/blocks and repos/{owner}/{repo}/labels.",
+          "deterministicFake": "src/gitea-fake.ts answers the same paths in memory through an HttpClient stand-in: repository acme/app with issues, a pull request, labels, comments and dependencies, newest-first listing, inclusive since= on whole seconds, limit capped at 50, +01:00 timestamps, a read:user scope switch, dependencies switch and 429s on demand; the provider, its retry and decoding run for real."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.identity",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "names the account and discovers repositories with issues, and still works without read:user"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.preflight",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "accepts the base URL with /api/v1, and refuses public plain http, a bad repository and a foreign reference before any request"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.instance-url",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "asks for the instance URL by name, requires it, and reads a bare host as https"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.private-hosts",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "allows plain http only for private hosts"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.pull-checkpoint",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "pulls every page whatever the order, skips pull requests, and checkpoints the newest update"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.fields",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "writes title, body, status and labels, creating a missing label unless the binding says no"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.dependencies",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "reads and writes dependencies as depends-on and blocks, and reads none when dependencies are off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.create",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "creates an issue with its labels, kind and closed state, then its dependencies, in the only repository when the binding names none"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.comments",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "reads comments with fetch and adds one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.references",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "resolves numbers, owner/repo#n and issue URLs on the instance, and refuses pull requests"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.rate-limit",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "waits for Retry-After on a 429, then gives up after three retries"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.refused-token",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "reports a refused token with its recovery and never echoes the token"
+        },
+        {
+          "kind": "unit-test",
+          "id": "backlog-gitea.host-api",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "answers the backlog over its Host API with the failure code intact"
+        },
+        {
+          "kind": "gherkin",
+          "id": "backlog-gitea.connect-bind-import-close",
+          "featureFile": "tooling/dshx/e2e/features/backlog-gitea.feature"
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "custom",
+          "span": "gitea request",
+          "file": "plugins/@dshfiles/backlog-gitea/src/gitea-provider.test.ts",
+          "testName": "records one gitea request span per call, with the operation and status only"
+        }
+      ],
+      "reach": ["click button \"Backlog\"", "click button \"Backlog settings\"", "click button \"Add Gitea connection\"", "expect textbox \"Instance URL\""]
+    }
+  ]
+}

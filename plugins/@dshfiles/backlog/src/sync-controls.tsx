@@ -42,7 +42,7 @@ import {
 } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { errorMessage, useMutation, useQuery, useQueryClient } from '@dshfiles/plugin-ui/query'
-import { Fragment, useState } from 'react'
+import { Fragment, useId, useState } from 'react'
 
 import { BacklogReference } from './backlog-reference.js'
 import {
@@ -690,6 +690,9 @@ const ConnectionForm = (props: {
     props.initial?.instanceId ??
     BacklogSyncModel.uniqueSlug(BacklogSyncModel.slugOf(label === props.descriptor.label ? props.descriptor.kind : label), new Set(props.takenIds))
   const keyed = props.descriptor.credential !== 'none'
+  const urlField = BacklogProviders.baseUrlField(props.descriptor)
+  const urlMissing = keyed && urlField.required && baseUrl.trim() === ''
+  const urlHintId = useId()
   const saveTested = (): void => actions.saveConnection.mutate({ connection: { instanceId, label: label.trim(), ...draft } }, { onSuccess: props.onDone })
   const save = (): void => {
     if (testedDraft && test.data?.error === null) return saveTested()
@@ -721,8 +724,12 @@ const ConnectionForm = (props: {
         ) : null}
         {keyed ? (
           <input
-            aria-label="API base URL"
-            placeholder="Default API"
+            type="text"
+            inputMode="url"
+            aria-label={urlField.label}
+            aria-required={urlField.required}
+            aria-describedby={urlMissing ? urlHintId : undefined}
+            placeholder={urlField.placeholder}
             value={baseUrl}
             onChange={event => setBaseUrl(event.currentTarget.value)}
             className={cn(inputClass, 'dshx:font-mono!')}
@@ -742,6 +749,11 @@ const ConnectionForm = (props: {
           />
         ))}
       </div>
+      {urlMissing ? (
+        <p id={urlHintId} className="dshx:text-xs dshx:text-muted-foreground">
+          {props.descriptor.label} needs its {urlField.label}, such as {urlField.placeholder}, to test and save.
+        </p>
+      ) : null}
       {isReferenceOrEmpty(credential) ? null : (
         <p role="alert" className="dshx:text-xs dshx:text-destructive">
           Keys are stored as vault references. Pick one with the key button in the field, or clear it to use the Host environment.
@@ -754,11 +766,21 @@ const ConnectionForm = (props: {
         </p>
       )}
       <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-2">
-        <Button type="button" size="sm" variant="outline" disabled={test.isPending || !isReferenceOrEmpty(credential)} onClick={() => test.mutate(draft)}>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={test.isPending || urlMissing || !isReferenceOrEmpty(credential)}
+          onClick={() => test.mutate(draft)}
+        >
           <RefreshCwIcon aria-hidden className={cn('dshx:size-3.5', test.isPending && 'dshx:animate-spin')} />
           Test connection
         </Button>
-        <Button type="submit" size="sm" disabled={test.isPending || actions.saveConnection.isPending || label.trim() === '' || !isReferenceOrEmpty(credential)}>
+        <Button
+          type="submit"
+          size="sm"
+          disabled={test.isPending || actions.saveConnection.isPending || urlMissing || label.trim() === '' || !isReferenceOrEmpty(credential)}
+        >
           Save connection
         </Button>
         <Button type="button" size="sm" variant="ghost" onClick={props.onDone}>

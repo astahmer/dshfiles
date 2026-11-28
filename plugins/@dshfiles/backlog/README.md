@@ -602,7 +602,8 @@ sync** lists **connections**, each with its **bindings**:
 
 - A **connection** is one account of one provider (“GitHub – work”, “GitHub – perso”): a name, a `secret:ALIAS`
   reference to its key (empty falls back to the provider's Host variable — `LINEAR_API_KEY`, `GITHUB_TOKEN`/`GH_TOKEN`,
-  then `gh auth token` — and a folder needs none) and an optional API base URL. **Test** names the account it signs in
+  then `gh auth token` — and a folder needs none) and a base URL: optional where the provider has a public API, named
+  and required where it has none (Jira's **Site URL**, Gitea's **Instance URL**). **Test** names the account it signs in
   as and how many containers it sees, never the key; the arrows reorder connections; removing one asks first and drops
   its bindings and their item links (items and remote items stay).
 - A **binding** is one sync flow of a connection: a container (Linear team, `owner/repo`, folder; empty derives it — the
@@ -704,13 +705,16 @@ canonical record shape. A descriptor may list `bindingOptions` (key, label, plac
 text field per option, the binding stores them as `options`, and every call scoped to that binding carries them
 (Notion's property names). `connectionOptions` work the same way one level up: the connection form shows one field per
 option, the connection stores them as `options` (never a key; changing one clears the last Test result), and `identity`
-and every scoped call receive them on `connection.options` (Jira's account email). A handler fails with `BacklogProviderFailed` (its `dshxWireCode` is
+and every scoped call receive them on `connection.options` (Jira's account email). A descriptor's `baseUrl` (label,
+placeholder, required) names the connection's URL field for a provider without a public default: the form shows that
+label and example, waits for the URL before **Test** and **Save**, and saving one without it fails with
+`sync-config-invalid`; without it the field is an optional `API base URL`. A handler fails with `BacklogProviderFailed` (its `dshxWireCode` is
 `backlog-provider-failed`): the backlog calls providers through `HostApis.typed` with that class declared, so its code
 (`not-found`, `rejected`, …), HTTP status and detail arrive intact and the user sees the provider's own recovery
 (“share the page with the integration”, “check the key”) rather than a generic refusal; only a call that never reached
 the provider reads as `transport` or `unsupported`. The backlog lists served providers once a minute; a built-in kind
 wins over one of the same name. The built-ins implement the same in-process `BacklogProvider` interface. `@dshfiles/backlog-notion` is the
-reference external provider.
+reference external provider; `@dshfiles/backlog-jira` and `@dshfiles/backlog-gitea` (Gitea and Forgejo) follow it.
 
 ## Search and saved views
 
