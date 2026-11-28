@@ -132,7 +132,7 @@ export const ModelDetails = (props: {
         </button>
       </header>
 
-      <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip]" data-model-details-body>
+      <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]" data-model-details-body>
         {model === undefined ? null : (
           <AccountRows
             accents={props.accountAccents}

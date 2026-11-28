@@ -23,6 +23,8 @@ describe('phone picker is one sheet, list then details in place (council picker 
     expect(tagOf(details, 'data-model-details-back')).toMatch(/dshx:pointer-coarse:size-11/u)
     expect(tagOf(picker, 'data-model-picker-scroll')).toContain('[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!')
     expect(tagOf(details, 'data-model-details-body')).toMatch(/dshx:\[overflow-x:clip\]/u)
+    // Content scrolling under the fixed header fades over 8 px, as the list does under the search (S2).
+    expect(tagOf(details, 'data-model-details-body')).toContain('mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)')
   })
 
   it('keeps the details header (Back, title, Close) outside the scroller, 48 px tall on the sheet', () => {
