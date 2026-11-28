@@ -4,6 +4,7 @@ Snapshot audit of the [HackSing/dsh-plugins](https://github.com/HackSing/dsh-plu
 (`data/plugins.json`, directory snapshot dated 2026-10-15), updated with decision-focused source
 research and disposable UI probes on 2026-10-16. Baseline: stock DSH **0.2.0-rc.2**, cordis 4.0.4,
 Node 22.23.3, macOS, jj-only version control, 44 owned plugins, multi-agent threads, multi-host SSH.
+For the narrower [#220 comparison on stock 0.2.2-rc.2](community-plugins-220.md), see the newer decisions and marketplace search check; this snapshot's compatibility and probe results do not carry forward.
 
 Verdicts used below:
 
