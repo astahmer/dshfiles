@@ -19,8 +19,15 @@ describe('every touch target is 44 pt (council picker C6)', () => {
   })
 
   it('gives every control a real 44 px on touch, or hides a hover-only hint there', () => {
-    const short = controls.filter(({ tag }) => !REAL_44.test(tag) && !/data-touch-row/u.test(tag))
+    // The composer trigger is exempt: the composer row gives its buttons the 44 pt hit area (see the next test).
+    const short = controls.filter(({ tag }) => !REAL_44.test(tag) && !/data-touch-row|data-model-trigger/u.test(tag))
     expect(short.map(({ name, tag }) => `${name}: ${tag.replace(/\s+/gu, ' ').slice(0, 140)}`)).toEqual([])
+  })
+
+  it("draws the composer trigger at the bar's 32 px chip height on touch, its 44 pt hit area coming from the composer row", () => {
+    const trigger = controls.find(({ tag }) => tag.includes('data-model-trigger'))?.tag ?? ''
+    expect(trigger).toMatch(/dshx:h-8 /u)
+    expect(trigger).not.toMatch(/pointer-coarse:(?:min-)?h-/u)
   })
 
   it('lets the whole Fast mode row toggle the switch', () => {

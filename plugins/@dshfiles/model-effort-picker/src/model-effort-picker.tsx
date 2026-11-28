@@ -270,9 +270,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
       <div className="dshx-root dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-0.5">
         <Popover onOpenChange={setOpen} open={open}>
           <PopoverTrigger asChild>
+            {/* Drawn at the bar's 32 px chip height on touch too: the composer row gives each of its buttons a 44 pt hit area
+                (InputBar.module.css), and a 44 px trigger regrew the row and put Send off its axis (council round 34 A2). */}
             <Button
               aria-label={`${shortLabel?.title ?? triggerLabel}, reasoning ${effortLabel ?? 'provider default'}`}
-              className="dshx-root dshx:h-8 dshx:pointer-coarse:h-11 dshx:max-w-72 dshx:min-w-20 dshx:in-data-model-icon:min-w-0 dshx:shrink dshx:justify-start dshx:gap-1 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:px-1.5 dshx:in-data-model-icon:px-1"
+              className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-20 dshx:in-data-model-icon:min-w-0 dshx:shrink dshx:justify-start dshx:gap-1 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:px-1.5 dshx:in-data-model-icon:px-1"
               data-model-trigger=""
               disabled={locked}
               size="sm"
