@@ -33,6 +33,8 @@ export const FallbacksSection = (props: {
   readonly current: ModelSelection | null
   readonly busy: boolean
   readonly accountAccents: ReadonlyMap<string, string>
+  /** N2: each account's short tag ("CC2"), the one the status bar and AI Accounts show. */
+  readonly accountBadges?: ReadonlyMap<string, string>
   readonly providerLabels: ReadonlyMap<string, string>
 }) => {
   const api = useApi(aiAccountsModelFallbackApi)
@@ -140,7 +142,7 @@ export const FallbacksSection = (props: {
                 <AccountBadge
                   className="dshx:max-w-[7rem]"
                   color={props.accountAccents.get(route.provider) ?? accountColor({ instanceId: route.provider })}
-                  label={ModelPickerModel.accountTag({ name: label.provider, provider: providerLabel })}
+                  label={props.accountBadges?.get(route.provider) ?? ModelPickerModel.accountTag({ name: label.provider })}
                   name={label.provider}
                 />
                 {quota === undefined ? null : (

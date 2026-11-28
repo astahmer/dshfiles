@@ -22,3 +22,24 @@ export const accountColor = ({ instanceId, accentColor }: { readonly instanceId:
   for (const character of instanceId) hash = (hash * 31 + character.charCodeAt(0)) % 997
   return ACCOUNT_HUES[hash % ACCOUNT_HUES.length] ?? ACCOUNT_HUES[0]
 }
+
+/**
+ * Council picker round 1, N2: accounts of one service never share a dot. Every account of a kind starts from the same
+ * kind accent (AI Accounts' `KIND_ACCENT`), so the first account keeps it and each later one that would repeat a dot of
+ * its service takes the next hue its service does not use yet.
+ */
+export const accountAccents = (
+  profiles: readonly { readonly instanceId: string; readonly kind: string; readonly accentColor?: string | undefined }[],
+): ReadonlyMap<string, string> => {
+  const accents = new Map<string, string>()
+  const usedByKind = new Map<string, Set<string>>()
+  for (const profile of profiles) {
+    const used = usedByKind.get(profile.kind) ?? new Set<string>()
+    usedByKind.set(profile.kind, used)
+    let color = accountColor(profile)
+    if (used.has(color)) color = ACCOUNT_HUES.find(hue => !used.has(hue)) ?? color
+    used.add(color)
+    accents.set(profile.instanceId, color)
+  }
+  return accents
+}

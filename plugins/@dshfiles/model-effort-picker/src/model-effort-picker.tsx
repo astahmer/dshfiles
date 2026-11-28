@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountColor } from './account-color.js'
+import { accountAccents } from './account-color.js'
 import { FallbacksSection } from './fallbacks-section.js'
 import { FastModeSection } from './fast-mode-section.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
@@ -113,13 +113,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
       ),
     [usage.data],
   )
-  const accountAccents = useMemo(
+  // N2: a distinct dot per account within one service, and the account's own short tag ("CC2").
+  const accountAccentMap = useMemo(() => accountAccents(profiles.data?.accounts ?? []), [profiles.data])
+  const accountBadges = useMemo(
     () =>
       new Map(
-        (profiles.data?.accounts ?? []).map(profile => [
-          profile.instanceId,
-          accountColor({ accentColor: profile.accentColor, instanceId: profile.instanceId }),
-        ]),
+        (profiles.data?.accounts ?? []).map(profile => [profile.instanceId, ModelPickerModel.accountTag({ name: profile.displayName, badge: profile.badge })]),
       ),
     [profiles.data],
   )
@@ -518,13 +517,14 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               >
                 <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col">
                   <ModelDetails
-                    accountAccents={accountAccents}
+                    accountAccents={accountAccentMap}
                     busy={busy}
                     current={current}
                     error={selectionError ?? state.error}
                     fallbacks={
                       <FallbacksSection
-                        accountAccents={accountAccents}
+                        accountAccents={accountAccentMap}
+                        accountBadges={accountBadges}
                         busy={busy}
                         current={current}
                         groups={state.groups}

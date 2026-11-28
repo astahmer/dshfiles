@@ -425,4 +425,17 @@ describe('route refresh', { timeout: 30_000 }, () => {
     expect(providers).not.toContain('cc_b')
     expect(await accountsCall(host, 'read', undefined)).toMatchObject({ ok: true, value: { output: { distribution: 'round-robin' } } })
   })
+
+  it('names an account shown after the plugin started by its display name, not its instance id', async () => {
+    // Council picker round 1, N2: the adapter names each provider from the profiles, so the route swap must see the
+    // new account's profile; a raw "codex_work_…" id reached the model picker this way.
+    const host = await start({ accounts: [{ id: 'cc_a' }, { id: 'cc_late', enabled: false }], distribution: 'sticky' })
+    const file = await accountsCall(host, 'read', undefined)
+    if (!file.ok) throw new Error(file.error.message)
+    const late = file.value.output.accounts.find(account => account.instanceId === 'cc_late')
+    const saved = await accountsCall(host, 'save', { draft: draftPayload(late, true) })
+    expect(saved.ok).toBe(true)
+
+    expect(host.host.ctx.llm.listProviders().find(provider => provider.id === 'cc_late')?.name).toBe('Account cc_late')
+  })
 })

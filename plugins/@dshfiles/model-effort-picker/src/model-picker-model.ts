@@ -184,16 +184,19 @@ export class ModelPickerModel {
     modelIdentity(group.id, model.id)?.name ?? model.name
 
   /**
-   * The account tag drops a leading service name so the provider label can name the service without repeating it.
-   * An ordinal remainder becomes "#1" instead of repeating the service, and anything else stays whole.
+   * Council picker round 1, N2: one short account tag everywhere, the account's badge as AI Accounts and the status bar
+   * show it ("CC2", not "#2"): its own badge when it has one, else the initials of its name with any number kept.
    */
-  static accountTag = ({ name, provider }: { readonly name: string; readonly provider: string | undefined }): string => {
-    const prefix = provider === undefined ? '' : `${provider} `
-    if (prefix.length === 0 || !name.toLowerCase().startsWith(prefix.toLowerCase())) return name
-    const remainder = name.slice(prefix.length).trim()
-    if (remainder.length === 0) return name
-    if (/\p{L}/u.test(remainder)) return remainder
-    return /^\d+$/u.test(remainder) ? `#${remainder}` : name
+  static accountTag = ({ name, badge }: { readonly name: string; readonly badge?: string | undefined }): string => {
+    if (badge !== undefined && badge.trim() !== '') return badge.trim()
+    const initials = name
+      .split(/\s+/u)
+      .filter(Boolean)
+      .map(part => (/^\d+$/u.test(part) ? part : part[0]))
+      .join('')
+      .slice(0, 3)
+      .toUpperCase()
+    return initials === '' ? name : initials
   }
 
   /** The trigger names the provider (its initials) only when another provider offers the same model name. */
@@ -214,14 +217,7 @@ export class ModelPickerModel {
     // the tooltip always name it.
     const fallback = ModelPickerModel.defaultAccountFor({ groups, model: current.model })
     if (fallback === undefined || fallback.id === group.id) return { model: name, title }
-    const initials = group.name
-      .split(/\s+/u)
-      .filter(Boolean)
-      .map(part => part[0])
-      .join('')
-      .slice(0, 3)
-      .toUpperCase()
-    return { model: name, providerTag: initials || group.id, title }
+    return { model: name, providerTag: ModelPickerModel.accountTag({ name: group.name }), title }
   }
 
   /** The account a model runs on by default: the first account, in catalog (priority) order, that offers it. */

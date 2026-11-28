@@ -49,19 +49,6 @@ describe('account colours', () => {
   })
 })
 
-describe('account tags', () => {
-  it('drops the service name when the remainder still identifies the account', () => {
-    expect(ModelPickerModel.accountTag({ name: 'OpenCode Go Alex', provider: 'OpenCode Go' })).toBe('Alex')
-    expect(ModelPickerModel.accountTag({ name: 'Codex Alex2', provider: 'Codex' })).toBe('Alex2')
-    expect(ModelPickerModel.accountTag({ name: 'ClaudeWork', provider: 'Claude' })).toBe('ClaudeWork')
-  })
-
-  it('keeps the account identifiable when the service prefix leaves an ordinal', () => {
-    expect(ModelPickerModel.accountTag({ name: 'GitHub Copilot 1', provider: 'GitHub Copilot' })).toBe('#1')
-    expect(ModelPickerModel.accountTag({ name: 'Any Account', provider: undefined })).toBe('Any Account')
-  })
-})
-
 describe('effort glyphs', () => {
   it('fills more bars and warms the hue as effort rises', () => {
     expect(effortGlyph({ index: 0, total: 6 })).toEqual({ filled: 1, tone: 'muted' })
