@@ -6,7 +6,7 @@ import { ArrowLeftIcon, CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { AccountAccent } from './account-color.js'
 import { AccountRows } from './account-rows.js'
-import { ModelPickerModel, type InspectedRoute, type ModelQuota } from './model-picker-model.js'
+import { ModelPickerModel, type InspectedRoute, type ModelQuota, type PriorityAccount } from './model-picker-model.js'
 import { EffortControl } from './effort-control.js'
 import { BrandMark } from './picker-atoms.js'
 
@@ -64,6 +64,8 @@ export const ModelDetails = (props: {
   readonly error: string | null
   readonly accountAccents: ReadonlyMap<string, AccountAccent>
   readonly providerLabels: ReadonlyMap<string, string>
+  /** ai-accounts' accounts in priority order (round 4 T13). */
+  readonly priorityAccounts?: readonly PriorityAccount[] | undefined
   /** What is left on each account (b:16yr): the list shows one row per model, so the account is chosen here. */
   readonly quotas: ReadonlyMap<string, ModelQuota>
   readonly onBack: () => void
@@ -187,6 +189,11 @@ export const ModelDetails = (props: {
               const account = accounts.find(candidate => candidate.id === accountId)
               if (account !== undefined) changeAccount(account)
             }}
+            defaultId={
+              model === undefined || group === undefined
+                ? undefined
+                : ModelPickerModel.defaultAccountFor({ groups: props.groups, model: model.id, provider: group.id, accounts: props.priorityAccounts })?.id
+            }
             quotas={props.quotas}
             selected={group?.id}
           />

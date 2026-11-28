@@ -52,6 +52,13 @@ interface FallbackLabel {
   readonly effort: string | undefined
 }
 
+/** An ai-accounts account as its `read` list gives it, in priority order. */
+export interface PriorityAccount {
+  readonly instanceId: string
+  readonly kind: string
+  readonly enabled: boolean
+}
+
 export class ModelPickerModel {
   /**
    * Council picker round 1, S1: details of a model the thread does not use are a draft. Inspecting, choosing its account,
@@ -223,27 +230,54 @@ export class ModelPickerModel {
   static triggerLabel = ({
     groups,
     current,
+    accounts,
   }: {
     readonly groups: readonly ModelGroup[]
     readonly current: ModelSelection
+    readonly accounts?: readonly PriorityAccount[] | undefined
   }): { readonly model: string; readonly providerTag?: string; readonly offDefault?: boolean; readonly title: string } | undefined => {
     const group = groups.find(candidate => candidate.id === current.provider)
     const model = group?.models.find(candidate => candidate.id === current.model)
     if (group === undefined || model === undefined) return undefined
     const name = ModelPickerModel.displayName({ group, model })
     const title = `${group.name} · ${name}`
-    // b:4qjm, round 3 R8: a model one account offers reads just the model. When several do, the chip names the account:
-    // quietly on the default one (the first, in priority order, that offers it), and marked as "off default" on any other
-    // (ink at 600 with its dot), so two accounts never read alike. The menu's Account section and the tooltip name it.
-    const offering = groups.filter(candidate => candidate.models.some(entry => entry.id === current.model))
-    if (offering.length < 2) return { model: name, title }
-    const offDefault = offering[0]?.id !== group.id
-    return { model: name, providerTag: ModelPickerModel.accountTag({ name: group.name }), offDefault, title }
+    // b:4qjm, round 3 R8, round 4 T13: a model one account of its service offers reads just the model. When several do,
+    // the chip names the account: quietly on the default one (where DSH routes a new thread on that model), and marked as
+    // off default on any other, so two accounts never read alike. The menu's Account section and the tooltip name it.
+    const siblings = ModelPickerModel.sameServiceOffering({ groups, provider: current.provider, model: current.model, accounts })
+    if (siblings.length < 2) return { model: name, title }
+    const fallback = ModelPickerModel.defaultAccountFor({ groups, provider: current.provider, model: current.model, accounts })
+    return { model: name, providerTag: ModelPickerModel.accountTag({ name: group.name }), offDefault: fallback?.id !== group.id, title }
   }
 
-  /** The account a model runs on by default: the first account, in catalog (priority) order, that offers it. */
-  static defaultAccountFor = (input: { readonly groups: readonly ModelGroup[]; readonly model: string }): ModelGroup | undefined =>
-    input.groups.find(group => group.models.some(model => model.id === input.model))
+  /** The accounts of `provider`'s service that offer `model`, in ai-accounts' priority order (catalog order without it). */
+  static sameServiceOffering = (input: {
+    readonly groups: readonly ModelGroup[]
+    readonly provider: string
+    readonly model: string
+    readonly accounts?: readonly PriorityAccount[] | undefined
+  }): readonly ModelGroup[] => {
+    const offers = (id: string): ModelGroup | undefined => input.groups.find(group => group.id === id && group.models.some(model => model.id === input.model))
+    const own = input.accounts?.find(account => account.instanceId === input.provider)
+    if (input.accounts === undefined || own === undefined) return input.groups.filter(group => group.models.some(model => model.id === input.model))
+    return input.accounts.filter(account => account.kind === own.kind && account.enabled).flatMap(account => offers(account.instanceId) ?? [])
+  }
+
+  /**
+   * Round 4 T13: the account DSH routes a new thread on `model` to, for `provider`'s service: the first enabled account
+   * of that service, in ai-accounts' priority order (its `read` list, which Priority distribution walks and the account
+   * priority control reorders), that offers the model. An account ai-accounts does not manage falls back to catalog
+   * order. Health is not counted: a cooled-down account is still the default, it is only skipped for a turn.
+   */
+  static defaultAccountFor = (input: {
+    readonly groups: readonly ModelGroup[]
+    readonly model: string
+    readonly provider?: string | undefined
+    readonly accounts?: readonly PriorityAccount[] | undefined
+  }): ModelGroup | undefined =>
+    input.provider === undefined
+      ? input.groups.find(group => group.models.some(model => model.id === input.model))
+      : ModelPickerModel.sameServiceOffering({ groups: input.groups, provider: input.provider, model: input.model, accounts: input.accounts })[0]
 
   /**
    * One list row per model (b:16yr). A route is still model × account; the view groups the routes of one model and one

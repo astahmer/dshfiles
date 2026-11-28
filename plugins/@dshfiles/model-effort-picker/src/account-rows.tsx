@@ -22,6 +22,8 @@ export const AccountRows = (props: {
   readonly quotas: ReadonlyMap<string, ModelQuota>
   readonly accents: ReadonlyMap<string, AccountAccent>
   readonly onChoose: (accountId: string) => void
+  /** Round 4 T13: the account a new thread on this model is routed to, captioned "Default". */
+  readonly defaultId?: string | undefined
 }) => {
   const headingId = useId()
   const group = useRef<HTMLDivElement>(null)
@@ -71,7 +73,14 @@ export const AccountRows = (props: {
               type="button"
             >
               <AccountDot accent={props.accents.get(account.id) ?? AccountColor.of({ instanceId: account.id })} className="dshx:size-2" />
-              <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{account.name}</span>
+              <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5">
+                <span className="dshx:min-w-0 dshx:truncate">{account.name}</span>
+                {account.id === props.defaultId ? (
+                  <span className="dshx:shrink-0 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground" data-model-account-default>
+                    Default
+                  </span>
+                ) : null}
+              </span>
               {/* Round 3 R18: without any quota (no heading) the column is gone, not a column of dashes. */}
               {heading === undefined ? null : (
                 <span

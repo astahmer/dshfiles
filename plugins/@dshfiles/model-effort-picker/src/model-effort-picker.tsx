@@ -103,7 +103,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const filteredGroups = useMemo(() => ModelPickerModel.filterGroups(state.groups, query), [state.groups, query])
   // Only the open menu shows account labels and quotas; reading them on mount cost two requests per thread switch.
   const usage = useApiQuery(aiAccountsApi, 'usage', { enabled: open })
-  const profiles = useApiQuery(aiAccountsApi, 'read', { enabled: open })
+  // Round 4 T13: the trigger needs ai-accounts' priority order when several accounts offer the thread's model, to tell
+  // the default account from another; otherwise the list is read only while the picker is open.
+  const triggerNeedsPriority = state.current !== null && state.groups.filter(group => group.models.some(model => model.id === state.current?.model)).length > 1
+  const profiles = useApiQuery(aiAccountsApi, 'read', { enabled: open || triggerNeedsPriority })
   const providerLabels = useMemo(
     () => new Map((profiles.data?.accounts ?? []).map(profile => [profile.instanceId, PROVIDER_LABEL[profile.kind]])),
     [profiles.data],
@@ -149,7 +152,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     () => (accountSwapEnabled ? ModelPickerModel.nextAccountSelection({ current, groups: state.groups, routes: accountSwapRoutes ?? [] }) : undefined),
     [accountSwapEnabled, accountSwapRoutes, state.groups, current],
   )
-  const shortLabel = current === null ? undefined : ModelPickerModel.triggerLabel({ groups: state.groups, current })
+  const shortLabel = current === null ? undefined : ModelPickerModel.triggerLabel({ groups: state.groups, current, accounts: profiles.data?.accounts })
   const triggerLabel = shortLabel?.model ?? current?.model ?? (state.status === 'loading' ? 'Loading models…' : 'Choose model')
   const triggerBrand = ModelPickerModel.triggerBrand({ groups: state.groups, current })
 
@@ -674,6 +677,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       onRetry={load}
                       onSelect={choose}
                       onUse={(selection, fast) => void useDraft(selection, fast)}
+                      priorityAccounts={profiles.data?.accounts}
                       providerLabels={providerLabels}
                       quotas={quotas}
                     />
