@@ -153,6 +153,9 @@ export const FallbackList = (props: {
             </div>
           )}
 
+          <span className="dshx:sr-only" id={`${listId}-reorder`}>
+            Alt+Arrow to reorder.
+          </span>
           <span aria-live="polite" className="dshx:sr-only" data-model-fallback-announcer>
             {moved}
           </span>
@@ -160,7 +163,9 @@ export const FallbackList = (props: {
             <ol aria-label="Fallback order" className="dshx:flex dshx:flex-col dshx:gap-px">
               {props.rows.map((row, index) => (
                 <li
-                  aria-label={`Fallback ${String(index + 1)}: ${row.model} on ${row.account}${row.serving ? ', serving now' : ''}. Alt+Arrow to reorder.`}
+                  aria-label={`Fallback ${String(index + 1)}: ${row.model} on ${row.account}${row.serving ? ', serving now' : ''}.`}
+                  // Round 6 V8: the key hint is a description, not part of each route's name.
+                  aria-describedby={`${listId}-reorder`}
                   className={cn(
                     'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
                     row.serving && 'dshx:bg-selected-wash',

@@ -104,6 +104,29 @@ export class ModelPickerModel {
   /** Round 4 T16: the trigger's effort word; "Off" beside a model name read as the model being off. */
   static triggerEffortText = (label: string): string => (/^(?:off|none)$/iu.test(label.trim()) ? 'No reasoning' : label)
 
+  /** Round 6 V8: a level's spoken name; \"Xhigh\" reads as one odd word, so it is \"Extra high\". */
+  static effortSpokenName = (name: string): string => (/^x-?high$/iu.test(name.trim()) ? 'Extra high' : name)
+
+  /** Round 6 V8: an account radio's name: the account, whether it is the default, and its quota. */
+  static accountSpokenName = (input: {
+    readonly name: string
+    readonly isDefault: boolean
+    readonly quota: ModelQuota | undefined
+    readonly quotaShown: boolean
+  }): string => {
+    const parts = [input.name]
+    if (input.isDefault) parts.push('default account')
+    if (input.quotaShown) {
+      const window =
+        input.quota?.label
+          .replace(/\s*limit$/iu, '')
+          .trim()
+          .toLowerCase() ?? ''
+      parts.push(input.quota === undefined ? 'quota unknown' : `${String(Math.round(input.quota.percent))} % ${window === '' ? '' : `${window} `}quota left`)
+    }
+    return parts.join(', ')
+  }
+
   static effortShortLabel = (effort: { readonly id: string; readonly name: string }): string => {
     const key = `${effort.id} ${effort.name}`.toLowerCase()
     const known: readonly (readonly [RegExp, string])[] = [

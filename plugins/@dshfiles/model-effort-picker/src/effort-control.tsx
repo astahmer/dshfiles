@@ -73,8 +73,12 @@ export const EffortControl = (props: {
   /** The chosen effort id; undefined leaves it to the provider. */
   readonly selected: string | undefined
   readonly onChange: (effort: string | undefined) => void
+  /** Round 6 V8: the details stage a change for a model not in use; it is announced as staged, not applied. */
+  readonly staged?: boolean
 }) => {
   const group = useRef<HTMLDivElement>(null)
+  const staged = useRef(props.staged === true)
+  staged.current = props.staged === true
   const headingId = useId()
   const [preview, setPreview] = useState<{ readonly value: string | undefined } | null>(null)
   const [applied, setApplied] = useState<{ readonly value: string | undefined } | null>(null)
@@ -86,6 +90,8 @@ export const EffortControl = (props: {
         commit: value => {
           setPreview(null)
           onChange.current(value)
+          // A staged level is announced whichever way it was chosen: nothing else says it took.
+          if (staged.current) setApplied({ value })
         },
         onSettled: value => setApplied({ value }),
         schedule: (run, ms) => {
@@ -108,7 +114,7 @@ export const EffortControl = (props: {
   const segments: readonly Segment[] = [
     // Round 4 T4: the accessible name contains the visible word (WCAG 2.5.3).
     { id: undefined, label: 'Auto', name: 'Auto, provider default' },
-    ...props.efforts.map(effort => ({ id: effort.id, label: ModelPickerModel.effortShortLabel(effort), name: effort.name })),
+    ...props.efforts.map(effort => ({ id: effort.id, label: ModelPickerModel.effortShortLabel(effort), name: ModelPickerModel.effortSpokenName(effort.name) })),
   ]
   const shown = preview === null ? props.selected : preview.value
   const found = segments.findIndex(segment => segment.id === shown)
@@ -142,7 +148,9 @@ export const EffortControl = (props: {
         <InfoHint description="Higher effort lets the model think for longer before it answers." label="About reasoning effort" />
       </div>
       <span aria-live="polite" className="dshx:sr-only" data-model-effort-announcer>
-        {applied === null ? '' : `Reasoning effort: ${segments.find(segment => segment.id === applied.value)?.name ?? 'Provider default'}, applied`}
+        {applied === null
+          ? ''
+          : `Reasoning effort: ${segments.find(segment => segment.id === applied.value)?.name ?? 'Provider default'}, ${props.staged === true ? 'staged' : 'applied'}`}
       </span>
       <div
         // Round 4 T4: a stable group name; the chosen value is in the heading and on the checked radio.
@@ -168,7 +176,8 @@ export const EffortControl = (props: {
           return (
             <button
               aria-checked={checked}
-              aria-label={segment.name}
+              // Round 6 V8 with round 4 T4: the spoken name, keeping the visible word in it ('XHigh, Extra high').
+              aria-label={segment.name.toLowerCase().includes(segment.label.toLowerCase()) ? segment.name : `${segment.label}, ${segment.name}`}
               className={cn(
                 'dshx:h-7 dshx:min-w-0 dshx:rounded-md dshx:text-muted-foreground dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
                 // Eight levels on desktop: 11 px labels with a 2 px inset keep them 10 px apart; touch keeps 13 px.

@@ -2247,7 +2247,7 @@ const pickAccountModel = async (page: Page, account: string): Promise<void> => {
   const row = modelList.locator('[data-model-picker-row]').filter({ hasText: 'gpt-6-luna' }).first()
   await row.locator('[data-model-details-trigger]').click()
   // Council picker C3/S1: accounts are radios; on a model the thread does not use yet, Use commits the draft.
-  const chip = page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: account, exact: true })
+  const chip = page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: new RegExp(`^${account.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(?:,|$)`, 'u') })
   await chip.click()
   const use = page.getByRole('button', { name: /^Use / })
   if (await use.isVisible()) await use.click()
@@ -2296,7 +2296,7 @@ Then('the picker offers to return the thread to its selection', async ({ page }:
   await serving.getByRole('button', { name: 'Return', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-fallback-chain-returns-to-the-selection', async () => {
     await expect(serving).toHaveCount(0)
-    await expect(page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: /^Command Code 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })

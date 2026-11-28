@@ -60,8 +60,13 @@ export const AccountRows = (props: {
             return (
               <button
                 aria-checked={checked}
-                aria-describedby={`${headingId}-quota-${String(index)}`}
-                aria-label={account.name}
+                // Round 6 V8: one name with all it says (\"Command Code 1, default account, 62 % weekly quota left\").
+                aria-label={ModelPickerModel.accountSpokenName({
+                  name: account.name,
+                  isDefault: account.id === props.defaultId,
+                  quota,
+                  quotaShown: heading !== undefined,
+                })}
                 className={cn(
                   'dshx:flex dshx:h-8 dshx:w-full dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:text-left dshx:text-xs dshx:outline-none dshx:hover:bg-accent/50 dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
                   // Round 3 R14, round 5 U4: hover is a light wash; the chosen account is its 1 px edge, check and 600 weight, no wash,
@@ -96,9 +101,6 @@ export const AccountRows = (props: {
                   >
                     {/* Round 5 U9: an unknown quota is a muted dash, as in the fallbacks. */}
                     <span aria-hidden="true">{percent === undefined ? '—' : `${quota?.onReserve === true ? '☾ ' : ''}${String(percent)}%`}</span>
-                    <span className="dshx:sr-only" id={`${headingId}-quota-${String(index)}`}>
-                      {percent === undefined ? 'quota unknown' : `${String(percent)} % left on ${account.name}`}
-                    </span>
                   </span>
                 )}
                 <span className="dshx:flex dshx:w-3.5 dshx:shrink-0 dshx:justify-center">

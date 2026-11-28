@@ -225,7 +225,9 @@ export const ModelDetails = (props: {
           </div>
         )}
 
-        {model === undefined || props.inspected === null ? null : <EffortControl efforts={efforts} onChange={changeEffort} selected={selectedEffort} />}
+        {model === undefined || props.inspected === null ? null : (
+          <EffortControl efforts={efforts} onChange={changeEffort} selected={selectedEffort} staged={draft} />
+        )}
 
         {group !== undefined && model !== undefined && props.fast !== undefined
           ? props.fast({ provider: group.id, model: model.id, draft: draft ? { value: stagedFast, onChange: setStagedFast } : null })

@@ -52,7 +52,7 @@ describe('round 4 smaller fixes (council picker T16)', () => {
     committer.preview('high')
     run()
     expect(settled).toEqual(['high'])
-    expect(source('effort-control.tsx')).toMatch(/aria-live="polite"[^>]*data-model-effort-announcer[\s\S]{0,200}Reasoning effort: \$\{[^}]*\}, applied/u)
+    expect(source('effort-control.tsx')).toMatch(/aria-live="polite"[^>]*data-model-effort-announcer[\s\S]{0,200}Reasoning effort: \$\{[^`]*\}, \$\{props\.staged === true \? 'staged' : 'applied'\}/u)
   })
 
   it('keeps Select rendered (disabled) when no row matches, so the search never widens', () => {

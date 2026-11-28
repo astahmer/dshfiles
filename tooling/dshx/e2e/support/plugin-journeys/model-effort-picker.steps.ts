@@ -212,9 +212,9 @@ When('a supported legacy Codex model is selected without validating a new connec
   await model.click()
   await modelList.locator('[data-model-picker-row]').filter({ hasText: /GPT-6 Luna/iu }).locator('[data-model-details-trigger]').click()
   await expect(trigger).toHaveText('GPT-6 Luna')
-  await expect(page.getByRole('dialog').getByRole('radio', { name: 'Codex 1', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await expect(page.getByRole('dialog').getByRole('radio', { name: /^Codex 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'true')
 
-  const fastMode = page.getByRole('switch', { name: 'Fast mode · may cost more', exact: true })
+  const fastMode = page.getByRole('switch', { name: 'Fast mode', exact: true })
   const dialog = page.getByRole('dialog')
   if (!(await dialog.isVisible())) await trigger.click()
   await expect(dialog).toBeVisible()
@@ -241,7 +241,7 @@ Then('Fast mode works for supported Codex models and stays hidden for Spark', as
 
   const trigger = page.locator('[data-model-picker-text]')
   const dialog = page.getByRole('dialog')
-  const fastMode = page.getByRole('switch', { name: 'Fast mode · may cost more', exact: true })
+  const fastMode = page.getByRole('switch', { name: 'Fast mode', exact: true })
   await recordAssertion(page, 'fast-mode-is-limited-to-supported-codex-models', async () => {
     if (!(await dialog.isVisible())) await trigger.click()
     await expect(dialog).toBeVisible()
@@ -335,7 +335,7 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
       await expect(accounts).toBeVisible()
     }
     await openMenu()
-    await expect(accounts.getByRole('radio', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-checked', 'true')
+    await expect(accounts.getByRole('radio', { name: /^Command Code 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'true')
     await expect(async () => {
       await openMenu()
       await accounts.getByRole('radio', { name: 'Command Code 2', exact: true }).click({ timeout: 2_000 })
@@ -354,7 +354,7 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
     if (initialEffort === '') await expect(effort).toHaveCount(0)
     else await expect(effort).toHaveText(initialEffort)
     await openMenu()
-    await expect(accounts.getByRole('radio', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-checked', 'false')
+    await expect(accounts.getByRole('radio', { name: /^Command Code 1(?:,|$)/u })).toHaveAttribute('aria-checked', 'false')
     await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)

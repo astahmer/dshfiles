@@ -27,7 +27,8 @@ describe('accounts are full-width radio rows (council picker C3)', () => {
       expect(radio).toMatch(/dshx:w-full[^"]*dshx:h-8[^"]*dshx:pointer-coarse:h-11|dshx:h-8[^"]*dshx:w-full[^"]*dshx:pointer-coarse:h-11/u)
     const checked = radios.filter(radio => radio.includes('aria-checked="true"'))
     expect(checked).toHaveLength(1)
-    expect(checked[0]).toContain('aria-label="Command Code 1"')
+    // Round 6 V8: the name carries the quota too.
+    expect(checked[0]).toContain('aria-label="Command Code 1, 62 % weekly quota left"')
     expect(checked[0]).toContain('data-model-account-check')
     expect(radios.filter(radio => radio.includes('data-model-account-check'))).toHaveLength(1)
   })
@@ -45,8 +46,7 @@ describe('accounts are full-width radio rows (council picker C3)', () => {
   it('tells an unknown quota from an empty one, and tones 15 % or less amber and 0 % red', () => {
     // Round 5 U9: a muted dash again (round 4 dropped it), the same as in the fallbacks.
     expect(text(radios[0] ?? '')).toContain('—')
-    expect(text(radios[0] ?? '')).toContain('quota unknown')
-    expect(text(radios[0] ?? '')).toContain('quota unknown')
+    expect(radios[0]).toContain('aria-label="Codex 1, quota unknown"')
     expect(radios[2]).toMatch(/dshx:text-warning/u)
     expect(radios[3]).toMatch(/dshx:text-destructive/u)
     expect(text(radios[3] ?? '')).toContain('0%')
@@ -54,7 +54,7 @@ describe('accounts are full-width radio rows (council picker C3)', () => {
   })
 
   it('names each quota for assistive tech', () => {
-    expect(text(radios[1] ?? '')).toContain('62 % left on Command Code 1')
+    expect(radios[1]).toContain('aria-label="Command Code 1, 62 % weekly quota left"')
   })
 
   it('reads the heading from the binding window, and says nothing when no quota is known', () => {
