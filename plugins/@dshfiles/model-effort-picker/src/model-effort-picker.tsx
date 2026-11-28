@@ -499,7 +499,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   // Round 5 U13, round 6 V4: the section has no right inset on the phone; the search row, the list and the
                   // select bar each keep 8 px, so they end 16 px from the edge as the search starts, and only the rows'
                   // 44 pt chevrons reach Close's edge.
-                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:pl-2 dshx:@max-pane-compact:pr-0 dshx:@max-pane-compact:pt-0',
+                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:pl-2 dshx:@max-pane-compact:pt-0',
+                  // Round 6 V6: an empty catalog keeps both sides, so its message centres.
+                  catalogEmpty ? 'dshx:@max-pane-compact:pr-2' : 'dshx:@max-pane-compact:pr-0',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
               >
@@ -509,7 +511,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   className={cn(
                     'dshx:hidden dshx:min-h-11 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex',
                     // Round 5 U6: an empty catalog has its title and Close on one 44 px line at every width.
-                    catalogEmpty && 'dshx:flex dshx:pl-1.5',
+                    catalogEmpty && 'dshx:flex dshx:pl-1.5 dshx:pointer-coarse:pl-0',
                   )}
                   data-model-picker-list-header
                 >
@@ -521,7 +523,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     {several ? t('selectModels') : 'Choose a model'}
                   </h2>
                 </header>
-                <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:@max-pane-compact:pr-2', catalogEmpty && 'dshx:hidden')} data-model-search-row>
+                <div
+                  className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:@max-pane-compact:pr-2', catalogEmpty && 'dshx:hidden')}
+                  data-model-search-row
+                >
                   {/* Round 3 R18: one focus ring (the field edge does not also turn accent), a clear button inside the field,
                       and a search that waits while there is nothing to search. */}
                   <div className="dshx:relative dshx:min-w-0 dshx:flex-1">
@@ -775,8 +780,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 className={cn(
                   // On an empty catalog's title line (round 5 U6; the picker is narrow there, so compact even on desktop), its centre
                   // at 23 px; else beside the details title.
-                  catalogEmpty ? 'dshx:top-3 dshx:pointer-coarse:top-0' : 'dshx:top-2.5 dshx:@max-pane-compact:top-0',
-                  'dshx:absolute dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11 dshx:@max-pane-compact:right-0',
+                  // Round 6 V6: the narrow empty picker is compact on desktop too; Close keeps the popover's 10 px there.
+                  catalogEmpty
+                    ? 'dshx:top-3 dshx:pointer-coarse:top-0 dshx:pointer-coarse:right-0'
+                    : 'dshx:top-2.5 dshx:@max-pane-compact:top-0 dshx:@max-pane-compact:right-0',
+                  'dshx:absolute dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11',
                 )}
                 data-model-picker-close
                 onClick={() => setOpen(false)}

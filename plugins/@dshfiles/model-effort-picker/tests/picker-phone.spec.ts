@@ -37,7 +37,7 @@ describe('phone picker is one sheet, list then details in place (council picker 
   it('draws no card inside the sheet: no caret, 16 px insets, a fixed sheet height', () => {
     expect(picker).not.toMatch(/rotate-45/u)
     // Round 5 U13: the list keeps its left inset only, so its right edge is Close's.
-    expect(tagOf(picker, 'aria-label="Choose a model"')).toMatch(/dshx:@max-pane-compact:pl-2 dshx:@max-pane-compact:pr-0/u)
+    expect(tagOf(picker, 'aria-label="Choose a model"')).toMatch(/dshx:@max-pane-compact:pl-2 dshx:@max-pane-compact:pt-0',[\s\S]{0,120}catalogEmpty \? 'dshx:@max-pane-compact:pr-2' : 'dshx:@max-pane-compact:pr-0'/u)
     expect(tagOf(picker, 'data-model-inspector')).toMatch(/dshx:@max-pane-compact:px-2/u)
     expect(tagOf(picker, 'data-model-inspector')).toMatch(/dshx:@max-pane-compact:border-l-0/u)
     expect(tagOf(picker, 'data-model-picker-surface')).toContain(

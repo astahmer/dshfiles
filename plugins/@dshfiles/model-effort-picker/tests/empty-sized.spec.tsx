@@ -10,7 +10,7 @@ describe('an empty catalog is sized to its message (council picker round 5, U6)'
   it('drops the list height and the search, and puts the title and Close on one line', () => {
     expect(picker).toMatch(/catalogEmpty\s*\?\s*'dshx:h-auto'/u)
     expect(picker).toMatch(/catalogEmpty && 'dshx:hidden'\)\}\s*data-model-search-row/u)
-    expect(picker).toMatch(/catalogEmpty && 'dshx:flex dshx:pl-1\.5',[\s\S]{0,40}\)\}\s*data-model-picker-list-header/u)
+    expect(picker).toMatch(/catalogEmpty && 'dshx:flex dshx:pl-1\.5 dshx:pointer-coarse:pl-0',[\s\S]{0,40}\)\}\s*data-model-picker-list-header/u)
   })
 
   it('says what to do when no model is chosen, and shows no fallbacks until one is', () => {
