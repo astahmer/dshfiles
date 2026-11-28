@@ -186,7 +186,7 @@
     {
       "id": "trace-explorer",
       "title": "Trace list and span waterfall",
-      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in red, totals of duration, cost, tokens, model and tool calls, and a side panel with the selected span's attributes, events (an exception.stacktrace read as call frames with the plugin-ui CallStackTree, or as raw text) and resource attributes, plus an Open thread link when a span carries dsh.session.id.",
+      "summary": "A Traces panel lists stored traces newest first with filters (text, service, error status, minimum duration) kept across reloads; opening one shows a collapsible, keyboard-navigable span waterfall (the plugin-ui TraceWaterfall) on a time axis, colored by service with errors in red, totals of duration, cost, tokens, model and tool calls, and a side panel with the selected span's attributes, events (an exception.stacktrace read as call frames with the plugin-ui CallStackTree, or as raw text) and resource attributes, plus an Open thread link when a span carries dsh.session.id. Zoom to the selected span's recorded interval or restore the full axis without filtering rows or recalculating totals; refreshes read stored OTLP batches, not live span-start events.",
       "reach": [
         "seed otlp-sample-trace",
         "click tab \"Observe\"",
@@ -195,14 +195,16 @@
         "fill textbox \"Search traces\" \"POST /orders\"",
         "click row \"dshx-sample POST /orders*\"",
         "click treeitem \"charge card*\"",
-        "expect complementary \"Span detail\""
+        "expect complementary \"Span detail\"",
+        "click button \"Zoom to selected span\"",
+        "expect button \"Show full trace\""
       ],
       "surfaces": ["client", "host", "tool", "storage"],
       "surface": "destinationSection",
       "destination": "observe",
       "currentSurface": "left-nav: Traces: Explorer › Traces",
       "configuration": [],
-      "states": ["empty", "listed", "filtered", "paged", "trace-open", "span-selected", "collapsed", "stack-frames", "stack-raw", "trace-missing"],
+      "states": ["empty", "listed", "filtered", "paged", "trace-open", "span-selected", "zoomed", "collapsed", "stack-frames", "stack-raw", "trace-missing"],
       "failureModes": [
         "A span whose parent never arrived is shown as a root rather than dropped.",
         "A trace pruned while open reports that it is no longer stored.",
@@ -258,6 +260,48 @@
           "id": "traces.waterfall-nesting",
           "file": "plugins/@dshfiles/traces/src/waterfall-spans.test.ts",
           "testName": "nests by the Host depth order and converts milliseconds to seconds"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-zoom",
+          "file": "plugins/@dshfiles/plugin-ui/tests/trace-waterfall.test.tsx",
+          "testName": "clips overlapping spans without hiding their rows or changing full-trace stats"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-zoom-stale",
+          "file": "plugins/@dshfiles/plugin-ui/tests/trace-waterfall.test.tsx",
+          "testName": "keeps each zoom local and drops the effective range when its anchor disappears"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-zoom-precision",
+          "file": "plugins/@dshfiles/plugin-ui/tests/trace-waterfall.test.tsx",
+          "testName": "keeps millisecond ticks and trace offsets distinct for short spans"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-zoom-microsecond",
+          "file": "plugins/@dshfiles/plugin-ui/tests/trace-waterfall.test.tsx",
+          "testName": "uses unique increasing ticks for a one-microsecond span far from trace start"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-zoom-density",
+          "file": "plugins/@dshfiles/plugin-ui/tests/trace-waterfall.test.tsx",
+          "testName": "thins zoom labels as the plot narrows without dropping ticks or changing the accessible range"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-zoom-annotations",
+          "file": "plugins/@dshfiles/plugin-ui/tests/trace-waterfall.test.tsx",
+          "testName": "retains annotations outside the clipped track and rejects invalid timing without losing rows"
+        },
+        {
+          "kind": "unit-test",
+          "id": "traces.waterfall-zoom-sparse",
+          "file": "plugins/@dshfiles/plugin-ui/tests/trace-waterfall.test.tsx",
+          "testName": "does not zoom to open or invalid spans or enable zoom on a live waterfall"
         },
         {
           "kind": "unit-test",

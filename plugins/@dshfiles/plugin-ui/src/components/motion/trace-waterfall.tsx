@@ -2,6 +2,8 @@ import * as React from 'react'
 import { animate, motionSafe, springs } from '../../motion/index.js'
 import { cn } from '../../lib/utils.js'
 import { SparklesIcon } from '../../icons.js'
+import { Badge } from '../ui/badge.js'
+import { Button } from '../ui/button.js'
 import {
   GrowRow,
   useLeavingRows,
@@ -62,6 +64,11 @@ export interface TraceWaterfallLabels {
   readonly expand: string
   readonly collapse: string
   readonly slowest: string
+  /** For stored batches, whose spans do not prove the whole trace has completed. */
+  readonly recorded?: string
+  readonly zoomToSpan: string
+  readonly resetZoom: string
+  readonly zoomRange: (from: string, to: string) => string
 }
 
 const defaultLabels: TraceWaterfallLabels = {
@@ -78,6 +85,9 @@ const defaultLabels: TraceWaterfallLabels = {
   expand: 'Expand',
   collapse: 'Collapse',
   slowest: 'Slowest',
+  zoomToSpan: 'Zoom to selected span',
+  resetZoom: 'Show full trace',
+  zoomRange: (from, to) => `Zoomed: ${from} to ${to} from trace start`,
 }
 
 export interface TraceWaterfallProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title' | 'onSelect'> {
@@ -86,6 +96,8 @@ export interface TraceWaterfallProps extends Omit<React.HTMLAttributes<HTMLEleme
   readonly spans: readonly TraceSpan[]
   /** Spans may still arrive; open spans grow with the clock. */
   readonly live: boolean
+  /** Enable a local time window for recorded spans, without filtering the span tree. */
+  readonly zoomable?: boolean
   /** Epoch ms of the trace start; the live clock counts from it. */
   readonly startedAt?: number | undefined
   readonly selectedId?: string | null | undefined
@@ -95,6 +107,80 @@ export interface TraceWaterfallProps extends Omit<React.HTMLAttributes<HTMLEleme
   /** Shortest axis in seconds (2 by default); a millisecond trace passes a smaller one so its bars fill the row. */
   readonly minimumDuration?: number
   readonly labels?: Partial<TraceWaterfallLabels>
+}
+
+const hasTiming = (span: TraceSpan): boolean =>
+  Number.isFinite(span.start) && span.start >= 0 && (span.end === undefined || (Number.isFinite(span.end) && span.end >= span.start))
+
+const hasInterval = (span: TraceSpan | undefined): span is TraceSpan & { end: number } => span?.end !== undefined && hasTiming(span) && span.end > span.start
+
+// Scale the local window directly: the full-trace ticks round to whole microseconds, collapsing narrow windows.
+const zoomTicks = (domain: number): number[] => [...new Set([0, domain / 4, domain / 2, domain * 0.75])]
+
+const formatZoomTick = (tick: number, domain: number): string => {
+  if (domain < 0.0001) return `${Number((tick * 1e6).toPrecision(3))}µs`
+  if (domain < 0.1) return `${Number((tick * 1e3).toPrecision(3))}ms`
+  return `${Number(tick.toPrecision(3))}s`
+}
+
+const formatZoomRange = (start: number, end: number): [string, string] => {
+  const from = formatDuration(start)
+  const to = formatDuration(end)
+  if (end - start >= 0.1 && from !== to) return [from, to]
+  const fromMs = Number((start * 1000).toFixed(3))
+  const toMs = Number((end * 1000).toFixed(3))
+  return Number.isFinite(toMs) && fromMs !== toMs ? [`${fromMs}ms`, `${toMs}ms`] : [`${start}s`, `${end}s`]
+}
+
+/** Draw fewer labels if the plot (not the viewport) cannot fit them. The time grid still uses every tick. */
+function ZoomAxisLabels({ ticks, domain }: { readonly ticks: readonly number[]; readonly domain: number }) {
+  const plotRef = React.useRef<HTMLDivElement>(null)
+  const [stride, setStride] = React.useState(0)
+  React.useLayoutEffect(() => {
+    const plot = plotRef.current
+    if (plot === null) return
+    const labels = Array.from(plot.children)
+    const measure = () => {
+      const area = plot.getBoundingClientRect()
+      // Hidden labels still have their natural glyph widths, including after a font change.
+      const bounds = labels.map(label => label.getBoundingClientRect())
+      const gap = 4
+      const fits = (step: number): boolean => {
+        let previousRight = area.left - gap
+        return bounds.every((box, index) => {
+          if (index % step !== 0) return true
+          if (box.left < previousRight + gap || box.right > area.right) return false
+          previousRight = box.right
+          return true
+        })
+      }
+      setStride([1, 2, labels.length].find(fits) ?? 0)
+    }
+    measure()
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(plot)
+    for (const label of labels) observer.observe(label)
+    return () => observer.disconnect()
+  }, [domain, ticks])
+  return (
+    <div
+      ref={plotRef}
+      aria-hidden
+      data-slot="trace-waterfall-zoom-axis"
+      className="dshx:relative dshx:h-full dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums"
+    >
+      {ticks.map((tick, index) => (
+        <span
+          key={tick}
+          className="dshx:absolute dshx:top-1/2 dshx:-translate-y-1/2 dshx:pl-1.5 dshx:whitespace-nowrap"
+          style={{ left: `${pct(tick, domain)}%`, visibility: stride !== 0 && index % stride === 0 ? 'visible' : 'hidden' }}
+        >
+          {formatZoomTick(tick, domain)}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 const isWaterfallKey = (key: string): boolean => ['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'Enter', ' '].includes(key)
@@ -109,6 +195,7 @@ export function TraceWaterfall({
   subtitle,
   spans,
   live,
+  zoomable = false,
   startedAt,
   selectedId,
   onSelectSpan,
@@ -119,7 +206,7 @@ export function TraceWaterfall({
   ...props
 }: TraceWaterfallProps) {
   const labels = { ...defaultLabels, ...labelOverrides }
-  const settled = spans.reduce((max, span) => Math.max(max, span.end ?? span.start), 0)
+  const settled = spans.reduce((max, span) => (hasTiming(span) && (live || span.end !== undefined) ? Math.max(max, span.end ?? span.start) : max), 0)
   const now = Math.max(useTraceClock(live, startedAt, settled), settled)
   const [collapsed, toggle] = useCollapsedSet(defaultCollapsed)
   const visibleRows = flattenTree(spans, collapsed)
@@ -128,14 +215,23 @@ export function TraceWaterfall({
   const treeRef = React.useRef<HTMLDivElement>(null)
   const [focusedId, setFocusedId] = React.useState<string | null>(null)
 
+  const [zoomSpanId, setZoomSpanId] = React.useState<string | null>(null)
+  const canZoom = zoomable && !live
+  const zoomSpan = canZoom ? spans.find(span => span.id === zoomSpanId) : undefined
+  const zoom = hasInterval(zoomSpan) ? zoomSpan : undefined
+  if (zoomSpanId !== null && zoom === undefined) setZoomSpanId(null)
+  const selectedSpan = canZoom ? spans.find(span => span.id === selectedId) : undefined
+  const origin = zoom?.start ?? 0
   const fitted = Math.max(now * 1.2, minimumDuration)
   const step = niceStep(fitted, 4)
-  const domain = useSpringNumber(Math.max(Math.ceil(fitted / step) * step, minimumDuration), springs.gentle)
-  const ticks = ticksFor(domain, 4)
+  const fullDomain = useSpringNumber(Math.max(Math.ceil(fitted / step) * step, minimumDuration), springs.gentle)
+  const domain = zoom === undefined ? fullDomain : zoom.end - origin
+  const isZoomed = zoom !== undefined
+  const ticks = React.useMemo(() => (isZoomed ? zoomTicks(domain) : ticksFor(domain, 4)), [domain, isZoomed])
 
   const endOf = (span: TraceSpan) => span.end ?? now
   const parentIds = new Set(spans.map(span => span.parentId))
-  const leaves = spans.filter(span => span.kind !== 'agent' && span.end !== undefined && !parentIds.has(span.id))
+  const leaves = spans.filter(span => span.kind !== 'agent' && span.end !== undefined && hasTiming(span) && !parentIds.has(span.id))
   const slowest = leaves.length >= 3 ? leaves.reduce((a, b) => (endOf(b) - b.start > endOf(a) - a.start ? b : a)) : undefined
   const childrenOf = (id: string) => spans.filter(span => span.parentId === id)
   const costOf = (span: TraceSpan): number => span.cost ?? childrenOf(span.id).reduce((sum, child) => sum + costOf(child), 0)
@@ -196,7 +292,12 @@ export function TraceWaterfall({
         ) : (
           <span className="dshx:flex-1" />
         )}
-        <TraceStatusBadge state={live ? 'live' : totals.errors > 0 ? 'failed' : 'done'} />
+        {/* A failed trace keeps its Failed badge; Recorded only replaces the neutral Done state. */}
+        {!live && totals.errors === 0 && labels.recorded !== undefined ? (
+          <Badge variant="muted">{labels.recorded}</Badge>
+        ) : (
+          <TraceStatusBadge state={live ? 'live' : totals.errors > 0 ? 'failed' : 'done'} />
+        )}
       </header>
 
       <StatStrip
@@ -211,6 +312,24 @@ export function TraceWaterfall({
           { label: labels.errors, value: totals.errors, tone: totals.errors > 0 ? 'destructive' : undefined },
         ]}
       />
+
+      {canZoom ? (
+        <div className="dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-x-3 dshx:gap-y-1 dshx:border-b dshx:border-border dshx:px-3 dshx:py-1">
+          <Button
+            className="dshx:h-11"
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={zoom === undefined && !hasInterval(selectedSpan)}
+            onClick={() => setZoomSpanId(zoom === undefined && hasInterval(selectedSpan) ? selectedSpan.id : null)}
+          >
+            {zoom === undefined ? labels.zoomToSpan : labels.resetZoom}
+          </Button>
+          <span role="status" className="dshx:text-xs dshx:tabular-nums dshx:text-muted-foreground">
+            {zoom === undefined ? '' : labels.zoomRange(...formatZoomRange(origin, zoom.end))}
+          </span>
+        </div>
+      ) : null}
 
       <div className="dshx:relative dshx:min-w-0">
         <div
@@ -232,13 +351,21 @@ export function TraceWaterfall({
             {labels.span}
           </span>
           <span className="dshx:relative dshx:mr-4 dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:@max-pane-narrow:mr-3 dshx:normal-case dshx:tracking-normal">
-            <TimeAxisLabels ticks={ticks} domain={domain} />
+            {isZoomed ? <ZoomAxisLabels ticks={ticks} domain={domain} /> : <TimeAxisLabels ticks={ticks} domain={domain} />}
           </span>
         </div>
         <div ref={treeRef} role="tree" aria-label={labels.tree} className="dshx:flex dshx:flex-col dshx:py-1" onKeyDown={onKeyDown}>
           {shownRows.map(({ item: row, leaving }) => {
             const span = row.node
             const end = endOf(span)
+            const clippedStart = zoom === undefined ? span.start : Math.max(origin, span.start) - origin
+            const clippedEnd = zoom === undefined ? end : Math.min(zoom.end, end) - origin
+            // Keep a zero-duration point if it is inside the window, but never turn an open or inverted span into a bar.
+            const inWindow =
+              hasTiming(span) &&
+              (span.end !== undefined || live) &&
+              (zoom === undefined || (span.start < zoom.end && (end > origin || (span.start === end && end === origin))))
+            const left = pct(clippedStart, domain)
             const running = span.end === undefined && live
             const failed = span.error !== undefined
             const cost = costOf(span)
@@ -262,11 +389,12 @@ export function TraceWaterfall({
                 }}
                 className={cn(
                   'dshx:relative dshx:flex dshx:h-9 dshx:items-center dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring/60 dshx:focus-visible:ring-inset',
+                  zoom !== undefined && 'dshx:h-auto dshx:min-h-11',
                   onSelectSpan && 'dshx:cursor-pointer dshx:hover:bg-accent/40',
                   selected && 'dshx:bg-accent/60 dshx:hover:bg-accent/60',
                 )}
               >
-                <div className="dshx:h-full dshx:w-[220px] dshx:shrink-0 dshx:border-r dshx:border-border dshx:pl-3 dshx:@max-pane-compact:w-[184px] dshx:@max-pane-narrow:w-[46%]">
+                <div className="dshx:min-h-0 dshx:w-[220px] dshx:shrink-0 dshx:self-stretch dshx:border-r dshx:border-border dshx:pl-3 dshx:@max-pane-compact:w-[184px] dshx:@max-pane-narrow:w-[46%]">
                   <TreeLabel
                     depth={row.depth}
                     name={span.name}
@@ -284,16 +412,19 @@ export function TraceWaterfall({
                     toggleFocusable={false}
                   />
                 </div>
-                <div className="dshx:relative dshx:mr-4 dshx:h-full dshx:min-w-0 dshx:flex-1 dshx:@max-pane-narrow:mr-3">
-                  <WaterfallBar
-                    span={span}
-                    left={pct(span.start, domain)}
-                    width={relativeWidth(pct(span.start, domain), pct(end - span.start, domain))}
-                    running={running}
-                    label={`${formatDuration(end - span.start)}${cost > 0 ? ` · ${formatCost(cost)}` : ''}`}
-                    slowest={isSlowest}
-                    slowestLabel={labels.slowest}
-                  />
+                <div className="dshx:relative dshx:mr-4 dshx:min-w-0 dshx:flex-1 dshx:self-stretch dshx:@max-pane-narrow:mr-3">
+                  {inWindow ? (
+                    <WaterfallBar
+                      span={span}
+                      left={left}
+                      width={relativeWidth(left, pct(clippedEnd - clippedStart, domain))}
+                      running={running}
+                      zoomed={zoom !== undefined}
+                      label={`${formatDuration(end - span.start)}${cost > 0 ? ` · ${formatCost(cost)}` : ''}`}
+                      slowest={isSlowest}
+                      slowestLabel={labels.slowest}
+                    />
+                  ) : null}
                 </div>
               </GrowRow>
             )
@@ -314,6 +445,7 @@ function WaterfallBar({
   left,
   width,
   running,
+  zoomed,
   label,
   slowest,
   slowestLabel,
@@ -322,6 +454,7 @@ function WaterfallBar({
   readonly left: number
   readonly width: number
   readonly running: boolean
+  readonly zoomed: boolean
   readonly label: string
   readonly slowest: boolean
   readonly slowestLabel: string
@@ -340,24 +473,35 @@ function WaterfallBar({
   }, [slowest])
   const failed = span.error !== undefined
   const tone = failed ? 'destructive' : (span.tone ?? kindTone[span.kind])
-  return (
-    <div className="dshx:absolute dshx:inset-y-0 dshx:flex dshx:items-center dshx:gap-1.5" style={{ left: `${left}%`, right: 0 }}>
+  const trackClass = 'dshx:absolute dshx:inset-y-0 dshx:right-0 dshx:flex dshx:items-center dshx:gap-1.5'
+  const position = { left: `${left}%` }
+  const bar = (
+    <span
+      ref={ref}
+      aria-hidden
+      data-slot="trace-waterfall-bar"
+      className={cn(
+        'dshx:relative dshx:h-4 dshx:shrink-0 dshx:origin-left dshx:overflow-hidden dshx:rounded-md dshx:border',
+        toneTint[tone],
+        span.kind === 'agent' && !running && 'dshx:bg-transparent dshx:border-muted-foreground/40',
+        zoomed && 'dshx:h-2.5',
+      )}
+      style={{ width: `max(3px, ${width}%)` }}
+    >
+      {running ? <span className="dshx:absolute dshx:inset-y-0 dshx:right-0 dshx:w-2/5 dshx:bg-gradient-to-r dshx:from-transparent dshx:to-card/70" /> : null}
+    </span>
+  )
+  const annotation = (
+    <div
+      className={cn(
+        'dshx:flex dshx:items-center dshx:gap-x-1.5',
+        zoomed ? 'dshx:min-w-0 dshx:flex-wrap dshx:gap-y-0.5' : 'dshx:shrink-0 dshx:@max-pane-narrow:hidden',
+      )}
+    >
       <span
-        ref={ref}
-        aria-hidden
-        data-slot="trace-waterfall-bar"
         className={cn(
-          'dshx:relative dshx:h-4 dshx:shrink-0 dshx:origin-left dshx:overflow-hidden dshx:rounded-md dshx:border',
-          toneTint[tone],
-          span.kind === 'agent' && !running && 'dshx:bg-transparent dshx:border-muted-foreground/40',
-        )}
-        style={{ width: `max(3px, ${width}%)` }}
-      >
-        {running ? <span className="dshx:absolute dshx:inset-y-0 dshx:right-0 dshx:w-2/5 dshx:bg-gradient-to-r dshx:from-transparent dshx:to-card/70" /> : null}
-      </span>
-      <span
-        className={cn(
-          'dshx:shrink-0 dshx:text-xs dshx:whitespace-nowrap dshx:tabular-nums dshx:@max-pane-narrow:hidden',
+          'dshx:text-xs dshx:tabular-nums',
+          zoomed ? 'dshx:min-w-0 dshx:[overflow-wrap:anywhere]' : 'dshx:whitespace-nowrap',
           failed ? 'dshx:text-destructive' : 'dshx:text-muted-foreground',
         )}
       >
@@ -366,11 +510,26 @@ function WaterfallBar({
       {slowest ? (
         <span
           ref={chipRef}
-          className="dshx:shrink-0 dshx:rounded-sm dshx:bg-warning/15 dshx:px-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wider dshx:text-warning dshx:uppercase dshx:@max-pane-narrow:hidden"
+          className="dshx:min-w-0 dshx:rounded-sm dshx:bg-warning/15 dshx:px-1 dshx:text-2xs dshx:font-semibold dshx:tracking-wider dshx:text-warning dshx:uppercase dshx:[overflow-wrap:anywhere]"
         >
           {slowestLabel}
         </span>
       ) : null}
+    </div>
+  )
+  return zoomed ? (
+    <div className="dshx:flex dshx:h-full dshx:min-w-0 dshx:flex-col dshx:justify-center dshx:gap-0.5 dshx:py-1">
+      <div data-slot="trace-waterfall-clip" className="dshx:relative dshx:h-2.5 dshx:overflow-hidden">
+        <div className={trackClass} style={position}>
+          {bar}
+        </div>
+      </div>
+      {annotation}
+    </div>
+  ) : (
+    <div className={trackClass} style={position}>
+      {bar}
+      {annotation}
     </div>
   )
 }

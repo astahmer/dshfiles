@@ -255,6 +255,10 @@ export const TraceDetailView = (props: {
       expand: t('expand'),
       collapse: t('collapse'),
       slowest: t('waterfallSlowest'),
+      recorded: t('waterfallRecorded'),
+      zoomToSpan: t('waterfallZoomToSpan'),
+      resetZoom: t('waterfallResetZoom'),
+      zoomRange: (from: string, to: string) => t('waterfallZoomRange', { from, to }),
     }),
     [t],
   )
@@ -266,6 +270,7 @@ export const TraceDetailView = (props: {
         subtitle={trace.spans[0]?.name}
         spans={spans}
         live={false}
+        zoomable
         minimumDuration={0.001}
         selectedId={selected?.spanId ?? null}
         onSelectSpan={setSelectedId}
