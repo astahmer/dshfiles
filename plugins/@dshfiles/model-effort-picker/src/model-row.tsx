@@ -95,7 +95,21 @@ export const ModelRow = (props: {
       onPointerUp={cancelPress}
       role="option"
     >
-      <BrandMark brand={brand} className="dshx:size-4" name={name} />
+      {/* N6: in select mode the mark column holds a 16 px checkbox (the option itself carries aria-checked). */}
+      {selectMode ? (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-field-border',
+            props.fanOutSelected && 'dshx:border-control-on-dense dshx:bg-control-on-dense dshx:text-control-on-foreground',
+          )}
+          data-model-fan-out-check
+        >
+          {props.fanOutSelected ? <CheckIcon className="dshx:size-3" /> : null}
+        </span>
+      ) : (
+        <BrandMark brand={brand} className="dshx:size-4" name={name} />
+      )}
       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
         <TruncatedTooltip content={props.model.id}>
           <span
@@ -125,22 +139,26 @@ export const ModelRow = (props: {
       <span className="dshx:flex dshx:w-4 dshx:shrink-0 dshx:items-center dshx:justify-center">
         {props.fastOn === true ? <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground" data-model-fast-on role="img" /> : null}
       </span>
-      {/* Pointer and touch only: the keyboard opens details with Right, so this is no second tab stop inside the option. */}
-      <button
-        aria-hidden="true"
-        className="dshx-hit-44 dshx:flex dshx:size-[18px] dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground"
-        data-model-details-label={`Details for ${name}`}
-        data-model-details-trigger
-        onClick={event => {
-          event.stopPropagation()
-          props.onInspect()
-        }}
-        onPointerDown={event => event.stopPropagation()}
-        tabIndex={-1}
-        type="button"
-      >
-        <ChevronRightIcon aria-hidden="true" className="dshx:size-3.5" />
-      </button>
+      {selectMode ? null : (
+        <>
+          {/* Pointer and touch only: the keyboard opens details with Right, so this is no second tab stop inside the option. */}
+          <button
+            aria-hidden="true"
+            className="dshx-hit-44 dshx:flex dshx:size-[18px] dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+            data-model-details-label={`Details for ${name}`}
+            data-model-details-trigger
+            onClick={event => {
+              event.stopPropagation()
+              props.onInspect()
+            }}
+            onPointerDown={event => event.stopPropagation()}
+            tabIndex={-1}
+            type="button"
+          >
+            <ChevronRightIcon aria-hidden="true" className="dshx:size-3.5" />
+          </button>
+        </>
+      )}
     </div>
   )
 }

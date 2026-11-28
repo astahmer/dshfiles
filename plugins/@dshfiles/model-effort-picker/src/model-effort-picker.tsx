@@ -9,11 +9,12 @@ import { Popover, PopoverContent, PopoverTrigger } from '@dshfiles/plugin-ui/com
 import { ScrollArea } from '@dshfiles/plugin-ui/components/ui/scroll-area'
 import { SearchInput } from '@dshfiles/plugin-ui/components/ui/search-input'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, ListChecksIcon, LoaderCircleIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountAccents } from './account-color.js'
 import { ListEmptyState } from './empty-state.js'
+import { FanOutBar } from './fan-out-bar.js'
 import { FallbacksSection } from './fallbacks-section.js'
 import { FastModeSection } from './fast-mode-section.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
@@ -21,7 +22,6 @@ import { ModelPickerModel } from './model-picker-model.js'
 import { ModelRow } from './model-row.js'
 import { BrandMark } from './picker-atoms.js'
 import { PROVIDER_LABEL } from './provider-labels.js'
-import { Switch } from '@dshfiles/plugin-ui/components/ui/switch'
 import { requestFanOut } from '@dshfiles/thread-sidebar/fan-out-request'
 import { englishModelPicker, type ModelPickerTranslate } from './locales.js'
 import { modelEffortPickerSettings } from './settings.js'
@@ -221,6 +221,8 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
 
   /** Shift-click collects routes for one fan-out request instead of switching this thread's model. */
   const toggleFanOut = (selection: ModelSelection): void => {
+    // A shift-click or long-press collects a route straight into select mode, so the bar and the checkboxes show it.
+    setSeveral(true)
     setFanOut(previous => ModelPickerModel.toggledFanOut(previous, selection))
   }
 
@@ -380,44 +382,68 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 aria-label="Choose a model"
                 className={cn(
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
-                  catalogEmpty && 'dshx:w-full',
+                  (catalogEmpty || several) && 'dshx:w-full',
                   'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:px-2',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
               >
-                <SearchInput
-                  aria-activedescendant={activeIndex < 0 ? undefined : `${listboxId}-${String(activeIndex)}`}
-                  aria-autocomplete="list"
-                  aria-controls={listboxId}
-                  aria-expanded={open}
-                  aria-label="Search models and accounts"
-                  autoComplete="off"
-                  className="dshx:shrink-0"
-                  onChange={event => setQuery(event.currentTarget.value)}
-                  onKeyDown={event => {
-                    const input = event.currentTarget
-                    const action = ModelPickerModel.listKey({
-                      key: event.key,
-                      active: activeIndex,
-                      count: rows.length,
-                      caretAtEnd: input.selectionStart === input.value.length && input.selectionEnd === input.value.length,
-                    })
-                    if (action.kind === 'none') return
-                    event.preventDefault()
-                    if (action.kind === 'move') {
-                      setActiveIndex(action.index)
-                      setKeyboardRow(true)
-                    } else if (action.kind === 'use') useRow(action.index, event.shiftKey)
-                    else {
-                      const row = rows[action.index]
-                      if (row !== undefined) showDetails({ model: row.model.id, provider: row.group.id })
-                    }
-                  }}
-                  role="combobox"
-                  placeholder="Search models…"
-                  ref={searchInputRef}
-                  value={query}
-                />
+                <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+                  <SearchInput
+                    aria-activedescendant={activeIndex < 0 ? undefined : `${listboxId}-${String(activeIndex)}`}
+                    aria-autocomplete="list"
+                    aria-controls={listboxId}
+                    aria-expanded={open}
+                    aria-label="Search models and accounts"
+                    autoComplete="off"
+                    className="dshx:min-w-0 dshx:flex-1"
+                    onChange={event => setQuery(event.currentTarget.value)}
+                    onKeyDown={event => {
+                      const input = event.currentTarget
+                      const action = ModelPickerModel.listKey({
+                        key: event.key,
+                        active: activeIndex,
+                        count: rows.length,
+                        caretAtEnd: input.selectionStart === input.value.length && input.selectionEnd === input.value.length,
+                      })
+                      if (action.kind === 'none') return
+                      event.preventDefault()
+                      if (action.kind === 'move') {
+                        setActiveIndex(action.index)
+                        setKeyboardRow(true)
+                      } else if (action.kind === 'use') useRow(action.index, event.shiftKey)
+                      else {
+                        const row = rows[action.index]
+                        if (row !== undefined) showDetails({ model: row.model.id, provider: row.group.id })
+                      }
+                    }}
+                    role="combobox"
+                    placeholder="Search models…"
+                    ref={searchInputRef}
+                    value={query}
+                  />
+                  {rows.length === 0 ? null : (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          aria-label={t('selectSeveral')}
+                          aria-pressed={several}
+                          className="dshx:size-8 dshx:shrink-0 dshx:pointer-coarse:size-11"
+                          data-model-select-several
+                          onClick={() => {
+                            setSeveral(!several)
+                            if (several) setFanOut([])
+                          }}
+                          size="icon"
+                          type="button"
+                          variant="ghost"
+                        >
+                          <ListChecksIcon aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom">{t('selectSeveral')}</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
                 <ScrollArea
                   className="dshx:min-h-0 dshx:flex-1 dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:[&_[data-slot=scroll-area-viewport]>div]:block! dshx:[&_[data-slot=scroll-area-viewport]]:[overflow-x:clip]!"
                   data-model-picker-scroll
@@ -474,41 +500,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     )}
                   </div>
                 </ScrollArea>
-                {rows.length === 0 ? null : (
-                  <div
-                    className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2 dshx:py-1.5"
-                    data-model-picker-fan-out=""
-                  >
-                    <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-                      <label className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:pointer-coarse:min-h-11">
-                        <Switch
-                          aria-label={t('selectSeveral')}
-                          data-touch-row
-                          checked={several || fanOut.length > 0}
-                          onCheckedChange={checked => {
-                            setSeveral(checked)
-                            if (!checked) setFanOut([])
-                          }}
-                          size="sm"
-                        />
-                        <span className="dshx:truncate">{fanOut.length > 0 ? t('selected', { count: fanOut.length }) : t('selectSeveral')}</span>
-                      </label>
-                      {fanOut.length > 0 ? (
-                        <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-                          <Button className="dshx:pointer-coarse:h-11" onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
-                            {t('clear')}
-                          </Button>
-                          <Button className="dshx:pointer-coarse:h-11" disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
-                            {t('fanOut')}
-                          </Button>
-                        </span>
-                      ) : null}
-                    </div>
-                    {several || fanOut.length > 0 ? (
-                      <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{fanOut.length === 1 ? t('fanOutNeedsTwo') : t('selectSeveralHint')}</p>
-                    ) : null}
-                  </div>
-                )}
+                {several ? (
+                  <FanOutBar count={fanOut.length} limit={ModelPickerModel.fanOutLimit} onClear={() => setFanOut([])} onFanOut={startFanOut} t={t} />
+                ) : null}
                 {state.failures.length > 0 && (
                   <p className="dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
                     {state.failures.length} provider{state.failures.length === 1 ? '' : 's'} could not load:{' '}
@@ -522,7 +516,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   'dshx:flex dshx:w-80 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:border-l dshx:border-border dshx:p-2.5 dshx:outline-none',
                   'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:px-2',
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
-                  catalogEmpty && 'dshx:hidden',
+                  (catalogEmpty || several) && 'dshx:hidden',
                 )}
                 data-model-inspector
                 onKeyDown={event => {

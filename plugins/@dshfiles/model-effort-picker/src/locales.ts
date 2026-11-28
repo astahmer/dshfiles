@@ -3,8 +3,7 @@ import { defineLocale } from '@dshfiles/dshx/client'
 /** Copy of the picker's fan-out ("Send to several models") controls (b:ysaj). */
 const en = {
   selectSeveral: 'Select several',
-  selectSeveralHint: 'Choose two to six models, then Fan out. Shift-click or long-press a model does the same.',
-  selected: '{count} selected',
+  selectedOf: '{count} of {limit} selected',
   clear: 'Clear',
   fanOut: 'Fan out…',
   fanOutNeedsTwo: 'Choose at least two models.',
@@ -12,8 +11,7 @@ const en = {
 
 const zh = {
   selectSeveral: '多选',
-  selectSeveralHint: '选择 2 到 6 个模型，然后分发。按住 Shift 点击或长按模型效果相同。',
-  selected: '已选 {count} 个',
+  selectedOf: '已选 {count} / {limit} 个',
   clear: '清除',
   fanOut: '分发…',
   fanOutNeedsTwo: '至少选择两个模型。',

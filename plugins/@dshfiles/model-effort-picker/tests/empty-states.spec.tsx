@@ -34,8 +34,8 @@ describe('empty and loading states say what to do next (council picker N4)', () 
 
   it('hides the inspector and Select several when there is nothing to inspect or select', () => {
     const picker = source('model-effort-picker.tsx')
-    expect(picker).toMatch(/catalogEmpty && 'dshx:hidden'/u)
-    expect(picker).toMatch(/\{rows\.length === 0 \? null : \(\s*<div[^>]*\s*className="[^"]*"\s*data-model-picker-fan-out/u)
+    expect(picker).toMatch(/\(catalogEmpty[^)]*\) && 'dshx:hidden'|catalogEmpty && 'dshx:hidden'/u)
+    expect(picker).toMatch(/\{rows\.length === 0 \? null : \(\s*<Tooltip>[\s\S]{0,500}data-model-select-several/u)
     expect(source('client.tsx')).toContain("new CustomEvent('dshfiles:open-settings', { detail: { section: 'ai-accounts' }, cancelable: true })")
   })
 })
