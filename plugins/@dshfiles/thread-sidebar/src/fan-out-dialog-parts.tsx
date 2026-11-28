@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
-import { ModelMark, RouteModel, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
+import { AccountDot, type AccountAccent } from '@dshfiles/ai-accounts/account-color'
+import { ModelMark, RouteModel, modelFamily, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
@@ -16,6 +17,8 @@ export interface FanOutChosenRoute {
 export const FanOutChosen = (props: {
   readonly routes: readonly FanOutChosenRoute[]
   readonly accountOf: (provider: string) => string
+  /** Round 5 U2: the account's dot before its tag, as in the model picker. */
+  readonly accentOf?: (provider: string) => AccountAccent | undefined
   readonly label: string
   readonly removeLabel: (model: string) => string
   readonly onRemove: (route: FanOutChosenRoute) => void
@@ -28,12 +31,18 @@ export const FanOutChosen = (props: {
       const name = modelIdentity(route.provider, route.model)?.name ?? route.model
       return (
         <span
-          className="dshx:inline-flex dshx:h-8 dshx:max-w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:pr-0.5 dshx:pl-2.5 dshx:text-sm dshx:pointer-coarse:h-11"
+          className="dshx:inline-flex dshx:h-8 dshx:max-w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:pr-0.5 dshx:pl-2.5 dshx:text-sm dshx:dark:border-field-border dshx:pointer-coarse:h-11"
           data-fan-out-chip
           key={`${route.provider}/${route.model}`}
         >
           <RouteModel className="dshx:min-w-0 dshx:text-foreground" model={route.model} provider={route.provider} seat size="md" />
-          <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{props.accountOf(route.provider)}</span>
+          <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:text-xs dshx:text-muted-foreground">
+            {(() => {
+              const accent = props.accentOf?.(route.provider)
+              return accent === undefined ? null : <AccountDot accent={accent} className="dshx:size-1.5" />
+            })()}
+            {props.accountOf(route.provider)}
+          </span>
           <button
             aria-label={props.removeLabel(name)}
             className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:hover:bg-muted dshx:hover:text-foreground dshx:pointer-coarse:size-11"
@@ -61,14 +70,15 @@ export const FanOutSummary = (props: {
   readonly className?: string
 }) => (
   <div className={cn('dshx:min-h-11 dshx:items-center dshx:gap-2', props.className)} data-fan-out-summary>
+    {/* Round 5 U2: one 20 px mark per distinct family, at most three, then the count. */}
     <span aria-hidden="true" className="dshx:flex dshx:items-center">
-      {props.routes.map((route, index) => (
+      {fanOutFamilies(props.routes).map((route, index) => (
         <span
           className={cn(
             'dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-background dshx:ring-1 dshx:ring-border',
             index > 0 && 'dshx:-ml-1.5',
           )}
-          key={`${route.provider}/${route.model}`}
+          key={route.model}
         >
           <ModelMark modelId={route.model} />
         </span>
@@ -80,6 +90,19 @@ export const FanOutSummary = (props: {
     </Button>
   </div>
 )
+
+/** The first route of each distinct model family, at most three (round 5 U2). */
+export const fanOutFamilies = (routes: readonly FanOutChosenRoute[]): readonly FanOutChosenRoute[] => {
+  const seen = new Set<string>()
+  return routes
+    .filter(route => {
+      const family = modelFamily(route.model) ?? route.model
+      if (seen.has(family)) return false
+      seen.add(family)
+      return true
+    })
+    .slice(0, 3)
+}
 
 /** N7: what Send says and, when it cannot run, why: two models and a prompt are needed. */
 export const fanOutSendState = (input: {

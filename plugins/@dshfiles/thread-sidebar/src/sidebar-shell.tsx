@@ -4,6 +4,8 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import type { SidebarPanelMetadata, SidebarRootComponentProps } from '@deepseek-ai/dsh-client-ui-sidebar/client'
 import type { PropsRenderSlots, TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import { writeClipboard } from '@deepseek-ai/dsh-client-ui-primitives'
+import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
+import { AccountColor } from '@dshfiles/ai-accounts/account-color'
 import { useApi, useApiQuery, useContract, useRegistry } from '@dshfiles/dshx/client'
 import { SettingsNavigation } from '@dshfiles/settings-shell/settings-navigation'
 import { PhonePairingQr } from '@dshfiles/phone-pairing/contract'
@@ -533,6 +535,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   })
   const [fanOutText, setFanOutText] = useState('')
   const [fanOutModels, setFanOutModels] = useState<readonly { provider: string; model: string; reasoningEffort?: string }[]>([])
+  // Round 5 U2: the chips draw each account's dot, by the rule the model picker uses (ai-accounts' account-color module).
+  const fanOutProfiles = useApiQuery(aiAccountsApi, 'read', { enabled: fanOutOpen })
+  const fanOutAccents = useMemo(() => AccountColor.accents(fanOutProfiles.data?.accounts ?? []), [fanOutProfiles.data])
   // Round 3 R2: the checklist opens on its own only when no model is chosen yet; with chosen models it waits behind Edit.
   const [fanOutPicking, setFanOutPicking] = useState(false)
   useEffect(() => {
@@ -2045,8 +2050,13 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         {/* Council picker N7, round 3 R2: under the phone shell a bottom sheet that sits on the software keyboard
             (--dsh-keyboard-inset, phone-shell.ts). One scroller between the header and a footer that never scrolls away,
             so Send stays in view while the prompt is focused. */}
-        <DialogContent className="dshx-root dshx:flex dshx:max-h-[85dvh] dshx:max-w-xl dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)] dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]:not([data-phone-keyboard])]:max-h-[85dvh] dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none dshx:in-[html[data-phone-keyboard]]:h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)] dshx:in-[html[data-phone-keyboard]]:max-h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)]" data-fan-out-dialog>
-          <DialogHeader className="dshx:shrink-0 dshx:px-4 dshx:pt-4 dshx:pb-3 dshx:pr-12 dshx:text-left">
+        <DialogContent className="dshx-root dshx:flex dshx:max-h-[85dvh] dshx:max-w-xl dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0! dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)] dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]:not([data-phone-keyboard])]:max-h-[85dvh] dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none dshx:in-[html[data-shell-phone-nav]]:rounded-t-2xl dshx:[&>[data-slot=dialog-close]]:flex dshx:[&>[data-slot=dialog-close]]:size-6 dshx:[&>[data-slot=dialog-close]]:items-center dshx:[&>[data-slot=dialog-close]]:justify-center dshx:pointer-coarse:[&>[data-slot=dialog-close]]:size-11 dshx:in-[html[data-shell-phone-nav]]:[&>[data-slot=dialog-close]]:top-4.5 dshx:in-[html[data-phone-keyboard]]:[&>[data-slot=dialog-close]]:top-0! dshx:in-[html[data-phone-keyboard]]:h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)] dshx:in-[html[data-phone-keyboard]]:max-h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)]" data-fan-out-dialog>
+          {/* Round 5 U2: the picker sheet's pattern on the phone: a grab handle, its 16 px radius, a left-aligned title on
+              one 56 px line with Close (the kit's corner Close, placed on the title's centre line). */}
+          <div aria-hidden="true" className="dshx:hidden dshx:shrink-0 dshx:pt-2 dshx:in-[html[data-shell-phone-nav]]:block dshx:in-[html[data-phone-keyboard]]:hidden!" data-fan-out-handle>
+            <div className="dshx:mx-auto dshx:h-1 dshx:w-9 dshx:rounded-full dshx:bg-muted-foreground/40" />
+          </div>
+          <DialogHeader className="dshx:h-14 dshx:shrink-0 dshx:in-[html[data-phone-keyboard]]:h-11 dshx:flex-row dshx:items-center dshx:px-4 dshx:pr-14 dshx:text-left">
             <DialogTitle>{text(props.t, 'threadSidebarFanOutTitle')}</DialogTitle>
           </DialogHeader>
           <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:overscroll-contain dshx:px-4 dshx:pb-3" data-fan-out-body>
@@ -2055,6 +2065,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             {fanOutModels.length === 0 ? null : (
               <>
                 <FanOutChosen
+                  accentOf={provider => fanOutAccents.get(provider)}
                   accountOf={provider => accountTagOf(fanOutCatalog.data?.groups.find(group => group.id === provider)?.name ?? provider)}
                   className="dshx:in-[html[data-phone-keyboard]]:hidden"
                   label={text(props.t, 'threadSidebarFanOutChosen')}
@@ -2065,12 +2076,12 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                     <Button
                       aria-controls="thread-sidebar-fan-out-models"
                       aria-expanded={fanOutPicking}
-                      className="dshx:h-8 dshx:rounded-lg dshx:px-2.5 dshx:pointer-coarse:h-11"
+                      className="dshx:h-8 dshx:rounded-lg dshx:border-dashed dshx:px-2.5 dshx:pointer-coarse:h-11"
                       data-fan-out-edit
                       onClick={() => setFanOutPicking(!fanOutPicking)}
                       size="sm"
                       type="button"
-                      variant="ghost"
+                      variant="outline"
                     >
                       {text(props.t, 'threadSidebarFanOutEditModels')}
                     </Button>
@@ -2091,7 +2102,10 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm dshx:font-medium dshx:in-[html[data-phone-keyboard]]:min-h-0 dshx:in-[html[data-phone-keyboard]]:flex-1">
               {text(props.t, 'threadSidebarFanOutPrompt')}
               <Textarea
-                className="dshx:resize-none dshx:in-[html[data-phone-keyboard]]:min-h-[5.5rem] dshx:in-[html[data-phone-keyboard]]:flex-1"
+                aria-describedby="thread-sidebar-fan-out-reason"
+                // Round 5 U2: at least four lines (the kit field sizes to its content), and one focus ring: the kit outline,
+                // with the edge staying neutral instead of also turning accent.
+                className="dshx:min-h-28 dshx:resize-none dshx:font-normal dshx:focus-visible:border-field-border dshx:in-[html[data-phone-keyboard]]:min-h-[5.5rem] dshx:in-[html[data-phone-keyboard]]:flex-1"
                 data-fan-out-prompt
                 onChange={event => setFanOutText(event.target.value)}
                 placeholder={text(props.t, 'threadSidebarFanOutPromptPlaceholder')}
@@ -2099,6 +2113,16 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
                 value={fanOutText}
               />
             </label>
+            {/* Round 5 U2: what Send does, under the prompt it describes, or why it waits. */}
+            <p
+              className={cn('dshx:-mt-2 dshx:text-xs dshx:text-muted-foreground', fanOutSend.reason === null && 'dshx:in-[html[data-phone-keyboard]]:sr-only')}
+              data-fan-out-reason
+              id="thread-sidebar-fan-out-reason"
+            >
+              {fanOutSend.reason === null
+                ? text(props.t, 'threadSidebarFanOutHelp')
+                : text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutNeedsPrompt')}
+            </p>
             {/* The full checklist is behind Add models (no chips yet) or the Edit models chip above. */}
             {fanOutModels.length > 0 ? null : (
               <Button
@@ -2161,16 +2185,13 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             className="dshx:flex dshx:shrink-0 dshx:flex-row dshx:items-center dshx:gap-3 dshx:border-t dshx:border-border dshx:px-4 dshx:pt-3 dshx:pb-4 dshx:in-[html[data-shell-phone-nav]]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] dshx:in-[html[data-phone-keyboard]]:pb-3"
             data-fan-out-footer
           >
-            {/* Round 4 T3: the helper text and Cancel / Send share one 44 px footer row. */}
-            <p className="dshx:min-w-0 dshx:flex-1 dshx:text-xs dshx:text-muted-foreground" data-fan-out-reason id="thread-sidebar-fan-out-reason">
-              {fanOutSend.reason === null ? '' : text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutNeedsPrompt')}
-            </p>
-            <DialogFooter className="dshx:shrink-0 dshx:flex-row dshx:justify-end">
+            {/* Round 5 U2: actions only; on the phone Cancel takes one part and Send two. */}
+            <DialogFooter className="dshx:w-full dshx:shrink-0 dshx:flex-row dshx:justify-end dshx:in-[html[data-shell-phone-nav]]:grid dshx:in-[html[data-shell-phone-nav]]:grid-cols-[1fr_2fr]">
               <Button className="dshx:pointer-coarse:h-11" type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
                 Cancel
               </Button>
               <Button
-                aria-describedby={fanOutSend.reason === null ? undefined : 'thread-sidebar-fan-out-reason'}
+                aria-describedby="thread-sidebar-fan-out-reason"
                 className="dshx:pointer-coarse:h-11"
                 type="button"
                 disabled={fanOutSend.disabled || sendFanOut.isPending}

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { FanOutChosen, FanOutSummary, accountTagOf, fanOutModelName, fanOutSendState } from './fan-out-dialog-parts.js'
+import { FanOutChosen, FanOutSummary, accountTagOf, fanOutFamilies, fanOutModelName, fanOutSendState } from './fan-out-dialog-parts.js'
 
 const text = (html: string): string => html.replace(/<!-- -->/gu, '').replace(/<[^>]+>/gu, '')
 
@@ -121,7 +121,7 @@ describe('fan-out sheet with the keyboard open (council picker round 4, T3)', ()
     expect(html).toContain('dshx:-ml-1.5')
     expect(text(html)).toContain('6 models')
     expect(html).toMatch(/<button[^>]*>Edit<\/button>/u)
-    expect(dialog).toMatch(/<FanOutChosen[\s\S]{0,200}className="dshx:in-\[html\[data-phone-keyboard\]\]:hidden"/u)
+    expect(dialog).toMatch(/<FanOutChosen[\s\S]{0,400}className="dshx:in-\[html\[data-phone-keyboard\]\]:hidden"/u)
     expect(dialog).toMatch(/<FanOutSummary[\s\S]{0,80}className="dshx:hidden dshx:in-\[html\[data-phone-keyboard\]\]:flex"/u)
   })
 
@@ -130,8 +130,50 @@ describe('fan-out sheet with the keyboard open (council picker round 4, T3)', ()
     expect(dialog).toMatch(/<DialogHeader className="[^"]*dshx:text-left/u)
   })
 
-  it('puts the helper text and Cancel / Send on one footer row, and Edit models at the end of the chips', () => {
+  it('puts Cancel / Send on one footer row, and Edit models at the end of the chips', () => {
     expect(dialog).toMatch(/className="dshx:flex dshx:shrink-0 dshx:flex-row dshx:items-center[^"]*"\s+data-fan-out-footer/u)
-    expect(dialog).toMatch(/trailing=\{\s*<Button[\s\S]{0,600}variant="ghost"/u)
+    // Round 5 U2: Edit models is the chip row's last chip (outline, dashed).
+    expect(dialog).toMatch(/trailing=\{\s*<Button[\s\S]{0,600}variant="outline"/u)
+  })
+})
+
+describe('fan-out sheet, round 5 (council picker U2)', () => {
+  const shell = readFileSync(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
+  const dialog = shell.slice(shell.indexOf('data-fan-out-dialog'), shell.indexOf('</DialogContent>', shell.indexOf('data-fan-out-dialog')))
+  const footer = dialog.slice(dialog.indexOf('data-fan-out-footer'))
+
+  it('keeps the footer to actions (Cancel one part, Send two on the phone) and says what Send does under the prompt', () => {
+    expect(footer).not.toContain('data-fan-out-reason')
+    expect(footer).toContain('dshx:in-[html[data-shell-phone-nav]]:grid dshx:in-[html[data-shell-phone-nav]]:grid-cols-[1fr_2fr]')
+    expect(dialog.indexOf('data-fan-out-reason')).toBeGreaterThan(dialog.indexOf('data-fan-out-prompt'))
+    expect(dialog).toContain("text(props.t, 'threadSidebarFanOutHelp')")
+    expect(dialog).toMatch(/<Textarea\s+aria-describedby="thread-sidebar-fan-out-reason"/u)
+  })
+
+  it('gives the prompt four lines and one focus ring, and the sheet the picker sheet handle and radius', () => {
+    expect(dialog).toContain('dshx:min-h-28 dshx:resize-none dshx:font-normal dshx:focus-visible:border-field-border')
+    expect(dialog).toContain('data-fan-out-handle')
+    expect(shell).toContain('dshx:in-[html[data-shell-phone-nav]]:rounded-t-2xl')
+  })
+
+  it('draws each chip with its account dot, on the field border in dark', () => {
+    const html = renderToString(
+      <FanOutChosen
+        accentOf={() => ({ light: 'oklch(0.52 0.12 200)', dark: 'oklch(0.76 0.11 200)', hue: 200 })}
+        accountOf={() => 'CC1'}
+        label="Chosen"
+        onRemove={() => undefined}
+        removeLabel={model => `Remove ${model}`}
+        routes={[{ provider: 'cc1', model: 'gpt-6-luna' }]}
+      />,
+    )
+    expect(html.indexOf('data-account-dot')).toBeGreaterThan(-1)
+    expect(html.indexOf('data-account-dot')).toBeLessThan(html.indexOf('CC1'))
+    expect(/<span[^>]*data-fan-out-chip[^>]*>/u.exec(html)?.[0]).toContain('dshx:dark:border-field-border')
+  })
+
+  it('shows one mark per distinct family, at most three, in the keyboard summary', () => {
+    const routes = ['gpt-6-luna', 'gpt-6-sol', 'claude-sonnet-5-5', 'gemini-3.8-flash', 'deepseek-v4-flash'].map(model => ({ provider: 'cc1', model }))
+    expect(fanOutFamilies(routes).map(route => route.model)).toEqual(['gpt-6-luna', 'claude-sonnet-5-5', 'gemini-3.8-flash'])
   })
 })
