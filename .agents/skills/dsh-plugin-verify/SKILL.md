@@ -20,6 +20,8 @@ fnm exec --using="$(cat .node-version)" pnpm --dir plugins run contract         
 A stale lockfile, a second copy of a `@deepseek-ai/*` package, or a plugin
 package without a `test` script all fail in ways that look like plugin code.
 Diff the failing paths against your own change before editing the plugin.
+See [Troubleshooting plugin development](../../../tooling/dshx/docs/compatibility.md#troubleshooting-plugin-development)
+for Cordis resolution, TypeScript build errors, and advice specific to older DSH installs.
 
 ## 1. Build and import-check
 

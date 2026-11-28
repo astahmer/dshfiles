@@ -79,6 +79,8 @@ Templates include native provider metadata. When adding a Client capability in `
 `pnpm dev` uses DSHX's existing project profile and native Host/Client tooling: Client HMR and Host restart remain native DSH operations. Use `dshx dev --port 0` for an isolated port while another DSH instance is running.
 
 For complete paths based on the owned DSH plugins—including schema-backed panels, session-bound UI and tool calls, settings, state, subprocesses, and raw Cordis extensions—see [authoring recipes](../recipes.md).
+If a native type is missing or a build recipe for an older DSH doesn't work,
+see [Troubleshooting plugin development](../compatibility.md#troubleshooting-plugin-development).
 
 ## Add a command
 

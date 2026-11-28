@@ -30,11 +30,15 @@ running on its schedule until you edit it.
   agree on every instant. Every daily, weekly and cron rule names an explicit IANA time zone.
 - A local time that does not exist (the spring-forward hour) is skipped; a repeated local time (the fall-back hour)
   runs once, at the earlier instant.
-- The Host must be running at the target time. A Host that was down across several targets runs **once**, for the
-  latest missed occurrence, then continues from the next target. A resumed automation starts from its next target
-  after now; runs missed while it was paused are not made up.
-- Automations live in plugin storage and survive Host restarts. The next target is committed before the thread
-  starts, so a crash never runs the same occurrence twice (it may skip it).
+- The Host must be running at the target time to run on time. An enabled schedule catches up **once** after
+  downtime, for the latest missed occurrence, then continues from the next target. Resuming a paused automation
+  starts at the next target after now; it does not make up runs missed while paused.
+- Automations live in plugin storage and survive Host restarts. The scheduler commits the next target before
+  dispatching the thread. If the Host crashes between those steps, the committed occurrence can be skipped rather
+  than retried. Committing the schedule does not guarantee a thread started or a report was published.
+
+See [Draft a daily project digest](docs/daily-digest.md) for an optional prompt and paused setup, the limits of
+Backlog and landing evidence, and how to start a follow-up outside the HTML card.
 
 ### Webhooks
 
