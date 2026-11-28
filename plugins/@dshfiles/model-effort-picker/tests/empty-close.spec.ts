@@ -6,6 +6,7 @@ const picker = readFileSync(new URL('../src/model-effort-picker.tsx', import.met
 describe('Close never sits inside the search field (council picker round 4, T6)', () => {
   it('narrows an empty catalog to the list width and keeps room for Close beside the search', () => {
     expect(picker).toContain("catalogEmpty && 'dshx:w-[min(22.5rem,calc(100vw-1.5rem))]'")
-    expect(picker).toMatch(/catalogEmpty && 'dshx:pr-8 dshx:@max-pane-compact:pr-0'\)\}\s*data-model-search-row/u)
+    // Round 5 U6: an empty catalog has no search row at all.
+    expect(picker).toMatch(/catalogEmpty && 'dshx:hidden'\)\}\s*data-model-search-row/u)
   })
 })

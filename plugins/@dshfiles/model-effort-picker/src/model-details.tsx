@@ -181,7 +181,12 @@ export const ModelDetails = (props: {
         data-model-details-body
         onScroll={event => setScrolled(event.currentTarget.scrollTop > 0)}
       >
-        {model === undefined ? null : (
+        {/* Round 5 U6: with no model chosen, one line says what to do; nothing else (no fallbacks) until one is. */}
+        {model === undefined ? (
+          <p className="dshx:mt-2 dshx:text-xs dshx:text-muted-foreground" data-model-details-none>
+            Choose a model in the list to see its accounts and reasoning effort.
+          </p>
+        ) : (
           <AccountRows
             accents={props.accountAccents}
             accounts={accounts}
@@ -217,7 +222,7 @@ export const ModelDetails = (props: {
           ? props.fast({ provider: group.id, model: model.id, draft: draft ? { value: stagedFast, onChange: setStagedFast } : null })
           : null}
 
-        {draft ? null : props.fallbacks}
+        {draft || model === undefined ? null : props.fallbacks}
       </div>
 
       {draft && name !== undefined ? (

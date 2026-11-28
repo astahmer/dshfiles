@@ -21,7 +21,7 @@ describe('Close ends the Tab cycle (council picker round 3, R17)', () => {
       picker.lastIndexOf('<button', picker.indexOf('data-model-picker-close')),
       picker.indexOf('>', picker.indexOf('data-model-picker-close')),
     )
-    expect(tag).toMatch(/dshx:absolute dshx:top-2\.5 dshx:right-2\.5/u)
+    expect(tag).toMatch(/catalogEmpty \? 'dshx:top-3 dshx:pointer-coarse:top-0' : 'dshx:top-2\.5 dshx:@max-pane-compact:top-0',\s*'dshx:absolute dshx:right-2\.5/u)
     expect(details).toMatch(/data-model-details-header|dshx:pr-7 dshx:pointer-coarse:pr-12/u)
     expect(details).toMatch(/dshx:pr-7 [^"]*dshx:pointer-coarse:pr-12/u)
   })

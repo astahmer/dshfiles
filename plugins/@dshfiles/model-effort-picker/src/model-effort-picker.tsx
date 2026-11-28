@@ -435,7 +435,13 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             sideOffset={8}
           >
             <div
-              className="dshx:relative dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch dshx:overflow-clip dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]"
+              className={cn(
+                'dshx:relative dshx:flex dshx:items-stretch dshx:overflow-clip',
+                // Round 5 U6: an empty catalog is sized to its message, not to a list it does not have.
+                catalogEmpty
+                  ? 'dshx:h-auto'
+                  : 'dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]',
+              )}
               data-model-picker-surface
             >
               <section
@@ -451,7 +457,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 {/* Round 3 R16: on a phone the list has the same 44 pt header line as details (the title here; Close is the
                     picker's one Close at the top right). There is nothing to go back to from the list, so no Back. */}
                 <header
-                  className="dshx:hidden dshx:min-h-11 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex"
+                  className={cn(
+                    'dshx:hidden dshx:min-h-11 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex',
+                    // Round 5 U6: an empty catalog has its title and Close on one 44 px line at every width.
+                    catalogEmpty && 'dshx:flex dshx:pl-1.5',
+                  )}
                   data-model-picker-list-header
                 >
                   <h2
@@ -462,10 +472,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     {several ? t('selectModels') : 'Choose a model'}
                   </h2>
                 </header>
-                <div
-                  className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1', catalogEmpty && 'dshx:pr-8 dshx:@max-pane-compact:pr-0')}
-                  data-model-search-row
-                >
+                <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1', catalogEmpty && 'dshx:hidden')} data-model-search-row>
                   {/* Round 3 R18: one focus ring (the field edge does not also turn accent), a clear button inside the field,
                       and a search that waits while there is nothing to search. */}
                   <div className="dshx:relative dshx:min-w-0 dshx:flex-1">
@@ -710,7 +717,12 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   (beside the details title on desktop, the sheet header on a phone). */}
               <button
                 aria-label="Close model picker"
-                className="dshx:absolute dshx:top-2.5 dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11 dshx:@max-pane-compact:top-0 dshx:@max-pane-compact:right-0"
+                className={cn(
+                  // On an empty catalog's title line (round 5 U6; the picker is narrow there, so compact even on desktop), its centre
+                  // at 23 px; else beside the details title.
+                  catalogEmpty ? 'dshx:top-3 dshx:pointer-coarse:top-0' : 'dshx:top-2.5 dshx:@max-pane-compact:top-0',
+                  'dshx:absolute dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11 dshx:@max-pane-compact:right-0',
+                )}
                 data-model-picker-close
                 onClick={() => setOpen(false)}
                 type="button"
