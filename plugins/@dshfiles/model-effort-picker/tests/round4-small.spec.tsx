@@ -12,7 +12,7 @@ const source = (name: string): string => readFileSync(new URL(`../src/${name}`, 
 describe('round 4 smaller fixes (council picker T16)', () => {
   it('draws the matched part of a name at 600 and leaves the text otherwise untouched', () => {
     const html = renderToStaticMarkup(<MatchedName name="gpt-6.2-astra" query="6.2" />)
-    expect(html).toBe('gpt-<span class="dshx:font-semibold dshx:text-foreground" data-model-match="true">6.2</span>-astra')
+    expect(html).toBe('gpt-<span class="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-2" data-model-match="true">6.2</span>-astra')
     expect(renderToStaticMarkup(<MatchedName name="gpt-6-luna" query="" />)).toBe('gpt-6-luna')
     expect(renderToStaticMarkup(<MatchedName name="gpt-6-luna" query="zz" />)).toBe('gpt-6-luna')
   })

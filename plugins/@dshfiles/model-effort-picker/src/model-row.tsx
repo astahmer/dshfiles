@@ -213,7 +213,7 @@ export const ModelRow = (props: {
 
 /**
  * The part [from, to) of a name, with the first case-insensitive occurrence of the search (found in the whole name, so
- * a match across the head and tail stays one match) drawn at 600 (no other change to the text).
+ * a match across the head and tail stays one match) underlined (no other change to the text).
  */
 export const MatchedName = ({
   name,
@@ -234,7 +234,8 @@ export const MatchedName = ({
   return (
     <>
       {name.slice(from, start)}
-      <span className="dshx:font-semibold dshx:text-foreground" data-model-match>
+      {/* Round 5 U14: an underline, not 600, so a match never reads as the model in use. */}
+      <span className="dshx:underline dshx:decoration-foreground/50 dshx:underline-offset-2" data-model-match>
         {name.slice(start, end)}
       </span>
       {name.slice(end, to)}
