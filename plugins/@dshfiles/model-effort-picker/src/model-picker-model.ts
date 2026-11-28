@@ -103,6 +103,14 @@ export class ModelPickerModel {
     return known.find(([pattern]) => pattern.test(key))?.[1] ?? effort.name
   }
 
+  /** C3: the accounts' quota column heading, named for the window that limits them ("Weekly quota left"). */
+  static quotaHeading = (quotas: readonly ModelQuota[]): string | undefined => {
+    if (quotas.length === 0) return undefined
+    const windows = new Set(quotas.map(quota => quota.label.replace(/\s*limit$/iu, '').trim()))
+    const [only] = windows
+    return windows.size === 1 && only !== undefined && only.length > 0 ? `${only} quota left` : 'Quota left'
+  }
+
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return groups

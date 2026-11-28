@@ -2,13 +2,12 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@dshfiles/plugin-ui/components/ui/tooltip'
 import { ArrowLeftIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountColor } from './account-color.js'
+import { AccountRows } from './account-rows.js'
 import { ModelPickerModel, type InspectedRoute, type ModelQuota } from './model-picker-model.js'
 import { EffortControl } from './effort-control.js'
-import { BrandMark, ProviderLabel, QuotaPercent } from './picker-atoms.js'
+import { BrandMark, ProviderLabel } from './picker-atoms.js'
 
 type CatalogGroup = ModelDirectoryState['groups'][number]
 
@@ -129,43 +128,18 @@ export const ModelDetails = (props: {
       </header>
 
       <div className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip]" data-model-details-body>
-        <div className="dshx:mt-2 dshx:flex dshx:items-start dshx:gap-2">
-          <p className="dshx:shrink-0 dshx:pt-1 dshx:text-2xs dshx:font-medium dshx:text-muted-foreground">Account</p>
-          <div aria-label="Available accounts" className="dshx:flex dshx:min-w-0 dshx:flex-wrap dshx:gap-1" data-model-account-chips>
-            {accounts.map(account => {
-              const quota = props.quotas.get(account.id)
-              return (
-                <Tooltip key={account.id}>
-                  <TooltipTrigger asChild>
-                    <button
-                      aria-label={account.name}
-                      aria-pressed={group?.id === account.id}
-                      className={cn(
-                        'dshx:flex dshx:h-6 dshx:max-w-[10rem] dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:border dshx:border-border dshx:px-2 dshx:text-2xs dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                        group?.id === account.id && 'dshx:border-info/60 dshx:bg-info/10 dshx:text-foreground',
-                      )}
-                      disabled={props.busy && !draft}
-                      onClick={() => changeAccount(account)}
-                      type="button"
-                    >
-                      <i
-                        aria-hidden="true"
-                        className="dshx:size-1.5 dshx:shrink-0 dshx:rounded-full"
-                        style={{ backgroundColor: props.accountAccents.get(account.id) ?? accountColor({ instanceId: account.id }) }}
-                      />
-                      <span className="dshx:min-w-0 dshx:truncate">{account.name}</span>
-                      {quota === undefined ? null : <QuotaPercent onReserve={quota.onReserve} percent={quota.percent} />}
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top">
-                    {account.name}
-                    {quota === undefined ? '' : ` · ${quota.label}: ${String(Math.round(quota.percent))}% left`}
-                  </TooltipContent>
-                </Tooltip>
-              )
-            })}
-          </div>
-        </div>
+        {model === undefined ? null : (
+          <AccountRows
+            accents={props.accountAccents}
+            accounts={accounts}
+            onChoose={accountId => {
+              const account = accounts.find(candidate => candidate.id === accountId)
+              if (account !== undefined) changeAccount(account)
+            }}
+            quotas={props.quotas}
+            selected={group?.id}
+          />
+        )}
 
         {props.error === null ? null : (
           <div

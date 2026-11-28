@@ -208,7 +208,7 @@ When('a supported legacy Codex model is selected without validating a new connec
   await model.click()
   await modelList.getByRole('button', { name: /Details for.*GPT-6 Luna/iu }).click()
   await expect(trigger).toHaveText('GPT-6 Luna')
-  await expect(page.getByRole('dialog').getByRole('button', { name: 'Codex 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByRole('dialog').getByRole('radio', { name: 'Codex 1', exact: true })).toHaveAttribute('aria-checked', 'true')
 
   const fastMode = page.getByRole('switch', { name: 'Fast mode · may cost more', exact: true })
   const dialog = page.getByRole('dialog')
@@ -320,7 +320,8 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
     await expect(page.getByRole('tooltip')).toContainText('Command Code 1')
     // b:4qjm/b:16yr: no swap button beside the chip; the detail panel's Account chips switch the thread's account.
     await expect(page.locator('[data-model-account-swap]')).toHaveCount(0)
-    const accounts = page.getByRole('group', { name: 'Available accounts' }).or(page.getByLabel('Available accounts')).first()
+    // Council picker C3: the accounts are a radio group headed "Account".
+    const accounts = page.getByRole('radiogroup', { name: 'Account', exact: true }).first()
     // The isolated composition can close the menu's first open at once (as it drops the trigger tooltip on main), so an
     // open that closed itself is opened again.
     const openMenu = async (): Promise<void> => {
@@ -329,11 +330,11 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
       await expect(accounts).toBeVisible()
     }
     await openMenu()
-    await expect(accounts.getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(accounts.getByRole('radio', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-checked', 'true')
     await expect(async () => {
       await openMenu()
-      await accounts.getByRole('button', { name: 'Command Code 2', exact: true }).click({ timeout: 2_000 })
-      await expect(accounts.getByRole('button', { name: 'Command Code 2', exact: true })).toHaveAttribute('aria-pressed', 'true', { timeout: 2_000 })
+      await accounts.getByRole('radio', { name: 'Command Code 2', exact: true }).click({ timeout: 2_000 })
+      await expect(accounts.getByRole('radio', { name: 'Command Code 2', exact: true })).toHaveAttribute('aria-checked', 'true', { timeout: 2_000 })
     }).toPass({ timeout: 20_000 })
     // One row per model however many accounts offer it.
     await expect(
@@ -348,7 +349,7 @@ Then('swapping accounts keeps the model and selects the next account', async ({ 
     if (initialEffort === '') await expect(effort).toHaveCount(0)
     else await expect(effort).toHaveText(initialEffort)
     await openMenu()
-    await expect(accounts.getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'false')
+    await expect(accounts.getByRole('radio', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-checked', 'false')
     await page.keyboard.press('Escape')
   })
   await finishJourneyAssertions(page)
