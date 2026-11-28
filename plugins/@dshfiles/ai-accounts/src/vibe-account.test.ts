@@ -74,3 +74,26 @@ describe('Vibe account home and login', () => {
     expect(card.windows).toEqual([])
   })
 })
+
+describe('Vibe transport selection and process environment', () => {
+  it('keeps an account that never chose a bridge on the headless CLI', () => {
+    expect(VibeAccountModel.bridge(undefined)).toBe('headless')
+    expect(VibeAccountModel.bridge('headless')).toBe('headless')
+    expect(VibeAccountModel.bridge('acp')).toBe('acp')
+  })
+
+  it('names the login command for the account s own VIBE_HOME', () => {
+    expect(VibeAccountModel.command('')).toBe('vibe --setup')
+    expect(VibeAccountModel.command('/synthetic/vibe-alt')).toBe("VIBE_HOME='/synthetic/vibe-alt' vibe --setup")
+  })
+
+  it('runs a Vibe process with the account home and no inherited API key, so the CLI login is what pays', () => {
+    const env = VibeAccountModel.cliEnvironment({
+      home: '/synthetic/vibe-alt',
+      environment: { PATH: '/usr/bin', MISTRAL_API_KEY: 'synthetic-inherited-key', VIBE_CWD: '/synthetic/project' },
+    })
+    expect(env).toMatchObject({ PATH: '/usr/bin', VIBE_HOME: '/synthetic/vibe-alt' })
+    expect(env['MISTRAL_API_KEY']).toBeUndefined()
+    expect(env['VIBE_CWD']).toBeUndefined()
+  })
+})

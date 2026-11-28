@@ -180,11 +180,7 @@ export class VibeCliSessions {
     const thinking = thinkingFor(model, streamOptions?.reasoning)
     if (thinking !== undefined) args.push('--thinking', thinking)
 
-    // The CLI reads the variable before its own login, so an inherited key would bill the API credit. Its `.env` and
-    // keyring stay untouched: those are the signed-in session this route exists for.
-    const env: NodeJS.ProcessEnv = { ...process.env, VIBE_HOME: home }
-    delete env['MISTRAL_API_KEY']
-    delete env['VIBE_CWD']
+    const env = VibeAccountModel.cliEnvironment({ environment: process.env, home })
 
     let child: ChildProcessByStdio<null, Readable, Readable>
     try {

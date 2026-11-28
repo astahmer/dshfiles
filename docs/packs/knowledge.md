@@ -28,7 +28,7 @@ Pack id `knowledge`. Back to [all packs](README.md).
 
 ## Features
 
-From the onboarding feature catalog: 21 features, the 6 curated ones first.
+From the onboarding feature catalog: 22 features, the 6 curated ones first.
 
 ### Curated
 
@@ -47,15 +47,16 @@ From the onboarding feature catalog: 21 features, the 6 curated ones first.
 4. **Serve session search from a worker-owned index** (`session-search`) — Replace the stock sessionQuery backend: searches are pure reads forwarded to a worker that owns the SQLite FTS5 index and ingests session logs incrementally, while list, read and title reads stay core's own code with cached folds.
 5. **Find every match in one thread** (`session-search`) — Return every current-surface event of one Session whose indexed text has all the words typed (the last as a prefix), in transcript order with a short snippet, for the Chat find bar and the session_find_in_thread agent tool. An archived Session is indexed for that request.
 6. **Search the prompts sent across threads** (`session-search`) — Serve the newest prompts a person sent across every top-level thread, newest first and each text once, from a time-ordered user_prompts table beside the FTS index: bounded by a window of newest prompts and a size cap, optionally narrowed to prompts holding every typed word. Suba…
-7. **Manage reusable prompt snippets** (`prompt-stash`, composer) — Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.
-8. **Insert prompt text without submitting** (`prompt-stash`, composer) — Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.
-9. **Browse recent text-only user messages** (`prompt-stash`, composer) — Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.
-10. **Search every prompt sent across threads** (`prompt-stash`, composer) — Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_histor…
-11. **Keep draft attachments across thread navigation** (`prompt-stash`, composer) — While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.
-12. **Answer agent grep and glob from a resident fff index** (`fff-search`) — On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.
-13. **Answer ctx.web fetches across redirects with the readable article** (`web-fetch-readable`, settings) — A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.
-14. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tool…
-15. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Register resources and attach reusable typed property packs, without modifying native content or running agents.
+7. **Search user and assistant messages across threads** (`session-search`) — Search current-surface user/message and assistant/message documents across top-level threads, optionally narrowed by role (all, user, assistant), leaving out user messages a plugin or agent sent, routing through conversation_documents once backfilled and returning each hit's ses…
+8. **Manage reusable prompt snippets** (`prompt-stash`, composer) — Save, edit, delete, search, and insert bounded prompt snippets from one Host-owned library every browser shares, with revision checks against concurrent writers.
+9. **Insert prompt text without submitting** (`prompt-stash`, composer) — Insert into the captured composer cursor span, preserve existing attachments, and reject stale composer state without sending the message.
+10. **Browse recent text-only user messages** (`prompt-stash`, composer) — Offer bounded recent loaded user text while excluding agent, tool, archived, and unsupported content.
+11. **Search every prompt sent across threads** (`prompt-stash`, composer) — Search the prompts you sent in every top-level thread from the Prompts menu's All threads tab, Ctrl+R in a focused composer, or the Search prompt history palette entry; Enter inserts one at the cursor without sending and the star saves it to the shared library. The prompt_histor…
+12. **Keep draft attachments across thread navigation** (`prompt-stash`, composer) — While a thread's composer holds draft attachments, keep that thread's session scope retained so leaving the thread and coming back (sidebar Back, another thread) keeps the files and images with the draft text.
+13. **Answer agent grep and glob from a resident fff index** (`fff-search`) — On every agent/created the bundle registers Agent-scoped grep and glob tools that shadow the stock ripgrep-backed ones with the same names and arguments, served from one fff index per search root in a child process DSH's subprocess service starts on the first search.
+14. **Answer ctx.web fetches across redirects with the readable article** (`web-fetch-readable`, settings) — A fetch backend for the web seam: follows cross-origin redirects with public-address revalidation and pinning on every hop, decodes JavaScript, YAML, TOML and sniffed untyped text, and reduces HTML to its Mozilla Readability article.
+15. **Source chips under web_search and web_fetch results** (`web-fetch-readable`, transcript) — Each web_search and web_fetch row in the transcript keeps the native view and gains one chip per page it returned, under the card through tool-meta's tool.call.sections seat: the host and the page title (web_search's source titles, web_fetch's article heading), the URL in a tool…
+16. **Typed packs on referenced resources** (`resource-packs`, knowledge) — Register resources and attach reusable typed property packs, without modifying native content or running agents.
 
 ## Enable it
 

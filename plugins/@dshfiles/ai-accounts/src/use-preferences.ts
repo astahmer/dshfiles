@@ -5,7 +5,7 @@ import * as Schema from 'effect/Schema'
 import { AiAccountsSchema } from './effect-schema.js'
 import { recoveryPolicySchema } from './failure-policy.js'
 import { QuotaCoverageModel } from './quota-coverage-model.js'
-import { DEFAULT_CLIENT_SETTINGS, aiAccountsSettings, type SaveMode } from './settings.js'
+import { AccountSettingsModel, DEFAULT_CLIENT_SETTINGS, aiAccountsSettings, type SaveMode } from './settings.js'
 
 const meterLabelSchema = Schema.Literals(['both', 'percent', 'reset']).pipe(Schema.catchDecoding(() => Effect.succeed(Option.some('both'))))
 export type MeterLabel = typeof meterLabelSchema.Type
@@ -28,6 +28,7 @@ export const usePreferences = () => {
   const saveMode: SaveMode = value?.saveMode === 'manual' ? 'manual' : 'auto'
   return {
     settings,
+    vibe: AccountSettingsModel.vibe(value?.vibe),
     saveMode,
     autoSaveDelayMs: value?.autoSaveDelayMs ?? DEFAULT_CLIENT_SETTINGS.autoSaveDelayMs,
     usageRefreshMs: (value?.usageRefreshSeconds ?? DEFAULT_CLIENT_SETTINGS.usageRefreshSeconds) * 1000,
