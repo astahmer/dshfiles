@@ -60,7 +60,7 @@ export const ModelRow = (props: {
   useEffect(() => cancelPress, [])
   const name = ModelPickerModel.displayName({ group: props.group, model: props.model })
   const brand = ModelPickerModel.brandFor({ model: props.model })
-  const shownName = ModelPickerModel.middleTruncate(name)
+  const parts = ModelPickerModel.nameTail(name)
   const selectMode = props.selectSeveral === true
   const quotaId = props.id === undefined ? undefined : `${props.id}-quota`
 
@@ -144,12 +144,23 @@ export const ModelRow = (props: {
         {/* Round 3 R3: the name comes first and truncates last. The account tag is short and fixed, so nothing beside the
           name takes its room while it still fits. */}
         <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
-          <TruncatedTooltip content={props.model.id} shortened={shownName !== name}>
+          <TruncatedTooltip content={props.model.id}>
             <span
-              className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-semibold')}
+              className={cn(
+                'dshx:flex dshx:min-w-0 dshx:flex-[1_1_auto] dshx:overflow-hidden dshx:text-sm dshx:font-[450]',
+                props.active && 'dshx:font-semibold',
+              )}
               data-model-picker-name
             >
-              <MatchedName name={shownName} query={props.query} />
+              {/* Round 5 U1: the head shrinks with one ellipsis; the tail ("-preview") always shows. */}
+              <span className="dshx:min-w-0 dshx:truncate" data-truncates>
+                <MatchedName from={0} name={name} query={props.query} to={parts.head.length} />
+              </span>
+              {parts.tail === '' ? null : (
+                <span className="dshx:shrink-0 dshx:whitespace-pre">
+                  <MatchedName from={parts.head.length} name={name} query={props.query} to={name.length} />
+                </span>
+              )}
             </span>
           </TruncatedTooltip>
           {/* Round 4 T7: the bolt sits next to the name, so it never moves the trailing columns. */}
@@ -203,18 +214,33 @@ export const ModelRow = (props: {
   )
 }
 
-/** The name with the first case-insensitive occurrence of the search drawn at 600 (no other change to the text). */
-export const MatchedName = ({ name, query }: { readonly name: string; readonly query: string | undefined }) => {
+/**
+ * The part [from, to) of a name, with the first case-insensitive occurrence of the search (found in the whole name, so
+ * a match across the head and tail stays one match) drawn at 600 (no other change to the text).
+ */
+export const MatchedName = ({
+  name,
+  query,
+  from = 0,
+  to = name.length,
+}: {
+  readonly name: string
+  readonly query: string | undefined
+  readonly from?: number
+  readonly to?: number
+}) => {
   const needle = query?.trim() ?? ''
   const at = needle === '' ? -1 : name.toLowerCase().indexOf(needle.toLowerCase())
-  if (at < 0) return <>{name}</>
+  const start = Math.max(from, at)
+  const end = Math.min(to, at + needle.length)
+  if (at < 0 || start >= end) return <>{name.slice(from, to)}</>
   return (
     <>
-      {name.slice(0, at)}
+      {name.slice(from, start)}
       <span className="dshx:font-semibold dshx:text-foreground" data-model-match>
-        {name.slice(at, at + needle.length)}
+        {name.slice(start, end)}
       </span>
-      {name.slice(at + needle.length)}
+      {name.slice(end, to)}
     </>
   )
 }

@@ -52,6 +52,12 @@ interface FallbackLabel {
   readonly effort: string | undefined
 }
 
+/** A model name split for one ellipsis by width (round 5 U1): the head truncates, the tail stays. */
+export interface NameParts {
+  readonly head: string
+  readonly tail: string
+}
+
 /** An ai-accounts account as its `read` list gives it, in priority order. */
 export interface PriorityAccount {
   readonly instanceId: string
@@ -157,11 +163,17 @@ export class ModelPickerModel {
   }
 
   /**
-   * Round 4 T5: a long model name cut in the middle (its first 18 and last 14 characters), so the suffix that tells
-   * models apart ("…context-preview", "…-2512") survives where the row has no room. Short names pass through.
+   * Round 5 U1: a long name splits into a head that the row's width truncates and a tail that never shrinks, so one
+   * ellipsis falls in the middle by width (round 4 cut by character count, then CSS cut again: two ellipses). The tail
+   * is the final token with its dash (\"-preview\") when that is 4 to 13 characters, else the last 12 characters.
    */
-  static middleTruncate = (name: string, head = 18, tail = 14): string =>
-    name.length <= head + tail + 1 ? name : `${name.slice(0, head)}…${name.slice(-tail)}`
+  static nameTail = (name: string): NameParts => {
+    if (name.length <= 24) return { head: name, tail: '' }
+    const dash = name.lastIndexOf('-')
+    const token = dash < 0 ? '' : name.slice(dash)
+    const tail = token.length >= 4 && token.length <= 13 ? token : name.slice(-12)
+    return { head: name.slice(0, name.length - tail.length), tail }
+  }
 
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()

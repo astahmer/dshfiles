@@ -55,6 +55,10 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
   )
 }
 
+/** Whether an element, or a part of it marked `data-truncates` (a name's head, round 5 U1), is cut short. */
+export const isTruncatedWithin = (element: Element): boolean =>
+  isTruncated(element) || [...element.querySelectorAll('[data-truncates]')].some(part => isTruncated(part))
+
 /** Whether a text element is cut short by its ellipsis. */
 export const isTruncated = (element: { readonly scrollWidth: number; readonly clientWidth: number } | null): boolean =>
   element !== null && element.scrollWidth > element.clientWidth + 1
@@ -83,8 +87,8 @@ export const TruncatedTooltip = ({
     >
       <TooltipTrigger
         asChild
-        onFocus={event => setOpen(shortened || isTruncated(event.currentTarget))}
-        onPointerEnter={event => setOpen(shortened || isTruncated(event.currentTarget))}
+        onFocus={event => setOpen(shortened || isTruncatedWithin(event.currentTarget))}
+        onPointerEnter={event => setOpen(shortened || isTruncatedWithin(event.currentTarget))}
         onPointerLeave={() => setOpen(false)}
       >
         {children}
