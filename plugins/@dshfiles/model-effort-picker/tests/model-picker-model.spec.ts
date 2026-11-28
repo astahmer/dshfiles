@@ -181,16 +181,15 @@ describe('model picker selection rules', () => {
       )
     })
 
-    it("lists one row per model and provider, standing for the thread's account or the first account (b:16yr)", () => {
-      const providerOf = (id: string): string | undefined => (id.startsWith('codex-') ? 'Codex' : 'OpenCode')
-      const rows = ModelPickerModel.modelRows({ groups: accounts, current: onAlex2, providerOf })
+    it("lists one row per model, standing for the thread's account or the first account (b:16yr, council picker N4)", () => {
+      const rows = ModelPickerModel.modelRows({ groups: accounts, current: onAlex2 })
       expect(rows.map(row => `${row.group.id}:${row.model.id}:${String(row.accounts.length)}`)).toEqual(['codex-alex2:gpt-6-luna:3', 'opencode:kimi:1'])
       expect(rows[0]?.active).toBe(true)
-      const fresh = ModelPickerModel.modelRows({ groups: accounts, current: { provider: 'opencode', model: 'kimi' }, providerOf })
+      const fresh = ModelPickerModel.modelRows({ groups: accounts, current: { provider: 'opencode', model: 'kimi' } })
       expect(fresh.map(row => row.group.id)).toEqual(['opencode', 'codex-alex1'])
-      // The same model id from another service stays its own row.
-      const twoServices = ModelPickerModel.modelRows({ groups: [alex1, { ...other, models: [luna] }], current: null, providerOf })
-      expect(twoServices).toHaveLength(2)
+      // N4: the same model id from another service is the same row, so the list does not regroup once services are known.
+      const twoServices = ModelPickerModel.modelRows({ groups: [alex1, { ...other, models: [luna] }], current: null })
+      expect(twoServices).toHaveLength(1)
     })
 
     it('rotates only through the configured routes, and offers nothing when no other route qualifies', () => {

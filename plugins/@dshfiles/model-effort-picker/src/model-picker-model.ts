@@ -133,6 +133,19 @@ export class ModelPickerModel {
   static resultAnnouncement = (input: { readonly query: string; readonly count: number }): string =>
     input.count === 0 ? `No models match “${input.query.trim()}”` : `${String(input.count)} model${input.count === 1 ? '' : 's'}`
 
+  /** N4: which empty state the list shows, if any: still loading, a search with no match, or no model at all. */
+  static emptyState = (input: {
+    readonly status: string
+    readonly query: string
+    readonly rowCount: number
+    readonly catalogEmpty: boolean
+  }): 'loading' | 'no-match' | 'no-models' | null => {
+    if (input.rowCount > 0) return null
+    if (input.status === 'loading') return 'loading'
+    if (input.query.trim() !== '' && !input.catalogEmpty) return 'no-match'
+    return 'no-models'
+  }
+
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return groups
@@ -234,7 +247,6 @@ export class ModelPickerModel {
   static modelRows = (input: {
     readonly groups: readonly ModelGroup[]
     readonly current: ModelSelection | null
-    readonly providerOf: (groupId: string) => string | undefined
   }): readonly {
     readonly key: string
     readonly group: ModelGroup
@@ -245,7 +257,9 @@ export class ModelPickerModel {
     const rows = new Map<string, { group: ModelGroup; model: CatalogModel; accounts: ModelGroup[] }>()
     for (const group of input.groups) {
       for (const model of group.models) {
-        const key = `${input.providerOf(group.id) ?? group.id}\u0000${model.id}`
+        // N4: keyed by the model id alone, which the catalog knows from the first frame; keyed by service, the rows of
+        // one model split and then merged once the account profiles arrived, so the list jumped as it opened.
+        const key = model.id
         const row = rows.get(key)
         if (row === undefined) rows.set(key, { group, model, accounts: [group] })
         else {

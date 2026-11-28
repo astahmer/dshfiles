@@ -75,6 +75,10 @@ export default defineClientPlugin({
           const injected = {
             available,
             sessionId,
+            // N4: Settings › AI accounts through the settings shell's documented window event (no layout provider).
+            openAccounts: () => {
+              window.dispatchEvent(new CustomEvent('dshfiles:open-settings', { detail: { section: 'ai-accounts' }, cancelable: true }))
+            },
             directory: remoteDirectory.store,
             load: () => {
               if (!available) return

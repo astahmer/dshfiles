@@ -56,7 +56,7 @@ When('the composer model picker is searched for an unavailable model', async ({ 
   if (popoverBounds === null) throw new Error('The model picker popover has no visible bounds.')
   expect(popoverBounds.width).toBeLessThanOrEqual(700)
   await search.fill('zz-no-provider-model-83914')
-  await expect(modelList.getByText('No matching models.', { exact: true })).toBeVisible()
+  await expect(modelList.getByText('No models match “zz-no-provider-model-83914”', { exact: true })).toBeVisible()
   await expect(modelList.locator('[data-model-picker-row]')).toHaveCount(0)
 })
 
@@ -70,7 +70,7 @@ Then('the empty search keeps the composer selection', async ({ page }: { page: P
     await expect(model).toHaveText(selection.model)
     if (selection.effort === '') await expect(effortLabel).toHaveCount(0)
     else await expect(effortLabel).toHaveText(selection.effort)
-    await expect(page.getByRole('listbox', { name: 'Models and accounts', exact: true }).getByText('No matching models.', { exact: true })).toBeVisible()
+    await expect(page.getByRole('listbox', { name: 'Models and accounts', exact: true }).getByText('No models match “zz-no-provider-model-83914”', { exact: true })).toBeVisible()
     await expect(page.locator('[data-model-details-trigger]')).toHaveCount(0)
     await expect(page.getByRole('dialog')).toBeVisible()
   })

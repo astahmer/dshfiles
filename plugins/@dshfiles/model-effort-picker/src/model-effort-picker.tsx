@@ -13,6 +13,7 @@ import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, ZapIcon
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { accountAccents } from './account-color.js'
+import { ListEmptyState } from './empty-state.js'
 import { FallbacksSection } from './fallbacks-section.js'
 import { FastModeSection } from './fast-mode-section.js'
 import { ModelDetails, type InspectedRoute } from './model-details.js'
@@ -29,6 +30,8 @@ import { selectionFailureNotice } from './session-presence.js'
 type Props = Omit<ModelSelectInjected, 'resolveText'> & {
   readonly locked: boolean
   readonly sessionId: string
+  /** Opens AI accounts (N4: the way forward when no account offers a model). */
+  readonly openAccounts?: () => void
   /** The picker's locale seat (`dshfiles.modelPicker`); English when absent. */
   readonly t?: (key: string, params?: Readonly<Record<string, string | number>>) => string
 }
@@ -57,7 +60,7 @@ const FastModeIndicator = ({
   return null
 }
 
-export const ModelEffortPicker = ({ locked, available, directory, load, select, sessionId, t: seat }: Props) => {
+export const ModelEffortPicker = ({ locked, available, directory, load, select, sessionId, openAccounts, t: seat }: Props) => {
   const t: ModelPickerTranslate = seat === undefined ? englishModelPicker : (key, params) => seat(key, params)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -99,10 +102,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   )
   // b:16yr: one row per model; the detail panel chooses the account.
   const selected = state.current
-  const rows = useMemo(
-    () => ModelPickerModel.modelRows({ groups: filteredGroups, current: selected, providerOf: id => providerLabels.get(id) }),
-    [filteredGroups, selected, providerLabels],
-  )
+  const rows = useMemo(() => ModelPickerModel.modelRows({ groups: filteredGroups, current: selected }), [filteredGroups, selected])
   const quotas = useMemo(
     () =>
       new Map(
@@ -128,6 +128,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const selectedModel = selectedGroup?.models.find(model => model.id === current?.model)
   const inspectedRoute: InspectedRoute | null = inspected ?? (current === null ? null : { model: current.model, provider: current.provider })
   const busy = locked || state.status === 'selecting'
+  // N4: no account offers a model: one message with its way forward, and no inspector of a model that is not there.
+  const catalogEmpty = state.status !== 'loading' && state.groups.every(group => group.models.length === 0)
+  const emptyState = ModelPickerModel.emptyState({ status: state.status, query, rowCount: rows.length, catalogEmpty })
   const effortLabel = selectedModel === undefined ? state.retainedEffort : ModelPickerModel.effortName(selectedModel, current)
   const settings = useSettings(modelEffortPickerSettings)
   const accountSwapEnabled = settings.value?.accountSwap ?? false
@@ -377,6 +380,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 aria-label="Choose a model"
                 className={cn(
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
+                  catalogEmpty && 'dshx:w-full',
                   'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:px-2',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
@@ -450,46 +454,61 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         quota={quotas.get(group.id)}
                       />
                     ))}
-                    {rows.length === 0 && (
-                      <p className="dshx:px-3 dshx:py-5 dshx:text-center dshx:text-xs dshx:text-muted-foreground">
-                        {state.status === 'loading' ? 'Loading model catalog…' : 'No matching models.'}
-                      </p>
+                    {emptyState === null ? null : (
+                      <ListEmptyState
+                        kind={emptyState}
+                        onClearSearch={() => {
+                          setQuery('')
+                          searchInputRef.current?.focus()
+                        }}
+                        onOpenAccounts={
+                          openAccounts === undefined
+                            ? undefined
+                            : () => {
+                                setOpen(false)
+                                openAccounts()
+                              }
+                        }
+                        query={query}
+                      />
                     )}
                   </div>
                 </ScrollArea>
-                <div
-                  className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2 dshx:py-1.5"
-                  data-model-picker-fan-out=""
-                >
-                  <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
-                    <label className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:pointer-coarse:min-h-11">
-                      <Switch
-                        aria-label={t('selectSeveral')}
-                        data-touch-row
-                        checked={several || fanOut.length > 0}
-                        onCheckedChange={checked => {
-                          setSeveral(checked)
-                          if (!checked) setFanOut([])
-                        }}
-                        size="sm"
-                      />
-                      <span className="dshx:truncate">{fanOut.length > 0 ? t('selected', { count: fanOut.length }) : t('selectSeveral')}</span>
-                    </label>
-                    {fanOut.length > 0 ? (
-                      <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-                        <Button className="dshx:pointer-coarse:h-11" onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
-                          {t('clear')}
-                        </Button>
-                        <Button className="dshx:pointer-coarse:h-11" disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
-                          {t('fanOut')}
-                        </Button>
-                      </span>
+                {rows.length === 0 ? null : (
+                  <div
+                    className="dshx:flex dshx:flex-col dshx:gap-1 dshx:rounded-md dshx:border dshx:border-border dshx:bg-muted/40 dshx:px-2 dshx:py-1.5"
+                    data-model-picker-fan-out=""
+                  >
+                    <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-2">
+                      <label className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:pointer-coarse:min-h-11">
+                        <Switch
+                          aria-label={t('selectSeveral')}
+                          data-touch-row
+                          checked={several || fanOut.length > 0}
+                          onCheckedChange={checked => {
+                            setSeveral(checked)
+                            if (!checked) setFanOut([])
+                          }}
+                          size="sm"
+                        />
+                        <span className="dshx:truncate">{fanOut.length > 0 ? t('selected', { count: fanOut.length }) : t('selectSeveral')}</span>
+                      </label>
+                      {fanOut.length > 0 ? (
+                        <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+                          <Button className="dshx:pointer-coarse:h-11" onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
+                            {t('clear')}
+                          </Button>
+                          <Button className="dshx:pointer-coarse:h-11" disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
+                            {t('fanOut')}
+                          </Button>
+                        </span>
+                      ) : null}
+                    </div>
+                    {several || fanOut.length > 0 ? (
+                      <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{fanOut.length === 1 ? t('fanOutNeedsTwo') : t('selectSeveralHint')}</p>
                     ) : null}
                   </div>
-                  {several || fanOut.length > 0 ? (
-                    <p className="dshx:m-0 dshx:text-xs dshx:text-muted-foreground">{fanOut.length === 1 ? t('fanOutNeedsTwo') : t('selectSeveralHint')}</p>
-                  ) : null}
-                </div>
+                )}
                 {state.failures.length > 0 && (
                   <p className="dshx:px-1 dshx:text-2xs dshx:text-muted-foreground">
                     {state.failures.length} provider{state.failures.length === 1 ? '' : 's'} could not load:{' '}
@@ -503,6 +522,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   'dshx:flex dshx:w-80 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:border-l dshx:border-border dshx:p-2.5 dshx:outline-none',
                   'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:px-2',
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
+                  catalogEmpty && 'dshx:hidden',
                 )}
                 data-model-inspector
                 onKeyDown={event => {
