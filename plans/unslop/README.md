@@ -540,6 +540,15 @@ Model picker (owner request 2026-11-27 23:18): baseline council Astra 6 / Opus 6
 `.cache/unslop-audit/r5/council/picker-1-fixes.md` (inspect never switches the thread, one surface, segmented effort,
 a visible Fast switch with the kit tooltip-state bug fixed, neutral selection, a one-stop keyboard list) in progress.
 
+Council round 35 (full set): **Astra 9.5 / Opus 9.5 / Fable 9.5**, the target. Polish the seats agreed on
+(`.cache/unslop-audit/r5/council/round-35-polish.md`), landed: Send/Stop's offset derived from the row's line (the child
+composer's 2 px regression), the phone thread ⋯ sheet on the kit sheet surface with a title, icon rows and a "More thread
+actions ›" row instead of a nested ⋯, the project picker's quiet remove control and neutral No folder, the forced More
+statuses label on the section edge, the desktop dock's fifth row peeking, the phone jump-to-latest floating above the dock.
+Decision: the closed Filters trigger drops its "· edited" suffix (it only fit from a 400 px sidebar); the count badge, the
+tooltip and the accessible name carry the edited state. Model picker council round 2: Astra 8 / Opus 7.5 / Fable 6.5; fix
+list `picker-2-fixes.md` in progress.
+
 ## Round four
 
 Started 2026-11-25: a sweep of what rounds one to three did not look at closely. Three read-only audits run first, in
