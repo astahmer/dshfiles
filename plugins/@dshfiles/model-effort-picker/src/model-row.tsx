@@ -15,7 +15,7 @@ type CatalogModel = CatalogGroup['models'][number]
  * One model in the picker's listbox (council picker round 1, C5): the row is the `option` the search combobox points at
  * with `aria-activedescendant`, so the list is one tab stop. A click or Enter uses the model; the chevron (pointer and
  * touch; Right arrow from the keyboard) opens its details. `aria-selected` marks the model in use, and in select mode
- * `aria-checked` marks the routes collected for a fan-out.
+ * the routes collected for a fan-out.
  */
 export const ModelRow = (props: {
   readonly id?: string
@@ -86,12 +86,13 @@ export const ModelRow = (props: {
       role="presentation"
     >
       <div
-        aria-checked={selectMode ? props.fanOutSelected : undefined}
         aria-describedby={props.quota === undefined ? undefined : quotaId}
         aria-disabled={props.busy || undefined}
         aria-label={optionName}
-        aria-selected={selectMode ? undefined : props.active}
-        className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:self-stretch dshx:pl-1.5"
+        // Round 4 T9: in select mode aria-selected marks a collected route (the listbox is multiselectable), which
+        // VoiceOver reads; outside it, the model in use.
+        aria-selected={selectMode ? props.fanOutSelected : props.active}
+        className={cn('dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:self-stretch dshx:pl-1.5', selectMode && 'dshx:pr-2')}
         data-model-picker-option
         id={props.id}
         onClick={event => {
@@ -122,7 +123,7 @@ export const ModelRow = (props: {
         onPointerUp={cancelPress}
         role="option"
       >
-        {/* N6: in select mode the mark column holds a 16 px checkbox (the option itself carries aria-checked); round 3 R3:
+        {/* N6: in select mode the mark column holds a 16 px checkbox (the option itself carries aria-selected); round 3 R3:
           the brand mark stays after it. */}
         {selectMode ? (
           <span

@@ -68,10 +68,10 @@ describe('keyboard: one tab stop for the list (council picker C5)', () => {
     expect(/<button[^>]*data-model-details-trigger[^>]*>/u.exec(html)?.[0]).toContain('tabindex="-1"')
   })
 
-  it('marks fan-out choices with aria-checked, not the aria-selected of the model in use', () => {
-    const option = optionTag(row({ selectSeveral: true, fanOutSelected: true }))
-    expect(option).toContain('aria-checked="true"')
-    expect(option).not.toContain('aria-selected')
+  it('marks fan-out choices with aria-selected in select mode, which VoiceOver reads (round 4 T9)', () => {
+    expect(optionTag(row({ selectSeveral: true, fanOutSelected: true }))).toContain('aria-selected="true"')
+    expect(optionTag(row({ selectSeveral: true, fanOutSelected: false }))).toContain('aria-selected="false"')
+    expect(optionTag(row({ selectSeveral: true, fanOutSelected: true }))).not.toContain('aria-checked')
   })
 
   it('marks the row the keyboard is on with the hover wash, the focus ring staying on the search (round 3 R11)', () => {

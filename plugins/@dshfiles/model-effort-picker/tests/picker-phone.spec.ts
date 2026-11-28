@@ -54,6 +54,6 @@ describe('phone picker is one sheet, list then details in place (council picker 
     expect(header).toMatch(/dshx:hidden dshx:min-h-11[^"]*dshx:@max-pane-compact:flex/u)
     expect(header).toMatch(/dshx:pr-12/u)
     expect(picker.indexOf('data-model-picker-list-header')).toBeLessThan(picker.indexOf('<SearchInput'))
-    expect(picker).toMatch(/data-model-picker-list-header\s*>\s*<h2[^>]*>Choose a model<\/h2>/u)
+    expect(picker).toMatch(/data-model-picker-list-header\s*>\s*<h2[^>]*>\{several \? t\('selectModels'\) : 'Choose a model'\}<\/h2>/u)
   })
 })

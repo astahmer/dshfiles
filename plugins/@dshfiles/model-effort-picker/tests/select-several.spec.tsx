@@ -38,7 +38,7 @@ const selection = (variant: 'bar' | 'tray', count: number): string =>
       variant={variant}
     />,
   )
-const fanOutButton = (html: string): string => /<button[^>]*>Fan out…<\/button>/u.exec(html)?.[0] ?? ''
+const fanOutButton = (html: string): string => /<button[^>]*>Continue…<\/button>/u.exec(html)?.[0] ?? ''
 const row = (fanOutSelected: boolean): string =>
   renderToStaticMarkup(
     <TooltipProvider>
@@ -65,7 +65,7 @@ describe('select several is a mode with checkboxes and an action bar (council pi
     expect(/<span[^>]*data-model-fan-out-check[^>]*>/u.exec(checked)?.[0]).toMatch(/dshx:size-4/u)
     expect(checked.indexOf('data-model-mark')).toBeGreaterThan(checked.indexOf('data-model-fan-out-check'))
     expect(checked).not.toContain('data-model-details-trigger')
-    expect(/<div[^>]*role="option"[^>]*>/u.exec(checked)?.[0]).toContain('aria-checked="true"')
+    expect(/<div[^>]*role="option"[^>]*>/u.exec(checked)?.[0]).toContain('aria-selected="true"')
   })
 
   it('drops the shift-click tip', () => {
@@ -101,14 +101,25 @@ describe('select mode keeps the list and turns details into a tray (council pick
     expect(text(selection('bar', 0))).toContain('0 selected · up to 6')
   })
 
-  it('names the mode control "Select" / "Done" in sight, pressed while on, 44 pt on touch', () => {
+  it('names the mode control "Select" / "Cancel" in sight (no aria-pressed), on with the selected wash and edge (round 4 T9)', () => {
     const picker = source('model-effort-picker.tsx')
     const control = picker.slice(
       picker.lastIndexOf('<Button', picker.indexOf('data-model-select-several')),
       picker.indexOf('</Button>', picker.indexOf('data-model-select-several')),
     )
-    expect(control).toContain('aria-pressed={several}')
+    expect(control).not.toContain('aria-pressed')
     expect(control).toMatch(/dshx:pointer-coarse:h-11/u)
-    expect(control).toContain("{several ? t('done') : t('select')}")
+    expect(control).toContain("several && 'dshx:bg-selected-wash dshx:selected-edge'")
+    expect(control).toContain("{several ? t('cancel') : t('select')}")
+    // Cancel is always available; Select waits only while nothing matches.
+    expect(control).toContain('disabled={!several && rows.length === 0}')
+  })
+
+  it('heads the tray "Select models", opens the prompt with "Continue…" and keeps the quota off the wash edge', () => {
+    const tray = selection('tray', 2)
+    expect(tray).toMatch(/<h2[^>]*>Select models<\/h2>/u)
+    expect(text(tray)).toContain('Continue…')
+    expect(text(tray)).not.toContain('Fan out')
+    expect(/<div[^>]*role="option"[^>]*>/u.exec(row(false))?.[0]).toMatch(/dshx:pr-2/u)
   })
 })

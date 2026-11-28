@@ -435,7 +435,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   className="dshx:hidden dshx:min-h-11 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex"
                   data-model-picker-list-header
                 >
-                  <h2 className="dshx:text-heading dshx:font-semibold">Choose a model</h2>
+                  <h2 className="dshx:text-heading dshx:font-semibold">{several ? t('selectModels') : 'Choose a model'}</h2>
                 </header>
                 <div
                   className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1', catalogEmpty && 'dshx:pr-8 dshx:@max-pane-compact:pr-0')}
@@ -494,21 +494,24 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       </button>
                     )}
                   </div>
-                  {rows.length === 0 ? null : (
-                    // Round 3 R12: a visible "Select" / "Done" label at 44 pt on touch, pressed while the mode is on.
+                  {catalogEmpty ? null : (
+                    // Round 3 R12, round 4 T9/T16: "Select" enters the mode (disabled, not gone, when no row matches, so the
+                    // search never widens); "Cancel" leaves it and drops the selection, always available. The label says the
+                    // state, so no aria-pressed; on, it takes the selected wash and edge.
                     <Button
-                      aria-pressed={several}
-                      className="dshx:h-8 dshx:shrink-0 dshx:px-2.5 dshx:pointer-coarse:h-11"
+                      className={cn('dshx:h-8 dshx:shrink-0 dshx:px-2.5 dshx:pointer-coarse:h-11', several && 'dshx:bg-selected-wash dshx:selected-edge')}
                       data-model-select-several
+                      data-on={several || undefined}
+                      disabled={!several && rows.length === 0}
                       onClick={() => {
                         setSeveral(!several)
                         if (several) setFanOut([])
                       }}
                       size="sm"
                       type="button"
-                      variant={several ? 'secondary' : 'ghost'}
+                      variant="ghost"
                     >
-                      {several ? t('done') : t('select')}
+                      {several ? t('cancel') : t('select')}
                     </Button>
                   )}
                 </div>

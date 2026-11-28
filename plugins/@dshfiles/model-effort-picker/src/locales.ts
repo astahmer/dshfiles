@@ -9,7 +9,9 @@ const en = {
   remove: 'Remove {model}',
   chooseInList: 'Choose models in the list.',
   clear: 'Clear',
-  fanOut: 'Fan out…',
+  fanOut: 'Continue…',
+  selectModels: 'Select models',
+  cancel: 'Cancel',
   fanOutNeedsTwo: 'Choose at least two models.',
 }
 
@@ -21,7 +23,9 @@ const zh = {
   remove: '移除 {model}',
   chooseInList: '在列表中选择模型。',
   clear: '清除',
-  fanOut: '分发…',
+  fanOut: '继续…',
+  selectModels: '选择模型',
+  cancel: '取消',
   fanOutNeedsTwo: '至少选择两个模型。',
 } satisfies Record<keyof typeof en, string>
 
