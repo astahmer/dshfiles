@@ -27,20 +27,22 @@ export const FastModeRow = (props: {
   const id = useId()
   return (
     <div className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-fast-mode>
-      <div className="dshx:flex dshx:min-h-8 dshx:items-center dshx:justify-between dshx:gap-2 dshx:pointer-coarse:min-h-11">
-        <label className="dshx:min-w-0 dshx:text-xs dshx:font-medium" htmlFor={id}>
+      {/* The whole row is the label, so a tap anywhere on it toggles the switch (C6: a real 44 px target). */}
+      <label className="dshx:flex dshx:min-h-8 dshx:cursor-pointer dshx:items-center dshx:justify-between dshx:gap-2 dshx:pointer-coarse:min-h-11" htmlFor={id}>
+        <span className="dshx:min-w-0 dshx:text-xs dshx:font-medium">
           Fast mode <span className="dshx:font-normal dshx:text-muted-foreground">· may cost more</span>
-        </label>
+        </span>
         <Switch
           checked={props.enabled}
           className="dshx:h-4 dshx:w-7"
           data-model-fast-mode-toggle
+          data-touch-row
           disabled={props.disabled}
           id={id}
           onCheckedChange={props.onChange}
           size="sm"
         />
-      </div>
+      </label>
       {props.error === null ? null : (
         <p className="dshx:text-2xs dshx:text-destructive" data-model-fast-mode-error>
           {props.error} Try the switch again, or reopen the picker.

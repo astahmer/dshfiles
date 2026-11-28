@@ -78,7 +78,7 @@ export const FallbacksSection = (props: {
 
   const addFallback = (
     <Button
-      className="dshx:h-6 dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground"
+      className="dshx:h-6 dshx:gap-1 dshx:rounded-md dshx:px-1.5 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:h-11"
       disabled={disabled || !canAdd || props.current === null}
       onClick={() => {
         if (props.current !== null) save(ModelPickerModel.withFallback(chain, ModelPickerModel.fallbackFor(props.current)))
@@ -101,7 +101,7 @@ export const FallbacksSection = (props: {
               <TooltipTrigger asChild>
                 <Button
                   aria-label={`After a fallback answers: ${RETURN_LABELS[snapshot.returnPolicy]}. Switch to ${RETURN_LABELS[nextPolicy]}.`}
-                  className="dshx:h-5 dshx:gap-1 dshx:px-1 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground"
+                  className="dshx:h-5 dshx:gap-1 dshx:px-1 dshx:text-2xs dshx:font-normal dshx:text-muted-foreground dshx:pointer-coarse:h-11"
                   disabled={disabled}
                   onClick={() => void write(() => api.setReturnPolicy({ returnPolicy: nextPolicy }))}
                   size="xs"
@@ -151,7 +151,7 @@ export const FallbacksSection = (props: {
             actions: (
               <Button
                 aria-label={`Remove ${label.model}`}
-                className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground"
+                className="dshx:size-5 dshx:shrink-0 dshx:text-muted-foreground dshx:pointer-coarse:size-11"
                 disabled={disabled}
                 onClick={() => save(ModelPickerModel.withoutFallback(chain, index))}
                 size="icon-xs"
@@ -177,7 +177,13 @@ export const FallbacksSection = (props: {
           <span className="dshx:min-w-0 dshx:truncate">
             {serving?.model} · {serving?.provider}
           </span>
-          <Button disabled={disabled} onClick={() => void write(() => api.returnToSelection({ sessionId: props.sessionId }))} size="xs" variant="ghost">
+          <Button
+            className="dshx:pointer-coarse:h-11"
+            disabled={disabled}
+            onClick={() => void write(() => api.returnToSelection({ sessionId: props.sessionId }))}
+            size="xs"
+            variant="ghost"
+          >
             Return
           </Button>
         </div>
@@ -195,7 +201,7 @@ export const FallbacksSection = (props: {
           {addFallback}
           {snapshot.threadChain === null ? null : (
             <Button
-              className="dshx:h-6 dshx:shrink-0 dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground"
+              className="dshx:h-6 dshx:shrink-0 dshx:px-1.5 dshx:text-2xs dshx:text-muted-foreground dshx:pointer-coarse:h-11"
               disabled={disabled}
               onClick={() => void write(() => api.setChain({ sessionId: props.sessionId, chain: null }))}
               size="xs"

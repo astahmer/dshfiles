@@ -151,7 +151,7 @@ export const ModelDetails = (props: {
             role="alert"
           >
             <p className="dshx:min-w-0 dshx:text-2xs dshx:text-destructive">{props.error}</p>
-            <Button onClick={props.onRetry} size="xs" variant="outline">
+            <Button className="dshx:pointer-coarse:h-11" onClick={props.onRetry} size="xs" variant="outline">
               Retry
             </Button>
           </div>

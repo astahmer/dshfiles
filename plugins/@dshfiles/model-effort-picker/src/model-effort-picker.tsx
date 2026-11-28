@@ -265,7 +265,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           <PopoverTrigger asChild>
             <Button
               aria-label={`${shortLabel?.title ?? triggerLabel}, reasoning ${effortLabel ?? 'provider default'}`}
-              className="dshx-root dshx:h-8 dshx:max-w-72 dshx:min-w-20 dshx:in-data-model-icon:min-w-0 dshx:shrink dshx:justify-start dshx:gap-1 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:px-1.5 dshx:in-data-model-icon:px-1"
+              className="dshx-root dshx:h-8 dshx:pointer-coarse:h-11 dshx:max-w-72 dshx:min-w-20 dshx:in-data-model-icon:min-w-0 dshx:shrink dshx:justify-start dshx:gap-1 dshx:px-2 dshx:text-left dshx:@max-pane-narrow:px-1.5 dshx:in-data-model-icon:px-1"
               data-model-trigger=""
               disabled={locked}
               size="sm"
@@ -466,6 +466,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     <label className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:text-xs dshx:pointer-coarse:min-h-11">
                       <Switch
                         aria-label={t('selectSeveral')}
+                        data-touch-row
                         checked={several || fanOut.length > 0}
                         onCheckedChange={checked => {
                           setSeveral(checked)
@@ -477,10 +478,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     </label>
                     {fanOut.length > 0 ? (
                       <span className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
-                        <Button onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
+                        <Button className="dshx:pointer-coarse:h-11" onClick={() => setFanOut([])} size="sm" type="button" variant="ghost">
                           {t('clear')}
                         </Button>
-                        <Button disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
+                        <Button className="dshx:pointer-coarse:h-11" disabled={fanOut.length < 2} onClick={startFanOut} size="sm" type="button">
                           {t('fanOut')}
                         </Button>
                       </span>
@@ -567,7 +568,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             <TooltipTrigger asChild>
               <Button
                 aria-label={`Switch to ${nextAccount.group.name}`}
-                className="dshx:shrink-0 dshx:text-muted-foreground dshx:hover:text-foreground"
+                className="dshx:shrink-0 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:size-11"
                 data-model-account-swap
                 disabled={busy}
                 onClick={() => void submitSelection(nextAccount.selection)}
