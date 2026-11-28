@@ -23,6 +23,8 @@ export const ModelRow = (props: {
   readonly busy: boolean
   /** The keyboard's current row: it draws the kit focus ring (2 px, 1 px offset). */
   readonly highlighted?: boolean
+  /** Round 3 R11: the model the details pane shows; a neutral 2 px leading bar marks it (the check stays for the model in use). */
+  readonly inspected?: boolean
   /** Fast mode is on for this route (C2): a static ink bolt, not a switch. Amber stays for low quota. */
   readonly fastOn?: boolean
   readonly quota: ModelQuota | undefined
@@ -56,13 +58,17 @@ export const ModelRow = (props: {
   return (
     <div
       className={cn(
-        'dshx:group/row dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pr-0.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
+        'dshx:group/row dshx:relative dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pr-0.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
         (props.active || props.fanOutSelected) && 'dshx:bg-selected-wash',
         props.active && 'dshx:selected-edge',
-        props.highlighted === true && 'dshx:outline-2 dshx:outline-offset-1 dshx:outline-[var(--dsw-alias-state-business-primary)] dshx:outline-solid',
+        // Round 3 R11: the search's active option (what Enter uses) shows the hover wash; the focus ring stays on the search.
+        props.highlighted === true && !(props.active || props.fanOutSelected) && 'dshx:bg-accent/60',
+        props.inspected === true &&
+          'dshx:before:absolute dshx:before:inset-y-1.5 dshx:before:left-0 dshx:before:w-0.5 dshx:before:rounded-full dshx:before:bg-muted-foreground',
       )}
       data-active-visible={props.highlighted === true || undefined}
       data-fan-out-selected={props.fanOutSelected || undefined}
+      data-model-inspected={props.inspected === true || undefined}
       data-model-picker-row
       onPointerMove={props.onHover}
       role="presentation"

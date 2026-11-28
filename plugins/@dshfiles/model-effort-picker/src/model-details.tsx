@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
-import { ArrowLeftIcon, XIcon } from '@dshfiles/plugin-ui/icons'
+import { ArrowLeftIcon, CheckIcon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import type { AccountAccent } from './account-color.js'
 import { AccountRows } from './account-rows.js'
@@ -115,11 +115,17 @@ export const ModelDetails = (props: {
               <span className="dshx:truncate dshx:text-xs dshx:text-muted-foreground" data-model-details-route>
                 {[providerLabel, group.name].filter(Boolean).join(' · ')}
               </span>
+              {/* Round 3 R11: the header says whether the thread uses this model. */}
               {draft ? (
                 <span className="dshx:text-2xs dshx:text-muted-foreground" data-model-details-draft-caption>
                   Inspecting · not in use
                 </span>
-              ) : null}
+              ) : (
+                <span className="dshx:flex dshx:items-center dshx:gap-1 dshx:text-2xs dshx:font-medium dshx:text-foreground" data-model-details-in-use>
+                  <CheckIcon aria-hidden="true" className="dshx:size-3" />
+                  In use
+                </span>
+              )}
             </span>
           </>
         )}

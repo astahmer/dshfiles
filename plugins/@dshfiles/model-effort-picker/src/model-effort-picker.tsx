@@ -73,7 +73,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   // C5: the search is a combobox over the listbox; `activeIndex` is the row it points at, ringed while the keyboard moves.
   const listboxId = useId()
   const [activeIndex, setActiveIndex] = useState(-1)
-  const [keyboardRow, setKeyboardRow] = useState(false)
   const [announcement, setAnnouncement] = useState('')
   // Routes whose Fast mode state is known (the trigger's route, each inspected route): the list marks those that are on.
   const [knownFast, setKnownFast] = useState<ReadonlyMap<string, boolean>>(new Map())
@@ -176,7 +175,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             rows.findIndex(row => row.active),
           ),
     )
-    setKeyboardRow(false)
     if (query.trim() !== '') setAnnouncement(ModelPickerModel.resultAnnouncement({ query, count: rows.length }))
   }, [open, query, rows])
 
@@ -440,7 +438,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       event.preventDefault()
                       if (action.kind === 'move') {
                         setActiveIndex(action.index)
-                        setKeyboardRow(true)
                       } else if (action.kind === 'use') useRow(action.index, event.shiftKey)
                       else {
                         const row = rows[action.index]
@@ -491,11 +488,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       <ModelRow
                         active={active}
                         busy={busy}
-                        highlighted={keyboardRow && index === activeIndex}
+                        highlighted={index === activeIndex}
+                        inspected={inspected !== null && inspected.model === model.id}
                         id={`${listboxId}-${String(index)}`}
                         onHover={() => {
                           setActiveIndex(index)
-                          setKeyboardRow(false)
                         }}
                         current={current}
                         fanOutSelected={ModelPickerModel.isFanOutRoute(fanOut, { provider: group.id, model: model.id })}

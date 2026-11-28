@@ -74,10 +74,11 @@ describe('keyboard: one tab stop for the list (council picker C5)', () => {
     expect(option).not.toContain('aria-selected')
   })
 
-  it('draws the kit focus ring (2 px, 1 px offset) on the whole row the keyboard is on', () => {
+  it('marks the row the keyboard is on with the hover wash, the focus ring staying on the search (round 3 R11)', () => {
     const rowTag = (html: string): string => /<div[^>]*data-model-picker-row[^>]*>/u.exec(html)?.[0] ?? ''
-    expect(rowTag(row({ highlighted: true }))).toMatch(/dshx:outline-2 dshx:outline-offset-1/u)
-    expect(rowTag(row({ highlighted: false }))).not.toMatch(/outline-2/u)
+    expect(rowTag(row({ highlighted: true }))).toMatch(/dshx:bg-accent\/60/u)
+    expect(rowTag(row({ highlighted: true }))).not.toMatch(/outline-2/u)
+    expect(rowTag(row({ highlighted: false }))).not.toMatch(/ dshx:bg-accent\/60/u)
   })
 
   it('names the quota for assistive tech', () => {
