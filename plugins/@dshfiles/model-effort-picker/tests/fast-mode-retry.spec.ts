@@ -3,10 +3,11 @@ import { describe, expect, it } from 'vitest'
 import { FastModeRetry } from '../src/fast-mode-section.js'
 
 describe('Fast mode appears once a late catalog says so (council picker round 5, U3)', () => {
-  it('asks again while the route reads unavailable, five times at most, and never once it is known', () => {
+  it('asks again while the route reads unavailable, every 3 s for up to a minute, and never once it is known', () => {
+    expect(FastModeRetry.DELAY_MS * FastModeRetry.LIMIT).toBe(60_000)
     expect(FastModeRetry.shouldRetry({ status: { available: false }, retries: 0 })).toBe(true)
-    expect(FastModeRetry.shouldRetry({ status: { available: false }, retries: 4 })).toBe(true)
-    expect(FastModeRetry.shouldRetry({ status: { available: false }, retries: 5 })).toBe(false)
+    expect(FastModeRetry.shouldRetry({ status: { available: false }, retries: 19 })).toBe(true)
+    expect(FastModeRetry.shouldRetry({ status: { available: false }, retries: 20 })).toBe(false)
     expect(FastModeRetry.shouldRetry({ status: { available: true }, retries: 0 })).toBe(false)
     expect(FastModeRetry.shouldRetry({ status: undefined, retries: 0 })).toBe(false)
   })

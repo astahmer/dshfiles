@@ -64,10 +64,13 @@ export const FastModeRow = (props: {
   )
 }
 
-/** When to ask a route's Fast mode status again (round 5 U3): while it reads unavailable, up to five times. */
+/**
+ * When to ask a route's Fast mode status again (round 5 U3): while it reads unavailable, every 3 s for up to a minute
+ * (Codex lists its Fast tiers once its catalog loads, which took longer than ten seconds after accounts came back).
+ */
 export class FastModeRetry {
-  static readonly DELAY_MS = 2_000
-  static readonly LIMIT = 5
+  static readonly DELAY_MS = 3_000
+  static readonly LIMIT = 20
   static shouldRetry(input: { readonly status: { readonly available: boolean } | undefined; readonly retries: number }): boolean {
     return input.status !== undefined && !input.status.available && input.retries < FastModeRetry.LIMIT
   }
