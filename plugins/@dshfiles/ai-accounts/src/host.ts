@@ -104,8 +104,9 @@ import { AntigravityAcpSessions } from './antigravity-acp.js'
 import { ANTIGRAVITY_CLI_TOKEN, AntigravityAccountModel } from './antigravity-account.js'
 import { createAntigravityProvider } from './antigravity-provider.js'
 import { VIBE_CLI_TOKEN, VibeCliSessions } from './vibe-cli.js'
-import { createVibeProvider } from './vibe-provider.js'
-import { AntigravityProcesses, AntigravityProcessesPromiseModel, type AntigravityProcessesPromise } from './antigravity-processes.js'
+import { createVibeAcpProvider, createVibeProvider } from './vibe-provider.js'
+import { VibeAcpSessions, vibeBuiltinAuthorizer } from './vibe-acp.js'
+import { CliProcesses, CliProcessesPromiseModel, type CliProcessesPromise } from './cli-processes.js'
 
 /**
  * Per-account Codex and OpenCode Go provider instances for DeepSeek Harness.
@@ -145,7 +146,7 @@ const startAccountsHost = (input: {
   readonly usageHistory: { readonly collectNow: () => Promise<number> }
   readonly pricing: PricingCatalogPromise
   readonly modelCatalogs: ModelCatalogsPromise
-  readonly antigravity: AntigravityProcessesPromise
+  readonly antigravity: CliProcessesPromise
   readonly onRelease: (release: () => void) => void
 }): AccountsHostActivation => {
   const { ctx, readSettings, store, onRelease } = input
@@ -359,16 +360,40 @@ const startAccountsHost = (input: {
   })
   onRelease(() => void antigravityCli.dispose())
   const antigravityUpstream = createAntigravityProvider(antigravityCli)
-  // Mistral's Vibe allowance is reachable only by the CLI itself, so this route spawns `vibe` per step with the
-  // account's signed-in VIBE_HOME instead of sending HTTP (see vibe-cli.ts).
-  const vibeCli = new VibeCliSessions({
-    home: provider => {
-      const route = routes.get(provider)
-      return route?.kind === VIBE_KIND ? route.home : ''
-    },
-  })
+  // Mistral's Vibe allowance is reachable only by the CLI itself, so a Vibe account runs `vibe` with its signed-in
+  // VIBE_HOME instead of sending HTTP: `vibe-acp` holds one process per conversation and bridges DSH's tools, or the
+  // headless `vibe` runs once per step without them (see vibe-acp.ts and vibe-cli.ts).
+  const vibeHome = (provider: string) => {
+    const route = routes.get(provider)
+    return route?.kind === VIBE_KIND ? route.home : ''
+  }
+  const vibeCli = new VibeCliSessions({ home: vibeHome })
   onRelease(() => vibeCli.dispose())
-  const vibeUpstream = createVibeProvider({ upstream: mistralUpstream, sessions: vibeCli })
+  const vibeCliUpstream = createVibeProvider({ upstream: mistralUpstream, sessions: vibeCli })
+  const vibeAcp = new VibeAcpSessions({
+    processes: input.antigravity,
+    home: vibeHome,
+    settings: () => readSettings().vibe,
+    authorizeBuiltin: vibeBuiltinAuthorizer({
+      session: sessionId => {
+        const agent = ctx.agents.get(SessionId(sessionId))
+        if (agent === undefined) return undefined
+        const policy = ctx.get('sandboxPolicy')?.resolve({ session: agent.session })
+        return {
+          fileMode: policy?.mode,
+          writableRoots: policy === undefined ? [] : [policy.workspaceRoot, ...(policy.additionalWritableRoots ?? [])],
+          ask: async ask => {
+            const approval = ctx.get('approval')
+            return (
+              approval !== undefined && (await approval.request({ agent, toolName: ask.toolName, reason: ask.reason, signal: ask.signal })) === 'allowed-once'
+            )
+          },
+        }
+      },
+    }),
+  })
+  onRelease(() => void vibeAcp.dispose())
+  const vibeAcpUpstream = createVibeAcpProvider({ upstream: mistralUpstream, sessions: vibeAcp })
   const githubCopilotUpstream = githubCopilotProvider()
   const declaredRetryAfter = new DeclaredRetryAfter()
   /** Codex accounts a quota failure sent to Luna Reserve ahead of their usage card, until this time. */
@@ -457,7 +482,7 @@ const startAccountsHost = (input: {
         })
       }
       if (route.kind === CLAUDE_KIND) return ClaudeAccountModel.usesCliTransport(route) ? claudeCliUpstream : claudeUpstream
-      if (route.kind === VIBE_KIND) return vibeUpstream
+      if (route.kind === VIBE_KIND) return route.bridge === 'acp' ? vibeAcpUpstream : vibeCliUpstream
       if (route.kind === GITHUB_COPILOT_KIND) return githubCopilotUpstream
       if (route.kind === ANTIGRAVITY_KIND) return antigravityUpstream
       return keyedUpstream(route)
@@ -872,6 +897,9 @@ const startAccountsHost = (input: {
     pool.setDistribution(nextConfig.distribution)
     config = nextConfig
     routes = nextRoutes
+    vibeAcp.retainAccounts(
+      new Map([...nextRoutes].flatMap(([id, route]) => (route.kind === VIBE_KIND && route.enabled && route.bridge === 'acp' ? [[id, route.home]] : []))),
+    )
     profiles = buildProfiles(nextRoutes, sourceFile)
     reasoningDefaults.clear()
     for (const [id, pins] of buildReasoningDefaults()) reasoningDefaults.set(id, pins)
@@ -956,7 +984,7 @@ const AccountsHostLive = Layer.effectDiscard(
     const usage = UsageSnapshotPromiseModel.facade(yield* UsageSnapshot, services)
     const usageHistory = UsageHistoryPromiseModel.facade(yield* UsageHistorySchedule, services)
     const modelCatalogs = ModelCatalogsPromiseModel.facade(yield* ModelCatalogs, services)
-    const antigravity = AntigravityProcessesPromiseModel.facade(yield* AntigravityProcesses, services)
+    const antigravity = CliProcessesPromiseModel.facade(yield* CliProcesses, services)
     const pricingService = yield* PricingCatalog
     const pricing = PricingCatalogPromiseModel.facade(pricingService, services)
     // The imperative Host reads preferences synchronously; this mirror follows every committed change.
@@ -1024,7 +1052,7 @@ export default DshxPlugin.make({
         UsageHistoryPromiseModel.layer,
         PricingCatalog.scheduled().pipe(Layer.provideMerge(PricingCatalog.layer({ path: DEFAULT_PRICING_PATH }))),
         ModelCatalogs.layer,
-        AntigravityProcesses.hostLayer,
+        CliProcesses.hostLayer,
       ).pipe(
         Layer.provideMerge(AccountPoolLive),
         Layer.provideMerge(

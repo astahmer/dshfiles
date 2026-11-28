@@ -488,7 +488,7 @@
         "A rejected model alias reports the CLI's own stderr so the alias can be corrected rather than retried silently.",
         "A process that writes nothing for ten minutes is stopped and names the CLI log under VIBE_HOME.",
         "The route disables an inherited MISTRAL_API_KEY so the CLI's signed-in session is what pays, not the API credit.",
-        "No quota is guessed: a signed-out profile reports unauthenticated, and the card reads Mistral's own two buckets when the CLI login exists."
+        "No quota is guessed: a signed-out profile reports unauthenticated, and only the Vibe & Studio allowance determines the CLI card’s quota."
       ],
       "externalDependencies": [
         {
@@ -520,6 +520,153 @@
           "kind": "not-applicable",
           "id": "ai-accounts.vibe-cli-route-browser",
           "reason": "Host-only transport: adding the account reuses the AI Accounts add-account dialog walked by the existing dashboard scenario, and the route's own catalogue and stream are proven by the fake-vibe unit tests. A browser scenario would only re-render that dialog, since no client surface renders the route itself."
+        }
+      ]
+    },
+    {
+      "id": "vibe-acp-bridge",
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "vibe describe",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "records Vibe handshake and prompt spans without the home, instructions, prompt or models"
+        },
+        {
+          "kind": "custom",
+          "span": "vibe prompt",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "records Vibe handshake and prompt spans without the home, instructions, prompt or models"
+        },
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "model-stream"
+        }
+      ],
+      "title": "Run Vibe with DSH's tools through its ACP server",
+      "summary": "A Vibe account switched to the ACP bridge holds one `vibe-acp` process per thread: DSH's tools reach it as one stdio MCP server, Vibe publishes an ACP tool update before invoking MCP; only the held MCP request becomes a native DSH call. The native executor applies the calling session's sandbox and approval policy and the result releases the held call inside the same ACP prompt. Vibe 3.1.5 ignores the private agent profile's tool allowlist, so the route runs Vibe in its ask mode and answers each builtin's permission request the way the calling session treats a native tool with that effect. Context usage, cost and the session's token meta from `usage_update` become per-step ledger numbers.",
+      "surfaces": ["client", "host", "storage"],
+      "surface": "settingsSection",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › Mistral Vibe ACP; accounts editor › Runtime paths › Bridge",
+      "reach": ["click button \"AI accounts\"", "expect text \"Mistral Vibe ACP\""],
+      "configuration": [
+        {
+          "key": "vibe.acpApprovalPolicy",
+          "defaultValue": "session",
+          "constraints": "session answers each Vibe builtin as the calling session treats a native tool (reads and full access run, other writes ask the session); ask asks the session before every builtin. DSH's own tools always keep their native policy.",
+          "choices": ["session", "ask"],
+          "coveredBy": ["ai-accounts.vibe-acp-builtin-approval"]
+        },
+        {
+          "key": "vibe.strictTools",
+          "defaultValue": "false",
+          "constraints": "When true, deny every Vibe builtin so only the bridged DSH tools run.",
+          "coveredBy": ["ai-accounts.vibe-acp-strict-tools"]
+        }
+      ],
+      "states": ["headless", "acp", "starting", "streaming", "awaiting-tools", "idle", "cli-missing", "signed-out", "profile-missing"],
+      "failureModes": [
+        "A Host without `vibe-acp` reports the install hint and `vibe --setup` instead of a spawn error.",
+        "A signed-out account reports `VIBE_HOME=\u2026 vibe --setup` for its own home instead of a raw ACP error.",
+        "A session where Vibe did not load the managed agent profile fails the step instead of running with Vibe's own write, edit and shell tools enabled.",
+        "Vibe's own write, edit, shell and code tools ask the calling session under a confining file policy and are denied when its approvals are off; strict tools denies every builtin.",
+        "A process that exits mid-step fails the step with its stderr tail; a cancelled step stops the process and its held call."
+      ],
+      "externalDependencies": [
+        {
+          "id": "vibe-acp",
+          "boundary": "Mistral Vibe 3.x's `vibe-acp` ACP stdio server and its `vibe --setup` login; DSH never copies or prints that credential.",
+          "deterministicFake": "vibe-acp.fixture.ts runs a fake `vibe-acp` that speaks ACP over stdio, projects the session/new MCP server, reports tools under _meta.tool_name as mcp_dsh.<tool>, and reproduces Vibe’s tool_denied callback result."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-ordering",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp-spike.test.ts",
+          "testName": "publishes a DSH tool as mcp_dsh.<tool> and emits its tool_call before the bridge call can be answered"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-tool-round-trip",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "holds a DSH tool call until DSH answers it, then continues the same ACP prompt in the same process"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-managed-profile",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "runs Vibe with the managed agent profile: DSH instructions, DSH tools and the builtins the route gates listed, the account home"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-refuses-unsafe-profile",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "refuses to run a step when Vibe did not load the managed profile instead of leaving its own tools enabled"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-usage",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "answers one step with Vibe s text, thinking and this step s share of the session usage"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-permission",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "admits a bridged DSH tool under Vibe 3.1.5 s real tool metadata in a full-access session whose approvals are off"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-builtin-approval",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "runs Vibe s own shell as the calling session allows a native one"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-full-access-subagent",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "runs Vibe s own shell and file writes in a subagent of a full-access session whose approvals are off, without asking"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-workspace-write",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "confines Vibe s own file writes in a workspace-write session as DSH confines its own"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-bridged-tool-guidance",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "tells Vibe to use the bridged DSH tools for shell and file work instead of its own builtins"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-strict-tools",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-acp.test.ts",
+          "testName": "strictTools denies every Vibe builtin request and cleans up when the account is removed"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-switch",
+          "file": "plugins/@dshfiles/ai-accounts/src/provider-routes.test.ts",
+          "testName": "carries the per-account bridge, defaulting an account that never chose one to the headless CLI"
+        },
+        {
+          "kind": "unit-test",
+          "id": "ai-accounts.vibe-acp-switch-control",
+          "file": "plugins/@dshfiles/ai-accounts/src/vibe-bridge-switch.test.tsx",
+          "testName": "shows the account s bridge and switches it when the other transport is chosen"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "ai-accounts.vibe-acp-browser",
+          "reason": "Host-only transport: the browser surface is the switch itself, whose pressed state and click are covered by the switch component test, and the route's catalogue, tool round trip, profile and usage by the fake-vibe-acp unit tests. A browser scenario would only re-render the account editor that existing AI Accounts scenarios already walk."
         }
       ]
     },

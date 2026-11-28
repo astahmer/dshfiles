@@ -5,6 +5,7 @@ import { CodexHomeError, type CodexHomeLayout } from './codex-home.js'
 import { AccountHomePolicy } from './account-home-policy.js'
 import { DEFAULT_MISTRAL_KEY_ENV, MISTRAL_KIND as M_KIND } from './mistral-account.js'
 import { VIBE_KIND as V_KIND, VibeAccountModel } from './vibe-account.js'
+import type { VibeBridge } from './api.js'
 import { ANTIGRAVITY_KIND as AG_KIND, AntigravityAccountModel } from './antigravity-account.js'
 
 export const CODEX_KIND = 'codex'
@@ -80,6 +81,8 @@ export interface VibeRoute {
   readonly displayName: string
   /** The account's VIBE_HOME, where `vibe --setup` stored the login. */
   readonly home: string
+  /** Which transport serves this account: `acp` bridges DSH's tools, `headless` runs `vibe` per step. */
+  readonly bridge: VibeBridge
   readonly enabled: boolean
 }
 
@@ -197,6 +200,7 @@ export class ProviderRoutes {
         instanceId,
         displayName: displayNameFor(account.displayName, VIBE_KIND, instanceId),
         home: VibeAccountModel.resolveHome(account.home),
+        bridge: account.bridge,
         enabled: account.enabled,
       })
     }

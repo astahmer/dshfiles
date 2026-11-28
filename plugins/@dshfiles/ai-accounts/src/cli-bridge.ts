@@ -47,7 +47,7 @@ createInterface({ input: process.stdin }).on('line', line => {
 export const bridgeCallSchema = Schema.Struct({
   id: Schema.Union([Schema.String, Schema.Number]),
   name: Schema.String,
-  arguments: Schema.Record(Schema.String, Schema.Unknown),
+  arguments: Schema.Record(Schema.String, Schema.Json),
 })
 
 export class CliBridge {

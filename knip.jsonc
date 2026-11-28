@@ -36,6 +36,9 @@
     "plugins/@dshfiles/opencode-compat/tests/fixtures/**",
     // Command-line tools the context-compaction README documents (`node scripts/replay-*.mjs`), not imported modules.
     "plugins/@dshfiles/context-compaction/scripts/replay-*.mjs",
+    // The manual half of the vibe-acp spike (`node scripts/vibe-acp-spike.mjs`), which drives the real binary: the CI
+    // half is the fake in src/vibe-acp.fixture.ts.
+    "plugins/@dshfiles/ai-accounts/scripts/vibe-acp-spike.mjs",
     "plugins/@dshfiles/thread-sidebar/src/restart-controller.ts",
     // Vendored upstream test helper (src/native/testing/generation.ts) kept for byte-parity
     // with the pinned package; `native-fork-diff` reports it missing if it is deleted.

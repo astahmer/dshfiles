@@ -4,12 +4,13 @@ import { CopyIcon } from '@dshfiles/plugin-ui/icons'
 import { useState } from 'react'
 import type { WorkspacePickerPorts } from '@dshfiles/workspace-folder-picker/picker'
 import { ApiKeySetupDialog } from './api-key-setup-dialog.js'
-import { AccountsRules, type AccountDraft } from './api.js'
+import { AccountsRules, vibeBridge, type AccountDraft } from './api.js'
 import { NumberedSection } from './panel-primitives.js'
 import { AccountDraftModel } from './account-draft.js'
 import { shouldOfferCredentialSetup } from './credential-setup-model.js'
 import type { AccountsPanelState } from './use-accounts-panel-state.js'
 import { ShellCommand } from './shell-command.js'
+import { VibeBridgeSwitch } from './vibe-bridge-switch.js'
 
 const PathField = (props: {
   readonly label: string
@@ -58,11 +59,8 @@ const KEY_FIELD = {
     placeholder: 'MISTRAL_WORK_API_KEY',
   },
   antigravity: null,
-  vibe: {
-    label: 'VIBE_HOME',
-    hint: 'The folder `vibe --setup` signed in to. Empty uses ~/.vibe; this route runs the Vibe CLI, so it needs no key reference.',
-    placeholder: '~/.vibe',
-  },
+  // A Vibe account's only path is its VIBE_HOME, which gets its own field below; it carries no key reference.
+  vibe: null,
 } satisfies Record<AccountDraft['kind'], { readonly label: string; readonly hint: string; readonly placeholder: string } | null>
 
 const launchCommandFor = (draft: AccountDraft): string | null => {
@@ -190,6 +188,27 @@ export const RuntimePathsSection = (props: {
           placeholder="empty: ~ (agy acp --login)"
           value={draft.homePath}
         />
+      ) : null}
+      {draft.kind === 'vibe' ? (
+        <>
+          <PathField
+            ariaLabel="VIBE_HOME"
+            hint="The folder `vibe --setup` signed in to. Empty uses your own ~/.vibe; a thread on this account draws that plan's Vibe & Studio allowance."
+            label="VIBE_HOME"
+            onChange={homePath => setDraft({ ...draft, homePath })}
+            placeholder="~/.vibe"
+            value={draft.homePath}
+          />
+          <VibeBridgeSwitch
+            bridge={vibeBridge(draft.bridge)}
+            disabled={props.state.saving === true}
+            onChange={bridge => {
+              const next = { ...draft, bridge }
+              setDraft(next)
+              void save(next)
+            }}
+          />
+        </>
       ) : null}
       {keyField === null ? null : (
         <>

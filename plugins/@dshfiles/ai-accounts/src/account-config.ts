@@ -2,6 +2,8 @@ import type { AccountStoreFile } from './account-store.js'
 import type { Distribution } from './account-pool.js'
 import { CodexHomeModel } from './codex-home.js'
 import { CredentialModel } from './credentials.js'
+import { VibeAccountModel } from './vibe-account.js'
+import type { VibeBridge } from './api.js'
 export interface CodexAccountConfig {
   readonly instanceId: string
   readonly displayName: string
@@ -55,6 +57,8 @@ export interface VibeAccountConfig {
   readonly displayName: string
   /** The account's VIBE_HOME; empty means the Host user's `~/.vibe`. */
   readonly home: string
+  /** `acp` holds one `vibe-acp` process per conversation and bridges DSH's tools; `headless` runs `vibe` per step. */
+  readonly bridge: VibeBridge
   readonly enabled: boolean
 }
 
@@ -98,7 +102,13 @@ export const configFromAccountsFile = (file: AccountStoreFile): AiAccountsConfig
       continue
     }
     if (account.kind === 'vibe') {
-      vibeAccounts.push({ instanceId: account.instanceId, displayName: account.displayName, home: account.homePath, enabled: account.enabled })
+      vibeAccounts.push({
+        instanceId: account.instanceId,
+        displayName: account.displayName,
+        home: account.homePath,
+        bridge: VibeAccountModel.bridge(account.bridge),
+        enabled: account.enabled,
+      })
       continue
     }
     if (account.kind === 'claude') {

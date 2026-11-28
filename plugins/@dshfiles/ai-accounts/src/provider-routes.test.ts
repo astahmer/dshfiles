@@ -61,6 +61,18 @@ describe('Vibe CLI routes', () => {
     expect(built.routes.get(generated.instanceId)).toMatchObject({ kind: 'vibe', home: join(homedir(), '.vibe') })
     expect(built.routes.get('vibe_alt')).toMatchObject({ kind: 'vibe', home: '/synthetic/vibe-alt' })
   })
+
+  it('carries the per-account bridge, defaulting an account that never chose one to the headless CLI', async () => {
+    const { AccountDraftModel } = await import('./account-draft.js')
+    const { configFromAccountsFile } = await import('./account-config.js')
+    const generated = AccountDraftModel.newAccountDraft({ kind: 'vibe', existing: [] })
+    const acp = { ...generated, instanceId: 'vibe_acp', bridge: 'acp' as const }
+    const config = configFromAccountsFile({ distribution: 'priority', cooldownMs: 0, shadowRoot: '/synthetic/shadows', accounts: [generated, acp] })
+    expect(config.vibeAccounts.map(account => account.bridge)).toEqual(['headless', 'acp'])
+    const built = ProviderRoutes.buildRoutes(config)
+    expect(built.routes.get(generated.instanceId)).toMatchObject({ kind: 'vibe', bridge: 'headless' })
+    expect(built.routes.get('vibe_acp')).toMatchObject({ kind: 'vibe', bridge: 'acp' })
+  })
 })
 
 describe('managed setup Codex routes', () => {

@@ -1419,7 +1419,7 @@
     },
     {
       "name": "ai_accounts_save_account",
-      "description": "Save an account profile or change its enabled/model settings. Stores references and metadata only, never credential values. Call only when the user asked to edit that account.",
+      "description": "Save an account profile or change its enabled/model settings or Mistral Vibe bridge (draft.bridge: acp or headless). Stores references and metadata only, never credential values. Call only when the user asked to edit that account.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1463,6 +1463,14 @@
                 "enum": [
                   "cli",
                   "reference"
+                ]
+              },
+              "bridge": {
+                "description": "Mistral Vibe only: acp bridges DSH tools; headless (default) runs the standalone CLI.",
+                "type": "string",
+                "enum": [
+                  "acp",
+                  "headless"
                 ]
               },
               "apiBaseUrl": {

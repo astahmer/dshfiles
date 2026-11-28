@@ -47,6 +47,7 @@ export class AccountDraftModel {
     shadowHomePath: profile.shadowHomePath,
     apiKeyEnv: profile.apiKeyEnv,
     ...(profile.authSource !== undefined && { authSource: profile.authSource }),
+    ...(profile.bridge !== undefined && { bridge: profile.bridge }),
     apiBaseUrl: profile.apiBaseUrl,
     badge: profile.badge,
     accentColor: profile.accentColor,
@@ -78,6 +79,7 @@ export class AccountDraftModel {
     left.homePath === right.homePath &&
     left.shadowHomePath === right.shadowHomePath &&
     left.apiKeyEnv === right.apiKeyEnv &&
+    left.bridge === right.bridge &&
     left.authSource === right.authSource &&
     left.apiBaseUrl === right.apiBaseUrl &&
     left.badge === right.badge &&

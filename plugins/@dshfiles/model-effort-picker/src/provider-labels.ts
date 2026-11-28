@@ -10,4 +10,5 @@ export const PROVIDER_LABEL = {
   cursor: 'Cursor',
   mistral: 'Mistral',
   antigravity: 'Antigravity',
+  vibe: 'Mistral Vibe',
 } satisfies Record<AccountKind, string>

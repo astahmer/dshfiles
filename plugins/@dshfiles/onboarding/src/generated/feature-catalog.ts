@@ -72,7 +72,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "ai-accounts",
       "description": "Per-account Codex, Claude, Antigravity, Mistral Vibe CLI, OpenCode Go and Command Code provider instances, plus Cursor quota, for DeepSeek Harness, in the spirit of T3 Code.",
       "ui": true,
-      "features": 22
+      "features": 23
     },
     {
       "name": "annotations",
@@ -654,7 +654,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "tool-subagent",
       "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
       "ui": false,
-      "features": 2
+      "features": 3
     },
     {
       "name": "traces",
@@ -3428,6 +3428,33 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "action": "expect",
           "by": "button",
           "name": "Copy Vibe sign-in command",
+          "value": null
+        }
+      ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "ai-accounts#vibe-acp-bridge",
+      "plugin": "ai-accounts",
+      "id": "vibe-acp-bridge",
+      "title": "Run Vibe with DSH's tools through its ACP server",
+      "summary": "A Vibe account switched to the ACP bridge holds one `vibe-acp` process per thread: DSH's tools reach it as one stdio MCP server, Vibe publishes an ACP tool update before invoking MCP; only the held MCP request becomes a native DSH call. The native executor applies the calling se…",
+      "destination": "settings",
+      "currentSurface": "settings: AI Accounts › Mistral Vibe ACP; accounts editor › Runtime paths › Bridge",
+      "reach": [
+        {
+          "text": "click button \"AI accounts\"",
+          "action": "click",
+          "by": "button",
+          "name": "AI accounts",
+          "value": null
+        },
+        {
+          "text": "expect text \"Mistral Vibe ACP\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Mistral Vibe ACP",
           "value": null
         }
       ],
@@ -27517,6 +27544,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's…",
       "destination": "none",
       "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#child-turn-guard",
+      "plugin": "tool-subagent",
+      "id": "child-turn-guard",
+      "title": "Keep a delegated child working when its turn hands the task back",
+      "summary": "A delegated child that ends a turn as completed while its closing text hands the task back (reassign, cannot complete, no implementation, unfinished, remains unverified, do not land, not implemented, hand back, take over) receives one continuing message at the loop's turn-stoppi…",
+      "destination": "none",
+      "currentSurface": "host: delegated child turns",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

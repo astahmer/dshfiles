@@ -72,6 +72,15 @@ export const aiAccountsSettings = defineSettings({
     autoRetryQuotaDefault: Schema.boolean().default(true),
     /** Show a per-turn automatic-retry checkbox beside exhausted-limit errors. */
     showQuotaRetryChoice: Schema.boolean().default(true),
+    vibe: Schema.object({
+      acpApprovalPolicy: Schema.union([
+        Schema.const('session').description('Follow the calling session: reads and full access run, other writes ask'),
+        Schema.const('ask').description('Ask the calling DSH session before every Vibe builtin, reads included'),
+      ])
+        .default('session')
+        .description('Vibe builtin approvals'),
+      strictTools: Schema.boolean().default(false).description('Offer only DSH tools on Vibe ACP routes'),
+    }).description('Mistral Vibe ACP'),
     /** What each kind of failed model request on an account route does next. */
     failureRecovery: Schema.object({
       transport: kindPolicySetting(DEFAULT_RECOVERY_POLICY.transport, 'Connection resets, timeouts, 5xx and replay-buffer overflows.'),
@@ -152,6 +161,7 @@ const liveSettingsSchema = EffectSchema.Struct({
   autoRetryQuotaDefault: EffectSchema.optional(EffectSchema.Unknown),
   showQuotaRetryChoice: EffectSchema.optional(EffectSchema.Unknown),
   promptCacheRetention: EffectSchema.optional(EffectSchema.Unknown),
+  vibe: EffectSchema.optional(EffectSchema.Unknown),
 })
 
 type LiveSettings = typeof liveSettingsSchema.Type
@@ -170,7 +180,28 @@ const liveFields = (live: AiAccountsSettingsValue): LiveSettings => {
   return result._tag === 'Success' ? result.success : {}
 }
 
+export interface VibeAcpSettings {
+  readonly acpApprovalPolicy: 'session' | 'ask'
+  readonly strictTools: boolean
+}
+
+export const DEFAULT_VIBE_ACP_SETTINGS: VibeAcpSettings = { acpApprovalPolicy: 'session', strictTools: false }
+
+const vibeSettingsSchema = EffectSchema.Struct({
+  acpApprovalPolicy: EffectSchema.optional(EffectSchema.Unknown),
+  strictTools: EffectSchema.optional(EffectSchema.Unknown),
+})
+
+const decodeVibeSettings = (value: unknown): VibeAcpSettings => {
+  const settings = decodeSetting(vibeSettingsSchema, value, {})
+  return {
+    acpApprovalPolicy: decodeSetting(EffectSchema.Literals(['session', 'ask']), settings.acpApprovalPolicy, DEFAULT_VIBE_ACP_SETTINGS.acpApprovalPolicy),
+    strictTools: decodeSetting(EffectSchema.Boolean, settings.strictTools, DEFAULT_VIBE_ACP_SETTINGS.strictTools),
+  }
+}
+
 export interface AccountSettingsSnapshot {
+  readonly vibe: VibeAcpSettings
   readonly pricing: PricingSettings
   /** Enable Codex Fast mode for supported routes unless a Session changes that route. */
   readonly fastModeDefault: boolean
@@ -189,6 +220,7 @@ export interface AccountSettingsSnapshot {
 const fromLive = (live: AiAccountsSettingsValue): AccountSettingsSnapshot => {
   const fields = liveFields(live)
   return {
+    vibe: decodeVibeSettings(fields.vibe),
     pricing: {
       costEstimates: decodeSetting(EffectSchema.Boolean, fields.costEstimates, true),
       pricingRefreshHours: decodeSetting(EffectSchema.Finite.check(EffectSchema.isGreaterThanOrEqualTo(1)), fields.pricingRefreshHours, 24),
@@ -213,4 +245,5 @@ const fromLive = (live: AiAccountsSettingsValue): AccountSettingsSnapshot => {
 
 export class AccountSettingsModel {
   static readonly fromLive = fromLive
+  static readonly vibe = decodeVibeSettings
 }

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createMistralProvider } from './mistral-provider.js'
 import { VibeCliSessions } from './vibe-cli.js'
-import { createVibeProvider } from './vibe-provider.js'
+import { VibeAcpSessions } from './vibe-acp.js'
+import { createVibeAcpProvider, createVibeProvider } from './vibe-provider.js'
 
 const provider = createVibeProvider({
   upstream: createMistralProvider(),
@@ -31,6 +32,22 @@ describe('the Vibe provider catalog', () => {
     expect(large?.thinkingLevelMap).toMatchObject({ medium: 'medium', max: null })
     expect(glm?.input).toEqual(['text'])
     expect(glm?.thinkingLevelMap).toMatchObject({ max: 'max' })
+  })
+})
+
+describe('the Vibe ACP provider catalog', () => {
+  const acp = createVibeAcpProvider({
+    upstream: createMistralProvider(),
+    sessions: new VibeAcpSessions({
+      processes: { launch: () => ({ send: () => undefined, stop: async () => undefined }), after: () => () => undefined },
+      home: () => '/synthetic/vibe',
+    }),
+  })
+
+  it('publishes the same catalog under the ACP api, so a bridged account picks the same models', () => {
+    expect(acp.id).toBe('vibe')
+    expect(acp.getModels().map(model => model.id)).toEqual(provider.getModels().map(model => model.id))
+    for (const model of acp.getModels()) expect(model).toMatchObject({ api: 'vibe-acp', provider: 'vibe', reasoning: true })
   })
 })
 
