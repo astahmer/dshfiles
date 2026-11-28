@@ -2258,6 +2258,9 @@ When('a new thread falls back from the first account to the third one in the com
   await page.getByRole('button', { name: 'New session', exact: true }).first().click()
   await composerPicker(page).click()
   await pickAccountModel(page, 'Command Code 3')
+  // Council picker N5: the chain is collapsed to one line until opened.
+  const toggle = fallbacks(page).locator('[data-model-fallbacks-toggle]')
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
   await fallbacks(page).getByRole('button', { name: 'Add fallback', exact: true }).click()
   await expect(fallbacks(page).getByRole('listitem')).toHaveCount(1)
   await page.screenshot({ path: test.info().outputPath('model-fallbacks.png') })

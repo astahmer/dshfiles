@@ -183,6 +183,7 @@
         "click button \", reasoning *\"",
         "press ArrowRight",
         "expect region \"Fallbacks\"",
+        "click button \"Fallbacks*\"",
         "click button \"Add fallback\"",
         "expect list \"Fallback order\""
       ],
