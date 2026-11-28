@@ -207,28 +207,27 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
     expect(ruleIn(PHONE, `${phone} .body[data-content-phase='active'] .composerSeat`)).toMatch(/--dsh-composer-seat-fade-solid: 0px;/)
   })
 
-  it('ends the Live work strip with the jump control after a hairline (council round 8 C4)', () => {
-    const seat = ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:has(> [data-live-work-summary]) > .jumpSeat::before`)
-    expect(seat).toMatch(/width:\s*1px/)
-    expect(seat).toMatch(/height:\s*20px/)
-    expect(seat).toMatch(/background: var\(--dshx-tone-line, var\(--dsw-alias-border-l2\)\)/)
-    expect(ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:has(> [data-live-work-summary]) > .jumpSeat`)).toMatch(/gap:\s*6px/)
-    // Council round 10 C1: the 28px round seat sits 8px inside the strip's end, as Live work's chevron does at its start.
-    expect(ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:has(> [data-live-work-summary]) > .jumpSeat`)).toMatch(/padding-inline-end:\s*8px/)
-  })
-
-  it('gives the jump control a trailing seat in the dock head, beside Live work', async () => {
+  // Council round 35 P7 (Opus): in the head the control read as a word of the Live work strip. The head offers no seat, so
+  // Chat's "Back to bottom" floats as on a desktop: its 36px round button, 12px above the composer stack, right-aligned.
+  it('holds Live work only: no seat for the jump control, which floats above the dock as on a desktop', async () => {
     vi.stubGlobal('matchMedia', (query: string) => ({ matches: query === '(max-width: 27.99rem)', addEventListener: () => undefined, removeEventListener: () => undefined }))
     const host = document.createElement('div')
     document.body.append(host)
     const root = createRoot(host)
     await act(async () =>
-      root.render(<PhoneDockHead className="head" jumpSeatClassName="seat" counts={{ jobs: 1, subagents: 0 }} open={false} onToggle={() => undefined} label="Live work" detail="1 job" />),
+      root.render(<PhoneDockHead className="head" counts={{ jobs: 1, subagents: 0 }} open={false} onToggle={() => undefined} label="Live work" detail="1 job" />),
     )
     const head = host.querySelector('[data-composer-dock-head]')
+    expect(head?.children).toHaveLength(1)
     expect(head?.firstElementChild?.hasAttribute('data-live-work-summary')).toBe(true)
-    // The seat trails the row, so the control sits in the dock, never over the transcript's prose.
-    expect(head?.lastElementChild?.hasAttribute('data-composer-jump-seat')).toBe(true)
+    expect(host.querySelector('[data-composer-jump-seat]')).toBeNull()
+    // It floats 12px above the dock itself: the seat height Chat reads leaves out the phone seat's clear top band.
+    const content = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/ConversationContent.tsx'), 'utf8')
+    expect(content).toMatch(/const band = Number\.parseFloat\(getComputedStyle\(seat\)\.paddingTop\) \|\| 0/u)
+    expect(content).toMatch(/const seatHeight = `\$\{seat\.offsetHeight - band\}px`/u)
+    // No seat styling is left behind for a control that never lands in the head.
+    expect(css).not.toMatch(/\.jumpSeat\b/u)
+    expect(css).not.toMatch(/composer-jump-seat/u)
     await act(async () => root.unmount())
     host.remove()
   })
@@ -246,8 +245,8 @@ describe('the phone dock edge (round five C1, council round 4)', () => {
     host.remove()
   })
 
-  it('folds the head away while it holds neither Live work nor the control', () => {
-    const hidden = ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:not(:has([data-live-work-summary], [data-composer-jump-seat] > *))`)
+  it('folds the head away while it holds no Live work', () => {
+    const hidden = ruleIn('@media (max-width: 27.99rem)', `${phone} .dockHead:not(:has([data-live-work-summary]))`)
     expect(hidden).toMatch(/display:\s*none/)
   })
 })
@@ -360,12 +359,6 @@ describe('the phone Live work strip on the nav surface (council round 11 C4)', (
     expect(head).not.toMatch(/--dsw-specific-input-major/)
     expect(head).toMatch(/border: 1px solid var\(--dshx-field-border, var\(--dsw-alias-border-l3\)\);/)
     expect(head).toMatch(/border-bottom-width: 0;/)
-  })
-
-  it('fills the jump control with the composer fill and a hairline, so it does not vanish into the strip in light', () => {
-    const jump = ruleIn(NARROW, `${attached} > .dockHead:has(> [data-live-work-summary]) > .jumpSeat > :global(button)`)
-    expect(jump).toMatch(/background: var\(--dsw-specific-input-major\);/)
-    expect(jump).toMatch(/box-shadow: inset 0 0 0 1px var\(--dsw-alias-border-l2\);/)
   })
 })
 

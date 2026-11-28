@@ -154,7 +154,10 @@ export function ConversationContent(props: ConversationContentProps) {
     if (seat === null || scroller === null) return
     seatObserver.current = new ResizeObserver(() => {
       // Both reads before either write: a write between them forces a second layout of the whole conversation.
-      const seatHeight = `${seat.offsetHeight}px`
+      // The phone seat's top pad is a clear band above the dock, where the transcript's fade ends: a floating control
+      // (Chat's Back to bottom) clears the dock itself by its 12px, not the band (council round 35 P7).
+      const band = Number.parseFloat(getComputedStyle(seat).paddingTop) || 0
+      const seatHeight = `${seat.offsetHeight - band}px`
       const viewportHeight = `${scroller.clientHeight}px`
       if (scroller.style.getPropertyValue('--dsh-composer-height') !== seatHeight) scroller.style.setProperty('--dsh-composer-height', seatHeight)
       if (scroller.style.getPropertyValue('--dsh-conversation-viewport-height') !== viewportHeight) {
@@ -352,12 +355,11 @@ export function ConversationContent(props: ConversationContentProps) {
   const composerBar = (
     <div ref={stackRef} className={clsx(css.composerStack, hero && css.composerHero)} data-live-work-open={liveWorkOpen ? '' : undefined}>
       {hero && <HeroShell t={t} project={chipTitle} />}
-      {/* Unslop r5 C1 (council round 4): the phone dock's head row holds Live work and the jump control's trailing seat. */}
+      {/* Unslop r5 C1 (council round 4): the phone dock's head row holds Live work (round 35 P7: no jump control seat). */}
       {session !== undefined && (
         <PhoneDockHead
           className={css.dockHead}
           summaryClassName={css.liveWork}
-          jumpSeatClassName={css.jumpSeat}
           counts={liveWork}
           open={liveWorkOpen}
           onToggle={() => { setLiveWorkOpenFor(liveWorkOpen ? undefined : sessionId) }}

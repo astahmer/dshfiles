@@ -165,21 +165,20 @@ export function LiveWorkSummary(props: {
 }
 
 /**
- * The phone dock's head row (round five C1, council round 4): the Live work disclosure, then a trailing seat that Chat's
- * "Back to bottom" control portals into (`[data-composer-jump-seat]`, read by chat's `dockJumpSeat`), so on a phone the
- * control sits on the dock instead of over the transcript's last lines. Rendered only below 28rem; ConversationRoot
- * folds the row away while it holds neither.
+ * The phone dock's head row (round five C1, council round 4): the Live work disclosure. Rendered only below 28rem;
+ * ConversationRoot folds the row away while it holds no live work. Council round 35 P7 (Opus): it no longer offers Chat's
+ * "Back to bottom" control a seat (`[data-composer-jump-seat]`), where the control read as a word of the strip; Chat
+ * floats it as on a desktop, a 36px round button 12px above the composer stack, at the pane's right edge.
  */
 export function PhoneDockHead(
-  props: Parameters<typeof LiveWorkSummary>[0] & { readonly summaryClassName?: string | undefined; readonly jumpSeatClassName?: string | undefined },
+  props: Parameters<typeof LiveWorkSummary>[0] & { readonly summaryClassName?: string | undefined },
 ): JSX.Element | null {
   const narrow = useNarrowDock()
   if (!narrow) return null
-  const { className, summaryClassName, jumpSeatClassName, ...summary } = props
+  const { className, summaryClassName, ...summary } = props
   return (
     <div className={className} data-composer-dock-head="">
       <LiveWorkSummary {...summary} className={summaryClassName} />
-      <span className={jumpSeatClassName} data-composer-jump-seat="" />
     </div>
   )
 }
