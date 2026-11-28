@@ -8,8 +8,9 @@ const tagOf = (text: string, marker: string): string => {
 }
 
 describe('phone edges on one line (council picker round 5, U13)', () => {
-  it("pulls Back 14 px left so its glyph starts on Account's edge", () => {
-    expect(source('model-details.tsx')).toContain('dshx:pointer-coarse:size-11 dshx:pointer-coarse:-ml-3.5')
+  it("starts Back's arrow on Account's edge while its 44 pt box stays inside the sheet", () => {
+    // An 8 px pull (the pane's inset) and the arrow 8 px into its box: a 14 px pull clipped the box to 38 px.
+    expect(source('model-details.tsx')).toContain('dshx:pointer-coarse:size-11 dshx:pointer-coarse:-ml-2 dshx:pointer-coarse:justify-start dshx:pointer-coarse:pl-2')
   })
 
   it("ends the Fallbacks chevron and the fallback actions on Close's glyph edge, and the select bar without an inset", () => {
