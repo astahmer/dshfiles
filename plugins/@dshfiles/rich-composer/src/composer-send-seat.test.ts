@@ -68,20 +68,115 @@ describe('the composer send seat (council round 13 C3)', () => {
   })
 })
 
+/** The sheet without every block that opens with `prelude` (nested rules included). */
+const without = (prelude: string): string => {
+  let sheet = css
+  for (let from = sheet.indexOf(prelude); from >= 0; from = sheet.indexOf(prelude)) {
+    let depth = 0
+    for (let index = sheet.indexOf('{', from); index < sheet.length; index += 1) {
+      if (sheet[index] === '{') depth += 1
+      if (sheet[index] === '}') depth -= 1
+      if (depth === 0) {
+        sheet = sheet.slice(0, from) + sheet.slice(index + 1)
+        break
+      }
+    }
+  }
+  return sheet
+}
+
+/** Custom properties a pointer sees, by name (the last declaration wins, as in the cascade's order). */
+const customProperties = (pointer: 'fine' | 'coarse'): ReadonlyMap<string, string> =>
+  new Map(
+    [...(pointer === 'fine' ? without('@media (pointer: coarse)') : css).matchAll(/(--[\w-]+):\s*([^;{}]+);/g)].map(match => [
+      match[1] ?? '',
+      (match[2] ?? '').trim(),
+    ]),
+  )
+
+/** A px length: a number, `Npx`, `var(--x, fallback)` or a `calc()` of them with + - * / and parentheses. */
+const lengthOf = (expression: string, properties: ReadonlyMap<string, string>): number => {
+  let source = expression
+  for (let guard = 0; /var\(/.test(source); guard += 1) {
+    if (guard > 20) throw new Error(`unresolved: ${expression}`)
+    source = source.replace(/var\((--[\w-]+)(?:,\s*([^()]+))?\)/g, (_, name: string, fallback: string | undefined) => {
+      const value = properties.get(name) ?? fallback
+      if (value === undefined) throw new Error(`no value for ${name} in ${expression}`)
+      return `(${value})`
+    })
+  }
+  const tokens = source.replace(/calc\(/g, '(').replace(/(\d)px/g, '$1').match(/\d+(?:\.\d+)?|[-+*/()]/g) ?? []
+  let at = 0
+  const primary = (): number => {
+    const token = tokens[at++]
+    if (token === '(') {
+      const value = sum()
+      at += 1
+      return value
+    }
+    if (token === '-') return -primary()
+    return Number(token)
+  }
+  const product = (): number => {
+    let value = primary()
+    while (tokens[at] === '*' || tokens[at] === '/') value = tokens[at++] === '*' ? value * primary() : value / primary()
+    return value
+  }
+  const sum = (): number => {
+    let value = product()
+    while (tokens[at] === '+' || tokens[at] === '-') value = tokens[at++] === '+' ? value + product() : value - product()
+    return value
+  }
+  return sum()
+}
+
+const declaration = (body: string, property: string): string | undefined =>
+  [...body.matchAll(new RegExp(`(?:^|[;\\s])${property}:\\s*([^;]+);`, 'g'))].at(-1)?.[1]?.trim()
+
 // Council round 34 A2: on a phone Send sat 2px under the + control's line (7.8px once a 44px chip grew the row).
-describe('Send on the bar\'s line (council round 34 A2)', () => {
-  it('shares the row\'s centre on a narrow card: Send\'s centre is the row\'s bottom pad plus half its 32px model chip', () => {
-    const pad = Number(/padding: 0 8px (\d+)px;/.exec(rules('', '.row'))?.[1])
-    const line = 32
-    const bottomOf = (body: string): number => Number(/bottom: (\d+)px;/.exec(body)?.[1])
-    // A fine pointer: the narrow rule (the first .send block under the container query) and the 28px Send.
-    const fine = bottomOf(rules('@container (max-width: 560px)', '.send'))
-    const fineSend = Number(/height: (\d+)px;/.exec(rules('', '.primary'))?.[1])
-    expect(fine + fineSend / 2).toBe(pad + line / 2)
-    // Touch: the coarse narrow rule and the 32px Send.
-    const touch = bottomOf(rules('@media (pointer: coarse)', '.send').split('\n').filter(line => /bottom:/.test(line)).join('\n'))
-    const touchSend = Number(/height: (\d+)px;/.exec(rules('@media (pointer: coarse)', '.primary'))?.[1])
-    expect(touch + touchSend / 2).toBe(pad + line / 2)
+// Council round 35 P1 (Fable): a subagent's composer has no model chip, so its row's line was the 28px + control and Stop
+// sat 2px above it; the offset is now derived from the row's own line, which the row holds at the model chip's 32px.
+describe('Send on the bar\'s line (council round 34 A2, round 35 P1)', () => {
+  const NARROW = '@container (max-width: 560px)'
+
+  /** Send's and the row's centres, measured up from the card's bottom edge, for a row whose tallest chip is `chip`. */
+  const centres = (pointer: 'fine' | 'coarse', chip: number) => {
+    const properties = customProperties(pointer)
+    // The row is a border box: its pads, then its line.
+    const padding = (declaration(rules('', '.row'), 'padding') ?? '').split(/\s+/)
+    const pad = lengthOf(padding[2] ?? '', properties)
+    const coarseTop = declaration(rules('@media (pointer: coarse)', '.row'), 'padding-top')
+    const top = pointer === 'coarse' && coarseTop !== undefined ? lengthOf(coarseTop, properties) : lengthOf(padding[0] ?? '0', properties)
+    // The row's floor (narrow and phone rows only: there Send leaves the row's flow and is positioned against the card).
+    const floor = declaration(rules(NARROW, '.row'), 'min-height')
+    const line = Math.max(chip, floor === undefined ? 0 : lengthOf(floor, properties) - pad - top)
+    const sendSize = lengthOf(declaration(rules(pointer === 'coarse' ? '@media (pointer: coarse)' : '', '.primary'), 'height') ?? '', properties)
+    // The narrow rule's own offset is the first under the container query (the touch block nests its own after it).
+    const fine = /(?:^|[;\s])bottom:\s*([^;]+);/.exec(rules(NARROW, '.send'))?.[1]?.trim()
+    const touch = declaration(rules('@media (pointer: coarse)', '.send'), 'bottom')
+    const bottom = lengthOf((pointer === 'coarse' ? (touch ?? fine) : fine) ?? '', properties)
+    return { send: bottom + sendSize / 2, row: pad + line / 2 }
+  }
+
+  // 11: a parent thread's composer, whose model chip is the row's tallest item (32px). 18: a subagent's composer, whose
+  // tallest item is the 28px + control (no model chip).
+  it.each([
+    ['a parent thread (11)', 32],
+    ['a subagent thread (18)', 28],
+  ] as const)('puts Send\'s centre on the row\'s centre within 0.5px in %s, on a fine pointer and on touch', (_, chip) => {
+    for (const pointer of ['fine', 'coarse'] as const) {
+      const { send, row } = centres(pointer, chip)
+      expect(Math.abs(send - row), `${pointer}: Send ${String(send)} vs row ${String(row)}`).toBeLessThanOrEqual(0.5)
+    }
+  })
+
+  it('derives the offset from the row\'s line and pad, never a bare constant', () => {
+    for (const body of [rules(NARROW, '.send'), rules('@media (pointer: coarse)', '.send')]) {
+      const bottom = declaration(body, 'bottom')
+      if (bottom === undefined) continue
+      expect(bottom).toMatch(/var\(--dsh-composer-row-line/)
+      expect(bottom).toMatch(/var\(--dsh-composer-row-pad/)
+    }
   })
 })
 

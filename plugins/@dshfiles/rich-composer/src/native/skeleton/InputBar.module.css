@@ -527,8 +527,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* The bar's line (its 32px model chip) and its pads, which a narrow card's Send is placed from (council round 35 P1). */
+  --dsh-composer-row-line: 32px;
+  --dsh-composer-row-pad: 8px;
+  --dsh-composer-row-pad-top: 0px;
   /* Composer redesign (b:v9yh): the bar sits right under the text line, 8px off the card's edges. */
-  padding: 0 8px 8px;
+  padding: var(--dsh-composer-row-pad-top) 8px var(--dsh-composer-row-pad);
   min-width: 0;
   /* Size container so the chips inside can collapse to icon-only when the
      card runs out of row width (PermissionSelect @container rule). Anonymous
@@ -988,12 +992,18 @@
     --dsh-composer-send-seat: 92px;
   }
 
-  /* Send's centre is the row's line (council round 34 A2): the row's 8px bottom pad plus half its 32px model chip, so a
-     28px Send sits 10px up and a touch screen's 32px Send 8px up (below). */
+  /* Send's centre is the row's line (council round 34 A2): the row's bottom pad plus half its line, so a 28px Send sits
+     10px up and a touch screen's 32px Send 8px up (below). Council round 35 P1: a subagent's bar has no model chip, so its
+     line was the 28px + control and Stop sat 2px above it; the row now holds its line at the model chip's 32px whatever
+     it shows, and the offset is derived from that line and the pad, not a constant. */
+  .row {
+    min-height: calc(var(--dsh-composer-row-pad-top) + var(--dsh-composer-row-line) + var(--dsh-composer-row-pad));
+  }
+
   .send {
     position: absolute;
     right: 8px;
-    bottom: 10px;
+    bottom: calc(var(--dsh-composer-row-pad) + (var(--dsh-composer-row-line) - 28px) / 2);
     z-index: 1;
   }
 
@@ -1026,7 +1036,7 @@
 @media (pointer: coarse) {
   @container (max-width: 560px) {
     .send {
-      bottom: 8px;
+      bottom: calc(var(--dsh-composer-row-pad) + (var(--dsh-composer-row-line) - 32px) / 2);
     }
   }
 }
@@ -1052,7 +1062,7 @@
 @media (pointer: coarse) {
   @container (max-width: 560px) {
     .row {
-      padding-top: 8px;
+      --dsh-composer-row-pad-top: 8px;
       margin-top: -8px;
     }
 

@@ -28,7 +28,8 @@ const coarse = (selector: string, context = '') =>
 describe('composer touch targets on a coarse pointer', () => {
   it('leaves room above the chips inside the scrolling bar without moving it', () => {
     const row = coarse('.row', '(max-width: 560px)')
-    expect(row.some(block => /padding-top:\s*8px/.test(block.body) && /margin-top:\s*-8px/.test(block.body))).toBe(true)
+    // The pad rides the row's own top-pad property (council round 35 P1), which its padding and its line floor read.
+    expect(row.some(block => /(?:padding-top|--dsh-composer-row-pad-top):\s*8px/.test(block.body) && /margin-top:\s*-8px/.test(block.body))).toBe(true)
   })
 
   it('lets + win the strip it shares with the chip beside it', () => {
