@@ -91,7 +91,14 @@ export const EffortControl = (props: {
     [],
   )
   useEffect(() => () => committer.dispose(), [committer])
-  if (props.efforts.length === 0) return null
+  // Round 4 T15: a model without levels says so, rather than the section vanishing between models.
+  if (props.efforts.length === 0)
+    return (
+      <section aria-label="Reasoning effort" className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-effort data-model-effort-none>
+        <h3 className="dshx:text-xs dshx:font-medium">Reasoning effort</h3>
+        <p className="dshx:text-xs dshx:text-muted-foreground">No reasoning levels</p>
+      </section>
+    )
 
   const segments: readonly Segment[] = [
     // Round 4 T4: the accessible name contains the visible word (WCAG 2.5.3).

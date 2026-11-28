@@ -41,8 +41,11 @@ describe('reasoning effort is a discrete, truthful choice (council picker C1)', 
     expect(text(render('medium'))).toContain('Reasoning effort · Medium')
   })
 
-  it('is hidden when the model has no levels', () => {
-    expect(render(undefined, [])).toBe('')
+  it('says "No reasoning levels" when the model has none, with no radio group (round 4 T15)', () => {
+    const html = render(undefined, [])
+    expect(text(html)).toBe('Reasoning effortNo reasoning levels')
+    expect(html).not.toContain('role="radiogroup"')
+    expect(/<p[^>]*>No reasoning levels<\/p>/u.exec(html)?.[0]).toContain('dshx:text-muted-foreground')
   })
 })
 
