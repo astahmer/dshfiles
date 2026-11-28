@@ -38,6 +38,11 @@ export interface RegisteredProject {
   readonly canonicalPath: string
   readonly isJjWorkspace?: boolean
   readonly removable?: boolean
+  /**
+   * `folder`: an entry that is not a project folder (the Host's No folder) draws a neutral folder mark instead of the
+   * project's coloured letters (council round 35 P3).
+   */
+  readonly mark?: 'folder'
 }
 
 export interface DirectoryListing {
@@ -108,12 +113,13 @@ export interface PickerAddAction {
   readonly onSelect: () => void
 }
 
-const optionClassName = (active: boolean): string =>
-  cn(
-    // `min-w-0`: a row gives way to its remove button instead of scrolling the list sideways (council round 34 A1).
-    'dshx:flex dshx:w-full dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-left dshx:outline-none',
-    active && 'dshx:bg-accent dshx:text-accent-foreground',
-  )
+// `min-w-0`: a row gives way to its remove button instead of scrolling the list sideways (council round 34 A1).
+const optionClassName =
+  'dshx:flex dshx:w-full dshx:min-w-0 dshx:cursor-pointer dshx:items-center dshx:gap-3 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-left dshx:outline-none'
+
+/** A list row: its option and its trailing control. The highlight fills the whole row, the control's column included. */
+const rowClassName = (active: boolean): string =>
+  cn('dshx:flex dshx:items-center dshx:gap-1 dshx:rounded-md', active && 'dshx:bg-accent dshx:text-accent-foreground')
 
 const listClassName = 'dshx:flex dshx:max-h-[min(420px,55vh)] dshx:min-h-12 dshx:flex-col dshx:gap-0.5 dshx:overflow-y-auto dshx:px-2 dshx:pb-2'
 
@@ -349,6 +355,9 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
   }
 
   const title = props.heading ?? (props.mode === 'directories' ? 'Choose a folder' : 'Choose a project or folder')
+  const addActions = props.addActions ?? []
+  // Browsing a folder, the breadcrumb row has room at its end: a narrow sheet's Add sits there, not alone on a line.
+  const crumbsHoldAdd = pathMode && listing !== null && addActions.length > 0
 
   return (
     <>
@@ -432,58 +441,67 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                 Browse…
               </Button>
             )}
-            {props.addActions === undefined || props.addActions.length === 0 ? null : <PickerAddActions actions={props.addActions} />}
+            {addActions.length === 0 ? null : (
+              <>
+                <PickerAddButtons actions={addActions} />
+                {/* While browsing, a narrow sheet's Add ends the breadcrumb row instead (council round 35 P3). */}
+                {crumbsHoldAdd ? null : <PickerAddMenu actions={addActions} />}
+              </>
+            )}
           </div>
           {pathMode ? (
             <>
               {listing !== null && (
-                <div
-                  aria-label="Folder path"
-                  className="dshx:flex dshx:items-center dshx:gap-0.5 dshx:overflow-x-auto dshx:border-b dshx:px-2 dshx:py-1.5"
-                  role="navigation"
-                >
-                  <Button
-                    aria-label="Up one folder"
-                    className="dshx:size-7 dshx:shrink-0 dshx:p-0"
-                    disabled={parentPath === null}
-                    onClick={() => browse(parentPath ?? undefined)}
-                    size="sm"
-                    type="button"
-                    variant="ghost"
+                <div className="dshx:flex dshx:items-center dshx:gap-1 dshx:border-b dshx:pr-2">
+                  <div
+                    aria-label="Folder path"
+                    className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-0.5 dshx:overflow-x-auto dshx:px-2 dshx:py-1.5"
+                    role="navigation"
                   >
-                    <ArrowUpIcon aria-hidden className="dshx:size-4" />
-                  </Button>
-                  <TooltipProvider>
-                    {ProjectFolderPickerModel.visibleCrumbs(listing.crumbs).map((crumb, index, crumbs) => (
-                      <span className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-0.5" key={crumb.path}>
-                        {index > 0 && <ChevronRightIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" />}
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <button
-                              aria-current={index === crumbs.length - 1 ? 'page' : undefined}
-                              className={cn(
-                                'dshx:max-w-40 dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
-                                index === crumbs.length - 1 ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground',
-                              )}
-                              onClick={() => browse(crumb.path)}
-                              type="button"
-                            >
-                              {crumb.name}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom">{crumb.path}</TooltipContent>
-                        </Tooltip>
-                      </span>
-                    ))}
-                  </TooltipProvider>
+                    <Button
+                      aria-label="Up one folder"
+                      className="dshx:size-7 dshx:shrink-0 dshx:p-0"
+                      disabled={parentPath === null}
+                      onClick={() => browse(parentPath ?? undefined)}
+                      size="sm"
+                      type="button"
+                      variant="ghost"
+                    >
+                      <ArrowUpIcon aria-hidden className="dshx:size-4" />
+                    </Button>
+                    <TooltipProvider>
+                      {ProjectFolderPickerModel.visibleCrumbs(listing.crumbs).map((crumb, index, crumbs) => (
+                        <span className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-center dshx:gap-0.5" key={crumb.path}>
+                          {index > 0 && <ChevronRightIcon aria-hidden className="dshx:size-3 dshx:shrink-0 dshx:text-muted-foreground" />}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                aria-current={index === crumbs.length - 1 ? 'page' : undefined}
+                                className={cn(
+                                  'dshx:max-w-40 dshx:truncate dshx:rounded-sm dshx:px-1.5 dshx:py-1 dshx:text-xs dshx:outline-none dshx:hover:bg-accent dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring',
+                                  index === crumbs.length - 1 ? 'dshx:font-medium dshx:text-foreground' : 'dshx:text-muted-foreground',
+                                )}
+                                onClick={() => browse(crumb.path)}
+                                type="button"
+                              >
+                                {crumb.name}
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">{crumb.path}</TooltipContent>
+                          </Tooltip>
+                        </span>
+                      ))}
+                    </TooltipProvider>
+                  </div>
+                  {crumbsHoldAdd ? <PickerAddMenu actions={addActions} /> : null}
                 </div>
               )}
               <div aria-busy={listingQuery.isFetching} aria-label="Folders" className={cn(listClassName, listing === null && 'dshx:pt-2')} role="listbox">
                 {folderEntries.map((entry, index) => (
-                  <div className="dshx:flex dshx:items-center" key={entry.path} role="none">
+                  <div className={rowClassName(index === selectedIndex)} key={entry.path} role="none">
                     <button
                       aria-selected={index === selectedIndex}
-                      className={cn(optionClassName(index === selectedIndex), 'dshx:flex-1')}
+                      className={cn(optionClassName, 'dshx:flex-1')}
                       onClick={() => setSelectedIndex(index)}
                       onDoubleClick={() => browse(entry.path)}
                       role="option"
@@ -492,7 +510,10 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
                       <FolderIcon aria-hidden className="dshx:size-4 dshx:shrink-0 dshx:text-muted-foreground" />
                       <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col">
                         <span className="dshx:truncate dshx:text-sm">{entry.name}</span>
-                        <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{entry.path}</span>
+                        {/* A folder in the open folder needs no path: the breadcrumbs say it (council round 35 P3). */}
+                        {ProjectFolderPickerModel.isDirectChild(entry.path, listing?.path) ? null : (
+                          <span className="dshx:truncate dshx:font-mono dshx:text-xs dshx:text-muted-foreground">{entry.path}</span>
+                        )}
                       </span>
                       {entry.hidden && <Badge variant="muted">Hidden</Badge>}
                     </button>
@@ -674,43 +695,45 @@ export const ProjectFolderPicker = (props: ProjectFolderPickerProps): JSX.Elemen
 
 /**
  * The caller's ways to add a project. A wide pane shows them as buttons; a narrow one (a phone sheet) folds them into
- * one Add menu on the scope's line, so the header keeps the sheet's width (council round 34 A1).
+ * one Add menu on the scope's line, so the header keeps the sheet's width (council round 34 A1), or at the end of the
+ * breadcrumb row while browsing (council round 35 P3).
  */
-const PickerAddActions = (props: { readonly actions: readonly PickerAddAction[] }): JSX.Element => (
-  <>
-    <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:@max-pane-narrow:hidden" data-picker-add="buttons">
+const PickerAddButtons = (props: { readonly actions: readonly PickerAddAction[] }): JSX.Element => (
+  <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:@max-pane-narrow:hidden" data-picker-add="buttons">
+    {props.actions.map(action => (
+      <Button className="dshx:shrink-0" disabled={action.disabled === true} key={action.id} onClick={action.onSelect} size="sm" type="button" variant="outline">
+        {action.icon}
+        {action.label}
+      </Button>
+    ))}
+  </div>
+)
+
+const PickerAddMenu = (props: { readonly actions: readonly PickerAddAction[] }): JSX.Element => (
+  <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <Button
+        aria-label="Add a project"
+        className="dshx:hidden dshx:@max-pane-narrow:ml-auto dshx:@max-pane-narrow:inline-flex dshx:pointer-coarse:h-11"
+        data-picker-add="menu"
+        size="sm"
+        type="button"
+        variant="outline"
+      >
+        <PlusIcon aria-hidden />
+        Add
+        <ChevronDownIcon aria-hidden />
+      </Button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="end" className="dshx-root">
       {props.actions.map(action => (
-        <Button className="dshx:shrink-0" disabled={action.disabled === true} key={action.id} onClick={action.onSelect} size="sm" type="button" variant="outline">
+        <DropdownMenuItem className="dshx:pointer-coarse:min-h-11" disabled={action.disabled === true} key={action.id} onSelect={action.onSelect}>
           {action.icon}
           {action.label}
-        </Button>
+        </DropdownMenuItem>
       ))}
-    </div>
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          aria-label="Add a project"
-          className="dshx:hidden dshx:@max-pane-narrow:ml-auto dshx:@max-pane-narrow:inline-flex dshx:pointer-coarse:h-11"
-          data-picker-add="menu"
-          size="sm"
-          type="button"
-          variant="outline"
-        >
-          <PlusIcon aria-hidden />
-          Add
-          <ChevronDownIcon aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="dshx-root">
-        {props.actions.map(action => (
-          <DropdownMenuItem className="dshx:pointer-coarse:min-h-11" disabled={action.disabled === true} key={action.id} onSelect={action.onSelect}>
-            {action.icon}
-            {action.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  </>
+    </DropdownMenuContent>
+  </DropdownMenu>
 )
 
 /**
@@ -750,16 +773,25 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
   const title = props.entry.kind === 'project' ? props.entry.project.title : (props.entry.path.split('/').filter(Boolean).at(-1) ?? props.entry.path)
   const path = props.entry.kind === 'project' ? props.entry.project.canonicalPath : props.entry.path
   return (
-    <div aria-label={title} className="dshx:flex dshx:items-center dshx:gap-1" role="group">
+    <div aria-label={title} className={rowClassName(props.active)} role="group">
       <button
         aria-selected={props.active}
-        className={optionClassName(props.active)}
+        className={optionClassName}
         onClick={props.onSelect}
         onMouseEnter={props.onHover}
         role="option"
         type="button"
       >
-        {props.entry.kind === 'project' ? (
+        {props.entry.kind === 'project' && props.entry.project.mark === 'folder' ? (
+          // Not a project folder (No folder): a neutral folder mark, not coloured letters (council round 35 P3).
+          <span
+            aria-hidden
+            className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:bg-muted dshx:text-muted-foreground"
+            data-picker-folder-mark=""
+          >
+            <FolderIcon className="dshx:size-3.5" />
+          </span>
+        ) : props.entry.kind === 'project' ? (
           // The kit's project mark (council round 34 A1): the letters and colour the thread list, the tabs and the
           // composer's headline draw for this project, at the row's 28px seat.
           <ProjectMark
@@ -794,7 +826,8 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
       {props.onRemove !== undefined && (
         <Button
           aria-label={`Remove ${title} from known projects`}
-          className="dshx:size-8 dshx:shrink-0 dshx:px-0"
+          // Secondary ink at rest, a 14px glyph (council round 35 P3); the kit icon size keeps its 44pt touch area.
+          className="dshx:size-8 dshx:shrink-0 dshx:px-0 dshx:text-muted-foreground"
           onClick={event => {
             event.stopPropagation()
             props.onRemove?.()
@@ -803,7 +836,7 @@ const PickerEntryRow = (props: PickerEntryRowProps): JSX.Element => {
           type="button"
           variant="ghost"
         >
-          <XIcon aria-hidden className="dshx:size-4" />
+          <XIcon aria-hidden className="dshx:size-3.5" />
         </Button>
       )}
     </div>

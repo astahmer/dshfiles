@@ -204,7 +204,7 @@ export const HeroWorkspacePicker = (
   // workspaces are not projects: the run row's Workspace segment offers them as "Share a thread's workspace".
   const hostProjects = (projects.data?.projects ?? []).filter(project => !NoFolderWorkspace.isScratchWorkspace(project))
   const registered: RegisteredProject[] = [
-    { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder', removable: false },
+    { workspaceId: NO_FOLDER_ID, title: props.t('noFolder'), canonicalPath: '~/.dsh/no-folder', removable: false, mark: 'folder' },
     ...hostProjects.map(project => ({ workspaceId: project.workspaceId, title: project.title, canonicalPath: project.path })),
   ]
   // Read once per open rather than subscribed: every Session event would otherwise re-render the destination bar.

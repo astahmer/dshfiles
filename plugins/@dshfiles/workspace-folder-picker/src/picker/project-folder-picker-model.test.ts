@@ -264,4 +264,16 @@ describe('project and folder selection', () => {
     ]
     expect(ProjectFolderPickerModel.visibleCrumbs(crumbs).map(crumb => crumb.name)).toEqual(['/', 'ghostty'])
   })
+
+  // Council round 35 P3: a folder listed in the open folder drops the path the breadcrumbs already show.
+  it('knows a folder that sits directly in another', () => {
+    expect(ProjectFolderPickerModel.isDirectChild('/srv/projects/api', '/srv/projects')).toBe(true)
+    expect(ProjectFolderPickerModel.isDirectChild('/srv/projects/api', '/srv/projects/')).toBe(true)
+    expect(ProjectFolderPickerModel.isDirectChild('/.local', '/')).toBe(true)
+    expect(ProjectFolderPickerModel.isDirectChild('/srv/projects/api/src', '/srv/projects')).toBe(false)
+    expect(ProjectFolderPickerModel.isDirectChild('/srv/projects', '/srv/projects')).toBe(false)
+    expect(ProjectFolderPickerModel.isDirectChild('/srv/projectsX/api', '/srv/projects')).toBe(false)
+    expect(ProjectFolderPickerModel.isDirectChild('C:\\Users\\dana\\code', 'C:\\Users\\dana')).toBe(true)
+    expect(ProjectFolderPickerModel.isDirectChild('/srv/projects/api', undefined)).toBe(false)
+  })
 })

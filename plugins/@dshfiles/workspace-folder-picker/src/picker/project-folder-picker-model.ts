@@ -109,6 +109,17 @@ export class ProjectFolderPickerModel {
     return normalizedPath.startsWith(prefix)
   }
 
+  /** Whether `path` sits directly in `parentPath` (one level down), so a row in that folder's listing needs no path. */
+  static readonly isDirectChild = (path: string, parentPath: string | undefined): boolean => {
+    if (parentPath === undefined) return false
+    const style = ProjectFolderPickerModel.pathStyleOf(parentPath)
+    const prefix = childPrefix(comparisonPath(parentPath, style))
+    const normalizedPath = comparisonPath(path, style)
+    if (!normalizedPath.startsWith(prefix)) return false
+    const rest = normalizedPath.slice(prefix.length)
+    return rest.length > 0 && !rest.includes('/')
+  }
+
   static readonly initialBrowseTarget = (mode: 'projects' | 'directories' | undefined): { readonly path: undefined } | null =>
     mode === 'directories' ? { path: undefined } : null
 
