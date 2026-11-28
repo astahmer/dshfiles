@@ -24,7 +24,14 @@ const KIT_MARK_TONE = 'dshx:brightness-85 dshx:dark:brightness-100'
  * when the family is unknown. The kit mark is always 16 px; `className` sizes the picker's own artwork.
  */
 export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey | undefined; readonly name: string; readonly className?: string }) => {
-  if (brand !== undefined && modelFamily(brand) !== undefined) return <ModelMark modelId={brand} className={KIT_MARK_TONE} />
+  // Round 4 T2: the kit mark is always 16 px, so `className` places a box around it (it was dropped, and the details
+  // header's alignment offset never landed).
+  if (brand !== undefined && modelFamily(brand) !== undefined)
+    return (
+      <span className={cn('dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center', className)} data-model-brand-box>
+        <ModelMark modelId={brand} className={KIT_MARK_TONE} />
+      </span>
+    )
   if (brand === undefined)
     return (
       <span

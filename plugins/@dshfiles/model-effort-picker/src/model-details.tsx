@@ -112,7 +112,7 @@ export const ModelDetails = (props: {
             <BrandMark brand={ModelPickerModel.brandFor({ model })} className="dshx:size-[18px] dshx:pointer-coarse:mt-[13px]" name={name} />
             {/* N1: the model on its own line (15 px (text-heading) / 600, up to two lines), the service and account below it. */}
             {/* Round 3 R13: on touch the title first line centres on the 44 pt Back and Close boxes beside it. */}
-            <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5 dshx:pointer-coarse:pt-3">
+            <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:flex-col dshx:gap-0.5 dshx:pointer-coarse:pt-[13.5px]">
               <h2 className="dshx:line-clamp-2 dshx:text-heading dshx:leading-tight dshx:font-semibold dshx:break-words" data-model-picker-current>
                 {name}
               </h2>

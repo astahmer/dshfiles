@@ -419,14 +419,15 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 className={cn(
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
                   catalogEmpty && 'dshx:w-full',
-                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:px-2',
+                  // Round 4 T2: on the phone the panes start at the sheet's top, so their 44 pt header line meets Close's.
+                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:px-2 dshx:@max-pane-compact:pt-0',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
               >
-                {/* Round 3 R16: on a phone the list has the same 48 pt header as details (the title here; Close is the
+                {/* Round 3 R16: on a phone the list has the same 44 pt header line as details (the title here; Close is the
                     picker's one Close at the top right). There is nothing to go back to from the list, so no Back. */}
                 <header
-                  className="dshx:hidden dshx:min-h-12 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex"
+                  className="dshx:hidden dshx:min-h-11 dshx:shrink-0 dshx:items-center dshx:pr-12 dshx:@max-pane-compact:flex"
                   data-model-picker-list-header
                 >
                   <h2 className="dshx:text-heading dshx:font-semibold">Choose a model</h2>
@@ -591,7 +592,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
               <div
                 className={cn(
                   'dshx:flex dshx:w-80 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:border-l dshx:border-border dshx:p-2.5 dshx:outline-none',
-                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:px-2',
+                  'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:border-l-0 dshx:@max-pane-compact:px-2 dshx:@max-pane-compact:pt-0',
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
                   catalogEmpty && 'dshx:hidden',
                   several && 'dshx:@max-pane-compact:hidden',
@@ -669,7 +670,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   (beside the details title on desktop, the sheet header on a phone). */}
               <button
                 aria-label="Close model picker"
-                className="dshx:absolute dshx:top-2.5 dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11 dshx:@max-pane-compact:top-0.5 dshx:@max-pane-compact:right-0"
+                className="dshx:absolute dshx:top-2.5 dshx:right-2.5 dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:size-11 dshx:@max-pane-compact:top-0 dshx:@max-pane-compact:right-0"
                 data-model-picker-close
                 onClick={() => setOpen(false)}
                 type="button"

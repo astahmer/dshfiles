@@ -49,9 +49,9 @@ describe('phone picker is one sheet, list then details in place (council picker 
     expect(tagOf(picker, '<PopoverContent')).toContain('dshx:in-[html[data-shell-phone-nav]]:bg-popover!')
   })
 
-  it('gives the phone list view the same 48 pt header as details, title and Close (round 3 R16)', () => {
+  it('gives the phone list view the same 44 pt header line as details, title and Close (round 3 R16)', () => {
     const header = tagOf(picker, 'data-model-picker-list-header')
-    expect(header).toMatch(/dshx:hidden dshx:min-h-12[^"]*dshx:@max-pane-compact:flex/u)
+    expect(header).toMatch(/dshx:hidden dshx:min-h-11[^"]*dshx:@max-pane-compact:flex/u)
     expect(header).toMatch(/dshx:pr-12/u)
     expect(picker.indexOf('data-model-picker-list-header')).toBeLessThan(picker.indexOf('<SearchInput'))
     expect(picker).toMatch(/data-model-picker-list-header\s*>\s*<h2[^>]*>Choose a model<\/h2>/u)

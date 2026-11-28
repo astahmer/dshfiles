@@ -10,8 +10,11 @@ describe('the composer model mark through the kit (council round 18 C3)', () => 
     const element = mark(brand)
     // The kit's 16 px mark in the family's brand colour (BRAND_COLOURS; plugin-ui tests/route-model), never the
     // picker's own artwork, whose OpenAI mark took the label's ink through `currentColor`.
-    expect(element.type).toBe(ModelMark)
-    expect(element.props).toEqual({ modelId: brand, className: 'dshx:brightness-85 dshx:dark:brightness-100' })
+    // Round 4 T2: inside a box that takes the caller's className (size, offset), since the kit mark is always 16 px.
+    expect(element.type).toBe('span')
+    const inner = element.props.children
+    expect(inner.type).toBe(ModelMark)
+    expect(inner.props).toEqual({ modelId: brand, className: 'dshx:brightness-85 dshx:dark:brightness-100' })
   })
 
   it('keeps its own artwork for families the kit does not draw, and the initial for none', () => {
