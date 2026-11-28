@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "browser-panel",
+      "title": "See the browser agents drive",
+      "summary": "Agents › Browser (browse), also in the command palette and the New tab view chooser, reads `browse status --json` on the Host: CLI version, whether the relay runs, the extension and connected browsers, and the agent tabs. It never starts the relay, refreshes every pollIntervalMs while open, and says how to install browse when the CLI is missing. Agents read the same status with browse_status.",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Browser (browse)\"",
+        "click option \"Browser (browse)*\"",
+        "expect heading \"Browser (browse)\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Agents Configured agents and their messages.\"",
+        "click button \"Browser (browse)\"",
+        "expect heading \"Browser (browse)\""
+      ],
+      "surfaces": ["client", "host", "api", "tool", "settings"],
+      "surface": "destinationSection",
+      "destination": "agents",
+      "currentSurface": "Agents › Browser (browse); command palette and New tab › Browser (browse)",
+      "onboarding": {
+        "firstAction": "Open Browser (browse) from the command palette to see whether the relay and your browser are connected.",
+        "doneWhen": "The panel shows the browse version and your browser as connected.",
+        "open": {
+          "command": "@dshfiles/browse.open"
+        }
+      },
+      "configuration": [
+        {
+          "key": "command",
+          "defaultValue": "browse",
+          "constraints": "A program name looked up on PATH plus ~/.local/bin, ~/.nix-profile/bin, /etc/profiles/per-user/$USER/bin and the system profiles, or an absolute path.",
+          "coveredBy": ["browse.status-cli", "browse.not-installed"]
+        },
+        {
+          "key": "pollIntervalMs",
+          "defaultValue": "5000",
+          "constraints": "1000 to 60000 milliseconds; the panel polls at most every 2 s while a pairing code waits.",
+          "coveredBy": ["browse.status-cli"]
+        }
+      ],
+      "states": ["relay-running", "relay-stopped", "extension-connected", "extension-not-paired", "not-installed", "status-failed"],
+      "failureModes": [
+        "browse missing from every searched directory shows the install command (Nix or the curl installer) and the command setting to point at it.",
+        "A non-zero exit or unreadable status JSON shows the exit code and `browse status` to run in a terminal.",
+        "A stopped relay is reported as such; reading status never starts it."
+      ],
+      "externalDependencies": [
+        {
+          "id": "browse-cli",
+          "boundary": "The browse CLI (0.1.5) and its relay on 127.0.0.1:19988",
+          "deterministicFake": "tests/browse-cli.test.ts puts a shell-script browse on PATH that answers with captured 0.1.5 output; parsers run on captured status and pair --list output."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "browse.status-cli",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "reads the relay from the browse on PATH, runs only `status --json` and records one span"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.not-installed",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "says browse is not installed, with the install recovery, when the command is nowhere"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.status-running",
+          "file": "plugins/@dshfiles/browse/tests/model.test.ts",
+          "testName": "reads a running relay with a connected browser and no tabs"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.status-stopped",
+          "file": "plugins/@dshfiles/browse/tests/model.test.ts",
+          "testName": "reads a stopped relay without inventing browsers or tabs"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "browse.browser-journey",
+          "reason": "The panel depends on a real browse CLI and relay on the machine; it is proven in a scratch DSH with dshx dev and the screenshot in docs/screenshots, not in the hermetic e2e suite."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "browse status",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "reads the relay from the browse on PATH, runs only `status --json` and records one span"
+        }
+      ]
+    },
+    {
+      "id": "browser-pairing",
+      "title": "Pair a browser with a one-time code",
+      "summary": "Pair a browser runs `browse pair --wait-seconds 600` on the Host and shows its one-time code large with a copy button and where to enter it (Extensions → browse → Options). The process keeps waiting Host-side; the panel then shows paired, expired, failed or cancelled. One pairing runs at a time: starting again returns the same code, Cancel stops it. Paired browsers are listed from `browse pair --list` and can be unpaired after a confirmation. Agents get browse_pair_start, browse_pair_cancel, browse_pairings and browse_pairing_revoke (confirm: true required).",
+      "reach": [
+        "click button \"Open command palette\"",
+        "fill combobox \"Search the command palette\" \"Browser (browse)\"",
+        "click option \"Browser (browse)*\"",
+        "expect text \"Pair a browser\""
+      ],
+      "reachNarrow": [
+        "click button \"More\"",
+        "click button \"Agents Configured agents and their messages.\"",
+        "click button \"Browser (browse)\"",
+        "expect text \"Pair a browser\""
+      ],
+      "surfaces": ["client", "host", "api", "tool"],
+      "surface": "destinationSection",
+      "destination": "agents",
+      "currentSurface": "Agents › Browser (browse) › Pair a browser and Paired browsers",
+      "configuration": [],
+      "states": ["idle", "pending", "paired", "expired", "failed", "cancelled", "unpaired"],
+      "failureModes": [
+        "browse pair exiting before it prints a code, or printing none within 20 s, fails the start with `browse pair` to run in a terminal.",
+        "A code nobody redeems within 10 minutes ends as expired, with Pair another browser for a fresh one.",
+        "Unpairing a browser that is no longer paired answers not unpaired and asks to list again.",
+        "A DSH restart drops the waiting process; the code then cannot complete and a new pairing is needed."
+      ],
+      "externalDependencies": [
+        {
+          "id": "browse-cli",
+          "boundary": "The browse CLI pair verbs and the browser extension that redeems the code",
+          "deterministicFake": "tests/browse-cli.test.ts drives pair through a fake browse whose mode file selects paired, expired, waiting or no-code runs."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "browse.pair-paired",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "returns the code at once, then reports the paired browser"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.pair-expired",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "reports an expired code when no browser redeemed it"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.pair-single-cancel",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "keeps one pairing at a time, cancels it, and can start again"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.pair-no-code",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "fails with a recovery when browse pair prints no code"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.pair-list-revoke",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "lists paired browsers and unpairs only a browser that exists"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.pair-output",
+          "file": "plugins/@dshfiles/browse/tests/model.test.ts",
+          "testName": "lists paired browsers from browse pair --list"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "browse.pairing-journey",
+          "reason": "Pairing needs the real browse CLI, its relay and a browser extension to redeem the code; the scratch DSH run with the real CLI and the pairing screenshot cover it instead of the hermetic e2e suite."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "automatic",
+          "source": "api-dispatch"
+        },
+        {
+          "kind": "automatic",
+          "source": "agent-tool"
+        },
+        {
+          "kind": "custom",
+          "span": "browse pair",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "returns the code at once, then reports the paired browser"
+        },
+        {
+          "kind": "custom",
+          "span": "browse pair list",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "lists paired browsers and unpairs only a browser that exists"
+        }
+      ]
+    },
+    {
+      "id": "handoff-attention",
+      "title": "Tabs waiting on you reach the Inbox",
+      "summary": "When an agent's browse call waits on a person (sign-in, captcha, 2FA), each waiting tab becomes a blocking Inbox item with the agent's message, resolved once the call continues, and the panel header shows how many tabs wait. The Host reads `browse status --json` every pollIntervalMs only while notifyHandoffs is on (off by default, since it spends Host time without an agent asking); turning it off resolves the open items and stops the check. It runs the local CLI only and spends no tokens.",
+      "surfaces": ["host", "integration", "settings"],
+      "surface": "attentionProvider",
+      "destination": "inbox",
+      "currentSurface": "Inbox › Needs you (source browse.handoff); Browser (browse) header badge",
+      "configuration": [
+        {
+          "key": "notifyHandoffs",
+          "defaultValue": "false",
+          "constraints": "Boolean; off stops the background status check and resolves open handoff items.",
+          "choices": ["true", "false"],
+          "coveredBy": ["browse.handoff-drafts"]
+        },
+        {
+          "key": "pollIntervalMs",
+          "defaultValue": "5000",
+          "constraints": "1000 to 60000 milliseconds between background checks.",
+          "coveredBy": ["browse.handoff-drafts"]
+        }
+      ],
+      "states": ["watching", "off", "inbox-missing"],
+      "failureModes": [
+        "Without the activity-timeline Inbox loaded, nothing is published; the panel badge still counts waiting tabs.",
+        "A failed status read keeps the previous Inbox items until the next successful check."
+      ],
+      "externalDependencies": [
+        {
+          "id": "browse-cli",
+          "boundary": "browse status --json tabs with a handoff",
+          "deterministicFake": "tests/model.test.ts maps a status fixture with a waiting tab (shape from the relay's tab summaries) to Inbox drafts."
+        }
+      ],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "browse.handoff-drafts",
+          "file": "plugins/@dshfiles/browse/tests/model.test.ts",
+          "testName": "turns each waiting tab into one blocking item about its page"
+        },
+        {
+          "kind": "unit-test",
+          "id": "browse.handoff-status",
+          "file": "plugins/@dshfiles/browse/tests/model.test.ts",
+          "testName": "reports tabs waiting on the user with their handoff message and start"
+        },
+        {
+          "kind": "not-applicable",
+          "id": "browse.handoff-journey",
+          "reason": "A handoff needs an agent blocked in a real browser tab through the relay; the Inbox items are covered by the draft mapping test and the Inbox's own journeys."
+        }
+      ],
+      "telemetry": [
+        {
+          "kind": "custom",
+          "span": "browse status",
+          "file": "plugins/@dshfiles/browse/tests/browse-cli.test.ts",
+          "testName": "reads the relay from the browse on PATH, runs only `status --json` and records one span"
+        }
+      ]
+    }
+  ]
+}

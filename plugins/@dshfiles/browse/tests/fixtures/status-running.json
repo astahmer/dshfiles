@@ -1,0 +1,55 @@
+{
+  "connected": true,
+  "pairingState": "connected",
+  "nextStep": null,
+  "relay": {
+    "version": "0.1.5",
+    "endpoint": "http://127.0.0.1:19988",
+    "instanceId": "00000000000000000000000000000000",
+    "startedAt": "2026-11-24T15:21:05.754Z",
+    "pid": 42964
+  },
+  "extension": {
+    "connected": true,
+    "pairingState": "connected",
+    "version": "0.1.5",
+    "build": "2026-11-17T23:01:22.524Z",
+    "origin": "chrome-extension://mfnicocicmmlkpjnaffgihfjhdgjkdjg",
+    "protocolVersion": 3,
+    "protocolCompatible": true,
+    "protocolLegacy": false,
+    "reconnecting": false,
+    "browsers": [
+      {
+        "id": "brave-clements-macbook-pro",
+        "name": "Brave on Clements-MacBook-Pro",
+        "default": true,
+        "connected": true,
+        "version": "0.1.5",
+        "tabs": 0
+      }
+    ],
+    "pairingFailures": 0,
+    "activeTargets": 0
+  },
+  "tabs": [],
+  "autoUpdate": {
+    "install": "binary",
+    "method": "binary",
+    "updateCommand": "browse update",
+    "cli": "browse",
+    "mode": "on",
+    "effective": "on",
+    "version": "0.1.5",
+    "channel": "stable",
+    "checkedAt": "2026-11-24T15:21:06.183Z"
+  },
+  "setup": {
+    "installed": true,
+    "version": "0.1.5",
+    "executable": "/Users/me/.local/bin/browse",
+    "mcp": null,
+    "agents": [],
+    "updates": "automatic (stable channel)"
+  }
+}

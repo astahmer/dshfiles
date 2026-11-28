@@ -117,6 +117,12 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "features": 1
     },
     {
+      "name": "browse",
+      "description": "Companion panel for the browse CLI: relay and extension status, browser pairing, paired browsers and agent tabs that wait on you.",
+      "ui": true,
+      "features": 3
+    },
+    {
       "name": "btw",
       "description": "/btw opens a side chat about the current thread: a cache-friendly fork in a right-sidebar panel, archived on close.",
       "ui": true,
@@ -648,7 +654,7 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "name": "tool-subagent",
       "description": "Owned fork of DSH's subagent delegation tool whose model-selection policy follows the saved setting in running Sessions",
       "ui": false,
-      "features": 2
+      "features": 3
     },
     {
       "name": "traces",
@@ -10955,6 +10961,164 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         }
       ],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "browse#browser-panel",
+      "plugin": "browse",
+      "id": "browser-panel",
+      "title": "See the browser agents drive",
+      "summary": "Agents › Browser (browse), also in the command palette and the New tab view chooser, reads `browse status --json` on the Host: CLI version, whether the relay runs, the extension and connected browsers, and the agent tabs. It never starts the relay, refreshes every pollIntervalMs…",
+      "destination": "agents",
+      "currentSurface": "Agents › Browser (browse); command palette and New tab › Browser (browse)",
+      "reach": [
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Browser (browse)\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Browser (browse)"
+        },
+        {
+          "text": "click option \"Browser (browse)*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Browser (browse)*",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Browser (browse)\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Browser (browse)",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents Configured agents and their messages.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents Configured agents and their messages.",
+          "value": null
+        },
+        {
+          "text": "click button \"Browser (browse)\"",
+          "action": "click",
+          "by": "button",
+          "name": "Browser (browse)",
+          "value": null
+        },
+        {
+          "text": "expect heading \"Browser (browse)\"",
+          "action": "expect",
+          "by": "heading",
+          "name": "Browser (browse)",
+          "value": null
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open Browser (browse) from the command palette to see whether the relay and your browser are connected.",
+        "doneWhen": "The panel shows the browse version and your browser as connected.",
+        "open": {
+          "command": "@dshfiles/browse.open"
+        }
+      }
+    },
+    {
+      "key": "browse#browser-pairing",
+      "plugin": "browse",
+      "id": "browser-pairing",
+      "title": "Pair a browser with a one-time code",
+      "summary": "Pair a browser runs `browse pair --wait-seconds 600` on the Host and shows its one-time code large with a copy button and where to enter it (Extensions → browse → Options). The process keeps waiting Host-side; the panel then shows paired, expired, failed or cancelled. One pairin…",
+      "destination": "agents",
+      "currentSurface": "Agents › Browser (browse) › Pair a browser and Paired browsers",
+      "reach": [
+        {
+          "text": "click button \"Open command palette\"",
+          "action": "click",
+          "by": "button",
+          "name": "Open command palette",
+          "value": null
+        },
+        {
+          "text": "fill combobox \"Search the command palette\" \"Browser (browse)\"",
+          "action": "fill",
+          "by": "combobox",
+          "name": "Search the command palette",
+          "value": "Browser (browse)"
+        },
+        {
+          "text": "click option \"Browser (browse)*\"",
+          "action": "click",
+          "by": "option",
+          "name": "Browser (browse)*",
+          "value": null
+        },
+        {
+          "text": "expect text \"Pair a browser\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Pair a browser",
+          "value": null
+        }
+      ],
+      "reachNarrow": [
+        {
+          "text": "click button \"More\"",
+          "action": "click",
+          "by": "button",
+          "name": "More",
+          "value": null
+        },
+        {
+          "text": "click button \"Agents Configured agents and their messages.\"",
+          "action": "click",
+          "by": "button",
+          "name": "Agents Configured agents and their messages.",
+          "value": null
+        },
+        {
+          "text": "click button \"Browser (browse)\"",
+          "action": "click",
+          "by": "button",
+          "name": "Browser (browse)",
+          "value": null
+        },
+        {
+          "text": "expect text \"Pair a browser\"",
+          "action": "expect",
+          "by": "text",
+          "name": "Pair a browser",
+          "value": null
+        }
+      ],
+      "onboarding": null
+    },
+    {
+      "key": "browse#handoff-attention",
+      "plugin": "browse",
+      "id": "handoff-attention",
+      "title": "Tabs waiting on you reach the Inbox",
+      "summary": "When an agent's browse call waits on a person (sign-in, captcha, 2FA), each waiting tab becomes a blocking Inbox item with the agent's message, resolved once the call continues, and the panel header shows how many tabs wait. The Host reads `browse status --json` every pollInterv…",
+      "destination": "inbox",
+      "currentSurface": "Inbox › Needs you (source browse.handoff); Browser (browse) header badge",
+      "reach": [],
       "reachNarrow": null,
       "onboarding": null
     },
@@ -27380,6 +27544,18 @@ export const FEATURE_CATALOG: FeatureCatalog = {
       "summary": "The forked subagent tool declares an optional agent argument (a handle; constant schema, also without a provider). An agent registry providing @dshfiles/tool-subagent/agent-resolver decides the agent (argument, else the caller's default) or refuses it. The child gets the agent's…",
       "destination": "none",
       "currentSurface": "agent tools: subagent (agent argument), list_subagent_models (agent listing)",
+      "reach": [],
+      "reachNarrow": null,
+      "onboarding": null
+    },
+    {
+      "key": "tool-subagent#child-turn-guard",
+      "plugin": "tool-subagent",
+      "id": "child-turn-guard",
+      "title": "Keep a delegated child working when its turn hands the task back",
+      "summary": "A delegated child that ends a turn as completed while its closing text hands the task back (reassign, cannot complete, no implementation, unfinished, remains unverified, do not land, not implemented, hand back, take over) receives one continuing message at the loop's turn-stoppi…",
+      "destination": "none",
+      "currentSurface": "host: delegated child turns",
       "reach": [],
       "reachNarrow": null,
       "onboarding": null

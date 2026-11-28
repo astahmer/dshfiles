@@ -1,5 +1,5 @@
 {
-  "hostBundles": 90,
+  "hostBundles": 91,
   "hostPackages": [
     "@dshfiles/activity-timeline",
     "@dshfiles/agent-communication",
@@ -18,6 +18,7 @@
     "@dshfiles/backlog",
     "@dshfiles/backlog-jira",
     "@dshfiles/backlog-notion",
+    "@dshfiles/browse",
     "@dshfiles/capabilities-hub",
     "@dshfiles/command-palette",
     "@dshfiles/context-compaction",
@@ -92,12 +93,12 @@
     "@dshfiles/workspace-folder-picker",
     "@dshfiles/worktree-memory"
   ],
-  "apiMethods": 691,
-  "apiToolBindings": 488,
-  "apiToolNameCount": 488,
-  "apiToolSchemas": 487,
-  "definedTools": 25,
-  "tools": 512,
+  "apiMethods": 708,
+  "apiToolBindings": 502,
+  "apiToolNameCount": 502,
+  "apiToolSchemas": 501,
+  "definedTools": 26,
+  "tools": 527,
   "schemas": [
     {
       "name": "activity_timeline_attention",
@@ -377,6 +378,34 @@
       }
     },
     {
+      "name": "agents_project_default_set",
+      "description": "Set a DSH project's default agent, or clear it with handle null (threads then use @dsh). Threads started afterwards get it; running threads keep theirs. May run only when the user asked for that change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "handle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "handle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "agents_project_defaults",
+      "description": "The default agent of each DSH project (by project workspace id). A thread no agent started, in that project, gets it; projects without one use @dsh. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      }
+    },
+    {
       "name": "agents_remove",
       "description": "Remove one agent. Destructive: requires `confirm: true`, which is never implied by a bare request.",
       "parameters": {
@@ -478,6 +507,38 @@
                 ],
                 "additionalProperties": false
               },
+              "tools": {
+                "type": "object",
+                "properties": {
+                  "tools": {
+                    "type": "object",
+                    "properties": {}
+                  },
+                  "groups": {
+                    "type": "object",
+                    "properties": {}
+                  }
+                },
+                "required": [
+                  "tools",
+                  "groups"
+                ],
+                "additionalProperties": false
+              },
+              "subagents": {
+                "type": "object",
+                "properties": {
+                  "allowed": {},
+                  "default": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "allowed",
+                  "default"
+                ],
+                "additionalProperties": false
+              },
               "enabled": {
                 "type": "boolean"
               }
@@ -502,6 +563,107 @@
       }
     },
     {
+      "name": "agents_subagents_set",
+      "description": "Which agents this agent's subagents may run as ('any' or a list of handles) and the default one (null: the parent thread's agent). Reversible by setting the previous value. May run only when the user asked for that change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "subagents": {
+            "type": "object",
+            "properties": {
+              "allowed": {},
+              "default": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "allowed",
+              "default"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "agents_thread_access",
+      "description": "One thread's agent, how it was decided (explicit, inherited from a subagent's parent, the project default or the @dsh fallback), its override and the tool policy that results. recorded: false is a preview for a thread whose agent is not decided yet. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sessionId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "agents_thread_override_set",
+      "description": "Override one thread's tools with another agent's tools ({ kind: 'agent', handle }) or every tool ({ kind: 'all' }); null clears it. It applies from that thread's next model request, which loses its prompt cache once. May run only when the user asked for that change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "sessionId": {
+            "type": "string"
+          },
+          "override": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "agent"
+                    ]
+                  },
+                  "handle": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "kind",
+                  "handle"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "all"
+                    ]
+                  }
+                },
+                "required": [
+                  "kind"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "sessionId",
+          "override"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
       "name": "agents_threads",
       "description": "The threads one agent started, newest first, with their titles and start times. Read-only.",
       "parameters": {
@@ -515,6 +677,92 @@
           "handle"
         ],
         "additionalProperties": false
+      }
+    },
+    {
+      "name": "agents_tool_access_get",
+      "description": "One agent's tool access: sparse enabled/pinned entries per tool name and per group; every tool without an entry is enabled and deferred behind tool_search. Null when no agent has that handle. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "agents_tool_access_set",
+      "description": "Enable, disable, pin or unpin tools or whole groups for one agent; a tool entry beats its group entry. Threads started afterwards get it (a running thread keeps its tools; override it with agents_thread_override_set). Reversible: an edit with entry null removes that entry. May run only when the user asked for that change.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "handle": {
+            "type": "string"
+          },
+          "edits": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "target": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "tool",
+                        "group"
+                      ]
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "key"
+                  ],
+                  "additionalProperties": false
+                },
+                "entry": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "pinned": {
+                      "type": "boolean"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "target",
+                "entry"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "handle",
+          "edits"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "agents_tool_catalog",
+      "description": "Every tool this Host serves, grouped by MCP server (mcp:<server>), owning plugin (plugin:<package>) or DSH itself (native), with the first sentence of each description: the keys agents_tool_access_set takes. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
       }
     },
     {
@@ -759,7 +1007,8 @@
               "github-copilot",
               "cursor",
               "mistral",
-              "antigravity"
+              "antigravity",
+              "vibe"
             ]
           },
           "requestId": {
@@ -993,7 +1242,8 @@
               "github-copilot",
               "cursor",
               "mistral",
-              "antigravity"
+              "antigravity",
+              "vibe"
             ]
           },
           "requestId": {
@@ -1169,7 +1419,7 @@
     },
     {
       "name": "ai_accounts_save_account",
-      "description": "Save an account profile or change its enabled/model settings. Stores references and metadata only, never credential values. Call only when the user asked to edit that account.",
+      "description": "Save an account profile or change its enabled/model settings or Mistral Vibe bridge (draft.bridge: acp or headless). Stores references and metadata only, never credential values. Call only when the user asked to edit that account.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1189,7 +1439,8 @@
                   "github-copilot",
                   "cursor",
                   "mistral",
-                  "antigravity"
+                  "antigravity",
+                  "vibe"
                 ]
               },
               "displayName": {
@@ -1212,6 +1463,14 @@
                 "enum": [
                   "cli",
                   "reference"
+                ]
+              },
+              "bridge": {
+                "description": "Mistral Vibe only: acp bridges DSH tools; headless (default) runs the standalone CLI.",
+                "type": "string",
+                "enum": [
+                  "acp",
+                  "headless"
                 ]
               },
               "apiBaseUrl": {
@@ -1259,6 +1518,10 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "contextWindowOverrides": {
+                "type": "object",
+                "properties": {}
               },
               "useExtraUsage": {
                 "type": "boolean"
@@ -1322,6 +1585,30 @@
           "continuationId",
           "sessionId",
           "enabled"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "ai_accounts_set_context_window",
+      "description": "Set the context window (tokens) one account uses for one model, or null to restore the provider default. The value is clamped to the provider maximum shown by ai_accounts_catalog (maxContextWindow). A larger window changes when DSH compacts and how many tokens a request may carry. Call only when the user asked to change that window.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "instanceId": {
+            "type": "string"
+          },
+          "modelId": {
+            "type": "string"
+          },
+          "contextWindow": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "instanceId",
+          "modelId",
+          "contextWindow"
         ],
         "additionalProperties": false
       }
@@ -4465,6 +4752,67 @@
         "required": [
           "id"
         ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pair_cancel",
+      "description": "Stop the pairing in progress; its code stops being awaited. Run only when the user asked to cancel pairing.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pair_start",
+      "description": "Start pairing a browser with browse: returns a one-time code the user enters in the browse extension (Extensions → browse → Options → Pairing code), valid 10 minutes. Starts the relay if needed. A pairing already running returns its code. Run only when the user asked to pair a browser.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pairing_revoke",
+      "description": "Unpair one browser from browse (destructive: it disconnects until paired again with browse_pair_start). Run only when the user asked to unpair that browser; pass confirm: true, which is required.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "target": {
+            "description": "The paired browser to remove: its profile (the stable key from browse_pairings), id or name.",
+            "type": "string"
+          },
+          "confirm": {
+            "description": "Must be true: unpairing disconnects that browser until it is paired again.",
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "target",
+          "confirm"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_pairings",
+      "description": "List the browsers paired with browse: id, name, profile key, when paired and when last seen. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "browse_status",
+      "description": "Report the local browse setup: CLI version, whether its relay runs, the extension and connected browsers, agent tabs, tabs waiting on the user (handoff message and since when) and the pairing in progress. Never starts the relay. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
         "additionalProperties": false
       }
     },
@@ -11838,7 +12186,7 @@
     },
     {
       "name": "thread_create",
-      "description": "Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and optionally hand it its first message (text) in the same call: the thread's turn starts with that text instead of sitting idle, so no separate prompt call is needed. title applies when given; with only text the Host's automatic title stands, derived from that first message. Omitted text creates a blank thread, as before. A refused first message still returns the new thread id with prompt: 'refused' and the reason, so the created thread is never hidden. Call only when the user asked for this.",
+      "description": "Start a new thread in a project (projectId) or in a directory (cwd), which uses the project that owns it so the thread groups correctly, and optionally hand it its first message (text) in the same call: the thread's turn starts with that text instead of sitting idle, so no separate prompt call is needed. title applies when given; with only text the Host's automatic title stands, derived from that first message. Omitted text creates a blank thread, as before. Started by an Agent, the new thread reports back: each of its turn ends (finished, failed, or stopped on a question) sends the calling thread one compact notice with the status and an answer preview, waking it when idle; pass notifyCreator: false to opt out, thread_unsubscribe to stop later. A refused first message still returns the new thread id with prompt: 'refused' and the reason, so the created thread is never hidden. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -11856,6 +12204,9 @@
           },
           "text": {
             "type": "string"
+          },
+          "notifyCreator": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false
@@ -12079,7 +12430,7 @@
     },
     {
       "name": "thread_prompt",
-      "description": "Hand a message to one thread: queue (the default) adds it as the thread's next turn and starts that turn when the thread is idle, so it is how an Agent follows up on a thread it started; steer folds it into the turn already running, which the Host refuses when no turn is live. Defaults to the calling thread. Call only when the user asked for this.",
+      "description": "Hand a message to one thread: queue (the default) adds it as the thread's next turn and starts that turn when the thread is idle, so it is how an Agent follows up on a thread it started; steer folds it into the turn already running, which the Host refuses when no turn is live. Defaults to the calling thread. watch: true also subscribes the calling thread to that thread's turn ends (as thread_subscribe does), for a thread it did not create; a thread created with thread_create already reports back. Call only when the user asked for this.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -12095,6 +12446,9 @@
               "queue",
               "steer"
             ]
+          },
+          "watch": {
+            "type": "boolean"
           }
         },
         "required": [
@@ -12734,6 +13088,15 @@
     {
       "name": "thread_views_list",
       "description": "Read the thread list filter presets (saved views): their filters, order, the active preset, whether the list was edited since it was applied (`edited`, unsaved filters in `settings.draft`), the current project scope and control visibility. Read-only.",
+      "parameters": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "tool_search_access",
+      "description": "Show the calling thread's agent, why it applies (its own agent, a per-thread override, the project's default agent or the built-in default), the tools it pins and the tools it disables. Read-only. Change it with the agents_* tool-access tools, only when the user asked.",
       "parameters": {
         "type": "object",
         "properties": {},

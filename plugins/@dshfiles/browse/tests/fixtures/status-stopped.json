@@ -1,0 +1,14 @@
+{
+  "relay": {
+    "running": false,
+    "endpoint": "http://127.0.0.1:19988"
+  },
+  "setup": {
+    "installed": true,
+    "version": "0.1.5",
+    "executable": "/Users/me/.local/bin/browse",
+    "mcp": null,
+    "agents": [],
+    "updates": "automatic (stable channel)"
+  }
+}

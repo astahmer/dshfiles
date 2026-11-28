@@ -10,7 +10,7 @@ A pack is a named set of owned plugins adopted together; a plugin may sit in sev
 4. [GitHub & review](github.md) (`github`, 3 plugins) — Open and watch pull requests, review a workspace before landing, and run project automations from GitHub events.
 5. [Backlog & planning](planning.md) (`planning`, 6 plugins) — A backlog that starts threads (with Jira and Notion), goals agents keep working on, schedules and a reorderable queue.
 6. [Accounts & cost](accounts.md) (`accounts`, 5 plugins) — Several AI accounts with failover, secret aliases, usage and quota, context compaction, and deferred tools to keep prompts small.
-7. [Agents & orchestration](agents.md) (`agents`, 9 plugins) — Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, and the tools, skills and MCP servers agents use.
+7. [Agents & orchestration](agents.md) (`agents`, 10 plugins) — Persistent agents that message each other, questions that wait for you, background jobs, threads on other hosts, the tools, skills and MCP servers agents use, and the browser they drive.
 8. [Editor, boards & sharing](files.md) (`files`, 5 plugins) — A file editor, whiteboards per project, and threads you can share by link, move to another machine or clean up.
 9. [Observe & perf](observe.md) (`observe`, 5 plugins) — Traces of every turn and tool call, an activity log, a browser preview of dev servers, process memory, and hot reload that waits for idle.
 10. [Knowledge](knowledge.md) (`knowledge`, 8 plugins) — Memory across threads, reference repositories, search over past threads, prompts and other agents' logs, readable web pages, and fast file search.
