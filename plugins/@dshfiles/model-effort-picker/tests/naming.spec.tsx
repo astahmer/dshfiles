@@ -36,7 +36,7 @@ describe('one naming everywhere (council picker N1)', () => {
         />
       </TooltipProvider>,
     )
-    expect(/<div[^>]*role="option"[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:h-8 [^"]*dshx:pointer-coarse:h-11/u)
+    expect(/<div[^>]*data-model-picker-row[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:h-8 [^"]*dshx:pointer-coarse:h-11/u)
     expect(/<span[^>]*data-model-picker-name[^>]*>([^<]*)</u.exec(html)?.[1]).toBe('gpt-6-luna')
     expect(/<span[^>]*data-model-picker-name[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:text-sm dshx:font-\[450\]/u)
     expect(text(html)).not.toContain('·')

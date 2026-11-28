@@ -62,11 +62,10 @@ describe('keyboard: one tab stop for the list (council picker C5)', () => {
     expect(option).toContain('aria-selected="true"')
     expect(option).not.toContain('aria-pressed')
     expect(option).not.toContain('tabindex')
-    // The chevron is pointer-only: hidden from assistive tech and out of the tab order.
-    expect(/<button[^>]*data-model-details-trigger[^>]*>/u.exec(html)?.[0]).toMatch(
-      /aria-hidden="true"[^>]*tabindex="-1"|tabindex="-1"[^>]*aria-hidden="true"/u,
-    )
-    expect(html.match(/<button/gu) ?? []).toHaveLength(1)
+    // Round 3 R10: no button inside the option; the chevron is its own control beside it, out of the tab order.
+    const inside = html.slice(html.indexOf('role="option"'), html.indexOf('data-model-details-trigger'))
+    expect(inside.match(/<button/gu) ?? []).toHaveLength(1)
+    expect(/<button[^>]*data-model-details-trigger[^>]*>/u.exec(html)?.[0]).toContain('tabindex="-1"')
   })
 
   it('marks fan-out choices with aria-checked, not the aria-selected of the model in use', () => {
@@ -76,8 +75,9 @@ describe('keyboard: one tab stop for the list (council picker C5)', () => {
   })
 
   it('draws the kit focus ring (2 px, 1 px offset) on the whole row the keyboard is on', () => {
-    expect(optionTag(row({ highlighted: true }))).toMatch(/dshx:outline-2 dshx:outline-offset-1/u)
-    expect(optionTag(row({ highlighted: false }))).not.toMatch(/outline-2/u)
+    const rowTag = (html: string): string => /<div[^>]*data-model-picker-row[^>]*>/u.exec(html)?.[0] ?? ''
+    expect(rowTag(row({ highlighted: true }))).toMatch(/dshx:outline-2 dshx:outline-offset-1/u)
+    expect(rowTag(row({ highlighted: false }))).not.toMatch(/outline-2/u)
   })
 
   it('names the quota for assistive tech', () => {

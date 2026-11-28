@@ -50,121 +50,124 @@ export const ModelRow = (props: {
   const selectMode = props.selectSeveral === true
   const quotaId = props.id === undefined ? undefined : `${props.id}-quota`
 
+  // Round 3 R10: the option is the model; the chevron beside it is its own control ("Details for <model>"), so VoiceOver
+  // can reach details without the Right key. The row only draws them as one line.
+  const optionName = `${selectMode ? '' : 'Use '}${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`
   return (
     <div
-      aria-checked={selectMode ? props.fanOutSelected : undefined}
-      aria-describedby={props.quota === undefined ? undefined : quotaId}
-      aria-disabled={props.busy || undefined}
-      aria-label={`Use ${name}${props.providerLabel === undefined ? '' : ` via ${props.providerLabel}`} (${props.group.name})`}
-      aria-selected={selectMode ? undefined : props.active}
       className={cn(
-        'dshx:group/row dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-1.5 dshx:rounded-md dshx:px-1.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
+        'dshx:group/row dshx:flex dshx:h-8 dshx:cursor-default dshx:items-center dshx:gap-1 dshx:rounded-md dshx:pr-0.5 dshx:transition-colors dshx:hover:bg-accent/60 dshx:pointer-coarse:h-11',
         (props.active || props.fanOutSelected) && 'dshx:bg-selected-wash',
         props.active && 'dshx:selected-edge',
         props.highlighted === true && 'dshx:outline-2 dshx:outline-offset-1 dshx:outline-[var(--dsw-alias-state-business-primary)] dshx:outline-solid',
       )}
       data-active-visible={props.highlighted === true || undefined}
       data-fan-out-selected={props.fanOutSelected || undefined}
-      data-model-picker-option
       data-model-picker-row
-      id={props.id}
-      onClick={event => {
-        if (press.current.fired) {
-          press.current.fired = false
-          return
-        }
-        if (props.busy) return
-        const selection = ModelPickerModel.selectionForModel(props.group, props.model, props.current)
-        if (event.shiftKey || selectMode) props.onFanOut(selection)
-        else props.onSelect(selection)
-      }}
-      onContextMenu={event => {
-        if (press.current.fired) event.preventDefault()
-      }}
-      onPointerCancel={cancelPress}
-      onPointerDown={event => {
-        press.current.fired = false
-        if (event.pointerType !== 'touch') return
-        cancelPress()
-        press.current.timer = setTimeout(() => {
-          press.current.timer = undefined
-          press.current.fired = true
-          props.onFanOut(ModelPickerModel.selectionForModel(props.group, props.model, props.current))
-        }, 500)
-      }}
-      onPointerLeave={cancelPress}
       onPointerMove={props.onHover}
-      onPointerUp={cancelPress}
-      role="option"
+      role="presentation"
     >
-      {/* N6: in select mode the mark column holds a 16 px checkbox (the option itself carries aria-checked); round 3 R3:
+      <div
+        aria-checked={selectMode ? props.fanOutSelected : undefined}
+        aria-describedby={props.quota === undefined ? undefined : quotaId}
+        aria-disabled={props.busy || undefined}
+        aria-label={optionName}
+        aria-selected={selectMode ? undefined : props.active}
+        className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:gap-1.5 dshx:self-stretch dshx:pl-1.5"
+        data-model-picker-option
+        id={props.id}
+        onClick={event => {
+          if (press.current.fired) {
+            press.current.fired = false
+            return
+          }
+          if (props.busy) return
+          const selection = ModelPickerModel.selectionForModel(props.group, props.model, props.current)
+          if (event.shiftKey || selectMode) props.onFanOut(selection)
+          else props.onSelect(selection)
+        }}
+        onContextMenu={event => {
+          if (press.current.fired) event.preventDefault()
+        }}
+        onPointerCancel={cancelPress}
+        onPointerDown={event => {
+          press.current.fired = false
+          if (event.pointerType !== 'touch') return
+          cancelPress()
+          press.current.timer = setTimeout(() => {
+            press.current.timer = undefined
+            press.current.fired = true
+            props.onFanOut(ModelPickerModel.selectionForModel(props.group, props.model, props.current))
+          }, 500)
+        }}
+        onPointerLeave={cancelPress}
+        onPointerUp={cancelPress}
+        role="option"
+      >
+        {/* N6: in select mode the mark column holds a 16 px checkbox (the option itself carries aria-checked); round 3 R3:
           the brand mark stays after it. */}
-      {selectMode ? (
-        <span
-          aria-hidden="true"
-          className={cn(
-            'dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-field-border',
-            props.fanOutSelected && 'dshx:border-control-on-dense dshx:bg-control-on-dense dshx:text-control-on-foreground',
-          )}
-          data-model-fan-out-check
-        >
-          {props.fanOutSelected ? <CheckIcon className="dshx:size-3" /> : null}
-        </span>
-      ) : null}
-      <BrandMark brand={brand} className="dshx:size-4" name={name} />
-      {/* Round 3 R3: the name comes first and truncates last. The account tag is short and fixed, so nothing beside the
-          name takes its room while it still fits. */}
-      <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
-        <TruncatedTooltip content={props.model.id}>
+        {selectMode ? (
           <span
-            className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
-            data-model-picker-name
-          >
-            {name}
-          </span>
-        </TruncatedTooltip>
-        {props.accountTag === undefined ? null : (
-          <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" data-model-row-account>
-            {props.accountTag}
-          </span>
-        )}
-      </span>
-      {/* b:16yr: one row per model, so no account badge or per-row effort glyph: the account and the reasoning effort are
-          chosen in the detail panel. What stays is what is left on the account a click would use, quiet unless low. */}
-      <span className="dshx:flex dshx:w-8 dshx:shrink-0 dshx:justify-end" data-model-picker-quota>
-        {props.quota === undefined ? null : (
-          <>
-            <QuotaText label={props.quota.label} onReserve={props.quota.onReserve} percent={props.quota.percent} />
-            <span className="dshx:sr-only" id={quotaId}>
-              {`${String(Math.round(props.quota.percent))} % left on ${props.group.name}`}
-            </span>
-          </>
-        )}
-      </span>
-      {/* Round 3 R3: the check and the bolt take room only on the rows that show them. */}
-      {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground dshx:shrink-0" data-model-current-check /> : null}
-      {props.fastOn === true ? (
-        <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground dshx:shrink-0" data-model-fast-on role="img" />
-      ) : null}
-      {selectMode ? null : (
-        <>
-          {/* Pointer and touch only: the keyboard opens details with Right, so this is no second tab stop inside the option. */}
-          <button
             aria-hidden="true"
-            className="dshx-hit-44 dshx:flex dshx:size-[18px] dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
-            data-model-details-label={`Details for ${name}`}
-            data-model-details-trigger
-            onClick={event => {
-              event.stopPropagation()
-              props.onInspect()
-            }}
-            onPointerDown={event => event.stopPropagation()}
-            tabIndex={-1}
-            type="button"
+            className={cn(
+              'dshx:flex dshx:size-4 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-sm dshx:border dshx:border-field-border',
+              props.fanOutSelected && 'dshx:border-control-on-dense dshx:bg-control-on-dense dshx:text-control-on-foreground',
+            )}
+            data-model-fan-out-check
           >
-            <ChevronRightIcon aria-hidden="true" className="dshx:size-3.5" />
-          </button>
-        </>
+            {props.fanOutSelected ? <CheckIcon className="dshx:size-3" /> : null}
+          </span>
+        ) : null}
+        <BrandMark brand={brand} className="dshx:size-4" name={name} />
+        {/* Round 3 R3: the name comes first and truncates last. The account tag is short and fixed, so nothing beside the
+          name takes its room while it still fits. */}
+        <span className="dshx:flex dshx:min-w-0 dshx:flex-1 dshx:items-baseline dshx:gap-1.5 dshx:overflow-hidden">
+          <TruncatedTooltip content={props.model.id}>
+            <span
+              className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-selected')}
+              data-model-picker-name
+            >
+              {name}
+            </span>
+          </TruncatedTooltip>
+          {props.accountTag === undefined ? null : (
+            <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:tabular-nums" data-model-row-account>
+              {props.accountTag}
+            </span>
+          )}
+        </span>
+        {/* b:16yr: one row per model, so no account badge or per-row effort glyph: the account and the reasoning effort are
+          chosen in the detail panel. What stays is what is left on the account a click would use, quiet unless low. */}
+        <span className="dshx:flex dshx:w-8 dshx:shrink-0 dshx:justify-end" data-model-picker-quota>
+          {props.quota === undefined ? null : (
+            <>
+              <QuotaText label={props.quota.label} onReserve={props.quota.onReserve} percent={props.quota.percent} />
+              <span className="dshx:sr-only" id={quotaId}>
+                {`${String(Math.round(props.quota.percent))} % left on ${props.group.name}`}
+              </span>
+            </>
+          )}
+        </span>
+        {/* Round 3 R3: the check and the bolt take room only on the rows that show them. */}
+        {props.active ? <CheckIcon aria-hidden="true" className="dshx:size-3.5 dshx:text-foreground dshx:shrink-0" data-model-current-check /> : null}
+        {props.fastOn === true ? (
+          <ZapIcon aria-label="Fast mode on" className="dshx:size-3 dshx:text-foreground dshx:shrink-0" data-model-fast-on role="img" />
+        ) : null}
+      </div>
+      {selectMode ? null : (
+        <button
+          aria-label={`Details for ${name}`}
+          className="dshx-hit-44 dshx:flex dshx:size-6 dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+          data-model-details-label={`Details for ${name}`}
+          data-model-details-trigger
+          onClick={props.onInspect}
+          // The keyboard opens details with Right from the search, so the chevron is no extra tab stop; a screen reader
+          // reaches it by swiping, as its own button.
+          tabIndex={-1}
+          type="button"
+        >
+          <ChevronRightIcon aria-hidden="true" className="dshx:size-3.5" />
+        </button>
       )}
     </div>
   )
