@@ -2309,7 +2309,7 @@ export const GUIDE_CATALOG: GuideCatalog = {
       "publicSymbol": "PhoneThreadMenu",
       "importFrom": "@dshfiles/rich-composer/phone-thread-menu",
       "owner": "@dshfiles/rich-composer",
-      "source": "plugins/@dshfiles/rich-composer/src/phone-thread-menu.tsx:38",
+      "source": "plugins/@dshfiles/rich-composer/src/phone-thread-menu.tsx:51",
       "occupancy": "unavailable",
       "occupants": [],
       "key": "contract:@dshfiles/rich-composer.phone-thread-menu",
