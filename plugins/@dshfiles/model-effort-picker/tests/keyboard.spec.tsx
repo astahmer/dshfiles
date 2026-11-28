@@ -93,6 +93,8 @@ describe('keyboard: one tab stop for the list (council picker C5)', () => {
       expect(search).toContain(attribute)
     expect(tagOf(picker, 'aria-label="Models and accounts"')).toContain('role="listbox"')
     expect(picker).not.toMatch(/metaKey|⌘|<Kbd/u)
+    // The scroll viewport is no second tab stop (Chrome focuses a scroller whose children are not focusable).
+    expect(picker).toContain("closest('[data-slot=\"scroll-area-viewport\"]')?.setAttribute('tabindex', '-1')")
     expect(tagOf(picker, 'data-model-picker-announcer')).toContain('aria-live="polite"')
     expect(ModelPickerModel.resultAnnouncement({ query: 'zz', count: 0 })).toBe('No models match “zz”')
     expect(ModelPickerModel.resultAnnouncement({ query: 'gpt', count: 3 })).toBe('3 models')

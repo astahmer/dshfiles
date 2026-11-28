@@ -85,6 +85,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const modelListRef = useRef<HTMLDivElement | null>(null)
   const attachModelList = useCallback((node: HTMLDivElement | null) => {
     modelListRef.current = node
+    // C5: the search is the list's one tab stop. Chrome makes a scroller with no focusable children a tab stop of its
+    // own (the options are reached through aria-activedescendant), so the viewport opts out.
+    node?.closest('[data-slot="scroll-area-viewport"]')?.setAttribute('tabindex', '-1')
   }, [])
   const detailsRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
