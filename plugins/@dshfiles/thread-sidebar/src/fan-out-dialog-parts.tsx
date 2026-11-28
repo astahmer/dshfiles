@@ -1,4 +1,7 @@
-import { RouteModel, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
+import type { ReactNode } from 'react'
+import { ModelMark, RouteModel, modelIdentity } from '@dshfiles/plugin-ui/components/model-mark'
+import { Button } from '@dshfiles/plugin-ui/components/ui/button'
+import { cn } from '@dshfiles/plugin-ui/lib/utils'
 import { XIcon } from '@dshfiles/plugin-ui/icons'
 
 export interface FanOutChosenRoute {
@@ -16,8 +19,11 @@ export const FanOutChosen = (props: {
   readonly label: string
   readonly removeLabel: (model: string) => string
   readonly onRemove: (route: FanOutChosenRoute) => void
+  /** Round 4 T3: what ends the chip row (the Edit models ghost chip). */
+  readonly trailing?: ReactNode
+  readonly className?: string
 }) => (
-  <div aria-label={props.label} className="dshx:flex dshx:flex-wrap dshx:gap-1.5" data-fan-out-chosen role="group">
+  <div aria-label={props.label} className={cn('dshx:flex dshx:flex-wrap dshx:items-center dshx:gap-1.5', props.className)} data-fan-out-chosen role="group">
     {props.routes.map(route => {
       const name = modelIdentity(route.provider, route.model)?.name ?? route.model
       return (
@@ -39,6 +45,39 @@ export const FanOutChosen = (props: {
         </span>
       )
     })}
+    {props.trailing}
+  </div>
+)
+
+/**
+ * Round 4 T3: the chosen models in one row while the keyboard is up: their marks overlapped, "6 models", and Edit, so
+ * the prompt keeps its lines above the actions.
+ */
+export const FanOutSummary = (props: {
+  readonly routes: readonly FanOutChosenRoute[]
+  readonly countLabel: string
+  readonly editLabel: string
+  readonly onEdit: () => void
+  readonly className?: string
+}) => (
+  <div className={cn('dshx:min-h-11 dshx:items-center dshx:gap-2', props.className)} data-fan-out-summary>
+    <span aria-hidden="true" className="dshx:flex dshx:items-center">
+      {props.routes.map((route, index) => (
+        <span
+          className={cn(
+            'dshx:flex dshx:size-5 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-background dshx:ring-1 dshx:ring-border',
+            index > 0 && 'dshx:-ml-1.5',
+          )}
+          key={`${route.provider}/${route.model}`}
+        >
+          <ModelMark modelId={route.model} />
+        </span>
+      ))}
+    </span>
+    <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate dshx:text-sm dshx:font-medium">{props.countLabel}</span>
+    <Button className="dshx:pointer-coarse:h-11" onClick={props.onEdit} size="sm" type="button" variant="ghost">
+      {props.editLabel}
+    </Button>
   </div>
 )
 

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
-import { FanOutChosen, accountTagOf, fanOutModelName, fanOutSendState } from './fan-out-dialog-parts.js'
+import { FanOutChosen, FanOutSummary, accountTagOf, fanOutModelName, fanOutSendState } from './fan-out-dialog-parts.js'
 
 const text = (html: string): string => html.replace(/<!-- -->/gu, '').replace(/<[^>]+>/gu, '')
 
@@ -46,7 +46,9 @@ describe('fan-out dialog (council picker round 1, N7)', () => {
     expect(dialog.indexOf('<FanOutChosen')).toBeLessThan(dialog.indexOf('<Textarea'))
     expect(dialog).toMatch(/<label[^>]*>\s*\{text\(props\.t, 'threadSidebarFanOutPrompt'\)\}\s*<Textarea/u)
     expect(dialog).toContain("'threadSidebarFanOutSendTo'")
-    expect(shell).toMatch(/dshx:in-\[html\[data-shell-phone-nav\]\]:bottom-\[var\(--dsh-keyboard-inset,0px\)\][^"]*dshx:in-\[html\[data-shell-phone-nav\]\]:rounded-b-none/u)
+    expect(shell).toMatch(
+      /dshx:in-\[html\[data-shell-phone-nav\]\]:bottom-\[var\(--dsh-keyboard-inset,0px\)\][^"]*dshx:in-\[html\[data-shell-phone-nav\]\]:rounded-b-none/u,
+    )
     const locales = readFileSync(new URL('./locales.ts', import.meta.url), 'utf8')
     expect(locales).toContain("threadSidebarFanOutPromptPlaceholder: 'Prompt for each model…'")
     expect(locales).toContain("threadSidebarFanOutSendTo: 'Send to {count} models'")
@@ -72,7 +74,8 @@ describe('fan-out sheet on the phone (council picker round 3, R2)', () => {
 
   it('sits on the software keyboard under the phone shell, so Send stays in view with the prompt focused', () => {
     expect(shell).toContain('dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)]')
-    expect(shell).toContain('dshx:in-[html[data-shell-phone-nav]]:max-h-[calc(85dvh-var(--dsh-keyboard-inset,0px))]')
+    // Round 4 T3: with the keyboard up the sheet takes the visual viewport less 12 px.
+    expect(shell).toContain('dshx:in-[html[data-phone-keyboard]]:h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)]')
   })
 
   it('labels a 6-line prompt with no resize grip, and keeps the checklist behind Add / Edit models', () => {
@@ -95,5 +98,40 @@ describe('fan-out sheet on the phone (council picker round 3, R2)', () => {
     )
     expect(/<span[^>]*data-fan-out-chip[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:rounded-lg/u)
     expect(html).not.toContain('rounded-full')
+  })
+})
+
+describe('fan-out sheet with the keyboard open (council picker round 4, T3)', () => {
+  const shell = readFileSync(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
+  const dialog = shell.slice(shell.indexOf('data-fan-out-dialog'), shell.indexOf('</DialogContent>', shell.indexOf('data-fan-out-dialog')))
+
+  it('folds the chips into one summary row of overlapping marks, the count and Edit', () => {
+    const html = renderToString(
+      <FanOutSummary
+        countLabel="6 models"
+        editLabel="Edit"
+        onEdit={() => undefined}
+        routes={[
+          { provider: 'cc1', model: 'gpt-6-luna' },
+          { provider: 'cc1', model: 'claude-sonnet-5-5' },
+        ]}
+      />,
+    )
+    expect(html.match(/data-model-mark/gu) ?? []).toHaveLength(2)
+    expect(html).toContain('dshx:-ml-1.5')
+    expect(text(html)).toContain('6 models')
+    expect(html).toMatch(/<button[^>]*>Edit<\/button>/u)
+    expect(dialog).toMatch(/<FanOutChosen[\s\S]{0,200}className="dshx:in-\[html\[data-phone-keyboard\]\]:hidden"/u)
+    expect(dialog).toMatch(/<FanOutSummary[\s\S]{0,80}className="dshx:hidden dshx:in-\[html\[data-phone-keyboard\]\]:flex"/u)
+  })
+
+  it('lets the prompt take the sheet while the keyboard is up, and left-aligns the title', () => {
+    expect(dialog).toContain('dshx:in-[html[data-phone-keyboard]]:min-h-[5.5rem] dshx:in-[html[data-phone-keyboard]]:flex-1')
+    expect(dialog).toMatch(/<DialogHeader className="[^"]*dshx:text-left/u)
+  })
+
+  it('puts the helper text and Cancel / Send on one footer row, and Edit models at the end of the chips', () => {
+    expect(dialog).toMatch(/className="dshx:flex dshx:shrink-0 dshx:flex-row dshx:items-center[^"]*"\s+data-fan-out-footer/u)
+    expect(dialog).toMatch(/trailing=\{\s*<Button[\s\S]{0,600}variant="ghost"/u)
   })
 })
