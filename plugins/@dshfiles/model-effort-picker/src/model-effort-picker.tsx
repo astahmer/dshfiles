@@ -386,7 +386,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
           </PopoverTrigger>
           <PopoverContent
             align="start"
-            className="dshx-root dshx:@container dshx:w-[min(42.5625rem,calc(100vw-1.5rem))] dshx:overflow-clip! dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-0 dshx:shadow-lg dshx:in-[html[data-shell-phone-nav]]:bg-popover!"
+            className={cn(
+              'dshx-root dshx:@container dshx:w-[min(42.5625rem,calc(100vw-1.5rem))] dshx:overflow-clip! dshx:rounded-xl dshx:border dshx:border-border dshx:bg-popover dshx:p-0 dshx:shadow-lg dshx:in-[html[data-shell-phone-nav]]:bg-popover!',
+              // Round 4 T6: with nothing to inspect the picker is the list's width, and Close takes its own room.
+              catalogEmpty && 'dshx:w-[min(22.5rem,calc(100vw-1.5rem))]',
+            )}
             // Round 3 R7: on the phone the sheet takes the kit sheet's fill (the popover step), not the raised tone the
             // composer gives the sheets it opens, which equals the selected wash and the segment track.
             collisionPadding={12}
@@ -432,7 +436,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 >
                   <h2 className="dshx:text-heading dshx:font-semibold">Choose a model</h2>
                 </header>
-                <div className="dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1">
+                <div
+                  className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1', catalogEmpty && 'dshx:pr-8 dshx:@max-pane-compact:pr-0')}
+                  data-model-search-row
+                >
                   {/* Round 3 R18: one focus ring (the field edge does not also turn accent), a clear button inside the field,
                       and a search that waits while there is nothing to search. */}
                   <div className="dshx:relative dshx:min-w-0 dshx:flex-1">
