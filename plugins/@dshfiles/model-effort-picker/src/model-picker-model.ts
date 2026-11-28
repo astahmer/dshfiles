@@ -109,6 +109,29 @@ export class ModelPickerModel {
     return windows.size === 1 && only !== undefined && only.length > 0 ? `${only} quota left` : 'Quota left'
   }
 
+  /**
+   * C5: what a key in the search combobox does to the listbox. Up and Down move the active row, Enter uses it, Right (at
+   * the end of the query) opens its details; any other key edits the query.
+   */
+  static listKey = (input: {
+    readonly key: string
+    readonly active: number
+    readonly count: number
+    readonly caretAtEnd: boolean
+  }): { readonly kind: 'move' | 'use' | 'inspect'; readonly index: number } | { readonly kind: 'none' } => {
+    if (input.count === 0) return { kind: 'none' }
+    const at = input.active < 0 ? 0 : Math.min(input.active, input.count - 1)
+    if (input.key === 'ArrowDown') return { kind: 'move', index: input.active < 0 ? 0 : Math.min(input.count - 1, at + 1) }
+    if (input.key === 'ArrowUp') return { kind: 'move', index: Math.max(0, at - 1) }
+    if (input.key === 'Enter') return { kind: 'use', index: at }
+    if (input.key === 'ArrowRight' && input.caretAtEnd) return { kind: 'inspect', index: at }
+    return { kind: 'none' }
+  }
+
+  /** C5: the live announcement after a search. */
+  static resultAnnouncement = (input: { readonly query: string; readonly count: number }): string =>
+    input.count === 0 ? `No models match “${input.query.trim()}”` : `${String(input.count)} model${input.count === 1 ? '' : 's'}`
+
   static filterGroups = (groups: readonly ModelGroup[], query: string): readonly ModelGroup[] => {
     const needle = query.trim().toLowerCase()
     if (needle.length === 0) return groups

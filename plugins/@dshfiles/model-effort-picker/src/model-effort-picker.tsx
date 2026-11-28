@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import type { ModelSelectInjected } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { useApi, useApiQuery, useResource, useSettings } from '@dshfiles/dshx/client'
@@ -66,6 +66,11 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
   const [inspected, setInspected] = useState<InspectedRoute | null>(null)
   const [narrowDetails, setNarrowDetails] = useState(false)
   const [fanOut, setFanOut] = useState<readonly ModelSelection[]>([])
+  // C5: the search is a combobox over the listbox; `activeIndex` is the row it points at, ringed while the keyboard moves.
+  const listboxId = useId()
+  const [activeIndex, setActiveIndex] = useState(-1)
+  const [keyboardRow, setKeyboardRow] = useState(false)
+  const [announcement, setAnnouncement] = useState('')
   // Routes whose Fast mode state is known (the trigger's route, each inspected route): the list marks those that are on.
   const [knownFast, setKnownFast] = useState<ReadonlyMap<string, boolean>>(new Map())
   const rememberFast = useCallback((route: { readonly provider: string; readonly model: string }, enabled: boolean) => {
@@ -154,13 +159,26 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     if (available && connection === 'online') load()
   }, [available, connection, load])
 
+  // Opening or typing points the combobox at the model in use (the first row) and announces the result count.
   useEffect(() => {
     if (!open) return
-    const frame = requestAnimationFrame(() => {
-      modelListRef.current?.querySelector('[data-model-picker-option][aria-pressed="true"]')?.scrollIntoView({ block: 'nearest' })
-    })
+    setActiveIndex(
+      rows.length === 0
+        ? -1
+        : Math.max(
+            0,
+            rows.findIndex(row => row.active),
+          ),
+    )
+    setKeyboardRow(false)
+    if (query.trim() !== '') setAnnouncement(ModelPickerModel.resultAnnouncement({ query, count: rows.length }))
+  }, [open, query, rows])
+
+  useEffect(() => {
+    if (!open || activeIndex < 0) return
+    const frame = requestAnimationFrame(() => document.getElementById(`${listboxId}-${String(activeIndex)}`)?.scrollIntoView({ block: 'nearest' }))
     return () => cancelAnimationFrame(frame)
-  }, [open, query, rows.length, selectedGroup?.id, selectedModel?.id])
+  }, [open, activeIndex, listboxId])
 
   const fastApi = useApi(aiAccountsFastModeApi)
 
@@ -168,7 +186,13 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     setSelectionError(null)
     try {
       const result = await select(selection)
-      if (result !== undefined && !result.ok) setSelectionError(selectionFailureNotice(result.error.message))
+      if (result !== undefined && !result.ok) {
+        setSelectionError(selectionFailureNotice(result.error.message))
+        return
+      }
+      const group = state.groups.find(candidate => candidate.id === selection.provider)
+      const model = group?.models.find(candidate => candidate.id === selection.model)
+      setAnnouncement(`Switched to ${group === undefined || model === undefined ? selection.model : ModelPickerModel.displayName({ group, model })}`)
     } catch (error) {
       setSelectionError(selectionFailureNotice(error instanceof Error ? error.message : String(error)))
     }
@@ -215,6 +239,21 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     setInspected(route)
     setNarrowDetails(true)
     requestAnimationFrame(() => detailsRef.current?.focus())
+  }
+
+  /** Details → the list (C5: Left or Escape; a draft is discarded), focus back on the search with its row. */
+  const backToList = (): void => {
+    setInspected(null)
+    setNarrowDetails(false)
+    requestAnimationFrame(() => searchInputRef.current?.focus())
+  }
+
+  const useRow = (index: number, collect: boolean): void => {
+    const row = rows[index]
+    if (row === undefined || busy) return
+    const selection = ModelPickerModel.selectionForModel(row.group, row.model, current)
+    if (collect || several) toggleFanOut(selection)
+    else choose(selection)
   }
 
   if (!available) return null
@@ -316,20 +355,17 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             collisionPadding={12}
             onOpenAutoFocus={event => {
               event.preventDefault()
-              // On a touch screen a focused search raises the on-screen keyboard over the sheet: start on the model in
-              // use instead, and the search keyboard comes up only when the user taps the field.
-              if (window.matchMedia('(pointer: coarse)').matches) {
-                const list = modelListRef.current
-                list?.querySelector<HTMLButtonElement>('button[data-model-picker-option][aria-pressed="true"]:not(:disabled)')?.focus({ preventScroll: true })
-                return
-              }
+              // On a touch screen a focused search raises the on-screen keyboard over the sheet: nothing takes focus, and the
+              // search keyboard comes up only when the user taps the field.
+              if (window.matchMedia('(pointer: coarse)').matches) return
               searchInputRef.current?.focus()
             }}
             onEscapeKeyDown={(event: KeyboardEvent) => {
-              if (!narrowDetails || !window.matchMedia('(max-width: 43rem)').matches) return
+              // Escape walks back one level (C5): details → the list, then the list → the trigger (Radix closes).
+              const inDetails = detailsRef.current?.contains(document.activeElement) === true
+              if (!inDetails && !(narrowDetails && window.matchMedia('(max-width: 43rem)').matches)) return
               event.preventDefault()
-              setNarrowDetails(false)
-              requestAnimationFrame(() => searchInputRef.current?.focus())
+              backToList()
             }}
             side="top"
             sideOffset={8}
@@ -337,12 +373,6 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             <div
               className="dshx:flex dshx:h-[min(26rem,var(--radix-popover-content-available-height))] dshx:items-stretch dshx:@max-pane-compact:h-[min(calc(72dvh-2rem),var(--radix-popover-content-available-height,100dvh))]"
               data-model-picker-surface
-              onKeyDownCapture={event => {
-                if (event.key === 'k' && (event.metaKey || event.ctrlKey)) {
-                  event.preventDefault()
-                  searchInputRef.current?.focus()
-                }
-              }}
             >
               <section
                 aria-label="Choose a model"
@@ -353,22 +383,34 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 )}
               >
                 <SearchInput
+                  aria-activedescendant={activeIndex < 0 ? undefined : `${listboxId}-${String(activeIndex)}`}
+                  aria-autocomplete="list"
+                  aria-controls={listboxId}
+                  aria-expanded={open}
                   aria-label="Search models and accounts"
                   autoComplete="off"
                   className="dshx:shrink-0"
                   onChange={event => setQuery(event.currentTarget.value)}
                   onKeyDown={event => {
-                    if (event.key === 'Enter') {
-                      const first = rows[0]
-                      if (first === undefined || busy) return
-                      event.preventDefault()
-                      choose(ModelPickerModel.selectionForModel(first.group, first.model, current))
-                      return
-                    }
-                    if (event.key !== 'ArrowDown') return
+                    const input = event.currentTarget
+                    const action = ModelPickerModel.listKey({
+                      key: event.key,
+                      active: activeIndex,
+                      count: rows.length,
+                      caretAtEnd: input.selectionStart === input.value.length && input.selectionEnd === input.value.length,
+                    })
+                    if (action.kind === 'none') return
                     event.preventDefault()
-                    modelListRef.current?.querySelector<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)')?.focus()
+                    if (action.kind === 'move') {
+                      setActiveIndex(action.index)
+                      setKeyboardRow(true)
+                    } else if (action.kind === 'use') useRow(action.index, event.shiftKey)
+                    else {
+                      const row = rows[action.index]
+                      if (row !== undefined) showDetails({ model: row.model.id, provider: row.group.id })
+                    }
                   }}
+                  role="combobox"
                   placeholder="Search models…"
                   ref={searchInputRef}
                   value={query}
@@ -379,24 +421,22 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 >
                   <div
                     aria-label="Models and accounts"
-                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:pr-1"
-                    onKeyDown={event => {
-                      if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp') return
-                      const options = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-model-picker-option]:not(:disabled)'))
-                      const index = options.findIndex(option => option === event.target)
-                      if (index < 0) return
-                      event.preventDefault()
-                      const target = options[index + (event.key === 'ArrowDown' ? 1 : -1)]
-                      if (target !== undefined) target.focus()
-                      else if (event.key === 'ArrowUp' && index === 0) searchInputRef.current?.focus()
-                    }}
+                    aria-multiselectable={several || undefined}
+                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1"
+                    id={listboxId}
                     ref={attachModelList}
-                    role="list"
+                    role="listbox"
                   >
-                    {rows.map(({ key, group, model, active }) => (
+                    {rows.map(({ key, group, model, active }, index) => (
                       <ModelRow
                         active={active}
                         busy={busy}
+                        highlighted={keyboardRow && index === activeIndex}
+                        id={`${listboxId}-${String(index)}`}
+                        onHover={() => {
+                          setActiveIndex(index)
+                          setKeyboardRow(false)
+                        }}
                         current={current}
                         fanOutSelected={ModelPickerModel.isFanOutRoute(fanOut, { provider: group.id, model: model.id })}
                         group={group}
@@ -465,6 +505,13 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   !narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
                 data-model-inspector
+                onKeyDown={event => {
+                  // Left returns to the list (C5), except where Left already means something: a radio group or a field.
+                  if (event.key !== 'ArrowLeft' || !(event.target instanceof Element)) return
+                  if (event.target.closest('[role="radiogroup"], input, textarea') !== null) return
+                  event.preventDefault()
+                  backToList()
+                }}
                 ref={detailsRef}
                 tabIndex={-1}
               >
@@ -501,12 +548,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     )}
                     groups={state.groups}
                     inspected={inspectedRoute}
-                    onBack={() => {
-                      // A draft's Back discards it; on a narrow screen Back also returns to the list.
-                      setInspected(null)
-                      setNarrowDetails(false)
-                      requestAnimationFrame(() => searchInputRef.current?.focus())
-                    }}
+                    onBack={backToList}
                     onClose={() => setOpen(false)}
                     onInspect={setInspected}
                     onRetry={load}
@@ -539,6 +581,10 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             <TooltipContent side="top">Switch to {nextAccount.group.name}</TooltipContent>
           </Tooltip>
         )}
+        {/* C5: the result count and "Switched to ‹model›" reach assistive tech without moving focus. */}
+        <p aria-live="polite" className="dshx:sr-only" data-model-picker-announcer>
+          {announcement}
+        </p>
       </div>
     </TooltipProvider>
   )

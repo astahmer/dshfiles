@@ -96,7 +96,7 @@ export const FallbacksSection = (props: {
       <FallbackChain
         actions={
           <>
-            <InfoHint description="Routes tried in order when this model request fails under Priority distribution." />
+            <InfoHint description="Routes tried in order when this model request fails under Priority distribution." label="About fallbacks" />
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

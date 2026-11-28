@@ -2243,12 +2243,15 @@ const fallbacks = (page: Page) => page.getByRole('region', { name: 'Fallbacks', 
 
 const pickAccountModel = async (page: Page, account: string): Promise<void> => {
   // b:16yr: the list shows one row per model; the detail panel's Account chips choose the account.
-  const modelList = page.getByRole('list', { name: 'Models and accounts', exact: true })
+  const modelList = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   const row = modelList.locator('[data-model-picker-row]').filter({ hasText: 'gpt-6-luna' }).first()
-  await row.getByRole('button', { name: /Details for/iu }).click()
-  const chip = page.getByLabel('Available accounts').getByRole('button', { name: account, exact: true })
+  await row.locator('[data-model-details-trigger]').click()
+  // Council picker C3/S1: accounts are radios; on a model the thread does not use yet, Use commits the draft.
+  const chip = page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: account, exact: true })
   await chip.click()
-  await expect(chip).toHaveAttribute('aria-pressed', 'true')
+  const use = page.getByRole('button', { name: /^Use / })
+  if (await use.isVisible()) await use.click()
+  await expect(chip).toHaveAttribute('aria-checked', 'true')
 }
 
 When('a new thread falls back from the first account to the third one in the composer picker', async ({ page }: { page: Page }) => {
@@ -2290,7 +2293,7 @@ Then('the picker offers to return the thread to its selection', async ({ page }:
   await serving.getByRole('button', { name: 'Return', exact: true }).click()
   await recordAssertion(page, 'ai-accounts-fallback-chain-returns-to-the-selection', async () => {
     await expect(serving).toHaveCount(0)
-    await expect(page.getByLabel('Available accounts').getByRole('button', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('radiogroup', { name: 'Account', exact: true }).getByRole('radio', { name: 'Command Code 1', exact: true })).toHaveAttribute('aria-checked', 'true')
   })
   await finishJourneyAssertions(page)
 })

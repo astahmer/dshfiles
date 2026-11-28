@@ -154,7 +154,7 @@ const chooseFakeProviderModel = async (input: { readonly page: Page; readonly ti
   if (currentModelLabel.includes(modelId)) return
 
   await modelPicker.click({ timeout: Math.min(input.timeoutMs, 5_000) })
-  const modelList = input.page.getByRole('list', { name: 'Models and accounts', exact: true })
+  const modelList = input.page.getByRole('listbox', { name: 'Models and accounts', exact: true })
   const hasModelEffortPicker = (await modelList.count()) > 0
   // The native menu uses the full route id; the flat account list marks its model option explicitly.
   const bareModelId = modelId.slice(modelId.indexOf('/') + 1)

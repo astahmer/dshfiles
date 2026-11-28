@@ -15,7 +15,7 @@
       "reach": [
         "seed tool-call-thread",
         "click button \", reasoning *\"",
-        "expect list \"Models and accounts\"",
+        "expect listbox \"Models and accounts\"",
         "expect radiogroup \"Reasoning effort*\"",
         "expect radio \"High\""
       ],
@@ -181,7 +181,7 @@
       "reach": [
         "seed tool-call-thread",
         "click button \", reasoning *\"",
-        "click button \"Details for*\"",
+        "press ArrowRight",
         "expect region \"Fallbacks\"",
         "click button \"Add fallback\"",
         "expect list \"Fallback order\""
@@ -231,8 +231,8 @@
       "reach": [
         "seed tool-call-thread",
         "click button \", reasoning *\"",
-        "shiftclick button \"Use gpt-6-luna*\"",
-        "shiftclick button \"Use claude-sonnet-5-5*\"",
+        "shiftclick option \"Use gpt-6-luna*\"",
+        "shiftclick option \"Use claude-sonnet-5-5*\"",
         "expect text \"2 selected\"",
         "click button \"Fan out\u2026\"",
         "expect dialog \"Send to several models\""

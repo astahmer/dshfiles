@@ -352,8 +352,8 @@ Then('the compact model picker stages its selection without creating an empty ch
       await expect(trigger).toBeVisible()
       await trigger.click()
       // The installed compact picker lists every account and model in one flat list; the chosen row is the pressed one.
-      const models = page.getByRole('list', { name: 'Models and accounts', exact: true })
-      const alternate = models.locator('[data-model-picker-option][aria-pressed="false"]').first()
+      const models = page.getByRole('listbox', { name: 'Models and accounts', exact: true })
+      const alternate = models.locator('[data-model-picker-option][aria-selected="false"]').first()
       await expect(alternate).toBeVisible()
       const chosenLabel = await alternate.locator('[data-model-picker-name]').innerText()
       await alternate.click()
