@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "bundle",
+  "features": [
+    {
+      "id": "goal-auto-retry",
+      "title": "Resume a goal after a provider refusal",
+      "summary": "Arm a thread from the composer; when a goal round fails on a quota, rate limit or account error, the Host resumes the goal after the reset the provider announced plus a margin.",
+      "surfaces": ["client", "host", "integration"],
+      "surface": "composerContribution",
+      "destination": "composer",
+      "currentSurface": "composer: alarm chip beside Send",
+      "configuration": [
+        {
+          "key": "marginMinutes",
+          "defaultValue": "3",
+          "constraints": "Integer minutes from 0 to 60.",
+          "coveredBy": ["goal-auto-retry.reset-plus-margin"]
+        },
+        {
+          "key": "maxAttempts",
+          "defaultValue": "12",
+          "constraints": "Integer from 1 to 50; further refusals leave the goal paused.",
+          "coveredBy": ["goal-auto-retry.gives-up"]
+        }
+      ],
+      "states": ["idle", "armed", "scheduled", "resumed", "failed"],
+      "failureModes": [
+        "A refusal that carries no wait backs off from 5 minutes, doubling to the ceiling.",
+        "A human turn that fails is never retried: only a goal round counts.",
+        "A goal that is gone, complete or out of rounds marks the retry failed and stays paused with a reason.",
+        "A human resume by hand drops the pending retry instead of racing it."
+      ],
+      "externalDependencies": [],
+      "verification": [
+        {
+          "kind": "unit-test",
+          "id": "goal-auto-retry.reset-plus-margin",
+          "file": "plugins/@dshfiles/goal-auto-retry/src/policy.test.ts",
+          "testName": "follows the announced reset plus the margin"
+        },
+        {
+          "kind": "unit-test",
+          "id": "goal-auto-retry.gives-up",
+          "file": "plugins/@dshfiles/goal-auto-retry/src/host.test.ts",
+          "testName": "stops resuming after the configured attempts"
+        }
+      ],
+      "onboarding": {
+        "firstAction": "Open the alarm chip beside Send in a thread that has a goal.",
+        "doneWhen": "The chip stays lit and the goal resumes by itself after the next usage limit."
+      },
+      "telemetry": [
+        {
+          "kind": "not-applicable",
+          "reason": "Reads the goal service and an in-memory timer; it performs no I/O of its own and its resumes appear in the goal change stream."
+        }
+      ]
+    }
+  ]
+}
