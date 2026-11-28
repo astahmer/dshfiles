@@ -73,9 +73,10 @@ describe('the provider default is a real option, and arrowing commits only where
     expect(seven).toHaveLength(7)
     for (const option of seven) {
       expect(option).toMatch(/dshx:pointer-coarse:min-w-11 dshx:pointer-coarse:flex-1/u)
-      expect(option).toMatch(/dshx:pointer-coarse:basis-0 dshx:@max-\[20\.25rem\]\/effort:pointer-coarse:basis-\[calc\(25%-0\.125rem\)\]/u)
+      expect(option).toMatch(/dshx:pointer-coarse:basis-0 dshx:@max-\[20\.25rem\]\/effort:pointer-coarse:basis-1\/4/u)
     }
-    for (const option of radios(render('low'))) expect(option).toMatch(/dshx:pointer-coarse:basis-\[calc\(25%-0\.125rem\)\]/u)
+    // Round 5 U10: eight segments share one row from a 356 px track, else four to a row.
+    for (const option of radios(render('low'))) expect(option).toMatch(/dshx:pointer-coarse:basis-1\/4 dshx:@min-\[22\.25rem\]\/effort:pointer-coarse:basis-0/u)
   })
 
   it('applies only the level arrowing settles on, at once on Enter, Space, a click or leaving the group', () => {
@@ -119,5 +120,10 @@ describe('the provider default is a real option, and arrowing commits only where
     }
     expect(/<div[^>]*role="radiogroup"[^>]*>/u.exec(html)?.[0]).toContain('aria-label="Reasoning effort"')
     expect(/<div[^>]*role="radiogroup"[^>]*>/u.exec(html)?.[0]).not.toContain('aria-labelledby')
+  })
+
+  it('sets touch segments edge to edge at 13 px, so eight fit one row at 44 pt (round 5 U10)', () => {
+    expect(/<div[^>]*role="radiogroup"[^>]*>/u.exec(render('low'))?.[0]).toContain('dshx:pointer-coarse:gap-0')
+    for (const option of radios(render('low'))) expect(option).toMatch(/dshx:pointer-coarse:min-w-11[\s\S]*dshx:pointer-coarse:text-sm/u)
   })
 })

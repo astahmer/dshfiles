@@ -177,8 +177,10 @@ export const ModelDetails = (props: {
       </header>
 
       <div
-        className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]"
+        // Round 5 U10: once the header draws its hairline, the top fade goes, so nothing shows half-faded under the line.
+        className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)] dshx:data-[scrolled]:[mask-image:linear-gradient(to_bottom,black,black_calc(100%-8px),transparent)]"
         data-model-details-body
+        data-scrolled={scrolled || undefined}
         onScroll={event => setScrolled(event.currentTarget.scrollTop > 0)}
       >
         {/* Round 5 U6: with no model chosen, one line says what to do; nothing else (no fallbacks) until one is. */}
