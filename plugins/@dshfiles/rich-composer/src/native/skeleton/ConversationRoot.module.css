@@ -805,6 +805,13 @@ button.crumbEditable {
   display: none;
 }
 
+/* The phone shell has no width to drag (council picker round 4, T11). A strip there resolves to zero width but keeps its
+   offset (`left: 50% + content width / 2 + 24px`), so it widened .body's scrollable overflow to 565 px on a 390 px
+   screen, and WebKit scrolled the transcript's overflow-hidden column 162 px sideways behind the model picker's sheet. */
+:global(html[data-shell-phone-nav]) .widthHandle {
+  display: none;
+}
+
 /* Composer context stack (Figma 9:937): standalone dock cards share one
    rhythm above the input card. */
 .composerStack {
