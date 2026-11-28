@@ -570,8 +570,12 @@
   max-width: 96px;
 }
 
-.row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) :global([data-model-picker-provider]),
-.row[data-model-mark-tight] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) :global([data-model-picker-text]),
+/* Council picker round 1, N8: a tight bar truncates the name to 4rem instead of dropping it (the mode chip's words go
+   first), and the account tag stays, so the bar still says which model and, after a swap, which account answers. */
+.row[data-model-mark-tight] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) :global([data-model-picker-text]) {
+  max-width: 4rem;
+}
+
 .row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark]))) > svg:last-child {
   display: none;
 }

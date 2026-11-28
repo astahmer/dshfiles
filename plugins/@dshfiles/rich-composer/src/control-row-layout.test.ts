@@ -294,7 +294,8 @@ describe("a phone's bar (unslop r5 C3)", () => {
     const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'native/skeleton/InputBar.module.css'), 'utf8')
     const trigger = '.row[data-model-mark] :global([data-model-trigger]:has(:is(svg[data-brand], [data-model-mark])))'
     expect(css).toContain(`${trigger} {\n  min-width: 0;\n  gap: 0;\n  padding-inline: 4px;`)
-    expect(css).toContain(`${trigger} :global([data-model-picker-provider])`)
+    // Council picker round 1, N8: the account tag stays on the phone bar, so an account swap shows.
+    expect(css).not.toContain(`${trigger} :global([data-model-picker-provider])`)
     expect(css).toContain(`${trigger} > svg:last-child`)
     expect(css).toMatch(/\.row\[data-model-mark\] :global\(\[data-model-trigger\]\) :global\(:is\(svg\[data-brand\], \[data-model-mark\]\)\) \{\s*width: 16px;\s*height: 16px;/)
     // Zero-width plugin anchors each cost a gap, so the mark step drops them like the icon step: + · mode · ⋯ · model.

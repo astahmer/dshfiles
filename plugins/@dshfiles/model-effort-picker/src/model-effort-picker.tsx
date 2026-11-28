@@ -304,7 +304,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                 {shortLabel?.providerTag === undefined ? null : (
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <span className="dshx:shrink-0 dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground" data-model-picker-provider>
+                      <span className="dshx:shrink-0 dshx:text-2xs dshx:font-semibold dshx:text-foreground" data-model-picker-provider>
                         {shortLabel.providerTag}
                       </span>
                     </TooltipTrigger>
@@ -582,7 +582,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
             <TooltipTrigger asChild>
               <Button
                 aria-label={`Switch to ${nextAccount.group.name}`}
-                className="dshx:shrink-0 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:size-11"
+                className="dshx:shrink-0 dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:size-11 dshx:in-data-model-mark:hidden"
                 data-model-account-swap
                 disabled={busy}
                 onClick={() => void submitSelection(nextAccount.selection)}
