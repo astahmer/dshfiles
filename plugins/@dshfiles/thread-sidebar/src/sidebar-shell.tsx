@@ -86,6 +86,7 @@ import { NAVIGATION_EVENT, ThreadNavigationHistoryModel, type NavigationHistory,
 import type { PaletteAction } from '@dshfiles/command-palette/palette-contract'
 import { PaletteBridge } from './palette-bridge.js'
 import { usePaletteActions } from './palette-registration.js'
+import { FanOutChosen, accountTagOf, fanOutSendState } from './fan-out-dialog-parts.js'
 import { FAN_OUT_REQUEST_EVENT, fanOutRoutesOf } from './fan-out-request.js'
 import { registerWorkbenchPaletteActions } from './workbench-palette.js'
 import { threadActionsApi } from './thread-actions-api.js'
@@ -545,6 +546,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
     window.addEventListener(FAN_OUT_REQUEST_EVENT, onRequest)
     return () => window.removeEventListener(FAN_OUT_REQUEST_EVENT, onRequest)
   }, [])
+  const fanOutSend = fanOutSendState({ count: fanOutModels.length, prompt: fanOutText, pending: false })
   const sendFanOut = useMutation({
     mutationFn: async () => {
       const result = await fanOutApi.fanOut({
@@ -2037,11 +2039,31 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           if (!open) PaletteBridge.closeFanOut()
         }}
       >
-        <DialogContent className="dshx-root dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:max-w-xl">
+        {/* Council picker N7: a bottom sheet under the phone shell (the phone rule: sheets, not centred dialogs). */}
+        <DialogContent
+          className="dshx-root dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:max-w-xl dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-0 dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none dshx:in-[html[data-shell-phone-nav]]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
+          data-fan-out-dialog
+        >
           <DialogHeader>
             <DialogTitle>{text(props.t, 'threadSidebarFanOutTitle')}</DialogTitle>
           </DialogHeader>
-          <Textarea aria-label={text(props.t, 'threadSidebarFanOutPrompt')} value={fanOutText} onChange={event => setFanOutText(event.target.value)} />
+          {fanOutModels.length === 0 ? null : (
+            <FanOutChosen
+              accountOf={provider => accountTagOf(fanOutCatalog.data?.groups.find(group => group.id === provider)?.name ?? provider)}
+              label={text(props.t, 'threadSidebarFanOutChosen')}
+              onRemove={route => toggleFanOutModel(route.provider, route.model)}
+              removeLabel={model => text(props.t, 'threadSidebarFanOutRemove').replace('{model}', model)}
+              routes={fanOutModels}
+            />
+          )}
+          <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm dshx:font-medium">
+            {text(props.t, 'threadSidebarFanOutPrompt')}
+            <Textarea
+              onChange={event => setFanOutText(event.target.value)}
+              placeholder={text(props.t, 'threadSidebarFanOutPromptPlaceholder')}
+              value={fanOutText}
+            />
+          </label>
           <div className="dshx:max-h-64 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2">
             {fanOutCatalog.data?.groups.map(group => (
               <section key={group.id} className="dshx:mb-2">
@@ -2082,16 +2104,24 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
               {errorMessage(sendFanOut.error, 'Could not start the model threads.')}
             </p>
           )}
+          {fanOutSend.reason === null ? null : (
+            <p className="dshx:text-xs dshx:text-muted-foreground" data-fan-out-reason id="thread-sidebar-fan-out-reason">
+              {text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutNeedsPrompt')}
+            </p>
+          )}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
               Cancel
             </Button>
             <Button
+              aria-describedby={fanOutSend.reason === null ? undefined : 'thread-sidebar-fan-out-reason'}
               type="button"
-              disabled={sendFanOut.isPending || fanOutModels.length < 2 || fanOutText.trim().length === 0}
+              disabled={fanOutSend.disabled || sendFanOut.isPending}
               onClick={() => sendFanOut.mutate()}
             >
-              {text(props.t, sendFanOut.isPending ? 'threadSidebarFanOutSending' : 'threadSidebarFanOutSend')}
+              {sendFanOut.isPending
+                ? text(props.t, 'threadSidebarFanOutSending')
+                : text(props.t, 'threadSidebarFanOutSendTo').replace('{count}', String(fanOutModels.length))}
             </Button>
           </DialogFooter>
         </DialogContent>
