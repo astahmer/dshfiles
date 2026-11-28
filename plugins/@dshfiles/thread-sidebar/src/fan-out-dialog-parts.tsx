@@ -22,7 +22,7 @@ export const FanOutChosen = (props: {
       const name = modelIdentity(route.provider, route.model)?.name ?? route.model
       return (
         <span
-          className="dshx:inline-flex dshx:h-8 dshx:max-w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:rounded-full dshx:border dshx:border-border dshx:pr-0.5 dshx:pl-2.5 dshx:text-sm dshx:pointer-coarse:h-11"
+          className="dshx:inline-flex dshx:h-8 dshx:max-w-full dshx:min-w-0 dshx:items-center dshx:gap-1.5 dshx:rounded-lg dshx:border dshx:border-border dshx:pr-0.5 dshx:pl-2.5 dshx:text-sm dshx:pointer-coarse:h-11"
           data-fan-out-chip
           key={`${route.provider}/${route.model}`}
         >
@@ -30,7 +30,7 @@ export const FanOutChosen = (props: {
           <span className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground">{props.accountOf(route.provider)}</span>
           <button
             aria-label={props.removeLabel(name)}
-            className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:text-muted-foreground dshx:hover:bg-muted dshx:hover:text-foreground dshx:pointer-coarse:size-11"
+            className="dshx:flex dshx:size-7 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-md dshx:text-muted-foreground dshx:hover:bg-muted dshx:hover:text-foreground dshx:pointer-coarse:size-11"
             onClick={() => props.onRemove(route)}
             type="button"
           >

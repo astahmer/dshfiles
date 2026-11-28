@@ -533,9 +533,12 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   })
   const [fanOutText, setFanOutText] = useState('')
   const [fanOutModels, setFanOutModels] = useState<readonly { provider: string; model: string; reasoningEffort?: string }[]>([])
+  // Round 3 R2: the checklist opens on its own only when no model is chosen yet; with chosen models it waits behind Edit.
+  const [fanOutPicking, setFanOutPicking] = useState(false)
   useEffect(() => {
     if (!fanOutOpen) return
     setFanOutModels(fanOutPreset ?? [])
+    setFanOutPicking((fanOutPreset ?? []).length === 0)
   }, [fanOutOpen, fanOutPreset])
   useEffect(() => {
     const onRequest = (event: Event): void => {
@@ -2039,91 +2042,116 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
           if (!open) PaletteBridge.closeFanOut()
         }}
       >
-        {/* Council picker N7: a bottom sheet under the phone shell (the phone rule: sheets, not centred dialogs). */}
-        <DialogContent
-          className="dshx-root dshx:max-h-[85dvh] dshx:overflow-y-auto dshx:max-w-xl dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-0 dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none dshx:in-[html[data-shell-phone-nav]]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))]"
-          data-fan-out-dialog
-        >
-          <DialogHeader>
+        {/* Council picker N7, round 3 R2: under the phone shell a bottom sheet that sits on the software keyboard
+            (--dsh-keyboard-inset, phone-shell.ts). One scroller between the header and a footer that never scrolls away,
+            so Send stays in view while the prompt is focused. */}
+        <DialogContent className="dshx-root dshx:flex dshx:max-h-[85dvh] dshx:max-w-xl dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0 dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)] dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]]:max-h-[calc(85dvh-var(--dsh-keyboard-inset,0px))] dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none" data-fan-out-dialog>
+          <DialogHeader className="dshx:shrink-0 dshx:px-4 dshx:pt-4 dshx:pb-3 dshx:pr-12">
             <DialogTitle>{text(props.t, 'threadSidebarFanOutTitle')}</DialogTitle>
           </DialogHeader>
-          {fanOutModels.length === 0 ? null : (
-            <FanOutChosen
-              accountOf={provider => accountTagOf(fanOutCatalog.data?.groups.find(group => group.id === provider)?.name ?? provider)}
-              label={text(props.t, 'threadSidebarFanOutChosen')}
-              onRemove={route => toggleFanOutModel(route.provider, route.model)}
-              removeLabel={model => text(props.t, 'threadSidebarFanOutRemove').replace('{model}', model)}
-              routes={fanOutModels}
-            />
-          )}
-          <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm dshx:font-medium">
-            {text(props.t, 'threadSidebarFanOutPrompt')}
-            <Textarea
-              onChange={event => setFanOutText(event.target.value)}
-              placeholder={text(props.t, 'threadSidebarFanOutPromptPlaceholder')}
-              value={fanOutText}
-            />
-          </label>
-          <div className="dshx:max-h-64 dshx:overflow-y-auto dshx:rounded-md dshx:border dshx:border-border dshx:p-2">
-            {fanOutCatalog.data?.groups.map(group => (
-              <section key={group.id} className="dshx:mb-2">
-                <h3 className="dshx:px-2 dshx:py-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.name}</h3>
-                {group.models.map(model => {
-                  const checked = fanOutModels.some(route => route.provider === group.id && route.model === model.id)
-                  return (
-                    <label
-                      key={`${group.id}/${model.id}`}
-                      className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-sm dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:hover:bg-accent dshx:pointer-coarse:min-h-11"
-                    >
-                      <Checkbox
-                        checked={checked}
-                        disabled={!checked && fanOutModels.length >= 6}
-                        onCheckedChange={() => toggleFanOutModel(group.id, model.id, model.reasoning?.defaultEffort)}
-                      />
-                      {/* b:ysaj, council picker N1: the kit's display name, as the chips above and the picker name it. */}
-                      <span>{fanOutModelName(group.id, model.id, model.name)}</span>
-                    </label>
-                  )
-                })}
-              </section>
-            ))}
-            {fanOutCatalog.isPending ? <p role="status">{text(props.t, 'threadSidebarFanOutLoading')}</p> : null}
-            {fanOutCatalog.data !== undefined && fanOutCatalog.data.groups.length === 0 && fanOutCatalog.error === null ? (
-              <p role="status" className="dshx:p-2 dshx:text-sm dshx:text-muted-foreground">
-                {text(props.t, 'threadSidebarFanOutEmpty')}
-              </p>
+          <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:overscroll-contain dshx:px-4 dshx:pb-3" data-fan-out-body>
+            {fanOutModels.length === 0 ? null : (
+              <FanOutChosen
+                accountOf={provider => accountTagOf(fanOutCatalog.data?.groups.find(group => group.id === provider)?.name ?? provider)}
+                label={text(props.t, 'threadSidebarFanOutChosen')}
+                onRemove={route => toggleFanOutModel(route.provider, route.model)}
+                removeLabel={model => text(props.t, 'threadSidebarFanOutRemove').replace('{model}', model)}
+                routes={fanOutModels}
+              />
+            )}
+            <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm dshx:font-medium">
+              {text(props.t, 'threadSidebarFanOutPrompt')}
+              <Textarea
+                className="dshx:resize-none"
+                data-fan-out-prompt
+                onChange={event => setFanOutText(event.target.value)}
+                placeholder={text(props.t, 'threadSidebarFanOutPromptPlaceholder')}
+                rows={6}
+                value={fanOutText}
+              />
+            </label>
+            {/* The full checklist is behind Add / Edit models: the chips above are what Send uses. */}
+            <Button
+              aria-controls="thread-sidebar-fan-out-models"
+              aria-expanded={fanOutPicking}
+              className="dshx:self-start dshx:pointer-coarse:h-11"
+              data-fan-out-edit
+              onClick={() => setFanOutPicking(!fanOutPicking)}
+              size="sm"
+              type="button"
+              variant="outline"
+            >
+              {text(props.t, fanOutModels.length === 0 ? 'threadSidebarFanOutAddModels' : 'threadSidebarFanOutEditModels')}
+            </Button>
+            {fanOutPicking ? (
+              <div className="dshx:flex dshx:flex-col dshx:gap-2" data-fan-out-models id="thread-sidebar-fan-out-models">
+                {fanOutCatalog.data?.groups.map(group => (
+                  <section key={group.id}>
+                    <h3 className="dshx:py-1 dshx:text-xs dshx:font-medium dshx:text-muted-foreground">{group.name}</h3>
+                    {group.models.map(model => {
+                      const checked = fanOutModels.some(route => route.provider === group.id && route.model === model.id)
+                      return (
+                        <label
+                          key={`${group.id}/${model.id}`}
+                          className="dshx:flex dshx:items-center dshx:gap-2 dshx:rounded-md dshx:px-2 dshx:py-1.5 dshx:text-sm dshx:hover:bg-accent dshx:pointer-coarse:min-h-11"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            disabled={!checked && fanOutModels.length >= 6}
+                            onCheckedChange={() => toggleFanOutModel(group.id, model.id, model.reasoning?.defaultEffort)}
+                          />
+                          {/* b:ysaj, council picker N1: the kit's display name, as the chips above and the picker name it. */}
+                          <span>{fanOutModelName(group.id, model.id, model.name)}</span>
+                        </label>
+                      )
+                    })}
+                  </section>
+                ))}
+                {fanOutCatalog.isPending ? <p role="status">{text(props.t, 'threadSidebarFanOutLoading')}</p> : null}
+                {fanOutCatalog.data !== undefined && fanOutCatalog.data.groups.length === 0 && fanOutCatalog.error === null ? (
+                  <p role="status" className="dshx:text-sm dshx:text-muted-foreground">
+                    {text(props.t, 'threadSidebarFanOutEmpty')}
+                  </p>
+                ) : null}
+                {fanOutCatalog.error === null ? null : (
+                  <p role="alert" className="dshx:text-sm dshx:text-destructive">
+                    {errorMessage(fanOutCatalog.error, 'Could not load models. Reopen this dialog to retry.')}
+                  </p>
+                )}
+              </div>
             ) : null}
-            {fanOutCatalog.error === null ? null : (
+            {sendFanOut.error === null ? null : (
               <p role="alert" className="dshx:text-sm dshx:text-destructive">
-                {errorMessage(fanOutCatalog.error, 'Could not load models. Reopen this dialog to retry.')}
+                {errorMessage(sendFanOut.error, 'Could not start the model threads.')}
               </p>
             )}
           </div>
-          {sendFanOut.error === null ? null : (
-            <p role="alert" className="dshx:text-sm dshx:text-destructive">
-              {errorMessage(sendFanOut.error, 'Could not start the model threads.')}
-            </p>
-          )}
-          {fanOutSend.reason === null ? null : (
-            <p className="dshx:text-xs dshx:text-muted-foreground" data-fan-out-reason id="thread-sidebar-fan-out-reason">
-              {text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutNeedsPrompt')}
-            </p>
-          )}
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
-              Cancel
-            </Button>
-            <Button
-              aria-describedby={fanOutSend.reason === null ? undefined : 'thread-sidebar-fan-out-reason'}
-              type="button"
-              disabled={fanOutSend.disabled || sendFanOut.isPending}
-              onClick={() => sendFanOut.mutate()}
-            >
-              {sendFanOut.isPending
-                ? text(props.t, 'threadSidebarFanOutSending')
-                : text(props.t, 'threadSidebarFanOutSendTo').replace('{count}', String(fanOutModels.length))}
-            </Button>
-          </DialogFooter>
+          <div
+            className="dshx:flex dshx:shrink-0 dshx:flex-col dshx:gap-2 dshx:border-t dshx:border-border dshx:px-4 dshx:pt-3 dshx:pb-4 dshx:in-[html[data-shell-phone-nav]]:pb-[calc(1rem+env(safe-area-inset-bottom,0px))] dshx:in-[html[data-phone-keyboard]]:pb-3"
+            data-fan-out-footer
+          >
+            {fanOutSend.reason === null ? null : (
+              <p className="dshx:text-xs dshx:text-muted-foreground" data-fan-out-reason id="thread-sidebar-fan-out-reason">
+                {text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutNeedsPrompt')}
+              </p>
+            )}
+            <DialogFooter className="dshx:flex-row dshx:justify-end">
+              <Button className="dshx:pointer-coarse:h-11" type="button" variant="outline" onClick={() => PaletteBridge.closeFanOut()}>
+                Cancel
+              </Button>
+              <Button
+                aria-describedby={fanOutSend.reason === null ? undefined : 'thread-sidebar-fan-out-reason'}
+                className="dshx:pointer-coarse:h-11"
+                type="button"
+                disabled={fanOutSend.disabled || sendFanOut.isPending}
+                onClick={() => sendFanOut.mutate()}
+              >
+                {sendFanOut.isPending
+                  ? text(props.t, 'threadSidebarFanOutSending')
+                  : text(props.t, 'threadSidebarFanOutSendTo').replace('{count}', String(fanOutModels.length))}
+              </Button>
+            </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </TooltipProvider>

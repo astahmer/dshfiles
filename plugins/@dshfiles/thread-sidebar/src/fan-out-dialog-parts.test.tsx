@@ -46,9 +46,54 @@ describe('fan-out dialog (council picker round 1, N7)', () => {
     expect(dialog.indexOf('<FanOutChosen')).toBeLessThan(dialog.indexOf('<Textarea'))
     expect(dialog).toMatch(/<label[^>]*>\s*\{text\(props\.t, 'threadSidebarFanOutPrompt'\)\}\s*<Textarea/u)
     expect(dialog).toContain("'threadSidebarFanOutSendTo'")
-    expect(shell).toMatch(/dshx:in-\[html\[data-shell-phone-nav\]\]:bottom-0[^"]*dshx:in-\[html\[data-shell-phone-nav\]\]:rounded-b-none/u)
+    expect(shell).toMatch(/dshx:in-\[html\[data-shell-phone-nav\]\]:bottom-\[var\(--dsh-keyboard-inset,0px\)\][^"]*dshx:in-\[html\[data-shell-phone-nav\]\]:rounded-b-none/u)
     const locales = readFileSync(new URL('./locales.ts', import.meta.url), 'utf8')
     expect(locales).toContain("threadSidebarFanOutPromptPlaceholder: 'Prompt for each model…'")
     expect(locales).toContain("threadSidebarFanOutSendTo: 'Send to {count} models'")
+  })
+})
+
+describe('fan-out sheet on the phone (council picker round 3, R2)', () => {
+  const shell = readFileSync(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
+  const dialog = shell.slice(shell.indexOf('data-fan-out-dialog'), shell.indexOf('</DialogContent>', shell.indexOf('data-fan-out-dialog')))
+  const tag = (marker: string): string => {
+    const at = dialog.indexOf(marker)
+    return dialog.slice(dialog.lastIndexOf('<', at), dialog.indexOf('>\n', at))
+  }
+
+  it('has one scroller between the header and a footer that never scrolls away', () => {
+    expect(dialog.match(/overflow-y-auto/gu) ?? []).toHaveLength(1)
+    expect(tag('data-fan-out-body')).toMatch(/dshx:min-h-0 dshx:flex-1[^"]*dshx:overflow-y-auto/u)
+    expect(dialog).not.toContain('max-h-64')
+    expect(dialog.indexOf('data-fan-out-footer')).toBeGreaterThan(dialog.lastIndexOf('</div>', dialog.indexOf('data-fan-out-footer')) - 1)
+    expect(tag('data-fan-out-footer')).toMatch(/dshx:shrink-0/u)
+    expect(tag('data-fan-out-footer')).toContain('safe-area-inset-bottom')
+  })
+
+  it('sits on the software keyboard under the phone shell, so Send stays in view with the prompt focused', () => {
+    expect(shell).toContain('dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)]')
+    expect(shell).toContain('dshx:in-[html[data-shell-phone-nav]]:max-h-[calc(85dvh-var(--dsh-keyboard-inset,0px))]')
+  })
+
+  it('labels a 6-line prompt with no resize grip, and keeps the checklist behind Add / Edit models', () => {
+    expect(tag('data-fan-out-prompt')).toMatch(/dshx:resize-none/u)
+    expect(tag('data-fan-out-prompt')).toContain('rows={6}')
+    expect(tag('data-fan-out-edit')).toContain('aria-expanded={fanOutPicking}')
+    expect(dialog).toMatch(/\{fanOutPicking \? \(\s*<div[^>]*data-fan-out-models/u)
+    expect(shell).toContain('setFanOutPicking((fanOutPreset ?? []).length === 0)')
+  })
+
+  it('draws the chips on the UI radius, not as pills', () => {
+    const html = renderToString(
+      <FanOutChosen
+        accountOf={() => 'CC1'}
+        label="Chosen"
+        onRemove={() => undefined}
+        removeLabel={model => `Remove ${model}`}
+        routes={[{ provider: 'cc1', model: 'gpt-6-luna' }]}
+      />,
+    )
+    expect(/<span[^>]*data-fan-out-chip[^>]*>/u.exec(html)?.[0]).toMatch(/dshx:rounded-lg/u)
+    expect(html).not.toContain('rounded-full')
   })
 })
