@@ -63,6 +63,15 @@ export const FastModeRow = (props: {
   )
 }
 
+/** When to ask a route's Fast mode status again (round 5 U3): while it reads unavailable, up to five times. */
+export class FastModeRetry {
+  static readonly DELAY_MS = 2_000
+  static readonly LIMIT = 5
+  static shouldRetry(input: { readonly status: { readonly available: boolean } | undefined; readonly retries: number }): boolean {
+    return input.status !== undefined && !input.status.available && input.retries < FastModeRetry.LIMIT
+  }
+}
+
 /** Fast mode for the inspected route: hidden unless AI Accounts says the route supports it. */
 export const FastModeSection = ({
   sessionId,
@@ -85,6 +94,19 @@ export const FastModeSection = ({
   useEffect(() => {
     if (status !== undefined && status.available) onStatus?.(status.enabled)
   }, [status, onStatus])
+  // Round 5 U3: a route reads "unavailable" while its service's catalog is still loading (Codex lists its Fast tiers
+  // late), and nothing asked again, so the row never came. Ask again a few times while the details stay open.
+  const [retries, setRetries] = useState(0)
+  const { refetch } = state
+  useEffect(() => setRetries(0), [sessionId, provider, model])
+  useEffect(() => {
+    if (!FastModeRetry.shouldRetry({ status, retries })) return
+    const timer = setTimeout(() => {
+      setRetries(count => count + 1)
+      refetch()
+    }, FastModeRetry.DELAY_MS)
+    return () => clearTimeout(timer)
+  }, [status, retries, refetch])
   if (status === undefined || !status.available) return null
 
   const update = async (enabled: boolean): Promise<void> => {
