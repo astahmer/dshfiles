@@ -42,8 +42,9 @@ A Sidebar Session view holds a whole Session with its live follow, and a kept-mo
 | Setting (`dshfiles-sidebar-right`) | Default | Meaning                                                                                                                 |
 | ---------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `residentThreads`                  | `4`     | Threads besides the on-screen one whose side-panel tabs stay loaded. `0` keeps every visited thread loaded (pre-bound). |
+| `restoreSidebarState`              | `true`  | Restore the sidebar panel state (open/closed) when switching threads. Each thread remembers whether its sidebar was expanded. |
 
-The setting applies live, with no restart. A thread that leaves the window releases its resource pins and its Session reference; showing it again reopens its tabs and remounts their bodies. Workbench restored records follow the same window, so a record saved for a non-resident thread is not acquired on reload.
+Both settings apply live, with no restart. A thread that leaves the window releases its resource pins and its Session reference; showing it again reopens its tabs and remounts their bodies. Workbench restored records follow the same window, so a record saved for a non-resident thread is not acquired on reload.
 
 A remounted editor body restores its file content and its own drafts: those live in the editor's per-session store, not in the view. Its text-editor view state does not survive: the cursor, selection and scroll of a pruned Monaco body are lost, because the native editor tab body publishes no view state for this fork to save and restore. Losing them costs a scroll after a thread returns; keeping them would need a native provider API this fork cannot add.
 
