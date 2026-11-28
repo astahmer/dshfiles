@@ -30,10 +30,12 @@
   },
   "dependencies": {
     "@dshfiles/credential-port": "workspace:*",
+    "@dshfiles/jj-integration": "workspace:*",
     "@dshfiles/plugin-ui": "workspace:*",
     "@dshfiles/session-controller": "workspace:*",
     "@dshfiles/shared-runtime": "workspace:*",
     "@dshfiles/thread-sidebar": "workspace:*",
+    "@dshfiles/vcs-provider-port": "workspace:*",
     "effect": "catalog:"
   },
   "devDependencies": {

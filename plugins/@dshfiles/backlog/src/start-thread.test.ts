@@ -197,3 +197,26 @@ describe('start thread form', () => {
     expect(StartThreadForm.preview(`${'x'.repeat(10)}🟩🟩🟩`, 11)).toBe(`${'x'.repeat(10)}🟩…`)
   })
 })
+
+describe('StartThreadForm workspace choices', () => {
+  const destination = { vcs: 'jj' as const, mainBookmark: 'main', bookmarks: ['main', 'feature'], remoteBookmarks: ['main@origin', 'review@origin'] }
+
+  it('offers the New thread row choices: a new workspace or the checkout, then local and remote bookmarks', () => {
+    const options = StartThreadForm.checkoutOptions(destination)
+    expect(options.map(option => [option.group, option.label])).toEqual([
+      ['Workspace', 'New workspace'],
+      ['Workspace', 'Project checkout'],
+      ['Start from', 'feature'],
+      ['Start from remote', 'main@origin'],
+      ['Start from remote', 'review@origin'],
+    ])
+    expect(options[0]?.description).toBe('From main')
+    expect(options.filter(option => option.remote).map(option => option.value)).toEqual(['own:main@origin', 'own:review@origin'])
+  })
+
+  it('round-trips each choice through the picker value', () => {
+    for (const checkout of [{ kind: 'in-place' as const }, { kind: 'own' as const, base: undefined }, { kind: 'own' as const, base: 'origin/feature' }]) {
+      expect(StartThreadForm.checkoutOf(StartThreadForm.checkoutValue(checkout))).toEqual(checkout)
+    }
+  })
+})

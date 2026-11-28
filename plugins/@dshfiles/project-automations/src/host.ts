@@ -4,8 +4,10 @@ import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-workspace'
 import { SecretReferenceResolver } from '@dshfiles/credential-port/effect'
 import { Api, DshxPlugin, HostContext, hostService, WebRoutes } from '@dshfiles/dshx/effect'
+import { HostApis } from '@dshfiles/dshx/effect/host-apis'
 import { createHostApiClient } from '@dshfiles/dshx/host'
 import { sessionsApi } from '@dshfiles/session-controller/sessions-api'
+import { VcsProviderService } from '@dshfiles/vcs-provider-port/effect'
 import { Effect, Layer } from 'effect'
 import { automationsApi } from './automations-api.js'
 import { projectAutomationsSettingsLayer } from './automation-settings.js'
@@ -60,7 +62,12 @@ const WebhookRouteLive = Layer.effectDiscard(
   }),
 )
 
-const CoreLive = AutomationRunner.layer.pipe(Layer.provideMerge(Layer.mergeAll(AutomationStore.layer, WebhookReplayStore.layer, SessionsLive, ProjectsLive)))
+/** The version-control provider (jj-integration, git-worktrees) that cuts a run's thread a workspace of its own. */
+const VcsLive = VcsProviderService.layer.pipe(Layer.provide(HostApis.layer))
+
+const CoreLive = AutomationRunner.layer.pipe(
+  Layer.provideMerge(Layer.mergeAll(AutomationStore.layer, WebhookReplayStore.layer, SessionsLive, ProjectsLive, VcsLive)),
+)
 
 const AutomationsLive = Layer.mergeAll(AutomationsService.layer, WebhookRouteLive).pipe(
   Layer.provideMerge(Layer.mergeAll(CoreLive, OriginLive, WebhookGuards.layer, SecretReferenceResolver.layer, projectAutomationsSettingsLayer)),

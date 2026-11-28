@@ -46,6 +46,10 @@ export interface StartThreadInput {
   readonly ids: readonly number[]
   readonly workspaceId?: string | undefined
   readonly cwd?: string | undefined
+  /** false runs a project thread in the project checkout; omitted or true cuts it a workspace of its own. */
+  readonly isolate?: boolean | undefined
+  /** The bookmark that own workspace starts from (a remote one is fetched first); the project's main branch when omitted. */
+  readonly base?: string | undefined
   readonly agent?: string | undefined
   readonly provider?: string | undefined
   readonly model?: string | undefined
@@ -164,12 +168,18 @@ export class ThreadStart extends Context.Service<
        * The workspace a started thread runs in: the version-control provider that claims the project cuts a thread
        * workspace from it, and a project no provider claims, or a Host without any provider, starts in the checkout.
        */
-      const isolatedWorkspaceOf = Effect.fn('backlog isolated workspace')(function* (workspaceId: string) {
+      const isolatedWorkspaceOf = Effect.fn('backlog isolated workspace')(function* (workspaceId: string, base: string | undefined) {
         const path = (yield* workspaces.list).find(workspace => workspace.id === workspaceId)?.path
         const provider = path === undefined ? Option.none() : yield* vcs.resolve({ path })
-        if (Option.isNone(provider)) return WorkspaceId(workspaceId)
+        if (Option.isNone(provider)) {
+          if (base === undefined) return WorkspaceId(workspaceId)
+          return yield* new WorkspaceProvisionFailed({
+            workspaceId,
+            reason: `this project is not a jj or git repository, so it cannot start from "${base}". Leave the starting bookmark out, or enable Jujutsu for the project.`,
+          })
+        }
         const provisioned = yield* provider.value.client
-          .provision({ workspaceId, isolate: true })
+          .provision(base === undefined ? { workspaceId, isolate: true } : { workspaceId, isolate: true, base })
           .pipe(Effect.mapError(error => new WorkspaceProvisionFailed({ workspaceId, reason: error.message, cause: error })))
         return WorkspaceId(provisioned.workspaceId)
       })
@@ -320,9 +330,15 @@ export class ThreadStart extends Context.Service<
           registered: yield* workspaces.list,
           itemProjects: items.map(detail => detail.item.project),
         })
+        const planned = StartThreadPlacementPlan.checkout({ placement, isolate: input.isolate, base: input.base })
+        if (!planned.ok) return yield* new StartContextInvalid({ reason: planned.reason })
+        const checkout = planned.checkout
+        yield* Effect.annotateCurrentSpan({ 'dshx.backlog.checkout': checkout.kind })
         const base: SessionCreateRequest =
           placement.workspaceId !== undefined
-            ? { workspaceId: yield* isolatedWorkspaceOf(placement.workspaceId) }
+            ? {
+                workspaceId: checkout.kind === 'own' ? yield* isolatedWorkspaceOf(placement.workspaceId, checkout.base) : WorkspaceId(placement.workspaceId),
+              }
             : placement.cwd === undefined
               ? {}
               : { cwd: placement.cwd }

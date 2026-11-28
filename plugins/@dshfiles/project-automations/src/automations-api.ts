@@ -55,9 +55,17 @@ export const triggerSchema = Schema.Union([
   Schema.Struct({ kind: Schema.Literal('webhook'), secretRef: Schema.String, ratePerMinute }),
 ])
 
-/** Where a run posts its prompt: a new thread in the project, or an existing thread of it. */
+/**
+ * Where a run posts its prompt: a new thread in the project, or an existing thread of it. A new thread runs in the
+ * project checkout unless `isolate` gives it a workspace of its own, cut from `base` (the project's main branch when
+ * omitted), as the New thread row's workspace picker does.
+ */
 export const destinationSchema = Schema.Union([
-  Schema.Struct({ kind: Schema.Literal('new-thread') }),
+  Schema.Struct({
+    kind: Schema.Literal('new-thread'),
+    isolate: Schema.optional(Schema.Boolean),
+    base: Schema.optional(Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256))),
+  }),
   Schema.Struct({ kind: Schema.Literal('existing-thread'), sessionId: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(256)) }),
 ])
 export type AutomationDestination = typeof destinationSchema.Type
@@ -162,7 +170,7 @@ export const automationsApi = defineApi({
       tool: { name: 'automation_projects', readOnly: true },
     }),
     save: method({
-      description: `Create a project automation (omit id) or replace one (pass its id). A schedule trigger takes cron, daily, weekly or every timing with an explicit IANA time zone; a webhook trigger takes the HMAC secret as a secret:ALIAS reference and a per-minute rate limit. Each run posts its prompt: by default it starts a new thread in the project, and with destination {kind:'existing-thread',sessionId} it adds the prompt to that thread as a queued message. A webhook prompt may read {{body.path}} and {{headers.name}}, and accepts either the timestamped x-dsh-signature scheme or GitHub's x-hub-signature-256 over the raw body. ${ONLY_WHEN_ASKED}`,
+      description: `Create a project automation (omit id) or replace one (pass its id). A schedule trigger takes cron, daily, weekly or every timing with an explicit IANA time zone; a webhook trigger takes the HMAC secret as a secret:ALIAS reference and a per-minute rate limit. Each run posts its prompt: by default it starts a new thread in the project checkout; destination {kind:'new-thread',isolate:true} gives each run's thread a new jj/git workspace of its own, cut from base (a bookmark such as 'feature', or a remote one like 'feature@origin' that is fetched first; the project's main branch when omitted); and destination {kind:'existing-thread',sessionId} adds the prompt to that thread as a queued message. A webhook prompt may read {{body.path}} and {{headers.name}}, and accepts either the timestamped x-dsh-signature scheme or GitHub's x-hub-signature-256 over the raw body. ${ONLY_WHEN_ASKED}`,
       input: automationDraftSchema,
       output: automationViewSchema,
       tool: { name: 'automation_save', readOnly: false },

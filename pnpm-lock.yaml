@@ -6242,6 +6242,9 @@ importers:
       '@dshfiles/credential-port':
         specifier: workspace:*
         version: link:../credential-port
+      '@dshfiles/jj-integration':
+        specifier: workspace:*
+        version: link:../jj-integration
       '@dshfiles/plugin-ui':
         specifier: workspace:*
         version: link:../plugin-ui
@@ -6254,6 +6257,9 @@ importers:
       '@dshfiles/thread-sidebar':
         specifier: workspace:*
         version: link:../thread-sidebar
+      '@dshfiles/vcs-provider-port':
+        specifier: workspace:*
+        version: link:../vcs-provider-port
       effect:
         specifier: 'catalog:'
         version: 4.1.2

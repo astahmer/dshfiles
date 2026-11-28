@@ -75,6 +75,14 @@ const make = Effect.gen(function* () {
           code: 'unknown-project',
         }),
       )
+    const destination = draft.destination
+    if (destination?.kind === 'new-thread' && destination.base !== undefined && destination.isolate !== true)
+      return yield* Effect.fail(
+        new PluginApiError(
+          `A thread that runs in the project checkout cannot start from "${destination.base}": give it a workspace of its own (isolate: true), or leave the starting bookmark out.`,
+          { code: 'invalid-destination' },
+        ),
+      )
     if (draft.trigger.kind === 'webhook') {
       const checked = PromptTemplate.check(draft.prompt)
       if (!checked.ok) return yield* Effect.fail(new PluginApiError(`The prompt template is not valid: ${checked.message}`, { code: 'invalid-template' }))

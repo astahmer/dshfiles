@@ -2,6 +2,9 @@ import type { ModelCatalog } from '@deepseek-ai/dsh-api-session-controller/types
 import type { WorkspaceId } from '@deepseek-ai/dsh-workspace/types'
 import { Schema } from 'effect'
 import { BacklogReference } from './backlog-reference.js'
+import type { StartThreadCheckout } from './start-thread-workspace.js'
+
+export type { StartThreadCheckout } from './start-thread-workspace.js'
 
 const effortSchema = Schema.Struct({ id: Schema.String, name: Schema.String, description: Schema.optionalKey(Schema.String) })
 const modelSchema = Schema.Struct({
@@ -76,6 +79,28 @@ export type StartThreadTarget =
   | { readonly kind: 'cwd'; readonly path: string }
   | { readonly kind: 'default' }
 
+/**
+ * What a project's repository offers a new thread, as jj-integration describes it for the New thread row: the bookmarks
+ * (git: branches) a workspace of its own can start from, fetched remote ones apart, and the main branch it starts from
+ * by default.
+ */
+export interface StartThreadDestination {
+  readonly vcs: 'jj' | 'git'
+  readonly mainBookmark: string | null
+  readonly bookmarks: readonly string[]
+  readonly remoteBookmarks: readonly string[]
+}
+
+/** One entry of the dialog's workspace picker. */
+export interface StartThreadCheckoutOption {
+  readonly value: string
+  readonly label: string
+  readonly description: string
+  readonly group: string
+  /** A fetched remote bookmark, which the Host fetches again before the workspace starts from it. */
+  readonly remote: boolean
+}
+
 /** One row of the dialog's model list. */
 export interface StartThreadModelRow {
   readonly key: string
@@ -113,6 +138,8 @@ export interface StartThreadRequest {
   /** Create one thread for all items, or a separate thread for each selected item. */
   readonly mode?: 'together' | 'per-item'
   readonly target: StartThreadTarget
+  /** For a project target: its own workspace (from a bookmark) or the project checkout; omitted keeps the Host default, its own workspace. */
+  readonly checkout?: StartThreadCheckout
   /** The agent picked in the dialog; its preset and route win over the provider/model fields. */
   readonly agent?: StartThreadAgent
   /** `null` leaves the Host default when no agent route applies. */
@@ -205,6 +232,45 @@ export class StartThreadForm {
     if (itemPath === null) return 'default'
     const project = projects.find(candidate => candidate.path === itemPath)
     return project === undefined ? `cwd:${itemPath}` : `project:${project.id}`
+  }
+
+  /** The workspace picker's value for a checkout: one string, so own-from-bookmark and in-place share one list. */
+  static checkoutValue(checkout: StartThreadCheckout): string {
+    if (checkout.kind === 'in-place') return 'in-place'
+    return checkout.base === undefined ? 'own' : `own:${checkout.base}`
+  }
+
+  static checkoutOf(value: string): StartThreadCheckout {
+    if (value === 'in-place') return { kind: 'in-place' }
+    return { kind: 'own', base: value.startsWith('own:') ? value.slice('own:'.length) : undefined }
+  }
+
+  /**
+   * The New thread row's workspace choices for one repository: a new workspace from the main branch or the project
+   * checkout, then every local bookmark and every fetched remote bookmark a new workspace can start from.
+   */
+  static checkoutOptions(destination: StartThreadDestination): StartThreadCheckoutOption[] {
+    const main = destination.mainBookmark
+    const branch = destination.vcs === 'git' ? 'branch' : 'bookmark'
+    const startFrom = (base: string, group: string, remote: boolean): StartThreadCheckoutOption => ({
+      value: StartThreadForm.checkoutValue({ kind: 'own', base }),
+      label: base,
+      description: remote ? `New workspace · fetched first` : 'New workspace',
+      group,
+      remote,
+    })
+    return [
+      {
+        value: 'own',
+        label: 'New workspace',
+        description: main === null ? `From the project's main ${branch}` : `From ${main}`,
+        group: 'Workspace',
+        remote: false,
+      },
+      { value: 'in-place', label: 'Project checkout', description: 'Edits the project folder directly', group: 'Workspace', remote: false },
+      ...destination.bookmarks.filter(name => name !== main).map(name => startFrom(name, 'Start from', false)),
+      ...destination.remoteBookmarks.map(name => startFrom(name, 'Start from remote', true)),
+    ]
   }
 
   /** The preselected model row key, falling back to the first listed model when the default left the catalog. */
