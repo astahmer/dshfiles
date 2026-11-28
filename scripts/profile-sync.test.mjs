@@ -73,7 +73,8 @@ test('adds and removes seed bundles and keeps what the user added', () => {
   profile.dependencies['user-plugin'] = `link:${join(root, 'user-plugin')}`
   profile.dsh.profile.bundles.push('user-plugin')
   writeJson(join(profileDirectory(), 'package.json'), profile)
-  write(join(profileDirectory(), 'cordis.patch.yml'), `- id: user-entry\n${patchRegion.replace('managed', 'edited')}`)
+  // An edit to a row the seed declares stays the seed's: the region is restored as shipped.
+  write(join(profileDirectory(), 'cordis.patch.yml'), `- id: user-entry\n${patchRegion.replace('- id: managed', '- id: managed\n  disabled: true')}`)
   writeSeed(['alpha', 'gamma'])
 
   const result = sync()
@@ -228,6 +229,137 @@ test('keeps an empty root when nothing follows it', () => {
   write(join(profileDirectory(), 'cordis.patch.yml'), stockHeader)
   assert.equal(sync().status, 0)
   assert.equal(readFileSync(join(profileDirectory(), 'cordis.patch.yml'), 'utf8'), stockHeader)
+})
+
+// DSH's Settings append a row at the end of the patch, which is inside the managed region when that region ends the
+// file; replacing the region wholesale then lost MCP servers and UI preferences without a word (2026-11-18).
+const patchPath = () => join(profileDirectory(), 'cordis.patch.yml')
+const readPatch = () => readFileSync(patchPath(), 'utf8')
+const seedPatch = text => write(join(seedDirectory, 'cordis.patch.yml'), text)
+const region = (...rows) => `# BEGIN NIX-MANAGED DSH PLUGINS\n${rows.join('')}# END NIX-MANAGED DSH PLUGINS\n`
+const mcpRow = '- id: mcp-servers\n  name: "@dshfiles/mcp-servers"\n  config:\n    servers:\n      - id: local\n        transport: stdio\n'
+const stylesRow = '- id: ui-styles\n  config:\n    preset: warm-stone\n'
+const keptHeader = '# Rows saved inside the managed region, moved here by profile-sync: it rewrites only that region.'
+
+test('moves rows saved inside the managed region below it instead of dropping them', () => {
+  assert.equal(sync().status, 0)
+  write(patchPath(), `- id: user-entry\n${region('- id: managed\n', mcpRow, stylesRow)}`)
+
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  assert.match(result.output, /kept 2 rows saved inside the managed region below it: mcp-servers, ui-styles$/m)
+  const patch = readPatch()
+  assert.equal(patch, `- id: user-entry\n${patchRegion}\n${keptHeader}\n${mcpRow}${stylesRow}`)
+  assert.equal(patch.split('- id: mcp-servers').length, 2)
+
+  const again = sync()
+  assert.equal(again.status, 0, again.output)
+  assert.match(again.output, /is up to date/)
+  assert.equal(readPatch(), patch)
+})
+
+test('a later seed update keeps rows moved out of the region', () => {
+  assert.equal(sync().status, 0)
+  write(patchPath(), region('- id: managed\n', mcpRow))
+  assert.equal(sync().status, 0)
+  seedPatch(`- id: seeded\n${region('- id: managed\n', '- id: added-by-seed\n')}`)
+
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  const patch = readPatch()
+  assert.ok(patch.startsWith(region('- id: managed\n', '- id: added-by-seed\n')), patch)
+  assert.ok(patch.endsWith(mcpRow), patch)
+  assert.equal(patch.split('- id: mcp-servers').length, 2)
+})
+
+test('keeps a whole row: nested lists, nested ids, block scalars and blank lines', () => {
+  assert.equal(sync().status, 0)
+  const row = [
+    '- id: user-preset',
+    '  config:',
+    '    children:',
+    '      - id: managed',
+    '        disabled: true',
+    '    script: !!js |-',
+    '      const a = 1',
+    '',
+    '      return a',
+    '',
+  ].join('\n')
+  write(patchPath(), region('- id: managed\n', row, '# END DERIVED preset-standard\n'))
+
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  assert.match(result.output, /kept 1 row saved inside the managed region below it: user-preset$/m)
+  assert.ok(readPatch().endsWith(row), readPatch())
+  assert.ok(readPatch().startsWith(patchRegion), readPatch())
+})
+
+test('keeps a row identified by a nested id key', () => {
+  assert.equal(sync().status, 0)
+  const row = "- name: '@scope/plugin'\n  id: 'named-later'\n  config: {a: 1}\n"
+  write(patchPath(), region('- id: managed\n', row))
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  assert.match(result.output, /: named-later$/m)
+  assert.ok(readPatch().endsWith(row))
+})
+
+test('drops a row the previous seed declared once the seed stops declaring it', () => {
+  seedPatch(`- id: seeded\n${region('- id: managed\n', '- id: retired\n  disabled: true\n')}`)
+  assert.equal(sync().status, 0)
+  assert.deepEqual(JSON.parse(readFileSync(join(profileDirectory(), '.dshfiles-profile-sync.json'), 'utf8')).regionRowIds, ['managed', 'retired'])
+  seedPatch(`- id: seeded\n${patchRegion}`)
+
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  assert.doesNotMatch(result.output, /kept \d+ row/)
+  assert.doesNotMatch(readPatch(), /retired/)
+})
+
+test('records the seed row ids even when the profile is otherwise up to date', () => {
+  assert.equal(sync().status, 0)
+  const statePath = join(profileDirectory(), '.dshfiles-profile-sync.json')
+  const state = JSON.parse(readFileSync(statePath, 'utf8'))
+  delete state.regionRowIds
+  writeJson(statePath, state)
+  assert.equal(sync().status, 0)
+  assert.deepEqual(JSON.parse(readFileSync(statePath, 'utf8')).regionRowIds, ['managed'])
+})
+
+test('does not duplicate a row already declared outside the region, and keeps the stray copy as a comment', () => {
+  assert.equal(sync().status, 0)
+  const outside = '- id: mcp-servers\n  config:\n    servers: []\n'
+  write(patchPath(), `${outside}${region('- id: managed\n', mcpRow)}`)
+
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  assert.match(result.output, /warning: mcp-servers is declared both inside and outside the managed region/)
+  const patch = readPatch()
+  assert.equal(patch.match(/^- id: mcp-servers$/gm).length, 1)
+  assert.ok(patch.startsWith(`${outside}${patchRegion}`), patch)
+  for (const line of mcpRow.trimEnd().split('\n')) assert.ok(patch.includes(`\n# ${line}\n`), `${line} missing from\n${patch}`)
+  assert.equal(sync().status, 0)
+  assert.equal(readPatch(), patch)
+})
+
+test('an identical copy outside the region is dropped silently', () => {
+  assert.equal(sync().status, 0)
+  write(patchPath(), `${mcpRow}${region('- id: managed\n', mcpRow)}`)
+  const result = sync()
+  assert.equal(result.status, 0, result.output)
+  assert.doesNotMatch(result.output, /declared both inside|kept \d+ row/)
+  assert.equal(readPatch(), `${mcpRow}${patchRegion}`)
+})
+
+test('--dry-run reports the rows it would keep and writes nothing', () => {
+  assert.equal(sync().status, 0)
+  const before = region('- id: managed\n', mcpRow)
+  write(patchPath(), before)
+  const result = sync('--dry-run')
+  assert.equal(result.status, 0, result.output)
+  assert.match(result.output, /would keep 1 row saved inside the managed region below it: mcp-servers$/m)
+  assert.equal(readPatch(), before)
 })
 
 test('reinstalls when a linked dependency is missing from node_modules', () => {
