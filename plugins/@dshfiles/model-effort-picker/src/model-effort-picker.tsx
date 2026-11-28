@@ -496,7 +496,9 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                   'dshx:flex dshx:w-90 dshx:min-w-0 dshx:shrink-0 dshx:flex-col dshx:gap-1.5 dshx:p-1.5',
                   catalogEmpty && 'dshx:w-full',
                   // Round 4 T2: on the phone the panes start at the sheet's top, so their 44 pt header line meets Close's.
-                  // Round 5 U13: no right inset on the phone, so Select, the rows and their chevrons end on Close's edge.
+                  // Round 5 U13, round 6 V4: the section has no right inset on the phone; the search row, the list and the
+                  // select bar each keep 8 px, so they end 16 px from the edge as the search starts, and only the rows'
+                  // 44 pt chevrons reach Close's edge.
                   'dshx:@max-pane-compact:w-full dshx:@max-pane-compact:pl-2 dshx:@max-pane-compact:pr-0 dshx:@max-pane-compact:pt-0',
                   narrowDetails && 'dshx:@max-pane-compact:hidden',
                 )}
@@ -519,7 +521,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     {several ? t('selectModels') : 'Choose a model'}
                   </h2>
                 </header>
-                <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1', catalogEmpty && 'dshx:hidden')} data-model-search-row>
+                <div className={cn('dshx:flex dshx:shrink-0 dshx:items-center dshx:gap-1 dshx:@max-pane-compact:pr-2', catalogEmpty && 'dshx:hidden')} data-model-search-row>
                   {/* Round 3 R18: one focus ring (the field edge does not also turn accent), a clear button inside the field,
                       and a search that waits while there is nothing to search. */}
                   <div className="dshx:relative dshx:min-w-0 dshx:flex-1">
@@ -610,7 +612,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                     aria-multiselectable={several || undefined}
                     // On touch the rows end clear of the list's 10 px overlay scrollbar, which took the last 4 px of each
                     // row's 44 pt details chevron (round 3 touch probe).
-                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1 dshx:pointer-coarse:pr-0"
+                    className="dshx:flex dshx:flex-col dshx:gap-px dshx:p-1 dshx:@max-pane-compact:pr-2"
                     id={listboxId}
                     ref={attachModelList}
                     role="listbox"

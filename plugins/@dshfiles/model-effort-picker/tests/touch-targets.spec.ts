@@ -40,8 +40,9 @@ describe('every touch target is 44 pt (council picker C6)', () => {
   it("keeps the rows' details chevrons whole under the list's overlay scrollbar on touch (round 5 U13)", () => {
     const picker = sources.find(source => source.name === 'model-effort-picker.tsx')?.text ?? ''
     const listbox = picker.slice(picker.lastIndexOf('<div', picker.indexOf('aria-label="Models and accounts"')), picker.indexOf('role="listbox"'))
-    // The chevrons reach the sheet's edge; the 10 px overlay scrollbar lets taps through instead of taking room.
-    expect(listbox).toMatch(/dshx:pointer-coarse:pr-0/u)
+    // Round 6 V4: the list keeps 8 px on the phone, which the chevrons' 44 pt boxes reach into (to Close's edge); the
+    // 10 px overlay scrollbar lets taps through instead of taking room.
+    expect(listbox).toMatch(/dshx:@max-pane-compact:pr-2/u)
     expect(picker).toContain('dshx:pointer-coarse:[&_[data-slot=scroll-area-scrollbar]]:pointer-events-none')
   })
 })

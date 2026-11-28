@@ -194,7 +194,7 @@ export const ModelRow = (props: {
       {selectMode ? null : (
         <button
           aria-label={`Details for ${name}`}
-          className="dshx-hit-44 dshx:flex dshx:size-6 dshx:pointer-coarse:size-11 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
+          className="dshx-hit-44 dshx:flex dshx:size-6 dshx:pointer-coarse:size-11 dshx:pointer-coarse:@max-pane-compact:-mr-2 dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded dshx:text-muted-foreground dshx:outline-none dshx:hover:bg-muted dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring"
           data-model-details-label={`Details for ${name}`}
           data-model-details-trigger
           onClick={props.onInspect}
