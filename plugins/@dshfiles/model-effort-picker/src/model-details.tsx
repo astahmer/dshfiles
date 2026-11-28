@@ -80,6 +80,7 @@ export const ModelDetails = (props: {
   /** The thread's fallback chain; shown only on the thread's own model (a draft has no chain of its own). */
   readonly fallbacks?: ReactNode
 }) => {
+  const [scrolled, setScrolled] = useState(false)
   const group = props.inspected === null ? undefined : props.groups.find(candidate => candidate.id === props.inspected?.provider)
   const model = group?.models.find(candidate => candidate.id === props.inspected?.model)
   const draft = ModelPickerModel.isDraft({ inspected: props.inspected, current: props.current })
@@ -125,8 +126,10 @@ export const ModelDetails = (props: {
       data-model-details-draft={draft || undefined}
     >
       <header
-        className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:pr-7 dshx:pointer-coarse:pr-12 dshx:@max-pane-compact:min-h-12"
+        // Round 4 T10: a hairline under the header once the body scrolls under it (kept transparent at rest, so nothing moves).
+        className="dshx:flex dshx:min-w-0 dshx:shrink-0 dshx:items-start dshx:gap-1.5 dshx:border-b dshx:border-transparent dshx:pr-7 dshx:pb-1.5 dshx:data-[scrolled]:border-border dshx:pointer-coarse:pr-12 dshx:@max-pane-compact:min-h-12"
         data-model-details-header
+        data-scrolled={scrolled || undefined}
       >
         <button
           aria-label={draft ? 'Back to the model in use' : 'Back to models'}
@@ -174,6 +177,7 @@ export const ModelDetails = (props: {
       <div
         className="dshx:min-h-0 dshx:flex-1 dshx:overflow-y-auto dshx:[overflow-x:clip] dshx:[mask-image:linear-gradient(to_bottom,transparent,black_8px,black_calc(100%-8px),transparent)]"
         data-model-details-body
+        onScroll={event => setScrolled(event.currentTarget.scrollTop > 0)}
       >
         {model === undefined ? null : (
           <AccountRows

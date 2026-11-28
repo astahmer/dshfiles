@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
 import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selection/client'
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { aiAccountsApi } from '@dshfiles/ai-accounts/api'
@@ -62,29 +62,58 @@ export const FallbackList = (props: {
     if (to >= 0 && to < count && !props.disabled) props.onMove(index, to)
   }
 
+  // Round 4 T10: opening the chain brings its heading to the top of the details body, so the routes show.
+  const section = useRef<HTMLElement>(null)
+  const opening = useRef(false)
+  const toggle = (): void => {
+    if (!props.expanded) opening.current = true
+    props.onExpandedChange(!props.expanded)
+  }
+  useEffect(() => {
+    if (!props.expanded || !opening.current) return
+    opening.current = false
+    const element = section.current
+    const body = element?.closest('[data-model-details-body]')
+    if (element === null || element === undefined || !(body instanceof HTMLElement)) return
+    const top = element.getBoundingClientRect().top - body.getBoundingClientRect().top + body.scrollTop
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    body.scrollTo({ top, behavior: still ? 'auto' : 'smooth' })
+  }, [props.expanded])
+
   return (
-    <section aria-label="Fallbacks" className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-fallbacks>
-      <div className="dshx:flex dshx:items-center dshx:gap-1">
+    <section aria-label="Fallbacks" className="dshx:mt-3 dshx:flex dshx:flex-col dshx:gap-1" data-model-fallbacks ref={section}>
+      {/* Round 4 T10: the label, its chevron and its help icon sit together on the inspector's left edge, as effort's do. */}
+      <div className="dshx:flex dshx:min-w-0 dshx:items-center dshx:gap-1">
         <button
           aria-controls={listId}
           aria-expanded={props.expanded}
-          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-between dshx:gap-2 dshx:rounded-md dshx:px-0 dshx:text-left dshx:text-xs dshx:font-medium dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11"
+          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-1 dshx:rounded-md dshx:px-0 dshx:text-left dshx:text-xs dshx:font-medium dshx:outline-none dshx:hover:text-foreground dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11"
           data-model-fallbacks-toggle
-          onClick={() => props.onExpandedChange(!props.expanded)}
+          onClick={toggle}
           type="button"
         >
           <span className="dshx:truncate">
             Fallbacks <span className="dshx:font-normal dshx:text-muted-foreground">· {summary}</span>
           </span>
-          <ChevronRightIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', props.expanded && 'dshx:rotate-90')} />
         </button>
         <InfoHint description="Routes tried in order when this model request fails under Priority distribution." label="About fallbacks" />
+        {/* The rest of the row opens it too, for the pointer; the labelled toggle carries the state for assistive tech. */}
+        <button
+          aria-hidden="true"
+          className="dshx:flex dshx:h-8 dshx:min-w-0 dshx:flex-1 dshx:items-center dshx:justify-end dshx:rounded-md dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11"
+          data-model-fallbacks-chevron
+          onClick={toggle}
+          tabIndex={-1}
+          type="button"
+        >
+          <ChevronRightIcon aria-hidden="true" className={cn('dshx:size-3.5 dshx:shrink-0 dshx:text-muted-foreground', props.expanded && 'dshx:rotate-90')} />
+        </button>
       </div>
 
       {props.expanded ? (
         <div className="dshx:flex dshx:flex-col dshx:gap-1" id={listId}>
           {props.serving === null ? null : (
-            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:px-2 dshx:text-xs dshx:text-muted-foreground" role="status">
+            <div className="dshx:flex dshx:items-center dshx:gap-2 dshx:text-xs dshx:text-muted-foreground" role="status">
               <Undo2Icon aria-hidden="true" className="dshx:size-3.5 dshx:shrink-0" />
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">Serving {props.serving}</span>
               <Button className="dshx:pointer-coarse:h-11" disabled={props.disabled} onClick={props.onReturn} size="xs" variant="ghost">
@@ -99,7 +128,7 @@ export const FallbackList = (props: {
                 <li
                   aria-label={`Fallback ${String(index + 1)}: ${row.model} on ${row.account}${row.serving ? ', serving now' : ''}. Alt+Arrow to reorder.`}
                   className={cn(
-                    'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:pl-1 dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
+                    'dshx:flex dshx:h-8 dshx:min-w-0 dshx:items-center dshx:gap-2 dshx:rounded-md dshx:text-xs dshx:outline-none dshx:focus-visible:ring-2 dshx:focus-visible:ring-ring dshx:pointer-coarse:h-11',
                     row.serving && 'dshx:bg-selected-wash',
                   )}
                   data-model-fallback-rung
@@ -107,11 +136,7 @@ export const FallbackList = (props: {
                   onKeyDown={event => move(event, index)}
                   tabIndex={0}
                 >
-                  <span
-                    aria-hidden="true"
-                    className="dshx:w-5 dshx:shrink-0 dshx:text-right dshx:tabular-nums dshx:text-muted-foreground"
-                    data-model-fallback-rank
-                  >
+                  <span aria-hidden="true" className="dshx:w-4 dshx:shrink-0 dshx:tabular-nums dshx:text-muted-foreground" data-model-fallback-rank>
                     {index + 1}
                   </span>
                   <BrandMark brand={row.brand} className="dshx:size-4" name={row.model} />
@@ -178,7 +203,7 @@ export const FallbackList = (props: {
           {/* Add fallback is always the first action under the list, wherever the list ends. */}
           <div className="dshx:flex dshx:items-center dshx:justify-between dshx:gap-1">
             <Button
-              className="dshx:h-7 dshx:gap-1 dshx:px-2 dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:hover:text-foreground dshx:pointer-coarse:h-11"
+              className="dshx:h-7 dshx:gap-1 dshx:px-0! dshx:text-xs dshx:font-normal dshx:text-muted-foreground dshx:hover:bg-transparent dshx:hover:text-foreground dshx:pointer-coarse:h-11"
               data-model-fallback-add
               disabled={props.disabled || !props.canAdd}
               onClick={props.onAdd}

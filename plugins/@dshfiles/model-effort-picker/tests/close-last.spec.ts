@@ -23,6 +23,6 @@ describe('Close ends the Tab cycle (council picker round 3, R17)', () => {
     )
     expect(tag).toMatch(/dshx:absolute dshx:top-2\.5 dshx:right-2\.5/u)
     expect(details).toMatch(/data-model-details-header|dshx:pr-7 dshx:pointer-coarse:pr-12/u)
-    expect(details).toContain('dshx:pr-7 dshx:pointer-coarse:pr-12')
+    expect(details).toMatch(/dshx:pr-7 [^"]*dshx:pointer-coarse:pr-12/u)
   })
 })

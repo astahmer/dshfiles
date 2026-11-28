@@ -56,7 +56,7 @@ describe('fallbacks collapse to one line (council picker N5)', () => {
     const rungs = [...html.matchAll(/<li[^>]*data-model-fallback-rung[^>]*>.*?<\/li>/gu)].map(match => match[0])
     expect(rungs).toHaveLength(2)
     const first = rungs[0] ?? ''
-    expect(/<span[^>]*data-model-fallback-rank[^>]*>/u.exec(first)?.[0]).toMatch(/dshx:w-5/u)
+    expect(/<span[^>]*data-model-fallback-rank[^>]*>/u.exec(first)?.[0]).toMatch(/dshx:w-4/u)
     expect(first.indexOf('data-model-fallback-rank')).toBeLessThan(first.indexOf('data-model-mark'))
     expect(text(first)).toMatch(/^1gpt-6-lunaCC212%/u)
     expect(text(rungs[1] ?? '')).toContain('—')
