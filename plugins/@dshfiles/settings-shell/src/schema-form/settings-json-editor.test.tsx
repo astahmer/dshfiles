@@ -9,6 +9,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ShellTranslate } from '../native/locales.js'
 import { jsonValueSchema, SettingsSchemaModel, type JsonValue } from './schema-model.js'
+import { SettingsForm } from './settings-form.js'
 import { SettingsJsonEditor } from './settings-json-editor.js'
 
 const text = (value: JsonValue | undefined): string => Schema.decodeUnknownOption(Schema.String)(value).pipe(Option.getOrElse(() => ''))
@@ -131,6 +132,30 @@ const click = async (label: string): Promise<void> => {
     await Promise.resolve()
   })
 }
+
+it('associates multiline setting guidance with the keyboard-focusable JSON field without writing', async () => {
+  const store = createForm({ user: {}, revision: 3 })
+  const description = 'When: both conditions must match.\nThen: deny the call.'
+  await act(async () =>
+    root.render(
+      <SettingsForm
+        fields={[{ key: 'rules', path: ['rules'], title: 'Deny rules', description, control: { kind: 'json' }, groups: [], defaultValue: [] }]}
+        form={store.form}
+        namespace="example"
+        t={t}
+      />,
+    ),
+  )
+  const field = editor()
+  field.focus()
+  const guidance = document.getElementById(field.getAttribute('aria-describedby') ?? '')
+  expect(guidance?.textContent).toBe(description)
+  expect(guidance?.classList.contains('dshx:whitespace-pre-line')).toBe(true)
+  expect(field.getAttribute('aria-label')).toBe('Deny rules')
+  field.blur()
+  expect(store.calls).toEqual([])
+  expect(store.form.getSnapshot().revision).toBe(3)
+})
 
 describe('SettingsJsonEditor', () => {
   it('saves only the changed fields, fenced by the revision the draft started from, then follows the store', async () => {
