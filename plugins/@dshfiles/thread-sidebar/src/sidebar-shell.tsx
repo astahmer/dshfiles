@@ -302,11 +302,16 @@ const usePhoneStageMeta = (
 ): PhoneStageMeta | undefined => {
   const lineageKey = props.useSessions(state => {
     const ids: string[] = []
-    for (let cursor = stageThread; cursor !== undefined && ids.length < 64; cursor = Object.values(state.byId).find(session => session.id === cursor)?.parentId) ids.push(cursor)
+    for (let cursor = stageThread; cursor !== undefined && ids.length < 64; cursor = Object.values(state.byId).find(session => session.id === cursor)?.parentId)
+      ids.push(cursor)
     return ids.join('\n')
   })
-  const running = props.useSessions(state => stageThread !== undefined && Object.values(state.byId).some(session => session.id === stageThread && session.running))
-  const subagents = props.useSessions(state => (stageThread === undefined ? 0 : Object.values(state.byId).filter(session => session.parentId === stageThread && session.running).length))
+  const running = props.useSessions(
+    state => stageThread !== undefined && Object.values(state.byId).some(session => session.id === stageThread && session.running),
+  )
+  const subagents = props.useSessions(state =>
+    stageThread === undefined ? 0 : Object.values(state.byId).filter(session => session.parentId === stageThread && session.running).length,
+  )
   // The children that are not working, as one key: those with a failed-turn record are the summary's `2 failed`.
   const settledChildren = props.useSessions(state =>
     stageThread === undefined
@@ -319,10 +324,14 @@ const usePhoneStageMeta = (
   const workspaces = props.useWorkspaces(state => HostSnapshotsModel.selectStableWorkspaceItems(state.items))
   const threadDirectories = useThreadDirectories(workspaces)
   const savedChipOf = useSavedProjectChip()
-  const status = useSyncExternalStore(threadWorkStatusStore.subscribe, () => (stageThread === undefined ? undefined : threadWorkStatusStore.getSnapshot()?.get(stageThread)))
+  const status = useSyncExternalStore(threadWorkStatusStore.subscribe, () =>
+    stageThread === undefined ? undefined : threadWorkStatusStore.getSnapshot()?.get(stageThread),
+  )
   // A subagent's header (round 21 D3): its parent's title, the name its call gave it and its model, each a string.
   const parentId = lineageKey.split('\n')[1]
-  const parentTitle = props.useSessions(state => (parentId === undefined ? undefined : Object.values(state.byId).find(session => session.id === parentId)?.displayTitle))
+  const parentTitle = props.useSessions(state =>
+    parentId === undefined ? undefined : Object.values(state.byId).find(session => session.id === parentId)?.displayTitle,
+  )
   const childLabel = props.useSessions(state => {
     if (parentId === undefined || stageThread === undefined) return undefined
     const own = Object.values(state.byId).find(session => session.id === stageThread)?.projectionValues?.subagent?.label
@@ -369,9 +378,7 @@ const usePhoneStageMeta = (
               parentTitle,
               label: childLabel,
               route:
-                routeKey === undefined
-                  ? undefined
-                  : { provider: routeKey.slice(0, routeKey.indexOf('\n')), model: routeKey.slice(routeKey.indexOf('\n') + 1) },
+                routeKey === undefined ? undefined : { provider: routeKey.slice(0, routeKey.indexOf('\n')), model: routeKey.slice(routeKey.indexOf('\n') + 1) },
               terminal,
               failedLabel: t('threadSidebarFailed'),
             },
@@ -419,7 +426,9 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   )
   // The phone thread bar's glyph (council round 13 B6): whether the thread or one of its subagents works.
   const stageWorking = props.useSessions(
-    state => stageThread !== undefined && Object.values(state.byId).some(session => (session.id === stageThread || session.parentId === stageThread) && session.running),
+    state =>
+      stageThread !== undefined &&
+      Object.values(state.byId).some(session => (session.id === stageThread || session.parentId === stageThread) && session.running),
   )
   const stageMeta = usePhoneStageMeta(props, stageThread, preferences)
   // The stage Session follows a tap only once the thread opens; until then the bar names the pick from the list.
@@ -537,6 +546,7 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
   const [fanOutModels, setFanOutModels] = useState<readonly { provider: string; model: string; reasoningEffort?: string }[]>([])
   // Round 5 U2: the chips draw each account's dot, by the rule the model picker uses (ai-accounts' account-color module).
   const fanOutProfiles = useApiQuery(aiAccountsApi, 'read', { enabled: fanOutOpen })
+  const fanOutPromptRef = useRef<HTMLTextAreaElement>(null)
   const fanOutAccents = useMemo(() => AccountColor.accents(fanOutProfiles.data?.accounts ?? []), [fanOutProfiles.data])
   // Round 3 R2: the checklist opens on its own only when no model is chosen yet; with chosen models it waits behind Edit.
   const [fanOutPicking, setFanOutPicking] = useState(false)
@@ -2050,16 +2060,33 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
         {/* Council picker N7, round 3 R2: under the phone shell a bottom sheet that sits on the software keyboard
             (--dsh-keyboard-inset, phone-shell.ts). One scroller between the header and a footer that never scrolls away,
             so Send stays in view while the prompt is focused. */}
-        <DialogContent className="dshx-root dshx:flex dshx:max-h-[85dvh] dshx:max-w-xl dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0! dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)] dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]:not([data-phone-keyboard])]:max-h-[85dvh] dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none dshx:in-[html[data-shell-phone-nav]]:rounded-t-2xl dshx:[&>[data-slot=dialog-close]]:flex dshx:[&>[data-slot=dialog-close]]:size-6 dshx:[&>[data-slot=dialog-close]]:items-center dshx:[&>[data-slot=dialog-close]]:justify-center dshx:pointer-coarse:[&>[data-slot=dialog-close]]:size-11 dshx:in-[html[data-shell-phone-nav]]:[&>[data-slot=dialog-close]]:top-4.5 dshx:in-[html[data-phone-keyboard]]:[&>[data-slot=dialog-close]]:top-0! dshx:in-[html[data-phone-keyboard]]:h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)] dshx:in-[html[data-phone-keyboard]]:max-h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)]" data-fan-out-dialog>
+        <DialogContent
+          className="dshx-root dshx:flex dshx:max-h-[85dvh] dshx:max-w-xl dshx:flex-col dshx:gap-0 dshx:overflow-hidden dshx:p-0! dshx:in-[html[data-shell-phone-nav]]:top-auto dshx:in-[html[data-shell-phone-nav]]:bottom-[var(--dsh-keyboard-inset,0px)] dshx:in-[html[data-shell-phone-nav]]:left-0 dshx:in-[html[data-shell-phone-nav]]:w-full dshx:in-[html[data-shell-phone-nav]]:max-w-full dshx:in-[html[data-shell-phone-nav]:not([data-phone-keyboard])]:max-h-[85dvh] dshx:in-[html[data-shell-phone-nav]]:translate-x-0 dshx:in-[html[data-shell-phone-nav]]:translate-y-0 dshx:in-[html[data-shell-phone-nav]]:rounded-b-none dshx:in-[html[data-shell-phone-nav]]:rounded-t-2xl dshx:[&>[data-slot=dialog-close]]:flex dshx:[&>[data-slot=dialog-close]]:size-6 dshx:[&>[data-slot=dialog-close]]:items-center dshx:[&>[data-slot=dialog-close]]:justify-center dshx:pointer-coarse:[&>[data-slot=dialog-close]]:size-11 dshx:in-[html[data-shell-phone-nav]]:[&>[data-slot=dialog-close]]:top-4.5 dshx:in-[html[data-phone-keyboard]]:[&>[data-slot=dialog-close]]:top-0! dshx:in-[html[data-phone-keyboard]]:h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)] dshx:in-[html[data-phone-keyboard]]:max-h-[calc(100dvh-var(--dsh-keyboard-inset,0px)-12px)]"
+          data-fan-out-dialog
+          // Round 6 V3: with a pointer the prompt takes focus on open (one ring, the search field's pattern); on touch the
+          // dialog keeps the default, so the keyboard comes up only when the user taps the prompt.
+          onOpenAutoFocus={event => {
+            if (window.matchMedia('(pointer: coarse)').matches) return
+            event.preventDefault()
+            fanOutPromptRef.current?.focus()
+          }}
+        >
           {/* Round 5 U2: the picker sheet's pattern on the phone: a grab handle, its 16 px radius, a left-aligned title on
               one 56 px line with Close (the kit's corner Close, placed on the title's centre line). */}
-          <div aria-hidden="true" className="dshx:hidden dshx:shrink-0 dshx:pt-2 dshx:in-[html[data-shell-phone-nav]]:block dshx:in-[html[data-phone-keyboard]]:hidden!" data-fan-out-handle>
+          <div
+            aria-hidden="true"
+            className="dshx:hidden dshx:shrink-0 dshx:pt-2 dshx:in-[html[data-shell-phone-nav]]:block dshx:in-[html[data-phone-keyboard]]:hidden!"
+            data-fan-out-handle
+          >
             <div className="dshx:mx-auto dshx:h-1 dshx:w-9 dshx:rounded-full dshx:bg-muted-foreground/40" />
           </div>
           <DialogHeader className="dshx:h-14 dshx:shrink-0 dshx:in-[html[data-phone-keyboard]]:h-11 dshx:flex-row dshx:items-center dshx:px-4 dshx:pr-14 dshx:text-left">
             <DialogTitle>{text(props.t, 'threadSidebarFanOutTitle')}</DialogTitle>
           </DialogHeader>
-          <div className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:overscroll-contain dshx:px-4 dshx:pb-3" data-fan-out-body>
+          <div
+            className="dshx:flex dshx:min-h-0 dshx:flex-1 dshx:flex-col dshx:gap-4 dshx:overflow-y-auto dshx:overscroll-contain dshx:px-4 dshx:pb-3"
+            data-fan-out-body
+          >
             {/* Round 4 T3: with the keyboard up (phone-shell.ts sets data-phone-keyboard) the chips fold into one summary row,
                 so the prompt keeps its lines; the full chips return when the keyboard goes. */}
             {fanOutModels.length === 0 ? null : (
@@ -2102,10 +2129,11 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             <label className="dshx:flex dshx:flex-col dshx:gap-1.5 dshx:text-sm dshx:font-medium dshx:in-[html[data-phone-keyboard]]:min-h-0 dshx:in-[html[data-phone-keyboard]]:flex-1">
               {text(props.t, 'threadSidebarFanOutPrompt')}
               <Textarea
+                ref={fanOutPromptRef}
                 aria-describedby="thread-sidebar-fan-out-reason"
-                // Round 5 U2: at least four lines (the kit field sizes to its content), and one focus ring: the kit outline,
-                // with the edge staying neutral instead of also turning accent.
-                className="dshx:min-h-28 dshx:resize-none dshx:font-normal dshx:focus-visible:border-field-border dshx:in-[html[data-phone-keyboard]]:min-h-[5.5rem] dshx:in-[html[data-phone-keyboard]]:flex-1"
+                // Round 5 U2: at least four lines (the kit field sizes to its content). Round 6 V3: one focus ring, the
+                // search field's pattern: the kit outline, with the edge transparent while focused.
+                className="dshx:min-h-28 dshx:resize-none dshx:font-normal dshx:focus-visible:border-transparent dshx:in-[html[data-phone-keyboard]]:min-h-[5.5rem] dshx:in-[html[data-phone-keyboard]]:flex-1"
                 data-fan-out-prompt
                 onChange={event => setFanOutText(event.target.value)}
                 placeholder={text(props.t, 'threadSidebarFanOutPromptPlaceholder')}
@@ -2115,13 +2143,15 @@ const SidebarRootContent = (props: SidebarShellProps): JSX.Element => {
             </label>
             {/* Round 5 U2: what Send does, under the prompt it describes, or why it waits. */}
             <p
-              className={cn('dshx:-mt-2 dshx:text-xs dshx:text-muted-foreground', fanOutSend.reason === null && 'dshx:in-[html[data-phone-keyboard]]:sr-only')}
+              className={cn(
+                'dshx:-mt-2 dshx:text-xs dshx:text-muted-foreground',
+                fanOutSend.reason !== 'needs-two' && 'dshx:in-[html[data-phone-keyboard]]:sr-only',
+              )}
               data-fan-out-reason
               id="thread-sidebar-fan-out-reason"
             >
-              {fanOutSend.reason === null
-                ? text(props.t, 'threadSidebarFanOutHelp')
-                : text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutNeedsPrompt')}
+              {/* Round 6 V3: the help says what to do and what happens, so it also stands for a missing prompt. */}
+              {text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutHelp')}
             </p>
             {/* The full checklist is behind Add models (no chips yet) or the Edit models chip above. */}
             {fanOutModels.length > 0 ? null : (

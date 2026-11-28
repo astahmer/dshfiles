@@ -146,12 +146,12 @@ describe('fan-out sheet, round 5 (council picker U2)', () => {
     expect(footer).not.toContain('data-fan-out-reason')
     expect(footer).toContain('dshx:in-[html[data-shell-phone-nav]]:grid dshx:in-[html[data-shell-phone-nav]]:grid-cols-[1fr_2fr]')
     expect(dialog.indexOf('data-fan-out-reason')).toBeGreaterThan(dialog.indexOf('data-fan-out-prompt'))
-    expect(dialog).toContain("text(props.t, 'threadSidebarFanOutHelp')")
-    expect(dialog).toMatch(/<Textarea\s+aria-describedby="thread-sidebar-fan-out-reason"/u)
+    expect(dialog).toContain("text(props.t, fanOutSend.reason === 'needs-two' ? 'threadSidebarFanOutNeedsTwo' : 'threadSidebarFanOutHelp')")
+    expect(dialog).toMatch(/<Textarea\s+ref=\{fanOutPromptRef\}\s+aria-describedby="thread-sidebar-fan-out-reason"/u)
   })
 
   it('gives the prompt four lines and one focus ring, and the sheet the picker sheet handle and radius', () => {
-    expect(dialog).toContain('dshx:min-h-28 dshx:resize-none dshx:font-normal dshx:focus-visible:border-field-border')
+    expect(dialog).toContain('dshx:min-h-28 dshx:resize-none dshx:font-normal dshx:focus-visible:border-transparent')
     expect(dialog).toContain('data-fan-out-handle')
     expect(shell).toContain('dshx:in-[html[data-shell-phone-nav]]:rounded-t-2xl')
   })
@@ -175,5 +175,21 @@ describe('fan-out sheet, round 5 (council picker U2)', () => {
   it('shows one mark per distinct family, at most three, in the keyboard summary', () => {
     const routes = ['gpt-6-luna', 'gpt-6-sol', 'claude-sonnet-5-5', 'gemini-3.8-flash', 'deepseek-v4-flash'].map(model => ({ provider: 'cc1', model }))
     expect(fanOutFamilies(routes).map(route => route.model)).toEqual(['gpt-6-luna', 'claude-sonnet-5-5', 'gemini-3.8-flash'])
+  })
+})
+
+describe('fan-out prompt focus, round 6 (council picker V3)', () => {
+  const shell = readFileSync(new URL('./sidebar-shell.tsx', import.meta.url), 'utf8')
+
+  it('focuses the prompt on open with a pointer, and leaves touch to the default', () => {
+    expect(shell).toMatch(
+      /onOpenAutoFocus=\{event => \{\s*if \(window\.matchMedia\('\(pointer: coarse\)'\)\.matches\) return\s*event\.preventDefault\(\)\s*fanOutPromptRef\.current\?\.focus\(\)/u,
+    )
+    expect(shell).toMatch(/<Textarea\s+ref=\{fanOutPromptRef\}/u)
+  })
+
+  it('says what to write and what happens, under the prompt it describes', async () => {
+    const { threadSidebarDictionaries } = await import('./locales.js')
+    expect(threadSidebarDictionaries.en.threadSidebarFanOutHelp).toBe('Write one prompt. Each model replies in a separate thread.')
   })
 })
