@@ -38,6 +38,8 @@ export const ModelRow = (props: {
   readonly providerLabel: string | undefined
   /** Round 3 R3: the row's account as its short tag ("CC1"), muted, instead of the service name on every row. */
   readonly accountTag?: string | undefined
+  /** Round 4 T16: the search text, drawn at 600 where it occurs in the name. */
+  readonly query?: string | undefined
   /** Round 4 T7: the account's dot before its tag, as on the trigger and in the fallbacks. */
   readonly accountAccent?: AccountAccent | undefined
   readonly current: ModelSelection | null
@@ -147,7 +149,7 @@ export const ModelRow = (props: {
               className={cn('dshx:min-w-0 dshx:flex-[1_1_auto] dshx:truncate dshx:text-sm dshx:font-[450]', props.active && 'dshx:font-semibold')}
               data-model-picker-name
             >
-              {shownName}
+              <MatchedName name={shownName} query={props.query} />
             </span>
           </TruncatedTooltip>
           {/* Round 4 T7: the bolt sits next to the name, so it never moves the trailing columns. */}
@@ -198,5 +200,21 @@ export const ModelRow = (props: {
         </button>
       )}
     </div>
+  )
+}
+
+/** The name with the first case-insensitive occurrence of the search drawn at 600 (no other change to the text). */
+export const MatchedName = ({ name, query }: { readonly name: string; readonly query: string | undefined }) => {
+  const needle = query?.trim() ?? ''
+  const at = needle === '' ? -1 : name.toLowerCase().indexOf(needle.toLowerCase())
+  if (at < 0) return <>{name}</>
+  return (
+    <>
+      {name.slice(0, at)}
+      <span className="dshx:font-semibold dshx:text-foreground" data-model-match>
+        {name.slice(at, at + needle.length)}
+      </span>
+      {name.slice(at + needle.length)}
+    </>
   )
 }

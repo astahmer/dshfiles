@@ -378,7 +378,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                       className="dshx:shrink-0 dshx:text-xs dshx:text-muted-foreground dshx:@max-pane-narrow:hidden dshx:in-data-model-compact:hidden"
                       data-model-picker-effort
                     >
-                      {effortLabel}
+                      {ModelPickerModel.triggerEffortText(effortLabel)}
                     </span>
                   </>
                 )}
@@ -576,6 +576,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         onSelect={choose}
                         providerLabel={providerLabels.get(group.id)}
                         accountAccent={accountAccentMap.get(group.id)}
+                        query={query}
                         accountTag={accountBadges.get(group.id) ?? ModelPickerModel.accountTag({ name: group.name })}
                         fastOn={knownFast.get(fastModeRouteKey({ sessionId: '', provider: group.id, model: model.id })) === true}
                         quota={quotas.get(group.id)}

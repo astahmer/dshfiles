@@ -95,6 +95,9 @@ export class ModelPickerModel {
   }
 
   /** Council picker C1: a level's segment label (Off, Min, Low, Med, High, XHigh, Max); any other name stays whole. */
+  /** Round 4 T16: the trigger's effort word; "Off" beside a model name read as the model being off. */
+  static triggerEffortText = (label: string): string => (/^(?:off|none)$/iu.test(label.trim()) ? 'No reasoning' : label)
+
   static effortShortLabel = (effort: { readonly id: string; readonly name: string }): string => {
     const key = `${effort.id} ${effort.name}`.toLowerCase()
     const known: readonly (readonly [RegExp, string])[] = [

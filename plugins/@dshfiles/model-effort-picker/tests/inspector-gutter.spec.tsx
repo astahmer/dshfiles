@@ -12,7 +12,10 @@ const rows = (): string =>
   renderToStaticMarkup(
     <AccountRows
       accents={new Map()}
-      accounts={[{ id: 'cc1', name: 'Command Code 1' }]}
+      accounts={[
+        { id: 'cc1', name: 'Command Code 1' },
+        { id: 'cc2', name: 'Command Code 2' },
+      ]}
       onChoose={() => undefined}
       quotas={new Map([['cc1', { percent: 62, label: 'Weekly limit', onReserve: false }]])}
       selected="cc1"

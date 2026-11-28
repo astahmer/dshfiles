@@ -26,6 +26,7 @@ export const EFFORT_SETTLE_MS = 600
 export const createEffortCommitter = (input: {
   readonly commit: (effort: string | undefined) => void
   readonly schedule: (run: () => void, ms: number) => () => void
+  readonly onSettled?: (effort: string | undefined) => void
 }) => {
   let pending: { readonly value: string | undefined } | null = null
   let cancel: (() => void) | null = null
@@ -39,6 +40,8 @@ export const createEffortCommitter = (input: {
     const { value } = pending
     pending = null
     input.commit(value)
+    // Round 4 T16: a level applied by resting says so; a click or Enter is its own feedback.
+    input.onSettled?.(value)
   }
   return {
     /** An arrow key landed on `value`: show it, apply it once arrowing rests. */
@@ -74,6 +77,7 @@ export const EffortControl = (props: {
   const group = useRef<HTMLDivElement>(null)
   const headingId = useId()
   const [preview, setPreview] = useState<{ readonly value: string | undefined } | null>(null)
+  const [applied, setApplied] = useState<{ readonly value: string | undefined } | null>(null)
   const onChange = useRef(props.onChange)
   onChange.current = props.onChange
   const committer = useMemo(
@@ -83,6 +87,7 @@ export const EffortControl = (props: {
           setPreview(null)
           onChange.current(value)
         },
+        onSettled: value => setApplied({ value }),
         schedule: (run, ms) => {
           const timer = setTimeout(run, ms)
           return () => clearTimeout(timer)
@@ -136,6 +141,9 @@ export const EffortControl = (props: {
         </h3>
         <InfoHint description="Higher effort lets the model think for longer before it answers." label="About reasoning effort" />
       </div>
+      <span aria-live="polite" className="dshx:sr-only" data-model-effort-announcer>
+        {applied === null ? '' : `Reasoning effort: ${segments.find(segment => segment.id === applied.value)?.name ?? 'Provider default'}, applied`}
+      </span>
       <div
         // Round 4 T4: a stable group name; the chosen value is in the heading and on the checked radio.
         aria-label="Reasoning effort"

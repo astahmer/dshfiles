@@ -37,7 +37,8 @@ export const BrandMark = ({ brand, name, className }: { readonly brand: BrandKey
       <span
         aria-hidden="true"
         className={cn(
-          'dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground',
+          // Round 4 T16: in dark the disc lifts off the popover (bg-muted sat on it).
+          'dshx:flex dshx:size-[18px] dshx:shrink-0 dshx:items-center dshx:justify-center dshx:rounded-full dshx:bg-muted dshx:text-2xs dshx:font-semibold dshx:text-muted-foreground dshx:dark:bg-(--dshx-tone-5)',
           className,
         )}
       >

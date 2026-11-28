@@ -43,7 +43,9 @@ describe('accounts are full-width radio rows (council picker C3)', () => {
   })
 
   it('tells an unknown quota from an empty one, and tones 15 % or less amber and 0 % red', () => {
-    expect(text(radios[0] ?? '')).toContain('—')
+    // Round 4 T16: no dash; the unknown quota is said to assistive tech only.
+    expect(text(radios[0] ?? '')).not.toContain('—')
+    expect(text(radios[0] ?? '')).toContain('quota unknown')
     expect(text(radios[0] ?? '')).toContain('quota unknown')
     expect(radios[2]).toMatch(/dshx:text-warning/u)
     expect(radios[3]).toMatch(/dshx:text-destructive/u)
