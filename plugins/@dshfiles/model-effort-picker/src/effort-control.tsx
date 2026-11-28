@@ -156,7 +156,9 @@ export const EffortControl = (props: {
         // Round 4 T4: a stable group name; the chosen value is in the heading and on the checked radio.
         aria-label="Reasoning effort"
         className={cn(
-          'dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(2rem,1fr))] dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.5',
+          // Round 6 V10: in dark the picker lifts its own selected segment a step (the kit's thumb token, redefined here only,
+          // so the Filters panel and Usage keep theirs), to at least 1.3:1 on the track.
+          'dshx:grid dshx:grid-cols-[repeat(auto-fit,minmax(2rem,1fr))] dshx:gap-0.5 dshx:rounded-lg dshx:bg-segment-track dshx:p-0.5 dshx:dark:[--dshx-segment-thumb:var(--dshx-tone-5)]',
           // Round 4 T8: on touch a wrapping row with no empty cell. Up to seven segments share one row while the track is
           // 324 px or wider (each at least 44 pt); eight, or a narrower track, wrap four to a row and the last row stretches.
           // Round 5 U10: on touch the segments touch (no gap), so eight fit one row at 44 pt from a 356 px track.
@@ -187,7 +189,7 @@ export const EffortControl = (props: {
                   ? 'dshx:pointer-coarse:basis-1/4 dshx:@min-[22.25rem]/effort:pointer-coarse:basis-0'
                   : 'dshx:pointer-coarse:basis-0 dshx:@max-[20.25rem]/effort:pointer-coarse:basis-1/4',
                 'dshx:pointer-coarse:text-sm',
-                checked && 'dshx:segment-thumb dshx:font-selected dshx:text-foreground',
+                checked && 'dshx:segment-thumb dshx:font-selected dshx:text-foreground dshx:dark:[box-shadow:inset_0_1px_0_color-mix(in_oklab,var(--dsw-alias-label-primary)_6%,transparent)]!',
               )}
               data-model-effort-default={segment.id === undefined || undefined}
               data-model-effort-option
