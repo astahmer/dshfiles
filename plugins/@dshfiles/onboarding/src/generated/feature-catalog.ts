@@ -19351,17 +19351,17 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "shiftclick option \"Use gpt-6-luna*\"",
+          "text": "shiftclick option \"gpt-6-luna, *\"",
           "action": "shiftclick",
           "by": "option",
-          "name": "Use gpt-6-luna*",
+          "name": "gpt-6-luna, *",
           "value": null
         },
         {
-          "text": "shiftclick option \"Use claude-sonnet-5-5*\"",
+          "text": "shiftclick option \"claude-sonnet-5-5, *\"",
           "action": "shiftclick",
           "by": "option",
-          "name": "Use claude-sonnet-5-5*",
+          "name": "claude-sonnet-5-5, *",
           "value": null
         },
         {
@@ -19372,10 +19372,10 @@ export const FEATURE_CATALOG: FeatureCatalog = {
           "value": null
         },
         {
-          "text": "click button \"Fan out…\"",
+          "text": "click button \"Continue…\"",
           "action": "click",
           "by": "button",
-          "name": "Fan out…",
+          "name": "Continue…",
           "value": null
         },
         {
