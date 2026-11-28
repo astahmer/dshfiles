@@ -17,6 +17,9 @@ import type { AccountsUsage, UsageCard } from './api.js'
 /** Windows every provider meters against the plan; Claude's Opus/Sonnet windows only narrow one model. */
 const GENERIC_PLAN_WINDOWS: ReadonlySet<string> = new Set(['Current session', 'Weekly limit', 'Monthly limit'])
 
+/** Whether a window meters the whole plan, not one model (Claude's Weekly Opus/Sonnet/Fable). */
+export const isPlanWideWindow = (label: string): boolean => GENERIC_PLAN_WINDOWS.has(label)
+
 /** A spent window that reports no reset re-blocks on the next reading; this bounds the gap between readings. */
 export const UNKNOWN_RESET_HOLD_MS = 15 * 60_000
 

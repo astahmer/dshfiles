@@ -1,4 +1,5 @@
 import type { AccountKind, UsageCard, UsageHistoryPoint } from './api.js'
+import { isPlanWideWindow } from './extra-usage-guard.js'
 
 const MINUTE_MS = 60_000
 const HOUR_MS = 60 * MINUTE_MS
@@ -213,9 +214,12 @@ const boardCells = (window: WindowForecast, cellStarts: readonly number[], now: 
  * The window that binds an account: the first to run out before its reset,
  * else the one projected closest to its limit. Windows shorter than a day only
  * govern when nothing longer is reported, so a 5-hour session does not hide a
- * weekly limit on a seven-day board.
+ * weekly limit on a seven-day board. A model-scoped window (Weekly Fable) only
+ * narrows one model, so it governs only when no plan-wide window is reported.
  */
-const governingWindow = (windows: readonly WindowForecast[]): WindowForecast | undefined => {
+const governingWindow = (all: readonly WindowForecast[]): WindowForecast | undefined => {
+  const planWide = all.filter(window => isPlanWideWindow(window.label))
+  const windows = planWide.length > 0 ? planWide : all
   const long = windows.filter(window => window.lengthMs === null || window.lengthMs >= DAY_MS)
   const candidates = long.length > 0 ? long : windows
   const runningOut = candidates.filter(window => window.runsOutAt !== null).sort((left, right) => (left.runsOutAt ?? 0) - (right.runsOutAt ?? 0))
