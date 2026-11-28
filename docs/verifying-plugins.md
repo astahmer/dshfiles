@@ -25,6 +25,10 @@ A plugin that installs is not a plugin that works.
 - After every build, import-check the Host bundle with the DSH Node:
   `fnm exec --using="$(cat .node-version)" node -e "import('./dist/index.js')"`.
 
+To evaluate whether agents discover and benefit from the verification skills,
+use the separate [fresh-session skill evaluation](skill-evaluations.md). It
+scores proposed plans; it does not verify a plugin.
+
 ## Repository checks
 
 When changing a plugin, do **not** run the full repository or plugin test suite
