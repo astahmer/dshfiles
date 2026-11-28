@@ -8,7 +8,7 @@ import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ChevronRightIcon, PlusIcon, Undo2Icon, XIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountColor, type AccountAccent } from './account-color.js'
+import { AccountColor, type AccountAccent } from './account-color.js'
 import { AccountDot } from './account-dot.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { BrandMark, InfoHint, quotaTone } from './picker-atoms.js'
@@ -263,7 +263,7 @@ export const FallbacksSection = (props: {
       brand: routeModel === undefined ? undefined : ModelPickerModel.brandFor({ model: routeModel }),
       account: label.provider,
       tag: props.accountBadges?.get(route.provider) ?? ModelPickerModel.accountTag({ name: label.provider }),
-      color: props.accountAccents.get(route.provider) ?? accountColor({ instanceId: route.provider }),
+      color: props.accountAccents.get(route.provider) ?? AccountColor.of({ instanceId: route.provider }),
       quota: ModelPickerModel.quota(usage.data?.cards.find(card => card.instanceId === route.provider)),
       serving: snapshot.active !== null && snapshot.active.provider === route.provider && snapshot.active.model === route.model,
     }

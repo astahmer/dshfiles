@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { accountAccents, accountColor, DOT_DARK, DOT_LIGHT, hueOfHex, luminanceOfOklch } from '../src/account-color.js'
+import { AccountColor } from '../src/account-color.js'
+
+const { accents: accountAccents, of: accountColor, DARK: DOT_DARK, LIGHT: DOT_LIGHT, hueOfHex, luminanceOfOklch } = AccountColor
 import { ModelPickerModel } from '../src/model-picker-model.js'
 
 describe('accounts are told apart (council picker N2)', () => {

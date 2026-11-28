@@ -1,7 +1,7 @@
 import { useId, useRef, type KeyboardEvent } from 'react'
 import { CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountColor, type AccountAccent } from './account-color.js'
+import { AccountColor, type AccountAccent } from './account-color.js'
 import { AccountDot } from './account-dot.js'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { quotaTone } from './picker-atoms.js'
@@ -70,7 +70,7 @@ export const AccountRows = (props: {
               tabIndex={checked || (selectedIndex < 0 && index === 0) ? 0 : -1}
               type="button"
             >
-              <AccountDot accent={props.accents.get(account.id) ?? accountColor({ instanceId: account.id })} className="dshx:size-2" />
+              <AccountDot accent={props.accents.get(account.id) ?? AccountColor.of({ instanceId: account.id })} className="dshx:size-2" />
               <span className="dshx:min-w-0 dshx:flex-1 dshx:truncate">{account.name}</span>
               {/* Round 3 R18: without any quota (no heading) the column is gone, not a column of dashes. */}
               {heading === undefined ? null : (

@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@dshfi
 import { ArrowLeftRightIcon, ChevronDownIcon, CpuIcon, LoaderCircleIcon, XIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { useHostConnection } from '@dshfiles/plugin-ui/lib/host-connection'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { accountAccents, accountColor } from './account-color.js'
+import { AccountColor } from './account-color.js'
 import { AccountDot } from './account-dot.js'
 import { ListEmptyState } from './empty-state.js'
 import { FanOutSelection } from './fan-out-bar.js'
@@ -120,7 +120,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
     [usage.data],
   )
   // N2: a distinct dot per account within one service, and the account's own short tag ("CC2").
-  const accountAccentMap = useMemo(() => accountAccents(profiles.data?.accounts ?? []), [profiles.data])
+  const accountAccentMap = useMemo(() => AccountColor.accents(profiles.data?.accounts ?? []), [profiles.data])
   const fanOutTagOf = (provider: string): string =>
     accountBadges.get(provider) ?? ModelPickerModel.accountTag({ name: state.groups.find(group => group.id === provider)?.name ?? provider })
   const accountBadges = useMemo(
@@ -322,7 +322,7 @@ export const ModelEffortPicker = ({ locked, available, directory, load, select, 
                         {shortLabel.offDefault === true ? (
                           <span className="dshx:flex" data-model-picker-account-dot>
                             <AccountDot
-                              accent={accountAccentMap.get(current.provider) ?? accountColor({ instanceId: current.provider })}
+                              accent={accountAccentMap.get(current.provider) ?? AccountColor.of({ instanceId: current.provider })}
                               className="dshx:size-1.5"
                             />
                           </span>

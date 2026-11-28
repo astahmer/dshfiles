@@ -12,19 +12,22 @@ export interface AccountAccent {
 }
 
 /** Lightness and chroma per scheme: 4.5:1+ on the light wash, 6:1+ on the dark one (tests/account-identity.spec.ts). */
-export const DOT_LIGHT = { l: 0.52, c: 0.12 } as const
-export const DOT_DARK = { l: 0.76, c: 0.11 } as const
+const DOT_LIGHT = { l: 0.52, c: 0.12 } as const
+const DOT_DARK = { l: 0.76, c: 0.11 } as const
 
 /** Hue steps for a service's accounts, in order: any two of the first six are at least 60° apart. */
-export const HUE_STEPS = [0, 120, 240, 60, 180, 300] as const
+const HUE_STEPS = [0, 120, 240, 60, 180, 300] as const
 
 const HEX_COLOR = /^#[0-9a-f]{6}$/iu
 
 const toLinear = (channel: number): number => (channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
 
 /** OKLCH hue of an sRGB hex colour. */
-export const hueOfHex = (hex: string): number => {
-  const [r, g, b] = [1, 3, 5].map(at => toLinear(Number.parseInt(hex.slice(at, at + 2), 16) / 255)) as [number, number, number]
+const hueOfHex = (hex: string): number => {
+  const channel = (at: number): number => toLinear(Number.parseInt(hex.slice(at, at + 2), 16) / 255)
+  const r = channel(1)
+  const g = channel(3)
+  const b = channel(5)
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
   const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
@@ -34,7 +37,7 @@ export const hueOfHex = (hex: string): number => {
 }
 
 /** Relative luminance (WCAG) of an OKLCH colour, clipped into sRGB as the browser draws it. */
-export const luminanceOfOklch = (input: { readonly l: number; readonly c: number; readonly h: number }): number => {
+const luminanceOfOklch = (input: { readonly l: number; readonly c: number; readonly h: number }): number => {
   const rad = (input.h * Math.PI) / 180
   const a = input.c * Math.cos(rad)
   const b = input.c * Math.sin(rad)
@@ -64,14 +67,14 @@ const accentAt = (hue: number): AccountAccent => {
 }
 
 /** The dot of an account the picker has no profile for: a stable hue from its id. */
-export const accountColor = ({ instanceId, accentColor }: { readonly instanceId: string; readonly accentColor?: string | undefined }): AccountAccent =>
+const accountColor = ({ instanceId, accentColor }: { readonly instanceId: string; readonly accentColor?: string | undefined }): AccountAccent =>
   accentAt(accentColor !== undefined && HEX_COLOR.test(accentColor) ? hueOfHex(accentColor) : hashHue(instanceId))
 
 /**
  * Every account's dot. A service's first account keeps its accent's hue (AI Accounts' kind accent, or the user's), and
  * each later account of that service steps round the wheel (HUE_STEPS), so no two accounts of one service look alike.
  */
-export const accountAccents = (
+const accountAccents = (
   profiles: readonly { readonly instanceId: string; readonly kind: string; readonly accentColor?: string | undefined }[],
 ): ReadonlyMap<string, AccountAccent> => {
   const accents = new Map<string, AccountAccent>()
@@ -87,4 +90,19 @@ export const accountAccents = (
     accents.set(profile.instanceId, accentAt(kind.base + step + 30 * Math.floor((kind.count - 1) / HUE_STEPS.length)))
   }
   return accents
+}
+
+/** The picker's account dots (round 3 R9): one place for the rule and the colour maths its tests check. */
+export class AccountColor {
+  /** Dot lightness and chroma in light and dark. */
+  static readonly LIGHT = DOT_LIGHT
+  static readonly DARK = DOT_DARK
+  /** Hue steps for a service's accounts. */
+  static readonly HUE_STEPS = HUE_STEPS
+  static readonly hueOfHex = hueOfHex
+  static readonly luminanceOfOklch = luminanceOfOklch
+  /** The dot of one account, from its accent or its id. */
+  static readonly of = accountColor
+  /** Every account's dot, a service's accounts spaced round the wheel. */
+  static readonly accents = accountAccents
 }
