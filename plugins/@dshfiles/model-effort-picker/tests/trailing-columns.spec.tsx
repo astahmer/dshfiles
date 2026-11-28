@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { TooltipProvider } from '@dshfiles/plugin-ui/components/ui/tooltip'
-import { AccountColor } from '../src/account-color.js'
+import { AccountColor } from '@dshfiles/ai-accounts/account-color'
 import { ModelRow } from '../src/model-row.js'
 
 const row = (input: { readonly active?: boolean; readonly fastOn?: boolean }): string =>

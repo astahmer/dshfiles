@@ -9,8 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@dshfiles/plugin-ui/components/ui/select'
 import { ChevronRightIcon, EllipsisIcon, PlusIcon, Undo2Icon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { AccountColor, type AccountAccent } from './account-color.js'
-import { AccountDot } from './account-dot.js'
+import { AccountColor, AccountDot, type AccountAccent } from '@dshfiles/ai-accounts/account-color'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { BrandMark, InfoHint, quotaTone } from './picker-atoms.js'
 

@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { AccountColor } from '../src/account-color.js'
+import { AccountColor } from '@dshfiles/ai-accounts/account-color'
 
 const { of: accountColor, hueOfHex } = AccountColor
 import { EFFORT_BAR_COUNT, effortGlyph } from '../src/effort-levels.js'

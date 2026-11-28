@@ -1,8 +1,7 @@
 import { useId, useRef, type KeyboardEvent } from 'react'
 import { CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import { AccountColor, type AccountAccent } from './account-color.js'
-import { AccountDot } from './account-dot.js'
+import { AccountColor, AccountDot, type AccountAccent } from '@dshfiles/ai-accounts/account-color'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { quotaTone } from './picker-atoms.js'
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AccountColor } from '../src/account-color.js'
+import { AccountColor } from '@dshfiles/ai-accounts/account-color'
 
 const { accents: accountAccents, of: accountColor, DARK: DOT_DARK, LIGHT: DOT_LIGHT, hueOfHex, luminanceOfOklch } = AccountColor
 import { ModelPickerModel } from '../src/model-picker-model.js'

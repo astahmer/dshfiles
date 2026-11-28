@@ -4,7 +4,7 @@ import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/typ
 import { Button } from '@dshfiles/plugin-ui/components/ui/button'
 import { ArrowLeftIcon, CheckIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import type { AccountAccent } from './account-color.js'
+import type { AccountAccent } from '@dshfiles/ai-accounts/account-color'
 import { AccountRows } from './account-rows.js'
 import { ModelPickerModel, type InspectedRoute, type ModelQuota, type PriorityAccount } from './model-picker-model.js'
 import { EffortControl } from './effort-control.js'

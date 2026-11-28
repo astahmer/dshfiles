@@ -3,8 +3,7 @@ import type { ModelDirectoryState } from '@deepseek-ai/dsh-client-ui-model-selec
 import type { ModelSelection } from '@deepseek-ai/dsh-api-session-controller/types'
 import { CheckIcon, ChevronRightIcon, ZapIcon } from '@dshfiles/plugin-ui/icons'
 import { cn } from '@dshfiles/plugin-ui/lib/utils'
-import type { AccountAccent } from './account-color.js'
-import { AccountDot } from './account-dot.js'
+import { AccountDot, type AccountAccent } from '@dshfiles/ai-accounts/account-color'
 import { ModelPickerModel, type ModelQuota } from './model-picker-model.js'
 import { BrandMark, QuotaText, TruncatedTooltip } from './picker-atoms.js'
 
